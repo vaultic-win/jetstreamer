@@ -67,7 +67,15 @@ fn guard_walk_start(base: &Path, started: &Value, intent: &Value) -> Result<()> 
 }
 
 fn pinned_semantic_owner(export: &str) -> Result<()> {
-    let (iid, handoff, key, family_name, family_hash) = if cfg!(incident_v5q_136_post145_only) {
+    let (iid, handoff, key, family_name, family_hash) = if cfg!(incident_v5r_136_post145_only) {
+        (
+            "8f2b9c06b62147babe83c9ade7271cd3",
+            "v5r-name-handoff",
+            "encoded_prefix_custody",
+            "v5r-name-handoff/ACTUAL_ADVANCING_AND_136_CUSTODY.json",
+            "1343de96384e52ff061262a2d80c217d187a1fc8b0ce0e07e32940ee88e89b3b",
+        )
+    } else if cfg!(incident_v5q_136_post145_only) {
         (
             "cbacb5a17e6347509640846eccb95cb0",
             "v5q-name-handoff",
@@ -141,6 +149,7 @@ fn pinned_semantic_owner(export: &str) -> Result<()> {
 
 pub(crate) fn semantic_owner(export: &str) -> Result<()> {
     if cfg!(any(
+        incident_v5r_136_post145_only,
         incident_v5q_136_post145_only,
         incident_v5o_136_post145_only
     )) {

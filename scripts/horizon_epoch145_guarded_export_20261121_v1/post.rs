@@ -7,7 +7,9 @@ use std::os::unix::fs::PermissionsExt;
 #[cfg(not(incident_timeout_post145_only))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7/export145";
 #[cfg(incident_fixture_post145_only)]
-pub(super) const INCIDENT_POST_IMAGE: &str = if cfg!(incident_v5q_136_post145_only) {
+pub(super) const INCIDENT_POST_IMAGE: &str = if cfg!(incident_v5r_136_post145_only) {
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13l/export145"
+} else if cfg!(incident_v5q_136_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13k/export145"
 } else if cfg!(incident_v5o_136_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13j/export145"

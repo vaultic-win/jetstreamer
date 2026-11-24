@@ -12,6 +12,7 @@ case "$(dirname "$(realpath -e -- "$0")")" in
     "${pkg%/*}/tools-v13i") pkg="${pkg%/*}/tools-v13i" ;;
     "${pkg%/*}/tools-v13j") pkg="${pkg%/*}/tools-v13j" ;;
     "${pkg%/*}/tools-v13k") pkg="${pkg%/*}/tools-v13k" ;;
+    "${pkg%/*}/tools-v13l") pkg="${pkg%/*}/tools-v13l" ;;
     "${pkg%/*}/tools-v13g") pkg="${pkg%/*}/tools-v13g" ;;
     "${pkg%/*}/tools-v13f") pkg="${pkg%/*}/tools-v13f" ;;
     "${pkg%/*}/tools-v13e") pkg="${pkg%/*}/tools-v13e" ;;
@@ -49,7 +50,7 @@ publish)
     ;;
 *) exit 2 ;;
 esac
-if [[ $pkg == */tools-v13d || $pkg == */tools-v13e || $pkg == */tools-v13f || $pkg == */tools-v13g || $pkg == */tools-v13h || $pkg == */tools-v13i || $pkg == */tools-v13j || $pkg == */tools-v13k ]]; then
+if [[ $pkg == */tools-v13d || $pkg == */tools-v13e || $pkg == */tools-v13f || $pkg == */tools-v13g || $pkg == */tools-v13h || $pkg == */tools-v13i || $pkg == */tools-v13j || $pkg == */tools-v13k || $pkg == */tools-v13l ]]; then
     version=v1
     if [[ $pkg == */tools-v13e ]]; then version=v2; fi
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5j-$version/post-stop-fit
@@ -66,6 +67,10 @@ if [[ $pkg == */tools-v13d || $pkg == */tools-v13e || $pkg == */tools-v13f || $p
     fi
     if [[ $pkg == */tools-v13k ]]; then
         provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5q-136-v1/post-stop-fit
+        provider_args+=(--post-submission)
+    fi
+    if [[ $pkg == */tools-v13l ]]; then
+        provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5r-136-v1/post-stop-fit
         provider_args+=(--post-submission)
     fi
     if [[ $pkg == */tools-v13g ]]; then provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5m-v1/post-stop-fit; fi

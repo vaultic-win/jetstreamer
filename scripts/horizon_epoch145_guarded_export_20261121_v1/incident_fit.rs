@@ -34,7 +34,9 @@ const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-repla
 #[cfg(all(incident_timer145_only, not(incident_fixture145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit";
 #[cfg(incident_fixture_post145_only)]
-const PROVIDER: &str = if cfg!(incident_v5q_136_post145_only) {
+const PROVIDER: &str = if cfg!(incident_v5r_136_post145_only) {
+    "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5r-136-v1/post-stop-fit"
+} else if cfg!(incident_v5q_136_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5q-136-v1/post-stop-fit"
 } else if cfg!(incident_v5o_136_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5o-136-v1/post-stop-fit"
@@ -1548,7 +1550,9 @@ mod tests {
             let (_, before) = original(&price, 32 << 20).unwrap();
             assert_eq!(before["fleet"], json!(binding));
             if cfg!(incident_v5j_retry1_post145_only) {
-                let (directory, predecessor) = if cfg!(incident_v5q_136_post145_only) {
+                let (directory, predecessor) = if cfg!(incident_v5r_136_post145_only) {
+                    ("v5r-name-handoff", "cbacb5a17e6347509640846eccb95cb0")
+                } else if cfg!(incident_v5q_136_post145_only) {
                     ("v5q-name-handoff", "c01dc3ba08b74e3aa0d4b531601e9fda")
                 } else if cfg!(incident_v5o_136_post145_only) {
                     ("v5o-name-handoff", "f86e7e61f4b34dc7aedc4e08a128e713")
@@ -1568,17 +1572,24 @@ mod tests {
                     original(&handoff.join("submission-result.json"), 1 << 20).unwrap();
                 let (_, intent) =
                     original(&handoff.join("submission-intent.json"), 16 << 20).unwrap();
-                assert_eq!(intent["original"]["INVOCATION_ID"], predecessor);
-                assert_eq!(intent["argv"], started["argv"]);
+                let (original, argv) = if cfg!(incident_v5r_136_post145_only) {
+                    (&intent["incumbent"], &intent["successor_argv"])
+                } else {
+                    (&intent["original"], &intent["argv"])
+                };
+                assert_eq!(
+                    original["InvocationID"]
+                        .as_str()
+                        .or_else(|| original["INVOCATION_ID"].as_str()),
+                    Some(predecessor)
+                );
+                assert_eq!(argv, &started["argv"]);
                 assert_eq!(before["phase145"]["stage"], "leased-worker");
                 assert_eq!(
                     before["phase145"]["invocation_id"],
                     started["invocation_id"]
                 );
-                assert_ne!(
-                    started["invocation_id"],
-                    intent["original"]["INVOCATION_ID"]
-                );
+                assert_ne!(started["invocation_id"], predecessor);
             } else if cfg!(incident_status_owner145_only) {
                 let phase = &before["phase145"];
                 let (iid, failed, recovered, terminal_key, terminal) =
