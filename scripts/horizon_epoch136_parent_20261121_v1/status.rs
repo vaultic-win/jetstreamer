@@ -119,7 +119,12 @@ fn verify_bridge() -> Result<()> {
         SELECTED.get_or_init(|| PREFIX_PKG) == &PREFIX_PKG,
         "changed 136 transport package"
     );
-    let (action, ready_path) = if cfg!(feature = "v5q-semantic") {
+    let (action, ready_path) = if cfg!(feature = "v5r-semantic") {
+        (
+            "v5r-owner",
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch145-v5r-136-dispatch-20261124-v1/READY.json",
+        )
+    } else if cfg!(feature = "v5q-semantic") {
         (
             "v5q-owner",
             "/var/lib/jetstreamer/horizon_runtime_data/epoch145-v5q-136-dispatch-20261124-v1/READY.json",
@@ -266,7 +271,11 @@ fn bridge_timeout(op: &str, body: &Value, seconds: u64) -> Result<Value> {
     #[cfg(all(feature = "v5o-semantic", not(feature = "v5q-semantic")))]
     c.arg("v5o");
     #[cfg(feature = "v5q-semantic")]
-    c.arg("v5q");
+    c.arg(if cfg!(feature = "v5r-semantic") {
+        "v5r"
+    } else {
+        "v5q"
+    });
     let mut c = c
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

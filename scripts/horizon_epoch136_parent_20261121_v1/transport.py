@@ -23,7 +23,7 @@ data = json.load(sys.stdin)
 
 def provider():
     profile = sys.argv[4] if len(sys.argv) == 5 else "v5n"
-    assert profile in ("v5n", "v5o", "v5q")
+    assert profile in ("v5n", "v5o", "v5q", "v5r")
     root = base / "incident-replay-fit-20261121-v1" / f"tools-homefloor-145-post-{profile}-136-v1"
     seal = checked(dict(path=str(root / "deployment-seal-receipt.json"), sha256=sys.argv[3]))
     assert seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1" and seal["destination"] == str(root)
@@ -62,12 +62,12 @@ def registered_head(ref):
     raise ValueError("too many cadence successors")
 
 
-if action in ("v5n-owner", "v5o-owner", "v5q-owner"):
+if action in ("v5n-owner", "v5o-owner", "v5q-owner", "v5r-owner"):
     assert sys.argv[4:] == ([] if action == "v5n-owner" else [action[:3]])
     # The live Python owner holds the same kernel lock as earlier Bash owners.
     print(json.dumps(provider()["registered_status"](), sort_keys=True))
 elif action == "head" and len(sys.argv) >= 4:
-    assert sys.argv[4:] in ([], ["v5o"], ["v5q"])
+    assert sys.argv[4:] in ([], ["v5o"], ["v5q"], ["v5r"])
     print(json.dumps(registered_head(data["fleet"]), sort_keys=True))
 elif action == "head":
     ref = data["fleet"]
