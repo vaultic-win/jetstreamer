@@ -349,9 +349,15 @@ pub(super) fn activate(stage_sha: &str, fleet: &str, fleet_sha: &str) -> Result<
         return from_ref(&bound(&result)?);
     }
     let intent = dir.join("submission-intent.json");
+    // The fit provider requires the donor lock to be free. Retake the snapshot
+    // of both owners and the frozen inode after acquiring it for the transition.
+    let live_quote = if intent.try_exists()? {
+        None
+    } else {
+        Some(inspect(stage_sha, fleet, fleet_sha)?)
+    };
     let writer = writer_lock()?;
-    if !intent.try_exists()? {
-        let quote = inspect(stage_sha, fleet, fleet_sha)?;
+    if let Some(quote) = live_quote {
         ensure!(
             current_owners()?
                 == (
@@ -413,6 +419,8 @@ pub(super) fn activate(stage_sha: &str, fleet: &str, fleet_sha: &str) -> Result<
             "frozen candidate changed while the incumbent stopped"
         );
     }
+    // The successor uses the same donor-custody observation during its first fit.
+    drop(writer);
     let witness = submit_successor(&dir, E, INCUMBENT, after, &argv, &argv[tail..])?;
     let receipt = json!({
         "schema":"horizon-145-encoded-prefix-submission-v1",
@@ -422,7 +430,6 @@ pub(super) fn activate(stage_sha: &str, fleet: &str, fleet_sha: &str) -> Result<
         "publication_authorized":false,"r2_mutations":false
     });
     platform::save(&result, &receipt)?;
-    drop(writer);
     Ok(receipt)
 }
 
