@@ -1,0 +1,175 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -56,18 +56,31 @@
+ import guarded_replays
+ import publication_handoff
+ import staged211
++import staged247
+ from seven_status import publisher_fields, verify_publisher
+-definitions, successor_211 = publication_handoff.select_roster()
++definitions, successor_211, successor_247 = publication_handoff.select_roster()
+ if successor_211 is not None:
+     assert roster[211] == successor_211['predecessor']
+     roster[211] = successor_211['claim']
+     current = staged211.adopt_status(statuses.get(211), successor_211)
+     if current is not None:
+         statuses[211] = current
++if successor_247:
++    assert roster[247] == successor_247['predecessor']
++    roster[247] = successor_247['claim']
++    current = staged247.adopt_status(statuses.get(247), successor_247)
++    if current is not None:
++        statuses[247] = current
+ all_claims = dict(roster)
+
++def claim_key(epoch):
++    if epoch == 247:
++        return 'delivery247_pinned_claim' if successor_247 else 'successor247_claim'
++    return f'delivery{epoch}_claim'
++
+ def observe_image():
+-    return Path(successor_211['observer']['path']) if successor_211 else image('jetstreamer-horizon-observe')
++    successor = successor_247 or successor_211
++    return Path(successor['observer']['path']) if successor else image('jetstreamer-horizon-observe')
+
+ closed = {}
+ # Immutable fallback receipts for the failed public-playback invocations.
+@@ -92,7 +105,7 @@
+
+ def register_failed():
+     for e, sha in repair_status_digests.items():
+-        if e == 211 and successor_211:
++        if (e == 211 and successor_211) or (e == 247 and successor_247):
+             continue
+         status = {'path':str(repair_root/str(e)/'completion.json'),'sha256':sha}
+         receipt = bound(status)
+@@ -144,6 +157,10 @@
+ cfg.update(bound(ref(T/'observer-config-fields.json')))
+ if successor_211:
+     cfg['delivery211_claim'] = successor_211['configuration']
++if successor_247:
++    cfg.pop('successor247_claim', None)
++    cfg['staged247_resource_only'] = False
++    cfg['delivery247_pinned_claim'] = successor_247['configuration']
+ assert not cfg['replays']
+ cfg['replays']=guarded_replays.config()
+ cfg.update(previous_sample=str(old),output=str(obs),not_before_utc=utc(math.ceil(next_time)))
+@@ -152,22 +169,24 @@
+ suffix = '-terminal-' + '-'.join(map(str,sorted(failed))) if failed else ''
+ if successor_211:
+     suffix += '-staged211'
++if successor_247:
++    suffix += '-pinned247'
+ config_path = out/f'config{suffix}.json'
+ preflight_path = out/f'preflight{suffix}.json'
+ for e in failed:
+-    cfg.pop('successor247_claim' if e == 247 else f'delivery{e}_claim',None)
++    cfg.pop(claim_key(e),None)
+     if e == 247: cfg['staged247_resource_only'] = False
+ if config_path.exists():
+     saved = bound(ref(config_path))
+     cfg['replays'] = saved['replays']
+     for e in closed:
+-        key = 'successor247_claim' if e == 247 else f'delivery{e}_claim'
++        key = claim_key(e)
+         if key not in saved: cfg.pop(key, None)
+         else: assert saved[key] == cfg[key]
+         if e == 247: cfg['staged247_resource_only'] = saved['staged247_resource_only']
+ else:
+     for e in closed:
+-        key = 'successor247_claim' if e == 247 else f'delivery{e}_claim'
++        key = claim_key(e)
+         cfg.pop(key, None)
+         if e == 247: cfg['staged247_resource_only'] = False
+ config=record(config_path,cfg)
+@@ -194,7 +213,7 @@
+     assert sample['cadence']['previous_sample_sha256']==ref(old)['sha256'] and sample['cadence']['routine_minimum_interval_enforced']
+     rows=sample['delivery_resources']
+     check_roster()
+-    expected = {e for e in all_claims if cfg.get('successor247_claim' if e == 247 else f'delivery{e}_claim')}
++    expected = {e for e in all_claims if cfg.get(claim_key(e))}
+     assert {r['range'] for r in rows} == {f'{e}-{e}' for e in expected} and len(rows)==len(expected)
+     assert set(roster) <= expected
+     for e in expected & set(closed):
+@@ -384,8 +403,20 @@
+         gate = plan['gates']['211']
+         add(gate, successor_211['registration'], successor_211['predecessor_status'],
+             successor_211['initial_status'], successor_211['claim'], successor_211['spec'], *claim['evidence'])
++    if successor_247:
++        claim = bound(successor_247['claim'])
++        existing = [row for row in plan['pipeline_claims'] if row['unit'] == claim['unit']]
++        assert not existing or existing == [claim]
++        if not existing:
++            plan['pipeline_claims'].append(claim)
++        if claim['unit'] not in plan['tracked_units']:
++            plan['tracked_units'].append(claim['unit'])
++        add(plan['gates']['247'], successor_247['registration'], successor_247['predecessor_status'],
++            successor_247['claim'], successor_247['spec'], *claim['evidence'])
+     guarded_replays.gate(plan,cfg['replays'])
+     fleet_image = register_226(plan)
++    if successor_247:
++        fleet_image = staged247.fleet_image()
+     binding=record(out/f'seven-owner-plan-{cohort}.json',plan)
+     target=Path(plan['output'])
+     if not target.exists():
+@@ -461,6 +492,8 @@
+                  independently_verified_count=None)
+     if successor_211:
+         state['staged_211_registration'] = successor_211['registration']
++    if successor_247:
++        state['pinned_247_registration'] = successor_247['registration']
+     return state
+
+ def refresh_statuses():
+--- a/publication_handoff.py
++++ b/publication_handoff.py
+@@ -11,6 +11,7 @@
+
+ from ordinary249.delivery248 import aws, bound, props, ref
+ import staged211
++import staged247
+
+ PACKAGE = Path("/var/lib/jetstreamer/foundation-handoff-v232-a1")
+ STATE = Path("/home/ubuntu/.jetstreamer-private/foundation-publication-handoffs-v232")
+@@ -164,13 +165,16 @@
+     successor = staged211.load(definitions["211"])
+     if successor is not None:
+         definitions["211"] = dict(definitions["211"], claim=successor["claim"], spec=successor["spec"])
+-    return definitions, successor
++    pinned = staged247.load(definitions["247"])
++    if pinned is not None:
++        definitions["247"] = dict(definitions["247"], claim=pinned["claim"], spec=pinned["spec"])
++    return definitions, successor, pinned
+
+
+ def collect(all_claims, statuses, out, record, definitions=None):
+     """Called while the sole cadence owner holds its cycle lock."""
+     if definitions is None:
+-        definitions, _ = select_roster()
++        definitions, _, _ = select_roster()
+     assert {int(n): row["claim"] for n, row in definitions.items()} == all_claims
+     closed = {}
+     for epoch, claim_ref in all_claims.items():
+--- a/native_binding_replays.py
++++ b/native_binding_replays.py
+@@ -9,8 +9,10 @@
+ import publication_handoff
+ sample_publishers=[r for r in f['active'] if str(r['epoch']) in states['active_claims']]
+ import staged211
+-definitions, successor_211 = publication_handoff.select_roster()
++import staged247
++definitions, successor_211, successor_247 = publication_handoff.select_roster()
+ assert states.get('staged_211_registration') == (successor_211['registration'] if successor_211 else None)
++assert states.get('pinned_247_registration') == (successor_247['registration'] if successor_247 else None)
+ original={int(k):v['claim'] for k,v in definitions.items()}
+ assert {r['epoch'] for r in sample_publishers}==set(map(int,states['active_claims'])) and len(sample_publishers)==len(states['active_claims'])
+ import guarded_replays
+@@ -46,6 +48,8 @@
+     if not model.exists():funds.put(model,v)
+     assert bound(ref(model))==v
+     status_tool=staged211.status_image() if e==211 and successor_211 else tool
++    if e==247 and successor_247:
++        status_tool=staged247.fleet_image()
+     cmd=[status_tool,'status-publish-pipeline',model,'--plan-sha256',ref(model)['sha256']]
+     if not (wd/'check.json').exists():
+         r=sp.run([*cmd,'--check-only'],capture_output=True,text=True)
