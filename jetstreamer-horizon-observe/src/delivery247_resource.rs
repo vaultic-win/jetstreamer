@@ -25,7 +25,7 @@ impl Owner<'_> {
     fn range(&self) -> &'static str {
         match self.unit {
             UNIT211 | STAGED211 | STAGED211_RETRY => "211-211",
-            UNIT248 => "248-248",
+            UNIT248 | STAGED248 => "248-248",
             UNIT249 => "249-249",
             UNIT250 | STAGED250 => "250-250",
             UNIT251 => "251-251",
@@ -476,6 +476,9 @@ const PINNED247: &str = "horizon-upload-247-pinned-public-v254.service";
 const PINNED247_ETAG: &str = "c1be2474b6c9ba8d0ac11405a97ebee3-2688";
 const PINNED247_BYTES: &str = "180370916960";
 const UNIT248: &str = "horizon-upload-248-ordinary-v213.service";
+const STAGED248: &str = "horizon-upload-248-staged-public-v259.service";
+const STAGED248_ETAG: &str = "0da9fae324ac4bc403de9553a8110bef-2787";
+const STAGED248_BYTES: &str = "186974189938";
 const IMAGE248: &str = "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/jetstreamer-r2";
 const SHA248: &str = "c1e99ad4b2e7f3fe56235f42a722bbe93e3f13af2003d0eb5a150553ae0a660e";
 #[derive(Clone, Copy)]
@@ -485,6 +488,7 @@ pub(super) enum OrdinaryEpoch {
     Staged211Retry,
     Pinned247,
     Epoch248,
+    Staged248,
     Epoch249,
     Epoch250,
     Staged250,
@@ -497,7 +501,7 @@ impl OrdinaryEpoch {
         match self {
             Self::Epoch211 | Self::Staged211 | Self::Staged211Retry => 211,
             Self::Pinned247 => 247,
-            Self::Epoch248 => 248,
+            Self::Epoch248 | Self::Staged248 => 248,
             Self::Epoch249 => 249,
             Self::Epoch250 | Self::Staged250 => 250,
             Self::Epoch251 => 251,
@@ -511,6 +515,7 @@ impl OrdinaryEpoch {
             Self::Staged211Retry => STAGED211_RETRY,
             Self::Pinned247 => PINNED247,
             Self::Epoch248 => UNIT248,
+            Self::Staged248 => STAGED248,
             Self::Epoch249 => UNIT249,
             Self::Epoch250 => UNIT250,
             Self::Staged250 => STAGED250,
@@ -521,9 +526,11 @@ impl OrdinaryEpoch {
     }
     fn image(self) -> (&'static str, &'static str) {
         match self {
-            Self::Staged211 | Self::Staged211Retry | Self::Pinned247 | Self::Staged250 => {
-                (STAGED211_IMAGE, STAGED211_IMAGE_SHA)
-            }
+            Self::Staged211
+            | Self::Staged211Retry
+            | Self::Pinned247
+            | Self::Staged248
+            | Self::Staged250 => (STAGED211_IMAGE, STAGED211_IMAGE_SHA),
             _ => (IMAGE248, SHA248),
         }
     }
@@ -534,6 +541,7 @@ impl OrdinaryEpoch {
             Self::Staged211Retry => PUBLISHED211_PLAN_SHA,
             Self::Pinned247 => "6c6f7a3880a5c5e511575e7f51d9feb8ff26a52fe922d088bdecdc3c00c72a8e",
             Self::Epoch248 => "3053ed2ca2b2881f2d83855c0fa1cff6e63618387dfb630c76a3db7a2dc7d1fd",
+            Self::Staged248 => "855f77c457d19a502a54129443b59798d93465bc601712b27580d04da0263c45",
             Self::Epoch250 => "12e68ddf9b6d2505b6090688b5a3cfa4e720242b264cf2a6e7993b9b02f910c2",
             Self::Staged250 => "e96999d456f560fcdc1e1c2c29d11bb4fac9adde7d127542112fe77451c49aa0",
             Self::Epoch251 => "1c815780661e8b502634caff4a2b0d783e831fccc27c612d6a94c3480d00e318",
@@ -548,6 +556,7 @@ impl OrdinaryEpoch {
             (_, None) => Ok(self),
             (Self::Epoch211, Some(STAGED211)) => Ok(Self::Staged211),
             (Self::Epoch211, Some(STAGED211_RETRY)) => Ok(Self::Staged211Retry),
+            (Self::Epoch248, Some(STAGED248)) => Ok(Self::Staged248),
             (Self::Epoch250, Some(STAGED250)) => Ok(Self::Staged250),
             (Self::Epoch265, Some(RETRY265)) => Ok(Self::Retry265),
             _ => anyhow::bail!("unknown retry unit for ordinary epoch {}", self.number()),
@@ -595,6 +604,11 @@ impl OrdinaryEpoch {
                 "/home/ubuntu/.jetstreamer-private/current-reader-delivery-250-staged-published-v257/receipts".to_owned(),
                 "/var/lib/jetstreamer/horizon250-staged-published-v257/epoch-250-plan.json".to_owned(),
             ),
+            Self::Staged248 => (
+                "/home/ubuntu/.jetstreamer-private/qualification-248-reboot-20261117-v1/output".to_owned(),
+                "/home/ubuntu/.jetstreamer-private/current-reader-delivery-248-staged-recovery-v258/receipts".to_owned(),
+                "/var/lib/jetstreamer/horizon248-staged-recovery-v258/epoch-248-plan.json".to_owned(),
+            ),
             Self::Epoch248 | Self::Epoch249 | Self::Epoch250 => (
                 format!("/home/ubuntu/.jetstreamer-private/qualification-{epoch}-reboot-20261117-v1/output"),
                 format!("/home/ubuntu/.jetstreamer-private/current-reader-delivery-{epoch}-20261119-v2/receipts"),
@@ -619,6 +633,7 @@ impl OrdinaryEpoch {
         let staged_pin = match self {
             Self::Staged211 | Self::Staged211Retry => Some((STAGED211_ETAG, STAGED211_BYTES)),
             Self::Pinned247 => Some((PINNED247_ETAG, PINNED247_BYTES)),
+            Self::Staged248 => Some((STAGED248_ETAG, STAGED248_BYTES)),
             Self::Staged250 => Some((STAGED250_ETAG, STAGED250_BYTES)),
             _ => None,
         };
@@ -686,6 +701,7 @@ impl DeliveryClaim {
                     OrdinaryEpoch::Staged211
                         | OrdinaryEpoch::Staged211Retry
                         | OrdinaryEpoch::Pinned247
+                        | OrdinaryEpoch::Staged248
                         | OrdinaryEpoch::Staged250
                 ) || (command.ends_with(" }") && command.matches("{ path=").count() == 1)),
             "ordinary delivery unexpected uploader command"
@@ -892,6 +908,23 @@ mod tests {
                 STAGED250_BYTES,
             ]
         );
+    }
+    #[test]
+    fn staged_248_keeps_its_archive_pin_across_the_retry() {
+        let claim = DeliveryClaim {
+            retry_unit: Some(STAGED248.into()),
+            invocation_id: "a".repeat(32),
+            pid: 1234,
+            claim_sha256: "b".repeat(64),
+        };
+        let retry = OrdinaryEpoch::Epoch248.select(&claim).unwrap();
+        assert!(OrdinaryEpoch::Epoch250.select(&claim).is_err());
+        assert_ne!(retry.claim_path(), OrdinaryEpoch::Epoch248.claim_path());
+        let args = retry.argv();
+        assert_eq!(args[2], OrdinaryEpoch::Epoch248.argv()[2]);
+        assert_eq!(args[10], retry.digest());
+        assert_eq!(args[14], STAGED248_ETAG);
+        assert_eq!(args[16], STAGED248_BYTES);
     }
     #[test]
     fn custody_retry_211_pins_the_published_reader_without_reusing_the_old_claim() {

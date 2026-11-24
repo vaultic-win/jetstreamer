@@ -17,6 +17,7 @@ from ordinary249.delivery248 import aws, bound, props, ref
 import publication_handoff
 from seven_status import publisher_fields, verify_publisher
 import staged211retry
+import staged248
 import staged250
 from staged250 import PROFILE
 from staged211 import sealed
@@ -112,7 +113,7 @@ def preflight(profile):
     assert not profile.registration.exists()
     if profile.epoch == 211:
         staged211retry.prior_drained(staged_211)
-    else:
+    elif profile.epoch == 250:
         assert staged_250 is None
     original = definitions[str(profile.epoch)]
     previous = bound(original["claim"])
@@ -126,6 +127,10 @@ def preflight(profile):
 
     release = sealed(profile.package / "acceptance.json")
     proof = bound(release)
+    if profile.epoch == 248:
+        recovery = bound(proof["range_recovery"])
+        assert recovery["epoch"] == profile.epoch and recovery["archive_etag"] == profile.etag
+        assert recovery["archive_length"] == profile.size and not recovery["sidecar_authorized"]
     if profile.epoch == 211:
         repair = bound(proof["custody_repair"])
         expected = bound(repair["expectation"])["independent_evidence"]
@@ -230,9 +235,10 @@ def launch(profile):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--check-only", action="store_true")
-    parser.add_argument("--epoch", type=int, choices=(211, 250), default=250)
+    profiles = {211: staged211retry.PROFILE, 248: staged248.PROFILE, 250: PROFILE}
+    parser.add_argument("--epoch", type=int, choices=profiles, default=250)
     args = parser.parse_args()
-    profile = staged211retry.PROFILE if args.epoch == 211 else PROFILE
+    profile = profiles[args.epoch]
     os.umask(0o077)
     with (CONTROLLER / "cycle.lock").open("a+b") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
