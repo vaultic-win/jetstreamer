@@ -4,10 +4,10 @@ use anyhow::{Context, Result, ensure};
 use jetstreamer_horizon::{
     account_updates::AccountUpdateView,
     archive::{
-        ArchiveProvenance, ArchiveReader, BlockNotification, BucketDecoder, BucketHeader,
-        BucketIndexEntry, Compression, EntryRecord, EpochMeta, FileHeader, Footer, MAGIC,
-        MAX_BUCKET_STORED_BYTES, MAX_BUCKET_UNCOMPRESSED_BYTES, SemanticDigest, SlotKind,
-        SlotVisitor, encode_archive_provenance,
+        ArchiveFormatError, ArchiveProvenance, ArchiveReader, BlockNotification, BucketDecoder,
+        BucketHeader, BucketIndexEntry, ChainMismatchPolicy, Compression, EntryRecord, EpochMeta,
+        FileHeader, Footer, MAGIC, MAX_BUCKET_STORED_BYTES, MAX_BUCKET_UNCOMPRESSED_BYTES,
+        SemanticDigest, SlotKind, SlotVisitor, encode_archive_provenance,
     },
     transactions::Transaction,
 };
@@ -60,6 +60,50 @@ pub(super) fn copy_aligned_prefix<R: Read + Seek, W: Write>(
             Ok(())
         },
     )?;
+    ensure!(visitor.epoch_count == 1, "missing epoch notification");
+    Ok(visitor.digest.finish()?)
+}
+
+/// Independently validate the candidate whose encoded bytes matched the
+/// authenticated source prefix. Preserve the aligned export's cross-bucket
+/// parent and epoch-notification checks while deriving the candidate digest.
+pub(super) fn read_prefix_digest<R: Read + Seek>(
+    reader: &mut ArchiveReader<R>,
+) -> Result<[u8; 32]> {
+    reader.verify_chain = true;
+    reader.chain_mismatch_policy = ChainMismatchPolicy::Reject;
+    let mut visitor = Visitor::default();
+    let mut slots = 0u64;
+    for index in 0..reader.bucket_count() {
+        let decoded = reader.read_bucket_with_header(index, &mut visitor, |header, visitor| {
+            if index == 0 {
+                if header.poh_start_hash == Hash::default() {
+                    return Err(ArchiveFormatError::InvalidContainerLayout(
+                        "aligned prefix initial anchor is zero",
+                    ));
+                }
+                visitor.previous = header.poh_start_hash;
+            }
+            if header.poh_start_hash != visitor.previous {
+                return Err(ArchiveFormatError::PohMismatch {
+                    slot: header.first_slot,
+                });
+            }
+            Ok(())
+        })?;
+        slots = slots
+            .checked_add(decoded)
+            .context("prefix slot count overflow")?;
+        ensure!(
+            !visitor.discontinuous_parent,
+            "discontinuous stored parent hash"
+        );
+        ensure!(visitor.epoch_count <= 1, "duplicate epoch notification");
+    }
+    ensure!(
+        slots == reader.header().slot_count,
+        "incomplete aligned prefix"
+    );
     ensure!(visitor.epoch_count == 1, "missing epoch notification");
     Ok(visitor.digest.finish()?)
 }

@@ -42,6 +42,10 @@ pub const PINNED_WORKER_SHA256: [u8; 32] = [
     0x43, 0xcd, 0x5e, 0x41, 0x00, 0x3f, 0x9e, 0x82, 0xc9, 0x32, 0x82, 0x80, 0x07, 0x32, 0xd8, 0xc8,
 ];
 const MAXIMUM_OUTPUT_BYTES: u64 = 160u64 << 30;
+const ALIGNED_SOURCE_SHA256: [u8; 32] = [
+    0xcb, 0x8a, 0xc0, 0xbc, 0x47, 0x91, 0x9c, 0x22, 0xdc, 0x78, 0x98, 0xe0, 0x68, 0xfb, 0x43, 0xff,
+    0xac, 0x80, 0xac, 0xea, 0xdc, 0xac, 0xac, 0x3f, 0xf8, 0xf2, 0x4e, 0xf3, 0x2d, 0x3b, 0x33, 0x53,
+];
 
 /// Immutable source evidence held across the complete transformation.
 pub struct PinnedSource {
@@ -265,9 +269,7 @@ impl PinnedSource {
         // This immutable, authenticated source has a bucket-aligned cut, one
         // trailing checkpoint bucket and a width-preserving first epoch field.
         // Other checkpoint sources retain the existing general re-encoder.
-        if sha256_hex_string(&self.manifest.archive_sha256)
-            == "cb8ac0bc47919c22dc7898e068fb43ffac80aceadcacac3ff8f24ef32d3b3353"
-        {
+        if self.manifest.archive_sha256 == ALIGNED_SOURCE_SHA256 {
             return aligned::copy_aligned_prefix(
                 self.source_reader()?,
                 sink,
@@ -297,8 +299,7 @@ impl PinnedSource {
     /// checkpoint source. This yields no extraction or verification receipt.
     pub fn write_authenticated_prefix(&self, output: impl Write) -> Result<()> {
         ensure!(
-            sha256_hex_string(&self.manifest.archive_sha256)
-                == "cb8ac0bc47919c22dc7898e068fb43ffac80aceadcacac3ff8f24ef32d3b3353",
+            self.manifest.archive_sha256 == ALIGNED_SOURCE_SHA256,
             "unqualified aligned source"
         );
         let provenance = ArchiveReader::open(self.source_reader()?)?
@@ -313,6 +314,34 @@ impl PinnedSource {
             |_, _, _, _, _| Ok(()),
         )?;
         self.unchanged()
+    }
+
+    fn verified_encoded_prefix(
+        &self,
+        target: &Path,
+        identity: ArchiveFileIdentity,
+        maximum_bytes: u64,
+    ) -> Result<Option<[u8; 32]>> {
+        if self.manifest.archive_sha256 != ALIGNED_SOURCE_SHA256 {
+            return Ok(None);
+        }
+        let mut output = open_regular_nofollow(target)?;
+        ensure!(
+            archive_file_identity(&output)? == identity
+                && output.metadata()?.len() <= maximum_bytes,
+            "145 frozen output changed or exceeds admitted bound"
+        );
+        let mut expected = Sha256::new();
+        self.write_authenticated_prefix(&mut expected)?;
+        let mut actual = Sha256::new();
+        io::copy(&mut output, &mut actual)?;
+        ensure!(
+            archive_file_identity(&output)? == identity
+                && path_matches_archive_identity(target, identity)?,
+            "145 frozen output changed while hashing"
+        );
+        let digest: [u8; 32] = actual.finalize().into();
+        Ok((digest == <[u8; 32]>::from(expected.finalize())).then_some(digest))
     }
 
     /// Creates a private, canonical-width candidate with strict source-link
@@ -407,6 +436,13 @@ impl PinnedSource {
             (None, None) => Some(tempfile::NamedTempFile::new_in(root)?),
             (None, Some(_)) => None,
         };
+        // A complete match to the encoded prefix of the authenticated source
+        // removes the second source decode. The candidate still gets its own
+        // complete strict decode and semantic digest.
+        let encoded_sha256 = match original_output {
+            Some(identity) => self.verified_encoded_prefix(&target, identity, maximum_bytes)?,
+            None => None,
+        };
         let expected_semantic = if let Some(t) = temporary.as_mut() {
             let output = Limited {
                 sink: t.as_file_mut(),
@@ -417,11 +453,14 @@ impl PinnedSource {
             let digest = self.export_prefix(output, &expected)?;
             t.as_file_mut().flush()?;
             t.as_file().sync_all()?;
-            digest
+            Some(digest)
+        } else if encoded_sha256.is_some() {
+            None
         } else {
-            // Receipt-recovery retry derives the same expected semantics without
-            // allocating or replacing another archive.
-            source_pass(&mut || self.export_prefix(io::sink(), &expected))?
+            // Differently encoded candidates still use the existing semantic proof.
+            Some(source_pass(&mut || {
+                self.export_prefix(io::sink(), &expected)
+            })?)
         };
         let output_path = temporary
             .as_ref()
@@ -429,7 +468,11 @@ impl PinnedSource {
             .unwrap_or(target.as_path());
         let output_file = open_regular_nofollow(output_path)?;
         let output_identity = archive_file_identity(&output_file)?;
-        let mut reader = ArchiveReader::open(BufReader::new(open_regular_nofollow(output_path)?))?;
+        ensure!(
+            original_output.is_none_or(|original| original == output_identity),
+            "145 existing candidate changed before independent reread"
+        );
+        let mut reader = ArchiveReader::open(BufReader::new(output_file.try_clone()?))?;
         reader.verify_chain = true;
         reader.chain_mismatch_policy = ChainMismatchPolicy::Reject;
         ensure!(
@@ -443,15 +486,26 @@ impl PinnedSource {
             reader.provenance()? == Some(expected),
             "145 output provenance changed"
         );
-        let mut semantic = SemanticDigest::new();
-        ensure!(
-            reader.read_slots(FIRST_SLOT, CANONICAL_SLOTS, &mut semantic)? == CANONICAL_SLOTS
-                && semantic.finish()? == expected_semantic,
-            "145 independent output semantic reread failed"
-        );
+        let semantic_sha256 = if let Some(expected_semantic) = expected_semantic {
+            let mut semantic = SemanticDigest::new();
+            ensure!(
+                reader.read_slots(FIRST_SLOT, CANONICAL_SLOTS, &mut semantic)? == CANONICAL_SLOTS
+                    && semantic.finish()? == expected_semantic,
+                "145 independent output semantic reread failed"
+            );
+            expected_semantic
+        } else {
+            aligned::read_prefix_digest(&mut reader)?
+        };
         let mut output = open_regular_nofollow(output_path)?;
-        let mut hash = Sha256::new();
-        io::copy(&mut output, &mut hash)?;
+        let archive_sha256 = match encoded_sha256 {
+            Some(sha256) => sha256,
+            None => {
+                let mut hash = Sha256::new();
+                io::copy(&mut output, &mut hash)?;
+                hash.finalize().into()
+            }
+        };
         let bytes = output.metadata()?.len();
         ensure!(bytes <= maximum_bytes, "145 output exceeds admitted bound");
         ensure!(
@@ -491,11 +545,11 @@ impl PinnedSource {
             source_canonical_checkpoint_slot: TERMINAL_ROOT,
             source_canonical_accounts_hash: "DsoBNgzFVZ7j5bF2CpKnt7HAC7fRrMMwdWW9FUafRe1p",
             archive: target,
-            archive_sha256: format!("{:x}", hash.finalize()),
+            archive_sha256: sha256_hex_string(&archive_sha256),
             archive_bytes: bytes,
             output_slot_start: FIRST_SLOT,
             output_slot_count: CANONICAL_SLOTS,
-            output_semantic_sha256: sha256_hex_string(&expected_semantic),
+            output_semantic_sha256: sha256_hex_string(&semantic_sha256),
             expected_output_provenance_sha256,
             retained_verification_tail_slots: 71,
             source_must_be_retained: true,
@@ -582,7 +636,8 @@ mod tests {
         value.base.runtime_admission = RuntimeAdmission::Verified;
         assert!(canonical_prefix_provenance(promoted).is_err());
         let config = ArchiveWriterConfig {
-            compression: Compression::None,
+            compression: Compression::Zstd,
+            bucket_slots: 64,
             ..Default::default()
         };
         let mut writer = ArchiveWriter::new_with_provenance(
@@ -657,7 +712,10 @@ mod tests {
         let (output, stats) = reencode_archive_prefix(
             std::io::Cursor::new(&source),
             Vec::new(),
-            config,
+            ArchiveWriterConfig {
+                compression: Compression::None,
+                ..config
+            },
             CANONICAL_SLOTS,
         )
         .unwrap();
@@ -677,7 +735,9 @@ mod tests {
         // candidate pass. The same frozen 432000-slot output rejects a
         // switched digest and remains available for a valid retry.
         let stage = tempfile::tempdir().unwrap();
-        let output_dir = stage.path().join(".jetstreamer-private/epoch145-prefix-extract-fixture");
+        let output_dir = stage
+            .path()
+            .join(".jetstreamer-private/epoch145-prefix-extract-fixture");
         fs::create_dir_all(&output_dir).unwrap();
         fs::set_permissions(&output_dir, fs::Permissions::from_mode(0o700)).unwrap();
         let target = output_dir.join("epoch-145.jet");
@@ -701,6 +761,43 @@ mod tests {
         assert_eq!(
             result.archive_sha256,
             format!("{:x}", Sha256::digest(&output))
+        );
+
+        // The fixture bypasses source authentication so it can exercise the
+        // recovery route reserved for the one pinned production source.
+        fixture.manifest.archive_sha256 = ALIGNED_SOURCE_SHA256;
+        let mut aligned_output = Vec::new();
+        fixture
+            .write_authenticated_prefix(&mut aligned_output)
+            .unwrap();
+        assert_ne!(aligned_output, output);
+        let mut used_fallback = false;
+        fixture
+            .extract_with_source_pass(&output_dir, limit, None, refuse_write, |_| {
+                used_fallback = true;
+                Ok(stats.output_semantic_sha256)
+            })
+            .unwrap();
+        assert!(used_fallback);
+        fs::remove_file(&target).unwrap();
+        readonly(&target, &aligned_output);
+        let recovered = fixture
+            .extract_with_source_pass(
+                &output_dir,
+                aligned_output.len() as u64,
+                None,
+                refuse_write,
+                |_| panic!("exact encoded recovery should not re-decode the source"),
+            )
+            .unwrap();
+        assert!(recovered.independent_output_reread_passed);
+        assert_eq!(
+            recovered.output_semantic_sha256,
+            sha256_hex_string(&stats.output_semantic_sha256)
+        );
+        assert_eq!(
+            recovered.archive_sha256,
+            format!("{:x}", Sha256::digest(&aligned_output))
         );
 
         let mut expected = match provenance {
