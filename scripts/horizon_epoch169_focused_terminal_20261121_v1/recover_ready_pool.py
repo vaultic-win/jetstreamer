@@ -6,54 +6,10 @@ import json
 import os
 from pathlib import Path
 import re
-import stat
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from extend_ready_pool import BASE, REPORT_ROOT, load_audit
-
-
-STANDALONE_GUARD = "jetstreamer-utils/src/horizon_standalone_guard_bin.rs"
-
-
-def sealed_ref(audit, path):
-    md = path.lstat()
-    audit.check(path.resolve(strict=True) == path and stat.S_ISREG(md.st_mode)
-                and md.st_uid == 0 and not md.st_mode & 0o222,
-                f"Unsealed audit evidence {path}")
-    return audit.ref(path)
-
-
-def qualify(audit, cfg):
-    try:
-        return audit.current_branch(cfg)
-    except audit.ReaderChanged as error:
-        tip, changed = error.args
-        audit.check(re.fullmatch(r"[0-9a-f]{40}", tip) and changed == [STANDALONE_GUARD],
-                    f"Current branch has unqualified reader changes: {changed}")
-    evidence = sealed_ref(audit, BASE / f"COMPILED_INPUT_COMPARISON_{tip[:12]}.json")
-    comparison = audit.read(audit.checked_ref(evidence))
-    proof = audit.read(audit.checked_ref(cfg["proof"]))
-    sources = audit.read(audit.checked_ref(cfg["sources"]))["members"]
-    audit.check(comparison["schema"] == "horizon-live-audit-compiled-input-comparison-v1"
-                and comparison["fetched_account_updates"] == tip
-                and comparison["compiled_from"] == proof["source_commit"] == cfg["built_from"]
-                and comparison["source_manifest"] == cfg["sources"]
-                and comparison["manifest_members"] == len(sources)
-                and comparison["matching_members"] == len(sources) - 1
-                and STANDALONE_GUARD in sources
-                and comparison["only_changed_path"] == STANDALONE_GUARD
-                and comparison["changed_path_present_in_native_depinfo"] is False
-                and comparison["pipeline"] == cfg["elf"]
-                and comparison["original_cargo_artifacts"] == proof["compiler_artifacts"],
-                "Compiled input comparison does not qualify this reader and branch")
-    audit.checked_ref(comparison["original_cargo_artifacts"])
-    depinfo = audit.checked_ref(comparison["depinfo"])
-    audit.check(STANDALONE_GUARD.encode() not in depinfo.read_bytes(),
-                "Standalone guard was a compiled reader input")
-    return dict(branch_commit=tip, build_commit=cfg["built_from"], build=cfg["proof"],
-                binary=cfg["elf"], seal=cfg["seal"], observed=audit.now(),
-                source_fingerprint=proof.get("source_fingerprint"), compiled_input_comparison=evidence)
+from extend_ready_pool import BASE, REPORT_ROOT, load_audit, qualify, sealed_ref
 
 
 def recover(audit, cfg, attempt_name):
