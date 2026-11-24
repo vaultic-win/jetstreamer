@@ -58,7 +58,7 @@ def cases(native, test, need):
                    available_bytes=native["available_HOME_bytes"],guard_invocation_id="34"*16,
                    root_physical_observation=dict(maximum_physical_bytes=cap,exceeds_budget=False,
                          first=dict(physical_bytes=8192,vanished_entries=0),second=dict(physical_bytes=8192,vanished_entries=0)))
-        fleet=dict(focused169_terminal=native["closed_focused169"]["terminal"])
+        fleet=module["pinned"](native["fleet"])
         quote=lambda v:module["price"](native,fleet,own,v)
         p=test("registered postguard full quote retains all old bookings and only charges remaining hourly growth",lambda:quote(guard))
         need(p["fits"] and p["workspace_remaining"]==module["WORKSPACE"]-4096 and p["complete_cpu"]==64_000_000,
@@ -68,3 +68,18 @@ def cases(native, test, need):
         need(x["workspace_remaining"]==module["WORKSPACE"],"false realized credit")
         test("expired native hourly guard refused",lambda:quote(dict(guard,recorded_unix_seconds=1)),True)
         test("wrong hourly plan refused",lambda:quote(dict(guard,plan_sha256="ef"*32)),True)
+        workers=native["recovery_obligations"]["public_workers"][:-1]
+        observation=t/"six-public-workers.json"
+        observation.write_text(json.dumps(dict(active_ready_workers=workers)))
+        observation.chmod(0o400)
+        ref=dict(path=str(observation),sha256=hashlib.sha256(observation.read_bytes()).hexdigest())
+        six_fleet=dict(fleet,current_audit_progress=dict(observation=ref))
+        obligations=native["recovery_obligations"]
+        six_native=dict(native,recovery_obligations=dict(obligations,public_workers=workers))
+        six=test("hourly postguard accepts the recorded six public readers",
+                 lambda:module["price"](six_native,six_fleet,own,guard))
+        need(six["fits"] and six["required_HOME"]==p["required_HOME"],"reader turnover changed paid HOME")
+        reused=[dict(workers[0],start_ticks=workers[0]["start_ticks"]+1),*workers[1:]]
+        changed=dict(native,recovery_obligations=dict(obligations,public_workers=reused))
+        test("same-sized public roster with a reused PID is refused",
+             lambda:module["price"](changed,six_fleet,own,guard),True)

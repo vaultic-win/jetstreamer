@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import runpy
 import stat
 
 HOME = Path("/home/sol")
@@ -140,10 +141,10 @@ def price(native, projection, account_staging=True):
     need(native["candidate136"]["occupied"] is False and native["candidate136"]["loan_micros"] == 0
          and set(native["survivors"]) == {"172"} and set(native["replacements"]) == {"166","167","168","170"},
          "different 136/171 donor or peer topology")
-    workers = native["recovery_obligations"]["public_workers"]
-    need(len(workers) == 7 and len({(w["pid"],w["start_ticks"]) for w in workers}) == 7 and
-         native["resource_credit_bytes"] == 0, "incomplete fleet or audit")
+    need(native["resource_credit_bytes"] == 0, "incomplete fleet or audit")
     need(projection["latest_fleet"] == native["fleet"], "different projection and price fleet")
+    public_workers = runpy.run_path(str(Path(__file__).with_name("actor.py")))["public_workers"]
+    workers = public_workers(native, bound(native["fleet"]))
     base = native["complete_required_HOME_bytes"]
     protected = max(base, base-native["recovery_obligations"]["missing_mirror_bytes"]+
                     projection["audit_growth_and_mirror_bytes"])

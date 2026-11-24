@@ -114,15 +114,25 @@ def before(fleet, row=None):
                 timer_iid=t["InvocationID"],initial_physical=src["prestart_physical_bytes"])
 
 
+def public_workers(native, fleet):
+    observation = pinned(fleet["current_audit_progress"]["observation"])
+    workers = native["recovery_obligations"]["public_workers"]
+    need(workers == observation["active_ready_workers"] and
+         len({(w["pid"], w["start_ticks"]) for w in workers}) == len(workers) and
+         len({tuple(w["range"]) for w in workers}) == len(workers),
+         "public audit roster differs from the coordinated fleet")
+    return workers
+
+
 def price(native, fleet, binding, guard):
     """Keep the whole former 96 GiB root and all five canonical owners; count new growth once."""
     plan=pinned(binding["plan"])
     need(native["complete_cpu_quota_micros"]==CPU and native["complete_memory_plus_reserve_bytes"]==RAM and
          native["candidate136"]["occupied"] is False and native["candidate136"]["loan_micros"]==0 and
-         len(native["recovery_obligations"]["public_workers"])==7 and
          set(native["replacements"])=={"166","167","168","170"} and set(native["survivors"])=={"172"} and
          native["resource_credit_bytes"]==0 and native["closed_focused169"]["terminal"]==fleet["focused169_terminal"],
          "different five-owner funding or donor")
+    public_workers(native, fleet)
     b=native["bookings"]["169"]
     need(b["cap_bytes"]==96*G==b["physical_bytes"]+b["remaining_bytes"],"lost original 169 disk obligation")
     cap=plan["maximum_root_physical_bytes"]; obs=guard["root_physical_observation"]
