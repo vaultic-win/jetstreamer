@@ -9,6 +9,7 @@ publish = false
 [features]
 anza-parked-183 = []
 anza-closed-154 = []
+anza-closed-canaries = []
 
 [dependencies]
 anyhow = "1"

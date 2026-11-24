@@ -22,12 +22,15 @@ use std::{
 
 #[cfg(feature = "anza-closed-154")]
 mod anza_closed_154;
+#[cfg(feature = "anza-closed-canaries")]
+mod anza_closed_canaries;
 #[cfg(feature = "anza-parked-183")]
 mod anza_parked_183;
 
 const HOME_ROOT: &str = if cfg!(any(
     feature = "anza-parked-183",
-    feature = "anza-closed-154"
+    feature = "anza-closed-154",
+    feature = "anza-closed-canaries"
 )) {
     "/home/sol"
 } else {
@@ -329,6 +332,8 @@ fn ready(epoch: u64, receipt: &Value, inventory: &Value) -> Result<()> {
 }
 fn check_target(t: &Target) -> Result<()> {
     let scope = match t.epoch {
+        #[cfg(feature = "anza-closed-canaries")]
+        130 | 195 => anza_closed_canaries::is_target(t),
         #[cfg(feature = "anza-closed-154")]
         154 => anza_closed_154::is_target(t),
         #[cfg(feature = "anza-parked-183")]
@@ -728,6 +733,8 @@ fn run() -> Result<()> {
     if epochs.contains(&154) {
         anza_closed_154::verify_scope(&p, &lock)?;
     }
+    #[cfg(feature = "anza-closed-canaries")]
+    let canary_review = anza_closed_canaries::verify_scope(&p, &epochs, &lock)?;
     let bm = exact(&p.inventory_binary.path)?;
     ensure!(
         bm.uid() == 0
@@ -742,6 +749,12 @@ fn run() -> Result<()> {
     #[cfg(feature = "anza-closed-154")]
     let range = if epochs.contains(&154) {
         (153, 155)
+    } else {
+        range
+    };
+    #[cfg(feature = "anza-closed-canaries")]
+    let range = if canary_review.is_some() {
+        (range.0 - 1, range.1 + 1)
     } else {
         range
     };
@@ -768,6 +781,10 @@ fn run() -> Result<()> {
     #[cfg(feature = "anza-closed-154")]
     if epochs.contains(&154) {
         anza_closed_154::verify_delivery(&receipts, &inventory)?;
+    }
+    #[cfg(feature = "anza-closed-canaries")]
+    if let Some(review) = &canary_review {
+        anza_closed_canaries::verify_delivery(review, &epochs, &inventory)?;
     }
     inactive(&p.inactive_units)?;
     scan_consumers(&p.targets)?;
@@ -808,6 +825,10 @@ fn run() -> Result<()> {
         #[cfg(feature = "anza-closed-154")]
         if t.epoch == 154 {
             anza_closed_154::check_owners()?;
+        }
+        #[cfg(feature = "anza-closed-canaries")]
+        if let Some(review) = &canary_review {
+            anza_closed_canaries::check_owners(review)?;
         }
         inactive(&p.inactive_units)?;
         scan_consumers(std::slice::from_ref(t))?;
