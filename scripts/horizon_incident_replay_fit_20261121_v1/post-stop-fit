@@ -47,7 +47,8 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-FRESH_CENSUS_RECOVERY_145 = HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
+HOURLY170 = HERE == D / "tools-homefloor-170-metered-hourly-v2"
+FRESH_CENSUS_RECOVERY_145 = HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
 GUARD_WALK_RECOVERY_145 = FRESH_CENSUS_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5s-guard-recovery-v1"
 GUARD_TERMINAL_RECOVERY_145 = (
     GUARD_WALK_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5r-guard-recovery-v1"
@@ -90,6 +91,13 @@ V5J_POST = V5J_RETRY_POST or HERE == D / "tools-homefloor-145-post-v5j-v1"
 HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v1"
 if HOURLY169:
     hourly169 = runpy.run_path(str(HERE / "hourly169_actor.py"))
+if HOURLY170:
+    adapter = HERE / "hourly170_actor.py"
+    seal, _ = s.read(HERE / "deployment-seal-receipt.json")
+    member, = [row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444"]
+    s.need(seal["destination"] == str(HERE), "unbound hourly 170 capacity adapter")
+    fit.binary(adapter, member["sha256"])
+    hourly170 = runpy.run_path(str(adapter))
 RETRY4_145 = LEASE_RUNTIME_145 or LEASE_BUILD_145 or HOURLY169 or V5J_POST or DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
 RETRY4_168 = RETRY4_145 or HERE.name == "tools-homefloor-cold168-retry4-v1"
 CLOSED_RETRY3 = HERE.name == "tools-homefloor-closed168-retry3-v1"
@@ -159,6 +167,8 @@ def fleet_head(ref):
     rows=[v for k in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for v in f[k]]
     if HOURLY169:
         rows, _ = hourly169["archival_roster"](f)
+    if HOURLY170:
+        rows, _ = hourly170["roster"](f, "active")
     roster={v["epoch"]:v for v in rows}
     s.need(((169 in roster)==(f.get("focused169_terminal") is None)) and ((172 in roster) == (f.get("full172_local_commit") is None)) and roster.keys()<=ORIGINAL|{136,168,169,172} and len(rows)==len(roster),"unexpected root fleet membership")
     return f,roster
@@ -605,6 +615,8 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch):
+    if HOURLY170 and not fit.members(fit.A145):
+        return hourly170["drained145"](s, fit)
     guard_terminal = STOPPED_GUARD_145 or (GUARD_TERMINAL_RECOVERY_145 and not fit.members(fit.A145))
     for active, name in ((guard_terminal, "v5r_stopped.py"), (STOPPED_V5P, "v5p_stopped.py"), (STOPPED_V5O, "v5o_stopped.py"),
                          (STOPPED_V5N, "v5n_stopped.py"), (STOPPED_V5M, "v5m_stopped.py"),
@@ -668,8 +680,8 @@ def phase145(epoch):
                        "five-lane-semantic" if FIVE_LANE_145 else "homefloor-semantic")
             cfg, adapter, _ = profile145(here.parent, focused=focused)
             reader = runpy.run_path(str(adapter))
-            phase = reader["inspect"](s, fit.overlap.leases, s.show(fit.A145), fit.members(fit.A145),
-                                      epoch, here, cfg)
+            members = hourly170["epoch145_members"](s, fit) if HOURLY170 else fit.members(fit.A145)
+            phase = reader["inspect"](s, fit.overlap.leases, s.show(fit.A145), members, epoch, here, cfg)
             s.need(phase is not None, "unexpected HOME verifier image")
             return phase
         return registrations["phase145"](s, fit, epoch)
@@ -828,7 +840,7 @@ def closed168_tree():
     s.need(first==second and os.path.samestat(m,run.stat()),"retained metered 168 allocation changed during walk")
     return dict(physical_bytes=first,root=str(s.TREE),cap=fit.CAP)
 
-def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None):
+def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None,hourly170_owner=None):
     expect={v["unit"]:v["processes"] for v in peers.values()}
     expect.update({v["producer_unit"]:v["processes"] for v in replacements.values()})
     if extra and extra["actor"]:
@@ -840,6 +852,10 @@ def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None)
         s.need(HOURLY169 and own == 145 and hourly["unit"] not in expect and not c136["occupied"],
                "different focused 169 actor or donor")
         expect[hourly["unit"]] = hourly["processes"]
+    if hourly170_owner is not None:
+        s.need(HOURLY170 and own == 145 and hourly170_owner["unit"] not in expect and not c136["occupied"],
+               "conflicting native hourly 170 capacity claimant")
+        expect[hourly170_owner["unit"]] = hourly170_owner["processes"]
     s.need(fit.units()==set(expect),"foreign qualifier unit")
     for u,prs in expect.items():
         members=fit.members(u);expected=tuple(sorted(p[0] for p in prs))
@@ -1155,7 +1171,7 @@ def registered136(fleet, registration):
                 verified_release=release)
 
 
-def capture_once(epoch,ref,prestart136=None):
+def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
     closed_before=None
     if CLOSED_RETRY3:
@@ -1175,6 +1191,19 @@ def capture_once(epoch,ref,prestart136=None):
     closed172=full172_terminal(f,rows)
     peers=survivors(rows,ledger);status=registered_status()
     phase=phase145(epoch)
+    hourly170_owner = hourly170_guard = hourly170_contract = hourly170_row = None
+    if HOURLY170:
+        s.need(epoch == 145 and prestart136 is None and hourly170_mode in ("prestart", "post-guard", "active")
+               and failed170, "hourly 170 requires the positive retry 13 terminal")
+        _, hourly170_row = hourly170["roster"](f, hourly170_mode)
+        hourly170_contract = hourly170["ready_contract"]()
+        if hourly170_mode == "prestart":
+            hourly170["empty_actor"](s, fit)
+        else:
+            s.need(phase["stage"] == "v5u-drained",
+                   "live sealed V5u owner cannot accept the new 170 qualifier")
+            hourly170_owner = hourly170["owner"](s, fit, hourly170_contract, f, ref, hourly170_row, hourly170_mode)
+            hourly170_guard = hourly170["sample"](hourly170_contract, hourly170_owner, hourly170_mode)
     parked166=retry11["holding"](s,fit,f) if RETRY11 else None
     parked168=cold168["holding"](s,fit,f,parked166) if FIFTH168 else None
     if prestart136 is None:
@@ -1231,7 +1260,12 @@ def capture_once(epoch,ref,prestart136=None):
             active_run = cold170["RUN"]
 
         if a:rep[str(e)]=a
-        if a and a["physical"] is not None:
+        if e == 170 and hourly170_guard is not None:
+            s.need(root == hourly170["LANE"] and effective == hourly170["CAP"],
+                   "different original 170 whole-tree booking")
+            physical = hourly170_guard["measured_bytes"]
+            measurement = "bound hourly 170 native guard whole-tree observation"
+        elif a and a["physical"] is not None:
             physical=a["physical"];measurement="two complete native whole-tree walks"
         else:
             exclude=active_run if a else None
@@ -1309,7 +1343,7 @@ def capture_once(epoch,ref,prestart136=None):
         census_stops = {**stopped, "168": interrupted[168]}
     hourly = hourly169["archival_roster"](f)[1] if HOURLY169 else None
     entry_lease=f.get("epoch146_bounded_entry_lease")
-    population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease)
+    population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner)
     if closed169:books["169"]=focused169_booking(closed169)
     if closed172:books["172"]=full172_booking(closed172)
     raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
@@ -1321,7 +1355,7 @@ def capture_once(epoch,ref,prestart136=None):
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
     s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and
-           census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease)==(population,qualification),
+           census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner)==(population,qualification),
            "capacity generation changed during collection")
     if prestart136 is None and not c136["occupied"]:
         s.need(registered136(f,status["registration"])==c136,"136 idle or release generation changed during collection")
@@ -1398,7 +1432,7 @@ def capture_once(epoch,ref,prestart136=None):
         needmem += qualification["memory_bytes"]
     vfs=os.statvfs(HOME);avail=vfs.f_bavail*vfs.f_frsize
     own=rep.get(str(epoch)) if FIFTH168 or epoch!=168 else (extra or {}).get("actor")
-    return dict(schema="horizon-incident-replay-fit-v1",epoch=epoch,fleet=ref,recorded_unix_seconds=int(time.time()),
+    native = dict(schema="horizon-incident-replay-fit-v1",epoch=epoch,fleet=ref,recorded_unix_seconds=int(time.time()),
         fits=avail>=need and mem["MemAvailable:"]>=needmem,closed_recovered166=closed.get(166),closed_indexed167=closed.get(167),closed_recovered170=closed.get(170),closed_prestart_remaining=closed_prepaid,closed_metered168=closed168,closed_full172=closed172,closed_focused169=closed169,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
         replacements={e:v for e,v in rep.items() if v["admission"]},candidate=own,normal168=extra,bookings=books,
         complete_required_HOME_bytes=need,protected_raw_floor_bytes=protected,available_HOME_bytes=avail,
@@ -1406,10 +1440,23 @@ def capture_once(epoch,ref,prestart136=None):
         complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=needmem,available_memory_bytes=mem["MemAvailable:"],
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,**recovered_price,active168_guard_floor=floor168,
         population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
+    if not HOURLY170:
+        return native
+    s.need(hourly170["ready_contract"]() == hourly170_contract, "sealed diagnostic changed during native price")
+    if hourly170_owner is None:
+        hourly170["empty_actor"](s, fit)
+    else:
+        s.need(hourly170["owner"](s, fit, hourly170_contract, f, ref, hourly170_row, hourly170_mode) == hourly170_owner,
+               "hourly 170 native generation drifted during price")
+        refreshed = hourly170["sample"](hourly170_contract, hourly170_owner, hourly170_mode)
+        if hourly170_mode == "post-guard":
+            s.need(refreshed == hourly170_guard, "the original first guard changed")
+    return hourly170["price"](native, hourly170_contract, hourly170_owner, hourly170_guard, hourly170_mode)
 
-def capture_native(epoch,ref,prestart136=None):
+
+def capture_native(epoch,ref,prestart136=None,hourly170_mode=None):
     try:
-        return capture_once(epoch,ref,prestart136)
+        return capture_once(epoch,ref,prestart136,hourly170_mode)
     except WorkerFork as fork:
         e,before=fork.epoch,fork.anchor
         after=confirm_fork(e,epoch,before,{} if FIFTH168 and e==168 else proof_stops()[str(e)])
@@ -1417,7 +1464,7 @@ def capture_native(epoch,ref,prestart136=None):
         e,before,after=confirmed.epoch,confirmed.before,confirmed.after
     # Discard every earlier resource measurement. A second fork or a change of child
     # fails the capture instead of chaining unbounded retries.
-    result=capture_once(epoch,ref,prestart136)
+    result=capture_once(epoch,ref,prestart136,hourly170_mode)
     row=result["candidate"] if e==epoch else result["replacements"].get(str(e))
     s.need(row is not None,"replacement disappeared during complete reprice")
     same_fork(after,row,False)
@@ -1426,7 +1473,8 @@ def capture_native(epoch,ref,prestart136=None):
                                          final_guard=row["guard"],processes=row["processes"],complete_fit_repeated=True)
     return result
 
-def capture(epoch, ref, prestart136=None):
+def capture(epoch, ref, prestart136=None, hourly170_mode=None):
+    s.need(HOURLY170 == (hourly170_mode is not None), "hourly 170 mode requires its own sealed provider")
     if STOPPED_GUARD_145 or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or LATE_HANDOFF_145:
         s.need(epoch == 145 and (prestart136 is None or POST_136), "unexpected missed-census pricing scope")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
@@ -1449,15 +1497,23 @@ def capture(epoch, ref, prestart136=None):
             quotes.append(donor["snapshot"](candidate))
             return candidate
 
-        native = capture_native(epoch,ref,verified_prestart if prestart136 is not None else None)
+        native = capture_native(epoch,ref,verified_prestart if prestart136 is not None else None,hourly170_mode)
         if guarded:
             s.need(feature_before == snapshot(donor), "corrected epoch 159 grant changed during census")
             native["corrected_159_donor"] = feature_before
+        donor_price = native
+        if HOURLY170:
+            diagnostic = native["hourly170_diagnostic"]
+            if not diagnostic["resource_fit"]:
+                return native
+            # The donor prices the resource equation. The returned quote keeps
+            # the independent launch compatibility gate for the live V5u owner.
+            donor_price = dict(native, fits=True)
         if prestart136 is not None:
             left, right = quotes[-2:]
             native["epoch159_donor_cover"] = donor["cover"](left,native,right,exclusive136=native["candidate136"])
         else:
-            native["epoch159_donor_cover"] = donor["cover"](before,native,donor["snapshot"]())
+            native["epoch159_donor_cover"] = donor["cover"](before,donor_price,donor["snapshot"]())
         return native
     if HOURLY169:
         s.need(epoch == 145 and prestart136 is None, "hourly actor registration requires its dedicated complete quote")
@@ -1535,9 +1591,15 @@ if __name__=="__main__":
     if launching_post:
         s.need(POST_136, "post submission requires the 136-aware provider")
         args=args[1:]
+    hourly170_mode = None
+    if args and args[0].startswith("--hourly170="):
+        hourly170_mode = args.pop(0).split("=", 1)[1]
+    s.need(HOURLY170 == (hourly170_mode is not None) and
+           (not HOURLY170 or hourly170_mode in ("prestart", "post-guard", "active")),
+           "hourly 170 requires --hourly170=prestart|post-guard|active with its exact provider")
     review=args[:1]==["--next-admission"]
     if review:
-        s.need(not HOURLY169, "use the dedicated hourly actor complete quote directly")
+        s.need(not (HOURLY169 or HOURLY170), "use the dedicated hourly actor complete quote directly")
         args=args[1:]
     s.need(len(args)==3,"usage: post-stop-fit [--next-admission] EPOCH FLEET_ABSOLUTE_PATH FLEET_SHA256")
     signal.alarm(142)
@@ -1549,7 +1611,7 @@ if __name__=="__main__":
         runpy.run_path(str(HERE / "run-recovery"))["check_quote_parent"](ref)
     handback = semantic136_post_window() if launching_post else None
     try:
-        result=capture(int(args[0]),ref)
+        result=capture(int(args[0]),ref,hourly170_mode=hourly170_mode)
     except PublicReaderTurnover as error:
         print(error, file=sys.stderr)
         sys.exit(os.EX_TEMPFAIL)

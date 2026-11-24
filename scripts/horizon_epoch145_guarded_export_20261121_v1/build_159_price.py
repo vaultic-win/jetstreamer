@@ -159,6 +159,15 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
     failed170 = native.get("failed_cold170")
     if failed170:
         booking = native["bookings"]["170"]
+        diagnostic = native.get("hourly170_diagnostic")
+        measured = booking["measurement"] == "two complete stopped-tree walks"
+        if diagnostic is not None and diagnostic["stage"] in ("post-guard", "active"):
+            measured = (booking["measurement"] == "bound hourly 170 native guard whole-tree observation"
+                        and diagnostic["launch_compatible"] and diagnostic["retained_booking_bytes"] == 384 * GIB
+                        and diagnostic["private_growth_bytes"] == 96 * GIB
+                        and diagnostic["additive_charge_bytes"] == diagnostic["additive_memory_bytes"]
+                        == diagnostic["additive_cpu_quota_micros"] == 0
+                        and diagnostic["receipt"] is not None and diagnostic["intent"] is not None)
         need(exclusive136 is None and failed170 == fleet["cold170_retry13_execution_failure"]
              and failed170["reservation_ending_bytes"] == 0
              and fleet["canonical_producer_count"] == len(fleet["actual_executing_replays"]) == 4
@@ -167,7 +176,7 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
              and set(native["survivors"]) == {"172"}
              and booking["cap_bytes"] == 384 * GIB
              and booking["cap_bytes"] == booking["physical_bytes"] + booking["remaining_bytes"]
-             and booking["measurement"] == "two complete stopped-tree walks",
+             and measured,
              "changed failed epoch 170 booking or producer topology")
     else:
         need(fleet["canonical_producer_count"] == len(fleet["actual_executing_replays"]) == 5
