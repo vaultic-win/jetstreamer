@@ -8,6 +8,12 @@ use jetstreamer_horizon_observe::successor247 as successor;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
+const PINNED_247_UNIT: &str = "horizon-upload-247-pinned-public-v254.service";
+const PINNED_247_IMAGE: &str = "/var/lib/jetstreamer/horizon211-staged-recovery-v1/jetstreamer-r2";
+const PINNED_247_IMAGE_SHA: &str =
+    "7271de0e309c83f8fa2f35cf9091280a8b04f66c51d3175ad1d6ff02faa4c59d";
+const PINNED_247_MEMORY_CAP: u64 = 24 << 30;
+
 fn registered_upload(fleet: &Value, owner: &successor::Owner) -> Result<()> {
     let belongs = |r: &&Value| {
         r["unit"]["Id"] == fourth::unit(owner) || r["expected_invocation_id"] == owner.iid
@@ -96,7 +102,7 @@ fn recovery_history(fleet: &Value, owner: &successor::Owner) -> Result<()> {
     Ok(())
 }
 
-// The v221 cohort has several simultaneous deliveries using the same uploader image.
+// Ordinary delivery workers are charged against the fleet using their sealed launch.
 fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> Result<()> {
     use jetstreamer_horizon_observe::staged247_rss::{Endpoint, validate_delivery_endpoints};
     use std::path::Path;
@@ -112,8 +118,9 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
     let stem = name
         .strip_suffix(".service")
         .context("delivery unit name")?;
+    let pinned_247 = epoch == 247 && name == PINNED_247_UNIT;
     ensure!(
-        name.starts_with(&format!("horizon-upload-{epoch}-ordinary-"))
+        (pinned_247 || name.starts_with(&format!("horizon-upload-{epoch}-ordinary-")))
             && stem.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-'),
         "ordinary delivery epoch or unit changed"
     );
@@ -182,6 +189,15 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
                 == 1,
         "ordinary delivery claim, endpoints or sample clock changed"
     );
+    let (image, image_sha, cap) = if pinned_247 {
+        (
+            PINNED_247_IMAGE,
+            PINNED_247_IMAGE_SHA,
+            PINNED_247_MEMORY_CAP,
+        )
+    } else {
+        (fourth::IMAGE, fourth::IMAGE_SHA, successor::HARD)
+    };
     validate_delivery_endpoints(
         row,
         &Endpoint {
@@ -189,9 +205,9 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
             iid,
             pid,
             ticks: micros / 10_000,
-            image: fourth::IMAGE,
-            image_sha: fourth::IMAGE_SHA,
-            cap: successor::HARD,
+            image,
+            image_sha,
+            cap,
         },
         &range,
     )
@@ -236,6 +252,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                         | successor::UNIT
                         | fourth::UNIT
                         | fourth::V221_UNIT
+                        | PINNED_247_UNIT
                 ),
                 "unregistered epoch 247 uploader"
             );
@@ -278,9 +295,10 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         let name = row["producer_after"]["unit"]
             .as_str()
             .context("observed memory owner")?;
-        if owners.contains_key(fourth::V221_UNIT)
-            && name.starts_with("horizon-upload-")
-            && name.contains("-ordinary-")
+        if name == PINNED_247_UNIT
+            || (owners.contains_key(fourth::V221_UNIT)
+                && name.starts_with("horizon-upload-")
+                && name.contains("-ordinary-"))
         {
             ordinary_delivery_join(row, ledger, o, name)?;
         }
@@ -887,6 +905,29 @@ mod tests {
         ledger["active"][0]["phase"] = json!("replay");
         assert_eq!(super::report(&o, &ledger)["valid"], false);
     }
+    #[test]
+    fn pinned_247_requires_its_own_delivery_pipeline() {
+        let (mut observer, mut ledger) = fixture();
+        let mut delivery = observer["diagnostic_replays"]
+            .as_array_mut()
+            .unwrap()
+            .remove(0);
+        let mut owner = ledger["active"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("producer")
+            .unwrap();
+        owner["Id"] = json!(PINNED_247_UNIT);
+        ledger["active"][0]["unit"] = owner;
+        ledger["active"][0]["epoch"] = json!(247);
+        ledger["active"][0]["phase"] = json!("upload-readback");
+        delivery["observation"]["producer_after"]["unit"] = json!(PINNED_247_UNIT);
+        observer["delivery_resources"] = json!([delivery]);
+        ledger["pipelines"] = json!([]);
+        let failure = checked(&observer, &ledger).unwrap_err();
+        assert_eq!(failure.to_string(), "missing ordinary delivery pipeline");
+    }
+
     #[test]
     fn same_sample_delivery_rss_is_required_and_never_replay_credit() {
         let (mut o, mut ledger) = fixture();
