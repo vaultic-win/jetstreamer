@@ -56,7 +56,8 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v2",
     D / "tools-homefloor-170-metered-hourly-v3",
 )
-V5V_RECOVERY_145 = HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
+V5W_RECOVERY_145 = HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
+V5V_RECOVERY_145 = V5W_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
 FRESH_CENSUS_RECOVERY_145 = V5V_RECOVERY_145 or HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
 RETAIN_FAILED166 = FAILED166_CADENCE or V5V_RECOVERY_145
 GUARD_WALK_RECOVERY_145 = FRESH_CENSUS_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5s-guard-recovery-v1"
@@ -570,6 +571,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     if focused is not None:
         post_directory = fixture_post_directory(here)
         lease_directory = next(directory for enabled, directory in (
+            (V5W_RECOVERY_145, "tools-v5w"),
             (V5V_RECOVERY_145, "tools-v5v"),
             (FRESH_CENSUS_RECOVERY_145, "tools-v5u"),
             (GUARD_WALK_RECOVERY_145, "tools-v5t"),

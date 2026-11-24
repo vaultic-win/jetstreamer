@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_v5u_guard_recovery145_only)]
+#[cfg(incident_v5v_guard_recovery145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5v-custody-recovery-v1/post-stop-fit";
+#[cfg(all(incident_v5u_guard_recovery145_only, not(incident_v5v_guard_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5u-guard-recovery-v1/post-stop-fit";
 #[cfg(all(incident_v5t_guard_recovery145_only, not(incident_v5u_guard_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5t-guard-recovery-v1/post-stop-fit";
@@ -865,12 +867,14 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         let observed: Bound = serde_json::from_value(
             complete["phase145"]["window"]["guard_terminal_predecessor"].clone(),
         )?;
-        let pinned = Path::new(RUNTIME).join(
+        #[cfg(incident_v5v_guard_recovery145_only)]
+        let pinned = incident145::v5v_terminal()?;
+        #[cfg(not(incident_v5v_guard_recovery145_only))]
+        let pinned = custody::binding(&Path::new(RUNTIME).join(
             "epoch145-semantic-continuity-20261121-v1/v5v-name-handoff/V5U_TERMINAL.json",
-        );
+        ))?;
         ensure!(
-            observed.path == pinned
-                && observed == custody::binding(&pinned)?
+            observed == pinned
                 && complete["settled_hourly170"]["terminal"]["successful_exit"] == true
                 && complete["settled_hourly170"]["terminal"]["reservation_ending_bytes"] == 0,
             "capacity provider changed the V5u terminal or epoch 170 settlement"

@@ -109,7 +109,12 @@ pub fn predecessor() -> Result<Value> {
         }
         #[cfg(incident_v5u_guard_recovery145_only)]
         {
-            evidence["failed_v5u"] = crate::incident145::failed_v5u()?;
+            let v5u = crate::incident145::failed_v5u()?;
+            #[cfg(incident_v5v_guard_recovery145_only)]
+            {
+                evidence["failed_v5v"] = crate::incident145::failed_v5v(&v5u)?;
+            }
+            evidence["failed_v5u"] = v5u;
         }
         evidence
     };
