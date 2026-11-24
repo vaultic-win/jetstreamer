@@ -20,7 +20,7 @@ mod continuation144_admission;
 mod continuation144_prepare;
 mod continuation144_protection;
 mod continuation203;
-mod extract226;
+pub(super) mod extract226;
 mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;

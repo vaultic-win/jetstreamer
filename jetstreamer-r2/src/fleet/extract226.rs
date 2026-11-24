@@ -196,6 +196,7 @@ fn exact_process(
             .parse::<u64>()?,
     )?;
     ensure!(pid > 1, "missing epoch 226 owner");
+    let identity = native265_process::stat(u64::from(pid))?;
     let root = Path::new("/proc").join(pid.to_string());
     let image = Path::new(args[0]);
     let actual = fs::read(root.join("cmdline"))?;
@@ -250,9 +251,19 @@ fn exact_process(
         .find_map(|r| r.strip_prefix("anon "))
         .context("226 anonymous memory")?
         .parse::<u64>()?;
+    let members = fs::read_to_string(cg.join("cgroup.procs"))?;
+    let mut single_owner = members.split_whitespace().eq([pid.to_string().as_str()]);
+    for child in fs::read_dir(&cg)? {
+        single_owner &= !child?.file_type()?.is_dir();
+    }
+    ensure!(
+        native265_process::stat(u64::from(pid))? == identity,
+        "226 process identity changed during sampling"
+    );
     Ok(
         json!({"unit":unit,"invocation_id":invocation,"pid":pid,"memory_max_bytes":memory_max,
-        "memory_current_bytes":memory_current,"anonymous_bytes":anonymous,"image_sha256":image_sha,"cgroup":group}),
+        "memory_current_bytes":memory_current,"anonymous_bytes":anonymous,"image_sha256":image_sha,
+        "cgroup":group,"start_ticks":identity.1,"single_process_cgroup":single_owner}),
     )
 }
 
@@ -316,6 +327,76 @@ pub(super) fn live(
         "guard_plan":receipt["guard_plan"],"first_guard":receipt["first_guard"],
         "ordinary_replay_claim":false,"current_sidecar_eta_valid":false}),
     )
+}
+
+pub(crate) fn memory_rows(active: &Value, census: &Value, observer: &Value) -> Result<[Value; 2]> {
+    ensure!(
+        active["epoch"] == 226
+            && active["ordinary_replay_claim"] == false
+            && active["sampled_at_utc"] == observer["recorded_at_utc"]
+            && active["producer"] == census[UNIT],
+        "epoch 226 memory scope or sample changed"
+    );
+    let owners = &active["capacity_owners"];
+    let row = |key: &str, name: &str| -> Result<Value> {
+        let owner = &owners[key];
+        let unit = &census[name];
+        let pid = owner["pid"].as_u64().context("226 resource PID")?;
+        let ticks = owner["start_ticks"]
+            .as_u64()
+            .context("226 resource start")?;
+        ensure!(
+            pid > 1
+                && ticks > 0
+                && owner["single_process_cgroup"] == true
+                && owner["unit"] == name
+                && owner["cgroup"] == unit["ControlGroup"]
+                && iid(&owner["invocation_id"])
+                && owner["invocation_id"] == unit["InvocationID"]
+                && unit["Id"] == name
+                && unit["MainPID"].as_str().and_then(|v| v.parse().ok()) == Some(pid)
+                && unit["ActiveState"] == "active"
+                && unit["SubState"] == "running"
+                && unit["NRestarts"] == "0",
+            "226 resource owner or cgroup changed"
+        );
+        let sample = |endpoint: &str| -> Result<Value> {
+            let host = &observer["host_resident_memory"][endpoint];
+            let rss = &host["rss"];
+            ensure!(
+                host["status"] == "observed"
+                    && rss["census_stable"] == true
+                    && rss["error"].is_null(),
+                "226 coordinated host census unavailable"
+            );
+            let mut records = rss["processes"]
+                .as_array()
+                .context("226 coordinated host processes unavailable")?
+                .iter()
+                .filter(|row| row["pid"] == pid);
+            let process = records
+                .next()
+                .context("226 resource owner missing from host RSS")?;
+            ensure!(
+                records.next().is_none() && process["start_ticks"] == ticks,
+                "226 host RSS PID reused or duplicated"
+            );
+            Ok(json!({
+                "unit": name, "invocation_id": owner["invocation_id"], "restarts": 0,
+                "active_state": "active", "sub_state": "running",
+                "rss": {"census_stable": true, "aggregate_rss_bytes": process["rss_bytes"],
+                        "error": null, "processes": [process]},
+            }))
+        };
+        let before = sample("before")?;
+        let after = sample("after")?;
+        Ok(json!({
+            "invocation_binding_stable": true, "resource_only": true,
+            "controller_before": before, "producer_before": before,
+            "controller_after": after, "producer_after": after,
+        }))
+    };
+    Ok([row("producer", UNIT)?, row("broker", BROKER)?])
 }
 
 #[cfg(test)]

@@ -221,6 +221,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         "memory target requires same-sample 201–300 fleet"
     );
     let mut owners = BTreeMap::new();
+    let mut extraction = Vec::new();
     for active in ledger["active"].as_array().context("fleet active census")? {
         let unit = if active["producer"].is_object() {
             &active["producer"]
@@ -272,6 +273,28 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                 "duplicate memory owner conflicts"
             );
         }
+        if active["phase"] == "private-held-extraction" {
+            ensure!(extraction.is_empty(), "duplicate epoch 226 extraction");
+            extraction.extend(super::fleet::extract226::memory_rows(
+                active,
+                &ledger["unit_census"],
+                o,
+            )?);
+        }
+    }
+    if let [_, broker] = extraction.as_slice() {
+        let name = broker["producer_after"]["unit"]
+            .as_str()
+            .context("226 broker unit")?;
+        let iid = broker["producer_after"]["invocation_id"]
+            .as_str()
+            .context("226 broker invocation")?;
+        ensure!(
+            owners
+                .insert(name.to_owned(), (iid.to_owned(), false))
+                .is_none(),
+            "226 broker is already registered"
+        );
     }
     let mut ordinary = Vec::new();
     let mut private = Vec::new();
@@ -291,6 +314,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
             }
         }
     }
+    rows.extend(&extraction);
     for row in rows {
         let name = row["producer_after"]["unit"]
             .as_str()
@@ -836,6 +860,62 @@ mod tests {
         let ledger = json!({"first_epoch":201,"last_epoch":300,"sampled_at_utc":o["recorded_at_utc"],"active":active});
         (o, ledger)
     }
+    #[test]
+    fn extraction_charges_both_same_sample_owners_without_replay_credit() {
+        let (mut observer, mut ledger) = fixture();
+        let node = "horizon-qualify-226-checkpoint-continuation-extract-v1.service";
+        let broker = "foundation-226-original225-broker-v1.service";
+        let mut owners = serde_json::Map::new();
+        let mut units = serde_json::Map::new();
+        let host = &mut observer["host_resident_memory"]["after"]["rss"];
+        let rss = 10_000;
+        for (role, name, pid) in [("producer", node, 5), ("broker", broker, 6)] {
+            let iid = format!("{pid:032x}");
+            let group = format!("/system.slice/{name}");
+            owners.insert(
+                role.to_owned(),
+                json!({"unit":name,"invocation_id":iid,"pid":pid,
+                "cgroup":group,"start_ticks":20,"single_process_cgroup":true}),
+            );
+            units.insert(
+                name.to_owned(),
+                json!({"Id":name,"InvocationID":iid,
+                "ControlGroup":group,"MainPID":pid.to_string(),"ActiveState":"active",
+                "SubState":"running","NRestarts":"0"}),
+            );
+            host["processes"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"pid":pid,"start_ticks":20,"rss_bytes":rss}));
+        }
+        host["aggregate_rss_bytes"] =
+            json!(host["aggregate_rss_bytes"].as_u64().unwrap() + 2 * rss);
+        observer["host_resident_memory"]["before"] =
+            observer["host_resident_memory"]["after"].clone();
+        ledger["unit_census"] = Value::Object(units);
+        let active = json!({
+            "epoch":226,"phase":"private-held-extraction","ordinary_replay_claim":false,
+            "sampled_at_utc":observer["recorded_at_utc"],"producer":ledger["unit_census"][node],
+            "capacity_owners":owners,
+        });
+        ledger["active"].as_array_mut().unwrap().push(active);
+        let result = report(&observer, &ledger);
+        assert_eq!(result["valid"], true, "{result}");
+        assert_eq!(result["executing_lanes"], 3);
+        assert_eq!(result["non_replay_owner_count"], 2);
+        assert_eq!(result["non_replay_resident_bytes"], 2 * rss);
+        for key in ["producer", "broker"] {
+            let mut changed = ledger.clone();
+            changed["active"][3]["capacity_owners"][key]["start_ticks"] = json!(21);
+            assert_eq!(report(&observer, &changed)["valid"], false);
+            changed = ledger.clone();
+            changed["active"][3]["capacity_owners"][key]["single_process_cgroup"] = json!(false);
+            assert_eq!(report(&observer, &changed)["valid"], false);
+        }
+        ledger["unit_census"][broker]["InvocationID"] = json!("f".repeat(32));
+        assert_eq!(report(&observer, &ledger)["valid"], false);
+    }
+
     #[test]
     fn settled_qualifications_have_own_century_target_and_deduplicate_cohort_owners() {
         let (o, mut ledger) = fixture();
