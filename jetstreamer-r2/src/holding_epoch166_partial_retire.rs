@@ -221,6 +221,9 @@ fn native(unit: &str) -> Result<Value> {
     {
         command.args(["-p", "Names,Transient,NeedDaemonReload,ControlGroup,ExecMainCode,ExecMainExitTimestamp,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic"]);
     }
+    native_fields(&mut command)
+}
+fn native_fields(command: &mut std::process::Command) -> Result<Value> {
     let out = command.output()?;
     ensure!(
         out.status.success() && out.stderr.is_empty() && out.stdout.len() <= 256 << 10,

@@ -1034,7 +1034,13 @@ pub(super) fn verify(p: &Retire) -> Result<Value> {
             if c.all[&node.file.path].definition {
                 let mut actual_owner = false;
                 for unit in &node.owner_units {
-                    let row = native(unit)?;
+                    // The registered terminal proof checks ExecStart separately.
+                    // Definition attribution only needs the scalar path fields.
+                    let row = native_fields(
+                        std::process::Command::new("/usr/bin/systemctl")
+                            .args(["show", unit, "-p", "Id,FragmentPath,DropInPaths"]),
+                    )?;
+                    ensure!(row["Id"] == *unit, "different definition owner");
                     actual_owner |= row["FragmentPath"]
                         .as_str()
                         .is_some_and(|path| same_definition(path, &node.file.path))

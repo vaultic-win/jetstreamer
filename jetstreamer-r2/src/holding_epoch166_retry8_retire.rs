@@ -28,7 +28,8 @@ const MUTATION_LOCK: &str = "/home/sol/.jetstreamer-private/r2-receipts/local-mu
 const EPOCH_LOCK: &str = "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local3retry8-20261110-v1/private/destination-f5ca2c2ad058437c08aaf6b1f7ce14a26791e7ff9d9fb375ce654c014d85a2c3/locks/epoch-166.lock";
 const QUARANTINE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/retirements/epoch166-retry8-b9570bb82bf9f905f7725e03f08bca368d17581bce11327ec2536270202955f2.jet";
 const STATE_SHA: &str = "ef63e2a2e443375f84b1c851c8d0ffc51454d3ef0f5bea03124f8ce3cd73e47a";
-const LIFECYCLE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch166-stopped-prefix-retirement-runtime-20261120-v1";
+const LIFECYCLE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry8-retirement-runtime-20261124-v2";
 const EVIDENCE_ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry8-prefix-retirement-evidence-20261120-v1";
 const RUN_INODE: u64 = 106109769;
 const SCRATCH_INODE: u64 = 106109776;
