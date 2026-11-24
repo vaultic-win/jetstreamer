@@ -65,12 +65,14 @@ MISSED_RUNTIME_145 = GUARD_RUNTIME_145 or HERE == D / "tools-homefloor-145-misse
 LEASE_RUNTIME_145 = MISSED_RUNTIME_145 or HERE == D / "tools-homefloor-145-lease-rejoin-v1"
 STOPPED_V5R = HERE == D / "tools-homefloor-145-v5r-stopped-v1"
 STOPPED_V5S = HERE == D / "tools-homefloor-145-v5s-stopped-v1"
+STOPPED_V5T = HERE == D / "tools-homefloor-145-v5t-stopped-v1"
+STOPPED_GUARD_145 = STOPPED_V5R or STOPPED_V5S or STOPPED_V5T
 STOPPED_V5P = HERE == D / "tools-homefloor-145-v5p-stopped-v1"
 STOPPED_V5O = HERE == D / "tools-homefloor-145-v5o-stopped-v1"
 STOPPED_V5N = HERE == D / "tools-homefloor-145-v5n-stopped-v1"
 STOPPED_V5M = HERE == D / "tools-homefloor-145-v5m-stopped-v1"
 STOPPED_V5K = HERE == D / "tools-homefloor-145-v5k-stopped-v1"
-LEASE_BUILD_145 = STOPPED_V5S or STOPPED_V5R or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or STOPPED_V5K or HERE == D / "tools-homefloor-145-lease-build-v1"
+LEASE_BUILD_145 = STOPPED_GUARD_145 or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or STOPPED_V5K or HERE == D / "tools-homefloor-145-lease-build-v1"
 RETRY_HANDOFF_145 = LATE_HANDOFF_145 or HERE in (D / "tools-homefloor-145-handoff-v2", D / "tools-homefloor-145-handoff-v3")
 DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
 V5N_136 = HERE == D / "tools-homefloor-145-post-v5n-136-v1"
@@ -553,7 +555,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch):
-    guard_terminal = STOPPED_V5S or STOPPED_V5R or (GUARD_TERMINAL_RECOVERY_145 and not fit.members(fit.A145))
+    guard_terminal = STOPPED_GUARD_145 or (GUARD_TERMINAL_RECOVERY_145 and not fit.members(fit.A145))
     for active, name in ((guard_terminal, "v5r_stopped.py"), (STOPPED_V5P, "v5p_stopped.py"), (STOPPED_V5O, "v5o_stopped.py"),
                          (STOPPED_V5N, "v5n_stopped.py"), (STOPPED_V5M, "v5m_stopped.py"),
                          (STOPPED_V5K, "v5k_stopped.py")):
@@ -565,6 +567,8 @@ def phase145(epoch):
                 s.need(seal["destination"] == str(HERE), "unbound stopped 145 adapter")
                 fit.binary(HERE / name, member["sha256"])
             inspect = runpy.run_path(str(HERE / name))["stopped_phase"]
+            if STOPPED_V5T:
+                return inspect(s, fit, fresh_census=True)
             if STOPPED_V5S or GUARD_WALK_RECOVERY_145:
                 return inspect(s, fit, allocation_walk=True)
             return inspect(s, fit)
@@ -1364,7 +1368,7 @@ def capture_native(epoch,ref,prestart136=None):
     return result
 
 def capture(epoch, ref, prestart136=None):
-    if STOPPED_V5S or STOPPED_V5R or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or LATE_HANDOFF_145:
+    if STOPPED_GUARD_145 or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or LATE_HANDOFF_145:
         s.need(epoch == 145 and (prestart136 is None or POST_136), "unexpected missed-census pricing scope")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
         module = HERE / "build_159_price.py"
@@ -1373,7 +1377,7 @@ def capture(epoch, ref, prestart136=None):
         fit.binary(module,member["sha256"])
         donor = runpy.run_path(str(module))
         before = donor["snapshot"]() if prestart136 is None else None
-        guarded = STOPPED_V5S or STOPPED_V5R or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or GUARD_RUNTIME_145 or V5N_POST or GUARDED_HANDOFF_145
+        guarded = STOPPED_GUARD_145 or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or GUARD_RUNTIME_145 or V5N_POST or GUARDED_HANDOFF_145
         if guarded:
             feature = HERE/"v5n_feature_cover.py"
             source, = [m for m in seal["members"] if m["name"] == feature.name and m["mode"] == "0444"]

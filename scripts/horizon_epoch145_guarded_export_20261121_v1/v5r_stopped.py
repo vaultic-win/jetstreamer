@@ -10,6 +10,7 @@ TERMINAL = RUNTIME / (
 )
 TERMINAL_SHA = "85e6514447293f66ebf4e20936e9bac0551575bb0f6fdab66651b7aa0e391d97"
 WALK_TERMINAL_SHA = "72dccb349348cacf68d1ffad0aecf88aef2491623cb5c5876402c41e2e0bceba"
+FRESH_CENSUS_TERMINAL_SHA = "287ac3b37ff53897d20e0a98519df4bfdec9d186662532dbbd7f84ef07f7e5aa"
 PRIOR_ADAPTER = RUNTIME / (
     "incident-replay-fit-20261121-v1/tools-homefloor-145-v5p-stopped-v1/v5p_stopped.py"
 )
@@ -19,9 +20,23 @@ UNIT = "horizon-holding-export145-20261121-v1.service"
 STATE = RUNTIME / "epoch145-guarded-export-20261121-v1/state"
 
 
-def stopped_phase(status, fit, *, allocation_walk=False):
+def stopped_phase(status, fit, *, allocation_walk=False, fresh_census=False):
     original, original_ref = status.read(TERMINAL, TERMINAL_SHA)
-    if allocation_walk:
+    if fresh_census:
+        status.need(not allocation_walk, "ambiguous stopped verifier generation")
+        terminal, ref = status.read(
+            TERMINAL.with_name("V5T_FRESH_CENSUS_TERMINAL_105315.json"),
+            FRESH_CENSUS_TERMINAL_SHA,
+        )
+        _, previous = status.read(
+            TERMINAL.with_name("V5S_GUARD_WALK_TERMINAL_103041.json"), WALK_TERMINAL_SHA)
+        status.need(terminal["predecessor"] == previous and terminal["resource_credit_bytes"] == 0,
+                    "different guarded verifier predecessor")
+        schema = "horizon-epoch145-fresh-census-terminal-v1"
+        error = "stopped worker fresh-census deadline"
+        expected = terminal["manager"]
+        iid = expected["InvocationID"]
+    elif allocation_walk:
         iid = "c31fbc8288104da4bd78e10f8ada7196"
         terminal, ref = status.read(
             TERMINAL.with_name("V5S_GUARD_WALK_TERMINAL_103041.json"), WALK_TERMINAL_SHA)
