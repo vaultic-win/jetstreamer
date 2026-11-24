@@ -138,6 +138,74 @@ pub(super) fn seven_delivery_predecessor(
     Ok(true)
 }
 
+pub(super) fn stopped_292_observer_predecessor(
+    fleet: &BoundFile,
+    previous: &Value,
+    observer: &BoundFile,
+    observation: &Value,
+) -> Result<bool> {
+    let base = Path::new("/home/ubuntu/.codex/diagnostics");
+    let reference = |path: &str, sha256: &str| BoundFile {
+        path: base.join(path),
+        sha256: sha256.to_owned(),
+    };
+    let accepted = reference(
+        "horizon-foundation-seven-lane-v290/fleet.json",
+        "013e9cd9792671f29e969cca8bc53657caaf27c979525abce5293a423cb3ea5",
+    );
+    let resumed = reference(
+        "horizon-resume-observer-20261120-v292.json",
+        "f15689d43d54b2a9349e57b4045cbf2e9a1557f3ca388b59804e161a3415429f",
+    );
+    if fleet != &accepted || observer != &resumed {
+        return Ok(false);
+    }
+    let initial = reference(
+        "horizon-resume-observer-20261120-v290.json",
+        "f00885317d434657f343837d8cb2b22d034ba7ba63fe10a49841359f2939cd61",
+    );
+    let interrupted = reference(
+        "horizon-resume-observer-20261120-v291.json",
+        "52dfbb9ddebe3d81ec49f30e754a44991faf64e1a3172cf83cf735293592b7a3",
+    );
+    let cutoff = bound_json(&reference(
+        "horizon-foundation-seven-lane-v291/interrupted-cutoff.json",
+        "54ec6fd036e123c606dfa835caaf92f16be3f979b401ea8e3fe7f3c73bfe26a1",
+    ))?;
+    let initial_sample = bound_json(&initial)?;
+    let interrupted_sample = bound_json(&interrupted)?;
+    ensure!(
+        cutoff["schema"] == "foundation-epoch292-stopped-during-fleet-reconciliation-v1"
+            && cutoff["previous_fleet"] == private157::binding(fleet)
+            && cutoff["observer"] == private157::binding(&interrupted)
+            && cutoff["producer_invocation_id"] == "ed9666c18ff34ef3bb1cca59131a323b"
+            && cutoff["status_keys_authentication_passed"] == true
+            && cutoff["new_resource_samples"] == 0
+            && cutoff["archive_publication_authorized"] == false
+            && previous["observer_receipt"].as_str() == initial.path.to_str()
+            && previous["observer_sha256"] == initial.sha256
+            && previous["sampled_at_utc"] == initial_sample["recorded_at_utc"]
+            && *observation == bound_json(&resumed)?,
+        "different epoch 292 interruption or accepted observation"
+    );
+    for (reference, earlier, later) in [
+        (&initial, &initial_sample, &interrupted_sample),
+        (&interrupted, &interrupted_sample, observation),
+    ] {
+        let cadence = &later["cadence"];
+        ensure!(
+            later["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+                && cadence["previous_sample"].as_str() == reference.path.to_str()
+                && cadence["previous_sample_sha256"] == reference.sha256
+                && cadence["previous_sample_recorded_at_utc"] == earlier["recorded_at_utc"]
+                && cadence["routine_minimum_interval_enforced"] == true
+                && num(cadence, "observed_interval_seconds")? >= 1800,
+            "broken routine observation link after the epoch 292 stop"
+        );
+    }
+    Ok(true)
+}
+
 #[cfg(test)]
 #[test]
 #[ignore = "reads the recorded Foundation fleet and three routine observations"]
