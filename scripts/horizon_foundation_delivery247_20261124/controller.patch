@@ -104,7 +104,7 @@
 +        if claim['unit'] not in plan['tracked_units']:
 +            plan['tracked_units'].append(claim['unit'])
 +        add(plan['gates']['247'], successor_247['registration'], successor_247['predecessor_status'],
-+            successor_247['claim'], successor_247['spec'], *claim['evidence'])
++            successor_247['initial_status'], successor_247['claim'], successor_247['spec'], *claim['evidence'])
      guarded_replays.gate(plan,cfg['replays'])
      fleet_image = register_226(plan)
 +    if successor_247:

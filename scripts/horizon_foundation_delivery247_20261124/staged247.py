@@ -38,7 +38,7 @@ def load(original):
     pointer = sealed(REGISTRATION)
     data = bound(pointer)
     assert set(data) == {
-        "schema", "epoch", "predecessor", "predecessor_status", "claim", "spec",
+        "schema", "epoch", "predecessor", "predecessor_status", "claim", "spec", "initial_status",
     }
     assert data["schema"] == "foundation-staged-247-cadence-registration-v1"
     assert data["epoch"] == EPOCH and data["predecessor"] == original["claim"]
@@ -80,6 +80,21 @@ def load(original):
         bound(original["spec"]), uploader_pid=pid, reader_plan=plan,
         receipt_directory=str(STATE / "receipts"),
     )
+
+    assert data["initial_status"] == sealed(ROOT / "initial-status" / "completion.json")
+    initial = bound(data["initial_status"])
+    intent = bound(initial["intent"])
+    status = bound(initial["readback"])
+    assert initial["key"] == "epoch-247.epoch-status.json" and initial["authenticated_exact_byte_readback"]
+    assert intent["previous"] == OLD_STATUS and intent["key"] == initial["key"]
+    owner = {"claim": data["claim"], "unit": UNIT, "invocation_id": iid}
+    assert intent["owner"] == owner and intent["payload"] == status
+    assert status["epoch"] == EPOCH and status["phase"] == "verification"
+    assert status["jet_size_bytes"] == prepared["staged_object"]["archive_length"]
+    assert status["estimated_remaining_millis"] > 0
+    previous_status = bound(bound(OLD_STATUS)["readback"])
+    assert status["sampled_at_utc"] > previous_status["sampled_at_utc"]
+
     observer = sealed(OBSERVER)
     assert observer["sha256"] == OBSERVER_SHA
     return dict(data, registration=pointer, observer=observer, configuration={
@@ -88,8 +103,10 @@ def load(original):
 
 
 def adopt_status(current, successor):
-    if current is None or current == OLD_STATUS:
-        return current
+    if current is None:
+        return None
+    if current == OLD_STATUS:
+        return successor["initial_status"]
     owner = bound(bound(current)["intent"])["owner"]
     assert owner == {
         "claim": successor["claim"], "unit": UNIT,
