@@ -497,9 +497,8 @@ fn original() -> Result<Value> {
         result["invocation_id"] == SOURCE
             && intent["argv"] == result["argv"]
             && intent["original"]["_BOOT_ID"] == boot
-            && intent["original"]["INVOCATION_ID"] == "f86e7e61f4b34dc7aedc4e08a128e713"
-            && start_ref["sha256"]
-                == "e4b9e72a6481ea4f38b8fe7b49986463e2f93d37bc1dcb7f2156049930fd744b"
+            && intent["original"]["INVOCATION_ID"] == predecessor
+            && start_ref["sha256"] == start_sha
             && start["iid"] == SOURCE
             && start["image"] == IMAGE
             && start["r2_mutations"] == false
