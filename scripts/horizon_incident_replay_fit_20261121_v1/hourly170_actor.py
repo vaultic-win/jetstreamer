@@ -309,9 +309,35 @@ def owner(s, fit, contract, fleet, fleet_ref, row, stage):
         need(row[FIELD] == ref and row["unit"]["Id"] == UNIT and row["unit"]["InvocationID"] == iid
              and int(row["unit"]["MainPID"]) == pid, "unjoined private cadence row")
     need(fit.members(UNIT) == members and properties(UNIT, *fields) == m, "diagnostic native owner changed")
+    registration = None
+    if stage == "active":
+        registration = dict(
+            epoch=170,
+            role="private historical mismatch diagnostic",
+            unit=m,
+            native_start_ticks=ticks,
+            admission=ref,
+            guard_timer=t,
+            guard_plan=src["guard_plan"],
+            first_guard=src["first_guard"],
+            post_guard_capacity=dict(path=str(POST), sha256=grant["native_post_guard_fit_sha256"]),
+            observer_config=dict(
+                range="170", producer_unit=UNIT, controller_unit=UNIT,
+                expected_producer_invocation_id=iid, expected_controller_invocation_id=iid,
+                scratch_path=str(RUN / "scratch"), worker_executable_basename="historical-worker",
+                append_log=dict(path=str(RUN / "producer.log"), device=log.st_dev, inode=log.st_ino),
+            ),
+            coordinated_sample_observed_this_invocation=False,
+            canonical_replay_claimed=False,
+            transaction_replay_claimed=False,
+            archive_publication_authorized=False,
+            resource_credit_bytes=0,
+            **{FIELD: ref},
+        )
     return dict(unit=UNIT, processes=processes, iid=iid, timer_iid=t["InvocationID"],
                 plan=src["guard_plan"], first=src["first_guard"], intent=ref,
-                gate_prestart=src["prestart"], baseline=proposal["baseline_physical_bytes"], native_plan=plan)
+                gate_prestart=src["prestart"], baseline=proposal["baseline_physical_bytes"], native_plan=plan,
+                registration=registration)
 
 
 def roster(fleet, stage):
@@ -408,6 +434,13 @@ def price(native, contract, actor, guard, stage):
                    resource_fit=bool(native["fits"] and available >= required))
     if stage != "prestart":
         need(context["launch_compatible"], "live sealed V5u provider cannot recognize the 170 diagnostic")
+    if stage == "active" and context["resource_fit"]:
+        registration = actor["registration"]
+        need(registration[FIELD] == context["intent"]
+             and registration["canonical_replay_claimed"] is False
+             and registration["archive_publication_authorized"] is False,
+             "diagnostic cadence registration differs from the active quote")
+        context["cadence_registration"] = dict(registration, guard_protection=guard["receipt"])
     return dict(native, complete_required_HOME_bytes=required, available_HOME_bytes=available,
                 fits=context["resource_fit"] and context["launch_compatible"],
                 hourly170_diagnostic=context)

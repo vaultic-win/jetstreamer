@@ -75,6 +75,41 @@ class Hourly170Tests(unittest.TestCase):
         self.assertEqual(result["available_HOME_bytes"], observed["available_bytes"])
         self.assertEqual(d["intent"], first["intent"])
         self.assertEqual(d["receipt"], observed["receipt"])
+        self.assertNotIn("cadence_registration", d)
+
+    def test_active_quote_binds_private_cadence_row_to_current_guard(self):
+        running = actor()
+        registration = {
+            "epoch": 170,
+            route.FIELD: running["intent"],
+            "canonical_replay_claimed": False,
+            "archive_publication_authorized": False,
+        }
+        running["registration"] = registration
+        protection = guard()
+        result = route.price(base_price(), BIND, running, protection, "active")
+        diagnostic = result["hourly170_diagnostic"]
+        row = diagnostic["cadence_registration"]
+        self.assertEqual(row, dict(registration, guard_protection=protection["receipt"]))
+        roster = dict(actual_executing_replays=[{"epoch": 166}], actual_active_bootstraps=[],
+                      actual_active_private_diagnostics=[row])
+        self.assertEqual(route.roster(roster, "active"), ([{"epoch": 166}], row))
+        self.assertFalse(result["replay_launch_authorized"])
+
+    def test_unfunded_or_mismatched_active_diagnostic_cannot_supply_registration(self):
+        running = actor()
+        running["registration"] = {
+            "epoch": 170,
+            route.FIELD: {"path": "different-intent", "sha256": "c" * 64},
+            "canonical_replay_claimed": False,
+            "archive_publication_authorized": False,
+        }
+        floor = dict(guard(), available_bytes=FLOOR)
+        result = route.price(base_price(), BIND, running, floor, "active")
+        self.assertFalse(result["fits"])
+        self.assertNotIn("cadence_registration", result["hourly170_diagnostic"])
+        with self.assertRaisesRegex(ValueError, "cadence registration"):
+            route.price(base_price(), BIND, running, guard(), "active")
 
     def test_guard_floor_above_native_floor_is_preserved(self):
         base = base_price()

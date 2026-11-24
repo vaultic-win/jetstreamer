@@ -47,7 +47,10 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-HOURLY170 = HERE == D / "tools-homefloor-170-metered-hourly-v2"
+HOURLY170 = HERE in (
+    D / "tools-homefloor-170-metered-hourly-v2",
+    D / "tools-homefloor-170-metered-hourly-v3",
+)
 FRESH_CENSUS_RECOVERY_145 = HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
 GUARD_WALK_RECOVERY_145 = FRESH_CENSUS_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5s-guard-recovery-v1"
 GUARD_TERMINAL_RECOVERY_145 = (
