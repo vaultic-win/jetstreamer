@@ -24,7 +24,7 @@ struct Owner<'a> {
 impl Owner<'_> {
     fn range(&self) -> &'static str {
         match self.unit {
-            UNIT211 => "211-211",
+            UNIT211 | STAGED211 => "211-211",
             UNIT248 => "248-248",
             UNIT249 => "249-249",
             UNIT250 => "250-250",
@@ -450,12 +450,19 @@ const UNIT265: &str = "horizon-upload-265-ordinary-v215.service";
 const RETRY265: &str = "horizon-upload-265-ordinary-retry-v216.service";
 const UNIT249: &str = "horizon-upload-249-ordinary-v214.service";
 const UNIT211: &str = "horizon-upload-211-ordinary-v221.service";
+const STAGED211: &str = "horizon-upload-211-staged-recovery-v1.service";
+const STAGED211_IMAGE: &str = "/var/lib/jetstreamer/horizon211-staged-recovery-v1/jetstreamer-r2";
+const STAGED211_IMAGE_SHA: &str =
+    "7271de0e309c83f8fa2f35cf9091280a8b04f66c51d3175ad1d6ff02faa4c59d";
+const STAGED211_ETAG: &str = "7ee07c0c0517ba9265a8c43c01903e95-1760";
+const STAGED211_BYTES: &str = "118062008962";
 const UNIT248: &str = "horizon-upload-248-ordinary-v213.service";
 const IMAGE248: &str = "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/jetstreamer-r2";
 const SHA248: &str = "c1e99ad4b2e7f3fe56235f42a722bbe93e3f13af2003d0eb5a150553ae0a660e";
 #[derive(Clone, Copy)]
 pub(super) enum OrdinaryEpoch {
     Epoch211,
+    Staged211,
     Epoch248,
     Epoch249,
     Epoch250,
@@ -466,7 +473,7 @@ pub(super) enum OrdinaryEpoch {
 impl OrdinaryEpoch {
     fn number(self) -> u64 {
         match self {
-            Self::Epoch211 => 211,
+            Self::Epoch211 | Self::Staged211 => 211,
             Self::Epoch248 => 248,
             Self::Epoch249 => 249,
             Self::Epoch250 => 250,
@@ -477,6 +484,7 @@ impl OrdinaryEpoch {
     fn unit(self) -> &'static str {
         match self {
             Self::Epoch211 => UNIT211,
+            Self::Staged211 => STAGED211,
             Self::Epoch248 => UNIT248,
             Self::Epoch249 => UNIT249,
             Self::Epoch250 => UNIT250,
@@ -485,9 +493,16 @@ impl OrdinaryEpoch {
             Self::Retry265 => RETRY265,
         }
     }
+    fn image(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Staged211 => (STAGED211_IMAGE, STAGED211_IMAGE_SHA),
+            _ => (IMAGE248, SHA248),
+        }
+    }
     fn digest(self) -> &'static str {
         match self {
             Self::Epoch211 => "ce03172902f1108c996e0ac9e9ac90df9180ef8ba49440a3c428d177a7945da2",
+            Self::Staged211 => "c512e128fc76aa30bb2c0537e4f91a73e25a7516f18b34f424e3767b40a92cc4",
             Self::Epoch248 => "3053ed2ca2b2881f2d83855c0fa1cff6e63618387dfb630c76a3db7a2dc7d1fd",
             Self::Epoch250 => "12e68ddf9b6d2505b6090688b5a3cfa4e720242b264cf2a6e7993b9b02f910c2",
             Self::Epoch251 => "1c815780661e8b502634caff4a2b0d783e831fccc27c612d6a94c3480d00e318",
@@ -500,6 +515,7 @@ impl OrdinaryEpoch {
     pub(super) fn select(self, claim: &DeliveryClaim) -> Result<Self> {
         match (self, claim.retry_unit.as_deref()) {
             (_, None) => Ok(self),
+            (Self::Epoch211, Some(STAGED211)) => Ok(Self::Staged211),
             (Self::Epoch265, Some(RETRY265)) => Ok(Self::Retry265),
             _ => anyhow::bail!("unknown retry unit for ordinary epoch {}", self.number()),
         }
@@ -522,6 +538,11 @@ impl OrdinaryEpoch {
                 "/home/ubuntu/.jetstreamer-private/current-reader-delivery-211-v221/receipts".to_owned(),
                 "/var/lib/jetstreamer/horizon211-ordinary-reader-v221/epoch-211-plan.json".to_owned(),
             ),
+            Self::Staged211 => (
+                "/home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1/output".to_owned(),
+                "/home/ubuntu/.jetstreamer-private/current-reader-delivery-211-staged-recovery-v1/receipts".to_owned(),
+                "/var/lib/jetstreamer/horizon211-staged-recovery-v1/epoch-211-plan.json".to_owned(),
+            ),
             Self::Epoch251 => (
                 "/home/ubuntu/.jetstreamer-private/qualification-251-replacement-20261118-v1/output".to_owned(),
                 "/home/ubuntu/.jetstreamer-private/current-reader-delivery-251-20261119-v2/receipts".to_owned(),
@@ -533,8 +554,8 @@ impl OrdinaryEpoch {
                 format!("/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/epoch-{epoch}-plan.json"),
             ),
         };
-        vec![
-            IMAGE248.into(),
+        let mut args = vec![
+            self.image().0.into(),
             "sync".into(),
             source,
             "--epochs".into(),
@@ -547,7 +568,16 @@ impl OrdinaryEpoch {
             self.digest().into(),
             "--concurrency".into(),
             "2".into(),
-        ]
+        ];
+        if matches!(self, Self::Staged211) {
+            args.extend([
+                "--staged-archive-etag".into(),
+                STAGED211_ETAG.into(),
+                "--staged-archive-bytes".into(),
+                STAGED211_BYTES.into(),
+            ]);
+        }
+        args
     }
 }
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -574,6 +604,37 @@ impl DeliveryClaim {
         Ok(())
     }
 
+    fn claim_command<'a>(
+        &self,
+        epoch: OrdinaryEpoch,
+        args: &[String],
+        claim: &'a Value,
+    ) -> Result<&'a str> {
+        ensure!(
+            claim["epoch"] == epoch.number()
+                && claim["phase"] == "upload-readback"
+                && claim["unit"] == epoch.unit()
+                && claim["invocation_id"] == self.invocation_id
+                && claim["evidence"].as_array().is_some_and(|v| !v.is_empty()),
+            "ordinary delivery pipeline claim mismatch"
+        );
+        let command = claim["expected_exec_start"]
+            .as_str()
+            .context("ordinary delivery expected command")?;
+        let prefix = format!(
+            "{{ path={} ; argv[]={} ; ignore_errors=no ; start_time=",
+            epoch.image().0,
+            args.join(" ")
+        );
+        ensure!(
+            command.starts_with(&prefix)
+                && (!matches!(epoch, OrdinaryEpoch::Staged211)
+                    || (command.ends_with(" }") && command.matches("{ path=").count() == 1)),
+            "ordinary delivery unexpected uploader command"
+        );
+        Ok(command)
+    }
+
     fn checked_command(&self, epoch: OrdinaryEpoch) -> Result<()> {
         self.validate()?;
         let path = epoch.claim_path();
@@ -597,25 +658,7 @@ impl DeliveryClaim {
         );
         let claim: Value = serde_json::from_slice(&bytes)?;
         let args = epoch.argv();
-        ensure!(
-            claim["epoch"] == epoch.number()
-                && claim["phase"] == "upload-readback"
-                && claim["unit"] == epoch.unit()
-                && claim["invocation_id"] == self.invocation_id
-                && claim["evidence"].as_array().is_some_and(|v| !v.is_empty()),
-            "ordinary delivery pipeline claim mismatch"
-        );
-        let command = claim["expected_exec_start"]
-            .as_str()
-            .context("ordinary delivery expected command")?;
-        let prefix = format!(
-            "{{ path={IMAGE248} ; argv[]={} ; ignore_errors=no ; start_time=",
-            args.join(" ")
-        );
-        ensure!(
-            command.starts_with(&prefix),
-            "ordinary delivery unexpected uploader command"
-        );
+        let command = self.claim_command(epoch, &args, &claim)?;
         let actual = fs::read(format!("/proc/{}/cmdline", self.pid))?;
         ensure!(
             actual == (args.join("\0") + "\0").as_bytes(),
@@ -634,12 +677,13 @@ impl DeliveryClaim {
 }
 
 pub(super) fn sample_ordinary(epoch: OrdinaryEpoch, claim: &DeliveryClaim, clock: u64) -> Value {
+    let (image, sha) = epoch.image();
     let owner = Owner {
         unit: epoch.unit(),
         iid: &claim.invocation_id,
         pid: claim.pid,
-        image: IMAGE248,
-        sha: SHA248,
+        image,
+        sha,
         cap: 10 << 30,
     };
     let result = (|| {
@@ -748,6 +792,59 @@ mod tests {
         assert!(OrdinaryEpoch::Epoch249.select(&claim).is_err());
         claim.retry_unit = Some(UNIT248.into());
         assert!(original.select(&claim).is_err());
+    }
+    #[test]
+    fn staged_211_uses_its_own_exact_uploader_plan_and_archive_pin() {
+        let original = OrdinaryEpoch::Epoch211;
+        let claim = DeliveryClaim {
+            retry_unit: Some(STAGED211.into()),
+            invocation_id: "a".repeat(32),
+            pid: 1234,
+            claim_sha256: "b".repeat(64),
+        };
+        let staged = original.select(&claim).unwrap();
+        assert_eq!(staged.unit(), STAGED211);
+        assert_eq!(
+            Owner {
+                unit: STAGED211,
+                ..ORIGINAL
+            }
+            .range(),
+            "211-211"
+        );
+        assert_ne!(staged.claim_path(), original.claim_path());
+        assert_eq!(staged.image(), (STAGED211_IMAGE, STAGED211_IMAGE_SHA));
+        assert!(OrdinaryEpoch::Epoch265.select(&claim).is_err());
+        let args = staged.argv();
+        assert_eq!(args[2], original.argv()[2]);
+        assert_eq!(args[10], staged.digest());
+        assert_eq!(
+            &args[13..],
+            [
+                "--staged-archive-etag",
+                STAGED211_ETAG,
+                "--staged-archive-bytes",
+                STAGED211_BYTES,
+            ]
+        );
+        let cmd = format!(
+            "{{ path={} ; argv[]={} ; ignore_errors=no ; start_time=[n/a] }}",
+            STAGED211_IMAGE,
+            args.join(" ")
+        );
+        let mut payload = json!({
+            "epoch": 211,
+            "phase": "upload-readback",
+            "unit": STAGED211,
+            "invocation_id": claim.invocation_id,
+            "evidence": [{"path":"/sealed/launch.json","sha256":"1".repeat(64)}],
+            "expected_exec_start": cmd,
+        });
+        assert!(claim.claim_command(staged, &args, &payload).is_ok());
+        payload["expected_exec_start"] = json!(cmd.replace(STAGED211_ETAG, "incorrect"));
+        assert!(claim.claim_command(staged, &args, &payload).is_err());
+        payload["expected_exec_start"] = json!(cmd.replace(staged.digest(), original.digest()));
+        assert!(claim.claim_command(staged, &args, &payload).is_err());
     }
     #[test]
     fn ordinary_delivery_requires_a_bound_claim_and_pid() {
