@@ -1,4 +1,5 @@
 """Offline controls for the exact bounded 142 incident. No node is executed."""
+import ast
 from copy import deepcopy
 from pathlib import Path
 import json
@@ -92,7 +93,7 @@ def verify(bounded, s):
                 scope="Offline contract replay from native manager, input route and terminal receipt; no historical /proc image retained.")
 
 
-def verify146(bounded, s):
+def verify146(bounded, s, census):
     entry, entry_ref = s.read(bounded["ENTRY146"], bounded["ENTRY146_SHA"])
     unit = bounded["PROBE146"]
     group = "0::/horizonaudit.slice/" + unit
@@ -109,7 +110,12 @@ def verify146(bounded, s):
         s.need(ref == lease_ref and path == bounded["LEASE146"], "foreign test lease reference")
         return lease
 
+    vanished_while_checking = False
+    terminal = False
+
     def live(reader, route, expected, start):
+        if vanished_while_checking:
+            raise ProcessLookupError(pid)
         s.need(route["argv"] == entry["planned_argv"] and start == ticks, "wrong native test route")
         s.need(expected["snapshot"][2] == 4459684282 and expected["inputs_readonly"]
                and expected["worker_noexec"] and expected["private_network"]
@@ -118,9 +124,56 @@ def verify146(bounded, s):
                and expected["manager"]["TasksMax"] == "64", "missing bounded entry envelope")
         accepted.append(expected)
 
-    reader = SimpleNamespace(bound=bound, need=s.need, read=s.read)
+    processes = {}
+
+    class Process:
+        def __init__(self, pid):
+            self.name = str(pid)
+
+        def __truediv__(self, name):
+            assert name == "comm"
+            return SimpleNamespace(read_text=lambda: processes[int(self.name)][0])
+
+    class Proc:
+        def __init__(self, path):
+            assert path == "/proc"
+
+        def iterdir(self):
+            return [Process(pid) for pid in processes]
+
+    def process(pid):
+        details = processes[pid][1]
+        if isinstance(details, Exception):
+            raise details
+        return details
+
+    def ended(claim):
+        s.need(claim["pid"] == pid and claim["invocation_id"] == original["invocation_id"],
+               "terminal check used a foreign registration")
+        return terminal
+
+    def old_probe(reader, old_pid, comm, start, old_group):
+        if (old_pid, comm, old_group) == (bounded["PID"], "jetstreamer-nod", "0::" + bounded["GROUP"]):
+            return dict(pid=old_pid, invocation_id=bounded["IID"])
+
+    reader = SimpleNamespace(bound=bound, need=s.need, read=s.read, process=process)
     observe = bounded["observe146"]
-    with patch.dict(observe.__globals__, verify_live=live):
+    adapter = dict(bounded, observe=old_probe, terminal146=ended)
+
+    def capture(registration=lease_ref):
+        return census({}, {}, None, {"occupied":False}, 145, {}, entry_lease=registration)
+
+    def reject(call, exception, message):
+        try:
+            call()
+        except exception as exc:
+            s.need(str(exc) == message, "unrelated epoch 146 fixture failure")
+        else:
+            raise ValueError("missing rejection: " + message)
+
+    with patch.dict(observe.__globals__, verify_live=live, terminal146=ended), \
+            patch.dict(census.__globals__, Path=Proc, s=reader, fit=SimpleNamespace(units=lambda:set()),
+                       bounded142=adapter):
         claim = observe(reader,pid,"jetstreamer-nod",ticks,group,lease_ref)
         s.need(claim["registration"] == lease_ref and claim["memory_bytes"] == 192<<20
                and claim["scratch_bytes"] == 8<<20 and claim["additional_cpu_quota_micros"] == 0,
@@ -129,22 +182,189 @@ def verify146(bounded, s):
                     "preflight":dict(entry_ref,sha256="0"*64),"invocation_id":"0"*32}
         for field,value in variants.items():
             lease = dict(original, **{field:value})
-            try:
-                observe(reader,pid,"jetstreamer-nod",ticks,group,lease_ref)
-            except ValueError as exc:
-                s.need(str(exc)=="different bounded epoch 146 lease","unrelated epoch 146 fixture failure")
-            else:
-                raise ValueError("accepted changed bounded epoch 146 " + field)
+            reject(lambda:observe(reader,pid,"jetstreamer-nod",ticks,group,lease_ref),
+                   ValueError,"different bounded epoch 146 lease")
+        lease = dict(original, start_ticks=0)
+        reject(capture,ValueError,"different bounded epoch 146 lease")
+        lease = deepcopy(original)
         s.need(observe(reader,pid,"historical-work",ticks,group,lease_ref) is None
                and observe(reader,pid,"jetstreamer-nod",ticks,"0::/system.slice/"+unit,lease_ref) is None
                and len(accepted)==1,"foreign process reached the epoch 146 live reader")
+
+        reject(lambda:capture(dict(lease_ref, sha256="2"*64)),ValueError,"foreign test lease reference")
+        s.need(capture(None)==({},None),"unexpected reservation without a fleet lease")
+        processes[pid] = ("python3", (1,ticks,group))
+        held = capture()
+        processes[pid] = ("jetstreamer-nod", (1,ticks,group))
+        running = capture()
+        s.need(held==running==({},claim) and len(accepted)==2,"held-to-exec changed the reservation or skipped live verification")
+        reject(lambda:capture(None),ValueError,"unregistered replay process " + str(pid))
+        processes[pid] = ("jetstreamer-nod", (1,ticks+1,group))
+        reject(capture,ValueError,"different bounded epoch 146 lease")
+        processes[pid] = ("jetstreamer-nod", (1,ticks,"0::/system.slice/unregistered.service"))
+        reject(capture,ValueError,"unregistered replay process " + str(pid))
+        processes[pid] = ("historical-work", (1,ticks,group))
+        reject(capture,ValueError,"unregistered replay process " + str(pid))
+        processes[pid] = ("jetstreamer-nod", ProcessLookupError(pid))
+        reject(capture,ProcessLookupError,str(pid))
+        terminal = True
+        s.need(capture()==held,"positively identified exit during /proc scan dropped the reservation")
+        processes[pid] = ("jetstreamer-nod", (1,ticks,group))
+        vanished_while_checking = True
+        s.need(capture()==held,"positively identified exit during native verification dropped the reservation")
+        terminal = False
+        reject(capture,ProcessLookupError,str(pid))
+        processes.clear()
+        s.need(capture()==held and capture(None)==({},None),"terminal or fleet release changed the reservation incorrectly")
+        old_pid = bounded["PID"]
+        processes[old_pid] = ("jetstreamer-nod", (1,ticks,"0::"+bounded["GROUP"]))
+        reject(capture,ValueError,"overlapping bounded entry probes")
+        s.need(capture(None)==({},dict(pid=old_pid, invocation_id=bounded["IID"])),
+               "changed historic 142 census")
     return dict(preflight=entry_ref, accepted_fixture=True, rejected_fields=sorted(variants),
+                transition_controls=["held", "native exec", "identified exit during scan", "identified exit during verification",
+                                     "terminal reserved", "successor fleet release", "overlapping 142 rejected"],
+                terminal_controls=verify146_terminal(bounded, s, claim),
+                cadence_controls=verify146_cadence(s, claim),
                 live_node_executed=False)
+
+
+def verify146_terminal(bounded, s, claim):
+    unit, group, pid = claim["unit"], bounded["GROUP146"], claim["pid"]
+    terminal = dict(Id=unit, InvocationID=claim["invocation_id"], ExecMainPID=str(pid), MainPID="0",
+                    ControlPID="0", ActiveState="failed", SubState="failed", Job="", NRestarts="0",
+                    ControlGroup="")
+    rows = []
+    pid_visible = False
+    cgroup_members = ""
+
+    def show(command, **kwargs):
+        s.need(command[:3] == ["/usr/bin/systemctl", "show", "-p"] and command[-1] == unit,
+               "foreign terminal provider command")
+        return "\n".join(f"{k}={v}" for k,v in rows.pop(0).items())
+
+    class TerminalPath:
+        def __init__(self, name):
+            self.path = Path(name)
+
+        def __truediv__(self, key):
+            return TerminalPath(self.path / key)
+
+        def exists(self):
+            s.need(self.path == Path("/proc") / str(pid), "foreign terminal process check")
+            return pid_visible
+
+        def read_text(self):
+            s.need(self.path == Path("/sys/fs/cgroup") / group.lstrip("/") / "cgroup.procs",
+                   "foreign terminal cgroup check")
+            return cgroup_members
+
+    fn = bounded["terminal146"]
+    controls = ["exact terminal", "crossed invocation", "crossed main process", "active manager",
+                "remaining process", "remaining cgroup member", "changing manager"]
+    with patch.dict(fn.__globals__, Path=TerminalPath, subprocess=SimpleNamespace(check_output=show)):
+        rows = [terminal,terminal]
+        s.need(fn(claim),"exact terminal denied")
+        for crossed in (dict(terminal, InvocationID="9"*32),dict(terminal, ExecMainPID=str(pid+1)),
+                        dict(terminal, ActiveState="active")):
+            rows = [crossed]
+            s.need(not fn(claim),"foreign terminal accepted")
+        rows = [terminal]
+        pid_visible = True
+        s.need(not fn(claim),"terminal accepted with live process")
+        rows = [terminal]
+        pid_visible = False
+        cgroup_members = str(pid)
+        s.need(not fn(claim),"terminal accepted with live cgroup")
+        rows = [terminal,dict(terminal, InvocationID="9"*32)]
+        cgroup_members = ""
+        s.need(not fn(claim),"terminal accepted while manager changed")
+    return controls
+
+
+def verify146_cadence(s, claim):
+    cadence = (Path(__file__).parents[1] / "horizon_epoch172_half_core_20261120_v1"
+               / "survivor" / "status_cycle.py")
+    wanted = {"epoch146_entry", "install_epoch146_entry"}
+    tree = ast.parse(cadence.read_text())
+    funcs = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in wanted]
+    s.need(len(funcs) == len(wanted), "missing epoch 146 cadence integration")
+    key = "epoch146_bounded_entry_lease"
+    ref = claim["registration"]
+    offer = None
+    terminal = False
+    hold_matches = True
+    owner = SimpleNamespace(cadence168=SimpleNamespace(status168=s))
+    c = SimpleNamespace(fleet={}, fleet_ref={"sha256": "2"*64}, sample_ref={"sha256": "3"*64})
+
+    class CyclePath:
+        def __truediv__(self, name):
+            s.need(name == "ENTRY146_LEASE_OFFER.json", "wrong epoch 146 offer name")
+            return self
+
+        def exists(self):
+            return offer is not None
+
+    def reservation(reader, lease):
+        s.need(reader is s and lease == ref, "different cadence reservation")
+        return claim
+
+    def held(reader, lease):
+        return reservation(reader, lease) if hold_matches else None
+
+    c.paths = {"out": CyclePath()}
+    adapter = SimpleNamespace(reservation146=reservation, held146=held, terminal146=lambda _:terminal)
+    ns = dict(ENTRY146_FIELD=key, owners=owner, need=s.need, read_ref=lambda _:offer)
+    exec(compile(ast.Module(body=funcs, type_ignores=[]), str(cadence), "exec"), ns)
+    choose, install = ns["epoch146_entry"], ns["install_epoch146_entry"]
+
+    def reject(call, text):
+        try:
+            call()
+        except ValueError as error:
+            s.need(str(error) == text, "unrelated epoch 146 cadence rejection")
+        else:
+            raise ValueError("epoch 146 cadence accepted " + text)
+
+    with patch.dict(sys.modules, bounded142=adapter):
+        s.need(choose(c) is None, "ordinary cadence consumed a missing offer")
+        offer = dict(schema="horizon-epoch146-cadence-offer-v1", lease=ref,
+                     fleet_predecessor=c.fleet_ref, observer={"sha256": "4"*64})
+        reject(lambda:choose(c), "foreign epoch 146 cadence offer")
+        offer["observer"] = c.sample_ref
+        hold_matches = False
+        reject(lambda:choose(c), "epoch 146 hold differs from its reservation")
+        hold_matches = True
+        c.entry146 = choose(c)
+        successor = {}
+        hold_matches = False
+        reject(lambda:install(c, successor), "epoch 146 hold changed before fleet publication")
+        s.need(not successor, "changed hold added a reservation")
+        hold_matches = True
+        install(c, successor)
+        s.need(successor == {key:ref}, "successor omitted the held lease")
+
+        c.fleet = successor
+        reject(lambda:choose(c), "overlapping epoch 146 lease offer")
+        offer = None
+        c.entry146 = choose(c)
+        install(c, successor)
+        s.need(not c.entry146["new"] and successor == {key:ref},
+               "current lease lost before terminal")
+        terminal = True
+        install(c, successor)
+        s.need(not successor, "successor retained the terminal lease")
+        offer = dict(schema="horizon-epoch146-cadence-offer-v1", lease=ref,
+                     fleet_predecessor=c.fleet_ref, observer=c.sample_ref)
+        s.need(choose(c) is None, "expired unadopted offer acquired a reservation")
+    return ["ordinary cycle", "crossed sample", "unmatched hold", "hold changed before publication",
+            "first fleet registration", "overlapping offer", "preserved live lease",
+            "terminal release", "terminal before admission"]
 
 
 if __name__ == "__main__":
     module=runpy.run_path(str(Path(__file__).with_name("post-stop-fit")))
     result=verify(module["bounded142"],module["s"])
     if sys.argv[1:] == ["--with-146"]:
-        result["bounded146"]=verify146(module["bounded142"],module["s"])
+        result["bounded146"]=verify146(module["bounded142"],module["s"],module["census"])
     print(json.dumps(result,sort_keys=True))

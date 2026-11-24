@@ -22,6 +22,7 @@ PROBE146 = "horizon-146-full-local-qualification-20261124-v1.service"
 ENTRY146 = Path("/home/sol/.jetstreamer-private/epoch146-static-entry-20261124T044029948525Z/STATIC_ENTRY_PREFLIGHT.json")
 ENTRY146_SHA = "cb00246dd12b9d633014faacfb629e8d7576a727b0d77f4468690d6a20bcb338"
 LEASE146 = R / "epoch146-singleton-20261122-v1/BOUNDED_ENTRY_LEASE.json"
+GROUP146 = "/horizonaudit.slice/" + PROBE146
 STATIC = ("Id InvocationID ExecMainPID ExecMainStartTimestampMonotonic Slice NRestarts ControlPID Job "
           "User Group NoExecPaths ExecPaths LimitFSIZE LimitFSIZESoft MemoryMax MemorySwapMax TasksMax "
           "NoNewPrivileges PrivateNetwork ProtectSystem ProtectHome PrivateDevices ProtectControlGroups "
@@ -81,8 +82,13 @@ def verify_live(s, route, expected, start):
     def view(p):
         return proc / "root" / str(p).lstrip("/")
 
+    def check_generation(matches, reason):
+        if not matches and unit == PROBE146 and not proc.exists():
+            raise ProcessLookupError(pid)
+        s.need(matches, reason)
+
     before = manager()
-    s.need(before == expected["manager"] and members() == [pid], "foreign bounded entry manager or members")
+    check_generation(before == expected["manager"] and members() == [pid], "foreign bounded entry manager or members")
     binds = [b.split(":") for b in route["read_only_file_binds"]]
     status = dict(line.split(":", 1) for line in (proc / "status").read_text().splitlines() if ":" in line)
     scratch = os.statvfs(view(route["run_parent"]))
@@ -102,25 +108,100 @@ def verify_live(s, route, expected, start):
                   inputs_match=all(s.same_file(Path(a),view(b)) for a,b in binds),
                   scratch_bytes=scratch.f_frsize*scratch.f_blocks, scratch_tmpfs=mount_types == ["tmpfs"])
     check(s, actual, expected)
-    s.need(s.process(pid)[1:] == (start, group) and manager() == before and members() == [pid],
-           "bounded entry generation changed during census")
+    s.need(s.process(pid)[1:] == (start, group), "bounded entry generation changed during census")
+    check_generation(manager() == before and members() == [pid], "bounded entry generation changed during census")
 
 
-def observe146(s, pid, comm, start, group, lease_ref):
-    group146 = "/horizonaudit.slice/" + PROBE146
-    if (comm, group) != ("jetstreamer-nod", "0::" + group146):
-        return None
+def lease146(s, lease_ref):
     s.need(lease_ref is not None, "missing bounded epoch 146 lease")
     lease = s.bound(lease_ref, LEASE146)
     preflight, entry_ref = s.read(ENTRY146, ENTRY146_SHA)
     boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip().replace("-", "")
     iid = lease["invocation_id"]
+    pid, start = lease["pid"], lease["start_ticks"]
     s.need(lease["schema"] == "horizon-epoch146-bounded-entry-lease-v1"
            and lease["preflight"] == entry_ref and lease["boot"] == boot
            and lease["unit"] == preflight["planned_native_unit"] == PROBE146
-           and (lease["pid"], lease["start_ticks"]) == (pid, start)
+           and type(pid) is int and 2 <= pid <= (1 << 31) - 1
+           and type(start) is int and start > 0
            and isinstance(iid, str) and re.fullmatch("[0-9a-f]{32}", iid) and int(iid, 16),
            "different bounded epoch 146 lease")
+    claim = dict(unit=PROBE146, invocation_id=iid, pid=pid, start_ticks=start, memory_bytes=MEMORY,
+                 scratch_bytes=SCRATCH, additional_cpu_quota_micros=0, registration=lease_ref)
+    return claim, preflight, boot
+
+
+def reservation146(s, lease_ref):
+    # The accepted fleet owns the reservation. Holding, exec and exit do not release it.
+    return lease146(s, lease_ref)[0]
+
+
+MANAGER146 = "Id,InvocationID,ExecMainPID,MainPID,ControlPID,ActiveState,SubState,Job,NRestarts,ControlGroup"
+
+
+def manager146(keys=MANAGER146):
+    raw = subprocess.check_output(["/usr/bin/systemctl", "show", "-p", keys, PROBE146],
+                                  text=True, timeout=10)
+    return dict(line.split("=", 1) for line in raw.splitlines())
+
+
+def held146(s, lease_ref):
+    """Check the live held invocation for accounting. The launcher owns release."""
+    claim, preflight, _ = lease146(s, lease_ref)
+    pid = claim["pid"]
+    proc = Path("/proc") / str(pid)
+    group = Path("/sys/fs/cgroup") / GROUP146.lstrip("/")
+    keys = MANAGER146 + ",MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec"
+    expected = dict(Id=PROBE146, InvocationID=claim["invocation_id"], ExecMainPID=str(pid),
+                    MainPID=str(pid), ControlPID="0", ActiveState="active", SubState="running",
+                    Job="", NRestarts="0", ControlGroup=GROUP146, MemoryMax=str(MEMORY),
+                    MemorySwapMax="0", CPUQuotaPerSecUSec="250ms", TasksMax="64", RuntimeMaxUSec="8min")
+
+    def identity():
+        return (s.process(pid)[1:], (group / "cgroup.procs").read_text().split(),
+                (proc / "comm").read_text().strip())
+
+    before = identity()
+    s.need(manager146(keys) == expected and before[:2] == ((claim["start_ticks"], "0::" + GROUP146), [str(pid)])
+           and before[2] not in ("jetstreamer-nod", "historical-work"), "different held epoch 146 invocation")
+    scratch_path = Path(preflight["planned_argv"][2]).parent
+    scratch = os.statvfs(proc / "root" / str(scratch_path).lstrip("/"))
+    mounts = (line.split() for line in (proc / "mountinfo").read_text().splitlines())
+    scratch_types = [row[row.index("-") + 1] for row in mounts if row[4] == str(scratch_path)]
+    quota, period = map(int, (group / "cpu.max").read_text().split())
+    s.need(scratch.f_frsize * scratch.f_blocks == SCRATCH and scratch_types == ["tmpfs"]
+           and (group / "memory.max").read_text().strip() == str(MEMORY)
+           and (group / "memory.swap.max").read_text().strip() == "0"
+           and (group / "pids.max").read_text().strip() == "64"
+           and period > 0 and quota * 4 == period, "different held epoch 146 capacity")
+    s.need(manager146(keys) == expected and identity() == before, "held epoch 146 changed during census")
+    return claim
+
+
+def terminal146(claim):
+    before = manager146()
+    if not (before["Id"] == PROBE146 and before["InvocationID"] == claim["invocation_id"]
+            and before["ExecMainPID"] == str(claim["pid"]) and before["MainPID"] == before["ControlPID"] == "0"
+            and (before["ActiveState"], before["SubState"]) in (("inactive", "dead"), ("failed", "failed"))
+            and before["Job"] == "" and before["NRestarts"] == "0" and before["ControlGroup"] in ("", GROUP146)):
+        return False
+    proc = Path("/proc") / str(claim["pid"])
+    if proc.exists():
+        return False
+    members = Path("/sys/fs/cgroup") / GROUP146.lstrip("/") / "cgroup.procs"
+    try:
+        if members.read_text().split():
+            return False
+    except FileNotFoundError:
+        pass
+    return manager146() == before and not proc.exists()
+
+
+def observe146(s, pid, comm, start, group, lease_ref):
+    if (comm, group) != ("jetstreamer-nod", "0::" + GROUP146):
+        return None
+    claim, preflight, boot = lease146(s, lease_ref)
+    s.need((claim["pid"], claim["start_ticks"]) == (pid, start), "different bounded epoch 146 lease")
 
     node, worker = preflight["runtime"]["node"], preflight["runtime"]["worker"]
     snapshot = preflight["observed_mounts"][0]
@@ -138,8 +219,8 @@ def observe146(s, pid, comm, start, group, lease_ref):
     binds = preflight["planned_bind_read_only_paths"]
     route = dict(argv=argv, run_parent=run_parent, worker=worker, snapshot={"target":snapshot["planned_target"]},
                  read_only_file_binds=binds)
-    settings = dict(Id=PROBE146, MainPID=str(pid), ExecMainPID=str(pid), InvocationID=iid,
-                    ControlGroup=group146, ActiveState="active", SubState="running", Job="", NRestarts="0",
+    settings = dict(Id=PROBE146, MainPID=str(pid), ExecMainPID=str(pid), InvocationID=claim["invocation_id"],
+                    ControlGroup=GROUP146, ActiveState="active", SubState="running", Job="", NRestarts="0",
                     ControlPID="0", Slice="horizonaudit.slice", User="sol", Group="horizon",
                     MemoryMax=str(MEMORY), MemorySwapMax="0", TasksMax="64",
                     CPUQuotaPerSecUSec="250ms", RuntimeMaxUSec="8min",
@@ -153,6 +234,9 @@ def observe146(s, pid, comm, start, group, lease_ref):
                     image_digest=node["sha256"], uid=[1001]*4, gid=[1003]*4, fs_limit=[2 << 20]*2,
                     worker_noexec=True, private_network=True, snapshot=file_identity(Path(snapshot["source"])),
                     inputs_readonly=True, inputs_match=True, scratch_bytes=SCRATCH, scratch_tmpfs=True)
-    verify_live(s, route, expected, start)
-    return dict(unit=PROBE146, invocation_id=iid, pid=pid, start_ticks=start, memory_bytes=MEMORY,
-                scratch_bytes=SCRATCH, additional_cpu_quota_micros=0, registration=lease_ref)
+    try:
+        verify_live(s, route, expected, start)
+    except (FileNotFoundError, ProcessLookupError):
+        if not terminal146(claim):
+            raise
+    return claim

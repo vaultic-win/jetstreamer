@@ -49,6 +49,36 @@ struct CloudBootstrap {
     inactive_units: &'static [&'static str],
 }
 
+const EPOCH207_BOOTSTRAP: CloudBootstrap = CloudBootstrap {
+    review_schema: "horizon207-obsolete-bootstrap-main-review-v1",
+    path: "/var/lib/jetstreamer/horizon-focused-207-complete-span-store8-ca2e38b-v2/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst",
+    sha256: "8af3cd20c8f9820dacd25932fc6b7938193e0d1a5dc83d8ddd59dfeea69b2ddc",
+    bytes: 8_474_139_490,
+    key: "89423444/snapshot-89423444-3NVZVHDVwXgMxuTP77gaZF4UBP1oNBQzGScBGyoLx2Px.tar.zst",
+    generation: "1634790167725358",
+    md5: "Dil5cEJL57SGxIfql2EAHQ==",
+    crc32c: "Qynv0g==",
+    inactive_units: &[
+        "horizon-qualify-207-complete-span-ca2e38b-v2.service",
+        "horizon-qualify-207-singleton-admitted-v1.service",
+    ],
+};
+
+const EPOCH210_BOOTSTRAP: CloudBootstrap = CloudBootstrap {
+    review_schema: "horizon210-obsolete-bootstrap-main-review-v1",
+    path: "/var/lib/jetstreamer/horizon-focused-210-complete-span-store8-ca2e38b-v1/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst",
+    sha256: "3f67f416d254d7fb795bc902d5c47a6ae374fa36c173c00411d4b541fc610ccd",
+    bytes: 8_579_041_139,
+    key: "90719638/snapshot-90719638-3C18JGi6UtMvAi6M4AUPC96redPqo7h6QnAsrUi8d3SJ.tar.zst",
+    generation: "1628731675837475",
+    md5: "pBPdxBtyTOt6A7LhXryC8Q==",
+    crc32c: "rBQmbQ==",
+    inactive_units: &[
+        "horizon-qualify-210-complete-span-ca2e38b-v1.service",
+        "horizon-singleton-210-capped-4aeca563-v1.service",
+    ],
+};
+
 const EPOCH247_BOOTSTRAP: CloudBootstrap = CloudBootstrap {
     review_schema: "horizon247-obsolete-bootstrap-main-review-v1",
     path: "/var/lib/jetstreamer/horizon247-bootstrap-copy0347-work-v2/projection/bootstrap/snapshot-106703614-AtkJcCAEp3EfF4ymeeN9t3YvHuAq3aykuQ6vogtDYcf9.tar.zst",
@@ -370,6 +400,8 @@ fn ordinary_private_path(path: &Path) -> bool {
 }
 fn cloud_bootstrap(epoch: u64) -> Option<&'static CloudBootstrap> {
     match epoch {
+        207 => Some(&EPOCH207_BOOTSTRAP),
+        210 => Some(&EPOCH210_BOOTSTRAP),
         247 => Some(&EPOCH247_BOOTSTRAP),
         248 => Some(&EPOCH248_BOOTSTRAP),
         249 => Some(&EPOCH249_BOOTSTRAP),
@@ -874,6 +906,8 @@ mod tests {
     #[test]
     fn cloud_bootstrap_requires_its_exact_epoch_file_and_generation() {
         for (epoch, profile) in [
+            (207, &EPOCH207_BOOTSTRAP),
+            (210, &EPOCH210_BOOTSTRAP),
             (247, &EPOCH247_BOOTSTRAP),
             (248, &EPOCH248_BOOTSTRAP),
             (249, &EPOCH249_BOOTSTRAP),
