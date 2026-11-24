@@ -2037,6 +2037,21 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["full_cold_epoch_peak_qualified"] == false
             && receipt["canonical_sidecar_authorized"] == false
             && receipt["publication_authorized"] == false
+    } else if claim.unit == "horizon-qualify-230-bank-trace-v316.service" {
+        claim.epoch == 230
+            && claim.scratch_path
+                == Path::new("/home/ubuntu/.jetstreamer-private/epoch230-trace-tmpfs-v316/run")
+            && receipt["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+            && receipt["kind"] == "europe-rooted-slot-hash-comparison"
+            && receipt["epoch"] == 230
+            && receipt["unit"] == claim.unit
+            && receipt["invocation_id"] == claim.invocation_id
+            && receipt["run_root"].as_str() == claim.scratch_path.to_str()
+            && receipt["bootstrap_slot"] == 99_359_376
+            && receipt["target_slot"] == 99_368_202
+            && receipt["terminal_slot"] == 99_375_855
+            && receipt["entry_replay_requested"] == true
+            && receipt["canonical_epoch_publication_authorized"] == false
     } else {
         claim
             .unit
@@ -6059,6 +6074,38 @@ mod tests {
         assert!(validate_diagnostic_launch(&receipt, &claim).is_err());
         receipt["evidence"]["units"][0]["invocation_id"] = json!(claim.invocation_id);
         receipt["evidence"]["units"][0]["restarts"] = json!(1);
+        assert!(validate_diagnostic_launch(&receipt, &claim).is_err());
+    }
+
+    #[test]
+    fn epoch230_ram_bank_trace_is_bound_to_its_private_run() {
+        let mut claim = DiagnosticClaim {
+            epoch: 230,
+            unit: "horizon-qualify-230-bank-trace-v316.service".into(),
+            invocation_id: "a".repeat(32),
+            scratch_path: "/home/ubuntu/.jetstreamer-private/epoch230-trace-tmpfs-v316/run".into(),
+            launch_receipt: BoundFile {
+                path: "/var/lib/jetstreamer/launch.json".into(),
+                sha256: "b".repeat(64),
+            },
+        };
+        let mut receipt = json!({
+            "schema": "jetstreamer-historical-performance-launch-receipt-v1",
+            "kind": "europe-rooted-slot-hash-comparison", "epoch": 230,
+            "unit": claim.unit, "invocation_id": claim.invocation_id, "run_root": claim.scratch_path,
+            "bootstrap_slot": 99_359_376, "target_slot": 99_368_202, "terminal_slot": 99_375_855,
+            "entry_replay_requested": true, "canonical_epoch_publication_authorized": false,
+            "launched": true, "remote_mutations": false, "r2_mutations": false,
+            "evidence": {"units": [{"unit": claim.unit, "invocation_id": claim.invocation_id,
+                "restarts": 0, "load_state": "loaded", "result": "success", "main_pid": 1,
+                "active_state": "active", "sub_state": "running"}]},
+        });
+        validate_diagnostic_launch(&receipt, &claim).unwrap();
+        receipt["canonical_epoch_publication_authorized"] = json!(true);
+        assert!(validate_diagnostic_launch(&receipt, &claim).is_err());
+        receipt["canonical_epoch_publication_authorized"] = json!(false);
+        claim.scratch_path = "/home/ubuntu/.jetstreamer-private/another-run".into();
+        receipt["run_root"] = json!(claim.scratch_path);
         assert!(validate_diagnostic_launch(&receipt, &claim).is_err());
     }
 
