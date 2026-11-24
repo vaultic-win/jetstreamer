@@ -502,7 +502,7 @@ impl OrdinaryEpoch {
     fn digest(self) -> &'static str {
         match self {
             Self::Epoch211 => "ce03172902f1108c996e0ac9e9ac90df9180ef8ba49440a3c428d177a7945da2",
-            Self::Staged211 => "c512e128fc76aa30bb2c0537e4f91a73e25a7516f18b34f424e3767b40a92cc4",
+            Self::Staged211 => "d8217282aa7e280568082309a6881fb0a22040156f17524637e2737cf0e9245c",
             Self::Epoch248 => "3053ed2ca2b2881f2d83855c0fa1cff6e63618387dfb630c76a3db7a2dc7d1fd",
             Self::Epoch250 => "12e68ddf9b6d2505b6090688b5a3cfa4e720242b264cf2a6e7993b9b02f910c2",
             Self::Epoch251 => "1c815780661e8b502634caff4a2b0d783e831fccc27c612d6a94c3480d00e318",
