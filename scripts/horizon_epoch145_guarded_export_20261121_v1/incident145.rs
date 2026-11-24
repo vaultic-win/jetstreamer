@@ -4,7 +4,12 @@ use super::*;
 #[cfg(all(incident_encoded_prefix145_only, not(incident_audit_turnover145_only)))]
 compile_error!("the encoded-prefix successor requires the complete audit-turnover guard");
 
-#[cfg(incident_v5r_guard_recovery145_only)]
+#[cfg(all(incident_v5s_guard_recovery145_only, not(incident_v5r_guard_recovery145_only)))]
+compile_error!("the allocation-walk retry requires the guarded verifier");
+
+#[cfg(incident_v5s_guard_recovery145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5t/export145";
+#[cfg(all(incident_v5r_guard_recovery145_only, not(incident_v5s_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5s/export145";
 #[cfg(all(incident_encoded_prefix145_only, not(incident_v5r_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5r/export145";

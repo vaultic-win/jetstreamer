@@ -10,7 +10,8 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-GUARD_TERMINAL_RECOVERY = VERSION == "tools-v5s"
+GUARD_WALK_RECOVERY = VERSION == "tools-v5t"
+GUARD_TERMINAL_RECOVERY = VERSION == "tools-v5s" or GUARD_WALK_RECOVERY
 ENCODED_PREFIX_RECOVERY = VERSION == "tools-v5r" or GUARD_TERMINAL_RECOVERY
 AUDIT_TURNOVER_RECOVERY = ENCODED_PREFIX_RECOVERY or VERSION == "tools-v5q"
 STATUS_OWNER_RECOVERY = AUDIT_TURNOVER_RECOVERY or VERSION == "tools-v5p"
@@ -29,6 +30,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5q": "tools-homefloor-145-audit-turnover-rejoin-v1",
                       "tools-v5r": "tools-homefloor-145-encoded-prefix-rejoin-v1",
                       "tools-v5s": "tools-homefloor-145-v5r-guard-recovery-v1",
+                      "tools-v5t": "tools-homefloor-145-v5s-guard-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -126,19 +128,31 @@ def encoded_prefix_stop(s, build, successor):
 
 
 def guard_terminal_predecessor(s, build, successor):
-    proof = PKG.parent / "v5r-name-handoff" / "V5R_GUARD_TERMINAL_095224.json"
+    if GUARD_WALK_RECOVERY:
+        name = "V5S_GUARD_WALK_TERMINAL_103041.json"
+        original = "c31fbc8288104da4bd78e10f8ada7196"
+        schema = "horizon-epoch145-guard-walk-terminal-v1"
+        error = ("no pair of complete allocation walks for "
+                 "/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1")
+    else:
+        name = "V5R_GUARD_TERMINAL_095224.json"
+        original = "8f2b9c06b62147babe83c9ade7271cd3"
+        schema = "horizon-epoch145-retained-guard-terminal-v1"
+        error = "stopped worker fresh-census deadline"
+    proof = PKG.parent / "v5r-name-handoff" / name
     terminal, ref = s.read(proof, build["guard_terminal"]["sha256"])
-    original = "8f2b9c06b62147babe83c9ade7271cd3"
     state = STATE / original
     native = terminal["native_terminal"]
     failed, failed_ref = s.read(state / "failed.json", terminal["failure"]["sha256"])
     s.need(build["guard_terminal"] == ref and successor != original
-           and terminal["schema"] == "horizon-epoch145-retained-guard-terminal-v1"
+           and terminal["schema"] == schema
            and native["UNIT"] == UNIT and native["_PID"] == "1"
            and native["INVOCATION_ID"] == failed["iid"] == original and native["EXIT_STATUS"] == "1"
            and native["EXIT_CODE"] == "exited" and failed_ref == terminal["failure"]
-           and failed["error"] == "stopped worker fresh-census deadline"
-           and terminal["fully_verified"] is False and terminal["resource_credit_bytes"] == 0,
+           and failed["error"] == error
+           and terminal["fully_verified"] is False
+           and (terminal.get("archive_publication_authorized") is False if GUARD_WALK_RECOVERY
+                else terminal["resource_credit_bytes"] == 0),
            "unqualified recovery after the epoch 145 guard exit")
     boot = native["_BOOT_ID"]
     floor = int(native["__MONOTONIC_TIMESTAMP"])
