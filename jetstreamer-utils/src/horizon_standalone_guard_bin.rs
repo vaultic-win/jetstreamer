@@ -430,7 +430,8 @@ fn observe_root_for_import_prestart(plan: &Plan, unit: &Unit) -> bool {
         "horizon-import-239-current-20261117-v2.service"
             | "horizon-import-239-current-20261117-v3.service"
             | "horizon-import-244-current-20261117-v1.service"
-    ) && unit.active == "activating"
+    )
+        && unit.active == "activating"
         && unit.sub == "start-pre"
         && unit.pid == 0
 }
@@ -1368,10 +1369,7 @@ mod tests {
         prestart.active = "failed".into();
         assert!(!observe_root_for_import_prestart(&plan, &prestart));
         for (pointer, replacement) in [
-            (
-                "/unit",
-                json!("horizon-import-244-current-20261117-v2.service"),
-            ),
+            ("/unit", json!("horizon-import-244-current-20261117-v2.service")),
             ("/filesystem", json!("/other")),
             ("/worker_root", json!("/other")),
             ("/minimum_free_bytes", json!(1_999_999_999_999u64)),

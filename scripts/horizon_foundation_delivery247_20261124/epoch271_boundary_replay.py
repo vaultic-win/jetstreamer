@@ -25,6 +25,8 @@ TOKENS = V / "horizon271-boundary-trace-tokens-v297"
 RECEIPTS = V / "horizon271-boundary-trace-guard-receipts-v297"
 TRACE = V / "horizon271-boundary-trace-worker-v296-qualified"
 WORKER = TRACE / "jetstreamer-historical-worker-v1-8-11"
+REWARD_TUPLE_MODE = False
+PRIOR_TRACE = PREVIOUS / "terminal.json"
 REPO = "/home/ubuntu/workspace/jetstreamer"
 SCRIPTS = "scripts/horizon_foundation_delivery247_20261124"
 
@@ -55,9 +57,14 @@ def source_pin():
     commit = subprocess.check_output(
         [*git, "rev-parse", "origin/account-updates"], text=True, timeout=10
     ).strip()
-    subprocess.run(
-        [*git, "merge-base", "--is-ancestor", "bc1ec0f6", commit], check=True, timeout=10
-    )
+    required = ["bc1ec0f6"]
+    if REWARD_TUPLE_MODE:
+        build = json.loads((TRACE / "completion.json").read_bytes())
+        required.extend((build["worker_source_commit"], build["guard_source_commit"]))
+    for ancestor in required:
+        subprocess.run(
+            [*git, "merge-base", "--is-ancestor", ancestor, commit], check=True, timeout=10
+        )
     for member in (Path(__file__), Path(diagnostic.__file__)):
         tracked = subprocess.check_output(
             [*git, "show", f"{commit}:{SCRIPTS}/{member.name}"], timeout=10
@@ -66,14 +73,29 @@ def source_pin():
     return commit
 
 
-def worker_image(ops):
+def sealed_image(ops, executable):
     seal = ops.bound(ops.ref(TRACE / "deployment-seal-receipt.json"))
     assert seal["destination"] == str(TRACE)
-    member, = (row for row in seal["members"] if row["name"] == WORKER.name)
-    assert member["mode"] == "0555" and member["bytes"] == WORKER.stat().st_size
-    image = dict(path=str(WORKER), sha256=member["sha256"])
-    assert ops.checked_image(image) == str(WORKER)
+    member, = (row for row in seal["members"] if row["name"] == executable.name)
+    assert member["mode"] == "0555" and member["bytes"] == executable.stat().st_size
+    image = dict(path=str(executable), sha256=member["sha256"])
+    assert ops.checked_image(image) == str(executable)
     return image
+
+
+def select_reward_tuple_mode():
+    global diagnostic, PACKAGE, ROOT, UNIT, GUARD, TOKENS, RECEIPTS, TRACE, WORKER
+    global REWARD_TUPLE_MODE, PRIOR_TRACE
+    import diagnostic271_reward_tuples as diagnostic
+
+    REWARD_TUPLE_MODE = True
+    PACKAGE, ROOT, UNIT = diagnostic.PACKAGE, diagnostic.RUN_ROOT, diagnostic.UNIT
+    GUARD = "horizon-271-reward-tuples-protective-v299.service"
+    TOKENS = V / "horizon271-reward-tuples-tokens-v299"
+    RECEIPTS = V / "horizon271-reward-tuples-guard-receipts-v299"
+    TRACE = V / "horizon271-reward-tuple-worker-v299-qualified"
+    WORKER = TRACE / WORKER.name
+    PRIOR_TRACE = V / "horizon271-boundary-replay-v297/terminal.json"
 
 
 def prepare(legacy, measure):
@@ -81,11 +103,11 @@ def prepare(legacy, measure):
     branch = source_pin()
     previous = ops.bound(ops.ref(PREVIOUS / "profile.json"))
     old_namespace = ops.bound(ops.ref(PREVIOUS / "namespace.json"))
-    terminal = ops.bound(ops.ref(PREVIOUS / "terminal.json"))
+    terminal = ops.bound(ops.ref(PRIOR_TRACE))
     assert ops.props(terminal["producer"]["Id"], list(terminal["producer"])) == terminal["producer"]
     assert terminal["timer_drained"]["ActiveState"] == "inactive"
     assert old_namespace["result"]["namespace_verified"]
-    image = worker_image(ops)
+    image = sealed_image(ops, WORKER)
     compiled = ops.bound(ops.ref(TRACE / "completion.json"))
     assert compiled["stdout_protocol_equal_to_reference"] and not compiled["replay_started"]
     assert not compiled["publication_authorized"]
@@ -98,6 +120,8 @@ def prepare(legacy, measure):
     for leaf in ("output", "output/compact-indexes", "output/compact-indexes/270",
                  "output/compact-indexes/271", "state", "tmp", "tmp/isolated-empty-gcloud"):
         mkdir(ROOT / leaf, 0o700, 1000)
+    if REWARD_TUPLE_MODE:
+        mkdir(ROOT / "reward-tuples", 0o700, 1000)
     staged_file(ROOT / "output/genesis.tar.bz2", b"", 0o444)
     gate = V / "horizon271-europe-bounded-tokens-v287/pre-start.sh"
     staged_file(TOKENS / gate.name, gate.read_bytes(), 0o555)
@@ -114,6 +138,8 @@ def prepare(legacy, measure):
     for original, updated in replacements.items():
         assert original in service, original
         service = service.replace(original, updated)
+    if REWARD_TUPLE_MODE:
+        service += f'Environment="JETSTREAMER_EPOCH271_REWARD_DIR={ROOT / "reward-tuples"}"\n'
     staged_file(PACKAGE / "producer.service", service.encode())
     mounts = {name.replace(previous["run_root"], str(ROOT)): row
               for name, row in previous["mounts"].items()}
@@ -122,6 +148,9 @@ def prepare(legacy, measure):
     assert fit["disk_shortfall_bytes"] == fit["memory_shortfall_bytes"] == 0
     guard = ops.bound(previous["guard"])
     template = ops.bound(guard["plan"])
+    if REWARD_TUPLE_MODE:
+        guard["binary"] = sealed_image(ops, TRACE / "guard")
+        assert compiled["guard_tests_passed"] > 0
     assert ops.checked_image(guard["binary"]) == guard["binary"]["path"]
     assert template["minimum_free_bytes"] == fit["guard_minimum_free_bytes"]
     assert template["maximum_root_physical_bytes"] == previous["disk_cap_bytes"]
@@ -136,9 +165,12 @@ def prepare(legacy, measure):
                   dict(guard, plan=check, validation=validation))
     props, argv = legacy.startup.start_props(UNIT, PACKAGE / "producer.service")
     proof = dict(snapshot=snapshot, worker=image, mounts=mounts, argv=argv)
+    if REWARD_TUPLE_MODE:
+        proof["reward_directory"] = str(ROOT / "reward-tuples")
     args = [
         "systemd-run", "--quiet", "--wait", "--pipe", "--collect",
-        "--unit=foundation-271-boundary-namespace-v297", *props, "--",
+        "--unit=foundation-271-reward-namespace-v299" if REWARD_TUPLE_MODE
+        else "--unit=foundation-271-boundary-namespace-v297", *props, "--",
         "/usr/bin/python3", "-I", "-B", "-c", NAMESPACE_CHECK, json.dumps(proof),
     ]
     result = json.loads(subprocess.check_output(args, timeout=45))
@@ -147,7 +179,7 @@ def prepare(legacy, measure):
     profile = dict(
         previous, unit=UNIT, run_root=str(ROOT), worker_root=str(ROOT), worker=image,
         producer=ops.ref(PACKAGE / "producer.service"), guard=guard["binary"],
-        prior_trace=ops.ref(PREVIOUS / "terminal.json"), mounts=mounts, argv=argv,
+        prior_trace=ops.ref(PRIOR_TRACE), mounts=mounts, argv=argv,
         worker_build=ops.ref(TRACE / "completion.json"),
         launcher_source=branch, namespace=namespace,
     )
@@ -158,6 +190,11 @@ NAMESPACE_CHECK = """
 import hashlib, json, os, sys
 from pathlib import Path
 args = json.loads(sys.argv[1])
+if "reward_directory" in args:
+    directory = Path(args["reward_directory"])
+    assert os.environ["JETSTREAMER_EPOCH271_REWARD_DIR"] == str(directory)
+    assert directory.stat().st_uid == os.geteuid() == 1000
+    assert not any(directory.iterdir()) and os.access(directory, os.W_OK)
 for name, proof in args["mounts"].items():
     target = Path(name)
     stamp = target.stat()
@@ -181,28 +218,29 @@ def install_cadence(ops):
     before = {}
     installed = {}
     replacements = {}
-    module = CONTROL / "diagnostic271_boundary.py"
+    name = diagnostic.__name__
+    predecessor = "diagnostic271_boundary" if REWARD_TUPLE_MODE else "diagnostic271_europe"
+    module = CONTROL / f"{name}.py"
     assert Path(diagnostic.__file__) == module
-    for name, edits in {
+    for filename, edits in {
         "cycle.py": (
-            ("import diagnostic271_europe\n", "import diagnostic271_europe\nimport diagnostic271_boundary\n"),
-            ("cfg['diagnostic_replays'] += diagnostic271_europe.configuration()",
-             "cfg['diagnostic_replays'] += diagnostic271_europe.configuration()\ncfg['diagnostic_replays'] += diagnostic271_boundary.configuration()"),
-            ("    diagnostic271_europe.gate(plan)", "    diagnostic271_europe.gate(plan)\n    diagnostic271_boundary.gate(plan)"),
-            ("and not diagnostic271_europe.owns(r)]", "and not diagnostic271_europe.owns(r) and not diagnostic271_boundary.owns(r)]"),
+            (f"import {predecessor}\n", f"import {predecessor}\nimport {name}\n"),
+            (f"cfg['diagnostic_replays'] += {predecessor}.configuration()",
+             f"cfg['diagnostic_replays'] += {predecessor}.configuration()\ncfg['diagnostic_replays'] += {name}.configuration()"),
+            (f"    {predecessor}.gate(plan)", f"    {predecessor}.gate(plan)\n    {name}.gate(plan)"),
+            (f"and not {predecessor}.owns(r)]", f"and not {predecessor}.owns(r) and not {name}.owns(r)]"),
         ),
         "native_binding_replays.py": (
-            ("import diagnostic271_europe\n", "import diagnostic271_europe\nimport diagnostic271_boundary\n"),
-            ("diagnostic271_trace, diagnostic271_europe)",
-             "diagnostic271_trace, diagnostic271_europe, diagnostic271_boundary)"),
+            (f"import {predecessor}\n", f"import {predecessor}\nimport {name}\n"),
+            (f", {predecessor})", f", {predecessor}, {name})"),
         ),
     }.items():
-        member = CONTROL / name
-        before[name] = ops.ref(member)
+        member = CONTROL / filename
+        before[filename] = ops.ref(member)
         text = member.read_text()
-        staged_file(PACKAGE / (name + ".previous"), text.encode())
+        staged_file(PACKAGE / (filename + ".previous"), text.encode())
         for original, updated in edits:
-            assert text.count(original) == 1, (name, original)
+            assert text.count(original) == 1, (filename, original)
             text = text.replace(original, updated)
         ast.parse(text)
         with tempfile.NamedTemporaryFile(dir=CONTROL, delete=False, mode="w") as staged:
@@ -229,7 +267,7 @@ def launch(legacy, measure):
     profile = ops.bound(ops.ref(PACKAGE / "profile.json"))
     prior = ops.bound(profile["prior_trace"])
     assert ops.props(prior["producer"]["Id"], list(prior["producer"])) == prior["producer"]
-    assert profile["worker"] == worker_image(ops)
+    assert profile["worker"] == sealed_image(ops, WORKER)
     assert ops.checked_image(profile["node"]) == profile["node"]["path"]
     ns = ops.bound(profile["namespace"])
     assert ns["result"]["worker_readonly"] and ns["result"]["snapshot_readonly"]
@@ -260,7 +298,10 @@ def launch(legacy, measure):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("prepare", "launch"))
+    parser.add_argument("--reward-tuples", action="store_true")
     args = parser.parse_args()
+    if args.reward_tuples:
+        select_reward_tuple_mode()
     assert os.geteuid() == 0 and __debug__
     legacy = load("europe_diagnostic_admission", PREVIOUS / "admit.py")
     assert os.environ["CODEX_THREAD_ID"] == legacy.replay.THREAD
@@ -271,7 +312,7 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         assert legacy.partition.locked(legacy.partition.LOCK, os.getpid())
         state = legacy.ops.props("foundation-publication-cadence-v222.service", ["ActiveState", "Job"])
-        assert state == dict(ActiveState="inactive", Job=""), state
+        assert state["ActiveState"] in {"inactive", "failed"} and not state["Job"], state
         if args.operation == "prepare":
             prepare(legacy, measure)
         else:
