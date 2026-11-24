@@ -164,7 +164,27 @@
  original={int(k):v['claim'] for k,v in definitions.items()}
  assert {r['epoch'] for r in sample_publishers}==set(map(int,states['active_claims'])) and len(sample_publishers)==len(states['active_claims'])
  import guarded_replays
-@@ -46,6 +48,8 @@
+@@ -29,14 +31,17 @@
+         assert bound(ref(p))==v
+         return ref(p)
+     return funds.put(p,v)
+-closed=publication_handoff.collect(original,{int(k):v for k,v in states['statuses'].items()},root,record,definitions)
++statuses = {int(k):v for k,v in states['statuses'].items()}
++if successor_247 and 247 in statuses:
++    statuses[247] = staged247.adopt_status(statuses[247], successor_247)
++closed=publication_handoff.collect(original,statuses,root,record,definitions)
+ publishers=[r for r in sample_publishers if r['epoch'] not in closed]
+
+ tool=V/'horizon265-delivery-consumers-v215-seven222a3-qualified/jetstreamer-r2'
+ source={211:'20261120133744',247:'20261117045633',248:'20261117045633',249:'20261117045633',250:'20261117211823',251:'20261118215154',265:'20261120031251'}
+ for row in publishers:
+     e=row['epoch'];claim=states['active_claims'][str(e)];c=bound(claim)
+-    old=bound(states['statuses'][str(e)]);p=bound(old['readback']);i=bound(old['intent'])
++    old=bound(statuses[e]);p=bound(old['readback']);i=bound(old['intent'])
+     assert obs in i['evidence'] and c['invocation_id']==row['unit']['InvocationID']
+     b=bound(c['evidence'][0]);handoff=b['handoff'] if e!=247 else ref(V/'horizon-singleton-delivery247-20261119-v1/terminal-handoff.json')
+     h=bound(handoff);origin=h['producer']['unit'];start,=[int(x['__REALTIME_TIMESTAMP'])//1000 for x in h['producer']['events'] if x.get('MESSAGE_ID')=='39f53479d3a045ac8e11786248231fbf' and x['INVOCATION_ID']==origin['InvocationID']]
+@@ -46,6 +51,8 @@
      if not model.exists():funds.put(model,v)
      assert bound(ref(model))==v
      status_tool=staged211.status_image() if e==211 and successor_211 else tool

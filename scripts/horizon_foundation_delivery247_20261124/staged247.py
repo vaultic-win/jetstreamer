@@ -15,7 +15,8 @@ STATE = Path("/home/ubuntu/.jetstreamer-private/current-reader-delivery-247-pinn
 PREPARATION_SHA = "59e28b3e36771109aee30420430aac869d526e09d487000c3483fa87a6e0d84f"
 OBSERVER = V / "horizon247-pinned-public-observer-v254" / "jetstreamer-horizon-observe"
 OBSERVER_SHA = "81d9c61e3914fd07548612adb0c299d8ebc42f955047d38ba9e7f959f0362e0a"
-FLEET_PACKAGE = V / "horizon-pinned247-fleet-v254"
+FLEET_PACKAGE = V / "horizon-pinned247-fleet-v255"
+CLOCK_CORRECTION = D / "horizon-foundation-seven-lane-v255/247/clock-correction/completion.json"
 OLD_STATUS = {
     "path": "/home/ubuntu/.jetstreamer-private/foundation-publication-status-repair.aIkorzZ0/247/completion.json",
     "sha256": "de26b49d2242c0115770277e55105fd6f16ed7fde2843f093a1a4495476ce801",
@@ -107,6 +108,18 @@ def adopt_status(current, successor):
         return None
     if current == OLD_STATUS:
         return successor["initial_status"]
+    if CLOCK_CORRECTION.is_file():
+        replacement = sealed(CLOCK_CORRECTION)
+        completion = bound(replacement)
+        intent = bound(completion["intent"])
+        if intent["previous"] == current:
+            prior = bound(current)
+            before = bound(prior["readback"])
+            after = bound(completion["readback"])
+            assert completion["authenticated_exact_byte_readback"] and completion["key"] == prior["key"]
+            assert intent["payload"] == after
+            assert dict(before, elapsed_execution_millis=after["elapsed_execution_millis"]) == after
+            current = replacement
     owner = bound(bound(current)["intent"])["owner"]
     assert owner == {
         "claim": successor["claim"], "unit": UNIT,
