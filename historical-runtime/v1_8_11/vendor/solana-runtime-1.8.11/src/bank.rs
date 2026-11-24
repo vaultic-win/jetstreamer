@@ -2002,6 +2002,15 @@ impl Bank {
             reward_calc_tracer,
             self.stake_program_advance_activating_credits_observed(),
         );
+        #[cfg(feature = "epoch271-boundary-trace")]
+        self.trace_epoch271_inflation(
+            capitalization,
+            slot_in_year,
+            validator_rate,
+            epoch_duration_in_years,
+            validator_rewards,
+            &validator_point_value,
+        );
 
         if !self
             .feature_set
@@ -2100,6 +2109,15 @@ impl Bank {
             self.stake_program_advance_activating_credits_observed(),
             thread_pool,
         );
+        #[cfg(feature = "epoch271-boundary-trace")]
+        self.trace_epoch271_inflation(
+            capitalization,
+            slot_in_year,
+            validator_rate,
+            epoch_duration_in_years,
+            validator_rewards,
+            &validator_point_value,
+        );
 
         if !self
             .feature_set
@@ -2165,6 +2183,34 @@ impl Bank {
             ("pre_capitalization", capitalization, i64),
             ("post_capitalization", self.capitalization(), i64)
         );
+    }
+
+    #[cfg(feature = "epoch271-boundary-trace")]
+    fn trace_epoch271_inflation(
+        &self,
+        capitalization: u64,
+        slot_in_year: f64,
+        validator_rate: f64,
+        epoch_years: f64,
+        budget: u64,
+        point_value: &PointValue,
+    ) {
+        use std::io::{self, Write};
+
+        if self.slot() == 117_072_004 {
+            let _ = writeln!(
+                io::stderr().lock(),
+                "epoch271_inflation slot={} capitalization={} slot_in_year_bits={} rate_bits={} epoch_years_bits={} budget={} rewards={} points={}",
+                self.slot(),
+                capitalization,
+                slot_in_year.to_bits(),
+                validator_rate.to_bits(),
+                epoch_years.to_bits(),
+                budget,
+                point_value.rewards,
+                point_value.points,
+            );
+        }
     }
 
     /// map stake delegations into resolved (pubkey, account) pairs
@@ -5207,6 +5253,11 @@ impl Bank {
         );
 
         let rewards = self.rewards.read().unwrap();
+        let trace_directory = if self.slot() == 117_072_004 {
+            std::env::var_os("JETSTREAMER_EPOCH271_REWARD_DIR").map(PathBuf::from)
+        } else {
+            None
+        };
         for kind in &[RewardType::Staking, RewardType::Voting] {
             let mut records: Vec<_> = rewards
                 .iter()
@@ -5244,7 +5295,39 @@ impl Bank {
                 lamports,
                 digest.result(),
             );
+            if let Some(directory) = &trace_directory {
+                let path = directory.join(format!("{}.bin", kind));
+                if let Err(error) = Self::write_epoch271_reward_tuples(&path, &records) {
+                    let _ = writeln!(
+                        output,
+                        "epoch271_reward_trace_error kind={} error={}",
+                        kind, error
+                    );
+                }
+            }
         }
+    }
+
+    #[cfg(feature = "epoch271-boundary-trace")]
+    fn write_epoch271_reward_tuples(
+        path: &std::path::Path,
+        records: &[([u8; 32], i64, u64, u16)],
+    ) -> std::io::Result<()> {
+        use std::{
+            fs::OpenOptions,
+            io::{BufWriter, Write},
+        };
+
+        let file = OpenOptions::new().write(true).create_new(true).open(path)?;
+        let mut output = BufWriter::new(file);
+        for (address, amount, balance, commission) in records {
+            output.write_all(address)?;
+            output.write_all(&amount.to_le_bytes())?;
+            output.write_all(&balance.to_le_bytes())?;
+            output.write_all(&commission.to_le_bytes())?;
+        }
+        output.flush()?;
+        output.get_ref().sync_all()
     }
 
     /// Recalculate the hash_internal_state from the account stores. Would be used to verify a
