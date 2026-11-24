@@ -2037,6 +2037,27 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["full_cold_epoch_peak_qualified"] == false
             && receipt["canonical_sidecar_authorized"] == false
             && receipt["publication_authorized"] == false
+    } else if claim.unit == "horizon-qualify-226-checkpoint-continuation-suffix-v1.service"
+        || receipt["kind"] == "epoch226-checkpoint-suffix"
+    {
+        claim.epoch == 226
+            && claim.unit == "horizon-qualify-226-checkpoint-continuation-suffix-v1.service"
+            && claim.scratch_path
+                == Path::new("/home/ubuntu/.jetstreamer-private/checkpoint-continuation-226-suffix-v1")
+            && receipt["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+            && receipt["kind"] == "epoch226-checkpoint-suffix"
+            && receipt["epoch"] == 226
+            && receipt["unit"] == claim.unit
+            && receipt["invocation_id"] == claim.invocation_id
+            && receipt["run_root"].as_str() == claim.scratch_path.to_str()
+            && receipt["bootstrap_slot"] == 98_063_464
+            && receipt["first_slot"] == 98_063_465
+            && receipt["last_slot"] == 98_063_999
+            && receipt["worker_sha256"]
+                == "7a831420bb1498ddb0268309ce69f615c7f0c6d90cfab940896a03dc38b5336a"
+            && receipt["entry_replay_requested"] == true
+            && receipt["source_prefix_retained"] == true
+            && receipt["canonical_epoch_publication_authorized"] == false
     } else if claim.unit == "horizon-qualify-230-bank-trace-v316.service" {
         claim.epoch == 230
             && claim.scratch_path
@@ -6075,6 +6096,50 @@ mod tests {
         receipt["evidence"]["units"][0]["invocation_id"] = json!(claim.invocation_id);
         receipt["evidence"]["units"][0]["restarts"] = json!(1);
         assert!(validate_diagnostic_launch(&receipt, &claim).is_err());
+    }
+
+    #[test]
+    fn epoch226_checkpoint_suffix_keeps_the_exact_private_scope() {
+        let mut claim = DiagnosticClaim {
+            epoch: 226,
+            unit: "horizon-qualify-226-checkpoint-continuation-suffix-v1.service".into(),
+            invocation_id: "a".repeat(32),
+            scratch_path: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-226-suffix-v1".into(),
+            launch_receipt: BoundFile {
+                path: "/var/lib/jetstreamer/launch.json".into(),
+                sha256: "b".repeat(64),
+            },
+        };
+        let receipt = json!({
+            "schema": "jetstreamer-historical-performance-launch-receipt-v1",
+            "kind": "epoch226-checkpoint-suffix", "epoch": 226,
+            "unit": claim.unit, "invocation_id": claim.invocation_id, "run_root": claim.scratch_path,
+            "bootstrap_slot": 98_063_464, "first_slot": 98_063_465, "last_slot": 98_063_999,
+            "worker_sha256": "7a831420bb1498ddb0268309ce69f615c7f0c6d90cfab940896a03dc38b5336a",
+            "entry_replay_requested": true, "source_prefix_retained": true,
+            "canonical_epoch_publication_authorized": false,
+            "launched": true, "remote_mutations": false, "r2_mutations": false,
+            "evidence": {"units": [{"unit": claim.unit, "invocation_id": claim.invocation_id,
+                "restarts": 0, "load_state": "loaded", "result": "success", "main_pid": 1,
+                "active_state": "active", "sub_state": "running"}]},
+        });
+        validate_diagnostic_launch(&receipt, &claim).unwrap();
+        for (key, replacement) in [
+            ("first_slot", json!(98_063_464)),
+            ("last_slot", json!(98_064_000)),
+            ("worker_sha256", json!("f".repeat(64))),
+            ("source_prefix_retained", json!(false)),
+            ("canonical_epoch_publication_authorized", json!(true)),
+        ] {
+            let mut changed = receipt.clone();
+            changed[key] = replacement;
+            assert!(validate_diagnostic_launch(&changed, &claim).is_err(), "{key}");
+        }
+        claim.unit = "horizon-perf-epoch226-other@v1.service".into();
+        let mut renamed = receipt;
+        renamed["unit"] = json!(claim.unit);
+        renamed["evidence"]["units"][0]["unit"] = json!(claim.unit);
+        assert!(validate_diagnostic_launch(&renamed, &claim).is_err());
     }
 
     #[test]
