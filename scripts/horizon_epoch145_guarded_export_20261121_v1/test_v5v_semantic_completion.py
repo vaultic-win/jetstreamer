@@ -184,6 +184,71 @@ class QualifiedSuccessor(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "broken successor semantic receipt chain"):
             validate(verified, extraction, done, dict(anchors, invocation_id=OTHER), verified_ref, extraction_ref)
 
+    def test_pre_read_failure_requires_corrected_custody_and_a_drained_native_owner(self):
+        iid = scope["V5V"]
+        handoff = scope["V5V_HANDOFF"]
+        ref = scope["reference"]
+        terminal_ref = ref(handoff / "START_FAILURE_CUSTODY.json", scope["V5V_CUSTODY"])
+        intent_ref = ref(handoff / "START_INTENT.json", scope["V5V_INTENT"])
+        start_ref = ref(handoff / "START_RESULT.json", scope["V5V_RESULT"])
+        original = ref(handoff / "V5U_TERMINAL.json", scope["CORRECTED_V5U"])
+        worker = {"path": ARGV[0], "sha256": ARGV[-1]}
+        provider = {"path": "/sealed/provider", "sha256": "9" * 64}
+        fixture = history(iid)[:2]
+        exited = event(iid, "PROCESS_EXIT", 14)
+        exited.update(COMMAND="ExecStart", EXIT_CODE="exited", EXIT_STATUS="1")
+        failed = event(iid, "FAILURE", 15)
+        failed.update(UNIT_RESULT="exit-code")
+        fixture.extend((exited, failed))
+        candidate = {"inode": 103237059}
+        terminal = {
+            "schema": "horizon-epoch145-v5v-pre-read-custody-failure-v1",
+            "invocation_id": iid, "unit": UNIT, "candidate": candidate,
+            "manager": {"InvocationID": iid, "Id": UNIT, "ExecMainStatus": "1"},
+            "start": start_ref, "terminal_output": "epoch145: private binding custody",
+            "correction": {"receipt": original, "former_mode": "0444", "corrected_mode": "0600"},
+            "process_state_directory_created": False, "resource_credit_bytes": 0,
+            "r2_mutations": False,
+            "pid1_exit": {key: exited[key] for key in
+                ("EXIT_CODE", "EXIT_STATUS", "INVOCATION_ID", "__CURSOR", "__REALTIME_TIMESTAMP")},
+        }
+        intent = dict(INTENT, worker=worker, provider=provider, terminal=original,
+                      worker_seal={}, provider_seal={}, fleet={"path":ARGV[2], "sha256":ARGV[3]},
+                      argv=["/usr/bin/systemd-run", "--", *ARGV], not_before_monotonic_usec=10)
+        documents = {terminal_ref["path"]:terminal, start_ref["path"]:dict(result(iid),intent=intent_ref),
+                     intent_ref["path"]:intent}
+        extra = []
+
+        def read(path, *, mode):
+            self.assertEqual((str(path),mode), (original["path"],0o600))
+            return b"{}",original
+
+        def journal(selected, *_args, **_options):
+            return fixture if selected == iid else [*extra,*fixture]
+
+        with patch.dict(common, pinned_json=lambda _ref,path:documents[str(path)],
+                        v5u_predecessor=lambda _ref:(candidate,event(V5U,"FAILURE",5)),
+                        read_file=read, journal=journal,
+                        sealed_member=lambda _pkg,_seal,name,_mode:(b"",worker if name=="export145" else provider)):
+            self.assertEqual(scope["pre_read_failure"](terminal_ref), (terminal,failed))
+            terminal["correction"]["corrected_mode"] = "0444"
+            with self.assertRaisesRegex(ValueError,"corrected custody"):
+                scope["pre_read_failure"](terminal_ref)
+            terminal["correction"]["corrected_mode"] = "0600"
+            with patch.object(common["os"].path, "lexists", return_value=True):
+                with self.assertRaisesRegex(ValueError,"private candidate"):
+                    scope["pre_read_failure"](terminal_ref)
+            extra.append(event(OTHER,"STARTING",7))
+            with self.assertRaisesRegex(ValueError,"another native owner"):
+                scope["pre_read_failure"](terminal_ref)
+
+    def test_next_manager_cannot_reuse_either_failed_invocation(self):
+        intent = dict(INTENT, schema="horizon-epoch145-v5v-custody-successor-start-intent-v1")
+        for iid in (V5U, scope["V5V"]):
+            with self.assertRaisesRegex(ValueError,"foreign successful"):
+                manager(result(iid),intent,retry=True)
+        self.assertEqual(manager(result(),intent,retry=True),(OWNER,42))
+
     def test_published_donor_retries_only_the_identical_read_once(self):
         source = DIRECTORY / "build_159_price.py"
         self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), scope["DONOR_SHA"])

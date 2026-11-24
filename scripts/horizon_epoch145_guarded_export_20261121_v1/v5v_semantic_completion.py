@@ -12,8 +12,17 @@ import sys
 
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FAMILY = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
-PACKAGE = FAMILY / "tools-v5v"
-PROVIDER = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-v5u-guard-recovery-v1"
+RETRY = Path(__file__).resolve().parent.name == "tools-v5w"
+V5V_HANDOFF = FAMILY / "v5v-name-handoff"
+V5V_PACKAGE = FAMILY / "tools-v5v"
+V5V_PROVIDER = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-v5u-guard-recovery-v1"
+PACKAGE = FAMILY / "tools-v5w" if RETRY else V5V_PACKAGE
+PROVIDER = V5V_PROVIDER.with_name("tools-homefloor-145-v5v-custody-recovery-v1") if RETRY else V5V_PROVIDER
+V5V = "49ef63271f7345bd976c2897296ffbb7"
+V5V_CUSTODY = "f2ffaa9026eaeb5fc1616330f8e067742d7a06a96f6f46f12dac8354d7e35a9d"
+V5V_RESULT = "feaafe6fd9e0d474c385eadd48e9a57ecc4b29c16b7d20553ae0b62acb51f897"
+V5V_INTENT = "8659f84819e07aef5c9ca02fa0f435fc5c67fc021dd8278579dd9693241777ef"
+CORRECTED_V5U = "4a4bf1a64a85eeeae092d93643136b74d3fce3602393f34f2f28dea72eedb594"
 DONOR_SHA = "db0b9de9d848a525c0f2daf7810ac8dba85515253e99f8c358eb34e4ba2e5d7c"
 V5U_IMAGE = "18f46b23edd8061eb7ed9ae1566134bc7ea2cbaa6fa7b85cdd1745488366dca4"
 V5U_START = "85dede3d71e27414b28369d1686fe4d7e9ee207bcf6ac4a2c083836961149549"
@@ -194,7 +203,7 @@ def historical_failure():
     return start_ref, failure_ref, candidate, native_failure
 
 
-def failed_predecessor(terminal_ref):
+def v5u_predecessor(terminal_ref):
     start_ref, failure_ref, candidate, native_failure = historical_failure()
     require(terminal_ref["path"] == str(FAMILY / "v5v-name-handoff/V5U_TERMINAL.json"),
             "wrong predecessor terminal path")
@@ -208,6 +217,68 @@ def failed_predecessor(terminal_ref):
                 ("path", str(PAID)), ("device", 64512), ("inode", 103237059), ("bytes", BYTES))),
             "foreign V5u terminal or paid candidate")
     return candidate, native_failure
+
+
+def pre_read_failure(terminal_ref):
+    expected = reference(V5V_HANDOFF / "START_FAILURE_CUSTODY.json", V5V_CUSTODY)
+    require(terminal_ref == expected, "different V5v pre-read terminal receipt")
+    terminal = pinned_json(expected, Path(expected["path"]))
+    start_ref = reference(V5V_HANDOFF / "START_RESULT.json", V5V_RESULT)
+    intent_ref = reference(V5V_HANDOFF / "START_INTENT.json", V5V_INTENT)
+    result = pinned_json(start_ref, Path(start_ref["path"]))
+    intent = pinned_json(intent_ref, Path(intent_ref["path"]))
+    corrected = V5V_HANDOFF / "V5U_TERMINAL.json"
+    original_ref = reference(corrected, CORRECTED_V5U)
+    _, corrected_ref = read_file(corrected, mode=0o600)
+    candidate, old_failure = v5u_predecessor(original_ref)
+    require(result["intent"] == intent_ref and successor_manager(result, intent, retry=False)[0] == V5V
+            and corrected_ref == intent["terminal"] == original_ref
+            and terminal["schema"] == "horizon-epoch145-v5v-pre-read-custody-failure-v1"
+            and terminal["invocation_id"] == terminal["manager"]["InvocationID"] == V5V
+            and terminal["unit"] == terminal["manager"]["Id"] == UNIT
+            and terminal["manager"]["ExecMainStatus"] == "1"
+            and terminal["start"] == start_ref and terminal["candidate"] == candidate
+            and terminal["terminal_output"] == "epoch145: private binding custody"
+            and terminal["correction"] == {
+                "receipt": original_ref, "former_mode": "0444", "corrected_mode": "0600",
+            }
+            and terminal["process_state_directory_created"] is False
+            and not os.path.lexists(STATE / V5V)
+            and terminal["resource_credit_bytes"] == 0 and terminal["r2_mutations"] is False,
+            "different failed V5v admission, corrected custody or private candidate")
+    tail = [intent["worker"]["path"], "recover-full-output", intent["fleet"]["path"],
+            intent["fleet"]["sha256"], intent["worker"]["sha256"]]
+    _, image = sealed_member(V5V_PACKAGE, intent["worker_seal"], "export145", 0o555)
+    _, provider = sealed_member(V5V_PROVIDER, intent["provider_seal"], "post-stop-fit", 0o555)
+    require(intent["argv"][-5:] == tail and image == intent["worker"] and provider == intent["provider"],
+            "different V5v command or sealed deployment")
+    events = journal(V5V, STARTING, STARTED, PROCESS_EXIT, FAILURE, SUCCESS, STOPPING, STOPPED)
+    require([row["MESSAGE_ID"] for row in events] == [STARTING, STARTED, PROCESS_EXIT, FAILURE],
+            "different V5v start and fail history")
+    started, _ = validate_start_events(V5V, events[:2], tail, intent["not_before_monotonic_usec"], old_failure)
+    exited, failed = events[2:]
+    scope_event(exited, V5V, PROCESS_EXIT)
+    scope_event(failed, V5V, FAILURE)
+    require(exited["COMMAND"] == "ExecStart" and exited["EXIT_CODE"] == "exited" and exited["EXIT_STATUS"] == "1"
+            and failed["UNIT_RESULT"] == "exit-code"
+            and int(started["__MONOTONIC_TIMESTAMP"]) < int(exited["__MONOTONIC_TIMESTAMP"])
+            <= int(failed["__MONOTONIC_TIMESTAMP"])
+            and terminal["pid1_exit"] == {key: exited[key] for key in
+                ("EXIT_CODE", "EXIT_STATUS", "INVOCATION_ID", "__CURSOR", "__REALTIME_TIMESTAMP")},
+            "different PID1 exit from the failed V5v invocation")
+    history = journal(None, STARTING, STARTED, PROCESS_EXIT, FAILURE, SUCCESS, STOPPING, STOPPED,
+                      after_cursor=old_failure["__CURSOR"])
+    cutoff = int(failed["__MONOTONIC_TIMESTAMP"])
+    require([row for row in history if int(row["__MONOTONIC_TIMESTAMP"]) <= cutoff] == events,
+            "another native owner intervened before V5v failed")
+    return terminal, failed
+
+
+def failed_predecessor(terminal_ref):
+    if RETRY:
+        terminal, failed = pre_read_failure(terminal_ref)
+        return terminal["candidate"], failed
+    return v5u_predecessor(terminal_ref)
 
 
 def manager_properties(properties):
@@ -233,9 +304,16 @@ def predecessor_preflight(fleet_ref):
     expected = dict(Id=UNIT, ActiveState="failed", SubState="failed", InvocationID=V5U,
                     MainPID="0", ControlPID="0", Job="", NRestarts="0", ControlGroup="",
                     ExecMainStatus="1", Result="exit-code")
+    if RETRY:
+        terminal_ref = reference(V5V_HANDOFF / "START_FAILURE_CUSTODY.json", V5V_CUSTODY)
+        terminal, native_failure = pre_read_failure(terminal_ref)
+        expected = terminal["manager"]
+        properties = tuple(expected)
+        startup_ref, failure_ref, candidate = terminal["start"], terminal_ref, terminal["candidate"]
+    else:
+        startup_ref, failure_ref, candidate, native_failure = historical_failure()
     group = Path("/sys/fs/cgroup/system.slice") / UNIT
-    require(manager_properties(properties) == expected and not group.exists(), "failed V5u manager or cgroup changed")
-    startup_ref, failure_ref, candidate, native_failure = historical_failure()
+    require(manager_properties(properties) == expected and not group.exists(), "failed predecessor manager or cgroup changed")
     m = PAID.lstat()
     require(PAID.resolve(strict=True) == PAID and not os.path.lexists(PROMOTED)
             and (m.st_mode, m.st_uid, m.st_gid, m.st_nlink) == (stat.S_IFREG | 0o400, 0, 0, 1)
@@ -245,7 +323,8 @@ def predecessor_preflight(fleet_ref):
             }.items())
             and file_stamp(m) == file_stamp(PAID.lstat()) and manager_properties(properties) == expected and not group.exists(),
             "paid candidate or failed owner changed during preflight")
-    return {"schema": "horizon-epoch145-v5u-query-timeout-terminal-v1",
+    return {"schema": ("horizon-epoch145-v5w-predecessor-preflight-v1" if RETRY else
+                       "horizon-epoch145-v5u-query-timeout-terminal-v1"),
             "fleet_review": fleet_ref, "sampled_at_utc": fleet["sampled_at_utc"],
             "startup": startup_ref, "failure": failure_ref, "candidate": candidate,
             "native_failure_cursor": native_failure["__CURSOR"], "manager": expected,
@@ -253,21 +332,25 @@ def predecessor_preflight(fleet_ref):
             "archive_publication_authorized": False, "r2_mutations": False}
 
 
-def successor_manager(result, intent):
+def successor_manager(result, intent, *, retry=None):
+    retry = RETRY if retry is None else retry
     manager = result["manager"]
     iid = manager["InvocationID"]
+    schema = "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
+        "horizon-epoch145-v5u-semantic-successor-start-intent-v1"
+    )
     require(result["status"] == 0 and manager["Id"] == intent["unit"] == UNIT
-            and re.fullmatch(r"[a-f0-9]{32}", iid) and iid != V5U
+            and re.fullmatch(r"[a-f0-9]{32}", iid) and iid not in ((V5U, V5V) if retry else (V5U,))
             and manager["ActiveState"] == "active" and manager["SubState"] == "running"
             and manager["ControlPID"] == manager["NRestarts"] == "0" and not manager["Job"]
             and manager["ControlGroup"] == "/system.slice/" + UNIT and int(manager["MainPID"]) > 1
-            and intent["schema"] == "horizon-epoch145-v5u-semantic-successor-start-intent-v1"
+            and intent["schema"] == schema
             and intent["r2_mutations"] is False, "foreign successful semantic successor submission")
     return iid, int(manager["MainPID"])
 
 
 def startup(result_ref):
-    submission = FAMILY / "v5v-name-handoff"
+    submission = FAMILY / "v5w-name-handoff" if RETRY else V5V_HANDOFF
     result = pinned_json(result_ref, submission / "START_RESULT.json")
     intent_ref = result["intent"]
     intent = pinned_json(intent_ref, submission / "START_INTENT.json")
@@ -282,7 +365,7 @@ def startup(result_ref):
     launch_quote = pinned_json(intent["capacity"], submission / "FIT.json")
     require(launch_quote["fleet"] == bounds and launch_quote["fits"] is True
             and launch_quote["epoch"] == 145 and launch_quote["candidate"] is None
-            and launch_quote["phase145"]["InvocationID"] == V5U
+            and launch_quote["phase145"]["InvocationID"] == (V5V if RETRY else V5U)
             and launch_quote["phase145"]["guard_terminal"] == intent["terminal"]
             and launch_quote["resource_credit_bytes"] == 0
             and launch_quote["replay_launch_authorized"] is False,
@@ -415,8 +498,9 @@ def completion(anchors, started, success):
             "foreign promoted inode")
     require(not (state / "failed.json").exists() and file_stamp(info) == file_stamp(PROMOTED.lstat()),
             "promoted archive or terminal state changed")
-    return {"schema": "horizon-epoch145-v5u-successor-semantic-completion-v1",
-            "invocation_id": iid, "start": anchors["start"], "verified": verified_ref,
+    schema = ("horizon-epoch145-v5v-custody-successor-semantic-completion-v1" if RETRY else
+              "horizon-epoch145-v5u-successor-semantic-completion-v1")
+    return {"schema": schema, "invocation_id": iid, "start": anchors["start"], "verified": verified_ref,
             "extraction": extraction_ref, "completion": done_ref, "pid1_success": success["__CURSOR"],
             "native_start": started, "native_success": success, "archive": str(PROMOTED),
             "archive_bytes": BYTES, "archive_sha256": report["archive_sha256"],

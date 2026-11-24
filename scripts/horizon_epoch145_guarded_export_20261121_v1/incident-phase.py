@@ -11,7 +11,8 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-V5U_QUERY_RECOVERY = VERSION == "tools-v5v"
+V5V_CUSTODY_RECOVERY = VERSION == "tools-v5w"
+V5U_QUERY_RECOVERY = VERSION in ("tools-v5v", "tools-v5w")
 FRESH_CENSUS_RECOVERY = VERSION == "tools-v5u" or V5U_QUERY_RECOVERY
 GUARD_WALK_RECOVERY = VERSION == "tools-v5t" or FRESH_CENSUS_RECOVERY
 GUARD_TERMINAL_RECOVERY = VERSION == "tools-v5s" or GUARD_WALK_RECOVERY
@@ -36,6 +37,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5t": "tools-homefloor-145-v5s-guard-recovery-v1",
                       "tools-v5u": "tools-homefloor-145-v5t-guard-recovery-v1",
                       "tools-v5v": "tools-homefloor-145-v5u-guard-recovery-v1",
+                      "tools-v5w": "tools-homefloor-145-v5v-custody-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -149,7 +151,8 @@ def v5u_terminal_predecessor(s, seal, build, successor):
     checker = v5u_checker(s, seal, build)
     reference = build["guard_terminal"]
     _, native = checker["failed_predecessor"](reference)
-    s.need(successor != checker["V5U"], "failed V5u invocation reused as successor")
+    s.need(successor != checker["V5U"] and (not V5V_CUSTODY_RECOVERY or successor != checker["V5V"]),
+           "failed invocation reused as successor")
     rows = checker["journal"](None, checker["STARTING"], checker["STARTED"], checker["FAILURE"],
                               after_cursor=native["__CURSOR"])
     s.need([(row["INVOCATION_ID"], row["MESSAGE_ID"]) for row in rows]
@@ -165,11 +168,17 @@ def v5v_stopped_phase(s, fit, fleet, profile):
     reference = build["guard_terminal"]
     observed = checker["predecessor_preflight"](fleet)
     prior, actual = s.read(Path(reference["path"]), reference["sha256"])
-    s.need(actual == reference and all(prior[key] == observed[key] for key in
-           ("schema", "startup", "failure", "candidate", "native_failure_cursor", "manager",
-            "resource_credit_bytes", "archive_publication_authorized", "r2_mutations"))
-           and not fit.members(UNIT), "drained V5u capacity preflight changed")
-    return dict(observed["manager"], stage="v5u-drained", guard_terminal=reference,
+    if V5V_CUSTODY_RECOVERY:
+        s.need(actual == reference == observed["failure"] and prior["start"] == observed["startup"]
+               and prior["candidate"] == observed["candidate"] and prior["manager"] == observed["manager"]
+               and not fit.members(UNIT), "drained V5v custody preflight changed")
+    else:
+        s.need(actual == reference and all(prior[key] == observed[key] for key in
+               ("schema", "startup", "failure", "candidate", "native_failure_cursor", "manager",
+                "resource_credit_bytes", "archive_publication_authorized", "r2_mutations"))
+               and not fit.members(UNIT), "drained V5u capacity preflight changed")
+    stage = "v5v-drained" if V5V_CUSTODY_RECOVERY else "v5u-drained"
+    return dict(observed["manager"], stage=stage, guard_terminal=reference,
                 failure=observed["failure"], recovery=observed["startup"],
                 candidate=observed["candidate"])
 
@@ -398,8 +407,9 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     if HOMEFLOOR_REJOIN:
         predecessor = "failed_retry1"
     if V5U_QUERY_RECOVERY:
-        s.need(started["prior_frozen_recovery"]["failed_v5u"]["terminal"] == window["guard_terminal_predecessor"],
-               "native worker has a different V5u predecessor")
+        predecessor_key = "failed_v5v" if V5V_CUSTODY_RECOVERY else "failed_v5u"
+        s.need(started["prior_frozen_recovery"][predecessor_key]["terminal"] == window["guard_terminal_predecessor"],
+               "native worker has a different immediate predecessor")
     s.need(started["iid"] == generation and started["image"] == image_sha
            and started["r2_mutations"] is False and started["file"] == str(OUTPUT)
            and started["prior_frozen_recovery"][predecessor]["current_boot_failure"]["failure"] == failed

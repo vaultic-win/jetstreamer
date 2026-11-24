@@ -13,7 +13,12 @@ compile_error!("the fresh-census retry requires the allocation-walk guard");
 #[cfg(all(incident_v5u_guard_recovery145_only, not(incident_v5t_guard_recovery145_only)))]
 compile_error!("the timed-out V5u successor requires the previous fresh-census guard");
 
-#[cfg(incident_v5u_guard_recovery145_only)]
+#[cfg(all(incident_v5v_guard_recovery145_only, not(incident_v5u_guard_recovery145_only)))]
+compile_error!("the pre-read custody retry requires the entire V5v verifier guard");
+
+#[cfg(incident_v5v_guard_recovery145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5w/export145";
+#[cfg(all(incident_v5u_guard_recovery145_only, not(incident_v5v_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5v/export145";
 #[cfg(all(incident_v5t_guard_recovery145_only, not(incident_v5u_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5u/export145";
@@ -107,6 +112,76 @@ pub fn failed_v5u() -> Result<Value> {
         "V5u terminal and immutable paid candidate do not agree"
     );
     Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
+}
+
+#[cfg(incident_v5v_guard_recovery145_only)]
+pub(super) fn v5v_terminal() -> Result<Bound> {
+    let pin = Bound {
+        path: Path::new(RUNTIME).join(
+            "epoch145-semantic-continuity-20261121-v1/v5v-name-handoff/START_FAILURE_CUSTODY.json",
+        ),
+        sha256: "f2ffaa9026eaeb5fc1616330f8e067742d7a06a96f6f46f12dac8354d7e35a9d".into(),
+    };
+    ensure!(custody::binding(&pin.path)? == pin, "V5v failure custody changed");
+    Ok(pin)
+}
+
+#[cfg(incident_v5v_guard_recovery145_only)]
+pub(super) fn failed_v5v(v5u: &Value) -> Result<Value> {
+    let iid = "49ef63271f7345bd976c2897296ffbb7";
+    let terminal = v5v_terminal()?;
+    let failure = custody::evidence(&terminal)?;
+    let launch = Bound {
+        path: terminal.path.with_file_name("START_RESULT.json"),
+        sha256: "feaafe6fd9e0d474c385eadd48e9a57ecc4b29c16b7d20553ae0b62acb51f897".into(),
+    };
+    let start = custody::evidence(&launch)?;
+    let leaf = materialized::leaf()?;
+    let id = custody::frozen_identity(&leaf)?;
+    let state = Path::new(BASE).join("state").join(iid);
+    let raw = capacity::run(
+        "/usr/bin/journalctl",
+        &[
+            "--no-pager", "-ojson",
+            "--output-fields=UNIT,INVOCATION_ID,COMMAND,EXIT_CODE,EXIT_STATUS,_BOOT_ID,MESSAGE_ID",
+            "_PID=1",
+            &format!("UNIT={UNIT}"),
+            &format!("INVOCATION_ID={iid}"),
+            "MESSAGE_ID=98e322203f7a4ed290d09fe03c09fe15",
+        ],
+        "10",
+    )?;
+    let events = raw.lines().map(serde_json::from_str::<Value>)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let [exit] = events.as_slice() else {
+        anyhow::bail!("ambiguous V5v PID1 process exit");
+    };
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim().replace('-', "");
+    ensure!(
+        exit["UNIT"] == UNIT && exit["INVOCATION_ID"] == iid
+            && exit["_BOOT_ID"] == boot && exit["COMMAND"] == "ExecStart"
+            && exit["EXIT_CODE"] == "exited" && exit["EXIT_STATUS"] == "1"
+            && ["EXIT_CODE", "EXIT_STATUS", "INVOCATION_ID", "__CURSOR", "__REALTIME_TIMESTAMP"]
+                .iter().all(|key| failure["pid1_exit"][*key] == exit[*key])
+            && failure["schema"] == "horizon-epoch145-v5v-pre-read-custody-failure-v1"
+            && failure["terminal_output"] == "epoch145: private binding custody"
+            && failure["unit"] == UNIT && failure["invocation_id"] == iid
+            && failure["start"] == json!(launch) && start["status"] == 0
+            && start["manager"]["InvocationID"] == iid && start["manager"]["Id"] == UNIT
+            && failure["correction"]["receipt"] == v5u["terminal"]
+            && failure["correction"]["former_mode"] == "0444"
+            && failure["correction"]["corrected_mode"] == "0600"
+            && failure["process_state_directory_created"] == false
+            && fs::symlink_metadata(state).is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+            && failure["candidate"]["path"] == json!(leaf)
+            && failure["candidate"]["device"] == id.device && failure["candidate"]["inode"] == id.inode
+            && failure["candidate"]["bytes"] == id.bytes
+            && failure["candidate"]["mtime_ns"].as_i64().map(i128::from) == Some(id.mtime_ns)
+            && failure["candidate"]["ctime_ns"].as_i64().map(i128::from) == Some(id.ctime_ns)
+            && failure["resource_credit_bytes"] == 0 && failure["r2_mutations"] == false,
+        "V5v pre-read failure and the immutable paid candidate do not agree"
+    );
+    Ok(json!({"terminal": terminal, "start": launch, "native_exit":exit}))
 }
 
 pub fn predecessor() -> Result<Value> {
