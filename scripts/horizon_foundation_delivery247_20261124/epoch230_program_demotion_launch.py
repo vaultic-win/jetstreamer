@@ -111,12 +111,33 @@ def fresh_fit(profile):
     _,fleet_ref,fleet=kit.measure.source.latest()
     assert next(r for r in fleet['inventory']['entries'] if r['epoch']==230)['state']=='missing'
     owners={}
+    reconciled_terminals={}
     for row in fleet['active']:
         epoch=row['epoch']
         assert epoch not in owners
         live=row['producer']
+        if epoch==229:
+            terminal=V/'horizon229-trace-ram-v325/terminal.json'
+            if terminal.is_file():
+                terminal_ref=ops.ref(terminal)
+                record=ops.bound(terminal_ref)
+                correction_ref=ops.ref(terminal.with_name('terminal-timer-correction.json'))
+                correction=ops.bound(correction_ref)
+                assert record['epoch']==correction['epoch']==229 and correction['original_terminal']==terminal_ref
+                observed=record['producer']
+                assert observed['Id']==live['Id'] and observed['InvocationID']==live['InvocationID']
+                assert correction['invocation_id']==observed['InvocationID']
+                assert observed['MainPID']=='0' and not observed['ControlGroup']
+                assert ops.props(observed['Id'],list(observed))==observed
+                timer=correction['guard_timer_before']
+                for unit,state in ((timer['Id'],correction['guard_timer_drained']),
+                                   (timer['Unit'],correction['guard_service_drained'])):
+                    assert state['ActiveState']=='inactive' and state['Job']==''
+                    assert ops.props(unit,list(state))==state
+                reconciled_terminals[epoch]=dict(terminal=terminal_ref,guard_correction=correction_ref)
+                continue
         owners[epoch]=kit.measure.source.helper.active_props(live['Id'],live['InvocationID'])
-    assert set(owners)=={226,229,252,257,261,292}
+    assert set(owners)-{229}=={226,252,257,261,292}
     last=ops.bound(ops.ref(CURRENT/'admission.json'))['fit']
     for epoch,folder,lane in [(288,'horizon288-full-v303',last['live_units']['288']),
                               (230,'horizon230-bank-trace-ram-v316',last['diagnostic_ram_owner'])]:
@@ -144,7 +165,7 @@ def fresh_fit(profile):
     assert os.stat('/').st_dev!=os.stat(profile['filesystem']).st_dev
     assert tmpfs_bytes >= profile['ram_scratch_cap_bytes']+(2 << 30)
     assert headroom>=profile['memory_max_bytes'],headroom
-    return dict(fleet=fleet_ref,live=owners,broker=hold,headroom=headroom,
+    return dict(fleet=fleet_ref,live=owners,reconciled_terminals=reconciled_terminals,broker=hold,headroom=headroom,
                 tmpfs_available_bytes=tmpfs_bytes,sampled_unix_seconds=int(time.time()))
 
 def inventory():
