@@ -68,7 +68,8 @@ DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
 V5N_136 = HERE == D / "tools-homefloor-145-post-v5n-136-v1"
 V5O_136 = HERE == D / "tools-homefloor-145-post-v5o-136-v1"
 V5Q_136 = HERE == D / "tools-homefloor-145-post-v5q-136-v1"
-POST_136 = V5N_136 or V5O_136 or V5Q_136
+V5R_136 = HERE == D / "tools-homefloor-145-post-v5r-136-v1"
+POST_136 = V5N_136 or V5O_136 or V5Q_136 or V5R_136
 V5N_POST = POST_136 or HERE == D / "tools-homefloor-145-post-v5n-v1"
 V5M_POST = V5N_POST or HERE == D / "tools-homefloor-145-post-v5m-v1"
 V5K_POST = V5M_POST or HERE == D / "tools-homefloor-145-post-v5k-v1"
@@ -499,7 +500,7 @@ def fixture_post_directory(here):
 def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False, focused=None):
     if focused is not None:
         post_directory = fixture_post_directory(here)
-        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
+        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
                     "lease-semantic": ("profile145-lease-semantic.json", "tools-v5r" if ENCODED_PREFIX_RECOVERY_145 else "tools-v5q" if AUDIT_TURNOVER_RECOVERY_145 else "tools-v5p" if STATUS_OWNER_RECOVERY_145 else "tools-v5o" if DONOR_PRESSURE_145 else "tools-v5n" if GUARD_RUNTIME_145 else "tools-v5m" if MISSED_RUNTIME_145 else "tools-v5k"),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
@@ -578,7 +579,8 @@ def phase145(epoch):
         build, _ = s.read(package / "build-proof.json", profile["build_sha256"])
         complete, _ = reader["completion"](s, build)
         s.need(s.show(fit.A145) == m and not fit.members(fit.A145)
-               and (not (V5O_136 or V5Q_136) or not (Path("/sys/fs/cgroup/system.slice") / fit.A145).exists()),
+               and (not (V5O_136 or V5Q_136 or V5R_136)
+                    or not (Path("/sys/fs/cgroup/system.slice") / fit.A145).exists()),
                "145 name changed during post handoff")
         return {"Id": fit.A145, "MainPID": "0", "stage": "v5j-semantic-complete", "completion": complete}
     if DETACHED_145:
@@ -845,11 +847,11 @@ def registered_status():
             if RETRY4_168:
                 retry3=writer168["registered_writer"](scope,retry2,cold168["PREVIOUS_PREPARED_SHA"],cold168["PREVIOUS_GUARD_SHA"])
                 retry4=writer168v4["registered_writer"](scope,retry3,cold168["PREPARED_SHA"],cold168["GUARD_QUAL_SHA"])
-                if V5Q_136:
+                if V5Q_136 or V5R_136:
                     s.need(retry4[1] == s.ref(R / "survivor172-cadence-20261122-v1/tools-cold168-retry4-resume-v1/deployment-seal-receipt.json",
                                              "a608208cd09681d366f0994dfc43406b4f8430330e13919a88b3af031efaf160")
                            and retry4[2] == "d6d40746a4974ca186acd7f2d5a5cac4",
-                           "different cadence predecessor for V5q handoff")
+                           "different cadence predecessor for 145 handoff")
                 return writer168v4["registered_136_writer"](scope,retry4) if POST_136 else retry4
             if RETRY3_168:
                 return writer168["registered_writer"](scope,retry2,cold168["PREPARED_SHA"],cold168["GUARD_QUAL_SHA"])
@@ -921,6 +923,8 @@ def prefix145(fleet):
 
 
 def semantic136_route():
+    if V5R_136:
+        return R / "epoch145-v5r-136-dispatch-20261124-v1", R / "epoch136-joint-writer-20261124-v11/controller"
     if V5Q_136:
         return R / "epoch145-v5q-136-dispatch-20261124-v1", R / "epoch136-joint-writer-20261124-v10/controller"
     version = "v5o" if V5O_136 else "v5n"
@@ -978,7 +982,15 @@ def validate_v7_release(dispatcher, controller, selector, planref, plan, receipt
         fit.binary(boundary, record["sha256"])
         successor = runpy.run_path(str(boundary))
         worker = bound(plan["holding145_semantic_worker"])
-        if V5O_136 or V5Q_136:
+        if V5R_136:
+            profile, _, post = profile145(pkg, focused="v5j-post")
+            tools = successor["v5r_completion_tools"](plan, profile)
+            build = bound(tools["build"])
+            s.need(tools["seal"] == post["seal"]
+                   and build["encoded_prefix_custody"] == successor["V5R_RUNTIME"]
+                   and build["semantic_submission"] == successor["V5R_RESULT"]
+                   and worker["invocation_id"] == successor["V5R_IID"], "different encoded-prefix source lineage")
+        elif V5O_136 or V5Q_136:
             profile, _, post = profile145(pkg, focused="v5j-post")
             tools = (successor["v5o_completion_tools"](plan, profile, v5q=True) if V5Q_136 else
                      successor["v5o_completion_tools"](plan, profile))
@@ -1097,7 +1109,7 @@ def capture_once(epoch,ref,prestart136=None):
     interrupted = recover["settled"](f, bound, loader["load_package"]) if HOMEFLOOR else {}
     # Some successor packages replace the provider while retaining the donor's
     # sealed helper. Such packages still require the historical worker roster.
-    fresh_public = (post_price or V5Q_136) and HOMEFLOOR and "validate_public" in recover
+    fresh_public = (post_price or V5Q_136 or V5R_136) and HOMEFLOOR and "validate_public" in recover
     public_options = {"fresh_workers": True} if fresh_public else {}
     obligations = recover["obligations"](f, ref, bound, loader["load_package"],
                                          **public_options) if HOMEFLOOR else None
@@ -1406,7 +1418,8 @@ def semantic136_post_window():
     s.need(marker["post_started"] is False and marker["boundary"]["selector"] == selector_ref,
            "no completed 136 dispatch boundary for the selected 145 publication")
     iid = selector["original_semantic_invocation"]
-    expected = ("cbacb5a17e6347509640846eccb95cb0" if V5Q_136 else
+    expected = ("8f2b9c06b62147babe83c9ade7271cd3" if V5R_136 else
+                "cbacb5a17e6347509640846eccb95cb0" if V5Q_136 else
                 "f3474dfad55f4a05a64431421881db29" if V5O_136 else "f86e7e61f4b34dc7aedc4e08a128e713")
     s.need(iid == expected, "different semantic completion")
     completion = marker["semantic_completion"]

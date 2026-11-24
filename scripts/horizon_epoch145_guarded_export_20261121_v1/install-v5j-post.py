@@ -13,15 +13,18 @@ import sys
 R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = R / "epoch145-semantic-continuity-20261121-v1"
 FIT = R / "incident-replay-fit-20261121-v1"
+V5R_136 = sys.argv[1:2] == ["--encoded-prefix-136"]
 V5Q_136 = sys.argv[1:2] == ["--audit-turnover-136"]
 V5O_136 = sys.argv[1:2] == ["--donor-pressure-136"]
 V5N_136 = sys.argv[1:2] == ["--guard-walk-136"]
-POST_136 = V5Q_136 or V5O_136 or V5N_136
+POST_136 = V5R_136 or V5Q_136 or V5O_136 or V5N_136
 GUARD_POST = POST_136 or sys.argv[1:2] == ["--guard-walk"]
 MISSED_POST = GUARD_POST or sys.argv[1:2] == ["--missed-clock"]
 LEASE_POST = MISSED_POST or sys.argv[1:2] == ["--lease-ready"]
 RETRY = LEASE_POST or sys.argv[1:2] == ["--retry1"]
-if V5Q_136:
+if V5R_136:
+    target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5r-136-v1", "tools-v13l", None, None)
+elif V5Q_136:
     target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5q-136-v1", "tools-v13k", "tools-homefloor-145-handoff-v8", None)
 elif V5O_136:
     target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5o-136-v1", "tools-v13j", "tools-homefloor-145-handoff-v6", None)
@@ -41,15 +44,18 @@ elif RETRY:
 else:
     target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5j-v1", "tools-v13d", "tools-homefloor-145-handoff-v1",
                                                "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de")
-TARGET, POST, DISPATCH, DISPATCH_SHA = FIT / target, BASE / package, FIT / dispatch, dispatch_sha
-DONOR = FIT / ("tools-homefloor-145-audit-turnover-rejoin-v1" if V5Q_136 else "tools-homefloor-145-donor-pressure-rejoin-v1" if V5O_136 else "tools-homefloor-145-guard-walk-rejoin-v1" if GUARD_POST else "tools-homefloor-145-missed-rejoin-v1" if MISSED_POST else "tools-homefloor-145-rejoin-v4")
+TARGET, POST = FIT / target, BASE / package
+ENCODED_STAGE = R / "epoch145-encoded-prefix-stage-20261124-v1"
+DISPATCH = ENCODED_STAGE / "semantic-handoff-v1" if V5R_136 else FIT / dispatch
+DISPATCH_SHA = dispatch_sha
+DONOR = FIT / ("tools-homefloor-145-encoded-prefix-rejoin-v1" if V5R_136 else "tools-homefloor-145-audit-turnover-rejoin-v1" if V5Q_136 else "tools-homefloor-145-donor-pressure-rejoin-v1" if V5O_136 else "tools-homefloor-145-guard-walk-rejoin-v1" if GUARD_POST else "tools-homefloor-145-missed-rejoin-v1" if MISSED_POST else "tools-homefloor-145-rejoin-v4")
 FAMILY = Path("scripts/horizon_epoch145_guarded_export_20261121_v1")
 SOURCE_PROVIDER = "scripts/horizon_incident_replay_fit_20261121_v1/post-stop-fit"
 REPO = Path("/home/sol/workspace/jetstreamer")
 SEALER = Path("/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment")
 SEAL_SHA = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
 DONOR_SHA = "b2e28f51da8e428c106a23b3e5d73a6d92b1aca84043e82d1e662387d2c18b96" if MISSED_POST else "ed0e272c1cf6df09bb19ff6049154cad9e55f21e96089f66e6f9e3d0f89da9cb"
-UNIT = "horizon-145-v5q-136-post-build-v1.service" if V5Q_136 else "horizon-145-v5o-136-post-build-v1.service" if V5O_136 else "horizon-145-v5n-136-post-build-v1.service" if V5N_136 else "horizon-145-v5n-post-build-v1.service" if GUARD_POST else "horizon-145-v5m-post-build-v1.service" if MISSED_POST else "horizon-145-v5k-post-build-v1.service" if LEASE_POST else "horizon-145-v5j-post-build-v2.service" if RETRY else "horizon-145-v5j-post-build-v1.service"
+UNIT = "horizon-145-v5r-136-post-build-v1.service" if V5R_136 else "horizon-145-v5q-136-post-build-v1.service" if V5Q_136 else "horizon-145-v5o-136-post-build-v1.service" if V5O_136 else "horizon-145-v5n-136-post-build-v1.service" if V5N_136 else "horizon-145-v5n-post-build-v1.service" if GUARD_POST else "horizon-145-v5m-post-build-v1.service" if MISSED_POST else "horizon-145-v5k-post-build-v1.service" if LEASE_POST else "horizon-145-v5j-post-build-v2.service" if RETRY else "horizon-145-v5j-post-build-v1.service"
 SEAL = "deployment-seal-receipt.json"
 
 
@@ -122,10 +128,32 @@ def install(dest, members, planpath):
     return ref(dest / SEAL)
 
 
+def encoded_bindings(price):
+    handoff = BASE / "v5r-name-handoff"
+    custody_path = handoff / "ACTUAL_ADVANCING_AND_136_CUSTODY.json"
+    custody_ref = ref(custody_path)
+    custody = json.loads(custody_path.read_bytes())
+    staged = json.loads((ENCODED_STAGE / "STAGED.json").read_bytes())
+    dispatcher = ref(DISPATCH / SEAL)
+    provider = ref(DONOR / SEAL)
+    reader = ref(BASE / "tools-v5r/export145")
+    phase = price["phase145"]
+    require(custody_ref["sha256"] == "1343de96384e52ff061262a2d80c217d187a1fc8b0ce0e07e32940ee88e89b3b"
+            and dispatcher["sha256"] == "83a715e057cda6e3d1d93b8f4e71d8033f1249efab1f371cd430832cda7a7ec9"
+            and provider == staged["provider"] and reader["sha256"] == staged["native_profile"]["image"]
+            and custody["submission"] == ref(handoff / "submission-result.json")
+            and phase["invocation_id"] == custody["manager"]["InvocationID"]
+            and phase["stage"] == "leased-worker" and phase["window"]["recovery"] == custody["verifier_start"]
+            and phase["window"]["continuity_seal"] == staged["worker"],
+            "unbound encoded-prefix price or worker")
+    return dict(reader=reader, dispatcher=dispatcher, provider=provider, submission=custody["submission"]), custody_ref
+
+
 def main(commit, iid, writer_sha=None):
     require(os.geteuid() == 0 and sys.flags.isolated and __debug__, "root isolated interpreter required")
     require(re.fullmatch("[0-9a-f]{40}", commit) and re.fullmatch("[0-9a-f]{32}", iid), "use exact commit and invocation")
-    require((re.fullmatch("[0-9a-f]{64}", writer_sha or "") is not None) == POST_136,
+    require((V5R_136 and writer_sha is None)
+            or (re.fullmatch("[0-9a-f]{64}", writer_sha or "") is not None) == POST_136,
             "the 136 route requires the exact new writer deployment seal")
     q = BASE / ("incident-build-" + iid)
     require(q.resolve(strict=True) == q and q.stat().st_uid == 0 and q.stat().st_mode & 0o077 == 0,
@@ -141,7 +169,7 @@ def main(commit, iid, writer_sha=None):
     rows = [json.loads(x) for x in journal.splitlines()]
     success, = [r for r in rows if r.get("MESSAGE_ID") == "7ad2d189f7e94e70a38c781354912448"]
     start, = [r for r in rows if r.get("MESSAGE_ID") == "39f53479d3a045ac8e11786248231fbf"]
-    require((" v5q-136-post " if V5Q_136 else " v5o-136-post " if V5O_136 else " v5n-136-post " if V5N_136 else " v5n-post " if GUARD_POST else " v5m-post " if MISSED_POST else " v5k-post " if LEASE_POST else " v5j-retry1-post " if RETRY else " v5j-post ") in start["MESSAGE"] and int(start["__MONOTONIC_TIMESTAMP"]) < int(success["__MONOTONIC_TIMESTAMP"])
+    require((" v5r-136-post " if V5R_136 else " v5q-136-post " if V5Q_136 else " v5o-136-post " if V5O_136 else " v5n-136-post " if V5N_136 else " v5n-post " if GUARD_POST else " v5m-post " if MISSED_POST else " v5k-post " if LEASE_POST else " v5j-retry1-post " if RETRY else " v5j-post ") in start["MESSAGE"] and int(start["__MONOTONIC_TIMESTAMP"]) < int(success["__MONOTONIC_TIMESTAMP"])
             and not (Path("/sys/fs/cgroup/horizonaudit.slice") / UNIT).exists(), "build has not completed")
     outputs = q / "products"
     inputs = {}
@@ -156,7 +184,8 @@ def main(commit, iid, writer_sha=None):
     log = (q / "build.log").read_text()
     require(all(n + " ... ok" in log for n in required_tests) and "test result: FAILED" not in log
             and log.count("test result: ok.") == 4 and log.count("\nOK\n") == 2
-            and re.search(r"Ran 17 tests in ", log) and re.search(r"Ran 2 tests in ", log), "native/adapter test incomplete")
+            and re.search(r"Ran 17 tests in ", log)
+            and re.search(r"Ran 3 tests in " if V5R_136 else r"Ran 2 tests in ", log), "native/adapter test incomplete")
     image = outputs / "export145"
     image_sha = ref(image)["sha256"]
     artifacts = dict((Path(path).name, sha) for sha, path in (row.split("  ", 1) for row in (q / "artifacts").read_text().splitlines()))
@@ -164,7 +193,7 @@ def main(commit, iid, writer_sha=None):
             and str(TARGET / "post-stop-fit").encode() in image.read_bytes(), "unregistered native image")
     src = outputs / "source" / FAMILY
     adapter = src / "post_inputs.py"
-    adapter_args = ["--audit-turnover" if V5Q_136 else "--donor-pressure" if V5O_136 else "--guard-walk" if GUARD_POST else "--missed-clock" if MISSED_POST else "--lease-ready" if LEASE_POST else "--retry1"] if RETRY else []
+    adapter_args = ["--encoded-prefix" if V5R_136 else "--audit-turnover" if V5Q_136 else "--donor-pressure" if V5O_136 else "--guard-walk" if GUARD_POST else "--missed-clock" if MISSED_POST else "--lease-ready" if LEASE_POST else "--retry1"] if RETRY else []
     model = json.loads(subprocess.check_output([sys.executable, "-IB", adapter, *adapter_args, "inspect"]))
     need_refs = model["artifacts"]
     price = json.loads((q / "before.json").read_bytes())
@@ -172,7 +201,9 @@ def main(commit, iid, writer_sha=None):
             and price["available_memory_bytes"] - price["required_available_memory_bytes"] >= 805306368
             and price["available_HOME_bytes"] - price["complete_required_HOME_bytes"] >= 92274688 + 16777216
             and (q / "memory.peak").read_text().strip().isdigit(), "unfunded build")
-    if GUARD_POST:
+    if V5R_136:
+        bindings, binding_ref = encoded_bindings(price)
+    elif GUARD_POST:
         installer_args = sys.argv
         try:
             sys.argv = [str(adapter), *adapter_args]
@@ -184,7 +215,7 @@ def main(commit, iid, writer_sha=None):
             and ref(DISPATCH / SEAL)["sha256"] == (bindings["dispatcher"]["sha256"] if GUARD_POST else DISPATCH_SHA),
             "changed donor or sealer")
     proof = dict(schema="horizon-145-v5j-post-build-v1", source_commit=commit, source_hashes=inputs,
-                 verifier_sha256=image_sha, semantic_image=ref(BASE / ("tools-v5q/export145" if V5Q_136 else "tools-v5o/export145" if V5O_136 else "tools-v5n/export145" if GUARD_POST else "tools-v5m/export145" if MISSED_POST else "tools-v5k/export145" if LEASE_POST else "tools-v5j/export145")), artifact_hashes=artifacts,
+                 verifier_sha256=image_sha, semantic_image=ref(BASE / ("tools-v5r/export145" if V5R_136 else "tools-v5q/export145" if V5Q_136 else "tools-v5o/export145" if V5O_136 else "tools-v5n/export145" if GUARD_POST else "tools-v5m/export145" if MISSED_POST else "tools-v5k/export145" if LEASE_POST else "tools-v5j/export145")), artifact_hashes=artifacts,
                  build_iid=iid, native_success_cursor=success["__CURSOR"], tests=ref(q/"build.log"),
                  native_fixture_names=required_tests, memory_peak=int((q/"memory.peak").read_text()),
                  physical_scratch=int((q/"scratch-bytes").read_text().split()[0]), build_fleet=price["fleet"],
@@ -194,7 +225,9 @@ def main(commit, iid, writer_sha=None):
                  compiler_outputs=ref(q/"artifacts"), archive_body_verified_by_this_build=False, resource_credit_bytes=0)
     require(proof["semantic_image"]["sha256"] == (bindings["reader"]["sha256"] if GUARD_POST else "9068d5ac9ccd4d35481cbf2882faf67a97b0926133663a2e4885917e714bdc21" if MISSED_POST else "02c9a1ad332fbea43e4b552561fc01e503f1dedcec6347e541db4cf9de56f571" if LEASE_POST else "52d2dd991c69b24079308fafefd054af9aa4fe1d095d0469ec3d90ef851f1cc4"),
             "different semantic image")
-    if V5Q_136 or V5O_136:
+    if V5R_136:
+        proof.update(encoded_prefix_custody=binding_ref, semantic_submission=bindings["submission"])
+    elif V5Q_136 or V5O_136:
         runtime = "v5q" if V5Q_136 else "v5o"
         proof["audit_turnover_binding" if V5Q_136 else "donor_pressure_binding"] = binding_ref
         proof["semantic_submission"] = ref(BASE / f"{runtime}-name-handoff/submission-result.json")
@@ -226,6 +259,9 @@ def main(commit, iid, writer_sha=None):
                    item("export145", image, 0o555), item("run-post", launch, 0o555),
                    item("incident-post-phase.py", src/"incident-post-phase.py", 0o444),
                    item("post-inputs", src/"post_inputs.py", 0o555)], q/"post-seal-plan.json")
+    if V5R_136 and writer_sha is None:
+        return dict(post=post, build_proof=ref(POST/"build-proof.json"), provider_pending=True,
+                    production_worker_started=False, r2_mutations=False)
     donor = json.loads((DONOR/SEAL).read_bytes())
     members = {}
     for row in donor["members"]:
@@ -242,7 +278,7 @@ def main(commit, iid, writer_sha=None):
                "adapter_sha256": ref(POST/"incident-post-phase.py")["sha256"], "seal_sha256": post["sha256"]}
     members[profile_name] = item(profile_name, record(q/profile_name, profile), 0o444)
     if POST_136:
-        writer = R / ("epoch136-joint-writer-20261124-v10/controller" if V5Q_136 else "epoch136-joint-writer-20261123-v9/controller" if V5O_136 else "epoch136-joint-writer-20261123-v8/controller")
+        writer = R / ("epoch136-joint-writer-20261124-v11/controller" if V5R_136 else "epoch136-joint-writer-20261124-v10/controller" if V5Q_136 else "epoch136-joint-writer-20261123-v9/controller" if V5O_136 else "epoch136-joint-writer-20261123-v8/controller")
         writer_seal = writer / SEAL
         require(ref(writer_seal)["sha256"] == writer_sha, "different registered 136 controller seal")
         deployment = json.loads(writer_seal.read_bytes())

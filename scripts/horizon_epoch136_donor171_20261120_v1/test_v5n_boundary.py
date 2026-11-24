@@ -54,20 +54,25 @@ class CompletionJoin(unittest.TestCase):
             with self.subTest(changed=changed), self.assertRaises(ValueError):
                 tools(changed, profile)
 
-    def test_v5q_pending_or_crossed_start_cannot_admit(self):
-        semantic = dict(self.semantic, invocation_id=HANDOFF["V5Q_IID"])
-        for field in ("start", "verified", "extraction", "completion"):
-            semantic[field] = HANDOFF["ref"](HANDOFF["V5Q_STATE"] / Path(semantic[field]["path"]).name, "a" * 64)
-        semantic["start"] = HANDOFF["V5Q_START"]
-        inputs = dict(self.inputs, semantic=semantic)
-        phase = dict(self.phase, completion=semantic["completion"])
-        self.assertEqual(HANDOFF["join"](inputs, semantic, phase, v5q=True), semantic["completion"])
-        self.assertIsNone(HANDOFF["join"](dict(inputs, semantic=None, semantic_pending=True), None, None, v5q=True))
-        for receipt in (self.semantic, dict(semantic, start=HANDOFF["V5O_START"]), dict(semantic, pid1_success="")):
-            with self.subTest(receipt=receipt), self.assertRaises(ValueError):
-                HANDOFF["join"](dict(inputs, semantic=receipt), receipt, phase, v5q=True)
-        with self.assertRaises(ValueError):
-            HANDOFF["join"](inputs, semantic, dict(phase, MainPID="123"), v5q=True)
+    def test_pending_or_crossed_start_cannot_admit(self):
+        join = HANDOFF["join"]
+        for profile, foreign in (("V5Q", "V5O"), ("V5R", "V5Q")):
+            option = {profile.lower(): True}
+            semantic = dict(self.semantic, invocation_id=HANDOFF[f"{profile}_IID"])
+            for field in ("start", "verified", "extraction", "completion"):
+                semantic[field] = HANDOFF["ref"](HANDOFF[f"{profile}_STATE"] / Path(semantic[field]["path"]).name, "a" * 64)
+            semantic["start"] = HANDOFF[f"{profile}_START"]
+            inputs = dict(self.inputs, semantic=semantic)
+            phase = dict(self.phase, completion=semantic["completion"])
+            with self.subTest(profile=profile):
+                self.assertEqual(join(inputs, semantic, phase, **option), semantic["completion"])
+                self.assertIsNone(join(dict(inputs, semantic=None, semantic_pending=True), None, None, **option))
+                for receipt in (self.semantic, dict(semantic, start=HANDOFF[f"{foreign}_START"]),
+                                dict(semantic, pid1_success="")):
+                    with self.assertRaises(ValueError):
+                        join(dict(inputs, semantic=receipt), receipt, phase, **option)
+                with self.assertRaises(ValueError):
+                    join(inputs, semantic, dict(phase, MainPID="123"), **option)
 
     def test_captured_completion_and_drained_native_owner_join(self):
         self.assertEqual(HANDOFF["join"](self.inputs, self.semantic, self.phase), self.semantic["completion"])

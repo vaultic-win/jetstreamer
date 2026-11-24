@@ -31,6 +31,11 @@ V5Q_HANDOFF = FAMILY / "v5q-name-handoff"
 V5Q_POST = FAMILY / "tools-v13k"
 V5Q_PROVIDER = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5q-136-v1"
 V5Q_STATE = STATE.parent / V5Q_IID
+V5R_IID = "8f2b9c06b62147babe83c9ade7271cd3"
+V5R_HANDOFF = FAMILY / "v5r-name-handoff"
+V5R_POST = FAMILY / "tools-v13l"
+V5R_PROVIDER = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5r-136-v1"
+V5R_STATE = STATE.parent / V5R_IID
 READINESS = "https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev"
 
 
@@ -62,6 +67,13 @@ V5Q_RUNTIME = ref(FAMILY / "V5Q_RUNTIME_BINDINGS.json",
 V5Q_START = ref(V5Q_STATE / "recovery-started.json",
                 "7659aca1cf87aaeeb42a5c5c65ad186a03d1e55e9ce4dc0779d351b36ba30781")
 
+V5R_RESULT = ref(V5R_HANDOFF / "submission-result.json",
+                 "8c3e4d05c59f32545dff03258269e339cbde95ae4bcc5cc5a92aa8ae5514f68b")
+V5R_RUNTIME = ref(V5R_HANDOFF / "ACTUAL_ADVANCING_AND_136_CUSTODY.json",
+                  "1343de96384e52ff061262a2d80c217d187a1fc8b0ce0e07e32940ee88e89b3b")
+V5R_START = ref(V5R_STATE / "recovery-started.json",
+                "04138f9f3b0ef224625747ea19e4b34343570f80a34ceef9014aa995b19fab7a")
+
 
 def require(ok, message):
     if not ok:
@@ -75,8 +87,10 @@ def validated_phase(phase, semantic):
     return completion
 
 
-def join(inputs, captured, phase, *, v5o=False, v5q=False):
-    iid, state, start = ((V5Q_IID, V5Q_STATE, V5Q_START) if v5q else
+def join(inputs, captured, phase, *, v5o=False, v5q=False, v5r=False):
+    require(sum((v5o, v5q, v5r)) <= 1, "ambiguous semantic profile")
+    iid, state, start = ((V5R_IID, V5R_STATE, V5R_START) if v5r else
+                         (V5Q_IID, V5Q_STATE, V5Q_START) if v5q else
                          (V5O_IID, V5O_STATE, V5O_START) if v5o else (IID, STATE, None))
     require(inputs["schema"] == "horizon-145-v5j-publication-inputs-v1"
             and inputs["public_origin"] == READINESS and inputs["expected_slots"] == 432000
@@ -123,8 +137,7 @@ def inspect(pin, check_package, read_immutable, read_inputs, read_phase):
                 resource_credit_bytes=0, activation_authorized=False)
 
 
-def v5o_completion_tools(plan, profile, *, v5q=False):
-    post, submission = (V5Q_POST, V5Q_RESULT) if v5q else (V5O_POST, V5O_RESULT)
+def pinned_completion_tools(plan, profile, post, submission):
     tools = dict(seal=ref(post / "deployment-seal-receipt.json", profile["seal_sha256"]),
                  build=ref(post / "build-proof.json", profile["build_sha256"]),
                  adapter=ref(post / "incident-post-phase.py", profile["adapter_sha256"]))
@@ -133,8 +146,22 @@ def v5o_completion_tools(plan, profile, *, v5q=False):
     return tools
 
 
-def inspect_v5o(plan, pin, check_package, read_immutable, read_inputs, read_phase, *, v5q=False):
-    if v5q:
+def v5o_completion_tools(plan, profile, *, v5q=False):
+    post, submission = (V5Q_POST, V5Q_RESULT) if v5q else (V5O_POST, V5O_RESULT)
+    return pinned_completion_tools(plan, profile, post, submission)
+
+
+def v5r_completion_tools(plan, profile):
+    return pinned_completion_tools(plan, profile, V5R_POST, V5R_RESULT)
+
+
+def inspect_v5o(plan, pin, check_package, read_immutable, read_inputs, read_phase, *, v5q=False, v5r=False):
+    require(not (v5q and v5r), "ambiguous semantic profile")
+    if v5r:
+        iid, handoff, post_root, provider_root, submission, runtime = (
+            V5R_IID, V5R_HANDOFF, V5R_POST, V5R_PROVIDER, V5R_RESULT, V5R_RUNTIME)
+        version, build_key = "v5r", "encoded_prefix_custody"
+    elif v5q:
         iid, handoff, post_root, provider_root, submission, runtime = (
             V5Q_IID, V5Q_HANDOFF, V5Q_POST, V5Q_PROVIDER, V5Q_RESULT, V5Q_RUNTIME)
         version, build_key = "v5q", "audit_turnover_binding"
@@ -154,7 +181,7 @@ def inspect_v5o(plan, pin, check_package, read_immutable, read_inputs, read_phas
     profile_name = "profile145-v5j-post.json"
     require(rows[profile_name]["mode"] == "0444", "unsealed semantic post profile")
     profile = json.loads(pin(provider_root / profile_name, rows[profile_name]["sha256"]))
-    tools = v5o_completion_tools(plan, profile, v5q=v5q)
+    tools = pinned_completion_tools(plan, profile, post_root, submission)
     post = check_package(post_root, tools["seal"]["sha256"])
     rows = {member["name"]:member for member in post["members"]}
     require(rows["build-proof.json"]["sha256"] == tools["build"]["sha256"]
@@ -167,7 +194,7 @@ def inspect_v5o(plan, pin, check_package, read_immutable, read_inputs, read_phas
     capture = handoff / "semantic-completion.json"
     captured = json.loads(read_immutable(capture)) if os.path.lexists(capture) else None
     phase = None if captured is None else read_phase(image)
-    done = join(inputs, captured, phase, v5o=not v5q, v5q=v5q)
+    done = join(inputs, captured, phase, v5o=not (v5q or v5r), v5q=v5q, v5r=v5r)
     return dict(schema=f"horizon-136-{version}-completion-join-v1", invocation_id=iid,
                 semantic_result=submission, completion_tools=tools, ordinary_provider=provider,
                 semantic_complete=done, semantic_pending=done is None,
