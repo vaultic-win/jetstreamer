@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 #[cfg(feature = "registered-post")]
 mod boundary;
+mod encoded_cutover;
 mod events;
 mod incident;
 mod outcome;
@@ -223,6 +224,12 @@ fn required_environment() -> Result<()> {
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root operator");
     let args = std::env::args().skip(1).collect::<Vec<_>>();
+    if let [mode, stage_sha, fleet, fleet_sha] = args.as_slice()
+        && mode == "inspect-encoded-prefix-cutover"
+    {
+        println!("{}", encoded_cutover::inspect(stage_sha, fleet, fleet_sha)?);
+        return Ok(());
+    }
     if let [mode, iid, after, remainder @ ..] = args.as_slice()
         && mode == "inspect-native-stop"
     {
