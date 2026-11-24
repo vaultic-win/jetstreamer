@@ -6,6 +6,15 @@ const FOLLOWUP_REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_data/closed-
 const FOLLOWUP_REVIEW_SHA: &str =
     "3e4fb8c99b53cbec9ad8e8d2b0d63862c22a21d191229d539d3124f262710474";
 const FOLLOWUP_SCHEMA: &str = "horizon-closed-canary-retirement-review-v1";
+const SNAPSHOT_REVIEW: &str =
+    "/home/sol/.jetstreamer-private/epochs191-194-snapshot-retirement-20261124-v1/REVIEW.json";
+const SNAPSHOT_REVIEW_SHA: &str =
+    "e4acc2dd74d569d66d5f9440c97bce2ca180ce8490249ce3bda783bd4d8bc664";
+const SNAPSHOT_SCHEMA: &str = "horizon-191-194-bootstrap-duplicate-review-v1";
+const SNAPSHOT_DIR: &str = "epochs191-194-bootstrap-revalidation-20261016-v1";
+const SNAPSHOT_NAME: &str =
+    "snapshot-82511783-6wKFbWHJ2FFVaexQWuTrRVsGL53ef8k8CgNqPWvGuymm.tar.zst";
+const SNAPSHOT_KEEPER: &str = "/usr/local/lib/jetstreamer/deploy-epochs191-194-target5-20261016-v1";
 const INVENTORY: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/uploader-tools/jetstreamer-r2";
 const INVENTORY_SHA: &str = "eb448ede557144f04446dbe00a2d2ec7ad88c934a7a227797d0569a15307a904";
 const DIAGNOSTIC: &str = "diagnostic-epoch130-v1417-qualification-v1";
@@ -35,6 +44,7 @@ pub(super) fn is_target(t: &Target) -> bool {
                     .join(case)
                     .join("output/epoch-154-through-66958784.jet")
         }),
+        191 => t.path == root.join(SNAPSHOT_DIR).join("inputs").join(SNAPSHOT_NAME),
         195 => ["control32", "candidate8"].iter().any(|case| {
             t.path
                 == root
@@ -75,6 +85,13 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
                 FOLLOWUP_REVIEW_SHA,
                 FOLLOWUP_SCHEMA,
                 [134, 154],
+            )
+        } else if epochs.contains(&191) {
+            (
+                SNAPSHOT_REVIEW,
+                SNAPSHOT_REVIEW_SHA,
+                SNAPSHOT_SCHEMA,
+                [191, 191],
             )
         } else {
             return Ok(None);
@@ -128,23 +145,77 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
         );
     }
     check_owners(&review)?;
+    if schema == SNAPSHOT_SCHEMA {
+        verify_snapshot(&review, &p.targets[0])?;
+    }
     Ok(Some(review))
 }
 
+fn verify_snapshot(review: &Value, target: &Target) -> Result<()> {
+    let screen: Bound = serde_json::from_value(review["snapshot_screen"].clone())?;
+    let screen: Value = serde_json::from_slice(&bound(&screen, LIMIT)?)?;
+    let keeper_dir = Path::new(SNAPSHOT_KEEPER);
+    let keeper = keeper_dir.join(SNAPSHOT_NAME);
+    let parent = fs::symlink_metadata(keeper_dir)?;
+    let saved_keeper = stamp(&exact(&keeper)?);
+    let seal_path = keeper_dir.join("deployment-seal-receipt.json");
+    let seal_digest = screen["evidence"][seal_path.to_str().context("non-UTF-8 seal path")?]
+        .as_str()
+        .context("missing deployment seal binding")?;
+    let seal: Value = serde_json::from_slice(&bound(
+        &Bound {
+            path: seal_path,
+            sha256: seal_digest.into(),
+        },
+        LIMIT,
+    )?)?;
+    let expected = screen["content_sha256"]
+        .as_str()
+        .context("missing snapshot SHA-256")?;
+    ensure!(
+        screen["schema"] == "horizon-obsolete-191-194-snapshot-screen-v1"
+            && screen["source"].as_str() == target.path.to_str()
+            && screen["keeper"].as_str() == keeper.to_str()
+            && screen["compared_bytes"] == target.identity.len
+            && parent.is_dir()
+            && parent.uid() == 0
+            && parent.mode() & 0o222 == 0
+            && saved_keeper.uid == 0
+            && saved_keeper.mode & 0o222 == 0
+            && saved_keeper.dev != target.identity.dev
+            && saved_keeper.len == target.identity.len
+            && seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && seal["destination"] == SNAPSHOT_KEEPER
+            && seal["members"].as_array().is_some_and(|members| {
+                members.iter().any(|member| {
+                    member["source"].as_str() == target.path.to_str()
+                        && member["name"] == SNAPSHOT_NAME
+                        && member["bytes"] == target.identity.len
+                        && member["sha256"] == expected
+                })
+            }),
+        "retained snapshot or seal differs from the reviewed copy"
+    );
+    ensure!(
+        digest(&keeper)? == expected
+            && digest(&target.path)? == expected
+            && stamp(&exact(&keeper)?) == saved_keeper
+            && stamp(&exact(&target.path)?) == target.identity,
+        "snapshot bodies or file identities changed"
+    );
+    Ok(())
+}
+
 pub(super) fn check_owners(review: &Value) -> Result<()> {
-    let (diagnostic, benchmark) = if review["schema"] == FOLLOWUP_SCHEMA {
-        (DIAGNOSTIC_134, BENCHMARK_154)
-    } else {
-        (DIAGNOSTIC, BENCHMARK)
+    let markers: &[&str] = match review["schema"].as_str() {
+        Some(FOLLOWUP_SCHEMA) => &[DIAGNOSTIC_134, BENCHMARK_154],
+        Some(SNAPSHOT_SCHEMA) => &[SNAPSHOT_DIR],
+        _ => &[DIAGNOSTIC, BENCHMARK],
     };
     let scan = Command::new("/usr/bin/rg")
+        .args(["--files-with-matches", "--fixed-strings"])
+        .args(markers.iter().flat_map(|pattern| ["-e", pattern]))
         .args([
-            "--files-with-matches",
-            "--fixed-strings",
-            "-e",
-            diagnostic,
-            "-e",
-            benchmark,
             "/etc/systemd/system",
             "/run/systemd/transient",
             "/usr/lib/systemd/system",
@@ -193,11 +264,25 @@ pub(super) fn check_owners(review: &Value) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn inventory_range(review: &Value, range: (u64, u64)) -> (u64, u64) {
+    if review["schema"] == SNAPSHOT_SCHEMA {
+        (190, 195)
+    } else {
+        (range.0 - 1, range.1 + 1)
+    }
+}
+
 pub(super) fn verify_delivery(
     review: &Value,
     epochs: &BTreeSet<u64>,
     inventory: &Value,
 ) -> Result<()> {
+    let snapshot_epochs = BTreeSet::from([191, 192, 193, 194]);
+    let epochs = if review["schema"] == SNAPSHOT_SCHEMA {
+        &snapshot_epochs
+    } else {
+        epochs
+    };
     for &epoch in epochs {
         let evidence = &review["delivery_evidence"][epoch.to_string()];
         let mut digests = Vec::new();

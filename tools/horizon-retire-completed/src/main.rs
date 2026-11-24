@@ -333,7 +333,7 @@ fn ready(epoch: u64, receipt: &Value, inventory: &Value) -> Result<()> {
 fn check_target(t: &Target) -> Result<()> {
     let scope = match t.epoch {
         #[cfg(feature = "anza-closed-canaries")]
-        130 | 134 | 195 => anza_closed_canaries::is_target(t),
+        130 | 134 | 191 | 195 => anza_closed_canaries::is_target(t),
         #[cfg(feature = "anza-closed-canaries")]
         154 if anza_closed_canaries::is_target(t) => true,
         #[cfg(feature = "anza-closed-154")]
@@ -757,8 +757,8 @@ fn run() -> Result<()> {
         range
     };
     #[cfg(feature = "anza-closed-canaries")]
-    let range = if canary_review.is_some() {
-        (range.0 - 1, range.1 + 1)
+    let range = if let Some(review) = &canary_review {
+        anza_closed_canaries::inventory_range(review, range)
     } else {
         range
     };
