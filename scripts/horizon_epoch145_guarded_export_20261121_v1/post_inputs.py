@@ -20,6 +20,8 @@ import time
 R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = R / "epoch145-semantic-continuity-20261121-v1"
 POST = R / "epoch145-publication-20261121-v1"
+ENCODED_POST = (Path(__file__).resolve().parent.name == "tools-v13l" or
+                (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--encoded-prefix"]))
 AUDIT_POST = (Path(__file__).resolve().parent.name == "tools-v13k" or
               (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--audit-turnover"]))
 PRESSURE_POST = (Path(__file__).resolve().parent.name == "tools-v13j" or
@@ -520,6 +522,10 @@ def verify_build_price(d, price):
 
 
 def main():
+    if ENCODED_POST:
+        args = sys.argv[2:] if sys.argv[1:2] == ["--encoded-prefix"] else sys.argv[1:]
+        encoded_main(args)
+        return
     args = sys.argv[2:] if RETRY and sys.argv[1:2] in (["--retry1"], ["--lease-ready"], ["--missed-clock"], ["--guard-walk"], ["--donor-pressure"], ["--audit-turnover"]) else sys.argv[1:]
     if RETRY and len(args) == 2 and args[0] == "verify-build-price":
         need(os.geteuid() == 0 and sys.flags.isolated and __debug__, "root isolated interpreter required")
@@ -548,11 +554,78 @@ def main():
                 need(json.loads(d["read"](path)[0]) == verified, "different semantic completion already captured")
             else:
                 d["record"](path, verified)
-    print(json.dumps(dict(schema="horizon-145-v5j-publication-inputs-v1", artifacts=artifacts, semantic=verified,
-                          semantic_pending=verified is None, public_origin=ORIGIN,
-                          local_first_slot=62640000, local_last_slot=63071999, expected_slots=432000,
-                          parent_slot=62639999, parent_blockhash=PARENT_HASH, terminal_blockhash=LAST_HASH,
-                          publication_authorized=False, epoch_145_publicly_verified=False), sort_keys=True))
+    print(json.dumps(publication_inputs(artifacts, verified), sort_keys=True))
+
+
+def publication_inputs(artifacts, verified):
+    return dict(schema="horizon-145-v5j-publication-inputs-v1", artifacts=artifacts, semantic=verified,
+                semantic_pending=verified is None, public_origin=ORIGIN,
+                local_first_slot=62640000, local_last_slot=63071999, expected_slots=432000,
+                parent_slot=62639999, parent_blockhash=PARENT_HASH, terminal_blockhash=LAST_HASH,
+                publication_authorized=False, epoch_145_publicly_verified=False)
+
+
+def sealed_members(package, digest):
+    path = package / "deployment-seal-receipt.json"
+    raw = path.read_bytes()
+    need(hashlib.sha256(raw).hexdigest() == digest, "different post-inputs deployment")
+    seal = json.loads(raw)
+    need(seal["destination"] == str(package)
+         and seal["sealer_sha256"] == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+         and seal["remote_mutations"] is False, "foreign post-inputs deployment")
+
+    def member(name, mode):
+        row, = (m for m in seal["members"] if m["name"] == name and m["mode"] == mode)
+        result = package / name
+        m = result.lstat()
+        need(result.resolve(strict=True) == result and stat.S_ISREG(m.st_mode)
+             and m.st_uid == 0 and m.st_nlink == 1 and stat.S_IMODE(m.st_mode) == int(mode, 8)
+             and hashlib.sha256(result.read_bytes()).hexdigest() == row["sha256"],
+             "changed post-inputs member " + name)
+        return result
+
+    return member
+
+
+def encoded_main(args):
+    need(os.geteuid() == 0 and sys.flags.isolated and __debug__, "root isolated interpreter required")
+    package = R / "epoch145-encoded-prefix-stage-20261124-v1/semantic-handoff-v1"
+    qualified = sealed_members(package, "83a715e057cda6e3d1d93b8f4e71d8033f1249efab1f371cd430832cda7a7ec9")
+    verifier = qualified("follow145", "0555")
+    proof = json.loads(qualified("qualification.json", "0444").read_bytes())
+    custody = proof["custody"]
+    need(custody["path"] == str(BASE / "v5r-name-handoff/ACTUAL_ADVANCING_AND_136_CUSTODY.json"),
+         "different encoded-prefix custody")
+
+    def observe(mode):
+        return json.loads(subprocess.check_output([verifier, mode, custody["sha256"]], timeout=20))
+
+    if args in (["inspect-live"], ["inspect-semantic"]):
+        mode = "inspect-encoded-prefix-live" if args == ["inspect-live"] else "inspect-encoded-prefix-semantic"
+        print(json.dumps(observe(mode), sort_keys=True))
+        return
+    # Reuse the existing sealed evidence reader and the existing ordinary-pair
+    # compatibility check. This route uses Rust for native and semantic custody.
+    evidence = sealed_members(
+        R / "incident-replay-fit-20261121-v1/tools-homefloor-145-handoff-v8",
+        "b8a3d0ab8af85bd3407ddeb2b46b8f1cf8fa894f5fbb55b9f6ed09e187508350")
+    api = runpy.run_path(str(evidence("run-recovery", "0555")))
+    if len(args) == 2 and args[0] == "verify-build-price":
+        price = json.loads(api["read"](Path(args[1]))[0])
+        actual = observe("inspect-encoded-prefix-live")
+        phase = price["phase145"]
+        need(price["fits"] is True and price["resource_credit_bytes"] == 0
+             and 0 <= time.time() - price["recorded_unix_seconds"] <= 120
+             and phase["stage"] == actual["stage"] and phase["invocation_id"] == actual["invocation_id"]
+             and all(phase["window"][k] == v for k, v in actual["window"].items()),
+             "build price is outside the guarded encoded-prefix verifier generation")
+        return
+    need(args in (["inspect"], ["capture"]), "expected inspect or capture")
+    git = lambda *argv: subprocess.check_output(["runuser", "-u", "sol", "--", "git", "-C",
+                              "/home/sol/workspace/jetstreamer", *argv], text=True, timeout=30)
+    artifacts = original_pair(api, git)
+    mode = "capture-encoded-prefix-semantic" if args == ["capture"] else "inspect-encoded-prefix-semantic"
+    print(json.dumps(publication_inputs(artifacts, observe(mode)), sort_keys=True))
 
 
 if __name__ == "__main__":

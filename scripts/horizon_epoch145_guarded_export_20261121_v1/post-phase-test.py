@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 phase = runpy.run_path(os.environ.get("POST_PHASE_UNDER_TEST", str(Path(__file__).with_name("incident-post-phase.py"))))
 class Status:
@@ -90,6 +91,8 @@ class PostPhaseTest(unittest.TestCase):
             fn.__globals__.update(original)
 
     def test_successful_promotion_chain_and_foreign_candidate(self):
+        if phase["ENCODED_POST"]:
+            self.skipTest("encoded completion has its own invocation fixture")
         fn = phase["completion"]
         before = fn.__globals__.copy()
         gen = phase["BOOTSTRAP"]
@@ -215,6 +218,53 @@ class PostPhaseTest(unittest.TestCase):
                         fn(Status())
         finally:
             fn.__globals__.update(before)
+
+    def test_encoded_completion_requires_the_bound_capture(self):
+        if not phase["ENCODED_POST"]:
+            self.skipTest("requires the encoded post profile")
+        fn = phase["completion"]
+        gen = "a" * 32
+        with tempfile.TemporaryDirectory(dir=os.environ["TMPDIR"]) as name:
+            base = Path(name)
+            pkg = base / "tools-v13l"
+            pkg.mkdir()
+            handoff = base / "v5r-name-handoff"
+            handoff.mkdir()
+            state = base / "state" / gen
+            state.mkdir(parents=True)
+
+            def save(path, doc):
+                path.write_text(json.dumps(doc))
+                return Status.read(path)[1]
+
+            checker = pkg / "post-inputs"
+            checker.write_text("fixture scope")
+            save(pkg / "deployment-seal-receipt.json", {
+                "destination": str(pkg),
+                "sealer_sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+                "members": [{"name": "post-inputs", "mode": "0555",
+                             "sha256": hashlib.sha256(checker.read_bytes()).hexdigest()}],
+            })
+            submission = save(handoff / "submission-result.json", {"invocation_id": gen})
+            custody = save(handoff / "ACTUAL_ADVANCING_AND_136_CUSTODY.json", {
+                "schema": "horizon-145-encoded-prefix-live-custody-v1",
+                "manager": {"InvocationID": gen}, "submission": submission,
+            })
+            extraction = {"epoch": 145}
+            extracted = save(state / "extraction-complete.json", {"extraction": extraction})
+            done = save(state / "complete.json", {"receipt": extracted})
+            selected = {"invocation_id": gen, "completion": done, "extraction": extracted}
+            save(handoff / "semantic-completion.json", selected)
+            build = {"encoded_prefix_custody": custody, "semantic_submission": submission}
+            with patch.dict(fn.__globals__, PKG=pkg, STATE=state.parent, ENCODED_CUSTODY_SHA=custody["sha256"]):
+                with patch.object(subprocess, "check_output", return_value=json.dumps(selected).encode()) as native:
+                    self.assertEqual(fn(Status(), build), (done, extraction))
+                    native.assert_called_once_with([checker, "inspect-semantic"], timeout=20)
+                with patch.object(subprocess, "check_output", return_value=b"null"):
+                    with self.assertRaisesRegex(ValueError, "different captured V5r completion"):
+                        fn(Status(), build)
+                with self.assertRaisesRegex(ValueError, "different encoded-prefix post build"):
+                    fn(Status(), dict(build, semantic_submission={}))
 
     def test_unregistered_controller_and_phase_members(self):
         self.assertIsNone(phase["inspect"](Status(), None, {"MainPID":"0"}, (), 145, None, {}))
