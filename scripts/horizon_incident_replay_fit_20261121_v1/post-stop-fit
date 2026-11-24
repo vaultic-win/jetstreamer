@@ -47,7 +47,8 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-HOURLY170 = HERE in (
+HOURLY170_CADENCE = HERE == D / "tools-homefloor-170-metered-hourly-v4"
+HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v2",
     D / "tools-homefloor-170-metered-hourly-v3",
 )
@@ -957,7 +958,12 @@ def registered_status():
                 if V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 and (
                     R / "survivor172-cadence-20261122-v1/failed170-retry13-cadence-20261124-v1/ACTIVE.json"
                 ).exists():
-                    return writer168v4["registered_failed170_writer"](scope,retry4)
+                    failed = writer168v4["registered_failed170_writer"](scope,retry4)
+                    if HOURLY170_CADENCE and (
+                        R / "survivor172-cadence-20261122-v1/HOURLY170_CADENCE_ACTIVE.json"
+                    ).exists():
+                        return writer168v4["registered_hourly170_writer"](scope,failed)
+                    return failed
                 return writer168v4["registered_136_writer"](scope,retry4) if POST_136 else retry4
             if RETRY3_168:
                 return writer168["registered_writer"](scope,retry2,cold168["PREPARED_SHA"],cold168["GUARD_QUAL_SHA"])

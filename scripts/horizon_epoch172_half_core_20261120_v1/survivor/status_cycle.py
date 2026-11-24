@@ -22,7 +22,8 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
-FAILED170 = CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
+HOURLY170 = CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
+FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
 assert hashlib.sha256((PACKAGE/'deployment-seal-receipt.json').read_bytes()).hexdigest() == PARENT_SEAL
 sys.path.insert(0,str(PACKAGE))
 from evidence import bound, checked, content, durable, ensure_dir, lock, names, need, sealed, utc
@@ -40,6 +41,9 @@ import status
 sys.path.insert(0,str(CURRENT.parent))
 import cold167_status
 import cold166_status
+
+if HOURLY170:
+    import hourly170_cadence
 
 if PRIVATE136:
     private136 = cycle.private136
@@ -273,6 +277,12 @@ def publish(c,store,refs,out,epoch,archive=None):
                          estimate_model='Retain the absolute publication forecast of the authenticated predecessor.')
         if PRIVATE136:
             extra.update(private136.status_fields(c,epoch))
+        if HOURLY170 and epoch == 170 and c.hourly170:
+            private = c.hourly170.get('row')
+            extra.update(private170_observation=c.hourly170['receipt'],
+                         private_transaction_progress=bool(private and private['transaction_replay_claimed']))
+            if private:
+                extra['producer_invocation_id'] = private['unit']['InvocationID']
         durable(intent,dict(epoch=epoch,key=status.key(epoch),previous_receipt=original,conditional_header='If-Match',
                 before_etag=old['after_etag'],before_sha256=old['after_sha256'],before_status=prior,
                 after_sha256=hashlib.sha256(status.body(after)).hexdigest(),after_status=after,
@@ -403,11 +413,20 @@ def make_context(head,fleet,sample_ref,cfg,out):
     cold_workers.reconcile(c,cycle.observed_lane)
     c.entry146 = epoch146_entry(c)
     entry = {'entry_lease': c.entry146['lease']} if c.entry146 is not None else {}
+    native_owners = c.recovered_owners
+    if HOURLY170:
+        c.hourly170 = hourly170_cadence.observe(c)
+        hourly170_cadence.interpret(c,c.hourly170,cycle.observed_lane)
+        private = c.hourly170.get('row') if c.hourly170 else None
+        if private:
+            need('170' not in native_owners and 170 not in c.new_rows, 'epoch 170 has two native owners')
+            native_owners = dict(native_owners, **{'170': dict(
+                unit=private['unit'], actor=dict(producer_pid=int(private['unit']['MainPID'])))})
     if getattr(cold_workers, 'cold168', None):
-        cold_workers.cold168.census(owners, ident, c.recovered_owners, **entry)
+        cold_workers.cold168.census(owners, ident, native_owners, **entry)
     else:
         owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True,
-                             restored=c.recovered_owners,**entry)
+                             restored=native_owners,**entry)
     return c
 
 def baselines(head,fleet,bridge):
@@ -438,6 +457,8 @@ def census(c,bridge):
     if PRIVATE136 and c.private136:
         cap.update(private136_observation=c.private136['receipt'], private136_capacity=c.private136.get('capacity'),
                    active_live_diagnostics=private136.active(c.private136))
+    if HOURLY170 and c.hourly170:
+        cap['private170_observation'] = c.hourly170['receipt']
     if 'current_metered168_observation' in cap:
         cap['historical_pre_homefloor_metered168_observation']=cap.pop('current_metered168_observation')
     arc=status.observed_archive(c,172) if c.full172_row['scratch_path'] else None
@@ -469,10 +490,11 @@ def publish_all(c,bridge,store,vs):
     for e,r in refs.items(): authenticated(store,int(e),r)
     need(ready==status.inventory(c,store),'archive inventory changed during status refresh')
     counts=cold167_status.counts(c)
-    bounded136=private136.active(c.private136) if PRIVATE136 else 0
+    diagnostic_count=private136.active(c.private136) if PRIVATE136 else 0
+    diagnostic_count+=int(bool(HOURLY170 and c.hourly170 and c.hourly170.get('row')))
     original=dict(c.prior)
     original.update(receipts={k:v for k,v in refs.items() if k!='140'},observer=c.sample_ref,
-                    active_producer_count=counts['canonical_producer_count']+bounded136,active_private_diagnostic_count=bounded136,
+                    active_producer_count=counts['canonical_producer_count']+diagnostic_count,active_private_diagnostic_count=diagnostic_count,
                     canonical_producer_count=counts['canonical_producer_count'],replay_lanes=counts['current_replay_lanes'],
                     active_bootstraps=counts['active_bootstraps'],fleet_predecessor=c.fleet_ref,
                     effective_status_predecessor=c.fleet['authenticated_status_audit'],sampled_at_utc=c.stamp,
@@ -536,6 +558,8 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
     cold_workers.install(c,fleet)
     if PRIVATE136:
         private136.install(c,fleet)
+    if HOURLY170:
+        hourly170_cadence.install(fleet,c.hourly170)
     install_epoch146_entry(c, fleet)
     if c.new_rows:
         active=', '.join(map(str,sorted([172,*c.new_rows])))
@@ -664,13 +688,18 @@ def entry():
         package = 'tools-cold168-retry4-resume-v1'
     if FAILED170:
         need(package == 'tools-cold168-retry4-v1', '170 terminal cadence requires the qualified retry4 parent')
-        package = 'tools-cold168-retry4-failed170-v1'
+        package = 'tools-cold168-retry4-failed170-hourly170-v1' if HOURLY170 else 'tools-cold168-retry4-failed170-v1'
     need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
     receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
     seal=checked(receipt)
     member,=(v for v in seal['members'] if v['name']=='status_cycle.py')
     need(seal['destination']==str(CURRENT.parent) and member['sha256']==bound(CURRENT)['sha256'],
          'unsealed cadence entry')
+    if HOURLY170:
+        member, = (item for item in seal['members'] if item['name']=='hourly170_cadence.py')
+        need(Path(hourly170_cadence.__file__) == CURRENT.with_name(member['name'])
+             and bound(CURRENT.with_name(member['name']))['sha256']==member['sha256'],
+             'unsealed epoch 170 private cadence observer')
     return receipt
 
 
@@ -744,6 +773,45 @@ def failed170_resume(state, receipt, fd):
     return ready
 
 
+def hourly170_resume(state, receipt, fd):
+    """Adopt the incumbent's existing observer clock after an exclusive handoff."""
+    ready_path = ROOT/'HOURLY170_CADENCE_READY.json'
+    ready_ref = bound(ready_path)
+    ready = checked(ready_ref)
+    incumbent = ROOT/'failed170-retry13-cadence-20261124-v1/ACTIVE.json'
+    need(ready['schema']=='horizon-epoch170-hourly-cadence-ready-v1'
+         and ready['package']==receipt and ready['old_owner']==bound(incumbent),
+         'different hourly epoch 170 cadence deployment')
+    old = checked(ready['old_owner'])['new']
+    previous_lock = old['lock']
+    held = os.fstat(fd)
+    need(state['Id']==old['unit']==CONTROLLER and state['ActiveState']=='active' and not state['Job']
+         and state['InvocationID'] and state['InvocationID']!=old['invocation_id']
+         and (held.st_dev,held.st_ino)==(previous_lock['device'],previous_lock['inode']),
+         'hourly epoch 170 does not hold the incumbent consumer lock')
+    try:
+        still_running = owners.ticks(old['pid'])==old['start_ticks']
+    except FileNotFoundError:
+        still_running = False
+    need(not still_running, 'incumbent epoch 170 writer is still present')
+    fleet = checked(ready['fleet'])
+    need(ready['config']==fleet['sole_next_observer'] and ready['timer']==fleet['sole_next_timer']
+         and ready['fleet']['path']==str(max(BASE.glob('root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json'),
+                                             key=lambda path:path.stat().st_mtime_ns)),
+         'handoff does not bind the latest fleet and observer clock')
+    cfg = sealed(ready['config'])
+    waiting = timer_names()
+    need(waiting==[ready['timer']] or (not waiting and Path(cfg['output']).is_file()),
+         'incumbent observer timer or completed sample is missing')
+    pid = os.getpid()
+    actor = dict(unit=CONTROLLER, program=str(CURRENT), invocation_id=state['InvocationID'],
+                 pid=pid, start_ticks=owners.ticks(pid), lock=dict(previous_lock,fd=fd))
+    durable(ROOT/'HOURLY170_CADENCE_ACTIVE.json',
+            dict(schema='horizon-epoch170-hourly-cadence-active-v1', ready=ready_ref,
+                 old=old, new=actor, producer_mutations=False))
+    return ready
+
+
 def main():
     receipt=entry()
     if sys.argv[1:]==['--check-entry']:
@@ -775,6 +843,8 @@ def main():
             await_private136_owner(state,receipt)
         elif RESUMING:
             resume=status_resume.await_owner(globals(),receipt,state,fd)
+        elif HOURLY170:
+            resume=hourly170_resume(state,receipt,fd)
         elif FAILED170:
             resume=failed170_resume(state,receipt,fd)
         elif getattr(cold_workers, 'cold168', None):
