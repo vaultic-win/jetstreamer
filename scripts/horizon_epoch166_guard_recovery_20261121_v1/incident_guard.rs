@@ -16,7 +16,8 @@ const IMAGE: &str =
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
     feature = "epoch170-retry13",
-    feature = "epoch170-full-metered"
+    feature = "epoch170-full-metered",
+    feature = "epoch166-write-version-reproduction"
 )))]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-guard-20261121-v1/tools/guard";
@@ -32,6 +33,11 @@ const IMAGE: &str =
 #[cfg(feature = "epoch168-cold-v4")]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch168-cold-guard-20261123-v4/tools/guard";
+#[cfg(feature = "epoch166-write-version-reproduction")]
+const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch166-write-version-reproduction-guard-20261124-v1/tools/guard";
+#[cfg(feature = "epoch166-write-version-reproduction")]
+const REPRODUCTION_RUN: &str =
+    "epoch166-independent-cold-20261120-v1/bounded-write-version-20261124-v1";
 #[cfg(feature = "epoch166-retry11")]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry11-guard-20261122-v1/tools/guard";
@@ -87,6 +93,13 @@ const LANES: &[Lane] = &[Lane {
     runtime: "epoch168-retry4-rebook-20261123-v1",
     cap: 288 << 30,
 }];
+#[cfg(feature = "epoch166-write-version-reproduction")]
+const LANES: &[Lane] = &[Lane {
+    unit: "horizon-qualify-166-write-version-reproduction-20261124-v1.service",
+    tree: "epoch166-independent-cold-20261120-v1",
+    runtime: "epoch166-write-version-gap-20261124-v1",
+    cap: 288 << 30,
+}];
 #[cfg(feature = "epoch166-retry11")]
 const LANES: &[Lane] = &[Lane {
     unit: "horizon-qualify-166-independent-retry11-20261122.service",
@@ -139,7 +152,8 @@ const LANES: &[Lane] = &[Lane {
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
     feature = "epoch170-retry13",
-    feature = "epoch170-full-metered"
+    feature = "epoch170-full-metered",
+    feature = "epoch166-write-version-reproduction"
 )))]
 const LANES: &[Lane] = &[
     Lane {
@@ -196,7 +210,8 @@ pub(crate) fn validate(p: &Plan) -> Result<()> {
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
     feature = "epoch170-retry13",
-    feature = "epoch170-full-metered"
+    feature = "epoch170-full-metered",
+    feature = "epoch166-write-version-reproduction"
 ))]
 pub(crate) fn validate_cold_contract(plan: &Plan, image_sha256: &str) -> Result<()> {
     let deployment = Path::new(IMAGE)
@@ -235,6 +250,21 @@ pub(crate) fn validate_cold_contract(plan: &Plan, image_sha256: &str) -> Result<
 pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
     ensure!(image == Path::new(IMAGE), "use the sealed incident guard");
     let receipts = [
+        #[cfg(feature = "epoch166-write-version-reproduction")]
+        (
+            "epoch166-write-version-gap-20261124-v1/SUCCESSOR_ROOT.json",
+            "6330ad3f82a308d4d616c7ddcf610faad5a97b4accfc0254013532ec821bdd15",
+        ),
+        #[cfg(feature = "epoch166-write-version-reproduction")]
+        (
+            "epoch166-write-version-gap-20261124-v1/sealed/deployment-seal-receipt.json",
+            "003af2196b0eba330a05ed78dafe3508c598bcc1566caf9528c6818ff076df50",
+        ),
+        #[cfg(feature = "epoch166-write-version-reproduction")]
+        (
+            "epoch166-retry11-rebook-20261122-v1/WRITE_VERSION_TERMINAL_20261124.json",
+            "d14e5b66958981056b8606e6354f08615c801ed9c1c5414747723c225d2c9bc0",
+        ),
         #[cfg(feature = "epoch170-retry11")]
         (
             "epoch170-retry11-rebook-20261122-v1/SUCCESSOR_ROOT.json",
@@ -265,7 +295,10 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
             "epoch168-retry4-rebook-20261123-v1/SUCCESSOR_ROOT.json",
             "713e94750dd3d430c2f54c1ccb2af7ed708dec802af5cbf210ee4963a992d0f4",
         ),
-        #[cfg(feature = "epoch166-retry11")]
+        #[cfg(any(
+            feature = "epoch166-retry11",
+            feature = "epoch166-write-version-reproduction"
+        ))]
         (
             "epoch166-independent-closed-accounts-20261122-v1/SUCCESSOR_ROOT.json",
             "02ca91b396f6bc9327b626eb80583af4ce004d63fb6854c7a5e2c50f38c12329",
@@ -291,6 +324,20 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
         };
         bound(&r)?;
         refs.push(r);
+    }
+    #[cfg(feature = "epoch166-write-version-reproduction")]
+    {
+        let root = Path::new(HOME).join(REPRODUCTION_RUN);
+        let mut dir = root_directory()?;
+        for part in safe_components(&root)? {
+            dir = openat(&dir, part, true)?;
+        }
+        let m = dir.metadata()?;
+        ensure!(
+            (m.dev(), m.ino(), m.uid(), m.gid(), m.mode() & 0o7777)
+                == (64512, 93797556, 0, 0, 0o755),
+            "epoch 166 reproduction directory changed"
+        );
     }
     for (rel, ino) in [
         #[cfg(feature = "epoch170-retry11")]
@@ -323,7 +370,10 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
             "epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry4-20261123",
             103481722,
         ),
-        #[cfg(feature = "epoch166-retry11")]
+        #[cfg(any(
+            feature = "epoch166-retry11",
+            feature = "epoch166-write-version-reproduction"
+        ))]
         (
             "epoch166-independent-cold-20261120-v1/replacement-local3retry10-20261121-v1/cold-retry11-20261122",
             93782068,
@@ -560,6 +610,20 @@ mod tests {
         ));
     }
 
+    #[cfg(feature = "epoch166-write-version-reproduction")]
+    #[test]
+    fn bounded_166_uses_the_whole_tree_booking_and_a_separate_guard() {
+        assert_eq!(LANES.len(), 1);
+        assert_eq!(LANES[0].cap, 288 << 30);
+        assert_eq!(LANES[0].tree, "epoch166-independent-cold-20261120-v1");
+        assert!(is_route(
+            "horizon-qualify-166-write-version-reproduction-20261124-v1.service"
+        ));
+        assert!(!is_route(
+            "horizon-qualify-166-independent-retry11-20261122.service"
+        ));
+    }
+
     #[cfg(feature = "epoch170-full-metered")]
     #[test]
     fn metered_170_guard_recognizes_only_the_corrected_producer() {
@@ -620,7 +684,9 @@ mod tests {
         } else {
             3
         };
-        let expected = if cfg!(feature = "epoch170-full-metered") {
+        let expected = if cfg!(feature = "epoch166-write-version-reproduction") {
+            7
+        } else if cfg!(feature = "epoch170-full-metered") {
             5
         } else {
             expected
