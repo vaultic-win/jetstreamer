@@ -216,7 +216,8 @@ fn native(unit: &str) -> Result<Value> {
     let properties = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ExecMainPID,ExecMainStartTimestamp,NRestarts,Job,Result,ExecMainStatus,Restart,TriggeredBy,ExecStart,FragmentPath,DropInPaths";
     let mut command = std::process::Command::new("/usr/bin/systemctl");
     command.args(["show", unit, "-p", properties]);
-    if unit == super::epoch166_retry10_retire::PARK_UNIT
+    if unit == super::epoch166_retry8_retire::PARK_UNIT
+        || unit == super::epoch166_retry10_retire::PARK_UNIT
         || unit == super::epoch168_metered_retire::PARK
     {
         command.args(["-p", "Names,Transient,NeedDaemonReload,ControlGroup,ExecMainCode,ExecMainExitTimestamp,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic"]);
@@ -313,6 +314,14 @@ fn park(p: &Retire) -> Result<Value> {
     park_shape(&row, iid)?;
     if row["ExecStart"] != proof["native"]["ExecStart"] {
         match PARK {
+            super::epoch166_retry8_retire::PARK_UNIT => {
+                super::epoch166_retry8_retire::validate_reloaded_park(
+                    &proof["native"],
+                    &row,
+                    &helper,
+                    &argv,
+                )?;
+            }
             super::epoch166_retry10_retire::PARK_UNIT => {
                 super::epoch166_retry10_retire::validate_reloaded_park(
                     &proof["native"],
@@ -595,7 +604,8 @@ pub(super) async fn run(
         "epoch 166 requires its sealed runtime and separate versioned evidence bundles"
     );
     scope(p)?;
-    if PARK == super::epoch166_retry10_retire::PARK_UNIT
+    if PARK == super::epoch166_retry8_retire::PARK_UNIT
+        || PARK == super::epoch166_retry10_retire::PARK_UNIT
         || PARK == super::epoch168_metered_retire::PARK
     {
         // Check the recorded native dispatch before spending a full archive hash.
