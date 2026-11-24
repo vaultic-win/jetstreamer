@@ -92,7 +92,7 @@ def verify(bounded, s):
                 scope="Offline contract replay from native manager, input route and terminal receipt; no historical /proc image retained.")
 
 
-def verify146(bounded, s):
+def verify146(bounded, s, census):
     entry, entry_ref = s.read(bounded["ENTRY146"], bounded["ENTRY146_SHA"])
     unit = bounded["PROBE146"]
     group = "0::/horizonaudit.slice/" + unit
@@ -109,7 +109,12 @@ def verify146(bounded, s):
         s.need(ref == lease_ref and path == bounded["LEASE146"], "foreign test lease reference")
         return lease
 
+    vanished_while_checking = False
+    terminal = False
+
     def live(reader, route, expected, start):
+        if vanished_while_checking:
+            raise ProcessLookupError(pid)
         s.need(route["argv"] == entry["planned_argv"] and start == ticks, "wrong native test route")
         s.need(expected["snapshot"][2] == 4459684282 and expected["inputs_readonly"]
                and expected["worker_noexec"] and expected["private_network"]
@@ -118,9 +123,56 @@ def verify146(bounded, s):
                and expected["manager"]["TasksMax"] == "64", "missing bounded entry envelope")
         accepted.append(expected)
 
-    reader = SimpleNamespace(bound=bound, need=s.need, read=s.read)
+    processes = {}
+
+    class Process:
+        def __init__(self, pid):
+            self.name = str(pid)
+
+        def __truediv__(self, name):
+            assert name == "comm"
+            return SimpleNamespace(read_text=lambda: processes[int(self.name)][0])
+
+    class Proc:
+        def __init__(self, path):
+            assert path == "/proc"
+
+        def iterdir(self):
+            return [Process(pid) for pid in processes]
+
+    def process(pid):
+        details = processes[pid][1]
+        if isinstance(details, Exception):
+            raise details
+        return details
+
+    def ended(claim):
+        s.need(claim["pid"] == pid and claim["invocation_id"] == original["invocation_id"],
+               "terminal check used a foreign registration")
+        return terminal
+
+    def old_probe(reader, old_pid, comm, start, old_group):
+        if (old_pid, comm, old_group) == (bounded["PID"], "jetstreamer-nod", "0::" + bounded["GROUP"]):
+            return dict(pid=old_pid, invocation_id=bounded["IID"])
+
+    reader = SimpleNamespace(bound=bound, need=s.need, read=s.read, process=process)
     observe = bounded["observe146"]
-    with patch.dict(observe.__globals__, verify_live=live):
+    adapter = dict(bounded, observe=old_probe, terminal146=ended)
+
+    def capture(registration=lease_ref):
+        return census({}, {}, None, {"occupied":False}, 145, {}, entry_lease=registration)
+
+    def reject(call, exception, message):
+        try:
+            call()
+        except exception as exc:
+            s.need(str(exc) == message, "unrelated epoch 146 fixture failure")
+        else:
+            raise ValueError("missing rejection: " + message)
+
+    with patch.dict(observe.__globals__, verify_live=live, terminal146=ended), \
+            patch.dict(census.__globals__, Path=Proc, s=reader, fit=SimpleNamespace(units=lambda:set()),
+                       bounded142=adapter):
         claim = observe(reader,pid,"jetstreamer-nod",ticks,group,lease_ref)
         s.need(claim["registration"] == lease_ref and claim["memory_bytes"] == 192<<20
                and claim["scratch_bytes"] == 8<<20 and claim["additional_cpu_quota_micros"] == 0,
@@ -129,22 +181,108 @@ def verify146(bounded, s):
                     "preflight":dict(entry_ref,sha256="0"*64),"invocation_id":"0"*32}
         for field,value in variants.items():
             lease = dict(original, **{field:value})
-            try:
-                observe(reader,pid,"jetstreamer-nod",ticks,group,lease_ref)
-            except ValueError as exc:
-                s.need(str(exc)=="different bounded epoch 146 lease","unrelated epoch 146 fixture failure")
-            else:
-                raise ValueError("accepted changed bounded epoch 146 " + field)
+            reject(lambda:observe(reader,pid,"jetstreamer-nod",ticks,group,lease_ref),
+                   ValueError,"different bounded epoch 146 lease")
+        lease = dict(original, start_ticks=0)
+        reject(capture,ValueError,"different bounded epoch 146 lease")
+        lease = deepcopy(original)
         s.need(observe(reader,pid,"historical-work",ticks,group,lease_ref) is None
                and observe(reader,pid,"jetstreamer-nod",ticks,"0::/system.slice/"+unit,lease_ref) is None
                and len(accepted)==1,"foreign process reached the epoch 146 live reader")
+
+        reject(lambda:capture(dict(lease_ref, sha256="2"*64)),ValueError,"foreign test lease reference")
+        s.need(capture(None)==({},None),"unexpected reservation without a fleet lease")
+        processes[pid] = ("python3", (1,ticks,group))
+        held = capture()
+        processes[pid] = ("jetstreamer-nod", (1,ticks,group))
+        running = capture()
+        s.need(held==running==({},claim) and len(accepted)==2,"held-to-exec changed the reservation or skipped live verification")
+        reject(lambda:capture(None),ValueError,"unregistered replay process " + str(pid))
+        processes[pid] = ("jetstreamer-nod", (1,ticks+1,group))
+        reject(capture,ValueError,"different bounded epoch 146 lease")
+        processes[pid] = ("jetstreamer-nod", (1,ticks,"0::/system.slice/unregistered.service"))
+        reject(capture,ValueError,"unregistered replay process " + str(pid))
+        processes[pid] = ("historical-work", (1,ticks,group))
+        reject(capture,ValueError,"unregistered replay process " + str(pid))
+        processes[pid] = ("jetstreamer-nod", ProcessLookupError(pid))
+        reject(capture,ProcessLookupError,str(pid))
+        terminal = True
+        s.need(capture()==held,"positively identified exit during /proc scan dropped the reservation")
+        processes[pid] = ("jetstreamer-nod", (1,ticks,group))
+        vanished_while_checking = True
+        s.need(capture()==held,"positively identified exit during native verification dropped the reservation")
+        terminal = False
+        reject(capture,ProcessLookupError,str(pid))
+        processes.clear()
+        s.need(capture()==held and capture(None)==({},None),"terminal or fleet release changed the reservation incorrectly")
+        old_pid = bounded["PID"]
+        processes[old_pid] = ("jetstreamer-nod", (1,ticks,"0::"+bounded["GROUP"]))
+        reject(capture,ValueError,"overlapping bounded entry probes")
+        s.need(capture(None)==({},dict(pid=old_pid, invocation_id=bounded["IID"])),
+               "changed historic 142 census")
     return dict(preflight=entry_ref, accepted_fixture=True, rejected_fields=sorted(variants),
+                transition_controls=["held", "native exec", "identified exit during scan", "identified exit during verification",
+                                     "terminal reserved", "successor fleet release", "overlapping 142 rejected"],
+                terminal_controls=verify146_terminal(bounded, s, claim),
                 live_node_executed=False)
+
+
+def verify146_terminal(bounded, s, claim):
+    unit, group, pid = claim["unit"], bounded["GROUP146"], claim["pid"]
+    terminal = dict(Id=unit, InvocationID=claim["invocation_id"], ExecMainPID=str(pid), MainPID="0",
+                    ControlPID="0", ActiveState="failed", SubState="failed", Job="", NRestarts="0",
+                    ControlGroup="")
+    rows = []
+    pid_visible = False
+    cgroup_members = ""
+
+    def show(command, **kwargs):
+        s.need(command[:3] == ["/usr/bin/systemctl", "show", "-p"] and command[-1] == unit,
+               "foreign terminal provider command")
+        return "\n".join(f"{k}={v}" for k,v in rows.pop(0).items())
+
+    class TerminalPath:
+        def __init__(self, name):
+            self.path = Path(name)
+
+        def __truediv__(self, key):
+            return TerminalPath(self.path / key)
+
+        def exists(self):
+            s.need(self.path == Path("/proc") / str(pid), "foreign terminal process check")
+            return pid_visible
+
+        def read_text(self):
+            s.need(self.path == Path("/sys/fs/cgroup") / group.lstrip("/") / "cgroup.procs",
+                   "foreign terminal cgroup check")
+            return cgroup_members
+
+    fn = bounded["terminal146"]
+    controls = ["exact terminal", "crossed invocation", "crossed main process", "active manager",
+                "remaining process", "remaining cgroup member", "changing manager"]
+    with patch.dict(fn.__globals__, Path=TerminalPath, subprocess=SimpleNamespace(check_output=show)):
+        rows = [terminal,terminal]
+        s.need(fn(claim),"exact terminal denied")
+        for crossed in (dict(terminal, InvocationID="9"*32),dict(terminal, ExecMainPID=str(pid+1)),
+                        dict(terminal, ActiveState="active")):
+            rows = [crossed]
+            s.need(not fn(claim),"foreign terminal accepted")
+        rows = [terminal]
+        pid_visible = True
+        s.need(not fn(claim),"terminal accepted with live process")
+        rows = [terminal]
+        pid_visible = False
+        cgroup_members = str(pid)
+        s.need(not fn(claim),"terminal accepted with live cgroup")
+        rows = [terminal,dict(terminal, InvocationID="9"*32)]
+        cgroup_members = ""
+        s.need(not fn(claim),"terminal accepted while manager changed")
+    return controls
 
 
 if __name__ == "__main__":
     module=runpy.run_path(str(Path(__file__).with_name("post-stop-fit")))
     result=verify(module["bounded142"],module["s"])
     if sys.argv[1:] == ["--with-146"]:
-        result["bounded146"]=verify146(module["bounded142"],module["s"])
+        result["bounded146"]=verify146(module["bounded142"],module["s"],module["census"])
     print(json.dumps(result,sort_keys=True))

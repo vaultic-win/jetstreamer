@@ -793,6 +793,7 @@ def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None)
         for p,ticks,*inode in prs:
             st=Path(f"/proc/{p}/exe").stat()
             s.need(s.process(p)[1:]==(ticks,"0::/system.slice/"+u) and (not inode or [st.st_dev,st.st_ino]==inode),"process generation changed")
+    reserved = bounded142["reservation146"](s,entry_lease) if entry_lease is not None else None
     qualification=None
     monitored={p[0] for prs in expect.values() for p in prs}
     for p in Path("/proc").iterdir():
@@ -802,12 +803,24 @@ def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None)
         if comm.startswith(("historical-work","jetstreamer-nod")):
             # A child may appear after the cgroup leg. Recheck only the previously
             # attested one-process replacement; any other executable is foreign.
-            parent,start,group=s.process(int(p.name))
-            bounded=bounded142["observe"](s,int(p.name),comm,start,group)
-            if bounded is None and entry_lease is not None:
-                bounded=bounded142["observe146"](s,int(p.name),comm,start,group,entry_lease)
+            pid = int(p.name)
+            try:
+                parent,start,group=s.process(pid)
+            except (FileNotFoundError,ProcessLookupError):
+                if (reserved is not None and pid == reserved["pid"] and comm == "jetstreamer-nod"
+                        and bounded142["terminal146"](reserved)):
+                    continue
+                raise
+            bounded=bounded142["observe"](s,pid,comm,start,group)
+            if bounded is not None:
+                s.need(reserved is None and qualification is None,"overlapping bounded entry probes")
+                qualification=bounded
+                continue
+            if reserved is not None:
+                bounded=bounded142["observe146"](s,pid,comm,start,group,entry_lease)
             if bounded is not None:
                 s.need(qualification is None,"overlapping bounded entry probes")
+                s.need(bounded == reserved,"changed bounded epoch 146 reservation")
                 qualification=bounded
                 continue
             item=next(((int(k),v) for k,v in replacements.items() if len(v["processes"])==1 and
@@ -823,7 +836,7 @@ def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None)
             before=dict(prior,processes=now["processes"])
             same_fork(before,now,True)
             raise Reprice(e,before,now)
-    return {u:[p[:2] for p in prs] for u,prs in expect.items()}, qualification
+    return {u:[p[:2] for p in prs] for u,prs in expect.items()}, reserved if reserved is not None else qualification
 
 def joined_resident(active):
     if not active["admission"]:return 0
