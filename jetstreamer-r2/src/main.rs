@@ -111,6 +111,7 @@ struct Config {
     overwrite_existing: bool,
     repair_orphaned_archive: bool,
     recover_staged247: bool,
+    staged_archive: Option<StagedArchivePin>,
     observer_receipt: Option<PathBuf>,
     observer_sha256: Option<String>,
     expected_controller_invocation_id: Option<String>,
@@ -271,6 +272,7 @@ fn usage() -> ! {
         "[--receipt-directory DIRECTORY] [--public-receipt-directory DIRECTORY] [--delete-local] [--part-size-mib N] ",
         "[--legacy-part-size-mib N] [--legacy-etag-only] [--overwrite-existing] ",
         "[--repair-orphaned-archive] [--recover-staged-247] ",
+        "[--staged-archive-etag ETAG --staged-archive-bytes N] ",
         "[--current-reader-plan FILE --current-reader-plan-sha256 HEX] ",
         "[--concurrency N] [--observer-receipt FILE] [--observer-sha256 HEX] ",
         "[--expected-controller-invocation-id ID] [--expected-producer-invocation-id ID] ",
@@ -310,6 +312,8 @@ fn parse_args() -> Result<Config> {
     let mut overwrite_existing = false;
     let mut repair_orphaned_archive = false;
     let mut recover_staged247 = false;
+    let mut staged_archive_etag = None;
+    let mut staged_archive_bytes = None;
     let mut observer_receipt = None;
     let mut observer_sha256 = None;
     let mut expected_controller_invocation_id = None;
@@ -346,6 +350,14 @@ fn parse_args() -> Result<Config> {
             "--current-reader-plan" => current_reader_plan = Some(PathBuf::from(value()?)),
             "--current-reader-plan-sha256" => current_reader_plan_sha256 = Some(value()?),
             "--recover-staged-247" => recover_staged247 = true,
+            "--staged-archive-etag" => staged_archive_etag = Some(value()?),
+            "--staged-archive-bytes" => {
+                staged_archive_bytes = Some(
+                    value()?
+                        .parse()
+                        .context("invalid staged archive byte length")?,
+                )
+            }
             "--overwrite-existing" => overwrite_existing = true,
             "--repair-orphaned-archive" => repair_orphaned_archive = true,
             "--observer-receipt" => observer_receipt = Some(PathBuf::from(value()?)),
@@ -577,6 +589,22 @@ fn parse_args() -> Result<Config> {
             );
         }
     }
+    let staged_archive = match (staged_archive_etag, staged_archive_bytes) {
+        (Some(etag), Some(length)) => {
+            ensure!(
+                command == Command::Sync
+                    && epochs.as_ref().is_some_and(|epochs| epochs.len() == 1)
+                    && !overwrite_existing
+                    && !repair_orphaned_archive
+                    && !recover_staged247
+                    && !delete_local,
+                "staged archive recovery requires sync of one explicit epoch without overwrite, orphan repair, existing 247 recovery, or local retirement"
+            );
+            Some(StagedArchivePin::new(&etag, length)?)
+        }
+        (None, None) => None,
+        _ => bail!("--staged-archive-etag and --staged-archive-bytes must be supplied together"),
+    };
     let epochs = match (command, epochs) {
         (Command::Inventory, None) => bail!("inventory requires --epochs START-END"),
         (Command::PublicVerify, None) => bail!("public-verify requires --epochs START-END"),
@@ -605,6 +633,7 @@ fn parse_args() -> Result<Config> {
         overwrite_existing,
         repair_orphaned_archive,
         recover_staged247,
+        staged_archive,
         observer_receipt,
         observer_sha256,
         expected_controller_invocation_id,
@@ -1021,6 +1050,45 @@ struct RemoteArchive {
     composite_sha256: Option<String>,
     checksum_type: Option<ChecksumType>,
     multipart_part_size: Option<u64>,
+}
+
+#[derive(Debug)]
+struct StagedArchivePin {
+    etag: String,
+    length: u64,
+}
+
+impl StagedArchivePin {
+    fn new(etag: &str, length: u64) -> Result<Self> {
+        let etag = normalize_etag(etag);
+        let valid_etag = match etag.split_once('-') {
+            Some((digest, parts)) => {
+                is_lower_hex(digest, 32)
+                    && parts
+                        .parse::<u64>()
+                        .is_ok_and(|n| n > 0 && n.to_string() == parts)
+            }
+            None => is_lower_hex(etag, 32),
+        };
+        ensure!(
+            valid_etag && length > 0,
+            "invalid staged archive ETag or byte length"
+        );
+        Ok(Self {
+            etag: etag.to_owned(),
+            length,
+        })
+    }
+
+    fn authenticate(&self, archive: Option<&RemoteArchive>, sidecar_present: bool) -> Result<()> {
+        let archive = archive.context("staged archive is missing")?;
+        ensure!(
+            archive.etag == self.etag && archive.length == self.length,
+            "authenticated staged archive ETag or byte length changed"
+        );
+        ensure!(!sidecar_present, "staged sidecar already exists");
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -3245,6 +3313,13 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
     let checksum_key = format!("epoch-{epoch}.jet.sha256");
     let existing = head_archive(client, &r2.bucket, &archive_key).await?;
     let existing_sidecar = remote_sidecar(client, &r2.bucket, &checksum_key).await?;
+    if let Some(pin) = &config.staged_archive {
+        pin.authenticate(existing.as_ref(), existing_sidecar.is_some())?;
+        ensure!(
+            local.length == pin.length,
+            "local archive length differs from staged pin"
+        );
+    }
     let retained = if config.recover_staged247 {
         current_reader::staged247::object(&r2.bucket, &archive_key, existing.as_ref())?;
         ensure!(
@@ -3352,7 +3427,7 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
         (remote.etag, remote.composite_sha256)
     } else {
         ensure!(
-            config.command == Command::Sync,
+            config.command == Command::Sync && config.staged_archive.is_none(),
             "remote archive is missing for epoch {epoch}"
         );
         if repairing_orphan {
@@ -3464,7 +3539,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
     // canonical sidecar as meaning that the corresponding archive was fully
     // uploaded and verified by this publisher.
     match remote_sidecar(client, &r2.bucket, &checksum_key).await? {
-        Some(_) if retained.is_some() => anyhow::bail!("staged sidecar appeared during recovery"),
+        Some(_) if retained.is_some() || config.staged_archive.is_some() => {
+            anyhow::bail!("staged sidecar appeared during recovery")
+        }
         Some(_) if config.overwrite_existing => {
             put_sidecar(client, &r2.bucket, &local, true).await?
         }
@@ -3473,6 +3550,10 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
             "remote sidecar mismatch for epoch {epoch}"
         ),
         None if config.command == Command::Sync => {
+            if let Some(pin) = &config.staged_archive {
+                let staged = head_archive(client, &r2.bucket, &archive_key).await?;
+                pin.authenticate(staged.as_ref(), false)?;
+            }
             if let Some(prior) = &retained {
                 let final_staged = head_archive(client, &r2.bucket, &archive_key).await?;
                 current_reader::staged247::object(&r2.bucket, &archive_key, final_staged.as_ref())?;
@@ -3923,7 +4004,10 @@ async fn main() -> Result<()> {
         return fleet::capture_native261_input();
     }
     if env::args().nth(1).as_deref() == Some("verify-native261-bootstrap-history") {
-        ensure!(env::args().count() == 2, "verify-native261-bootstrap-history takes no arguments");
+        ensure!(
+            env::args().count() == 2,
+            "verify-native261-bootstrap-history takes no arguments"
+        );
         return fleet::verify_native261_bootstrap_history();
     }
     if env::args().nth(1).as_deref() == Some("capture-native261-terminal") {
@@ -5172,6 +5256,31 @@ mod tests {
             Sha256::digest(b"fgh").to_vec(),
         ]);
         assert_eq!(proof.composite_sha256, expected_sha);
+    }
+
+    #[test]
+    fn staged_archive_requires_the_exact_authenticated_object_without_a_sidecar() {
+        let etag = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-2";
+        let bytes = 1024;
+        let pin = StagedArchivePin::new(&format!("\"{etag}\""), bytes).unwrap();
+        let mut archive = RemoteArchive {
+            length: bytes,
+            etag: etag.to_owned(),
+            metadata_sha256: None,
+            composite_sha256: None,
+            checksum_type: None,
+            multipart_part_size: None,
+        };
+        assert!(pin.authenticate(Some(&archive), false).is_ok());
+        assert!(pin.authenticate(None, false).is_err());
+        assert!(pin.authenticate(Some(&archive), true).is_err());
+        archive.length -= 1;
+        assert!(pin.authenticate(Some(&archive), false).is_err());
+        archive.length = bytes;
+        archive.etag.replace_range(..1, "f");
+        assert!(pin.authenticate(Some(&archive), false).is_err());
+        assert!(StagedArchivePin::new(&format!("W/\"{etag}\""), bytes).is_err());
+        assert!(StagedArchivePin::new(etag, 0).is_err());
     }
 
     #[test]
