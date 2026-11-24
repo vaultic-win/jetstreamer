@@ -29,6 +29,10 @@ pub(super) struct Object {
 const MAX_READ: usize = 8 << 20;
 const TOTAL_READ_AHEAD: usize = 512 << 20;
 const MAX_HTTP_REQUESTS: usize = 16;
+const STANDARD_HTTP_ATTEMPTS: u32 = 3;
+// Short origin-wide outages have exhausted three attempts and discarded
+// hours of playback. Seven attempts allow 126 seconds of bounded backoff.
+const SERVER_HTTP_ATTEMPTS: u32 = 7;
 
 /// Decoding uses one worker per partition. Bound simultaneous HTTP requests
 /// separately and honor an origin's Retry-After across every pinned reader.
@@ -83,7 +87,7 @@ impl RequestBudget {
         }
         let response = request.send().await;
         let response = match response {
-            Err(_) if attempt < 2 => return Ok(None),
+            Err(_) if attempt + 1 < STANDARD_HTTP_ATTEMPTS => return Ok(None),
             Err(error) => {
                 return Err(io::Error::other(format!(
                     "public archive transport: {error}"
@@ -94,8 +98,11 @@ impl RequestBudget {
                     || (response.status() == StatusCode::SERVICE_UNAVAILABLE
                         && response.headers().contains_key(header::RETRY_AFTER)) =>
             {
-                self.defer(response.headers().get(header::RETRY_AFTER), attempt)?;
-                if attempt == 2 {
+                self.defer(
+                    response.headers().get(header::RETRY_AFTER),
+                    attempt.min(STANDARD_HTTP_ATTEMPTS - 1),
+                )?;
+                if attempt + 1 >= STANDARD_HTTP_ATTEMPTS {
                     return Err(io::Error::new(
                         io::ErrorKind::WouldBlock,
                         format!(
@@ -106,7 +113,18 @@ impl RequestBudget {
                 }
                 return Ok(None);
             }
-            Ok(response) if attempt < 2 && response.status().is_server_error() => return Ok(None),
+            Ok(response) if response.status().is_server_error() => {
+                if attempt + 1 < SERVER_HTTP_ATTEMPTS {
+                    return Ok(None);
+                }
+                return Err(io::Error::new(
+                    io::ErrorKind::WouldBlock,
+                    format!(
+                        "public archive HTTP server error after {SERVER_HTTP_ATTEMPTS} attempts: {} at {range}",
+                        response.status()
+                    ),
+                ));
+            }
             Ok(response) => response,
         };
         Ok(Some((response, permit)))
@@ -393,11 +411,13 @@ impl Reader {
         let end = start + count - 1;
         let range = format!("bytes={start}-{end}");
         let expected = format!("bytes {start}-{end}/{}", object.bytes);
-        for attempt in 0..3 {
-            let Some((mut response, _permit)) = budget
+        let mut attempt = 0;
+        loop {
+            let response = budget
                 .open_range(client, url, &range, Some(&object.etag), attempt)
-                .await?
-            else {
+                .await?;
+            attempt += 1;
+            let Some((mut response, _permit)) = response else {
                 continue;
             };
             let headers = response.headers();
@@ -427,8 +447,14 @@ impl Reader {
                         written += chunk.len();
                     }
                     Ok(None) if written == dest.len() => return Ok(()),
-                    Ok(None) => break,
-                    Err(_) if attempt < 2 => break,
+                    Ok(None) if attempt < STANDARD_HTTP_ATTEMPTS => break,
+                    Ok(None) => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::UnexpectedEof,
+                            "public archive transport: incomplete range after retries",
+                        ));
+                    }
+                    Err(_) if attempt < STANDARD_HTTP_ATTEMPTS => break,
                     Err(error) => {
                         return Err(io::Error::other(format!(
                             "public archive transport: {error}"
@@ -437,10 +463,6 @@ impl Reader {
                 }
             }
         }
-        Err(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "public archive transport: incomplete range after retries",
-        ))
     }
 
     pub async fn read_at(&mut self, mut offset: u64, mut dest: &mut [u8]) -> io::Result<()> {
@@ -510,26 +532,35 @@ mod tests {
     use std::net::TcpListener;
 
     fn serve(response: &'static str, range: &'static str) -> (Reader, std::thread::JoinHandle<()>) {
+        serve_sequence(vec![response], range)
+    }
+
+    fn serve_sequence(
+        responses: Vec<&'static str>,
+        range: &'static str,
+    ) -> (Reader, std::thread::JoinHandle<()>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let handle = std::thread::spawn(move || {
-            let (mut socket, _) = listener.accept().unwrap();
-            let mut headers = String::new();
-            let mut reader = BufReader::new(&socket);
-            loop {
-                let mut line = String::new();
-                assert!(reader.read_line(&mut line).unwrap() > 0);
-                if line == "\r\n" {
-                    break;
+            for response in responses {
+                let (mut socket, _) = listener.accept().unwrap();
+                let mut headers = String::new();
+                let mut reader = BufReader::new(&socket);
+                loop {
+                    let mut line = String::new();
+                    assert!(reader.read_line(&mut line).unwrap() > 0);
+                    if line == "\r\n" {
+                        break;
+                    }
+                    headers.push_str(&line);
                 }
-                headers.push_str(&line);
+                let headers = headers.to_ascii_lowercase();
+                assert!(headers.starts_with("get /epoch-0.jet http/1.1\r\n"));
+                assert!(headers.contains(&format!("range: {range}\r\n")));
+                assert!(headers.contains("if-match: \"original\"\r\n"));
+                assert!(!headers.contains("authorization:"));
+                socket.write_all(response.as_bytes()).unwrap();
             }
-            let headers = headers.to_ascii_lowercase();
-            assert!(headers.starts_with("get /epoch-0.jet http/1.1\r\n"));
-            assert!(headers.contains(&format!("range: {range}\r\n")));
-            assert!(headers.contains("if-match: \"original\"\r\n"));
-            assert!(!headers.contains("authorization:"));
-            socket.write_all(response.as_bytes()).unwrap();
         });
         (
             Reader {
@@ -549,6 +580,21 @@ mod tests {
             },
             handle,
         )
+    }
+
+    #[tokio::test]
+    async fn resumes_the_same_pinned_range_after_three_server_errors() {
+        let unavailable =
+            "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        let recovered = "HTTP/1.1 206 Partial Content\r\nContent-Length: 8\r\nContent-Range: bytes 0-7/8\r\nETag: \"original\"\r\n\r\nabcdefgh";
+        let (mut reader, server) = serve_sequence(
+            vec![unavailable, unavailable, unavailable, recovered],
+            "bytes=0-7",
+        );
+        let mut bytes = [0; 8];
+        reader.read_at(0, &mut bytes).await.unwrap();
+        assert_eq!(&bytes, b"abcdefgh");
+        server.join().unwrap();
     }
 
     #[tokio::test]
