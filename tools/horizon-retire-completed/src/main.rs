@@ -37,6 +37,16 @@ const LIMIT: u64 = 16 << 20;
 const EPOCH246_BOOTSTRAP: &str = "/var/lib/jetstreamer/horizon246-bootstrap-copy1636-work-v2/projection/bootstrap/snapshot-106271618-6LSJUywaryX8vRn53cbWqLJiTwBCCb3wnNTPevWfqtQD.tar.zst";
 const EPOCH246_BOOTSTRAP_SHA: &str =
     "c5abfce5d852b78860d22d71f1ce57f6752f45bb428257a73e037895ec6a03e7";
+const EPOCH249_BOOTSTRAP: &str = "/var/lib/jetstreamer/horizon-contiguous-249-251-current-46b4b4a-v1/snapshot-107567592-DBPics19TxLy8wawfQYvS65d72vKvFGLCW9HZv5q6GeH.tar.zst";
+const EPOCH249_BOOTSTRAP_SHA: &str =
+    "f9e582d104477e52b6327e26fe011dcfdde437254b953f1a13b78ad43fdef64a";
+const EPOCH249_BOOTSTRAP_BYTES: u64 = 13_571_383_805;
+const EPOCH249_BOOTSTRAP_KEY: &str =
+    "107567592/snapshot-107567592-DBPics19TxLy8wawfQYvS65d72vKvFGLCW9HZv5q6GeH.tar.zst";
+const EPOCH249_BOOTSTRAP_UNITS: [&str; 2] = [
+    "horizon-249-cached-fingerprint-capability2418-v1.service",
+    "horizon-qualify-249-reboot-20261117-v1.service",
+];
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -81,6 +91,8 @@ struct BootstrapReview {
     snapshot_sha256: String,
     no_staged_consumers_confirmed: bool,
     original_copy_completion: Bound,
+    #[serde(default)]
+    original_generation: Option<Bound>,
     evidence: Vec<Bound>,
     inactive_units: Vec<String>,
 }
@@ -228,7 +240,7 @@ fn check_target(t: &Target) -> Result<()> {
         "invalid target authorization"
     );
     ensure!(
-        ordinary_private_path(&t.path) || external_bootstrap_path(t.epoch, &t.path),
+        ordinary_private_path(&t.path) || external_bootstrap_sha(t.epoch, &t.path).is_some(),
         "target outside private data"
     );
     ensure!(
@@ -237,7 +249,7 @@ fn check_target(t: &Target) -> Result<()> {
         t.path.display()
     );
     ensure!(t.identity.len > 1 << 20, "retain compact metadata");
-    if external_bootstrap_path(t.epoch, &t.path) {
+    if external_bootstrap_sha(t.epoch, &t.path).is_some() {
         let binding = t
             .external_bootstrap_review
             .as_ref()
@@ -254,14 +266,24 @@ fn check_target(t: &Target) -> Result<()> {
         }
         let completion: Value =
             serde_json::from_slice(&bound(&review.original_copy_completion, LIMIT)?)?;
-        ensure!(
-            completion["schema"] == "horizon246-guarded-exact-Rust-sealer-copy1024-completion-v1"
-                && completion["Main_accepted_copy_only"] == true
-                && completion["snapshot"]["path"] == EPOCH246_BOOTSTRAP
-                && completion["snapshot"]["sha256"] == EPOCH246_BOOTSTRAP_SHA
-                && completion["snapshot"]["bytes"] == t.identity.len,
-            "external bootstrap differs from original copy evidence"
-        );
+        if t.epoch == 249 {
+            let generation = review
+                .original_generation
+                .as_ref()
+                .context("epoch 249 needs an authenticated generation lookup")?;
+            let metadata: Value = serde_json::from_slice(&bound(generation, LIMIT)?)?;
+            validate_epoch249_source(&completion, &metadata)?;
+        } else {
+            ensure!(
+                completion["schema"]
+                    == "horizon246-guarded-exact-Rust-sealer-copy1024-completion-v1"
+                    && completion["Main_accepted_copy_only"] == true
+                    && completion["snapshot"]["path"] == EPOCH246_BOOTSTRAP
+                    && completion["snapshot"]["sha256"] == EPOCH246_BOOTSTRAP_SHA
+                    && completion["snapshot"]["bytes"] == t.identity.len,
+                "external bootstrap differs from original copy evidence"
+            );
+        }
         inactive(&review.inactive_units)?;
     } else {
         ensure!(
@@ -276,35 +298,84 @@ fn ordinary_private_path(path: &Path) -> bool {
     let private = Path::new(HOME_ROOT).join(".jetstreamer-private");
     path.starts_with(&private) && !path.starts_with(private.join("r2-receipts"))
 }
-fn external_bootstrap_path(epoch: u64, path: &Path) -> bool {
-    epoch == 246 && path == Path::new(EPOCH246_BOOTSTRAP)
+fn external_bootstrap_sha(epoch: u64, path: &Path) -> Option<&'static str> {
+    match epoch {
+        246 if path == Path::new(EPOCH246_BOOTSTRAP) => Some(EPOCH246_BOOTSTRAP_SHA),
+        249 if path == Path::new(EPOCH249_BOOTSTRAP) => Some(EPOCH249_BOOTSTRAP_SHA),
+        _ => None,
+    }
 }
+
 fn validate_bootstrap_review(t: &Target, r: &BootstrapReview) -> Result<()> {
+    let (schema, size, required_units): (&str, u64, &[&str]) = match t.epoch {
+        246 => (
+            "horizon246-obsolete-bootstrap-main-review-v1",
+            13_110_128_323,
+            &[
+                "horizon-qualify-246-general-shrink-debt-budget506-e3f15eb2-v1.service",
+                "horizon-qualify-246-bootstrap-copy1636-v2.service",
+                "horizon-monitor-246-bootstrap-copy1636-v2.service",
+                "horizon-monitor-246-bootstrap-copy1636-v2.timer",
+            ],
+        ),
+        249 => (
+            "horizon249-obsolete-bootstrap-main-review-v1",
+            EPOCH249_BOOTSTRAP_BYTES,
+            &EPOCH249_BOOTSTRAP_UNITS,
+        ),
+        _ => anyhow::bail!("unsupported external bootstrap review"),
+    };
+    let digest = external_bootstrap_sha(t.epoch, &t.path).context("unexpected bootstrap path")?;
     ensure!(
-        r.schema == "horizon246-obsolete-bootstrap-main-review-v1"
-            && r.epoch == 246
+        r.schema == schema
+            && r.epoch == t.epoch
             && r.path == t.path
             && r.identity == t.identity
-            && r.snapshot_sha256 == EPOCH246_BOOTSTRAP_SHA
+            && r.snapshot_sha256 == digest
             && r.no_staged_consumers_confirmed
             && t.identity.uid == 0
-            && t.identity.len == 13110128323
+            && t.identity.len == size
+            && r.original_generation.is_some() == (t.epoch == 249)
             && !r.evidence.is_empty(),
         "invalid external bootstrap review"
     );
-    for required in [
-        "horizon-qualify-246-general-shrink-debt-budget506-e3f15eb2-v1.service",
-        "horizon-qualify-246-bootstrap-copy1636-v2.service",
-        "horizon-monitor-246-bootstrap-copy1636-v2.service",
-        "horizon-monitor-246-bootstrap-copy1636-v2.timer",
-    ] {
+    for required in required_units {
         ensure!(
-            r.inactive_units.iter().any(|u| u == required),
+            r.inactive_units.iter().any(|u| u == *required),
             "missing historical bootstrap consumer {required}"
         );
     }
     Ok(())
 }
+fn validate_epoch249_source(seal: &Value, metadata: &Value) -> Result<()> {
+    let path = Path::new(EPOCH249_BOOTSTRAP);
+    let members = seal["members"]
+        .as_array()
+        .context("missing sealed members")?;
+    let members: Vec<_> = members
+        .iter()
+        .filter(|member| member["name"].as_str() == path.file_name().and_then(|n| n.to_str()))
+        .collect();
+    ensure!(
+        seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && seal["destination"].as_str() == path.parent().and_then(Path::to_str)
+            && members.len() == 1
+            && members[0]["sha256"] == EPOCH249_BOOTSTRAP_SHA
+            && members[0]["bytes"] == EPOCH249_BOOTSTRAP_BYTES,
+        "epoch 249 bootstrap is outside the original sealed deployment"
+    );
+    ensure!(
+        metadata["bucket"] == "mainnet-beta-ledger-us-ny5"
+            && metadata["name"] == EPOCH249_BOOTSTRAP_KEY
+            && metadata["generation"] == "1637611511896161"
+            && metadata["size"] == EPOCH249_BOOTSTRAP_BYTES
+            && metadata["md5_hash"] == "5T7R2/oARnVkrPc85kobgA=="
+            && metadata["crc32c_hash"] == "wUO8lg==",
+        "epoch 249 bootstrap generation differs from the catalog"
+    );
+    Ok(())
+}
+
 fn inactive(units: &[String]) -> Result<()> {
     for unit in units {
         ensure!(
@@ -317,7 +388,16 @@ fn inactive(units: &[String]) -> Result<()> {
             "unsafe unit name"
         );
         let o = Command::new("/usr/bin/systemctl")
-            .args(["show", unit, "-p", "ActiveState", "-p", "MainPID"])
+            .args([
+                "show",
+                unit,
+                "-p",
+                "ActiveState",
+                "-p",
+                "MainPID",
+                "-p",
+                "Job",
+            ])
             .output()?;
         ensure!(o.status.success(), "cannot inspect unit {unit}");
         let s = String::from_utf8(o.stdout)?;
@@ -326,7 +406,8 @@ fn inactive(units: &[String]) -> Result<()> {
                 .any(|s| s == "ActiveState=inactive" || s == "ActiveState=failed")
                 && !s
                     .lines()
-                    .any(|s| s.starts_with("MainPID=") && s != "MainPID=0"),
+                    .any(|s| s.starts_with("MainPID=") && s != "MainPID=0")
+                && s.lines().any(|s| s == "Job="),
             "unit is live: {unit}"
         );
     }
@@ -336,7 +417,6 @@ fn contains(hay: &[u8], needle: &[u8]) -> bool {
     hay.windows(needle.len()).any(|w| w == needle)
 }
 
-#[cfg(any(feature = "anza-parked-183", feature = "anza-closed-154"))]
 fn has_mapping(maps: &[u8], t: &Target) -> bool {
     let dev = format!(
         "{:02x}:{:02x}",
@@ -372,7 +452,6 @@ fn scan_consumers(targets: &[Target]) -> Result<()> {
                         "PID {pid} references {} in {name}",
                         t.path.display()
                     );
-                    #[cfg(any(feature = "anza-parked-183", feature = "anza-closed-154"))]
                     ensure!(
                         name != "maps" || !has_mapping(&data, t),
                         "PID {pid} maps the selected archive inode"
@@ -497,9 +576,9 @@ fn run() -> Result<()> {
         ensure!(paths.insert(&t.path), "duplicate target");
         epochs.insert(t.epoch);
         check_target(t)?;
-        if external_bootstrap_path(t.epoch, &t.path) {
+        if let Some(expected) = external_bootstrap_sha(t.epoch, &t.path) {
             ensure!(
-                digest(&t.path)? == EPOCH246_BOOTSTRAP_SHA,
+                digest(&t.path)? == expected,
                 "external bootstrap content changed"
             );
             check_target(t)?;
@@ -656,16 +735,24 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
-    fn external_route_is_one_epoch_one_file_and_never_metadata() {
-        assert!(external_bootstrap_path(246, Path::new(EPOCH246_BOOTSTRAP)));
+    fn external_routes_select_exact_epoch_files_and_never_metadata() {
+        assert_eq!(
+            external_bootstrap_sha(246, Path::new(EPOCH246_BOOTSTRAP)),
+            Some(EPOCH246_BOOTSTRAP_SHA)
+        );
+        assert_eq!(
+            external_bootstrap_sha(249, Path::new(EPOCH249_BOOTSTRAP)),
+            Some(EPOCH249_BOOTSTRAP_SHA)
+        );
+        assert!(external_bootstrap_sha(246, Path::new(EPOCH249_BOOTSTRAP)).is_none());
         for path in [
             "/var/lib/jetstreamer/other/snapshot.tar.zst",
             "/var/lib/jetstreamer/horizon246-bootstrap-copy1636-work-v2/projection/bootstrap/deployment-seal-receipt.json",
             "/var/lib/jetstreamer/horizon246-bootstrap-copy1636-work-v2/projection/bootstrap",
         ] {
-            assert!(!external_bootstrap_path(246, Path::new(path)));
+            assert!(external_bootstrap_sha(246, Path::new(path)).is_none());
         }
-        assert!(!external_bootstrap_path(247, Path::new(EPOCH246_BOOTSTRAP)));
+        assert!(external_bootstrap_sha(247, Path::new(EPOCH246_BOOTSTRAP)).is_none());
         let home = Path::new(HOME_ROOT);
         assert!(ordinary_private_path(
             &home.join(".jetstreamer-private/old/archive")
@@ -706,6 +793,34 @@ mod tests {
         r.inactive_units.pop();
         assert!(validate_bootstrap_review(&t, &r).is_err());
     }
+    #[test]
+    fn obsolete_249_bootstrap_requires_its_original_snapshot_and_generation() {
+        let path = Path::new(EPOCH249_BOOTSTRAP);
+        let mut seal = json!({
+            "schema": "jetstreamer-sealed-deployment-receipt-v1",
+            "destination": path.parent().unwrap(),
+            "members": [{
+                "name": path.file_name().unwrap().to_str().unwrap(),
+                "bytes": EPOCH249_BOOTSTRAP_BYTES,
+                "sha256": EPOCH249_BOOTSTRAP_SHA,
+            }],
+        });
+        let mut metadata = json!({
+            "bucket": "mainnet-beta-ledger-us-ny5",
+            "name": EPOCH249_BOOTSTRAP_KEY,
+            "generation": "1637611511896161",
+            "size": EPOCH249_BOOTSTRAP_BYTES,
+            "md5_hash": "5T7R2/oARnVkrPc85kobgA==",
+            "crc32c_hash": "wUO8lg==",
+        });
+        validate_epoch249_source(&seal, &metadata).unwrap();
+        metadata["generation"] = json!("1637611511896160");
+        assert!(validate_epoch249_source(&seal, &metadata).is_err());
+        metadata["generation"] = json!("1637611511896161");
+        seal["members"][0]["bytes"] = json!(EPOCH249_BOOTSTRAP_BYTES - 1);
+        assert!(validate_epoch249_source(&seal, &metadata).is_err());
+    }
+
     #[test]
     fn running_executable_can_be_hashed() {
         assert_eq!(
