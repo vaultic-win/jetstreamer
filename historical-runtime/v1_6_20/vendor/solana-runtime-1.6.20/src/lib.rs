@@ -16,6 +16,8 @@ pub mod bloom;
 pub mod builtins;
 pub mod commitment;
 pub mod contains;
+#[cfg(feature = "epoch229-bank-trace")]
+mod epoch229_bank_trace;
 pub mod epoch_stakes;
 pub mod genesis_utils;
 pub mod hardened_unpack;
