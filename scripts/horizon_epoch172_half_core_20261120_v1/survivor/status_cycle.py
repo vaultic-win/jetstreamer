@@ -2,6 +2,8 @@
 import copy
 import datetime as dt
 import hashlib
+from importlib import import_module, util
+from inspect import signature
 import json
 import os
 from pathlib import Path
@@ -22,7 +24,7 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
-FAILED166_VERSION = next((version for version in (1, 2, 3)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4)
                           if CURRENT.parent == ROOT / f'tools-cold168-retry4-failed166-v{version}'), 0)
 FAILED166 = bool(FAILED166_VERSION)
 HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
@@ -399,6 +401,23 @@ def install_epoch146_entry(c, fleet):
     fleet[ENTRY146_FIELD] = entry['lease']
 
 
+def validate_epoch146_modules(seal):
+    for name in ('bounded142', 'bounded_entry_owners'):
+        source = CURRENT.with_name(name + '.py')
+        member, = (item for item in seal['members'] if item['name'] == source.name)
+        spec = util.find_spec(name)
+        need(spec is not None and spec.origin == str(source)
+             and source.stat().st_mode & 0o777 == 0o444 and member['mode'] == '0444'
+             and bound(source)['sha256'] == member['sha256'], 'unsealed epoch 146 cadence module ' + name)
+    bounded = import_module('bounded142')
+    census = import_module('bounded_entry_owners')
+    need(all(callable(getattr(bounded, method, None))
+             for method in ('reservation146', 'held146', 'terminal146', 'observe146')),
+         'missing epoch 146 lease validator')
+    need('entry_lease' in signature(census.replay_census).parameters,
+         'missing epoch 146 owner census support')
+
+
 def make_context(head,fleet,sample_ref,cfg,out):
     sample=checked(sample_ref);when=check_sample(fleet,sample,cfg)
     c=SimpleNamespace(fleet_ref=head,fleet=fleet,stamp=when,now=utc(when),cfg=cfg,sample=sample,sample_ref=sample_ref,
@@ -420,6 +439,7 @@ def make_context(head,fleet,sample_ref,cfg,out):
     cold_workers.reconcile(c,cycle.observed_lane)
     c.entry146 = epoch146_entry(c)
     entry = {'entry_lease': c.entry146['lease']} if c.entry146 is not None else {}
+    census_owners = import_module('bounded_entry_owners') if entry else owners
     native_owners = c.recovered_owners
     if HOURLY170:
         c.hourly170 = hourly170_cadence.observe(c)
@@ -430,10 +450,10 @@ def make_context(head,fleet,sample_ref,cfg,out):
             native_owners = dict(native_owners, **{'170': dict(
                 unit=private['unit'], actor=dict(producer_pid=int(private['unit']['MainPID'])))})
     if getattr(cold_workers, 'cold168', None):
-        cold_workers.cold168.census(owners, ident, native_owners, **entry)
+        cold_workers.cold168.census(census_owners, ident, native_owners, **entry)
     else:
-        owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True,
-                             restored=native_owners,**entry)
+        census_owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True,
+                                    restored=native_owners,**entry)
     return c
 
 def baselines(head,fleet,bridge):
@@ -711,6 +731,8 @@ def entry():
         need(Path(hourly170_cadence.__file__) == CURRENT.with_name(member['name'])
              and bound(CURRENT.with_name(member['name']))['sha256']==member['sha256'],
              'unsealed epoch 170 private cadence observer')
+    if FAILED166_VERSION == 4:
+        validate_epoch146_modules(seal)
     return receipt
 
 
