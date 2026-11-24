@@ -10,7 +10,12 @@ compile_error!("the allocation-walk retry requires the guarded verifier");
 #[cfg(all(incident_v5t_guard_recovery145_only, not(incident_v5s_guard_recovery145_only)))]
 compile_error!("the fresh-census retry requires the allocation-walk guard");
 
-#[cfg(incident_v5t_guard_recovery145_only)]
+#[cfg(all(incident_v5u_guard_recovery145_only, not(incident_v5t_guard_recovery145_only)))]
+compile_error!("the timed-out V5u successor requires the previous fresh-census guard");
+
+#[cfg(incident_v5u_guard_recovery145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5v/export145";
+#[cfg(all(incident_v5t_guard_recovery145_only, not(incident_v5u_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5u/export145";
 #[cfg(all(incident_v5s_guard_recovery145_only, not(incident_v5t_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5t/export145";
@@ -57,6 +62,52 @@ const STAGE: &str =
 const STAGE_SHA: &str = "76a835a3068d0e16c81820eba6d88cabf227f0c93e55d38f71c71360d3b2b079";
 const STARTED: &str = "9cdcfdb688ee018b9cddd43c9c5ba129712195e11d6c8172104a7f4a9a160a28";
 const FAIL: &str = "33e011228a58df3c2a82ca49013a7d524eeca1e849fc59993effe5d2faf18e74";
+
+#[cfg(incident_v5u_guard_recovery145_only)]
+pub fn failed_v5u() -> Result<Value> {
+    let iid = "8452dba9df42437b9874b35cb44d059f";
+    let state = Path::new(BASE).join("state").join(iid);
+    let startup = Bound {
+        path: state.join("recovery-started.json"),
+        sha256: "85dede3d71e27414b28369d1686fe4d7e9ee207bcf6ac4a2c083836961149549".into(),
+    };
+    let failure = Bound {
+        path: state.join("failed.json"),
+        sha256: "635ca9e4a87decf519815c27728b2b49884ff3f4e1149f2542d8f931f3731609".into(),
+    };
+    let start = custody::evidence(&startup)?;
+    let native = continuity::failure(iid)?;
+    let terminal_file = Path::new(RUNTIME).join(
+        "epoch145-semantic-continuity-20261121-v1/v5v-name-handoff/V5U_TERMINAL.json",
+    );
+    let terminal = custody::binding(&terminal_file)?;
+    let preflight = custody::evidence(&terminal)?;
+    let file = materialized::leaf()?;
+    let id = custody::frozen_identity(&file)?;
+    ensure!(
+        start["iid"] == iid
+            && start["image"] == "18f46b23edd8061eb7ed9ae1566134bc7ea2cbaa6fa7b85cdd1745488366dca4"
+            && start["file"] == json!(file)
+            && start["r2_mutations"] == false
+            && native["failure"] == json!(failure)
+            && preflight["schema"] == "horizon-epoch145-v5u-query-timeout-terminal-v1"
+            && preflight["startup"] == json!(startup)
+            && preflight["failure"] == json!(failure)
+            && preflight["manager"]["InvocationID"] == iid
+            && preflight["manager"]["Result"] == "exit-code"
+            && preflight["candidate"]["path"] == json!(file)
+            && preflight["candidate"]["device"] == id.device
+            && preflight["candidate"]["inode"] == id.inode
+            && preflight["candidate"]["bytes"] == id.bytes
+            && preflight["candidate"]["mtime_ns"].as_i64().map(i128::from) == Some(id.mtime_ns)
+            && preflight["candidate"]["ctime_ns"].as_i64().map(i128::from) == Some(id.ctime_ns)
+            && preflight["resource_credit_bytes"] == 0
+            && preflight["archive_publication_authorized"] == false
+            && preflight["r2_mutations"] == false,
+        "V5u terminal and immutable paid candidate do not agree"
+    );
+    Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
+}
 
 pub fn predecessor() -> Result<Value> {
     let state = Path::new(BASE).join("state").join(PREVIOUS);

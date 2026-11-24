@@ -4,13 +4,15 @@ import json
 import os
 from pathlib import Path
 import stat
+import runpy
 import subprocess
 import sys
 
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-FRESH_CENSUS_RECOVERY = VERSION == "tools-v5u"
+V5U_QUERY_RECOVERY = VERSION == "tools-v5v"
+FRESH_CENSUS_RECOVERY = VERSION == "tools-v5u" or V5U_QUERY_RECOVERY
 GUARD_WALK_RECOVERY = VERSION == "tools-v5t" or FRESH_CENSUS_RECOVERY
 GUARD_TERMINAL_RECOVERY = VERSION == "tools-v5s" or GUARD_WALK_RECOVERY
 ENCODED_PREFIX_RECOVERY = VERSION == "tools-v5r" or GUARD_TERMINAL_RECOVERY
@@ -33,6 +35,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5s": "tools-homefloor-145-v5r-guard-recovery-v1",
                       "tools-v5t": "tools-homefloor-145-v5s-guard-recovery-v1",
                       "tools-v5u": "tools-homefloor-145-v5t-guard-recovery-v1",
+                      "tools-v5v": "tools-homefloor-145-v5u-guard-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -127,6 +130,48 @@ def encoded_prefix_stop(s, build, successor):
            and all(witness["records"][key] == row for key, row in stopped["records"].items()),
            "encoded-prefix successor does not follow the recorded native stop")
     return reference
+
+
+def v5u_checker(s, seal, build):
+    tool = PKG / "v5v_semantic_completion.py"
+    row, = [entry for entry in seal["members"] if entry["name"] == tool.name]
+    info = tool.lstat()
+    digest = hashlib.sha256(tool.read_bytes()).hexdigest()
+    s.need(seal["destination"] == str(PKG) and row["mode"] == "0444" and row["sha256"] == digest
+           and (info.st_uid, info.st_gid, info.st_nlink, info.st_mode) == (0, 0, 1, stat.S_IFREG | 0o444)
+           and tool.resolve(strict=True) == tool
+           and build["semantic_checker"] == {"path": str(tool), "sha256": digest},
+           "foreign sealed V5v semantic checker")
+    return runpy.run_path(str(tool))
+
+
+def v5u_terminal_predecessor(s, seal, build, successor):
+    checker = v5u_checker(s, seal, build)
+    reference = build["guard_terminal"]
+    _, native = checker["failed_predecessor"](reference)
+    s.need(successor != checker["V5U"], "failed V5u invocation reused as successor")
+    rows = checker["journal"](None, checker["STARTING"], checker["STARTED"], checker["FAILURE"],
+                              after_cursor=native["__CURSOR"])
+    s.need([(row["INVOCATION_ID"], row["MESSAGE_ID"]) for row in rows]
+           == [(successor, checker["STARTING"]), (successor, checker["STARTED"])],
+           "the failed V5u owner has a different native successor")
+    return reference
+
+
+def v5v_stopped_phase(s, fit, fleet, profile):
+    seal, _ = s.read(PKG / "deployment-seal-receipt.json", profile["seal_sha256"])
+    build, _ = s.read(PKG / "build-proof.json", profile["build_sha256"])
+    checker = v5u_checker(s, seal, build)
+    reference = build["guard_terminal"]
+    observed = checker["predecessor_preflight"](fleet)
+    prior, actual = s.read(Path(reference["path"]), reference["sha256"])
+    s.need(actual == reference and all(prior[key] == observed[key] for key in
+           ("schema", "startup", "failure", "candidate", "native_failure_cursor", "manager",
+            "resource_credit_bytes", "archive_publication_authorized", "r2_mutations"))
+           and not fit.members(UNIT), "drained V5u capacity preflight changed")
+    return dict(observed["manager"], stage="v5u-drained", guard_terminal=reference,
+                failure=observed["failure"], recovery=observed["startup"],
+                candidate=observed["candidate"])
 
 
 def guard_terminal_predecessor(s, build, successor):
@@ -300,7 +345,9 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and {path.name for path in prior.iterdir()} == {"failed.json", "recovery-started.json"},
                "unqualified retry of the V5p audit turnover failure")
         window["public_audit_terminal"] = terminal
-    if GUARD_TERMINAL_RECOVERY:
+    if V5U_QUERY_RECOVERY:
+        window["guard_terminal_predecessor"] = v5u_terminal_predecessor(s, seal, build, generation)
+    elif GUARD_TERMINAL_RECOVERY:
         window["guard_terminal_predecessor"] = guard_terminal_predecessor(s, build, generation)
     elif ENCODED_PREFIX_RECOVERY:
         window["encoded_prefix_predecessor_stop"] = encoded_prefix_stop(s, build, generation)
@@ -350,6 +397,9 @@ def inspect(s, leased, m, members, epoch, provider, profile):
         predecessor = "failed_qualification_census"
     if HOMEFLOOR_REJOIN:
         predecessor = "failed_retry1"
+    if V5U_QUERY_RECOVERY:
+        s.need(started["prior_frozen_recovery"]["failed_v5u"]["terminal"] == window["guard_terminal_predecessor"],
+               "native worker has a different V5u predecessor")
     s.need(started["iid"] == generation and started["image"] == image_sha
            and started["r2_mutations"] is False and started["file"] == str(OUTPUT)
            and started["prior_frozen_recovery"][predecessor]["current_boot_failure"]["failure"] == failed

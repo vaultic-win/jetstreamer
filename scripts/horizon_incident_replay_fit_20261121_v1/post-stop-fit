@@ -56,7 +56,9 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v2",
     D / "tools-homefloor-170-metered-hourly-v3",
 )
-FRESH_CENSUS_RECOVERY_145 = HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
+V5V_RECOVERY_145 = HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
+FRESH_CENSUS_RECOVERY_145 = V5V_RECOVERY_145 or HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
+RETAIN_FAILED166 = FAILED166_CADENCE or V5V_RECOVERY_145
 GUARD_WALK_RECOVERY_145 = FRESH_CENSUS_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5s-guard-recovery-v1"
 GUARD_TERMINAL_RECOVERY_145 = (
     GUARD_WALK_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5r-guard-recovery-v1"
@@ -100,7 +102,7 @@ V5J_POST = V5J_RETRY_POST or HERE == D / "tools-homefloor-145-post-v5j-v1"
 HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v1"
 if HOURLY169:
     hourly169 = runpy.run_path(str(HERE / "hourly169_actor.py"))
-if HOURLY170:
+if HOURLY170 or V5V_RECOVERY_145:
     adapter = HERE / "hourly170_actor.py"
     seal, _ = s.read(HERE / "deployment-seal-receipt.json")
     member, = [row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444"]
@@ -568,6 +570,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     if focused is not None:
         post_directory = fixture_post_directory(here)
         lease_directory = next(directory for enabled, directory in (
+            (V5V_RECOVERY_145, "tools-v5v"),
             (FRESH_CENSUS_RECOVERY_145, "tools-v5u"),
             (GUARD_WALK_RECOVERY_145, "tools-v5t"),
             (GUARD_TERMINAL_RECOVERY_145, "tools-v5s"),
@@ -623,7 +626,11 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     fit.binary(adapter,cfg["adapter_sha256"]);fit.binary(image,cfg["image_sha256"])
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
-def phase145(epoch):
+def phase145(epoch, fleet=None):
+    if V5V_RECOVERY_145 and not fit.members(fit.A145):
+        s.need(epoch == 145 and fleet is not None, "V5v requires the accepted fleet and paid predecessor")
+        profile, adapter, _ = profile145(HERE, focused="lease-semantic")
+        return runpy.run_path(str(adapter))["v5v_stopped_phase"](s, fit, fleet, profile)
     if HOURLY170 and not fit.members(fit.A145):
         return hourly170["drained145"](s, fit)
     guard_terminal = STOPPED_GUARD_145 or (GUARD_TERMINAL_RECOVERY_145 and not fit.members(fit.A145))
@@ -963,7 +970,7 @@ def registered_status():
                     R / "survivor172-cadence-20261122-v1/failed170-retry13-cadence-20261124-v1/ACTIVE.json"
                 ).exists():
                     failed = writer168v4["registered_failed170_writer"](scope,retry4)
-                    if FAILED166_CADENCE:
+                    if RETAIN_FAILED166:
                         adopted = writer168v4["registered_hourly170_writer"](scope, failed, failed166=True)
                         for version in (2, 3, 4):
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
@@ -1192,6 +1199,40 @@ def registered136(fleet, registration):
                 verified_release=release)
 
 
+def settled_hourly170_for_145(fleet, fleet_ref, rows):
+    s.need(170 not in rows and not any(row["epoch"] == 170 for row in fleet["actual_active_private_diagnostics"]),
+           "V5v requires the drained private epoch 170 diagnostic")
+    observation = Path(fleet_ref["path"]).parent / "PRIVATE170_OBSERVATION.json"
+    observed, receipt = s.read(observation)
+    s.need(observed["schema"] == "horizon-170-private-cycle-observation-v1"
+           and observed["fleet"] == fleet["previous_Root_operational_review"]
+           and observed["sample"] == fleet["observer"] and set(observed["observed"]) == {"terminal"},
+           "different coordinated private epoch 170 terminal")
+    package = R / "survivor172-cadence-20261122-v1/tools-cold168-retry4-failed166-v4"
+    loader["load_package"](package, "b01cbf68251c60a2a836ebefa1fae70bdfa651cceab5d77ce7e340db55f76832")
+    evidence = R / "prefix140-status-cadence-20261122-v1/cadence-tools"
+    loader["load_package"](evidence, "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e")
+    sys.path.insert(0, str(evidence))
+    try:
+        route = runpy.run_path(str(package / "hourly170_cadence.py"))
+        s.need(Path(sys.modules["evidence"].__file__) == evidence / "evidence.py",
+               "different private epoch 170 evidence reader")
+    finally:
+        sys.path.pop(0)
+    unit = hourly170["UNIT"]
+    timer = hourly170["TIMER"]
+    properties = ("InvocationID", "MainPID", "ControlPID", "ControlGroup", "ActiveState", "Job")
+    head = hourly170["properties"](unit, *properties)
+    terminal = route["terminal"](hourly170, fit, hourly170["ready_contract"](), None, head)
+    timer_props = hourly170["properties"](timer, "ActiveState", "Job")
+    s.need(terminal == observed["observed"]["terminal"] and terminal["successful_exit"] is True
+           and terminal["reservation_ending_bytes"] == 0
+           and timer_props == {"ActiveState": "inactive", "Job": ""}
+           and hourly170["properties"](unit, *properties) == head,
+           "private epoch 170 owner or protection changed during epoch 145 capacity capture")
+    return {"observation": receipt, "terminal": terminal}
+
+
 def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
     closed_before=None
@@ -1201,7 +1242,8 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
     stopped=proof_stops()
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
     failed170 = failed170_replay(f, rows) if V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 else None
-    failed166 = retry11["failed"](s, fit, f, rows) if FAILED166_CADENCE else None
+    failed166 = retry11["failed"](s, fit, f, rows) if RETAIN_FAILED166 else None
+    hourly170_settled = settled_hourly170_for_145(f, ref, rows) if V5V_RECOVERY_145 else None
     terminal170 = None
     if PUBLISH170:
         s.need(epoch == 145 and prestart136 is None, "cold170 provider only prices terminal publication")
@@ -1212,7 +1254,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
     closed169=focused169_terminal(f,rows)
     closed172=full172_terminal(f,rows)
     peers=survivors(rows,ledger);status=registered_status()
-    phase=phase145(epoch)
+    phase=phase145(epoch, ref)
     hourly170_owner = hourly170_guard = hourly170_contract = hourly170_row = None
     if HOURLY170:
         s.need(epoch == 145 and prestart136 is None and hourly170_mode in ("prestart", "post-guard", "active")
@@ -1377,7 +1419,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
     needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
-    s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and
+    s.need(fleet_head(ref)[1]==rows and phase145(epoch, ref)==phase and registered_status()==status and
            census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner)==(population,qualification),
            "capacity generation changed during collection")
     if prestart136 is None and not c136["occupied"]:
@@ -1445,6 +1487,10 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
         s.need(retry11["failed"](s, fit, f, rows) == failed166 and "166" not in rep,
                "failed epoch 166 changed during capacity capture")
         recovered_price["failed_cold166"] = failed166
+    if hourly170_settled:
+        s.need(settled_hourly170_for_145(f, ref, rows) == hourly170_settled,
+               "private epoch 170 settlement drifted during the complete price")
+        recovered_price["settled_hourly170"] = hourly170_settled
     if COLD170:
         recovered_price["cold170"] = cold170["stable"](s)
     if RETRY11:
@@ -1508,6 +1554,9 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None):
         module = HERE / "build_159_price.py"
         member, = [v for v in seal["members"] if v["name"] == module.name]
         s.need(seal["destination"] == str(HERE) and member["mode"] == "0444", "unbound donor price")
+        if V5V_RECOVERY_145:
+            s.need(member["sha256"] == "db0b9de9d848a525c0f2daf7810ac8dba85515253e99f8c358eb34e4ba2e5d7c",
+                   "V5v requires the published epoch 159 donor retry")
         fit.binary(module,member["sha256"])
         donor = runpy.run_path(str(module))
         before = donor["snapshot"]() if prestart136 is None else None
