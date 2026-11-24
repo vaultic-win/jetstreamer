@@ -25,7 +25,6 @@ TOKENS = V / "horizon271-boundary-trace-tokens-v297"
 RECEIPTS = V / "horizon271-boundary-trace-guard-receipts-v297"
 TRACE = V / "horizon271-boundary-trace-worker-v296-qualified"
 WORKER = TRACE / "jetstreamer-historical-worker-v1-8-11"
-WORKER_SHA = "6190b692751e372b1f7a9ad932f171f6cffe1e426f240e1d3abe031bbc56"
 REPO = "/home/ubuntu/workspace/jetstreamer"
 SCRIPTS = "scripts/horizon_foundation_delivery247_20261124"
 
@@ -67,6 +66,16 @@ def source_pin():
     return commit
 
 
+def worker_image(ops):
+    seal = ops.bound(ops.ref(TRACE / "deployment-seal-receipt.json"))
+    assert seal["destination"] == str(TRACE)
+    member, = (row for row in seal["members"] if row["name"] == WORKER.name)
+    assert member["mode"] == "0555" and member["bytes"] == WORKER.stat().st_size
+    image = dict(path=str(WORKER), sha256=member["sha256"])
+    assert ops.checked_image(image) == str(WORKER)
+    return image
+
+
 def prepare(legacy, measure):
     ops = legacy.ops
     branch = source_pin()
@@ -76,8 +85,7 @@ def prepare(legacy, measure):
     assert ops.props(terminal["producer"]["Id"], list(terminal["producer"])) == terminal["producer"]
     assert terminal["timer_drained"]["ActiveState"] == "inactive"
     assert old_namespace["result"]["namespace_verified"]
-    image = {"path": str(WORKER), "sha256": WORKER_SHA}
-    assert ops.checked_image(image) == str(WORKER)
+    image = worker_image(ops)
     compiled = ops.bound(ops.ref(TRACE / "completion.json"))
     assert compiled["stdout_protocol_equal_to_reference"] and not compiled["replay_started"]
     assert not compiled["publication_authorized"]
@@ -221,8 +229,7 @@ def launch(legacy, measure):
     profile = ops.bound(ops.ref(PACKAGE / "profile.json"))
     prior = ops.bound(profile["prior_trace"])
     assert ops.props(prior["producer"]["Id"], list(prior["producer"])) == prior["producer"]
-    assert profile["worker"] == dict(path=str(WORKER), sha256=WORKER_SHA)
-    assert ops.checked_image(profile["worker"]) == str(WORKER)
+    assert profile["worker"] == worker_image(ops)
     assert ops.checked_image(profile["node"]) == profile["node"]["path"]
     ns = ops.bound(profile["namespace"])
     assert ns["result"]["worker_readonly"] and ns["result"]["snapshot_readonly"]
