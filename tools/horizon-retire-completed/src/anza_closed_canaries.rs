@@ -15,6 +15,13 @@ const SNAPSHOT_DIR: &str = "epochs191-194-bootstrap-revalidation-20261016-v1";
 const SNAPSHOT_NAME: &str =
     "snapshot-82511783-6wKFbWHJ2FFVaexQWuTrRVsGL53ef8k8CgNqPWvGuymm.tar.zst";
 const SNAPSHOT_KEEPER: &str = "/usr/local/lib/jetstreamer/deploy-epochs191-194-target5-20261016-v1";
+const BOOTSTRAP_REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch197-bootstrap-retirement-20261124-v1/REVIEW.json";
+const BOOTSTRAP_REVIEW_SHA: &str =
+    "1a0fe33ab596047495bac621d14bab451034044b302a72230242a08771a15944";
+const BOOTSTRAP_SCHEMA: &str = "horizon-197-bootstrap-retirement-review-v1";
+const BOOTSTRAP_DIR: &str = "epoch197-singleton-20261017-v1/bootstrap";
+const BOOTSTRAP_NAME: &str =
+    "snapshot-85103144-3VddsRMBDanRrgVeyJGzKvqAKoNjBrwkoSj6BEAvx2qB.tar.zst";
 const INVENTORY: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/uploader-tools/jetstreamer-r2";
 const INVENTORY_SHA: &str = "eb448ede557144f04446dbe00a2d2ec7ad88c934a7a227797d0569a15307a904";
 const DIAGNOSTIC: &str = "diagnostic-epoch130-v1417-qualification-v1";
@@ -52,6 +59,7 @@ pub(super) fn is_target(t: &Target) -> bool {
                     .join(case)
                     .join("output/epoch-195-through-84247825.jet")
         }),
+        197 => t.path == root.join(BOOTSTRAP_DIR).join("inputs").join(BOOTSTRAP_NAME),
         _ => false,
     }
 }
@@ -92,6 +100,13 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
                 SNAPSHOT_REVIEW_SHA,
                 SNAPSHOT_SCHEMA,
                 [191, 191],
+            )
+        } else if epochs.contains(&197) {
+            (
+                BOOTSTRAP_REVIEW,
+                BOOTSTRAP_REVIEW_SHA,
+                BOOTSTRAP_SCHEMA,
+                [197, 197],
             )
         } else {
             return Ok(None);
@@ -147,6 +162,9 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
     check_owners(&review)?;
     if schema == SNAPSHOT_SCHEMA {
         verify_snapshot(&review, &p.targets[0])?;
+    }
+    if schema == BOOTSTRAP_SCHEMA {
+        verify_gcs_bootstrap(&review, &p.targets[0])?;
     }
     Ok(Some(review))
 }
@@ -206,10 +224,54 @@ fn verify_snapshot(review: &Value, target: &Target) -> Result<()> {
     Ok(())
 }
 
+fn verify_gcs_bootstrap(review: &Value, target: &Target) -> Result<()> {
+    let restore: Bound = serde_json::from_value(review["targets"][0]["terminal"].clone())?;
+    let restore: Value = serde_json::from_slice(&bound(&restore, LIMIT)?)?;
+    let metadata: Bound = serde_json::from_value(review["gcs_metadata"].clone())?;
+    let metadata: Value = serde_json::from_slice(&bound(&metadata, LIMIT)?)?;
+    let original = &restore["remote_object"];
+    let generation = 1_634_789_304_042_914_u64;
+    let key = format!("85103144/{BOOTSTRAP_NAME}");
+    ensure!(
+        restore["schema"] == "jetstreamer-bound-gcs-snapshot-restore-v1"
+            && restore["remote_mutations"] == false
+            && restore["r2_mutations"] == false
+            && restore["destination"].as_str() == target.path.to_str()
+            && restore["generation"] == generation
+            && restore["file"]["size"] == target.identity.len
+            && original["bucket"] == "mainnet-beta-ledger-us-ny5"
+            && original["bucket"] == metadata["bucket"]
+            && original["name"] == key
+            && original["name"] == metadata["name"]
+            && original["generation"] == generation
+            && metadata["generation"].as_str().and_then(|v| v.parse().ok()) == Some(generation)
+            && original["size"] == target.identity.len
+            && original["size"] == metadata["size"]
+            && original["md5_base64"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty())
+            && original["md5_base64"] == metadata["md5_hash"]
+            && original["crc32c_base64"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty())
+            && original["crc32c_base64"] == metadata["crc32c_hash"],
+        "GCS generation differs from the original authenticated snapshot restore"
+    );
+    let sha = restore["file"]["sha256"]
+        .as_str()
+        .context("missing restored snapshot digest")?;
+    ensure!(
+        digest(&target.path)? == sha && stamp(&exact(&target.path)?) == target.identity,
+        "restored snapshot body or identity changed"
+    );
+    Ok(())
+}
+
 pub(super) fn check_owners(review: &Value) -> Result<()> {
     let markers: &[&str] = match review["schema"].as_str() {
         Some(FOLLOWUP_SCHEMA) => &[DIAGNOSTIC_134, BENCHMARK_154],
         Some(SNAPSHOT_SCHEMA) => &[SNAPSHOT_DIR],
+        Some(BOOTSTRAP_SCHEMA) => &[BOOTSTRAP_DIR],
         _ => &[DIAGNOSTIC, BENCHMARK],
     };
     let scan = Command::new("/usr/bin/rg")
