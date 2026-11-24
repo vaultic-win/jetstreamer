@@ -430,8 +430,7 @@ fn observe_root_for_import_prestart(plan: &Plan, unit: &Unit) -> bool {
         "horizon-import-239-current-20261117-v2.service"
             | "horizon-import-239-current-20261117-v3.service"
             | "horizon-import-244-current-20261117-v1.service"
-    )
-        && unit.active == "activating"
+    ) && unit.active == "activating"
         && unit.sub == "start-pre"
         && unit.pid == 0
 }
@@ -664,6 +663,24 @@ fn supported_unit(plan: &Plan) -> bool {
             && plan.receipt_directory == Path::new(receipts)
             && plan.minimum_free_bytes == 2 << 30
             && plan.maximum_root_physical_bytes == Some(scratch_limit)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.native_main.is_none()
+            && plan.bounded_measurement.is_none()
+            && plan.bounded_canary.is_none();
+    }
+
+    if plan.unit == "horizon-perf-epoch288-shrink-debt@v327.service" {
+        return plan.filesystem == Path::new("/")
+            && plan.worker_root
+                == Path::new(
+                    "/home/ubuntu/.jetstreamer-private/qualification-288-shrink-debt-compare-v327",
+                )
+            && plan.receipt_directory
+                == Path::new(
+                    "/var/lib/jetstreamer/horizon288-shrink-debt-comparison-v327/guard-receipts",
+                )
+            && plan.minimum_free_bytes == 3_770_104_987_645
+            && plan.maximum_root_physical_bytes == Some(501_073_741_824)
             && plan.maximum_worker_vmas == 3_500_000
             && plan.native_main.is_none()
             && plan.bounded_measurement.is_none()
@@ -1395,7 +1412,10 @@ mod tests {
         prestart.active = "failed".into();
         assert!(!observe_root_for_import_prestart(&plan, &prestart));
         for (pointer, replacement) in [
-            ("/unit", json!("horizon-import-244-current-20261117-v2.service")),
+            (
+                "/unit",
+                json!("horizon-import-244-current-20261117-v2.service"),
+            ),
             ("/filesystem", json!("/other")),
             ("/worker_root", json!("/other")),
             ("/minimum_free_bytes", json!(1_999_999_999_999u64)),
@@ -1726,9 +1746,15 @@ mod tests {
         });
         assert!(validate_plan(&serde_json::from_value(plan.clone()).unwrap()).is_ok());
         for (key, change) in [
-            ("unit", json!("horizon-perf-epoch229-slot-hash@other.service")),
+            (
+                "unit",
+                json!("horizon-perf-epoch229-slot-hash@other.service"),
+            ),
             ("filesystem", json!("/")),
-            ("worker_root", json!("/home/ubuntu/.jetstreamer-private/other")),
+            (
+                "worker_root",
+                json!("/home/ubuntu/.jetstreamer-private/other"),
+            ),
             ("receipt_directory", json!("/var/lib/jetstreamer/other")),
             ("minimum_free_bytes", json!((2u64 << 30) - 1)),
             ("maximum_root_physical_bytes", json!(170_000_000_001u64)),
@@ -1736,7 +1762,10 @@ mod tests {
         ] {
             let mut invalid = plan.clone();
             invalid[key] = change;
-            assert!(validate_plan(&serde_json::from_value(invalid).unwrap()).is_err(), "{key}");
+            assert!(
+                validate_plan(&serde_json::from_value(invalid).unwrap()).is_err(),
+                "{key}"
+            );
         }
     }
 
@@ -1757,6 +1786,44 @@ mod tests {
         let mut invalid = plan;
         invalid["maximum_root_physical_bytes"] = json!(170_000_000_000u64);
         assert!(validate_plan(&serde_json::from_value(invalid).unwrap()).is_err());
+    }
+
+    #[test]
+    fn epoch288_shrink_debt_compare_uses_exact_root_filesystem_and_original_cap() {
+        let plan = json!({
+            "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit": "horizon-perf-epoch288-shrink-debt@v327.service",
+            "invocation_id": "a".repeat(32),
+            "filesystem": "/",
+            "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-288-shrink-debt-compare-v327",
+            "receipt_directory": "/var/lib/jetstreamer/horizon288-shrink-debt-comparison-v327/guard-receipts",
+            "minimum_free_bytes": 3_770_104_987_645u64,
+            "maximum_root_physical_bytes": 501_073_741_824u64,
+            "maximum_worker_vmas": 3_500_000,
+        });
+        assert!(validate_plan(&serde_json::from_value(plan.clone()).unwrap()).is_ok());
+        for (key, value) in [
+            (
+                "unit",
+                json!("horizon-perf-epoch288-shrink-debt@other.service"),
+            ),
+            ("filesystem", json!("/tmp")),
+            (
+                "worker_root",
+                json!("/home/ubuntu/.jetstreamer-private/qualification-288-root-v303"),
+            ),
+            ("receipt_directory", json!("/var/lib/jetstreamer/other")),
+            ("minimum_free_bytes", json!(3_770_104_987_644u64)),
+            ("maximum_root_physical_bytes", json!(501_073_741_825u64)),
+            ("maximum_worker_vmas", json!(3_500_001)),
+        ] {
+            let mut changed = plan.clone();
+            changed[key] = value;
+            assert!(
+                validate_plan(&serde_json::from_value(changed).unwrap()).is_err(),
+                "{key}"
+            );
+        }
     }
 
     #[test]
