@@ -24,6 +24,7 @@ GUARD = "horizon-271-boundary-trace-protective-v297.service"
 TOKENS = V / "horizon271-boundary-trace-tokens-v297"
 RECEIPTS = V / "horizon271-boundary-trace-guard-receipts-v297"
 TRACE = V / "horizon271-boundary-trace-worker-v296-qualified"
+GUARD_TRACE = TRACE
 WORKER = TRACE / "jetstreamer-historical-worker-v1-8-11"
 TRACE_DIRECTORY = None
 TRACE_ENVIRONMENT = None
@@ -62,8 +63,9 @@ def source_pin():
     ).strip()
     required = ["bc1ec0f6"]
     if TRACE_DIRECTORY is not None:
-        build = json.loads((TRACE / "completion.json").read_bytes())
-        required.extend((build["worker_source_commit"], build["guard_source_commit"]))
+        worker_build = json.loads((TRACE / "completion.json").read_bytes())
+        guard_build = json.loads((GUARD_TRACE / "completion.json").read_bytes())
+        required.extend((worker_build["worker_source_commit"], guard_build["guard_source_commit"]))
     for ancestor in required:
         subprocess.run(
             [*git, "merge-base", "--is-ancestor", ancestor, commit], check=True, timeout=10
@@ -77,8 +79,8 @@ def source_pin():
 
 
 def sealed_image(ops, executable):
-    seal = ops.bound(ops.ref(TRACE / "deployment-seal-receipt.json"))
-    assert seal["destination"] == str(TRACE)
+    seal = ops.bound(ops.ref(executable.parent / "deployment-seal-receipt.json"))
+    assert seal["destination"] == str(executable.parent)
     member, = (row for row in seal["members"] if row["name"] == executable.name)
     assert member["mode"] == "0555" and member["bytes"] == executable.stat().st_size
     image = dict(path=str(executable), sha256=member["sha256"])
@@ -87,7 +89,7 @@ def sealed_image(ops, executable):
 
 
 def select_trace_mode(stake_inputs):
-    global diagnostic, PACKAGE, ROOT, UNIT, GUARD, TOKENS, RECEIPTS, TRACE, WORKER
+    global diagnostic, PACKAGE, ROOT, UNIT, GUARD, TOKENS, RECEIPTS, TRACE, GUARD_TRACE, WORKER
     global TRACE_DIRECTORY, TRACE_ENVIRONMENT, NAMESPACE_UNIT, PRIOR_TRACE, PREDECESSOR
     if stake_inputs:
         import diagnostic271_stake_inputs as diagnostic
@@ -100,6 +102,7 @@ def select_trace_mode(stake_inputs):
         TOKENS = V / "horizon271-stake-inputs-tokens-v307"
         RECEIPTS = V / "horizon271-stake-inputs-guard-receipts-v307"
         TRACE = V / "horizon271-stake-input-worker-v307-qualified"
+        GUARD_TRACE = V / "horizon271-stake-input-guard-v307-qualified"
         PRIOR_TRACE = V / "horizon271-reward-tuple-replay-v299/terminal.json"
     else:
         import diagnostic271_reward_tuples as diagnostic
@@ -112,6 +115,7 @@ def select_trace_mode(stake_inputs):
         TOKENS = V / "horizon271-reward-tuples-tokens-v299"
         RECEIPTS = V / "horizon271-reward-tuples-guard-receipts-v299"
         TRACE = V / "horizon271-reward-tuple-worker-v299-qualified"
+        GUARD_TRACE = TRACE
         PRIOR_TRACE = V / "horizon271-boundary-replay-v297/terminal.json"
     PACKAGE, ROOT, UNIT = diagnostic.PACKAGE, diagnostic.RUN_ROOT, diagnostic.UNIT
     WORKER = TRACE / WORKER.name
@@ -170,8 +174,9 @@ def prepare(legacy, measure):
     guard = ops.bound(previous["guard"])
     template = ops.bound(guard["plan"])
     if TRACE_DIRECTORY is not None:
-        guard["binary"] = sealed_image(ops, TRACE / "guard")
-        assert compiled["guard_tests_passed"] > 0
+        guard["binary"] = sealed_image(ops, GUARD_TRACE / "guard")
+        guard_build = ops.bound(ops.ref(GUARD_TRACE / "completion.json"))
+        assert guard_build["guard_tests_passed"] > 0
     assert ops.checked_image(guard["binary"]) == guard["binary"]["path"]
     assert template["minimum_free_bytes"] == fit["guard_minimum_free_bytes"]
     assert template["maximum_root_physical_bytes"] == previous["disk_cap_bytes"]
