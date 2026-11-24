@@ -400,7 +400,19 @@ def sample(contract, actor, stage):
                     Path("/proc/sys/kernel/random/boot_id").read_text().strip(), (SUCCESS, FAILURE, EXIT))
         need(len(rows) == 1 and rows[0]["MESSAGE_ID"] == SUCCESS, "first timer guard lacks PID1 success")
     else:
-        need(g["workers"] == [p[:2] for p in actor["processes"][1:]], "live worker has no exact completed guard sample")
+        workers = actor["processes"][1:]
+        observed = g["workers"]
+        need(len(observed) == len(workers) and all(
+            len(row) == 2 and row[0] == worker[0]
+            and type(row[1]) is int and 0 < row[1] <= p["maximum_worker_vmas"]
+            for row, worker in zip(observed, workers)
+        ), "live worker has no matching completed VMA guard sample")
+        if workers:
+            ticks_per_second = os.sysconf("SC_CLK_TCK")
+            boot = next(int(line.split()[1]) for line in Path("/proc/stat").read_text().splitlines()
+                        if line.startswith("btime "))
+            need(all(g["recorded_unix_seconds"] >= boot + (worker[1] + ticks_per_second - 1) // ticks_per_second
+                     for worker in workers), "epoch 170 guard sample predates the live worker identity")
     walks = [r[key] for key in ("first", "second")]
     need(all(actor["baseline"] <= t["physical_bytes"] <= cap for t in walks), "out-of-scope whole-tree growth")
     physical = min(t["physical_bytes"] for t in walks) if not any(t["vanished_entries"] for t in walks) else actor["baseline"]
