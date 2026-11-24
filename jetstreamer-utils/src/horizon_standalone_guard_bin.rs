@@ -644,25 +644,16 @@ fn handoff_pin_matches(pin: &Value, plan_sha: &str, invocation: &str, handoff: &
 }
 
 fn supported_unit(plan: &Plan) -> bool {
-    let performance_scope = match plan.unit.as_str() {
-        "horizon-perf-epoch230-slot-hashes@v304.service" => Some((
-            "/home/ubuntu/.jetstreamer-private/qualification-230-slot-hashes-v304",
-            "/var/lib/jetstreamer/horizon230-slot-hashes-guard-receipts-v304",
-            170_000_000_000,
-        )),
-        "horizon-perf-epoch271-reward-tuples@v299.service" => Some((
-            "/home/ubuntu/.jetstreamer-private/qualification-271-reward-tuples-v299",
-            "/var/lib/jetstreamer/horizon271-reward-tuples-guard-receipts-v299",
-            245_000_000_000,
-        )),
-        _ => None,
-    };
-    if let Some((worker_root, receipt_directory, maximum_bytes)) = performance_scope {
+    if plan.unit == "horizon-perf-epoch271-reward-tuples@v299.service" {
         return plan.filesystem == Path::new("/")
-            && plan.worker_root == Path::new(worker_root)
-            && plan.receipt_directory == Path::new(receipt_directory)
+            && plan.worker_root
+                == Path::new(
+                    "/home/ubuntu/.jetstreamer-private/qualification-271-reward-tuples-v299",
+                )
+            && plan.receipt_directory
+                == Path::new("/var/lib/jetstreamer/horizon271-reward-tuples-guard-receipts-v299")
             && plan.minimum_free_bytes == 3_770_104_987_645
-            && plan.maximum_root_physical_bytes == Some(maximum_bytes)
+            && plan.maximum_root_physical_bytes == Some(245_000_000_000)
             && plan.maximum_worker_vmas == 3_500_000
             && plan.native_main.is_none()
             && plan.bounded_measurement.is_none()
@@ -1717,36 +1708,6 @@ mod tests {
             ("receipt_directory", json!("/var/lib/jetstreamer/other")),
             ("minimum_free_bytes", json!(3_770_104_987_644u64)),
             ("maximum_root_physical_bytes", json!(245_000_000_001u64)),
-        ] {
-            let mut invalid = plan.clone();
-            invalid[key] = change;
-            assert!(
-                validate_plan(&serde_json::from_value(invalid).unwrap()).is_err(),
-                "{key}"
-            );
-        }
-    }
-
-    #[test]
-    fn epoch230_slot_hash_guard_requires_its_enrolled_scope() {
-        let plan = json!({
-            "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
-            "unit": "horizon-perf-epoch230-slot-hashes@v304.service",
-            "invocation_id": "a".repeat(32),
-            "filesystem": "/",
-            "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-230-slot-hashes-v304",
-            "receipt_directory": "/var/lib/jetstreamer/horizon230-slot-hashes-guard-receipts-v304",
-            "minimum_free_bytes": 3_770_104_987_645u64,
-            "maximum_root_physical_bytes": 170_000_000_000u64,
-            "maximum_worker_vmas": 3_500_000,
-        });
-        assert!(validate_plan(&serde_json::from_value(plan.clone()).unwrap()).is_ok());
-        for (key, change) in [
-            ("unit", json!("horizon-perf-epoch230-other@v304.service")),
-            ("worker_root", json!("/home/ubuntu/.jetstreamer-private/other")),
-            ("receipt_directory", json!("/var/lib/jetstreamer/other")),
-            ("minimum_free_bytes", json!(3_770_104_987_644u64)),
-            ("maximum_root_physical_bytes", json!(170_000_000_001u64)),
         ] {
             let mut invalid = plan.clone();
             invalid[key] = change;
