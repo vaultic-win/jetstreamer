@@ -10,11 +10,13 @@ import sys
 
 FAMILY = Path("scripts/horizon_epoch145_guarded_export_20261121_v1")
 PROVIDER = Path("scripts/horizon_incident_replay_fit_20261121_v1/post-stop-fit")
+RETRY4_STATUS = PROVIDER.with_name("retry4_status.py")
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1")
 DONORS = {
     "v5k": ("tools-homefloor-145-lease-build-v1", "ba47dd7987accfbb8471b845425dd56a9b9c2e3e2231601e277889e6444a30b5"),
     "v5m": ("tools-homefloor-145-v5k-stopped-v1", "ea8e6bd7138cc8eb241c3b39f12e69fc65844505cb60a0d29be966adf56f05c6"),
     "v5n": ("tools-homefloor-145-guard-walk-rejoin-v1", "4718a18e4b458fd563b5dbf6c7eadc29a055a507d4ffd232003d20e7935d77c3"),
+    "v5o": ("tools-homefloor-145-donor-pressure-rejoin-v1", "1618a2ec8613292dbaa45b1c34e8fa9ea8a2866fb7c6a0b4d1e575099577a069"),
 }
 
 
@@ -35,6 +37,8 @@ def main(commit, generation="v5k"):
             FAMILY / adapter, FAMILY / ("test_" + adapter), PROVIDER]
     if generation == "v5m":
         srcs.append(FAMILY / "build_159_price.py")
+    if generation == "v5o":
+        srcs.append(RETRY4_STATUS)
     if git("diff", "--name-only", commit, "origin/account-updates", "--", *srcs):
         raise ValueError("superseded source")
     for path in srcs:
@@ -56,6 +60,8 @@ def main(commit, generation="v5k"):
     replacements = [("post-stop-fit", PROVIDER, 0o555), (adapter, FAMILY / adapter, 0o444)]
     if generation == "v5m":
         replacements.append(("build_159_price.py", FAMILY / "build_159_price.py", 0o444))
+    if generation == "v5o":
+        replacements.append((RETRY4_STATUS.name, RETRY4_STATUS, 0o444))
     for name, src, mode in replacements:
         installed = util["write"](source / name, git("show", f"{commit}:{src}"))
         members[name] = item(name, installed, mode)

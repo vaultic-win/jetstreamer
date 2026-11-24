@@ -12,6 +12,13 @@ ANCHOR = '713e94750dd3d430c2f54c1ccb2af7ed708dec802af5cbf210ee4963a992d0f4'
 FAILURE = 'cf8ef71b5b000cc4138f726d019c59a107b9b3d45f741b0b4802a6f4f31f1d21'
 PREDECESSOR = 'b63b2e1b0f681e458a141a857db6b4b66137596f5387f9efb4edac31ab8d1bb7'
 PRIOR_SEAL = '2b36ded26d4e244c166c1f3623d8f125f558b94fb1a17555b96c361d5cb3cfd2'
+RESUME = STATUS/'tools-cold168-retry4-resume-v1'
+RESUME_PRIOR_SHA = '16cd7406abfd04bee0ae5ad8120e095507eeb7928f3ce670a8bb83328fc414ff'
+RESUME_WRITER = 'e83c7741fbb843029b110f1369e973a4'
+FAILED_RESUME = 'd3c726dc3143441b80687e0c9504221b'
+RESUME_FLEET = '7e45aafe0709ddd977f622a8a3ad1041678852bce5755d7268245cf07c90c037'
+RESUME_SAMPLE = '8ea7d08de19c26038d88f69a4f7df04e90df4b6cc45c3a7a4b65ebba8e05094c'
+EXIT = '98e322203f7a4ed290d09fe03c09fe15'
 
 
 def registered_writer(s, prior, prepared_sha, guard_sha):
@@ -73,17 +80,55 @@ def registered_writer(s, prior, prepared_sha, guard_sha):
            and s.iid(actor['invocation_id']) and actor['invocation_id']!=old_iid
            and all(actor['lock'][k]==old['lock'][k] for k in ('path','inode','device')),
            'foreign retry4 service, generation or exclusive lock')
-    return pkg,seal_ref,actor['invocation_id'],actor
+    return registered_resume_writer(s, (pkg,seal_ref,actor['invocation_id'],actor))
+
+
+def registered_resume_writer(s, prior):
+    active = STATUS/(PREFIX+'RESUME_ACTIVE.json')
+    if not active.exists():
+        return prior
+    old_package, _, old_iid, old = prior
+    s.need(old_package==STATUS/'tools-cold168-retry4-v1' and old_iid==RESUME_WRITER,
+           'different cadence resumption predecessor')
+    original, original_ref = s.read(STATUS/(PREFIX+'ACTIVE.json'), RESUME_PRIOR_SHA)
+    intent, intent_ref = s.read(STATUS/(PREFIX+'RESUME_INTENT.json'))
+    resumed, _ = s.read(active)
+    package = intent['package']
+    seal = s.bound(package, RESUME/'deployment-seal-receipt.json')
+    entry, = [m for m in seal['members'] if m['name']=='status_cycle.py' and m['mode']=='0444']
+    actor = resumed['new']
+    terminal = intent['terminal']
+    schedule = intent['schedule']
+    fleet, fleet_ref = s.read(R/'root231757-live166167170-20261123-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json', RESUME_FLEET)
+    sample, sample_ref = s.read(R/'sample-root234757-live166167170-20261123-v1.json', RESUME_SAMPLE)
+    s.need(original['new']==intent['old']==old and intent['prior_active']==original_ref
+           and intent['schema']=='horizon-retry4-status-resume-intent-v1'
+           and [(item['UNIT'],item['INVOCATION_ID'],item['MESSAGE_ID'],item['__CURSOR'].split(';')[1])
+                for item in terminal] == [(old['unit'],RESUME_WRITER,EXIT,'i=394009d'),(old['unit'],FAILED_RESUME,EXIT,'i=3940106')]
+           and int(terminal[0]['__REALTIME_TIMESTAMP']) < int(terminal[1]['__REALTIME_TIMESTAMP'])
+           and schedule['fleet']==fleet_ref and schedule['config']==fleet['sole_next_observer']
+           and schedule['completed_sample']==sample_ref and sample['recorded_at_utc']=='2026-11-23T23:47:57Z'
+           and resumed['schema']=='horizon-retry4-status-resume-active-v1' and resumed['intent']==intent_ref
+           and seal['schema']=='jetstreamer-sealed-deployment-receipt-v1'
+           and seal['destination']==str(RESUME) and seal['remote_mutations'] is False
+           and actor['unit']==old['unit'] and actor['program']==str(RESUME/entry['name'])
+           and actor['pid']>1 and actor['start_ticks']>old['start_ticks']
+           and s.iid(actor['invocation_id']) and actor['invocation_id'] not in (old_iid,FAILED_RESUME)
+           and all(actor['lock'][key]==old['lock'][key] for key in ('path','inode','device')),
+           'foreign or unregistered resumed cadence writer')
+    return RESUME,package,actor['invocation_id'],actor
 
 
 def registered_136_writer(s, prior):
     oldpkg, old_seal, _, old = prior
-    s.need(oldpkg == STATUS / 'tools-cold168-retry4-v1' and old is not None, 'different 136 cadence predecessor')
+    s.need(oldpkg in (STATUS / 'tools-cold168-retry4-v1', RESUME) and old is not None,
+           'different 136 cadence predecessor')
     root = STATUS / 'tools-cold168-retry4-136-v1'
     intent, intent_ref = s.read(STATUS / 'EPOCH136_V5N_STATUS_INTENT.json')
     qual = s.bound(intent['qualification'], STATUS / 'EPOCH136_V5N_STATUS_QUALIFIED.json')
     end, _ = s.read(STATUS / 'EPOCH136_V5N_STATUS_ACTIVE.json')
-    old_active = s.bound(intent['previous_active'], STATUS / (PREFIX + 'ACTIVE.json'))
+    previous_name = 'RESUME_ACTIVE.json' if oldpkg==RESUME else 'ACTIVE.json'
+    old_active = s.bound(intent['previous_active'], STATUS / (PREFIX + previous_name))
     new = end['new']
     seal = s.bound(qual['package'], root / 'deployment-seal-receipt.json')
     entry, = [m for m in seal['members'] if m['name'] == 'status_cycle.py' and m['mode'] == '0444']
