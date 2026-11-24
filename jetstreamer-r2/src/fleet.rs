@@ -20,6 +20,7 @@ mod continuation144_admission;
 mod continuation144_prepare;
 mod continuation144_protection;
 mod continuation203;
+mod extract226;
 mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
@@ -1564,6 +1565,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if extract226::namespace(claim) || receipt["schema"] == extract226::SCHEMA {
+        return extract226::launch(claim, receipt);
+    }
     if full266::namespace(claim) || [full266::bridge::FULL228.schema, full266::bridge::FULL266.schema, full266::bridge::SUCCESSOR266.schema].iter().any(|schema| receipt["schema"] == *schema) {
         full266::claim(claim,receipt)?;
         return Ok(());
@@ -2332,6 +2336,7 @@ pub(super) fn census(
             || ((first_epoch..=last_epoch).contains(&212) && name == native212::UNIT)
             || ((first_epoch..=last_epoch).contains(&261) && name == native261::UNIT)
             || ((first_epoch..=last_epoch).contains(&265) && name == native265::UNIT)
+            || ((first_epoch..=last_epoch).contains(&226) && name == extract226::BROKER)
         {
             ensure!(
                 names.contains(name),
@@ -3035,6 +3040,9 @@ pub(super) async fn run() -> Result<()> {
             );
         }
         names.insert(claim.unit.clone());
+        if extract226::namespace(claim) {
+            names.insert(extract226::BROKER.into());
+        }
     }
     let auxiliary_launch = if let Some(claim) = &plan.epoch203_ram_auxiliary {
         ram_auxiliary::validate_scope(&plan, &observer, claim)?;
@@ -3541,6 +3549,21 @@ pub(super) async fn run() -> Result<()> {
         let current = &before[&claim.unit];
         let is_active = (current["ActiveState"] == "active" && current["SubState"] == "running")
             || (retained220::namespace(claim) && retained220::live(current));
+        let extraction_resources = if extract226::namespace(claim) {
+            let broker = &before[extract226::BROKER];
+            if is_active {
+                let launch = checked_diagnostic_launch(claim)?;
+                Some(extract226::live(claim, &launch, current, broker)?)
+            } else {
+                ensure!(
+                    !diagnostic_stage_running(broker),
+                    "226 broker still owns resources after its producer exited"
+                );
+                None
+            }
+        } else {
+            None
+        };
         if is_active {
             register_live_diagnostic_scope(&mut live_diagnostic_epochs, claim)?;
             if private157::namespace(claim) {
@@ -3732,6 +3755,8 @@ pub(super) async fn run() -> Result<()> {
                 "native-ledger-read-only"
             } else if assembly144::namespace(claim) {
                 "private-assembly-only"
+            } else if extraction_resources.is_some() {
+                "private-held-extraction"
             } else if continuation144::namespace(claim) || continuation203::namespace(claim) {
                 "private-checkpoint-continuation"
             } else if native_restore_140(claim)
@@ -3751,13 +3776,17 @@ pub(super) async fn run() -> Result<()> {
             } else {
                 "diagnostic-qualification"
             };
-            active.push(json!({"epoch":claim.epoch,"phase":phase,"producer":current,
+            let mut entry = json!({"epoch":claim.epoch,"phase":phase,"producer":current,
                 "scratch_path":claim.scratch_path,"launch_receipt":claim.launch_receipt.path,
                 "launch_receipt_sha256":claim.launch_receipt.sha256,"sampled_at_utc":sample,
                 "scope_first_epoch":diagnostic_scope(claim).start(),
                 "scope_last_epoch":diagnostic_scope(claim).end(),
                 "resource_basis":"hash-bound private diagnostic launch and invocation identity; consult bound admission, guard and terminal evidence",
-                "ordinary_replay_claim":false,"current_sidecar_eta_valid":false}));
+                "ordinary_replay_claim":false,"current_sidecar_eta_valid":false});
+            if let Some(resources) = extraction_resources {
+                entry["capacity_owners"] = resources;
+            }
+            active.push(entry);
         }
         diagnostics.push(json!({"epoch":claim.epoch,"unit":current,"live":is_active,
             "scope_first_epoch":diagnostic_scope(claim).start(),
