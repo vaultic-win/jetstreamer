@@ -13,6 +13,8 @@ const PINNED_247_IMAGE: &str = "/var/lib/jetstreamer/horizon211-staged-recovery-
 const PINNED_247_IMAGE_SHA: &str =
     "7271de0e309c83f8fa2f35cf9091280a8b04f66c51d3175ad1d6ff02faa4c59d";
 const PINNED_247_MEMORY_CAP: u64 = 24 << 30;
+const STAGED_250_UNIT: &str = "horizon-upload-250-staged-public-v257.service";
+const STAGED_250_MEMORY_CAP: u64 = 10 << 30;
 
 fn registered_upload(fleet: &Value, owner: &successor::Owner) -> Result<()> {
     let belongs = |r: &&Value| {
@@ -118,9 +120,13 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
     let stem = name
         .strip_suffix(".service")
         .context("delivery unit name")?;
-    let pinned_247 = epoch == 247 && name == PINNED_247_UNIT;
+    let pinned_cap = match (epoch, name) {
+        (247, PINNED_247_UNIT) => Some(PINNED_247_MEMORY_CAP),
+        (250, STAGED_250_UNIT) => Some(STAGED_250_MEMORY_CAP),
+        _ => None,
+    };
     ensure!(
-        (pinned_247 || name.starts_with(&format!("horizon-upload-{epoch}-ordinary-")))
+        (pinned_cap.is_some() || name.starts_with(&format!("horizon-upload-{epoch}-ordinary-")))
             && stem.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-'),
         "ordinary delivery epoch or unit changed"
     );
@@ -189,12 +195,8 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
                 == 1,
         "ordinary delivery claim, endpoints or sample clock changed"
     );
-    let (image, image_sha, cap) = if pinned_247 {
-        (
-            PINNED_247_IMAGE,
-            PINNED_247_IMAGE_SHA,
-            PINNED_247_MEMORY_CAP,
-        )
+    let (image, image_sha, cap) = if let Some(cap) = pinned_cap {
+        (PINNED_247_IMAGE, PINNED_247_IMAGE_SHA, cap)
     } else {
         (fourth::IMAGE, fourth::IMAGE_SHA, successor::HARD)
     };
@@ -319,7 +321,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         let name = row["producer_after"]["unit"]
             .as_str()
             .context("observed memory owner")?;
-        if name == PINNED_247_UNIT
+        if matches!(name, PINNED_247_UNIT | STAGED_250_UNIT)
             || (owners.contains_key(fourth::V221_UNIT)
                 && name.starts_with("horizon-upload-")
                 && name.contains("-ordinary-"))
