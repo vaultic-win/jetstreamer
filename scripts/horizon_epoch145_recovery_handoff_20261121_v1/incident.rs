@@ -489,7 +489,7 @@ fn original() -> Result<Value> {
 
 #[cfg(feature = "v5r-136-post")]
 fn original() -> Result<Value> {
-    encoded_semantic::selector_origin()
+    encoded_semantic::selector_origin(SOURCE, IMAGE)
 }
 
 #[cfg(all(

@@ -342,10 +342,14 @@ fn capture(custody_sha: &str) -> Result<Value> {
 }
 
 #[cfg(feature = "v5r-136-post")]
-pub(super) fn selector_origin() -> Result<Value> {
+pub(super) fn selector_origin(expected_iid: &str, expected_image: &str) -> Result<Value> {
     let scope = Semantic::load(SELECTOR_CUSTODY)?;
     let start = &scope.custody["verifier_start"];
     let receipt = from_ref(start)?;
+    ensure!(
+        scope.iid == expected_iid && receipt["image"] == expected_image,
+        "different epoch 145 verifier invocation or image"
+    );
     Ok(json!({"start":start,"result":scope.submission,
         "parent":receipt["fresh_fit"]["phase145"]["window"]["native_parent"]}))
 }
