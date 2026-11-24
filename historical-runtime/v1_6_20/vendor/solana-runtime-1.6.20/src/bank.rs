@@ -2100,6 +2100,11 @@ impl Bank {
             // freeze is a one-way trip, idempotent
             self.freeze_started.store(true, Relaxed);
             *hash = self.hash_internal_state();
+            #[cfg(feature = "epoch230-bank-trace")]
+            if crate::epoch230_bank_trace::directory(self.slot()).is_some() {
+                crate::epoch230_bank_trace::capture_rewards(self.slot(), &self.rewards.read().unwrap())
+                    .expect("capture epoch 230 block rewards");
+            }
             self.rc.accounts.accounts_db.mark_slot_frozen(self.slot());
         }
     }
