@@ -1,6 +1,6 @@
 --- a/cycle.py
 +++ b/cycle.py
-@@ -417,6 +417,17 @@
+@@ -417,6 +417,19 @@
          plan['gates']['257']['next_action']='The release scheduler passed the warmup and full slot map. Qualify capacity for full replay, archive output and remaining terminal checks.'
          add(plan['gates']['230'],ref(D/'horizon230-singleton-manifest-v221-a2/assessment.json'))
          plan['gates']['230']['next_action']='The singleton manifest passed the deployed-node selection checks. Acquire the pinned GCS bootstrap at slot 98928278 once authenticated metadata and capacity are available.'
@@ -9,10 +9,12 @@
 +                  'sha256': '566c59cc90d6c9d8fb8c9ff71ff03722c4578e9e60ec9ec0403b40f9d11b0a5a'}
 +        checked = bound(gcs230)
 +        assert checked['epoch'] == 230 and not checked['replay_admitted']
-+        source = bound(checked['bootstrapped_source'])
++        source_ref = dict(checked['bootstrapped_source'],
++                          path=str(Path(gcs230['path']).with_name('bootstrap-restore.json')))
++        source = bound(source_ref)
 +        assert source['snapshot_slot'] == 98928278 and str(source['generation']) == '1633247230841050'
 +        assert source['file']['sha256'] == checked['bootstrap_sha256']
-+        add(plan['gates']['230'], gcs230, checked['bootstrapped_source'])
++        add(plan['gates']['230'], gcs230, source_ref)
 +        plan['gates']['230']['next_action'] = ('The generation-pinned GCS bootstrap at slot 98928278 is restored. '
 +            'Recheck the local bootstrap and admit the singleton replay when the sampled disk and memory fit.')
      if n>=224:
