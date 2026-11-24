@@ -40,7 +40,9 @@ const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-repla
 #[cfg(all(incident_timer145_only, not(incident_fixture145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit";
 #[cfg(incident_fixture_post145_only)]
-const PROVIDER: &str = if cfg!(incident_v5r_136_post145_only) {
+const PROVIDER: &str = if cfg!(incident_v5u_post145_only) {
+    "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5u-v1/post-stop-fit"
+} else if cfg!(incident_v5r_136_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5r-136-v1/post-stop-fit"
 } else if cfg!(incident_v5q_136_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5q-136-v1/post-stop-fit"

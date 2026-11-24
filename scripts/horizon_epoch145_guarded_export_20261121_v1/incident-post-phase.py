@@ -12,6 +12,7 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
+V5U_POST = VERSION == "tools-v13m"
 ENCODED_POST = VERSION == "tools-v13l"
 ENCODED_CUSTODY_SHA = "1343de96384e52ff061262a2d80c217d187a1fc8b0ce0e07e32940ee88e89b3b"
 AUDIT_POST = VERSION == "tools-v13k"
@@ -23,7 +24,7 @@ V5J_RETRY = LEASE_POST or VERSION == "tools-v13e"
 V5J_SUCCESSOR = V5J_RETRY or VERSION == "tools-v13d"
 SAME_IMAGE_RETRY = VERSION == "tools-v13c"
 FIXTURE_SUCCESSOR = SAME_IMAGE_RETRY or VERSION in ("tools-v13", "tools-v13b")
-TIMER_SUCCESSOR = V5J_SUCCESSOR or FIXTURE_SUCCESSOR or VERSION in ("tools-v11", "tools-v12")
+TIMER_SUCCESSOR = V5U_POST or V5J_SUCCESSOR or FIXTURE_SUCCESSOR or VERSION in ("tools-v11", "tools-v12")
 TIMEOUT_SUCCESSOR = TIMER_SUCCESSOR or VERSION in ("tools-v8", "tools-v9", "tools-v10")
 if TIMEOUT_SUCCESSOR:
     PKG = PKG.parent / VERSION
@@ -148,6 +149,29 @@ def fixture_semantic(s, build):
 
 
 def completion(s, build=None):
+    if V5U_POST:
+        seal, _ = s.read(PKG / "deployment-seal-receipt.json")
+        helper = PKG / "v5u-post-evidence.py"
+        member, = [row for row in seal["members"] if row["name"] == helper.name and row["mode"] == "0444"]
+        st = helper.lstat()
+        s.need(seal["destination"] == str(PKG) and helper.resolve(strict=True) == helper
+               and stat.S_ISREG(st.st_mode) and st.st_uid == st.st_gid == 0
+               and stat.S_IMODE(st.st_mode) == 0o444 and st.st_nlink == 1
+               and 0 < st.st_size <= 128 << 10
+               and hashlib.sha256(helper.read_bytes()).hexdigest() == member["sha256"]
+               and build["semantic_checker"] == dict(path=str(helper), sha256=member["sha256"]),
+               "different V5u completion checker deployment")
+        selected = json.loads(subprocess.check_output(["/usr/bin/python3", "-IB", helper], timeout=45))
+        iid = "8452dba9df42437b9874b35cb44d059f"
+        state = STATE / iid
+        s.need(selected["schema"] == "horizon-epoch145-v5u-semantic-completion-v1"
+               and selected["invocation_id"] == iid and selected["archive_publication_authorized"] is False,
+               "foreign V5u semantic completion")
+        done = s.bound(selected["completion"], state / "complete.json")
+        extracted = s.bound(selected["extraction"], state / "extraction-complete.json")
+        s.need(done["receipt"] == selected["extraction"], "different V5u extraction")
+        return selected["completion"], extracted["extraction"]
+
     if ENCODED_POST or AUDIT_POST or PRESSURE_POST:
         if ENCODED_POST:
             version, build_key = "v5r", "encoded_prefix_custody"

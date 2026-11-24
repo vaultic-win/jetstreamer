@@ -82,8 +82,9 @@ V5N_136 = HERE == D / "tools-homefloor-145-post-v5n-136-v1"
 V5O_136 = HERE == D / "tools-homefloor-145-post-v5o-136-v1"
 V5Q_136 = HERE == D / "tools-homefloor-145-post-v5q-136-v1"
 V5R_136 = HERE == D / "tools-homefloor-145-post-v5r-136-v1"
+V5U_POST_145 = HERE == D / "tools-homefloor-145-post-v5u-v1"
 POST_136 = V5N_136 or V5O_136 or V5Q_136 or V5R_136
-V5N_POST = POST_136 or HERE == D / "tools-homefloor-145-post-v5n-v1"
+V5N_POST = V5U_POST_145 or POST_136 or HERE == D / "tools-homefloor-145-post-v5n-v1"
 V5M_POST = V5N_POST or HERE == D / "tools-homefloor-145-post-v5m-v1"
 V5K_POST = V5M_POST or HERE == D / "tools-homefloor-145-post-v5k-v1"
 V5J_RETRY_POST = V5K_POST or HERE == D / "tools-homefloor-145-post-v5j-v2"
@@ -209,9 +210,9 @@ def full172_terminal(fleet,rows):
 def failed170_replay(fleet, rows):
     failure = fleet.get("cold170_retry13_execution_failure")
     if failure is None:
-        s.need(not FAILED170_BUILD_145, "epoch 170 failure absent from current fleet")
+        s.need(not (V5U_POST_145 or FAILED170_BUILD_145), "epoch 170 failure absent from current fleet")
         return None
-    s.need((FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145) and 170 not in rows,
+    s.need((V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145) and 170 not in rows,
            "unsupported failed epoch 170 roster")
     cadence = R / "survivor172-cadence-20261122-v1"
     ready, _ = s.read(cadence / "FAILED170_CADENCE_READY.json")
@@ -570,7 +571,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
             (MISSED_RUNTIME_145, "tools-v5m"),
             (True, "tools-v5k"),
         ) if enabled)
-        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
+        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
                     "lease-semantic": ("profile145-lease-semantic.json", lease_directory),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
@@ -657,7 +658,7 @@ def phase145(epoch):
         build, _ = s.read(package / "build-proof.json", profile["build_sha256"])
         complete, _ = reader["completion"](s, build)
         s.need(s.show(fit.A145) == m and not fit.members(fit.A145)
-               and (not (V5O_136 or V5Q_136 or V5R_136)
+               and (not (V5O_136 or V5Q_136 or V5R_136 or V5U_POST_145)
                     or not (Path("/sys/fs/cgroup/system.slice") / fit.A145).exists()),
                "145 name changed during post handoff")
         return {"Id": fit.A145, "MainPID": "0", "stage": "v5j-semantic-complete", "completion": complete}
@@ -950,7 +951,7 @@ def registered_status():
                                              "a608208cd09681d366f0994dfc43406b4f8430330e13919a88b3af031efaf160")
                            and retry4[2] == "d6d40746a4974ca186acd7f2d5a5cac4",
                            "different cadence predecessor for 145 handoff")
-                if FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 and (
+                if V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 and (
                     R / "survivor172-cadence-20261122-v1/failed170-retry13-cadence-20261124-v1/ACTIVE.json"
                 ).exists():
                     return writer168v4["registered_failed170_writer"](scope,retry4)
@@ -1179,7 +1180,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
         closed_before=closed_bootstrap["settled"](s,fit)
     stopped=proof_stops()
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
-    failed170 = failed170_replay(f, rows) if FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 else None
+    failed170 = failed170_replay(f, rows) if V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 else None
     terminal170 = None
     if PUBLISH170:
         s.need(epoch == 145 and prestart136 is None, "cold170 provider only prices terminal publication")

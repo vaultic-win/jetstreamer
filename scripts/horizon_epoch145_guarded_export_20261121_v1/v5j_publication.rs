@@ -147,7 +147,52 @@ fn pinned_semantic_owner(export: &str) -> Result<()> {
     terminal(export)
 }
 
+#[cfg(incident_v5u_post145_only)]
+fn v5u_semantic_owner(export: &str) -> Result<()> {
+    ensure!(export == "8452dba9df42437b9874b35cb44d059f", "foreign V5u semantic export");
+    let package = Path::new(INCIDENT_POST_IMAGE).parent().context("V5u post package")?;
+    let helper = package.join("v5u-post-evidence.py");
+    let (_, seal) = publication::frozen_json(&package.join("deployment-seal-receipt.json"))?;
+    let member = seal["members"].as_array().context("V5u post members")?.iter()
+        .find(|m| m["name"] == "v5u-post-evidence.py" && m["mode"] == "0444")
+        .context("V5u semantic checker outside deployment seal")?;
+    ensure!(
+        seal["destination"] == json!(package)
+            && seal["sealer_sha256"] == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+            && seal["remote_mutations"] == false,
+        "foreign V5u post package"
+    );
+    let bound = Bound {
+        path: helper.clone(),
+        sha256: member["sha256"].as_str().context("V5u semantic checker digest")?.into(),
+    };
+    custody::bytes(&bound, 128 << 10, true)?;
+    let report = capacity::run(
+        "/usr/bin/python3",
+        &["-IB", helper.to_str().context("V5u semantic checker path")?],
+        "45",
+    )?;
+    let result: Value = serde_json::from_str(&report)?;
+    ensure!(
+        result["schema"] == "horizon-epoch145-v5u-semantic-completion-v1"
+            && result["invocation_id"] == export
+            && result["archive_publication_authorized"] == false,
+        "foreign V5u semantic completion"
+    );
+    // The checker independently proved the ordered PID1 startup/exit.
+    terminal(export)
+}
+
 pub(crate) fn semantic_owner(export: &str) -> Result<()> {
+    #[cfg(incident_v5u_post145_only)]
+    return v5u_semantic_owner(export);
+
+    #[cfg(not(incident_v5u_post145_only))]
+    legacy_semantic_owner(export)
+}
+
+#[cfg(not(incident_v5u_post145_only))]
+fn legacy_semantic_owner(export: &str) -> Result<()> {
     if cfg!(any(
         incident_v5r_136_post145_only,
         incident_v5q_136_post145_only,
