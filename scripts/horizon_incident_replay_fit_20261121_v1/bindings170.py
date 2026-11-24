@@ -11,10 +11,10 @@ import time
 
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT = RUNTIME / "epoch170-metered-hourly-20261124-v1"
-FIT = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-170-metered-hourly-v5"
-FIT_SEAL = "39bdf59eee98364148a48136b39f12512c9ac70203a82062afd4f78995cd12bd"
-OBSERVER = RUNTIME / "survivor172-cadence-20261122-v1/tools-cold168-retry4-failed170-hourly170-v1"
-OBSERVER_SEAL = "f661e444b94106abf80982fc52c1d4ad5e68561619460a512e3647abda4344e8"
+FIT = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-170-metered-hourly-v7"
+FIT_SEAL = "8442e17a4055d37b0a039764bacc0cc1785e408c2be95b1570cf46fc4032d094"
+OBSERVER = RUNTIME / "survivor172-cadence-20261122-v1/tools-cold168-retry4-failed166-v2"
+OBSERVER_SEAL = "2cd5d8ca7ff607ececb36101e06ca0985c5dd88a906fd4a9d8b09b7eeb9d4c1d"
 
 
 def need(condition, message):

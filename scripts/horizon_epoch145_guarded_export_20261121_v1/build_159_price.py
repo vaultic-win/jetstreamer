@@ -165,6 +165,17 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
              "unqualified 136 donor or reduced reservation")
     failed170 = native.get("failed_cold170")
     if failed170:
+        failed166 = native.get("failed_cold166")
+        running = {167, 168, 172}
+        if failed166:
+            stopped166 = native["bookings"]["166"]
+            need(failed166 == fleet["cold166_retry11_write_version_failure"]
+                 and failed166["reservation_ending_bytes"] == 0
+                 and stopped166["cap_bytes"] == stopped166["physical_bytes"] + stopped166["remaining_bytes"] == 288 * GIB
+                 and stopped166["measurement"] == "two complete stopped-tree walks",
+                 "changed retained epoch 166 booking")
+        else:
+            running.add(166)
         booking = native["bookings"]["170"]
         diagnostic = native.get("hourly170_diagnostic")
         measured = booking["measurement"] == "two complete stopped-tree walks"
@@ -177,9 +188,9 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
                         and diagnostic["receipt"] is not None and diagnostic["intent"] is not None)
         need(exclusive136 is None and failed170 == fleet["cold170_retry13_execution_failure"]
              and failed170["reservation_ending_bytes"] == 0
-             and fleet["canonical_producer_count"] == len(fleet["actual_executing_replays"]) == 4
-             and {row["epoch"] for row in fleet["actual_executing_replays"]} == {166, 167, 168, 172}
-             and set(native["replacements"]) == {"166", "167", "168"}
+             and fleet["canonical_producer_count"] == len(fleet["actual_executing_replays"]) == len(running)
+             and {row["epoch"] for row in fleet["actual_executing_replays"]} == running
+             and set(native["replacements"]) == {str(epoch) for epoch in running - {172}}
              and set(native["survivors"]) == {"172"}
              and booking["cap_bytes"] == 384 * GIB
              and booking["cap_bytes"] == booking["physical_bytes"] + booking["remaining_bytes"]

@@ -150,32 +150,68 @@ def registered_failed170_writer(s, prior):
     return package, ready['package'], actor['invocation_id'], actor
 
 
-def registered_hourly170_writer(s, prior):
+def registered_hourly170_writer(s, prior, *, failed166=False):
     """Bind the diagnostic-aware consumer to the existing fleet lock."""
     old_package, old_seal, old_iid, old = prior
-    ready_path = STATUS / 'HOURLY170_CADENCE_READY.json'
-    active, _ = s.read(STATUS / 'HOURLY170_CADENCE_ACTIVE.json')
+    prefix = 'FAILED166' if failed166 else 'HOURLY170'
+    ready_path = STATUS / (prefix + '_CADENCE_READY.json')
+    active, _ = s.read(STATUS / (prefix + '_CADENCE_ACTIVE.json'))
     ready = s.bound(active['ready'], ready_path)
     previous = s.bound(ready['old_owner'], STATUS / 'failed170-retry13-cadence-20261124-v1/ACTIVE.json')
-    package = STATUS / 'tools-cold168-retry4-failed170-hourly170-v1'
+    package = STATUS / ('tools-cold168-retry4-failed166-v1' if failed166 else
+                        'tools-cold168-retry4-failed170-hourly170-v1')
     seal = s.bound(ready['package'], package / 'deployment-seal-receipt.json')
     fleet = s.bound(ready['fleet'], Path(ready['fleet']['path']))
     actor = active['new']
+    schema = 'horizon-epoch166-failed-cadence' if failed166 else 'horizon-epoch170-hourly-cadence'
     s.need(old_package == STATUS / 'tools-cold168-retry4-failed170-v1'
            and old_seal['path'] == str(old_package / 'deployment-seal-receipt.json')
-           and ready['schema'] == 'horizon-epoch170-hourly-cadence-ready-v1'
-           and active['schema'] == 'horizon-epoch170-hourly-cadence-active-v1'
+           and ready['schema'] == schema + '-ready-v1'
+           and active['schema'] == schema + '-active-v1'
            and active['producer_mutations'] is False
            and previous['new'] == active['old'] == old
-           and ready['config'] == fleet['sole_next_observer']
-           and ready['timer'] == fleet['sole_next_timer']
            and seal['destination'] == str(package) and seal['remote_mutations'] is False,
            'foreign hourly epoch 170 cadence transition')
+    if failed166:
+        recovery = s.bound(ready['old_registration'], Path(ready['old_registration']['path']))
+        terminal = s.bound(recovery['terminal'], Path(recovery['terminal']['path']))
+        config = s.bound(ready['config'], Path(ready['config']['path']))
+        s.need(terminal['fleet'] == ready['fleet'] and terminal['prior_config'] == fleet['sole_next_observer']
+               and config['previous_sample'] == fleet['observer']['path']
+               and [row['range'] for row in config['replays']] == ['167', '168', '172'],
+               'foreign failed epoch 166 census')
+    else:
+        s.need(ready['config'] == fleet['sole_next_observer'] and ready['timer'] == fleet['sole_next_timer'],
+               'different hourly epoch 170 observer clock')
     s.need(actor['program'] == str(package / 'status_cycle.py') and actor['unit'] == old['unit']
            and s.iid(actor['invocation_id']) and actor['invocation_id'] != old_iid
            and actor['pid'] > 1 and actor['start_ticks'] > old['start_ticks']
            and all(actor['lock'][key] == old['lock'][key] for key in ('path', 'inode', 'device')),
            'changed hourly epoch 170 writer identity or lock')
+    return package, ready['package'], actor['invocation_id'], actor
+
+
+def registered_failed166_rejoin(s, prior):
+    old_package, old_seal, old_iid, old = prior
+    active, _ = s.read(STATUS / 'FAILED166_CADENCE_V2_ACTIVE.json')
+    ready = s.bound(active['ready'], STATUS / 'FAILED166_CADENCE_V2_READY.json')
+    previous = s.bound(ready['old_owner'], STATUS / 'FAILED166_CADENCE_ACTIVE.json')
+    fleet = s.bound(ready['fleet'], Path(ready['fleet']['path']))
+    package = STATUS / 'tools-cold168-retry4-failed166-v2'
+    seal = s.bound(ready['package'], package / 'deployment-seal-receipt.json')
+    actor = active['new']
+    s.need(old_package == STATUS / 'tools-cold168-retry4-failed166-v1'
+           and old_seal['path'] == str(old_package / 'deployment-seal-receipt.json')
+           and active['schema'] == 'horizon-epoch166-cadence-rejoin-active-v1'
+           and ready['schema'] == 'horizon-epoch166-cadence-rejoin-ready-v1'
+           and active['producer_mutations'] is False and previous['new'] == active['old'] == old
+           and ready['config'] == fleet['sole_next_observer'] and ready['timer'] == fleet['sole_next_timer']
+           and seal['destination'] == str(package) and seal['remote_mutations'] is False
+           and actor['program'] == str(package / 'status_cycle.py') and actor['unit'] == old['unit']
+           and s.iid(actor['invocation_id']) and actor['invocation_id'] != old_iid
+           and actor['pid'] > 1 and actor['start_ticks'] > old['start_ticks']
+           and all(actor['lock'][key] == old['lock'][key] for key in ('path', 'inode', 'device')),
+           'different epoch 166 cadence rejoin identity or clock')
     return package, ready['package'], actor['invocation_id'], actor
 
 

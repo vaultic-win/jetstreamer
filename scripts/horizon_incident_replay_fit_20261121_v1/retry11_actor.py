@@ -26,6 +26,39 @@ BASIS_SHA = 'd5071abe6d840e4cb0dd402ce75ee69e720543fb83005cc944dd939061aca7e5'
 GUARD_ROOT = R/'epoch166-retry11-guard-20261122-v1'
 
 
+def failed(s, fit, fleet, rows):
+    failure = fleet['cold166_retry11_write_version_failure']
+    root = R/DIRECTORY
+    terminal = s.bound(failure['terminal'], root/'WRITE_VERSION_TERMINAL_20261124.json')
+    admission = s.bound(failure['admission'], root/'ACTUAL_ADMISSION_AND_PROTECTION.json')
+    worker = s.bound(failure['first_worker'], root/'FIRST_PROTECTED_WORKER.json')
+    plan = s.bound(admission['actual_guard_plan'], root/'ACTUAL_GUARD_PLAN.json')
+    iid = failure['producer_invocation_id']
+    exit_event = terminal['pid1_exit']
+    s.need(166 not in rows and
+           terminal['schema'] == 'horizon-epoch166-retry11-write-version-terminal-v1'
+           and terminal['epoch'] == admission['epoch'] == 166 and worker['admission'] == failure['admission']
+           and terminal['producer_invocation'] == admission['producer_invocation_id'] == worker['producer_invocation_id'] == iid
+           and exit_event['_PID'] == '1' and exit_event['UNIT'] == admission['producer_unit'] == UNIT
+           and exit_event['INVOCATION_ID'] == iid and exit_event['EXIT_CODE'] == 'exited'
+           and exit_event['EXIT_STATUS'] == '1'
+           and terminal['guard_timer_before']['InvocationID'] == admission['timer_invocation_id']
+           and admission['timer_unit'] == TIMER and plan['worker_root'] == str(LANE)
+           and plan['maximum_root_physical_bytes'] == 288 << 30
+           and plan['unit'] == UNIT and plan['invocation_id'] == iid
+           and failure['reservation_ending_bytes'] == terminal['resource_credit_bytes'] == 0,
+           'failed epoch 166 terminal or retained booking differs')
+    for unit in (UNIT, TIMER.removesuffix('.timer') + '.service'):
+        meta = s.show(unit)
+        s.need(meta['ActiveState'] in ('failed', 'inactive') and not meta['Job']
+               and meta['MainPID'] == meta['ControlPID'] == '0' and not fit.members(unit),
+               'failed epoch 166 producer or guard is still live')
+    timer = s.show(TIMER)
+    s.need(timer['ActiveState'] == 'inactive' and not timer['Job'], 'failed epoch 166 timer is still live')
+    stable(s)
+    return failure
+
+
 def stable(s):
     source, ref = s.read(CLEAN/'SUCCESSOR_ROOT.json', ROOT_SHA)
     info = RUN.lstat()

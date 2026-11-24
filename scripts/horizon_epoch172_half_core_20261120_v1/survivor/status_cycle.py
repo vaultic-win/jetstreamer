@@ -22,7 +22,8 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
-FAILED166 = CURRENT.parent == ROOT / 'tools-cold168-retry4-failed166-v1'
+FAILED166_V2 = CURRENT.parent == ROOT / 'tools-cold168-retry4-failed166-v2'
+FAILED166 = FAILED166_V2 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed166-v1'
 HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
 FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
 assert hashlib.sha256((PACKAGE/'deployment-seal-receipt.json').read_bytes()).hexdigest() == PARENT_SEAL
@@ -697,7 +698,7 @@ def entry():
         need(package == 'tools-cold168-retry4-v1', '170 terminal cadence requires the qualified retry4 parent')
         package = 'tools-cold168-retry4-failed170-hourly170-v1' if HOURLY170 else 'tools-cold168-retry4-failed170-v1'
     if FAILED166:
-        package = 'tools-cold168-retry4-failed166-v1'
+        package = 'tools-cold168-retry4-failed166-v2' if FAILED166_V2 else 'tools-cold168-retry4-failed166-v1'
     need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
     receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
     seal=checked(receipt)
@@ -877,6 +878,42 @@ def failed166_resume(state, receipt, fd):
     return ready
 
 
+def rejoin_failed166_cadence(state, receipt, fd):
+    ready_ref = bound(ROOT/'FAILED166_CADENCE_V2_READY.json')
+    ready = checked(ready_ref)
+    incumbent_ref = bound(ROOT/'FAILED166_CADENCE_ACTIVE.json')
+    need(ready['schema'] == 'horizon-epoch166-cadence-rejoin-ready-v1'
+         and ready['package'] == receipt and ready['old_owner'] == incumbent_ref,
+         'different epoch 166 cadence rejoin deployment')
+    old = checked(incumbent_ref)['new']
+    held = os.fstat(fd)
+    need(state['Id'] == old['unit'] == CONTROLLER and state['ActiveState'] == 'active' and not state['Job']
+         and state['InvocationID'] and state['InvocationID'] != old['invocation_id']
+         and (held.st_dev, held.st_ino) == (old['lock']['device'], old['lock']['inode']),
+         'epoch 166 cadence successor lacks the incumbent lock')
+    try:
+        still_running = owners.ticks(old['pid']) == old['start_ticks']
+    except FileNotFoundError:
+        still_running = False
+    need(not still_running, 'incumbent epoch 166 cadence writer is still running')
+    fleet = checked(ready['fleet'])
+    cold166_status.failed_route(fleet)
+    cfg = sealed(ready['config'])
+    need(ready['config'] == fleet['sole_next_observer'] and ready['timer'] == fleet['sole_next_timer']
+         and ready['fleet']['path'] == str(max(BASE.glob('root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json'),
+                                               key=lambda path: path.stat().st_mtime_ns))
+         and (timer_names() == [ready['timer']] or
+              (not timer_names() and Path(cfg['output']).is_file())),
+         'epoch 166 cadence rejoin lost its latest fleet or observer clock')
+    pid = os.getpid()
+    actor = dict(unit=CONTROLLER, program=str(CURRENT), invocation_id=state['InvocationID'],
+                 pid=pid, start_ticks=owners.ticks(pid), lock=dict(old['lock'], fd=fd))
+    durable(ROOT/'FAILED166_CADENCE_V2_ACTIVE.json',
+            dict(schema='horizon-epoch166-cadence-rejoin-active-v1', ready=ready_ref,
+                 old=old, new=actor, producer_mutations=False))
+    return ready
+
+
 def main():
     receipt=entry()
     if sys.argv[1:]==['--check-entry']:
@@ -911,6 +948,8 @@ def main():
             await_private136_owner(state,receipt)
         elif RESUMING:
             resume=status_resume.await_owner(globals(),receipt,state,fd)
+        elif FAILED166_V2:
+            resume=rejoin_failed166_cadence(state,receipt,fd)
         elif FAILED166:
             resume=failed166_resume(state,receipt,fd)
         elif HOURLY170:

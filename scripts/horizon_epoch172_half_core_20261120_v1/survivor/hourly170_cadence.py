@@ -14,6 +14,9 @@ from evidence import BASE, bound, checked, durable, need
 ROOT = BASE / "epoch170-metered-hourly-20261124-v1"
 PROVIDER = BASE / "incident-replay-fit-20261121-v1/tools-homefloor-170-metered-hourly-v3"
 PROVIDER_SEAL = "4dc458d027ef29a669002b28a203b5cee4cfc19b79110a6dd0348bf73f1cb0a2"
+if Path(__file__).resolve().parent.name == "tools-cold168-retry4-failed166-v2":
+    PROVIDER = PROVIDER.with_name("tools-homefloor-170-metered-hourly-v6")
+    PROVIDER_SEAL = "91a9c718e062c1dafe8516023c10bc4bec054b1ccb7c59eebc2ad6cba71fba16"
 FIELD = "epoch170_hourly_start_intent"
 RELEASE = ROOT / "barrier/allow.json"
 SCHEMA = "horizon-170-private-cycle-observation-v1"
