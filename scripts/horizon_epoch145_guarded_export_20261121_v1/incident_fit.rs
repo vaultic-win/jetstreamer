@@ -566,6 +566,21 @@ fn reserved_memory(_complete: &Value) -> Result<u64> {
         .context("qualified memory budget")
 }
 
+fn live_memory_budget(
+    mut required: u64,
+    credits: impl IntoIterator<Item = Result<u64>>,
+    mut read_available: impl FnMut() -> Result<u64>,
+) -> Result<(u64, u64)> {
+    let mut available = read_available()?;
+    let mut credits = credits.into_iter();
+    while available < required {
+        let Some(credit) = credits.next() else { break };
+        required = required.checked_sub(credit?).context("memory budget")?;
+        available = read_available()?;
+    }
+    Ok((available, required))
+}
+
 /// Reopen the holding tool's two completed retirements while this verifier holds
 /// the same serial transition lock. Free space is measured by the provider.
 #[cfg(any(incident_five_lane145_only, incident_v5j_post145_only))]
@@ -1181,7 +1196,6 @@ impl Fit {
         }
         required = required.max(absolute);
         let free = capacity::home()?.0;
-        let mut resident = 0u64;
         let peers = s["survivors"]
             .as_object()
             .unwrap()
@@ -1198,7 +1212,14 @@ impl Fit {
                     capacity::n(&s["joined_resident_lower_bounds"], e),
                 )
             });
-        for (unit, row, baseline) in peers.chain(joined) {
+        let mut charged = peers
+            .chain(joined)
+            .map(|(unit, row, baseline)| Ok((baseline?, unit, row)))
+            .collect::<Result<Vec<_>>>()?;
+        charged.sort_unstable_by_key(|(baseline, ..)| std::cmp::Reverse(*baseline));
+        // Walking the same large address spaces every guard tick contends with
+        // the verifier for its core. Unmeasured peers get zero resident credit.
+        let credits = charged.into_iter().map(|(baseline, unit, row)| {
             let p = Path::new(GROUPS).join(unit.as_str().context("resident unit")?);
             let values = fs::read_to_string(p.join("memory.stat"))?;
             let stat = |name: &str| -> Result<u64> {
@@ -1221,18 +1242,20 @@ impl Fit {
                     .parse()?;
                 pss = pss.checked_add(kb * 1024).context("PSS sum")?;
             }
-            resident = resident
-                .checked_add(
-                    pss.min(stat("anon ")? + stat("file_mapped ")?)
-                        .min(baseline?)
-                        .min(68 << 30),
-                )
-                .context("resident sum")?;
+            Ok(pss
+                .min(stat("anon ")? + stat("file_mapped ")?)
+                .min(baseline)
+                .min(68 << 30))
+        });
+        let (available, memory) = live_memory_budget(reserved_memory(s)?, credits, || {
+            capacity::meminfo("MemAvailable:")
+        })?;
+        if active_population()? != actual {
+            return Err(capacity::Reprice(
+                "native population changed during the live guard".into(),
+            )
+            .into());
         }
-        let memory = reserved_memory(s)?
-            .checked_sub(resident)
-            .context("memory budget")?;
-        let available = capacity::meminfo("MemAvailable:")?;
         if free < required || available < memory {
             return Err(capacity::Reprice(format!(
                 "live fit: HOME {free}/{required}; memory {available}/{memory}"
@@ -1465,6 +1488,36 @@ mod tests {
         assert_eq!(remaining136(&sample).unwrap(), 72u64 << 30);
         sample["root_physical_observation"]["second"]["physical_bytes"] = (cap + 1).into();
         assert!(remaining136(&sample).is_err());
+    }
+    #[test]
+    fn live_memory_fit_stops_after_sufficient_measured_credit() {
+        let mut measured = 0;
+        let credits = [28, 25, 20].into_iter().map(|credit| {
+            measured += 1;
+            Ok(credit)
+        });
+        assert_eq!(
+            live_memory_budget(100, credits, || Ok(60)).unwrap(),
+            (60, 47)
+        );
+        assert_eq!(measured, 2);
+        let unused = std::iter::once_with(|| panic!("already fits without a credit"));
+        assert_eq!(
+            live_memory_budget(100, unused, || Ok(100)).unwrap(),
+            (100, 100)
+        );
+    }
+
+    #[test]
+    fn live_memory_fit_checks_all_available_credit_under_pressure() {
+        let mut observations = [60, 55, 37].into_iter();
+        let quote =
+            live_memory_budget(100, [Ok(20), Ok(40)], || Ok(observations.next().unwrap())).unwrap();
+        assert_eq!(quote, (37, 40));
+        assert!(
+            live_memory_budget(100, [Err(anyhow::anyhow!("unavailable credit"))], || Ok(60))
+                .is_err()
+        );
     }
     #[test]
     #[ignore = "root-owned accepted fleet and native production cgroups"]
