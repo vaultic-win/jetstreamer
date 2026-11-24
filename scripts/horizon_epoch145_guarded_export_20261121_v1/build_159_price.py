@@ -156,9 +156,23 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
         need(exclusive136 == before["exclusive136"] == candidate and candidate["cap"] == candidate["remaining"] == 72 * GIB
              and candidate["loan_micros"] in (0, 4_250_000) and not build_bytes and not build_ram,
              "unqualified 136 donor or reduced reservation")
-    need(fleet["canonical_producer_count"] == len(fleet["actual_executing_replays"]) == 5 and
-         set(native["replacements"]) == {"166", "167", "168", "170"} and set(native["survivors"]) == {"172"},
-         "changed donor or producer topology")
+    failed170 = native.get("failed_cold170")
+    if failed170:
+        booking = native["bookings"]["170"]
+        need(exclusive136 is None and failed170 == fleet["cold170_retry13_execution_failure"]
+             and failed170["reservation_ending_bytes"] == 0
+             and fleet["canonical_producer_count"] == len(fleet["actual_executing_replays"]) == 4
+             and {row["epoch"] for row in fleet["actual_executing_replays"]} == {166, 167, 168, 172}
+             and set(native["replacements"]) == {"166", "167", "168"}
+             and set(native["survivors"]) == {"172"}
+             and booking["cap_bytes"] == 384 * GIB
+             and booking["cap_bytes"] == booking["physical_bytes"] + booking["remaining_bytes"]
+             and booking["measurement"] == "two complete stopped-tree walks",
+             "changed failed epoch 170 booking or producer topology")
+    else:
+        need(fleet["canonical_producer_count"] == len(fleet["actual_executing_replays"]) == 5
+             and set(native["replacements"]) == {"166", "167", "168", "170"} and set(native["survivors"]) == {"172"},
+             "changed donor or producer topology")
     orig, _ = bound(ROOT / "HEAD131757-132005-donor.json", PRICE)
     old = orig["reserved_hourly"]
     need(old["guard_cpu_micros"] == 1_000_000 and old["guard_memory"] == GIB and
