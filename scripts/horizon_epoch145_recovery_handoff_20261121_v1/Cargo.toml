@@ -11,6 +11,8 @@ registered-post = ["timer-rejoin"]
 fixture-post = ["registered-post"]
 retry-post = ["fixture-post"]
 v5n-136-post = ["retry-post"]
+v5o-136-post = ["retry-post"]
+v5q-136-post = ["retry-post"]
 
 [workspace]
 

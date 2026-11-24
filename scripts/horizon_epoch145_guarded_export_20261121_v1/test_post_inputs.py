@@ -54,6 +54,227 @@ def fixture():
 
 
 class PublicationInputs(unittest.TestCase):
+    def test_v5o_pending_does_not_claim_completion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            handoff = Path(tmp)
+            state = handoff / p.V5O_IID
+            state.mkdir()
+            paths = {p.DISPATCH / "admission-review.json": ({}, "a" * 64),
+                     handoff / "submission-intent.json": ({"argv": ["recover"]}, p.V5O_INTENT),
+                     handoff / "submission-result.json": ({"invocation_id":p.V5O_IID, "argv":["recover"]}, p.V5O_RESULT),
+                     state / "recovery-started.json": ({"iid":p.V5O_IID}, p.V5O_START)}
+            def read(path, sha):
+                value, expected = paths[path]
+                p.need(sha == expected, "crossed immutable V5o bound receipt")
+                return json.dumps(value).encode(), {"path":str(path), "sha256":sha}
+            api = dict(REVIEW_SHA="a" * 64, HANDOFF=handoff, STATE=handoff, OLD=p.V5N_IID,
+                       read=read, Host=lambda *_:Mock())
+            with patch.object(p, "PRESSURE_POST", True), patch.object(p, "validate_missed_start") as validate:
+                self.assertIsNone(p.semantic(api))
+                validate.assert_called_once_with({"iid":p.V5O_IID}, {"argv":["recover"]})
+                (state / "failed.json").touch()
+                with self.assertRaisesRegex(ValueError, "semantic verifier failed"):
+                    p.semantic(api)
+
+    def test_v5o_handoff_rejects_crossed_identity_even_with_consistent_argv(self):
+        result = {"invocation_id":p.V5N_IID, "argv":["recover"]}
+        paths = {"submission-result.json":result, "submission-intent.json":{"argv":["recover"]}}
+        sealed = {"submission-result.json":p.V5O_RESULT, "submission-intent.json":p.V5O_INTENT}
+        def read(path, sha):
+            self.assertEqual(sha, sealed[path.name])
+            return json.dumps(paths[path.name]).encode(), {}
+        api = dict(HANDOFF=Path("/handoff"), OLD="a" * 32, read=read, Host=lambda *_:Mock())
+        with patch.object(p, "PRESSURE_POST", True):
+            with self.assertRaisesRegex(ValueError, "submitted V5o"):
+                p.submission(api, {})
+            result["invocation_id"] = p.V5O_IID
+            p.submission(api, {})
+            result["argv"] = ["other"]
+            with self.assertRaisesRegex(ValueError, "submitted V5o"):
+                p.submission(api, {})
+
+    def test_v5o_live_inspection_retries_an_overlapping_census(self):
+        pid = {"pid":123, "start_ticks":45}
+        receipt = {"path":"/state/recovery-started.json", "sha256":p.V5O_START}
+        phase = {"stage":"leased-worker", "invocation_id":p.V5O_IID,
+                 "window":{"native_parent":pid, "recovery":receipt}}
+        start = {"fresh_fit":{"phase145":{"window":{"native_parent":pid}}}}
+        result = {"invocation_id":p.V5O_IID}
+        intent = {}
+        review = {}
+        host = Mock()
+        host.state.return_value = ({"InvocationID":p.V5O_IID, "MainPID":"123"}, [])
+        host.accepted.return_value = result
+        seal = {"members":[{"name":"post-stop-fit", "mode":"0555", "sha256":"a" * 64}]}
+        api = dict(bound=Mock(side_effect=[review, seal, review, seal]), read=Mock(), Host=lambda *_:host)
+        runtime = {"review":{"path":"/review"}, "provider":{"path":"/provider/deployment-seal-receipt.json"}}
+        observe = Mock(side_effect=[ValueError("foreign 145 descendants"), phase, ValueError("different owner")])
+        with patch.object(p, "guard_bindings", return_value=(runtime, {})), patch.object(
+                p, "submission", return_value=(intent, result)), patch.object(
+                p, "pressure_start", return_value=(start, receipt)), patch(
+                "runpy.run_path", return_value={"phase145":observe}), patch("time.sleep") as pause:
+            self.assertEqual(p.live_pressure(api), phase)
+            pause.assert_called_once_with(1)
+            with self.assertRaisesRegex(ValueError, "different owner"):
+                p.live_pressure(api)
+            self.assertEqual(observe.call_count, 3)
+            self.assertEqual(pause.call_count, 1)
+
+    def test_v13j_completion_joins_the_sealed_checker_and_captured_receipts(self):
+        checker = b"sealed fixture checker"
+        iid = p.V5O_IID
+        source = Path(__file__).with_name("incident-post-phase.py")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package, state = root / "tools-v13j", root / "state"
+            package.mkdir()
+            path = package / "post-inputs"
+            path.write_bytes(checker)
+            adapter = package / source.name
+            adapter.write_bytes(source.read_bytes())
+            complete = runpy.run_path(str(adapter))["completion"]
+            done = {"path":str(state / iid / "complete.json"), "sha256":"a" * 64}
+            extracted = {"path":str(state / iid / "extraction-complete.json"), "sha256":"b" * 64}
+            selected = {"invocation_id":iid, "completion":done, "extraction":extracted}
+            build = {"donor_pressure_binding":{"sha256":p.V5O_BINDING}}
+            seal = {"destination":str(package),
+                    "sealer_sha256":"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+                    "members":[{"name":"post-inputs", "mode":"0555", "sha256":hashlib.sha256(checker).hexdigest()}]}
+            status = Mock(need=p.need)
+            status.read.side_effect = [(seal, {}), (selected, {})] * 4
+            status.bound.side_effect = [{"receipt":extracted}, {"extraction":{"epoch":145}}]
+            with patch.dict(complete.__globals__, PKG=package, STATE=state), patch(
+                    "subprocess.check_output", return_value=json.dumps(selected).encode()) as command:
+                self.assertEqual(complete(status, build), (done, {"epoch":145}))
+                command.assert_called_once_with([path, "inspect-semantic"], timeout=20)
+                command.return_value = b"null"
+                with self.assertRaisesRegex(ValueError, "captured V5o"):
+                    complete(status, build)
+                command.return_value = json.dumps(dict(selected, invocation_id=p.V5N_IID)).encode()
+                with self.assertRaisesRegex(ValueError, "captured V5o"):
+                    complete(status, build)
+                path.write_bytes(b"different checker")
+                with self.assertRaisesRegex(ValueError, "unbound V13j inputs"):
+                    complete(status, build)
+
+    def test_v5o_requires_the_original_failed_v5n_custody(self):
+        anchor = dict(path=str(p.DISPATCH.parent / "tools-homefloor-145-handoff-v5/admission-review.json"), sha256=p.V5N_REVIEW)
+        old = dict(failed_phase=dict(candidate={"inode":103237059}), retained_inputs=["source", "manifest", "frozen"],
+                   retained_manifest={"sha256":"a" * 64}, holding={"166":{}, "168":{}})
+        exit_row = dict(INVOCATION_ID=p.V5N_IID, _PID="1", COMMAND="ExecStart", EXIT_CODE="exited", EXIT_STATUS="1")
+        review = dict(old, original_pid1_exit=exit_row, original_review=anchor,
+                      predecessor_receipts=dict(failure=p.V5N_FAILURE, recovery=p.V5N_RECOVERY),
+                      failed_phase=dict(old["failed_phase"], InvocationID=p.V5N_IID, manager_exit=exit_row,
+                                        failure=p.V5N_FAILURE, recovery=p.V5N_RECOVERY, source_checkpoint_exists=False,
+                                        resource_credit_bytes=0, retry_worker=None))
+        binding = {"prior_dispatch":{"sha256":p.V5N_DISPATCH}}
+        proof = dict(schema="horizon-epoch145-donor-pressure-recovery-build-v1", predecessor_dispatch=binding["prior_dispatch"],
+                     donor_pressure_failure=p.V5N_FAILURE, donor_pressure_recovery=p.V5N_RECOVERY)
+        failed = dict(iid=p.V5N_IID, error="ValueError: insufficient HOME or general-slot memory")
+        started = dict(iid=p.V5N_IID, r2_mutations=False)
+        p.validate_pressure_ancestry(binding, proof, review, old, failed, started)
+        for name, value in (("retained_inputs", ["substitute"]), ("original_pid1_exit", dict(exit_row, EXIT_STATUS="0")),
+                            ("failed_phase", dict(review["failed_phase"], source_checkpoint_exists=True)),
+                            ("failed_phase", dict(review["failed_phase"], resource_credit_bytes=1))):
+            with self.subTest(name=name, value=value), self.assertRaisesRegex(ValueError, "original stopped V5n"):
+                p.validate_pressure_ancestry(binding, proof, dict(review, **{name:value}), old, failed, started)
+
+    def test_v5o_success_uses_the_original_output_and_requires_exact_startup(self):
+        f = fixture()
+        f[3]["old_manager"]["InvocationID"] = p.V5N_IID
+        start = f[5][0][0]
+        phase = start["fresh_fit"]["phase145"]
+        bind = {name:{"sha256":sha * 64} for name, sha in (("worker", "1"), ("build", "2"), ("review", "3"), ("dispatcher", "4"))}
+        bind["reader"] = {"sha256":start["image"]}
+        fleet = {"path":"/fleet", "sha256":"1" * 64}
+        f[1].update(fleet=fleet, review_sha256=bind["review"]["sha256"])
+        f[1]["original"]["INVOCATION_ID"] = p.V5N_IID
+        f[1]["preflight"]["quote_provider"] = bind["dispatcher"]
+        start["fresh_fit"].update(fits=True, fleet=fleet, complete_cpu_quota_micros=64_000_000,
+            complete_memory_plus_reserve_bytes=810_658_050_048, resource_credit_bytes=0, replay_launch_authorized=False,
+            epoch159_donor_cover=dict(fleet=fleet, credited_retirement_bytes=0, remaining_home_bytes=300, replay_launch_authorized=False),
+            corrected_159_donor=dict(unit="horizon-epoch159-vote-feature-reference-20261123-v1.service", stage="drained"))
+        phase["window"].update(continuity_seal=bind["worker"], continuity_build=bind["build"],
+            donor_pressure_failure=p.V5N_FAILURE, donor_pressure_recovery=p.V5N_RECOVERY,
+            missed_clock_failure={"sha256":"04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6"},
+            guard_walk_failure={"sha256":"8a8ef5d04d44a1bb97771cef2a7e15958d721e0defc35f1e2aee0b3f55b85010"},
+            rejected_guard={"sha256":"6800d34a8bb71f468d2f06daf6a29cf9016d972f4cc1ef60d915600e8085ad1f"},
+            registered_guard_clock={"sha256":"119fdd9c0246b71fa188007daad510adc377bc002a110dda3e1074bb06d0819d"})
+        with patch.multiple(p, PRESSURE_POST=True, PINNED_POST=True, GUARD_POST=True, MISSED_POST=True), patch.object(p, "guard_bindings", return_value=(bind, None)):
+            self.assertEqual(p.validate_terminal(*f)["invocation_id"], IID)
+            for record, name, value in ((phase["window"], "donor_pressure_recovery", p.V5N_FAILURE),
+                                        (phase["window"], "continuity_build", bind["worker"]),
+                                        (phase["window"], "registered_guard_clock", bind["worker"]),
+                                        (start["fresh_fit"], "complete_cpu_quota_micros", 63_000_000),
+                                        (start["fresh_fit"]["epoch159_donor_cover"], "remaining_home_bytes", -1),
+                                        (start["fresh_fit"]["corrected_159_donor"], "stage", "leased")):
+                prior = record[name]
+                record[name] = value
+                with self.subTest(name=name), self.assertRaisesRegex(ValueError, "unbound V5o"):
+                    p.validate_terminal(*f)
+                record[name] = prior
+            f[4][1]["MESSAGE_ID"] = "failed"
+            with self.assertRaisesRegex(ValueError, "PID1"):
+                p.validate_terminal(*f)
+
+    def test_v5q_startup_is_bound_to_the_resumed_writer_and_both_failures(self):
+        status = {"invocation_id":"resumed-writer"}
+        provider = {"path":"/qualified/provider", "sha256":p.V5Q_PROVIDER}
+        links = {
+            "status_owner_failure":{"path":"/v5o/failed.json", "sha256":"a"*64},
+            "status_owner_recovery":{"path":"/v5o/recovery-started.json", "sha256":"b"*64},
+            "status_owner_terminal":{"path":"/v5o/terminal.json", "sha256":"c"*64},
+            "public_audit_terminal":{"path":"/v5p/terminal.json", "sha256":"d"*64},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "build-proof.json"
+            raw = json.dumps(dict(links, resumed_status=status)).encode()
+            path.write_bytes(raw)
+            binding = {"build":{"path":str(path), "sha256":hashlib.sha256(raw).hexdigest()}, "provider":provider}
+            start = {"iid":p.V5Q_IID, "fresh_fit":{"provider_seal":provider,
+                     "phase145":{"window":links}, "status_registration":status}}
+            p.validate_audit_start(binding, start)
+            with self.assertRaisesRegex(ValueError, "resumed cadence"):
+                p.validate_audit_start(binding, dict(start, iid=p.V5P_IID))
+            for key in links:
+                with self.subTest(key=key), self.assertRaisesRegex(ValueError, "prior terminal"):
+                    window = dict(links, **{key: {"path":"/wrong", "sha256":"a"*64}})
+                    p.validate_audit_start(binding, dict(start, fresh_fit=dict(start["fresh_fit"], phase145={"window":window})))
+            with self.assertRaisesRegex(ValueError, "resumed cadence"):
+                p.validate_audit_start(binding, dict(start, fresh_fit=dict(start["fresh_fit"], status_registration={})))
+
+    def test_v5q_advancing_witness_rejects_a_crossed_child_or_lease(self):
+        reader = {"path":"/qualified/image", "sha256":"a" * 64}
+        startup = {"path":"/qualified/startup", "sha256":p.V5Q_START}
+        ids = {"pid":31, "start_ticks":600}
+        before = dict(ids, observed_unix_ns=8, rchar=1234, cpu_ticks=25)
+        after = dict(ids, observed_unix_ns=12, rchar=1534, cpu_ticks=29)
+        sample = {"iid":p.V5Q_IID, "manager":{"InvocationID":p.V5Q_IID, "MainPID":"20"},
+                  "startup":startup, "reader":reader, "archive_publication_authorized":False,
+                  "resource_credit_bytes":0, "worker":[before, after],
+                  "submission":{"path":str(p.BASE / "v5q-name-handoff/submission-result.json"), "sha256":p.V5Q_RESULT}}
+        window = {"native_parent":{"pid":20}, "native_child":ids}
+        p.validate_audit_sample(sample, {"reader":reader}, startup, window)
+        for change in (dict(sample, resource_credit_bytes=1), dict(sample, worker=[before, before]),
+                       dict(sample, worker=[before, dict(after, start_ticks=601)])):
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, "advancing witness"):
+                p.validate_audit_sample(change, {"reader":reader}, startup, window)
+
+    def test_v5q_submission_and_failed_predecessor_never_cross(self):
+        refs = {"submission-result.json":p.V5Q_RESULT, "submission-intent.json":p.V5Q_INTENT}
+        result = {"invocation_id":p.V5Q_IID, "argv":["recover"]}
+        rows = {"submission-result.json":result, "submission-intent.json":{"argv":["recover"]}}
+        def read(path, sha):
+            self.assertEqual(sha, refs[path.name])
+            return json.dumps(rows[path.name]).encode(), {}
+        api = dict(HANDOFF=Path("/handoff"), OLD=p.V5P_IID, read=read, Host=lambda *_:Mock())
+        with patch.object(p, "AUDIT_POST", True):
+            self.assertEqual(p.submission(api, {})[1], result)
+            for wrong in (p.V5N_IID, p.V5O_IID, p.V5P_IID):
+                result["invocation_id"] = wrong
+                with self.subTest(wrong=wrong), self.assertRaisesRegex(ValueError, "foreign dispatch|submitted V5q"):
+                    p.submission(api, {})
+
     def test_tagged_v5j_semantic_success(self):
         f = fixture()
         accepted = p.validate_terminal(*f)
@@ -207,6 +428,37 @@ class PublicationInputs(unittest.TestCase):
             write(receipt, dict(proof, invocation_id="afcf6cdd1ec0400ea2757f81472987b3"))
             with self.assertRaisesRegex(ValueError, "different bound v5j"):
                 complete(Status(), build)
+
+    def test_v5q_build_price_uses_the_raw_quote_and_pinned_cadence(self):
+        iid, parent = p.V5Q_IID, {"pid":123, "start_ticks":45}
+        state, handoff = Path("/state"), Path("/handoff")
+        result = {"invocation_id":iid, "argv":["recover"]}
+        intent = {"original":{"INVOCATION_ID":p.V5P_IID}, "preflight":{"serial_handback":[]}, "argv":["recover"]}
+        reader = {"path":"/v5q/export145", "sha256":"b"*64}
+        receipts = {p.DISPATCH / "admission-review.json":{"reader":reader},
+                    handoff / "submission-intent.json":intent, handoff / "submission-result.json":result,
+                    p.BASE / "V5Q_ACTUAL_ADVANCING_WORKER.json":{}}
+        host = Mock()
+        host.state.return_value = ({"InvocationID":iid}, [])
+        host.accepted.return_value = result
+        window = {k:{"sha256":"c"*64} for k in ("continuity_seal", "continuity_build", "public_audit_terminal",
+                                               "status_owner_terminal", "donor_pressure_failure", "donor_pressure_recovery")}
+        window["native_parent"] = parent
+        window["recovery"] = {"path":str(state / iid / "recovery-started.json"), "sha256":p.V5Q_START}
+        cadence = {"invocation_id":"resumed-only"}
+        started = {"iid":iid, "image":reader["sha256"], "r2_mutations":False,
+                   "fresh_fit":{"phase145":{"window":window}, "serial_145_holding_handback":[],
+                                "status_registration":cadence, "provider_seal":{"sha256":p.V5Q_PROVIDER}}}
+        api = {"Host":lambda *_:host, "HANDOFF":handoff, "STATE":state, "OLD":p.V5P_IID,
+               "IMAGE_SHA":reader["sha256"], "REVIEW_SHA":"a"*64,
+               "read":lambda path,*_:(json.dumps(receipts[path]).encode(), {}),
+               "bound":lambda _ref:started, "retained":Mock(), "retry_handback":Mock()}
+        price = {"phase145":{"stage":"leased-worker", "invocation_id":iid, "window":window}, "status_registration":cadence}
+        with patch.multiple(p, AUDIT_POST=True, PINNED_POST=True, MISSED_POST=True), patch.object(
+                p, "validate_missed_start"), patch.object(p, "validate_audit_sample"):
+            p.verify_build_price(api, price)
+            with self.assertRaisesRegex(ValueError, "cadence"):
+                p.verify_build_price(api, dict(price, status_registration={"invocation_id":"other"}))
 
     def test_post_build_price_selects_only_current_leased_retry(self):
         parent = {"pid": 123, "start_ticks": 45}

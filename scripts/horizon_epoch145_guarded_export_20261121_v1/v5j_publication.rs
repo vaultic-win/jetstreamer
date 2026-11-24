@@ -66,7 +66,86 @@ fn guard_walk_start(base: &Path, started: &Value, intent: &Value) -> Result<()> 
     Ok(())
 }
 
+fn pinned_semantic_owner(export: &str) -> Result<()> {
+    let (iid, handoff, key, family_name, family_hash) = if cfg!(incident_v5q_136_post145_only) {
+        (
+            "cbacb5a17e6347509640846eccb95cb0",
+            "v5q-name-handoff",
+            "audit_turnover_binding",
+            "V5Q_RUNTIME_BINDINGS.json",
+            "a5dc1d9973d950d36f7302b800f0b10421066e135e0912750fd92b98521cadc4",
+        )
+    } else {
+        (
+            "f3474dfad55f4a05a64431421881db29",
+            "v5o-name-handoff",
+            "donor_pressure_binding",
+            "V5O_RUNTIME_BINDINGS.json",
+            "d571da98684079bc937a2ddeed52dbcd457eb0a74010519171b851e3e5297137",
+        )
+    };
+    ensure!(export == iid, "foreign pinned semantic export");
+    let post = Path::new(INCIDENT_POST_IMAGE)
+        .parent()
+        .context("V13j package")?;
+    let base = post.parent().context("V5o runtime family")?;
+    let (_, seal) = publication::frozen_json(&post.join("deployment-seal-receipt.json"))?;
+    let (build_ref, build) = publication::frozen_json(&post.join("build-proof.json"))?;
+    let members = seal["members"].as_array().context("V13j members")?;
+    let checker = members
+        .iter()
+        .find(|member| member["name"] == "post-inputs" && member["mode"] == "0555")
+        .context("V13j inputs checker")?;
+    let path = post.join("post-inputs");
+    let binding = Bound {
+        path: path.clone(),
+        sha256: checker["sha256"]
+            .as_str()
+            .context("V13j checker hash")?
+            .into(),
+    };
+    ensure!(
+        seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && seal["destination"] == json!(post)
+            && seal["sealer_sha256"]
+                == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+            && seal["remote_mutations"] == false
+            && members
+                .iter()
+                .any(|member| member["name"] == "build-proof.json"
+                    && member["mode"] == "0444"
+                    && member["sha256"] == build_ref.sha256)
+            && build["schema"] == "horizon-145-v5j-post-build-v1"
+            && build[key]
+                == json!({
+                    "path":base.join(family_name),
+                    "sha256":family_hash
+                }),
+        "post build is outside the qualified V5o runtime family"
+    );
+    custody::bytes(&binding, 1 << 20, true)?;
+    let output = capacity::run(
+        path.to_str().context("V13j checker path")?,
+        &["inspect-semantic"],
+        "20",
+    )?;
+    let report: Value = serde_json::from_str(&output)?;
+    let (_, captured) =
+        publication::frozen_json(&base.join(handoff).join("semantic-completion.json"))?;
+    ensure!(
+        report == captured && report["invocation_id"] == export,
+        "different captured V5o completion"
+    );
+    terminal(export)
+}
+
 pub(crate) fn semantic_owner(export: &str) -> Result<()> {
+    if cfg!(any(
+        incident_v5q_136_post145_only,
+        incident_v5o_136_post145_only
+    )) {
+        return pinned_semantic_owner(export);
+    }
     let (handoff_name, old, image_name, image_sha, dispatch) = if cfg!(incident_v5n_post145_only) {
         (
             "v5n-name-handoff",

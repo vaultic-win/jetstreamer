@@ -1,16 +1,20 @@
 """Price the original paid epoch 145 after its frozen semantic reader succeeds."""
 import hashlib
+import json
 import os
 from pathlib import Path
 import stat
 import sys
+import subprocess
 
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-GUARD_POST = VERSION in ("tools-v13h", "tools-v13i")
+AUDIT_POST = VERSION == "tools-v13k"
+PRESSURE_POST = VERSION == "tools-v13j"
+GUARD_POST = AUDIT_POST or PRESSURE_POST or VERSION in ("tools-v13h", "tools-v13i")
 MISSED_POST = GUARD_POST or VERSION == "tools-v13g"
 LEASE_POST = MISSED_POST or VERSION == "tools-v13f"
 V5J_RETRY = LEASE_POST or VERSION == "tools-v13e"
@@ -142,6 +146,29 @@ def fixture_semantic(s, build):
 
 
 def completion(s, build=None):
+    if AUDIT_POST or PRESSURE_POST:
+        version, iid, build_key, runtime_hash = (
+            ("v5q", "cbacb5a17e6347509640846eccb95cb0", "audit_turnover_binding",
+             "a5dc1d9973d950d36f7302b800f0b10421066e135e0912750fd92b98521cadc4") if AUDIT_POST else
+            ("v5o", "f3474dfad55f4a05a64431421881db29", "donor_pressure_binding",
+             "d571da98684079bc937a2ddeed52dbcd457eb0a74010519171b851e3e5297137"))
+        seal, _ = s.read(PKG / "deployment-seal-receipt.json")
+        checker = PKG / "post-inputs"
+        member, = (m for m in seal["members"] if m["name"] == checker.name and m["mode"] == "0555")
+        s.need(seal["destination"] == str(PKG) and
+               seal["sealer_sha256"] == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+               "foreign V13j deployment")
+        data = checker.read_bytes()
+        s.need(hashlib.sha256(data).hexdigest() == member["sha256"], "unbound V13j inputs")
+        selected, _ = s.read(PKG.parent / f"{version}-name-handoff/semantic-completion.json")
+        report = json.loads(subprocess.check_output([checker, "inspect-semantic"], timeout=20))
+        state = STATE / iid
+        s.need(report == selected and selected["invocation_id"] == iid
+               and build[build_key]["sha256"] == runtime_hash, f"different captured {version.capitalize()} completion")
+        completed = s.bound(selected["completion"], state / "complete.json")
+        extracted = s.bound(selected["extraction"], state / "extraction-complete.json")
+        s.need(completed["receipt"] == selected["extraction"], "different V5o extraction")
+        return selected["completion"], extracted["extraction"]
     if V5J_SUCCESSOR:
         handoff = PKG.parent / ("v5n-name-handoff" if GUARD_POST else "v5m-name-handoff" if MISSED_POST else "v5k-name-handoff" if LEASE_POST else "v5j-name-handoff-retry1" if V5J_RETRY else "v5j-name-handoff")
         selected, _ = s.read(handoff / "semantic-completion.json")

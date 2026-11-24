@@ -22,6 +22,10 @@ V20 = ROOT / "incident-replay-fit-20261121-v1/tools-v20"
 V7 = ROOT / "epoch136-joint-writer-20261122-v7b"
 RETRY_WRITER = ROOT / "epoch136-joint-writer-20261122-v7c"
 V5N_WRITER = ROOT / "epoch136-joint-writer-20261123-v8"
+V5Q_WRITER = ROOT / "epoch136-joint-writer-20261124-v10"
+V5Q_PROVIDER = ROOT / "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5q-136-v1"
+V5O_WRITER = ROOT / "epoch136-joint-writer-20261123-v9"
+V5O_PROVIDER = ROOT / "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5o-136-v1"
 V5N_PROVIDER = ROOT / "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5n-136-v1"
 SEALER = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
 
@@ -79,6 +83,8 @@ def capture_fixture(native_path, path, digest):
             return json.loads(result.stdout)
         transient = any(reason in result.stderr for reason in
                         (b"foreign 145 descendants", b"capacity generation changed during collection"))
+        if native_path.parent == V5Q_PROVIDER and result.returncode == os.EX_TEMPFAIL and not result.stdout:
+            transient = result.stderr == b"public audit workers changed during capacity capture\n"
         if not transient or attempt == 2:
             raise ValueError(result.stderr.decode(errors="replace")[-1800:])
         time.sleep(2)
@@ -121,13 +127,13 @@ def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_to
                 unfenced_with_candidate_cpu_micros=68_250_000, new_resource_credit_bytes=0)
 
 
-def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, retry=False, v5n=False):
-    require(not (retry or v5n) or (fixture and not (retry and v5n)), "invalid worker profile")
-    writer = V5N_WRITER if v5n else RETRY_WRITER if retry else V7
+def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, retry=False, v5n=False, v5o=False, v5q=False):
+    require(sum((retry, v5n, v5o, v5q)) <= int(fixture), "invalid worker profile")
+    writer = V5Q_WRITER if v5q else V5O_WRITER if v5o else V5N_WRITER if v5n else RETRY_WRITER if retry else V7
     require(mode in ("preflight", "session"), "unknown writer mode")
     expected = dict(image=dict(path=str(NATIVE / "post-stop-fit"), sha256=PRICE),
                     seal=dict(path=str(NATIVE / "deployment-seal-receipt.json"), sha256=NATIVE_SEAL))
-    directory = V5N_PROVIDER if v5n else V20 if fixture else NATIVE
+    directory = V5Q_PROVIDER if v5q else V5O_PROVIDER if v5o else V5N_PROVIDER if v5n else V20 if fixture else NATIVE
     if fixture:
         fixture_provider(provider, directory)
         expected = provider
@@ -151,13 +157,18 @@ def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, ret
             and historical["current_storage"]["remaining_DATA_growth_bytes"] == 18 << 30
             and ready["current_observation"] == fleet["current_audit_progress"]["observation"]
             and ready["current_storage"] == recorded["audit_storage"], "unbound audit transition")
+    if v5q:
+        homefloor = runpy.run_path(str(directory / "homefloor_fit.py"))
     def audit():
         seen, paid, witness = observe_public(Path("/home/sol").stat().st_dev, historical)
-        require(witness == recorded["audit_owner_witness"] and witness["native"]["ActiveState"] == "active"
-                and seen["active_ready_workers"] == prior_audit["active_ready_workers"]
-                and paid["output_budget"] == ready["current_storage"]["output_budget"]
-                and paid["maximum_host_allocation_bytes"] == ready["maximum_output_allocation_bytes"] == 256 << 20,
-                "changed ready audit controller, workers or HOME policy")
+        if v5q:
+            homefloor["validate_public"](fleet, checked, seen, paid, witness, fresh_workers=True)
+        else:
+            require(witness == recorded["audit_owner_witness"] and witness["native"]["ActiveState"] == "active"
+                    and seen["active_ready_workers"] == prior_audit["active_ready_workers"]
+                    and paid["output_budget"] == ready["current_storage"]["output_budget"]
+                    and paid["maximum_host_allocation_bytes"] == ready["maximum_output_allocation_bytes"] == 256 << 20,
+                    "changed ready audit controller, workers or HOME policy")
         return witness, seen["active_ready_workers"], paid
     first, workers, before_ready = audit()
     before = storage()
@@ -183,8 +194,8 @@ def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, ret
         require(not fixture or package == writer / "controller", "different V7 writer")
         session = runpy.run_path(str(package / "prestart_session.py"))
         context = {"fixture_provider": fixture_provider, "retry": retry} if fixture else {}
-        if v5n:
-            context.update(v5n=True, check_package=check_package, read_immutable=immutable_bytes)
+        if v5n or v5o or v5q:
+            context.update(v5n=v5n, v5o=v5o, v5q=v5q, check_package=check_package, read_immutable=immutable_bytes)
         native = session["capture_context"](ref, fence, waiter, **context, pin=pin, checked=checked,
                                             runpy=runpy, json=json, observation=observation)
     require(native["fleet"] == ref and native["schema"] == "horizon-incident-replay-fit-v1"
@@ -197,11 +208,15 @@ def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, ret
         binding = prospective["controller_deployment"]
         require(binding["path"] == str(controller / "deployment-seal-receipt.json"), "wrong fixture controller")
         deployment = check_package(controller, binding["sha256"])
-        member_name = "v5n_boundary.py" if v5n else "fixture_boundary.py"
+        member_name = "v5n_boundary.py" if v5n or v5o or v5q else "fixture_boundary.py"
         member = [r for r in deployment["members"] if r["name"] == member_name]
         require(len(member) == 1 and member[0]["mode"] == "0444", "missing fixture semantic reader")
         fixture_module = runpy.run_path(str(controller / member_name))
-        if v5n:
+        if v5o or v5q:
+            joined = fixture_module["inspect_v5o"](prospective, pin, check_package, immutable_bytes,
+                       fixture_module["read_inputs"], lambda _: native["phase145"], v5q=v5q)
+            require(not joined["semantic_pending"], "the selected verifier is still proving private semantic output")
+        elif v5n:
             require(prospective["holding145_semantic_worker"] == fixture_module["SEMANTIC_RESULT"] and
                     prospective["holding145_completion"] == fixture_module["COMPLETION_TOOLS"],
                     "different prospective V5n completion generation")
@@ -218,14 +233,16 @@ def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, ret
     require(first == last and workers == last_workers, "audit changed during native fit")
     disk = os.statvfs("/home/sol")
     total = int(Path("/proc/meminfo").read_text().splitlines()[0].split()[1]) * 1024
-    result = price(native, floor, before, after, disk.f_bavail * disk.f_frsize, total, waiter, v5n=v5n)
+    result = price(native, floor, before, after, disk.f_bavail * disk.f_frsize, total, waiter, v5n=v5n or v5o or v5q)
     return dict(result, schema="horizon-136-writer-joint-fit-v1", fleet=ref, provider_seal=expected["seal"],
                 authoritative_joint_fit=native, audit=first, ready_workers=workers,
                 ready_growth_before=before_ready, ready_growth_after=after_ready,
                 prefix_before=before, prefix_after=after, waiting_candidate=waiter,
                 activation_compatible=mode == "session" and result["disk_fits"] and result["memory_fits"],
                 replay_launch_authorized=False,
-                next_gate=("exclusive prestart after original V5n success and before V13h" if v5n else
+                next_gate=("exclusive prestart after original V5q success and before V13k" if v5q else
+                           "exclusive prestart after original V5o success and before V13j" if v5o else
+                           "exclusive prestart after original V5n success and before V13h" if v5n else
                            "successful V5F completion and exclusive prestart before V13" if fixture else
                            "successful V5e completion and exclusive prestart before V11"))
 
@@ -234,6 +251,8 @@ if __name__ == "__main__":
     print(json.dumps(inspect(Path(sys.argv[1]), sys.argv[2], json.loads(sys.argv[3]),
                              sys.argv[4], json.loads(sys.argv[5]),
                              json.loads(sys.argv[6]) if len(sys.argv) >= 7 else None,
-                             fixture=sys.argv[7:] in (["fixture-semantic"], ["retry-semantic"], ["v5n-semantic"]),
+                             fixture=sys.argv[7:] in (["fixture-semantic"], ["retry-semantic"], ["v5n-semantic"], ["v5o-semantic"], ["v5q-semantic"]),
                              retry=sys.argv[7:] == ["retry-semantic"],
-                             v5n=sys.argv[7:] == ["v5n-semantic"]), sort_keys=True))
+                             v5n=sys.argv[7:] == ["v5n-semantic"],
+                             v5o=sys.argv[7:] == ["v5o-semantic"],
+                             v5q=sys.argv[7:] == ["v5q-semantic"]), sort_keys=True))

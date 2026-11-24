@@ -143,7 +143,14 @@ pub(super) mod generation {
         pub(crate) const FAILURE: &str =
             "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43";
     }
-    #[cfg(all(feature = "retry-post", not(feature = "v5n-136-post")))]
+    #[cfg(all(
+        feature = "retry-post",
+        not(any(
+            feature = "v5n-136-post",
+            feature = "v5o-136-post",
+            feature = "v5q-136-post"
+        ))
+    ))]
     mod selected {
         pub(crate) const SOURCE: &str = "afcf6cdd1ec0400ea2757f81472987b3";
         pub(crate) const START: &str =
@@ -159,7 +166,10 @@ pub(super) mod generation {
         pub(crate) const FAILURE: &str =
             "38d828362fed1910cc60c605200380576c165168738dbf00520ce2b2522a0fcd";
     }
-    #[cfg(feature = "v5n-136-post")]
+    #[cfg(all(
+        feature = "v5n-136-post",
+        not(any(feature = "v5o-136-post", feature = "v5q-136-post"))
+    ))]
     mod selected {
         pub(crate) const SOURCE: &str = "f86e7e61f4b34dc7aedc4e08a128e713";
         pub(crate) const START: &str =
@@ -171,29 +181,87 @@ pub(super) mod generation {
         pub(crate) const FIT_PKG: &str =
             "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5n-136-v1";
     }
+    #[cfg(all(feature = "v5o-136-post", not(feature = "v5q-136-post")))]
+    mod selected {
+        pub(crate) const SOURCE: &str = "f3474dfad55f4a05a64431421881db29";
+        pub(crate) const START: &str =
+            "epoch145-semantic-continuity-20261121-v1/v5o-name-handoff/submission-result.json";
+        pub(crate) const ADVANCING: &str =
+            "4d80587d22ffa0883696f96c30958b54d30fb5455bde35050e96b50c8ba8c544";
+        pub(crate) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v13j";
+        pub(crate) const STATE_PATH: &str = "epoch145-v5o-136-dispatch-20261123-v1/state";
+        pub(crate) const FIT_PKG: &str =
+            "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5o-136-v1";
+    }
+    #[cfg(feature = "v5q-136-post")]
+    mod selected {
+        pub(crate) const SOURCE: &str = "cbacb5a17e6347509640846eccb95cb0";
+        pub(crate) const START: &str =
+            "epoch145-semantic-continuity-20261121-v1/v5q-name-handoff/submission-result.json";
+        pub(crate) const ADVANCING: &str =
+            "398f1a2d5d5a50ab4d35c0f27de035d7c07023b6c8d632ef326b9fcd169cb5e9";
+        pub(crate) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v13k";
+        pub(crate) const STATE_PATH: &str = "epoch145-v5q-136-dispatch-20261124-v1/state";
+        pub(crate) const FIT_PKG: &str =
+            "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5q-136-v1";
+    }
     pub(crate) use selected::*;
     pub(crate) const SEAL: &str = env!("HORIZON_145_POST_SEAL_SHA256");
     pub(crate) const FIT_SEAL: &str = env!("HORIZON_145_FIT_SEAL_SHA256");
-    #[cfg(not(feature = "v5n-136-post"))]
+    #[cfg(not(any(
+        feature = "v5n-136-post",
+        feature = "v5o-136-post",
+        feature = "v5q-136-post"
+    )))]
     pub(crate) const IMAGE: &str =
         "016f1beab41795dae2bbaa1cef5173773eeafae617a5f5db92ebd4aaa1887c21";
-    #[cfg(not(feature = "v5n-136-post"))]
+    #[cfg(not(any(
+        feature = "v5n-136-post",
+        feature = "v5o-136-post",
+        feature = "v5q-136-post"
+    )))]
     pub(crate) const SEMANTIC: &str =
         "epoch145-semantic-continuity-20261121-v1/tools-v5f/export145";
-    #[cfg(feature = "v5n-136-post")]
-    pub(crate) const IMAGE: &str =
-        "d6bc752180c265f6d680464ffec7ac2cc6bc4125440ef6ac1bb43534f3db2c34";
-    #[cfg(feature = "v5n-136-post")]
-    pub(crate) const SEMANTIC: &str =
-        "epoch145-semantic-continuity-20261121-v1/tools-v5n/export145";
+    #[cfg(any(
+        feature = "v5n-136-post",
+        feature = "v5o-136-post",
+        feature = "v5q-136-post"
+    ))]
+    pub(crate) const IMAGE: &str = if cfg!(feature = "v5q-136-post") {
+        "9e7be6067401af4b0f7e06d07540eb07ba06fee646843eee741a480cc520108e"
+    } else if cfg!(feature = "v5o-136-post") {
+        "7192fc4ea054340943dcf483b1d4b827052ec0e2feb60a2602e3cd4a58acc060"
+    } else {
+        "d6bc752180c265f6d680464ffec7ac2cc6bc4125440ef6ac1bb43534f3db2c34"
+    };
+    #[cfg(any(
+        feature = "v5n-136-post",
+        feature = "v5o-136-post",
+        feature = "v5q-136-post"
+    ))]
+    pub(crate) const SEMANTIC: &str = if cfg!(feature = "v5q-136-post") {
+        "epoch145-semantic-continuity-20261121-v1/tools-v5q/export145"
+    } else if cfg!(feature = "v5o-136-post") {
+        "epoch145-semantic-continuity-20261121-v1/tools-v5o/export145"
+    } else {
+        "epoch145-semantic-continuity-20261121-v1/tools-v5n/export145"
+    };
     pub(crate) const PIPELINE: &str =
         "0f29fd116ef54668698089c01f8cd50ffcf729b430e311bb90b989f4d5ad8e94";
-    pub(crate) const INSPECT: &str = if cfg!(feature = "v5n-136-post") {
+    pub(crate) const INSPECT: &str = if cfg!(feature = "v5q-136-post") {
+        "inspect-v5q"
+    } else if cfg!(feature = "v5o-136-post") {
+        "inspect-v5o"
+    } else if cfg!(feature = "v5n-136-post") {
         "inspect-v5n"
     } else {
         "inspect-v5f"
     };
-    pub(crate) const FOLLOW: &str = if cfg!(feature = "v5n-136-post") {
+    pub(crate) const FOLLOW: &str = if cfg!(feature = "v5q-136-post") {
+        "follow-v5q"
+    } else if cfg!(feature = "v5o-136-post") {
+        "follow-v5o"
+    } else if cfg!(feature = "v5n-136-post") {
         "follow-v5n"
     } else {
         "follow-v5f"
@@ -292,7 +360,11 @@ fn funded(boundary: impl Fn() -> Result<Option<fs::File>>) -> Result<(Value, Opt
         outcome::wait_file(&next)?;
     }
 }
-#[cfg(not(feature = "v5n-136-post"))]
+#[cfg(not(any(
+    feature = "v5n-136-post",
+    feature = "v5o-136-post",
+    feature = "v5q-136-post"
+)))]
 fn original() -> Result<Value> {
     let a = pinned(&rt(START), ADVANCING)?;
     let manager = from_ref(&a["manager"])?;
@@ -353,7 +425,10 @@ fn original() -> Result<Value> {
     Ok(a)
 }
 
-#[cfg(feature = "v5n-136-post")]
+#[cfg(all(
+    feature = "v5n-136-post",
+    not(any(feature = "v5o-136-post", feature = "v5q-136-post"))
+))]
 fn original() -> Result<Value> {
     let result = pinned(&rt(START), ADVANCING)?;
     let handoff = rt("epoch145-semantic-continuity-20261121-v1/v5n-name-handoff");
@@ -392,6 +467,96 @@ fn original() -> Result<Value> {
     Ok(json!({"start":start_ref,"sample":sample,"result":result}))
 }
 
+#[cfg(any(feature = "v5o-136-post", feature = "v5q-136-post"))]
+fn original() -> Result<Value> {
+    let result = pinned(&rt(START), ADVANCING)?;
+    let (handoff, intent_sha, predecessor, start_sha) = if cfg!(feature = "v5q-136-post") {
+        (
+            "v5q-name-handoff",
+            "7e5e053d00263b2e89bfcb22664718d2c9157ec67ca360bd7e165bd9573384e6",
+            "c01dc3ba08b74e3aa0d4b531601e9fda",
+            "7659aca1cf87aaeeb42a5c5c65ad186a03d1e55e9ce4dc0779d351b36ba30781",
+        )
+    } else {
+        (
+            "v5o-name-handoff",
+            "96080ed3e71613abd4072b666d1b6503316797dd30be0a788d7a0d4488c3aa63",
+            "f86e7e61f4b34dc7aedc4e08a128e713",
+            "e4b9e72a6481ea4f38b8fe7b49986463e2f93d37bc1dcb7f2156049930fd744b",
+        )
+    };
+    let handoff = rt("epoch145-semantic-continuity-20261121-v1").join(handoff);
+    let intent = pinned(&handoff.join("submission-intent.json"), intent_sha)?;
+    let state = rt("epoch145-guarded-export-20261121-v1/state").join(SOURCE);
+    let start_ref = bound(&state.join("recovery-started.json"))?;
+    let start = from_ref(&start_ref)?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    ensure!(
+        result["invocation_id"] == SOURCE
+            && intent["argv"] == result["argv"]
+            && intent["original"]["_BOOT_ID"] == boot
+            && intent["original"]["INVOCATION_ID"] == "f86e7e61f4b34dc7aedc4e08a128e713"
+            && start_ref["sha256"]
+                == "e4b9e72a6481ea4f38b8fe7b49986463e2f93d37bc1dcb7f2156049930fd744b"
+            && start["iid"] == SOURCE
+            && start["image"] == IMAGE
+            && start["r2_mutations"] == false
+            && !state.join("failed.json").try_exists()?,
+        "different original semantic invocation or startup"
+    );
+    Ok(json!({"start":start_ref, "result":result,
+              "parent":start["fresh_fit"]["phase145"]["window"]["native_parent"]}))
+}
+
+#[cfg(any(feature = "v5o-136-post", feature = "v5q-136-post"))]
+fn inspect_pressure(inputs: &Path, original: &Value) -> Result<()> {
+    let manager = native(E)?;
+    let (pid, evidence) = if manager["ActiveState"] == "inactive" {
+        drained(&manager, E)?;
+        let evidence: Value = serde_json::from_slice(&command(inputs, &["inspect-semantic"])?)?;
+        ensure!(
+            manager["LoadState"] == "not-found"
+                && manager["SubState"] == "dead"
+                && manager["ControlGroup"] == ""
+                && manager["InvocationID"] == ""
+                && evidence["invocation_id"] == SOURCE
+                && evidence["start"] == original["start"]
+                && native(E)? == manager
+                && !Path::new("/sys/fs/cgroup/system.slice")
+                    .join(E)
+                    .try_exists()?,
+            "different or incompletely drained semantic verifier"
+        );
+        (0, evidence)
+    } else {
+        let (parent, iid) = stable(&manager, E)?;
+        let evidence: Value = serde_json::from_slice(&command(inputs, &["inspect-live"])?)?;
+        let window = &evidence["window"];
+        ensure!(
+            iid == SOURCE
+                && evidence["invocation_id"] == SOURCE
+                && evidence["stage"] == "leased-worker"
+                && window["recovery"] == original["start"]
+                && window["native_parent"] == original["parent"]
+                && window["native_parent"]["pid"] == parent
+                && platform::ticks(parent)? == window["native_parent"]["start_ticks"]
+                && platform::proc_exe(parent)? == rt(SEMANTIC)
+                && native(E)? == manager,
+            "different leased semantic verifier"
+        );
+        (parent, evidence)
+    };
+    check_member(&rt(FIT_PKG), FIT_SEAL, "post-stop-fit")?;
+    println!(
+        "{}",
+        json!({"original":SOURCE,"manager":pid,"fleet":fleet()?,
+                         "evidence":evidence,"post_seal":SEAL,"launch":false})
+    );
+    Ok(())
+}
+
 pub(super) fn completed_semantics() -> Result<Value> {
     let s = rt("epoch145-guarded-export-20261121-v1/state").join(SOURCE);
     ensure!(
@@ -401,19 +566,39 @@ pub(super) fn completed_semantics() -> Result<Value> {
     let done = bound(&s.join("complete.json"))?;
     let d = from_ref(&done)?;
     let e = from_ref(&d["receipt"])?;
-    #[cfg(feature = "v5n-136-post")]
+    #[cfg(any(
+        feature = "v5n-136-post",
+        feature = "v5o-136-post",
+        feature = "v5q-136-post"
+    ))]
     {
         let inputs = check_member(&rt(PKG), SEAL, "post-inputs")?;
-        let current: Value = serde_json::from_slice(&command(&inputs, &["inspect"])?)?;
-        let captured = rt(
-            "epoch145-semantic-continuity-20261121-v1/v5n-name-handoff/semantic-completion.json",
-        );
+        let (current, handoff) = if cfg!(any(feature = "v5o-136-post", feature = "v5q-136-post")) {
+            let version = if cfg!(feature = "v5q-136-post") {
+                "v5q-name-handoff"
+            } else {
+                "v5o-name-handoff"
+            };
+            (
+                serde_json::from_slice::<Value>(&command(&inputs, &["inspect-semantic"])?)?,
+                version,
+            )
+        } else {
+            let report: Value = serde_json::from_slice(&command(&inputs, &["inspect"])?)?;
+            ensure!(
+                report["semantic_pending"] == false,
+                "semantic verifier still pending"
+            );
+            (report["semantic"].clone(), "v5n-name-handoff")
+        };
+        let captured = rt("epoch145-semantic-continuity-20261121-v1")
+            .join(handoff)
+            .join("semantic-completion.json");
         ensure!(
-            current["semantic_pending"] == false
-                && current["semantic"] == from_ref(&bound(&captured)?)?
-                && current["semantic"]["completion"] == done
-                && current["semantic"]["invocation_id"] == SOURCE,
-            "missing captured V13h completion"
+            current == from_ref(&bound(&captured)?)?
+                && current["completion"] == done
+                && current["invocation_id"] == SOURCE,
+            "missing captured original semantic completion"
         );
     }
     ensure!(
@@ -621,92 +806,113 @@ pub fn run(mode: &str) -> Result<()> {
     check_member(&rt(PKG), SEAL, "run-post")?;
     check_member(&rt(PKG), SEAL, "export145")?;
     if mode == INSPECT {
-        let current = native(E)?;
-        let (pid, iid) = stable(&current, E)?;
-        #[cfg(not(feature = "v5n-136-post"))]
-        let obs = &original["observations"][1];
-        #[cfg(feature = "v5n-136-post")]
-        let obs = &original["sample"]["window"]["native_parent"];
-        let (pid_key, ticks_key) = if cfg!(feature = "v5n-136-post") {
-            ("pid", "start_ticks")
-        } else {
-            ("parent_pid", "parent_ticks")
-        };
-        ensure!(
-            iid == SOURCE
-                && i64::from(pid) == obs[pid_key].as_i64().context("semantic parent")?
-                && platform::ticks(pid)? == obs[ticks_key]
-                && platform::proc_exe(pid)? == rt(SEMANTIC),
-            "different original live verifier"
-        );
-        #[cfg(all(feature = "fixture-post", not(feature = "v5n-136-post")))]
+        #[cfg(any(feature = "v5o-136-post", feature = "v5q-136-post"))]
+        return inspect_pressure(&check_member(&rt(PKG), SEAL, "post-inputs")?, &original);
+        #[cfg(not(any(feature = "v5o-136-post", feature = "v5q-136-post")))]
         {
-            let child = i32::try_from(obs["child_pid"].as_i64().context("original V5f worker")?)?;
-            let parent_command = fs::read(format!("/proc/{pid}/cmdline"))?;
-            let worker_command = fs::read(format!("/proc/{child}/cmdline"))?;
-            let manager = from_ref(&original["manager"])?;
-            let intent = from_ref(&manager["intent"])?;
-            let image = rt(SEMANTIC);
-            let exe = platform::string_path(&image)?;
+            let current = native(E)?;
+            let (pid, iid) = stable(&current, E)?;
+            #[cfg(not(any(
+                feature = "v5n-136-post",
+                feature = "v5o-136-post",
+                feature = "v5q-136-post"
+            )))]
+            let obs = &original["observations"][1];
+            #[cfg(feature = "v5n-136-post")]
+            let obs = &original["sample"]["window"]["native_parent"];
+            let (pid_key, ticks_key) = if cfg!(feature = "v5n-136-post") {
+                ("pid", "start_ticks")
+            } else {
+                ("parent_pid", "parent_ticks")
+            };
             ensure!(
-                platform::proc_exe(child)? == image
-                    && platform::ticks(child)? == obs["child_ticks"]
-                    && parent_command
-                        == [
-                            exe,
-                            "recover-full-output",
-                            text(&intent["fleet"]["path"])?,
-                            text(&intent["fleet"]["sha256"])?,
-                            IMAGE,
-                            ""
-                        ]
-                        .join("\0")
-                        .as_bytes()
-                    && worker_command
-                        == [exe, "recover-worker", &pid.to_string(), IMAGE, ""]
+                iid == SOURCE
+                    && i64::from(pid) == obs[pid_key].as_i64().context("semantic parent")?
+                    && platform::ticks(pid)? == obs[ticks_key]
+                    && platform::proc_exe(pid)? == rt(SEMANTIC),
+                "different original live verifier"
+            );
+            #[cfg(all(
+                feature = "fixture-post",
+                not(any(
+                    feature = "v5n-136-post",
+                    feature = "v5o-136-post",
+                    feature = "v5q-136-post"
+                ))
+            ))]
+            {
+                let child =
+                    i32::try_from(obs["child_pid"].as_i64().context("original V5f worker")?)?;
+                let parent_command = fs::read(format!("/proc/{pid}/cmdline"))?;
+                let worker_command = fs::read(format!("/proc/{child}/cmdline"))?;
+                let manager = from_ref(&original["manager"])?;
+                let intent = from_ref(&manager["intent"])?;
+                let image = rt(SEMANTIC);
+                let exe = platform::string_path(&image)?;
+                ensure!(
+                    platform::proc_exe(child)? == image
+                        && platform::ticks(child)? == obs["child_ticks"]
+                        && parent_command
+                            == [
+                                exe,
+                                "recover-full-output",
+                                text(&intent["fleet"]["path"])?,
+                                text(&intent["fleet"]["sha256"])?,
+                                IMAGE,
+                                ""
+                            ]
                             .join("\0")
                             .as_bytes()
-                    && fs::read_to_string(format!("/proc/{child}/cgroup"))?.trim()
-                        == format!("0::/system.slice/{E}")
-                    && fs::read_to_string(format!("/proc/{child}/stat"))?
-                        .rsplit_once(')')
-                        .context("worker stat")?
-                        .1
-                        .split_whitespace()
-                        .nth(1)
-                        .context("worker parent")?
-                        .parse::<i32>()?
-                        == pid,
-                "different live V5f parent or worker"
+                        && worker_command
+                            == [exe, "recover-worker", &pid.to_string(), IMAGE, ""]
+                                .join("\0")
+                                .as_bytes()
+                        && fs::read_to_string(format!("/proc/{child}/cgroup"))?.trim()
+                            == format!("0::/system.slice/{E}")
+                        && fs::read_to_string(format!("/proc/{child}/stat"))?
+                            .rsplit_once(')')
+                            .context("worker stat")?
+                            .1
+                            .split_whitespace()
+                            .nth(1)
+                            .context("worker parent")?
+                            .parse::<i32>()?
+                            == pid,
+                    "different live V5f parent or worker"
+                );
+                ensure!(bound(&image)?["sha256"] == IMAGE, "V5f image changed");
+                check_member(&rt(FIT_PKG), FIT_SEAL, "post-stop-fit")?;
+            }
+            #[cfg(feature = "v5n-136-post")]
+            {
+                let child = &original["sample"]["window"]["native_child"];
+                let child_pid = i32::try_from(child["pid"].as_i64().context("V5n child")?)?;
+                ensure!(
+                    platform::proc_exe(child_pid)? == rt(SEMANTIC)
+                        && platform::ticks(child_pid)? == child["start_ticks"]
+                        && fs::read_to_string(format!("/proc/{child_pid}/cgroup"))?.trim()
+                            == format!("0::/system.slice/{E}"),
+                    "different advancing V5n child"
+                );
+                check_member(&rt(FIT_PKG), FIT_SEAL, "post-stop-fit")?;
+            }
+            println!(
+                "{}",
+                json!({"original":iid,"manager":pid,"fleet":fleet()?,"post_seal":SEAL,"launch":false})
             );
-            ensure!(bound(&image)?["sha256"] == IMAGE, "V5f image changed");
-            check_member(&rt(FIT_PKG), FIT_SEAL, "post-stop-fit")?;
+            return Ok(());
         }
-        #[cfg(feature = "v5n-136-post")]
-        {
-            let child = &original["sample"]["window"]["native_child"];
-            let child_pid = i32::try_from(child["pid"].as_i64().context("V5n child")?)?;
-            ensure!(
-                platform::proc_exe(child_pid)? == rt(SEMANTIC)
-                    && platform::ticks(child_pid)? == child["start_ticks"]
-                    && fs::read_to_string(format!("/proc/{child_pid}/cgroup"))?.trim()
-                        == format!("0::/system.slice/{E}"),
-                "different advancing V5n child"
-            );
-            check_member(&rt(FIT_PKG), FIT_SEAL, "post-stop-fit")?;
-        }
-        println!(
-            "{}",
-            json!({"original":iid,"manager":pid,"fleet":fleet()?,"post_seal":SEAL,"launch":false})
-        );
-        return Ok(());
     }
     ensure!(mode == FOLLOW, "invalid incident mode");
     #[cfg(feature = "fixture-post")]
     let _previous = boundary::guard_predecessor()?;
     let _lock = guard_instance(&rt(STATE_PATH))?;
     events::manager(E, SOURCE)?;
-    if cfg!(feature = "v5n-136-post") {
+    if cfg!(any(
+        feature = "v5n-136-post",
+        feature = "v5o-136-post",
+        feature = "v5q-136-post"
+    )) {
         let inputs = check_member(&rt(PKG), SEAL, "post-inputs")?;
         command(&inputs, &["capture"])?;
         let retained = completed_semantics()?;

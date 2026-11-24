@@ -24,6 +24,51 @@ class CompletionJoin(unittest.TestCase):
         self.phase = dict(Id=HANDOFF["UNIT"], MainPID="0", stage="v5j-semantic-complete",
                           completion=self.semantic["completion"])
 
+    def test_v5o_joins_only_the_actual_pinned_start_and_current_drained_owner(self):
+        semantic = dict(self.semantic, invocation_id=HANDOFF["V5O_IID"])
+        for field in ("start", "verified", "extraction", "completion"):
+            semantic[field] = HANDOFF["ref"](HANDOFF["V5O_STATE"] / Path(semantic[field]["path"]).name, "a" * 64)
+        semantic["start"] = HANDOFF["V5O_START"]
+        inputs = dict(self.inputs, semantic=semantic)
+        phase = dict(self.phase, completion=semantic["completion"])
+        join = HANDOFF["join"]
+        self.assertEqual(join(inputs, semantic, phase, v5o=True), semantic["completion"])
+        self.assertIsNone(join(dict(inputs, semantic=None, semantic_pending=True), None, None, v5o=True))
+        for crossed in (None, self.semantic, dict(semantic, start=dict(semantic["start"], sha256="a" * 64))):
+            with self.subTest(receipt=crossed), self.assertRaises(ValueError):
+                join(dict(inputs, semantic=crossed), crossed, phase, v5o=True)
+        with self.assertRaises(ValueError):
+            join(inputs, semantic, dict(phase, MainPID="55"), v5o=True)
+
+    def test_v5o_completion_tools_come_from_the_selected_versioned_profile(self):
+        tools = HANDOFF["v5o_completion_tools"]
+        post = HANDOFF["V5O_POST"]
+        profile = dict(seal_sha256="a" * 64, build_sha256="b" * 64, adapter_sha256="c" * 64)
+        frozen = dict(seal=HANDOFF["ref"](post / "deployment-seal-receipt.json", profile["seal_sha256"]),
+                      build=HANDOFF["ref"](post / "build-proof.json", profile["build_sha256"]),
+                      adapter=HANDOFF["ref"](post / "incident-post-phase.py", profile["adapter_sha256"]))
+        plan = dict(holding145_semantic_worker=HANDOFF["V5O_RESULT"], holding145_completion=frozen)
+        self.assertEqual(tools(plan, profile), frozen)
+        for changed in (dict(plan, holding145_semantic_worker=HANDOFF["SEMANTIC_RESULT"]),
+                        dict(plan, holding145_completion=HANDOFF["COMPLETION_TOOLS"])):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                tools(changed, profile)
+
+    def test_v5q_pending_or_crossed_start_cannot_admit(self):
+        semantic = dict(self.semantic, invocation_id=HANDOFF["V5Q_IID"])
+        for field in ("start", "verified", "extraction", "completion"):
+            semantic[field] = HANDOFF["ref"](HANDOFF["V5Q_STATE"] / Path(semantic[field]["path"]).name, "a" * 64)
+        semantic["start"] = HANDOFF["V5Q_START"]
+        inputs = dict(self.inputs, semantic=semantic)
+        phase = dict(self.phase, completion=semantic["completion"])
+        self.assertEqual(HANDOFF["join"](inputs, semantic, phase, v5q=True), semantic["completion"])
+        self.assertIsNone(HANDOFF["join"](dict(inputs, semantic=None, semantic_pending=True), None, None, v5q=True))
+        for receipt in (self.semantic, dict(semantic, start=HANDOFF["V5O_START"]), dict(semantic, pid1_success="")):
+            with self.subTest(receipt=receipt), self.assertRaises(ValueError):
+                HANDOFF["join"](dict(inputs, semantic=receipt), receipt, phase, v5q=True)
+        with self.assertRaises(ValueError):
+            HANDOFF["join"](inputs, semantic, dict(phase, MainPID="123"), v5q=True)
+
     def test_captured_completion_and_drained_native_owner_join(self):
         self.assertEqual(HANDOFF["join"](self.inputs, self.semantic, self.phase), self.semantic["completion"])
 

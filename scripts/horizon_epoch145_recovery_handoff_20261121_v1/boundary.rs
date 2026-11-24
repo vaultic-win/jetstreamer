@@ -34,7 +34,14 @@ pub(super) mod profile {
         pub(crate) const CLOSED: &str =
             "d267b6e774e26fc5c9d5b95f5845b547afbfde74f58e434b835acd63785a7f07";
     }
-    #[cfg(all(feature = "retry-post", not(feature = "v5n-136-post")))]
+    #[cfg(all(
+        feature = "retry-post",
+        not(any(
+            feature = "v5n-136-post",
+            feature = "v5o-136-post",
+            feature = "v5q-136-post"
+        ))
+    ))]
     mod selected {
         pub(crate) const DIR: &str = "epoch145-fixture-retry1-dispatch-20261122-v1";
         pub(crate) const DISPATCH: &str = "horizon-145-fixture-retry1-dispatch-20261122-v1.service";
@@ -43,12 +50,31 @@ pub(super) mod profile {
         pub(crate) const CLOSED: &str =
             "e292ddb3e46ff8e5fb0d0dd39bacc6bb5376ac238c4868b622ccfdb42df47b5a";
     }
-    #[cfg(feature = "v5n-136-post")]
+    #[cfg(all(
+        feature = "v5n-136-post",
+        not(any(feature = "v5o-136-post", feature = "v5q-136-post"))
+    ))]
     mod selected {
         pub(crate) const DIR: &str = "epoch145-v5n-136-dispatch-20261123-v1";
         pub(crate) const DISPATCH: &str = "horizon-145-v5n-136-dispatch-20261123-v1.service";
         pub(crate) const OLD: &str = "horizon-145-fixture-retry1-dispatch-20261122-v1.service";
         pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261123-v8";
+        pub(crate) const CLOSED: &str = env!("HORIZON_145_PREDECESSOR_DRAINED_SHA256");
+    }
+    #[cfg(all(feature = "v5o-136-post", not(feature = "v5q-136-post")))]
+    mod selected {
+        pub(crate) const DIR: &str = "epoch145-v5o-136-dispatch-20261123-v1";
+        pub(crate) const DISPATCH: &str = "horizon-145-v5o-136-dispatch-20261123-v1.service";
+        pub(crate) const OLD: &str = "horizon-145-fixture-retry1-dispatch-20261122-v1.service";
+        pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261123-v9";
+        pub(crate) const CLOSED: &str = env!("HORIZON_145_PREDECESSOR_DRAINED_SHA256");
+    }
+    #[cfg(feature = "v5q-136-post")]
+    mod selected {
+        pub(crate) const DIR: &str = "epoch145-v5q-136-dispatch-20261124-v1";
+        pub(crate) const DISPATCH: &str = "horizon-145-v5q-136-dispatch-20261124-v1.service";
+        pub(crate) const OLD: &str = "horizon-145-fixture-retry1-dispatch-20261122-v1.service";
+        pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261124-v10";
         pub(crate) const CLOSED: &str = env!("HORIZON_145_PREDECESSOR_DRAINED_SHA256");
     }
     pub(crate) use selected::*;
@@ -184,7 +210,11 @@ fn registration() -> Result<(Value, Value)> {
             "seal": bound(&provider.join("deployment-seal-receipt.json"))?}),
             "different registered V21 provider"
         );
-        let (status, status_sha) = if cfg!(feature = "v5n-136-post") {
+        let (status, status_sha) = if cfg!(any(
+            feature = "v5n-136-post",
+            feature = "v5o-136-post",
+            feature = "v5q-136-post"
+        )) {
             (
                 rt(
                     "survivor172-cadence-20261122-v1/tools-cold168-retry4-136-v1/deployment-seal-receipt.json",
@@ -248,7 +278,14 @@ fn previous_locks() -> Result<Vec<PathBuf>> {
         vec![(original, "controller_lock")],
         vec![(OLD, "previous"), (earlier, "earlier")],
     );
-    #[cfg(all(feature = "retry-post", not(feature = "v5n-136-post")))]
+    #[cfg(all(
+        feature = "retry-post",
+        not(any(
+            feature = "v5n-136-post",
+            feature = "v5o-136-post",
+            feature = "v5q-136-post"
+        ))
+    ))]
     let (locks, units) = (
         vec![
             (original, "controller_lock"),
@@ -263,7 +300,11 @@ fn previous_locks() -> Result<Vec<PathBuf>> {
             (earlier, "earliest"),
         ],
     );
-    #[cfg(feature = "v5n-136-post")]
+    #[cfg(any(
+        feature = "v5n-136-post",
+        feature = "v5o-136-post",
+        feature = "v5q-136-post"
+    ))]
     let (locks, units) = (
         vec![
             (original, "controller_lock"),
@@ -286,6 +327,31 @@ fn previous_locks() -> Result<Vec<PathBuf>> {
             (earlier, "earliest"),
         ],
     );
+    #[cfg(any(feature = "v5o-136-post", feature = "v5q-136-post"))]
+    {
+        let retired = [(
+            "epoch145-v5n-136-dispatch-20261123-v1",
+            "horizon-145-v5n-136-dispatch-20261123-v1.service",
+        )];
+        #[cfg(feature = "v5q-136-post")]
+        let retired = retired.into_iter().chain([(
+            "epoch145-v5o-136-dispatch-20261123-v1",
+            "horizon-145-v5o-136-dispatch-20261123-v1.service",
+        )]);
+        for (directory, unit) in retired {
+            let owner = native(unit)?;
+            drained(&owner, unit)?;
+            ensure!(
+                owner["LoadState"] == "not-found"
+                    && !rt(directory).join("READY.json").try_exists()?
+                    && !rt(directory).join("OFFER.json").try_exists()?
+                    && !Path::new("/sys/fs/cgroup/system.slice")
+                        .join(unit)
+                        .try_exists()?,
+                "retired selector still owns a handoff"
+            );
+        }
+    }
     let mut paths = Vec::new();
     for (path, field) in locks {
         let m = fs::symlink_metadata(&path)?;
@@ -362,7 +428,11 @@ fn before_submission() -> Result<()> {
             "145 already crossed its post boundary"
         );
     }
-    #[cfg(feature = "v5n-136-post")]
+    #[cfg(any(
+        feature = "v5n-136-post",
+        feature = "v5o-136-post",
+        feature = "v5q-136-post"
+    ))]
     for entry in fs::read_dir(rt("epoch145-publication-20261121-v1"))? {
         let name = entry?.file_name();
         let name = name.to_str().context("non-UTF8 145 publication entry")?;
@@ -399,18 +469,50 @@ fn fixture_plan(plan: &Value) -> Result<()> {
     };
     let worker = json!({"path":rt(START),"sha256":ADVANCING});
     let build = binding("build-proof.json")?;
-    #[cfg(not(feature = "v5n-136-post"))]
+    #[cfg(not(any(
+        feature = "v5n-136-post",
+        feature = "v5o-136-post",
+        feature = "v5q-136-post"
+    )))]
     ensure!(
         from_ref(&build)?["prior_phase"] == worker,
         "different V5f retained worker"
     );
-    #[cfg(feature = "v5n-136-post")]
+    #[cfg(all(
+        feature = "v5n-136-post",
+        not(any(feature = "v5o-136-post", feature = "v5q-136-post"))
+    ))]
     ensure!(
         from_ref(&worker)?["invocation_id"] == SEMANTIC
             && build["sha256"]
                 == "acd58b6927de438b036275c50d2edbc08f2f33626dec64e6a43d2235b80e541c",
         "different original V5n or V13h build"
     );
+    #[cfg(any(feature = "v5o-136-post", feature = "v5q-136-post"))]
+    {
+        let receipt = from_ref(&build)?;
+        let family = rt("epoch145-semantic-continuity-20261121-v1");
+        let (key, name, hash) = if cfg!(feature = "v5q-136-post") {
+            (
+                "audit_turnover_binding",
+                "V5Q_RUNTIME_BINDINGS.json",
+                "a5dc1d9973d950d36f7302b800f0b10421066e135e0912750fd92b98521cadc4",
+            )
+        } else {
+            (
+                "donor_pressure_binding",
+                "V5O_RUNTIME_BINDINGS.json",
+                "d571da98684079bc937a2ddeed52dbcd457eb0a74010519171b851e3e5297137",
+            )
+        };
+        ensure!(
+            from_ref(&worker)?["invocation_id"] == SEMANTIC
+                && receipt["schema"] == "horizon-145-v5j-post-build-v1"
+                && receipt["semantic_submission"] == worker
+                && receipt[key] == json!({"path":family.join(name), "sha256":hash}),
+            "different original semantic invocation or post build"
+        );
+    }
     ensure!(
         seal["destination"] == json!(post)
             && plan["holding145_semantic_worker"] == worker
@@ -849,7 +951,14 @@ pub(super) fn before_post(done: &Value) -> Result<File> {
 mod tests {
     use super::*;
 
-    #[cfg(all(feature = "fixture-post", not(feature = "v5n-136-post")))]
+    #[cfg(all(
+        feature = "fixture-post",
+        not(any(
+            feature = "v5n-136-post",
+            feature = "v5o-136-post",
+            feature = "v5q-136-post"
+        ))
+    ))]
     #[test]
     fn only_the_selected_v7b_and_v13b_can_follow_the_fixture_worker() {
         let actual =

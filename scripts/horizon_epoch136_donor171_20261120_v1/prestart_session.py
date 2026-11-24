@@ -135,7 +135,7 @@ def boundary(proof, writer, fleetref, registered):
 
 
 def capture_context(fleetref, fence, waiter, *, pin, checked, runpy, json, observation, fixture_provider=None,
-                    retry=False, v5n=False, check_package=None, read_immutable=None):
+                    retry=False, v5n=False, v5o=False, v5q=False, check_package=None, read_immutable=None):
     # The systemd writer and its immutable plan, not a projection from the caller,
     # select the deployed price and cross-owner inspector.
     proc = Path("/proc") / str(os.getppid())
@@ -162,27 +162,32 @@ def capture_context(fleetref, fence, waiter, *, pin, checked, runpy, json, obser
     checker = ready["boundary_inspector"]
     executable = Path(checker["path"])
     require(executable.is_relative_to(RUNTIME) and executable.parent != Path("/"), "foreign boundary inspector")
-    if v5n:
-        require(owner_pkg == RUNTIME / "epoch136-joint-writer-20261123-v8/controller" and
+    if v5n or v5o or v5q:
+        version, writer, dispatcher = (
+            ("V5Q_IID", "epoch136-joint-writer-20261124-v10", "epoch145-v5q-136-dispatch-20261124-v1") if v5q else
+            ("V5O_IID", "epoch136-joint-writer-20261123-v9", "epoch145-v5o-136-dispatch-20261123-v1") if v5o else
+            ("IID", "epoch136-joint-writer-20261123-v8", "epoch145-v5n-136-dispatch-20261123-v1"))
+        require(owner_pkg == RUNTIME / writer / "controller" and
                 Path(planref["path"]) == owner_pkg.parent / "registered-production-plan.json" and
-                ready_path == RUNTIME / "epoch145-v5n-136-dispatch-20261123-v1/READY.json",
-                "foreign V5n writer or selector")
+                ready_path == RUNTIME / dispatcher / "READY.json", "foreign semantic writer or selector")
         module = owner_pkg / "v5n_boundary.py"
         pin(module, members[module.name]["sha256"])
         successor = runpy.run_path(str(module))
-        require(plan["holding145_semantic_worker"] == successor["SEMANTIC_RESULT"] and
-                plan["holding145_completion"] == successor["COMPLETION_TOOLS"] and
-                ready["schema"] == "horizon-145-136-prestart-selector-ready-v1" and
-                ready["original_semantic_invocation"] == successor["IID"] and
-                ready["registered_provider"] == plan["joint_fit_145"], "foreign V5n boundary")
+        require(ready["schema"] == "horizon-145-136-prestart-selector-ready-v1" and
+                ready["original_semantic_invocation"] == successor[version] and
+                ready["registered_provider"] == plan["joint_fit_145"], "foreign semantic boundary")
+        if not (v5o or v5q):
+            require(plan["holding145_semantic_worker"] == successor["SEMANTIC_RESULT"] and
+                    plan["holding145_completion"] == successor["COMPLETION_TOOLS"], "foreign V5n boundary")
         require(executable == ready_path.parent / "tools/boundary-inspector" and
                 ready["deployment"]["path"] == str(executable.parent / "deployment-seal-receipt.json"),
-                "foreign V5n boundary inspector")
+                "foreign semantic boundary inspector")
         deployment = check_package(executable.parent, ready["deployment"]["sha256"])
         require(sum(row["name"] == executable.name and row["sha256"] == checker["sha256"] and row["mode"] == "0555"
-                    for row in deployment["members"]) == 1, "unsealed V5n boundary inspector")
-        provider = fixture_provider(ready["registered_provider"],
+                    for row in deployment["members"]) == 1, "unsealed semantic boundary inspector")
+        directory = (successor["V5Q_PROVIDER"] if v5q else successor["V5O_PROVIDER"] if v5o else
                      RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5n-136-v1")
+        provider = fixture_provider(ready["registered_provider"], directory)
         price = runpy.run_path(str(provider))
     elif fixture_provider is not None:
         writer = "epoch136-joint-writer-20261122-v7c" if retry else "epoch136-joint-writer-20261122-v7b"
@@ -216,7 +221,12 @@ def capture_context(fleetref, fence, waiter, *, pin, checked, runpy, json, obser
         require(len(call.stdout) < 65536, "oversized selector proof")
         proof = json.loads(call.stdout)
         completion = boundary(proof, writer, fleetref, registered)
-        if v5n:
+        if v5o or v5q:
+            joined = successor["inspect_v5o"](plan, pin, check_package, read_immutable,
+                                  successor["read_inputs"], successor["read_phase"], v5q=v5q)
+            require(not joined["semantic_pending"] and joined["semantic_complete"] == completion,
+                    "different pinned semantic completion or native handoff")
+        elif v5n:
             joined = successor["inspect"](pin, check_package, read_immutable, successor["read_inputs"],
                                          successor["read_phase"])
             require(not joined["semantic_pending"] and joined["semantic_complete"] == completion,

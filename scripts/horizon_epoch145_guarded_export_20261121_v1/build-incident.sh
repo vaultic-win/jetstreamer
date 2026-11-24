@@ -65,6 +65,16 @@ if [[ $flavor == homefloor-rejoin ]]; then
   homefloor_rejoin=true
   flavor=fixture-rejoin
 fi
+v5q_136_post=false
+if [[ $flavor == v5q-136-post ]]; then
+  v5q_136_post=true
+  flavor=v5n-post
+fi
+v5o_136_post=false
+if [[ $flavor == v5o-136-post ]]; then
+  v5o_136_post=true
+  flavor=v5n-post
+fi
 v5n_136_post=false
 if [[ $flavor == v5n-136-post ]]; then
   v5n_136_post=true
@@ -196,6 +206,8 @@ if $v5m_post; then
 fi
 if $v5n_post; then extra+=(--cfg incident_v5n_post145_only); fi
 if $v5n_136_post; then extra+=(--cfg incident_v5n_136_post145_only); fi
+if $v5o_136_post; then extra+=(--cfg incident_v5o_136_post145_only); fi
+if $v5q_136_post; then extra+=(--cfg incident_v5q_136_post145_only); fi
 if $v5j_retry_post; then extra+=(--cfg incident_v5j_retry1_post145_only); fi
 if $registered_v7c; then extra+=(--cfg incident_v7c_post145_only); fi
 if $registered_v7b; then extra+=(--cfg incident_v7b_post145_only); fi
@@ -261,6 +273,8 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
       if $v5k_post; then native_package=tools-homefloor-145-lease-rejoin-v1; fi
       if $v5m_post; then native_package=tools-homefloor-145-missed-rejoin-v1; fi
       if $v5n_post; then native_package=tools-homefloor-145-guard-walk-rejoin-v1; fi
+      if $v5o_136_post; then native_package=tools-homefloor-145-donor-pressure-rejoin-v1; fi
+      if $v5q_136_post; then native_package=tools-homefloor-145-audit-turnover-rejoin-v1; fi
       [[ ${5:?expected original build price generation} == "$native_package" ]]
     elif $fixture_post; then
       native_package=${5:?expected build price generation}
@@ -369,7 +383,7 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
       fi
     fi
     audit_probe=false
-    if $audit_turnover && [[ ! -s "$q/fit-$probe.json" &&
+    if { $audit_turnover || $v5q_136_post; } && [[ ! -s "$q/fit-$probe.json" &&
          "$last" == 'public audit workers changed during capacity capture' ]]; then
       audit_probe=true
     fi
@@ -396,6 +410,8 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
     if $audit_turnover; then build_unit=horizon-145-audit-turnover-rejoin-build-v1.service; fi
     if $v5n_post; then build_unit=horizon-145-v5n-post-build-v1.service; fi
     if $v5n_136_post; then build_unit=horizon-145-v5n-136-post-build-v1.service; fi
+    if $v5o_136_post; then build_unit=horizon-145-v5o-136-post-build-v1.service; fi
+    if $v5q_136_post; then build_unit=horizon-145-v5q-136-post-build-v1.service; fi
     [[ $cg == "$slice/$build_unit" ]]
     [[ $(cat "$slice/cpu.max") == '1200000 100000' && $(cat "$slice/cpu.idle") == 1 ]]
     [[ $(cat "$slice/memory.high") == 21474836480 && $(cat "$slice/memory.max") == 25769803776 ]]
@@ -465,7 +481,13 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
       selector=--retry1
       if $v5k_post; then selector=--lease-ready; fi
       if $v5m_post; then
-        if $v5n_post; then
+        if $v5q_136_post; then
+          selector=--audit-turnover
+          [[ $seal_digest == f553f7a4f7d4b061f637b0a83e936e6dd6a9a33d4dcae56b15e492f74339b679 ]]
+        elif $v5o_136_post; then
+          selector=--donor-pressure
+          [[ $seal_digest == 1618a2ec8613292dbaa45b1c34e8fa9ea8a2866fb7c6a0b4d1e575099577a069 ]]
+        elif $v5n_post; then
           selector=--guard-walk
           handoff=${provider%/*/*}/tools-homefloor-145-handoff-v5
           jq -e --arg path "${provider%/*}/deployment-seal-receipt.json" --arg digest "$seal_digest" '
@@ -584,6 +606,8 @@ if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-pos
   if $v5m_post; then phase_package=tools-v13g; fi
   if $v5n_post; then phase_package=tools-v13h; fi
   if $v5n_136_post; then phase_package=tools-v13i; fi
+  if $v5o_136_post; then phase_package=tools-v13j; fi
+  if $v5q_136_post; then phase_package=tools-v13k; fi
   mkdir "$out/tmp/$phase_package"
   cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
   if $v5j_post; then

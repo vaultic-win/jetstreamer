@@ -6,32 +6,84 @@ use std::path::Path;
 
 const RUNTIME: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 const FAMILY: &str = "epoch145-semantic-continuity-20261121-v1";
-#[cfg(not(feature = "v5n-semantic"))]
+#[cfg(not(any(
+    feature = "v5n-semantic",
+    feature = "v5o-semantic",
+    feature = "v5q-semantic"
+)))]
 const PRICE: &str = "incident-replay-fit-20261121-v1/tools-v20";
-#[cfg(feature = "v5n-semantic")]
+#[cfg(all(
+    feature = "v5n-semantic",
+    not(any(feature = "v5o-semantic", feature = "v5q-semantic"))
+))]
 const PRICE: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5n-136-v1";
 
-#[cfg(feature = "v5n-semantic")]
+#[cfg(all(
+    feature = "v5n-semantic",
+    not(any(feature = "v5o-semantic", feature = "v5q-semantic"))
+))]
 mod profile {
     pub const CONTROLLER: &str = "epoch136-joint-writer-20261123-v8/controller";
     pub const DISPATCHER: &str = "epoch145-v5n-136-dispatch-20261123-v1";
     pub const WORKER: &str = "v5n-name-handoff/submission-result.json";
     pub const POST: &str = "tools-v13h";
 }
-#[cfg(all(feature = "retry-semantic", not(feature = "v5n-semantic")))]
+#[cfg(all(
+    feature = "retry-semantic",
+    not(any(
+        feature = "v5n-semantic",
+        feature = "v5o-semantic",
+        feature = "v5q-semantic"
+    ))
+))]
 mod profile {
     pub const CONTROLLER: &str = "epoch136-joint-writer-20261122-v7c/controller";
     pub const DISPATCHER: &str = "epoch145-fixture-retry1-dispatch-20261122-v1";
     pub const WORKER: &str = "V5F_RETRY1_ACTUAL_ADVANCING_WORKER.json";
     pub const POST: &str = "tools-v13c";
 }
-#[cfg(not(any(feature = "retry-semantic", feature = "v5n-semantic")))]
+#[cfg(not(any(
+    feature = "retry-semantic",
+    feature = "v5n-semantic",
+    feature = "v5o-semantic",
+    feature = "v5q-semantic"
+)))]
 mod profile {
     pub const CONTROLLER: &str = "epoch136-joint-writer-20261122-v7b/controller";
     pub const DISPATCHER: &str = "epoch145-fixture-phase-dispatch-20261122-v1";
     pub const WORKER: &str = "V5F_ACTUAL_ADVANCING_WORKER.json";
     pub const POST: &str = "tools-v13b";
 }
+#[cfg(all(feature = "v5o-semantic", not(feature = "v5q-semantic")))]
+const PRICE: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5o-136-v1";
+#[cfg(all(feature = "v5o-semantic", not(feature = "v5q-semantic")))]
+mod profile {
+    pub const CONTROLLER: &str = "epoch136-joint-writer-20261123-v9/controller";
+    pub const DISPATCHER: &str = "epoch145-v5o-136-dispatch-20261123-v1";
+    pub const WORKER: &str = "v5o-name-handoff/submission-result.json";
+    pub const POST: &str = "tools-v13j";
+}
+#[cfg(feature = "v5q-semantic")]
+const PRICE: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5q-136-v1";
+#[cfg(feature = "v5q-semantic")]
+mod profile {
+    pub const CONTROLLER: &str = "epoch136-joint-writer-20261124-v10/controller";
+    pub const DISPATCHER: &str = "epoch145-v5q-136-dispatch-20261124-v1";
+    pub const WORKER: &str = "v5q-name-handoff/submission-result.json";
+    pub const POST: &str = "tools-v13k";
+}
+#[cfg(any(
+    feature = "v5n-semantic",
+    feature = "v5o-semantic",
+    feature = "v5q-semantic"
+))]
+const SUBMISSION: &str = if cfg!(feature = "v5q-semantic") {
+    "398f1a2d5d5a50ab4d35c0f27de035d7c07023b6c8d632ef326b9fcd169cb5e9"
+} else if cfg!(feature = "v5o-semantic") {
+    "4d80587d22ffa0883696f96c30958b54d30fb5455bde35050e96b50c8ba8c544"
+} else {
+    "57eb2aadef0bd6e5591800c439fa0f2e6d701c2f4baa3dc45b5074fdddebd02e"
+};
 use profile::*;
 
 fn reference(row: &Value, directory: &str, name: &str) -> Result<()> {
@@ -61,11 +113,14 @@ pub fn validate(plan: &Value) -> Result<()> {
         "deployment-seal-receipt.json",
     )?;
     reference(&plan["holding145_semantic_worker"], FAMILY, WORKER)?;
-    #[cfg(feature = "v5n-semantic")]
+    #[cfg(any(
+        feature = "v5n-semantic",
+        feature = "v5o-semantic",
+        feature = "v5q-semantic"
+    ))]
     ensure!(
-        plan["holding145_semantic_worker"]["sha256"]
-            == "57eb2aadef0bd6e5591800c439fa0f2e6d701c2f4baa3dc45b5074fdddebd02e",
-        "different original V5n submission"
+        plan["holding145_semantic_worker"]["sha256"] == SUBMISSION,
+        "different original semantic submission"
     );
     for (key, name) in [
         ("seal", "deployment-seal-receipt.json"),
@@ -101,10 +156,13 @@ mod tests {
             "holding145_completion":{"seal":post("deployment-seal-receipt.json"),
                                      "build":post("build-proof.json"),"adapter":post("incident-post-phase.py")}
         });
-        #[cfg(feature = "v5n-semantic")]
+        #[cfg(any(
+            feature = "v5n-semantic",
+            feature = "v5o-semantic",
+            feature = "v5q-semantic"
+        ))]
         {
-            plan["holding145_semantic_worker"]["sha256"] =
-                json!("57eb2aadef0bd6e5591800c439fa0f2e6d701c2f4baa3dc45b5074fdddebd02e");
+            plan["holding145_semantic_worker"]["sha256"] = json!(SUBMISSION);
             let mut crossed = plan.clone();
             crossed["holding145_semantic_worker"]["sha256"] = json!("f".repeat(64));
             assert!(validate(&crossed).is_err());

@@ -36,6 +36,8 @@ fixture="$runtime/epoch136-joint-writer-20261122-v7b"
 selector="$runtime/epoch145-fixture-phase-dispatch-20261122-v1/READY.json"
 retry="$runtime/epoch136-joint-writer-20261122-v7c"
 successor="$runtime/epoch136-joint-writer-20261123-v8"
+v5o="$runtime/epoch136-joint-writer-20261123-v9"
+v5q="$runtime/epoch136-joint-writer-20261124-v10"
 if [[ $(realpath -e -- "$0") == "$retry/controller/run-writer" ]]; then
     fixture="$retry"
     selector="$runtime/epoch145-fixture-retry1-dispatch-20261122-v1/READY.json"
@@ -43,6 +45,14 @@ fi
 if [[ $(realpath -e -- "$0") == "$successor/controller/run-writer" ]]; then
     fixture="$successor"
     selector="$runtime/epoch145-v5n-136-dispatch-20261123-v1/READY.json"
+fi
+if [[ $(realpath -e -- "$0") == "$v5o/controller/run-writer" ]]; then
+    fixture="$v5o"
+    selector="$runtime/epoch145-v5o-136-dispatch-20261123-v1/READY.json"
+fi
+if [[ $(realpath -e -- "$0") == "$v5q/controller/run-writer" ]]; then
+    fixture="$v5q"
+    selector="$runtime/epoch145-v5q-136-dispatch-20261124-v1/READY.json"
 fi
 if [[ $(realpath -e -- "$0") == "$fixture/controller/run-writer" ]]; then
     [[ $pkg == "$fixture/controller" ]]
