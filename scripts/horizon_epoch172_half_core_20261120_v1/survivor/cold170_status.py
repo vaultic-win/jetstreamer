@@ -20,7 +20,8 @@ STOP = 'd670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a'
 FIELD = 'current_homefloor_cold166_167_170_owners'
 BINDING = LOCAL / f'{ATTEMPT}-170-generation.json'
 FAILED_RUN = ROOT / 'failed-replay-20261124T123309Z'
-FAILED_CADENCE = LOCAL.name == 'tools-cold168-retry4-failed170-v1'
+FAILED166_CADENCE = LOCAL.name == 'tools-cold168-retry4-failed166-v1'
+FAILED_CADENCE = FAILED166_CADENCE or LOCAL.name == 'tools-cold168-retry4-failed170-v1'
 FAILED_STATUS = 'cold170_retry13_execution_failure'
 FAILED_TERMINAL = {'path': str(FAILED_RUN/'TERMINAL.json'),
                    'sha256': '16664fda43d296d115858ff67a173d6d0cccb5f2ac90d446aa797da34a2f6c9d'}
@@ -202,15 +203,15 @@ def failed_route(fleet=None):
     return result
 
 
-def roster(module, fleet_ref, fleet, terminal=None):
+def roster(module, fleet_ref, fleet, terminal=None, failed166=None):
     checks = {166: retry166.check_generation, 167: cold167.check_generation, 170: check_generation}
     if cold168:
         checks[168] = lambda ref, data, state: cold168.check_generation(ref, data, state, cold167.EVENT)
     enrolled = set()
     for epoch, check in checks.items():
         state = module.native(epoch)
-        if epoch == 170 and terminal:
-            need(state is None, 'terminal cold170 producer still active')
+        if (epoch == 170 and terminal) or (epoch == 166 and failed166):
+            need(state is None, f'terminal cold{epoch} producer still active')
             continue
         if state is None:
             optional = {166: retry166}
@@ -235,8 +236,12 @@ def reconcile(c, observed_lane):
     c.histories = {}
     terminal = terminal_route(c.fleet)
     c.failed170 = failed_route(c.fleet)
+    c.failed166 = retry166.failed_route(c.fleet) if FAILED166_CADENCE else None
     need(not (terminal and c.failed170), 'conflicting epoch 170 commit and failure')
-    enrolled = roster(module, c.fleet_ref, c.fleet, terminal or c.failed170)
+    enrolled = roster(module, c.fleet_ref, c.fleet, terminal or c.failed170, c.failed166)
+    if c.failed166:
+        module.ROUTES.pop(166)
+        need(all(r['range'] != '166' for r in c.cfg['replays']), 'failed epoch 166 remained in sampled roster')
     if c.failed170:
         module.ROUTES.pop(170)
         need(all(r['range'] != '170' for r in c.cfg['replays']), 'failed epoch 170 remained in sampled roster')
@@ -313,6 +318,18 @@ def install(c, fleet):
     if 166 in c.new_rows:
         fleet[retry166.FIELD] = {key: c.recovered_owners[key] for key in ('166', '167')}
         fleet['current_homefloor_cold166_167_observation'] = capture
+    if c.failed166:
+        fleet[retry166.TERMINAL_FIELD] = c.failed166
+        if '166' in fleet.get(retry166.FIELD, {}):
+            fleet['historical_cold166_retry11_owner'] = fleet[retry166.FIELD]['166']
+            fleet[retry166.FIELD] = {'167': c.recovered_owners['167']}
+        row = next(v for v in fleet['epochs'] if v['epoch'] == 166)
+        previous = row.pop('current_home_floor_stop', row.get('original_home_floor_stop'))
+        need(previous['completion']['sha256'] == retry166.STOP, 'lost stopped predecessor of failed cold166')
+        row.update(original_home_floor_stop=previous, cold166_retry11_write_version_failure=c.failed166,
+                   state='verification', no_live_producer_claimed=True, current_repair_owner='/root', repair_open=True,
+                   current_status_scope='Epoch 166 retry11 exited on a historical account write version gap.',
+                   next_action='Reproduce the failing slot transition with the retained source and cursor evidence.')
     if 170 in c.commits:
         proof=c.commits[170]
         fleet['cold170_local_commit']=proof['terminal']

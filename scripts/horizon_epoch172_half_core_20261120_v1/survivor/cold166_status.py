@@ -12,6 +12,63 @@ TIMER='horizon-guard-166-independent-retry11-20261122.timer'
 STOP='a72e48f26f716ac397b974d73040fec59c68957ce21be60634627039b3e7cab6'
 FIELD='current_homefloor_cold166_167_owners'
 BINDING=Path(__file__).resolve().with_name('retry11-generation.json')
+TERMINAL_FIELD = 'cold166_retry11_write_version_failure'
+TERMINAL = dict(path=str(ROOT/'WRITE_VERSION_TERMINAL_20261124.json'),
+                sha256='d14e5b66958981056b8606e6354f08615c801ed9c1c5414747723c225d2c9bc0')
+
+
+def failed_route(fleet=None):
+    from owners import show
+
+    terminal = checked(TERMINAL)
+    intent = checked(terminal['intent'])
+    admission = bound(ROOT/'ACTUAL_ADMISSION_AND_PROTECTION.json')
+    first_worker = bound(ROOT/'FIRST_PROTECTED_WORKER.json')
+    admitted = checked(admission)
+    worker = checked(first_worker)
+    invocation = admitted['producer_invocation_id']
+    exit_event = terminal['pid1_exit']
+    timer = terminal['guard_timer_after']
+    need(terminal['schema'] == 'horizon-epoch166-retry11-write-version-terminal-v1'
+         and terminal['epoch'] == admitted['epoch'] == 166
+         and worker['admission'] == admission
+         and terminal['producer_invocation'] == worker['producer_invocation_id'] == invocation
+         and exit_event['_PID'] == '1' and exit_event['UNIT'] == admitted['producer_unit'] == UNIT
+         and exit_event['INVOCATION_ID'] == invocation and exit_event['EXIT_CODE'] == 'exited'
+         and exit_event['EXIT_STATUS'] == '1' and intent['pid1_exit'] == exit_event
+         and intent['error'] == terminal['error']
+         and terminal['guard_timer_before']['InvocationID'] == admitted['timer_invocation_id']
+         and terminal['guard_timer_before']['Triggers'] == TIMER.removesuffix('.timer') + '.service'
+         and admitted['timer_unit'] == TIMER and timer == dict(ActiveState='inactive', Job='')
+         and terminal['resource_credit_bytes'] == 0
+         and terminal['local_payloads_mutated'] is False and terminal['r2_mutations'] is False,
+         'different epoch 166 failure evidence or original reservation')
+    producer = terminal['stopped_producer']
+    guard_unit = TIMER.removesuffix('.timer') + '.service'
+    guard = terminal['guard_after']
+    for unit, state in ((UNIT, producer), (guard_unit, guard)):
+        fields = ('ActiveState', 'MainPID', 'ControlPID', 'ControlGroup', 'Job')
+        current = show(unit, fields)
+        need(current == {key: state[key] for key in fields}
+             and current['ActiveState'] in ('inactive', 'failed')
+             and current['MainPID'] == current['ControlPID'] == '0'
+             and not current['ControlGroup'] and not current['Job'],
+             'failed epoch 166 producer or guard is still live')
+    need(show(TIMER, tuple(timer)) == timer, 'failed epoch 166 guard timer is live')
+    result = dict(terminal=TERMINAL, admission=admission, first_worker=first_worker,
+                  producer_invocation_id=invocation, reservation_ending_bytes=0)
+    if fleet is not None:
+        registered = fleet.get(TERMINAL_FIELD)
+        live = [row for group in ('actual_executing_replays', 'actual_active_bootstraps')
+                for row in fleet[group] if row['epoch'] == 166]
+        if registered is None:
+            need(len(live) == 1 and live[0]['admission'] == admission
+                 and live[0]['unit']['InvocationID'] == invocation
+                 and live[0]['observer_config'] == worker['observer_row'],
+                 'different prior epoch 166 fleet owner')
+        else:
+            need(registered == result and not live, 'conflicting epoch 166 terminal and live owner')
+    return result
 
 def generation():
     binding=checked(bound(BINDING))

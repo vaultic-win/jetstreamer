@@ -22,7 +22,8 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
-HOURLY170 = CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
+FAILED166 = CURRENT.parent == ROOT / 'tools-cold168-retry4-failed166-v1'
+HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
 FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
 assert hashlib.sha256((PACKAGE/'deployment-seal-receipt.json').read_bytes()).hexdigest() == PARENT_SEAL
 sys.path.insert(0,str(PACKAGE))
@@ -101,6 +102,10 @@ def project(original, due, predecessor):
     rows=[owners_by_epoch['172']] if historical else list(owners_by_epoch.values())
     if FAILED170 and '170' in owners_by_epoch and cold_workers.failed_route():
         rows=[row for row in rows if row['range']!='170']
+    if FAILED166 and '166' in owners_by_epoch:
+        cold166_status.failed_route()
+        cold166_status.projection(owners_by_epoch['166'])
+        rows=[row for row in rows if row['range']!='166']
     for row in rows:
         if row['range']!='172':
             cold_workers.projection(row)
@@ -475,6 +480,8 @@ def census(c,bridge):
             cap[name]=c.recovered_ref
         if 170 in c.new_rows:
             cap[f'current_cold170_{cold_workers.ATTEMPT}_protection']=c.recovered_ref
+    if FAILED166:
+        cap['retained_cold166_retry11_reservation'] = c.failed166
     durable(path,witness)
     return witness
 
@@ -689,6 +696,8 @@ def entry():
     if FAILED170:
         need(package == 'tools-cold168-retry4-v1', '170 terminal cadence requires the qualified retry4 parent')
         package = 'tools-cold168-retry4-failed170-hourly170-v1' if HOURLY170 else 'tools-cold168-retry4-failed170-v1'
+    if FAILED166:
+        package = 'tools-cold168-retry4-failed166-v1'
     need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
     receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
     seal=checked(receipt)
@@ -812,10 +821,69 @@ def hourly170_resume(state, receipt, fd):
     return ready
 
 
+def check_failed166_ready(ready, receipt):
+    need(ready['schema'] == 'horizon-epoch166-failed-cadence-ready-v1'
+         and ready['package'] == receipt and ready['old_owner'] ==
+         bound(ROOT/'failed170-retry13-cadence-20261124-v1/ACTIVE.json'),
+         'different failed epoch 166 cadence deployment')
+    fleet_ref = ready['fleet']
+    fleet = checked(fleet_ref)
+    failure = cold166_status.failed_route(fleet)
+    correction = checked(ready['correction'])
+    need(correction['previous_receipt'] == fleet['complete_active_status_receipts']['166']
+         and correction['fleet_predecessor'] == fleet_ref and correction['terminal'] == failure['terminal']
+         and correction['epoch'] == 166 and correction['conditional_header'] == 'If-Match'
+         and correction['authenticated_readback'] and correction['after_status']['phase'] == 'verification'
+         and correction['current_repair_owner'] == '/root', 'different authenticated epoch 166 repair estimate')
+    recovery = checked(ready['old_registration'])
+    retired = checked(recovery['terminal'])
+    need(retired['fleet'] == fleet_ref and retired['prior_config'] == fleet['sole_next_observer']
+         and retired['error'] == 'native sampler failed' and retired['failed_sample'] is None
+         and ready['old_timer'] == names(sealed(recovery['config'])['not_before_utc'])['timer'],
+         'different failed observer clock')
+    cfg = sealed(ready['config'])
+    due = cfg['not_before_utc']
+    need(cfg == project(sealed(recovery['config']), due, fleet['observer'])
+         and [row['range'] for row in cfg['replays']] == ['167', '168', '172']
+         and utc(due) >= utc(sealed(recovery['config'])['not_before_utc'])
+         and utc(due) >= utc(checked(fleet['observer'])['recorded_at_utc']) + dt.timedelta(seconds=1800),
+         'different epoch 166 successor population or schedule')
+    return cfg
+
+
+def failed166_resume(state, receipt, fd):
+    ready_ref = bound(ROOT/'FAILED166_CADENCE_READY.json')
+    ready = checked(ready_ref)
+    cfg = check_failed166_ready(ready, receipt)
+    old = checked(ready['old_owner'])['new']
+    m = os.fstat(fd)
+    need(state['Id'] == old['unit'] == CONTROLLER and state['ActiveState'] == 'active' and not state['Job']
+         and state['InvocationID'] and state['InvocationID'] != old['invocation_id']
+         and (m.st_dev, m.st_ino) == (old['lock']['device'], old['lock']['inode']),
+         'epoch 166 successor does not hold the incumbent consumer lock')
+    try:
+        still_running = owners.ticks(old['pid']) == old['start_ticks']
+    except FileNotFoundError:
+        still_running = False
+    need(not still_running, 'incumbent writer is still running')
+    new_timer = names(cfg['not_before_utc'])['timer']
+    need(timer_names() in ([], [new_timer]), 'foreign observer timer is still armed')
+    pid = os.getpid()
+    actor = dict(unit=CONTROLLER, program=str(CURRENT), invocation_id=state['InvocationID'],
+                 pid=pid, start_ticks=owners.ticks(pid), lock=dict(old['lock'], fd=fd))
+    durable(ROOT/'FAILED166_CADENCE_ACTIVE.json',
+            dict(schema='horizon-epoch166-failed-cadence-active-v1', ready=ready_ref,
+                 old=old, new=actor, producer_mutations=False))
+    return ready
+
+
 def main():
     receipt=entry()
     if sys.argv[1:]==['--check-entry']:
         print(json.dumps(receipt))
+        return
+    if FAILED166 and sys.argv[1:] == ['--check-failed166']:
+        print(json.dumps(check_failed166_ready(read_ref(ROOT/'FAILED166_CADENCE_READY.json'), receipt)))
         return
     if RESUMING:
         member, = (row for row in checked(receipt)['members'] if row['name']=='status_resume.py')
@@ -843,6 +911,8 @@ def main():
             await_private136_owner(state,receipt)
         elif RESUMING:
             resume=status_resume.await_owner(globals(),receipt,state,fd)
+        elif FAILED166:
+            resume=failed166_resume(state,receipt,fd)
         elif HOURLY170:
             resume=hourly170_resume(state,receipt,fd)
         elif FAILED170:
