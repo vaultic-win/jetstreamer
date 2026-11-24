@@ -133,6 +133,7 @@ pub(super) fn validate(c: &Config) -> Result<()> {
     use OrdinaryEpoch::*;
     for (epoch, claim) in [
         (Epoch211, &c.delivery211_claim),
+        (Pinned247, &c.delivery247_pinned_claim),
         (Epoch248, &c.delivery248_claim),
         (Epoch249, &c.delivery249_claim),
         (Epoch250, &c.delivery250_claim),
@@ -161,6 +162,13 @@ pub(super) fn validate(c: &Config) -> Result<()> {
     ensure!(
         !(c.delivery247_resource_only && c.staged247_resource_only),
         "choose one 247 delivery observation"
+    );
+    ensure!(
+        c.delivery247_pinned_claim.is_none()
+            || (!c.delivery247_resource_only
+                && !c.staged247_resource_only
+                && c.successor247_claim.is_none()),
+        "pinned epoch 247 conflicts with a historical delivery owner"
     );
     let registered;
     let owner = if let Some(reference) = &c.successor247_claim {
@@ -456,6 +464,9 @@ const STAGED211_IMAGE_SHA: &str =
     "7271de0e309c83f8fa2f35cf9091280a8b04f66c51d3175ad1d6ff02faa4c59d";
 const STAGED211_ETAG: &str = "7ee07c0c0517ba9265a8c43c01903e95-1760";
 const STAGED211_BYTES: &str = "118062008962";
+const PINNED247: &str = "horizon-upload-247-pinned-public-v254.service";
+const PINNED247_ETAG: &str = "c1be2474b6c9ba8d0ac11405a97ebee3-2688";
+const PINNED247_BYTES: &str = "180370916960";
 const UNIT248: &str = "horizon-upload-248-ordinary-v213.service";
 const IMAGE248: &str = "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/jetstreamer-r2";
 const SHA248: &str = "c1e99ad4b2e7f3fe56235f42a722bbe93e3f13af2003d0eb5a150553ae0a660e";
@@ -463,6 +474,7 @@ const SHA248: &str = "c1e99ad4b2e7f3fe56235f42a722bbe93e3f13af2003d0eb5a150553ae
 pub(super) enum OrdinaryEpoch {
     Epoch211,
     Staged211,
+    Pinned247,
     Epoch248,
     Epoch249,
     Epoch250,
@@ -474,6 +486,7 @@ impl OrdinaryEpoch {
     fn number(self) -> u64 {
         match self {
             Self::Epoch211 | Self::Staged211 => 211,
+            Self::Pinned247 => 247,
             Self::Epoch248 => 248,
             Self::Epoch249 => 249,
             Self::Epoch250 => 250,
@@ -485,6 +498,7 @@ impl OrdinaryEpoch {
         match self {
             Self::Epoch211 => UNIT211,
             Self::Staged211 => STAGED211,
+            Self::Pinned247 => PINNED247,
             Self::Epoch248 => UNIT248,
             Self::Epoch249 => UNIT249,
             Self::Epoch250 => UNIT250,
@@ -495,7 +509,7 @@ impl OrdinaryEpoch {
     }
     fn image(self) -> (&'static str, &'static str) {
         match self {
-            Self::Staged211 => (STAGED211_IMAGE, STAGED211_IMAGE_SHA),
+            Self::Staged211 | Self::Pinned247 => (STAGED211_IMAGE, STAGED211_IMAGE_SHA),
             _ => (IMAGE248, SHA248),
         }
     }
@@ -503,6 +517,7 @@ impl OrdinaryEpoch {
         match self {
             Self::Epoch211 => "ce03172902f1108c996e0ac9e9ac90df9180ef8ba49440a3c428d177a7945da2",
             Self::Staged211 => "d8217282aa7e280568082309a6881fb0a22040156f17524637e2737cf0e9245c",
+            Self::Pinned247 => "6c6f7a3880a5c5e511575e7f51d9feb8ff26a52fe922d088bdecdc3c00c72a8e",
             Self::Epoch248 => "3053ed2ca2b2881f2d83855c0fa1cff6e63618387dfb630c76a3db7a2dc7d1fd",
             Self::Epoch250 => "12e68ddf9b6d2505b6090688b5a3cfa4e720242b264cf2a6e7993b9b02f910c2",
             Self::Epoch251 => "1c815780661e8b502634caff4a2b0d783e831fccc27c612d6a94c3480d00e318",
@@ -543,6 +558,11 @@ impl OrdinaryEpoch {
                 "/home/ubuntu/.jetstreamer-private/current-reader-delivery-211-staged-recovery-v1/receipts".to_owned(),
                 "/var/lib/jetstreamer/horizon211-staged-recovery-v1/epoch-211-plan.json".to_owned(),
             ),
+            Self::Pinned247 => (
+                "/home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output".to_owned(),
+                "/home/ubuntu/.jetstreamer-private/current-reader-delivery-247-pinned-public-v254/receipts".to_owned(),
+                "/home/ubuntu/.jetstreamer-private/current-reader-delivery-247-pinned-public-v254/epoch-247-plan.json".to_owned(),
+            ),
             Self::Epoch251 => (
                 "/home/ubuntu/.jetstreamer-private/qualification-251-replacement-20261118-v1/output".to_owned(),
                 "/home/ubuntu/.jetstreamer-private/current-reader-delivery-251-20261119-v2/receipts".to_owned(),
@@ -569,12 +589,17 @@ impl OrdinaryEpoch {
             "--concurrency".into(),
             "2".into(),
         ];
-        if matches!(self, Self::Staged211) {
+        let staged_pin = match self {
+            Self::Staged211 => Some((STAGED211_ETAG, STAGED211_BYTES)),
+            Self::Pinned247 => Some((PINNED247_ETAG, PINNED247_BYTES)),
+            _ => None,
+        };
+        if let Some((etag, bytes)) = staged_pin {
             args.extend([
                 "--staged-archive-etag".into(),
-                STAGED211_ETAG.into(),
+                etag.into(),
                 "--staged-archive-bytes".into(),
-                STAGED211_BYTES.into(),
+                bytes.into(),
             ]);
         }
         args
@@ -628,7 +653,7 @@ impl DeliveryClaim {
         );
         ensure!(
             command.starts_with(&prefix)
-                && (!matches!(epoch, OrdinaryEpoch::Staged211)
+                && (!matches!(epoch, OrdinaryEpoch::Staged211 | OrdinaryEpoch::Pinned247)
                     || (command.ends_with(" }") && command.matches("{ path=").count() == 1)),
             "ordinary delivery unexpected uploader command"
         );
@@ -684,7 +709,11 @@ pub(super) fn sample_ordinary(epoch: OrdinaryEpoch, claim: &DeliveryClaim, clock
         pid: claim.pid,
         image,
         sha,
-        cap: 10 << 30,
+        cap: if matches!(epoch, OrdinaryEpoch::Pinned247) {
+            24 << 30
+        } else {
+            10 << 30
+        },
     };
     let result = (|| {
         claim.checked_command(epoch)?;
@@ -732,7 +761,9 @@ mod tests {
     #[test]
     fn each_v221_delivery_uses_its_own_epoch_and_claim_directory() {
         use OrdinaryEpoch::*;
-        for epoch in [Epoch211, Epoch248, Epoch249, Epoch250, Epoch251, Retry265] {
+        for epoch in [
+            Epoch211, Pinned247, Epoch248, Epoch249, Epoch250, Epoch251, Retry265,
+        ] {
             let unit = epoch.unit();
             let owner = Owner { unit, ..ORIGINAL };
             let args = epoch.argv();
@@ -744,6 +775,21 @@ mod tests {
                 unit.trim_end_matches(".service")
             )));
         }
+    }
+    #[test]
+    fn pinned_247_uses_streaming_staged_publication_with_exact_identity() {
+        let args = OrdinaryEpoch::Pinned247.argv();
+        assert_eq!(args[4], "247-247");
+        assert_eq!(
+            args[13..],
+            [
+                "--staged-archive-etag",
+                PINNED247_ETAG,
+                "--staged-archive-bytes",
+                PINNED247_BYTES,
+            ]
+        );
+        assert!(!args.iter().any(|arg| arg == "--recover-staged-247"));
     }
     #[test]
     fn ordinary_delivery_binds_each_epoch_to_its_distinct_plan_and_process() {

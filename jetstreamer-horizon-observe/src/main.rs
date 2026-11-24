@@ -129,6 +129,8 @@ struct Config {
     #[serde(default)]
     delivery211_claim: Option<delivery247_resource::DeliveryClaim>,
     #[serde(default)]
+    delivery247_pinned_claim: Option<delivery247_resource::DeliveryClaim>,
+    #[serde(default)]
     delivery248_claim: Option<delivery247_resource::DeliveryClaim>,
     #[serde(default)]
     delivery249_claim: Option<delivery247_resource::DeliveryClaim>,
@@ -356,6 +358,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
             || !config.native_input_diagnostics.is_empty()
             || config.staged247_resource_only
             || config.delivery211_claim.is_some()
+            || config.delivery247_pinned_claim.is_some()
             || config.delivery248_claim.is_some()
             || config.delivery249_claim.is_some()
             || config.delivery250_claim.is_some()
@@ -409,6 +412,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "staged247_resource_only":config.staged247_resource_only,
             "successor247_claim":config.successor247_claim,
             "delivery211_claim":config.delivery211_claim,
+            "delivery247_pinned_claim":config.delivery247_pinned_claim,
             "delivery248_claim":config.delivery248_claim,
             "delivery249_claim":config.delivery249_claim,
             "delivery250_claim":config.delivery250_claim,
@@ -2013,6 +2017,7 @@ fn run(config: Config) -> Result<()> {
     use delivery247_resource::OrdinaryEpoch::*;
     for (epoch, claim) in [
         (Epoch211, &config.delivery211_claim),
+        (Pinned247, &config.delivery247_pinned_claim),
         (Epoch248, &config.delivery248_claim),
         (Epoch249, &config.delivery249_claim),
         (Epoch250, &config.delivery250_claim),
@@ -2550,6 +2555,7 @@ mod tests {
             staged247_resource_only: false,
             successor247_claim: None,
             delivery211_claim: None,
+            delivery247_pinned_claim: None,
             delivery248_claim: None,
             delivery249_claim: None,
             delivery250_claim: None,
