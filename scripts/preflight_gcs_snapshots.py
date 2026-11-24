@@ -54,6 +54,11 @@ BUCKET_NAME = "mainnet-beta-ledger-us-ny5"
 BUCKET_URI = f"gs://{BUCKET_NAME}"
 ROOT_PATTERN = f"{BUCKET_URI}/*/snapshot-*"
 HOURLY_PATTERN = f"{BUCKET_URI}/*/hourly/snapshot-*"
+SNAPSHOT_BUCKETS = (
+    BUCKET_NAME,
+    "mainnet-beta-ledger-europe-fr2",
+    "mainnet-beta-ledger-asia-sg1",
+)
 GCLOUD_ACCOUNT = "sam.johnson@anza.xyz"
 BILLING_PROJECT = "principal-lane-200702"
 LOCAL_ROOT = Path("/home/sol/horizon")
@@ -296,6 +301,7 @@ def _parse_snapshot_object(
     source: str,
     index: int,
     relevant_slots: Tuple[int, int],
+    bucket_name: str,
 ) -> Optional[SnapshotObject]:
     context = f"{source} inventory entry {index}"
     if not isinstance(raw, dict):
@@ -311,7 +317,7 @@ def _parse_snapshot_object(
 
     bucket = _required_string(metadata, "bucket", context)
     object_name = _required_string(metadata, "name", context)
-    if bucket != BUCKET_NAME:
+    if bucket != bucket_name:
         raise PreflightError(f"{context}: unexpected bucket {bucket!r}")
     filename = object_name.rsplit("/", 1)[-1]
     if not filename.endswith(SNAPSHOT_ARCHIVE_EXTENSIONS):
@@ -343,7 +349,7 @@ def _parse_snapshot_object(
     _validate_crc32c(crc32c, context)
     md5_hash = _optional_md5_hash(metadata, context)
 
-    uri = f"{BUCKET_URI}/{object_name}"
+    uri = f"gs://{bucket_name}/{object_name}"
     expected_versioned_uri = f"{uri}#{generation_text}"
     if versioned_uri != expected_versioned_uri:
         raise PreflightError(
@@ -351,7 +357,7 @@ def _parse_snapshot_object(
             f"{expected_versioned_uri!r}"
         )
     object_id = _required_string(metadata, "id", context)
-    if object_id != f"{BUCKET_NAME}/{object_name}/{generation_text}":
+    if object_id != f"{bucket_name}/{object_name}/{generation_text}":
         raise PreflightError(f"{context}: metadata.id does not match name and generation")
 
     match = _SNAPSHOT_PATH_RE.fullmatch(object_name)
@@ -404,6 +410,8 @@ def parse_inventory_json(
     source: str,
     relevant_slots: Optional[Tuple[int, int]] = None,
     exclusions: Optional[List[Dict[str, Any]]] = None,
+    *,
+    bucket_name: str = BUCKET_NAME,
 ) -> Tuple[SnapshotObject, ...]:
     """Parse one raw gcloud JSON listing and validate every returned object."""
     if source not in ("root", "hourly"):
@@ -427,7 +435,7 @@ def parse_inventory_json(
     objects = [
         parsed
         for index, item in enumerate(raw)
-        if (parsed := _parse_snapshot_object(item, source, index, relevant_slots)) is not None
+        if (parsed := _parse_snapshot_object(item, source, index, relevant_slots, bucket_name)) is not None
     ]
     seen: Dict[str, SnapshotObject] = {}
     for item in objects:
@@ -485,7 +493,7 @@ def parse_inventory_json(
                 slot = comparison_slots.get(name)
                 if slot is None:
                     continue
-                canonical = _parse_snapshot_object(entry, source, index, (slot, slot))
+                canonical = _parse_snapshot_object(entry, source, index, (slot, slot), bucket_name)
                 if canonical is None:
                     raise PreflightError(f"invalid comparison root {name!r}")
                 if canonical_roots.setdefault(name, canonical) != canonical:
@@ -556,7 +564,7 @@ def _validate_manifest_md5(value: Any, context: str) -> str:
 
 
 def _parse_manifest_snapshot(
-    raw: Any, schema: str, context: str
+    raw: Any, schema: str, context: str, bucket_name: str
 ) -> SnapshotObject:
     if not isinstance(raw, dict):
         raise PreflightError(f"{context}: snapshot must be a JSON object")
@@ -619,7 +627,7 @@ def _parse_manifest_snapshot(
     middle = "hourly/" if source == "hourly" else ""
     object_name = f"{anchor_slot}/{middle}{filename}"
     uri = _required_string(raw, "uri", context)
-    expected_uri = f"{BUCKET_URI}/{object_name}"
+    expected_uri = f"gs://{bucket_name}/{object_name}"
     if uri != expected_uri:
         raise PreflightError(
             f"{context}: uri {uri!r} does not match snapshot identity {expected_uri!r}"
@@ -715,6 +723,8 @@ def load_sealed_manifest_objects(
     expected_fingerprint: str,
     first_epoch: int,
     last_epoch: int,
+    *,
+    bucket_name: str = BUCKET_NAME,
 ) -> Tuple[Tuple[SnapshotObject, ...], Tuple[SnapshotObject, ...], Dict[str, Any]]:
     """Recover immutable inventory evidence from a fingerprint-bound report."""
     requested_slot_range(first_epoch, last_epoch)
@@ -747,9 +757,9 @@ def load_sealed_manifest_objects(
     required_identity = {
         "account": GCLOUD_ACCOUNT,
         "billing_project": BILLING_PROJECT,
-        "bucket": BUCKET_URI,
+        "bucket": f"gs://{bucket_name}",
         "epoch_slots": EPOCH_SLOTS,
-        "inventory_patterns": {"hourly": HOURLY_PATTERN, "root": ROOT_PATTERN},
+        "inventory_patterns": snapshot_inventory_patterns(bucket_name),
     }
     for field, expected in required_identity.items():
         if manifest.get(field) != expected:
@@ -851,7 +861,7 @@ def load_sealed_manifest_objects(
         ):
             raise PreflightError(f"{context}: publication gate is incompatible")
         bootstrap = _parse_manifest_snapshot(
-            raw_cohort.get("bootstrap"), schema, f"{context} bootstrap"
+            raw_cohort.get("bootstrap"), schema, f"{context} bootstrap", bucket_name
         )
         if cohort_last > cohort_first and bootstrap.source != "root":
             raise PreflightError(f"{context}: multi-epoch bootstrap must be a root")
@@ -868,7 +878,7 @@ def load_sealed_manifest_objects(
         for checkpoint_index, raw_checkpoint in enumerate(raw_checkpoints):
             checkpoint_context = f"{context} root checkpoint {checkpoint_index}"
             checkpoint = _parse_manifest_snapshot(
-                raw_checkpoint, schema, checkpoint_context
+                raw_checkpoint, schema, checkpoint_context, bucket_name
             )
             if (
                 checkpoint.source != "root"
@@ -946,7 +956,7 @@ def load_sealed_manifest_objects(
         if raw_epoch.get("bootstrap_window") != expected_window:
             raise PreflightError(f"{context}: bootstrap window is invalid")
         epoch_bootstrap = _parse_manifest_snapshot(
-            raw_epoch.get("bootstrap"), schema, f"{context} bootstrap"
+            raw_epoch.get("bootstrap"), schema, f"{context} bootstrap", bucket_name
         )
         if epoch_bootstrap != bootstrap:
             raise PreflightError(f"{context}: bootstrap disagrees with its cohort")
@@ -960,7 +970,7 @@ def load_sealed_manifest_objects(
         )
         parsed_checkpoints = tuple(
             _parse_manifest_snapshot(
-                item, schema, f"{context} root checkpoint {checkpoint_index}"
+                item, schema, f"{context} root checkpoint {checkpoint_index}", bucket_name
             )
             for checkpoint_index, item in enumerate(raw_epoch_checkpoints)
         )
@@ -1303,6 +1313,8 @@ def build_manifest(
     plans: Sequence[EpochPlan],
     target_cohort_epochs: int = 1,
     publish_through_epoch: Optional[int] = None,
+    *,
+    bucket_name: str = BUCKET_NAME,
 ) -> Dict[str, Any]:
     if not plans:
         if publish_through_epoch is not None:
@@ -1352,10 +1364,10 @@ def build_manifest(
     return {
         "account": GCLOUD_ACCOUNT,
         "billing_project": BILLING_PROJECT,
-        "bucket": BUCKET_URI,
+        "bucket": f"gs://{bucket_name}",
         "epoch_slots": EPOCH_SLOTS,
         "first_epoch": plans[0].epoch if plans else None,
-        "inventory_patterns": {"hourly": HOURLY_PATTERN, "root": ROOT_PATTERN},
+        "inventory_patterns": snapshot_inventory_patterns(bucket_name),
         "last_epoch": plans[-1].epoch if plans else None,
         "publication_boundary_epoch": publish_through_epoch,
         "runtime_routes": [
@@ -1514,8 +1526,13 @@ def build_storage_report(
     }
 
 
+def snapshot_inventory_patterns(bucket_name: str) -> Dict[str, str]:
+    uri = f"gs://{bucket_name}"
+    return {"root": f"{uri}/*/snapshot-*", "hourly": f"{uri}/*/hourly/snapshot-*"}
+
+
 def gcloud_inventory_command(pattern: str) -> List[str]:
-    if pattern not in (ROOT_PATTERN, HOURLY_PATTERN):
+    if not any(pattern in snapshot_inventory_patterns(bucket).values() for bucket in SNAPSHOT_BUCKETS):
         raise ValueError("unexpected inventory pattern")
     return [
         "gcloud",
@@ -1563,7 +1580,7 @@ def _read_fixture(path: Path, label: str) -> str:
 
 
 def load_inventory_texts(
-    root_fixture: Optional[Path], hourly_fixture: Optional[Path]
+    root_fixture: Optional[Path], hourly_fixture: Optional[Path], bucket_name: str = BUCKET_NAME
 ) -> Tuple[str, str]:
     if (root_fixture is None) != (hourly_fixture is None):
         raise PreflightError(
@@ -1573,7 +1590,8 @@ def load_inventory_texts(
         return _read_fixture(root_fixture, "root"), _read_fixture(hourly_fixture, "hourly")
     # Keep these as distinct invocations.  The path shape is part of the trust
     # boundary between canonical checkpoints and bootstrap-only hourly objects.
-    return run_gcloud_inventory(ROOT_PATTERN), run_gcloud_inventory(HOURLY_PATTERN)
+    patterns = snapshot_inventory_patterns(bucket_name)
+    return run_gcloud_inventory(patterns["root"]), run_gcloud_inventory(patterns["hourly"])
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
@@ -1616,6 +1634,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--first-epoch", type=int, default=FIRST_EPOCH)
     parser.add_argument("--last-epoch", type=int, default=LAST_EPOCH)
+    parser.add_argument(
+        "--snapshot-bucket",
+        choices=SNAPSHOT_BUCKETS,
+        default=BUCKET_NAME,
+        help="official ledger bucket used consistently for bootstrap and checkpoint snapshots",
+    )
     parser.add_argument(
         "--publish-through-epoch",
         type=int,
@@ -1672,6 +1696,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     arguments.source_manifest_fingerprint,
                     arguments.first_epoch,
                     arguments.last_epoch,
+                    bucket_name=arguments.snapshot_bucket,
                 )
             )
         else:
@@ -1680,13 +1705,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     "--source-manifest-fingerprint requires --source-manifest-report"
                 )
             root_text, hourly_text = load_inventory_texts(
-                arguments.inventory_root_json, arguments.inventory_hourly_json
+                arguments.inventory_root_json,
+                arguments.inventory_hourly_json,
+                arguments.snapshot_bucket,
             )
             root_objects = parse_inventory_json(
-                root_text, "root", relevant_slots, inventory_exclusions
+                root_text, "root", relevant_slots, inventory_exclusions,
+                bucket_name=arguments.snapshot_bucket,
             )
             hourly_objects = parse_inventory_json(
-                hourly_text, "hourly", relevant_slots, inventory_exclusions
+                hourly_text, "hourly", relevant_slots, inventory_exclusions,
+                bucket_name=arguments.snapshot_bucket,
             )
         plans = build_epoch_plans(
             root_objects,
@@ -1699,6 +1728,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             plans,
             arguments.target_cohort_epochs,
             arguments.publish_through_epoch,
+            bucket_name=arguments.snapshot_bucket,
         )
         fingerprint = manifest_fingerprint(manifest)
         storage = build_storage_report(plans, arguments.local_root)

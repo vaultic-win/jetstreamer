@@ -20,8 +20,14 @@ from typing import Any, Sequence
 
 RECEIPT_SCHEMA = "jetstreamer-bound-gcs-snapshot-restore-v1"
 ALLOWED_BUCKET = "mainnet-beta-ledger-us-ny5"
+ALLOWED_BUCKETS = (
+    ALLOWED_BUCKET,
+    "mainnet-beta-ledger-europe-fr2",
+    "mainnet-beta-ledger-asia-sg1",
+)
+BUCKET_PATTERN = "|".join(re.escape(bucket) for bucket in ALLOWED_BUCKETS)
 VERSIONED_URI = re.compile(
-    rf"^gs://{ALLOWED_BUCKET}/(?P<object>[^#]+)#(?P<generation>[1-9][0-9]*)$"
+    rf"^gs://(?P<bucket>{BUCKET_PATTERN})/(?P<object>[^#]+)#(?P<generation>[1-9][0-9]*)$"
 )
 SNAPSHOT_NAME = re.compile(
     r"^snapshot-(?P<slot>0|[1-9][0-9]*)-[1-9A-HJ-NP-Za-km-z]+\.tar\.(?:zst|lz4|bz2)$"
@@ -49,7 +55,7 @@ def parse_versioned_uri(value: str) -> tuple[str, int, int]:
     match = VERSIONED_URI.fullmatch(value)
     if match is None:
         raise RestoreError(
-            f"versioned URI must identify one immutable object generation in gs://{ALLOWED_BUCKET}"
+            "versioned URI must identify one immutable object generation in an official ledger bucket"
         )
     object_name = match.group("object")
     if "//" in object_name or any(part in ("", ".", "..") for part in object_name.split("/")):
@@ -254,9 +260,10 @@ def describe_remote_snapshot(
         raise RestoreError("gcloud object describe returned invalid JSON") from error
     if not isinstance(metadata, dict):
         raise RestoreError("gcloud object describe did not return one metadata object")
+    bucket = match.group("bucket")
     object_name = match.group("object")
     generation_text = match.group("generation")
-    if metadata.get("bucket") != ALLOWED_BUCKET or metadata.get("name") != object_name:
+    if metadata.get("bucket") != bucket or metadata.get("name") != object_name:
         raise RestoreError("remote snapshot metadata identifies an unexpected object")
     generation = metadata.get("generation")
     if str(generation) != generation_text:
@@ -307,7 +314,7 @@ def describe_remote_snapshot(
         actual_md5 = aliased_hash("md5Hash", "md5_hash", 16, "remote MD5")
     if actual_crc32c != expected_crc32c or actual_md5 != expected_md5:
         raise RestoreError("remote snapshot metadata hashes do not match sealed expectations")
-    expected_id = f"{ALLOWED_BUCKET}/{object_name}/{generation_text}"
+    expected_id = f"{bucket}/{object_name}/{generation_text}"
     raw_id = metadata.get("id")
     storage_url = metadata.get("storage_url")
     if raw_id is None and storage_url is None:
@@ -317,7 +324,7 @@ def describe_remote_snapshot(
     if storage_url is not None and storage_url != versioned_uri:
         raise RestoreError("remote snapshot metadata storage URL mismatch")
     return {
-        "bucket": ALLOWED_BUCKET,
+        "bucket": bucket,
         "name": object_name,
         "generation": int(generation_text),
         "size": expected_size,

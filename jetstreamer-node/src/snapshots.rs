@@ -8,6 +8,11 @@ use jetstreamer_firehose::epochs::{epoch_to_slot_range, slot_to_epoch};
 use tokio::process::Command;
 
 pub const DEFAULT_BUCKET: &str = "gs://mainnet-beta-ledger-us-ny5";
+pub const SNAPSHOT_BUCKETS: [&str; 3] = [
+    DEFAULT_BUCKET,
+    "gs://mainnet-beta-ledger-europe-fr2",
+    "gs://mainnet-beta-ledger-asia-sg1",
+];
 const ALL_SNAPSHOT_ARCHIVE_EXTENSIONS: &[&str] = &[".tar.zst", ".tar.lz4", ".tar.bz2"];
 static DEFAULT_SNAPSHOT_LISTING: tokio::sync::OnceCell<String> = tokio::sync::OnceCell::const_new();
 
@@ -385,7 +390,7 @@ pub async fn download_exact_snapshot_generation(
 
 /// Downloads one exact object generation from a fingerprint-bound snapshot URI.
 ///
-/// The URI must name an object in [`DEFAULT_BUCKET`] using either the canonical
+/// The URI must name an object in one of [`SNAPSHOT_BUCKETS`] using either the canonical
 /// root form (`<slot>/<name>`) or hourly form
 /// (`<anchor>/hourly/<name>`). Root anchors must equal the snapshot slot;
 /// hourly anchors may precede it. The URI is revalidated here rather than
@@ -500,7 +505,15 @@ fn validate_exact_snapshot_uri(
     snapshot_slot: u64,
     snapshot_uri: &str,
 ) -> Result<&str, SnapshotError> {
-    let object = parse_snapshot_object_uri(DEFAULT_BUCKET, snapshot_uri)?;
+    let bucket = SNAPSHOT_BUCKETS
+        .into_iter()
+        .find(|bucket| {
+            snapshot_uri
+                .strip_prefix(*bucket)
+                .is_some_and(|suffix| suffix.starts_with('/'))
+        })
+        .ok_or_else(|| invalid_snapshot_object_uri(snapshot_uri))?;
+    let object = parse_snapshot_object_uri(bucket, snapshot_uri)?;
     if !snapshot_name_is_bound_to_slot(object.name, snapshot_slot, ALL_SNAPSHOT_ARCHIVE_EXTENSIONS)
     {
         return Err(SnapshotError::InvalidExactSnapshotIdentity {

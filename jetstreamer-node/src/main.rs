@@ -296,7 +296,7 @@ use jetstreamer_node::segment_manifest::{
     SegmentRuntimeIdentity, read_and_validate_segment_manifest, write_segment_manifest,
 };
 use jetstreamer_node::snapshots::{
-    DEFAULT_BUCKET, download_exact_snapshot_uri_generation,
+    DEFAULT_BUCKET, SNAPSHOT_BUCKETS, download_exact_snapshot_uri_generation,
     download_snapshot_at_or_before_slot_matching, list_snapshots_in_slot_range_matching,
 };
 use log::{error, info, warn};
@@ -6394,6 +6394,7 @@ fn validate_cohort_manifest_snapshot(
     role: CohortManifestSnapshotRole,
     accepted_extensions: &[&str],
     manifest_schema: &str,
+    snapshot_bucket: &str,
 ) -> Result<(String, Hash), String> {
     if item.size == 0 || item.generation == 0 {
         return Err(format!(
@@ -6419,7 +6420,7 @@ fn validate_cohort_manifest_snapshot(
                     item.versioned_uri, item.anchor_slot, item.slot
                 ));
             }
-            format!("{DEFAULT_BUCKET}/{}/{}", item.anchor_slot, filename)
+            format!("{snapshot_bucket}/{}/{}", item.anchor_slot, filename)
         }
         "hourly"
             if matches!(
@@ -6433,7 +6434,7 @@ fn validate_cohort_manifest_snapshot(
                     item.versioned_uri, item.anchor_slot, item.slot
                 ));
             }
-            format!("{DEFAULT_BUCKET}/{}/hourly/{}", item.anchor_slot, filename)
+            format!("{snapshot_bucket}/{}/hourly/{}", item.anchor_slot, filename)
         }
         "hourly" => {
             return Err(format!(
@@ -6556,7 +6557,7 @@ fn root_checkpoint_cohort_plan_from_report(
     if !matches!(
         body.schema.as_str(),
         COHORT_MANIFEST_SCHEMA_V3 | COHORT_MANIFEST_SCHEMA
-    ) || body.bucket != DEFAULT_BUCKET
+    ) || !SNAPSHOT_BUCKETS.contains(&body.bucket.as_str())
         || body.epoch_slots != 432_000
     {
         return Err(format!(
@@ -6634,6 +6635,7 @@ fn root_checkpoint_cohort_plan_from_report(
         },
         selection.descriptor.bootstrap.archive_extensions,
         &manifest_schema,
+        &body.bucket,
     )?;
     let bounds = normal_epoch_bootstrap_bounds(start_epoch)?;
     if !bounds.accepts(entry.bootstrap.slot, bootstrap_hash) {
@@ -6655,6 +6657,7 @@ fn root_checkpoint_cohort_plan_from_report(
             CohortManifestSnapshotRole::RootCheckpoint,
             selection.descriptor.bootstrap.archive_extensions,
             &manifest_schema,
+            &body.bucket,
         )?;
         if checkpoint.slot <= previous_slot || checkpoint.slot > cohort_end {
             return Err(format!(
@@ -23789,6 +23792,43 @@ mod early_snapshot_tests {
     }
 
     #[test]
+    fn sealed_cohort_manifest_binds_each_snapshot_to_the_regional_bucket() {
+        let regional_bucket = SNAPSHOT_BUCKETS[1];
+        let (original, _) = cohort_manifest_report(b"regional bootstrap");
+        let mut regional: serde_json::Value = serde_json::from_str(
+            &original
+                .to_string()
+                .replace(DEFAULT_BUCKET, regional_bucket),
+        )
+        .unwrap();
+        let fingerprint = cohort_manifest_fingerprint(&regional["manifest"]).unwrap();
+        regional["manifest_fingerprint"] = serde_json::json!(fingerprint);
+        let selection = root_checkpoint_cohort_runtime(17, 19, true).unwrap();
+        let plan = root_checkpoint_cohort_plan_from_report(
+            regional.clone(),
+            &fingerprint,
+            17,
+            19,
+            selection,
+        )
+        .unwrap();
+        assert!(plan.bootstrap.uri.starts_with(regional_bucket));
+        assert!(plan.root_checkpoints[0].uri.starts_with(regional_bucket));
+
+        regional["manifest"]["verification_cohorts"][0]["root_checkpoints"] =
+            original["manifest"]["verification_cohorts"][0]["root_checkpoints"].clone();
+        let fingerprint = cohort_manifest_fingerprint(&regional["manifest"]).unwrap();
+        regional["manifest_fingerprint"] = serde_json::json!(fingerprint);
+        let error =
+            root_checkpoint_cohort_plan_from_report(regional, &fingerprint, 17, 19, selection)
+                .unwrap_err();
+        assert!(
+            error.contains("URI or generation is not canonical"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn sealed_cohort_manifest_bounds_and_backfills_publication_boundary() {
         let bytes = b"audited publication boundary";
         let (mut report, _) = cohort_manifest_report(bytes);
@@ -24294,6 +24334,7 @@ mod early_snapshot_tests {
             CohortManifestSnapshotRole::Bootstrap { allow_hourly: true },
             &[".tar.bz2"],
             COHORT_MANIFEST_SCHEMA,
+            DEFAULT_BUCKET,
         )
         .unwrap();
 
@@ -24308,6 +24349,7 @@ mod early_snapshot_tests {
                 role,
                 &[".tar.bz2"],
                 COHORT_MANIFEST_SCHEMA,
+                DEFAULT_BUCKET,
             )
             .unwrap_err();
             assert!(error.contains("cannot use an hourly snapshot"), "{error}");
@@ -24321,6 +24363,7 @@ mod early_snapshot_tests {
             CohortManifestSnapshotRole::Bootstrap { allow_hourly: true },
             &[".tar.bz2"],
             COHORT_MANIFEST_SCHEMA,
+            DEFAULT_BUCKET,
         )
         .unwrap_err();
         assert!(error.contains("after snapshot slot"), "{error}");
@@ -24333,6 +24376,7 @@ mod early_snapshot_tests {
             CohortManifestSnapshotRole::Bootstrap { allow_hourly: true },
             &[".tar.bz2"],
             COHORT_MANIFEST_SCHEMA,
+            DEFAULT_BUCKET,
         )
         .unwrap_err();
         assert!(error.contains("unsupported source mirror"), "{error}");
@@ -24345,6 +24389,7 @@ mod early_snapshot_tests {
             CohortManifestSnapshotRole::Bootstrap { allow_hourly: true },
             &[".tar.bz2", ".tar.zst"],
             COHORT_MANIFEST_SCHEMA,
+            DEFAULT_BUCKET,
         )
         .unwrap_err();
         assert!(error.contains("snapshot filename"), "{error}");
@@ -24357,6 +24402,7 @@ mod early_snapshot_tests {
             CohortManifestSnapshotRole::Bootstrap { allow_hourly: true },
             &[".tar.bz2"],
             COHORT_MANIFEST_SCHEMA,
+            DEFAULT_BUCKET,
         )
         .unwrap_err();
         assert!(error.contains("root snapshot"), "{error}");
