@@ -259,17 +259,20 @@ pub(super) fn run_child_with_startup(
                 return lease.check();
             }
             lease.check()?;
-            let wait = match fit.current(0) {
-                Ok(_) => false,
-                Err(e)
-                    if e.is::<capacity::GuardInFlight>()
-                        || e.is::<capacity::Reprice>()
-                        || (cfg!(continuity145_only) && e.is::<peer_terminal::Pending>()) =>
-                {
-                    true
-                }
-                Err(e) => return Err(e),
-            };
+            // A scheduled refresh freezes the child and checks a fresh fit
+            // before resuming it. Skip the redundant live census on that tick.
+            let wait = last.elapsed() >= Duration::from_secs(30)
+                || match fit.current(0) {
+                    Ok(_) => false,
+                    Err(e)
+                        if e.is::<capacity::GuardInFlight>()
+                            || e.is::<capacity::Reprice>()
+                            || (cfg!(continuity145_only) && e.is::<peer_terminal::Pending>()) =>
+                    {
+                        true
+                    }
+                    Err(e) => return Err(e),
+                };
             if wait || last.elapsed() >= Duration::from_secs(30) {
                 if let Err(e) = freeze(pid) {
                     if child.try_wait()?.is_some_and(|s| s.success()) {
