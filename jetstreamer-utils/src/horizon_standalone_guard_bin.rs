@@ -644,6 +644,32 @@ fn handoff_pin_matches(pin: &Value, plan_sha: &str, invocation: &str, handoff: &
 }
 
 fn supported_unit(plan: &Plan) -> bool {
+    let ram_scope = match plan.unit.as_str() {
+        "horizon-perf-epoch229-slot-hash@v325.service" => Some((
+            "/home/ubuntu/.jetstreamer-private/epoch229-trace-tmpfs-v325",
+            "/var/lib/jetstreamer/horizon229-trace-ram-v325/guard-receipts",
+            170_000_000_000,
+        )),
+        "horizon-perf-epoch230-program-demotion@v328.service" => Some((
+            "/home/ubuntu/.jetstreamer-private/epoch230-demotion-tmpfs-v328",
+            "/var/lib/jetstreamer/horizon230-program-demotion-ram-v328/guard-receipts",
+            150_000_000_000,
+        )),
+        _ => None,
+    };
+    if let Some((mount, receipts, scratch_limit)) = ram_scope {
+        let mount = Path::new(mount);
+        return plan.filesystem == mount
+            && plan.worker_root == mount.join("run")
+            && plan.receipt_directory == Path::new(receipts)
+            && plan.minimum_free_bytes == 2 << 30
+            && plan.maximum_root_physical_bytes == Some(scratch_limit)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.native_main.is_none()
+            && plan.bounded_measurement.is_none()
+            && plan.bounded_canary.is_none();
+    }
+
     if plan.unit == "horizon-perf-epoch271-reward-tuples@v299.service" {
         return plan.filesystem == Path::new("/")
             && plan.worker_root
@@ -1685,6 +1711,54 @@ mod tests {
             assert!(validate_plan(&bad).is_err(), "{key}");
         }
     }
+    #[test]
+    fn epoch229_slot_hash_guard_requires_its_enrolled_tmpfs_scope() {
+        let plan = json!({
+            "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit": "horizon-perf-epoch229-slot-hash@v325.service",
+            "invocation_id": "a".repeat(32),
+            "filesystem": "/home/ubuntu/.jetstreamer-private/epoch229-trace-tmpfs-v325",
+            "worker_root": "/home/ubuntu/.jetstreamer-private/epoch229-trace-tmpfs-v325/run",
+            "receipt_directory": "/var/lib/jetstreamer/horizon229-trace-ram-v325/guard-receipts",
+            "minimum_free_bytes": 2u64 << 30,
+            "maximum_root_physical_bytes": 170_000_000_000u64,
+            "maximum_worker_vmas": 3_500_000,
+        });
+        assert!(validate_plan(&serde_json::from_value(plan.clone()).unwrap()).is_ok());
+        for (key, change) in [
+            ("unit", json!("horizon-perf-epoch229-slot-hash@other.service")),
+            ("filesystem", json!("/")),
+            ("worker_root", json!("/home/ubuntu/.jetstreamer-private/other")),
+            ("receipt_directory", json!("/var/lib/jetstreamer/other")),
+            ("minimum_free_bytes", json!((2u64 << 30) - 1)),
+            ("maximum_root_physical_bytes", json!(170_000_000_001u64)),
+            ("maximum_worker_vmas", json!(3_500_001)),
+        ] {
+            let mut invalid = plan.clone();
+            invalid[key] = change;
+            assert!(validate_plan(&serde_json::from_value(invalid).unwrap()).is_err(), "{key}");
+        }
+    }
+
+    #[test]
+    fn epoch230_program_demotion_guard_has_its_own_ram_budget() {
+        let plan = json!({
+            "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit": "horizon-perf-epoch230-program-demotion@v328.service",
+            "invocation_id": "a".repeat(32),
+            "filesystem": "/home/ubuntu/.jetstreamer-private/epoch230-demotion-tmpfs-v328",
+            "worker_root": "/home/ubuntu/.jetstreamer-private/epoch230-demotion-tmpfs-v328/run",
+            "receipt_directory": "/var/lib/jetstreamer/horizon230-program-demotion-ram-v328/guard-receipts",
+            "minimum_free_bytes": 2u64 << 30,
+            "maximum_root_physical_bytes": 150_000_000_000u64,
+            "maximum_worker_vmas": 3_500_000,
+        });
+        assert!(validate_plan(&serde_json::from_value(plan.clone()).unwrap()).is_ok());
+        let mut invalid = plan;
+        invalid["maximum_root_physical_bytes"] = json!(170_000_000_000u64);
+        assert!(validate_plan(&serde_json::from_value(invalid).unwrap()).is_err());
+    }
+
     #[test]
     fn epoch271_reward_tuple_guard_requires_its_enrolled_scope() {
         let plan = json!({
