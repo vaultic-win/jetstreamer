@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_audit_turnover145_only)]
+#[cfg(incident_encoded_prefix145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-encoded-prefix-rejoin-v1/post-stop-fit";
+#[cfg(all(incident_audit_turnover145_only, not(incident_encoded_prefix145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-audit-turnover-rejoin-v1/post-stop-fit";
 #[cfg(all(incident_status_owner145_only, not(incident_audit_turnover145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-status-owner-rejoin-v1/post-stop-fit";

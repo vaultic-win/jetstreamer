@@ -223,10 +223,16 @@ fn required_environment() -> Result<()> {
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root operator");
     let args = std::env::args().skip(1).collect::<Vec<_>>();
-    if let [mode, iid, after] = args.as_slice()
+    if let [mode, iid, after, remainder @ ..] = args.as_slice()
         && mode == "inspect-native-stop"
     {
-        println!("{}", events::inspect_native_stop(E, iid, after.parse()?)?);
+        let successor = match remainder {
+            [] => None,
+            [next] => Some(next.as_str()),
+            _ => bail!("follow145 inspect-native-stop IID MONOTONIC_USEC [SUCCESSOR_IID]"),
+        };
+        let witness = events::inspect_native_stop(E, iid, after.parse()?, successor)?;
+        println!("{witness}");
         return Ok(());
     }
     #[cfg(feature = "fixture-post")]

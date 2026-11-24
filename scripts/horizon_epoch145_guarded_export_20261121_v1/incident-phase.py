@@ -1,14 +1,17 @@
 """Observe the dedicated frozen-145 verifier from the funded incident census."""
 import hashlib
+import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import sys
 
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-AUDIT_TURNOVER_RECOVERY = VERSION == "tools-v5q"
+ENCODED_PREFIX_RECOVERY = VERSION == "tools-v5r"
+AUDIT_TURNOVER_RECOVERY = ENCODED_PREFIX_RECOVERY or VERSION == "tools-v5q"
 STATUS_OWNER_RECOVERY = AUDIT_TURNOVER_RECOVERY or VERSION == "tools-v5p"
 DONOR_PRESSURE = STATUS_OWNER_RECOVERY or VERSION == "tools-v5o"
 GUARD_WALK = DONOR_PRESSURE or VERSION == "tools-v5n"
@@ -23,6 +26,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5n": "tools-homefloor-145-guard-walk-rejoin-v1",
                       "tools-v5p": "tools-homefloor-145-status-owner-rejoin-v1",
                       "tools-v5q": "tools-homefloor-145-audit-turnover-rejoin-v1",
+                      "tools-v5r": "tools-homefloor-145-encoded-prefix-rejoin-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -84,6 +88,39 @@ def own_probe(s, parent, members, epoch, provider):
            and s.same_file(Path(f"/proc/{me}/exe"), Path("/usr/bin/python3"))
            and s.process(me)[2] == "0::/system.slice/" + UNIT, "foreign 145 admission probe")
     return tuple(p for p in members if p != me)
+
+
+def encoded_prefix_stop(s, build, successor):
+    original = "cbacb5a17e6347509640846eccb95cb0"
+    proof = PKG.parent / "v5r-name-handoff" / "PREDECESSOR_STOP.json"
+    stopped, reference = s.read(proof)
+    s.need(stopped["schema"] == "horizon-manager-explicit-stop-witness-v1"
+           and stopped["unit"] == UNIT and stopped["invocation_id"] == original
+           and stopped["worker_launch_authorized"] is False
+           and set(stopped["records"]) == {"stop_started", "deactivated", "stop_finished"},
+           "different encoded-prefix predecessor stop")
+    package = BASE / "epoch145-explicit-stop-inspector-20261124-v2" / "tools"
+    seal, _ = s.read(package / "deployment-seal-receipt.json", build["stop_inspector_seal_sha256"])
+    member, = (m for m in seal["members"] if m["name"] == "follow145" and m["mode"] == "0555")
+    s.need(seal["destination"] == str(package) and seal["remote_mutations"] is False,
+           "foreign encoded-prefix stop inspector")
+    inspector = package / member["name"]
+    image = inspector.lstat()
+    s.need(stat.S_ISREG(image.st_mode) and image.st_uid == 0
+           and image.st_nlink == 1 and stat.S_IMODE(image.st_mode) == 0o555,
+           "unsealed encoded-prefix stop inspector")
+    with inspector.open("rb") as stream:
+        s.need(hashlib.file_digest(stream, "sha256").hexdigest() == member["sha256"],
+               "changed encoded-prefix stop inspector")
+    witness = json.loads(subprocess.check_output([
+        str(inspector), "inspect-native-stop", original, str(stopped["not_before_monotonic_usec"]),
+        successor], timeout=15))
+    s.need(witness["schema"] == "horizon-manager-explicit-successor-witness-v1"
+           and witness["boot_id"] == stopped["boot_id"] and witness["unit"] == UNIT
+           and witness["invocation_id"] == original and witness["successor_invocation_id"] == successor
+           and all(witness["records"][key] == row for key, row in stopped["records"].items()),
+           "encoded-prefix successor does not follow the recorded native stop")
+    return reference
 
 
 def inspect(s, leased, m, members, epoch, provider, profile):
@@ -202,6 +239,8 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and {path.name for path in prior.iterdir()} == {"failed.json", "recovery-started.json"},
                "unqualified retry of the V5p audit turnover failure")
         window["public_audit_terminal"] = terminal
+    if ENCODED_PREFIX_RECOVERY:
+        window["encoded_prefix_predecessor_stop"] = encoded_prefix_stop(s, build, generation)
     if observed == (pid,):
         s.need(epoch == 145 and os.getpid() in members, "145 participant has no leased child")
         return {"invocation_id": generation, "stage": "controller", "window": window}
@@ -232,6 +271,9 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     if AUDIT_TURNOVER_RECOVERY:
         s.need(started_fit["phase145"]["window"]["public_audit_terminal"] == window["public_audit_terminal"],
                "foreign audit turnover pre-worker admission")
+    if ENCODED_PREFIX_RECOVERY:
+        s.need(started_fit["phase145"]["window"]["encoded_prefix_predecessor_stop"]
+               == window["encoded_prefix_predecessor_stop"], "foreign encoded-prefix pre-worker admission")
     predecessor = ("failed_manager_query" if TIMEOUT_REJOIN else
                    "failed_fresh_census" if REJOIN else "failed_preincident_verifier")
     if FOCUSED_REJOIN:

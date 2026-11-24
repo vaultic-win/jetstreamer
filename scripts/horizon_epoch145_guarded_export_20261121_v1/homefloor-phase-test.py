@@ -311,5 +311,53 @@ class StatusOwnerPhase(HomefloorPhase):
             self.inspect((10,20))
 
 
+class EncodedPrefixStop(TestCase):
+    def test_provider_binds_the_original_stop_to_the_current_native_successor(self):
+        with tempfile.TemporaryDirectory(dir="/home/sol/.jetstreamer-private") as directory:
+            base = Path(directory)
+            package = base / "tools-v5r"
+            package.mkdir()
+            adapter = package / SCRIPT.name
+            adapter.write_bytes(SCRIPT.read_bytes())
+            validate = runpy.run_path(str(adapter))["encoded_prefix_stop"]
+            validate.__globals__.update(BASE=base, PKG=package)
+            handoff = base / "v5r-name-handoff"
+            handoff.mkdir()
+            receipt = handoff / "PREDECESSOR_STOP.json"
+            original = "cbacb5a17e6347509640846eccb95cb0"
+            successor = "a" * 32
+            records = dict(stop_started={"cursor": "one"}, deactivated={"cursor": "two"},
+                           stop_finished={"cursor": "three"})
+            stopped = dict(schema="horizon-manager-explicit-stop-witness-v1", unit=UNIT,
+                           invocation_id=original, boot_id="b" * 32,
+                           not_before_monotonic_usec=100, records=records,
+                           worker_launch_authorized=False)
+            receipt.write_text(json.dumps(stopped))
+            inspector = base / "epoch145-explicit-stop-inspector-20261124-v2/tools/follow145"
+            inspector.parent.mkdir(parents=True)
+            inspector.write_bytes(b"stop inspector test fixture")
+            inspector.chmod(0o555)
+            seal = inspector.with_name("deployment-seal-receipt.json")
+            seal.write_text(json.dumps(dict(destination=str(inspector.parent), remote_mutations=False,
+                members=[dict(name="follow145", mode="0555",
+                              sha256=hashlib.sha256(inspector.read_bytes()).hexdigest())])))
+            build = dict(stop_inspector_seal_sha256=Status.read(seal)[1]["sha256"])
+            witness = dict(stopped, schema="horizon-manager-explicit-successor-witness-v1",
+                           successor_invocation_id=successor)
+            with patch("subprocess.check_output", return_value=json.dumps(witness)) as observe:
+                self.assertEqual(validate(Status, build, successor), Status.read(receipt)[1])
+                observe.assert_called_once_with(
+                    [str(inspector), "inspect-native-stop", original, "100", successor], timeout=15)
+            crossed = dict(witness, successor_invocation_id="c" * 32)
+            with patch("subprocess.check_output", return_value=json.dumps(crossed)):
+                with self.assertRaisesRegex(ValueError, "does not follow the recorded native stop"):
+                    validate(Status, build, successor)
+            receipt.write_text(json.dumps(dict(stopped, records={})))
+            with patch("subprocess.check_output") as observe:
+                with self.assertRaisesRegex(ValueError, "different encoded-prefix predecessor stop"):
+                    validate(Status, build, successor)
+                observe.assert_not_called()
+
+
 if __name__ == "__main__":
     main()
