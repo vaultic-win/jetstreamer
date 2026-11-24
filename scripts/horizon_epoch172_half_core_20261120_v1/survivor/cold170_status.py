@@ -19,6 +19,13 @@ RUN = Path('/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/re
 STOP = 'd670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a'
 FIELD = 'current_homefloor_cold166_167_170_owners'
 BINDING = LOCAL / f'{ATTEMPT}-170-generation.json'
+FAILED_RUN = ROOT / 'failed-replay-20261124T123309Z'
+FAILED_CADENCE = LOCAL.name == 'tools-cold168-retry4-failed170-v1'
+FAILED_STATUS = 'cold170_retry13_execution_failure'
+FAILED_TERMINAL = {'path': str(FAILED_RUN/'TERMINAL.json'),
+                   'sha256': '16664fda43d296d115858ff67a173d6d0cccb5f2ac90d446aa797da34a2f6c9d'}
+FAILED_DRAIN = {'path': str(FAILED_RUN/'ORPHAN_GUARD_DRAINED.json'),
+                'sha256': 'e570c630afe4add0209a6af6ebd9da6cc0195bc0a5b4034dcf2716baf130bae7'}
 ENROLLMENTS = {
     'retry11': ('8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728',
                 '36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d', 113704962),
@@ -146,6 +153,55 @@ def terminal_route(fleet):
     return None
 
 
+def failed_route(fleet=None):
+    """Recognize only the drained retry13 execution failure and retain its booking."""
+    if not FAILED_CADENCE or ATTEMPT != 'retry13' or not Path(FAILED_DRAIN['path']).exists():
+        return None
+    from owners import show
+    terminal = checked(FAILED_TERMINAL)
+    drain = checked(FAILED_DRAIN)
+    plan = checked(drain['intent'])
+    admission = checked(terminal['admission'])
+    worker = checked(terminal['first_worker'])
+    exited = terminal['manager_exit']
+    iid = admission['producer_invocation_id']
+    need(terminal['schema'] == 'horizon-epoch170-retry13-execution-failure-v1'
+         and terminal['admission'] == bound(ROOT/'ACTUAL_ADMISSION_AND_PROTECTION.json')
+         and terminal['first_worker'] == bound(ROOT/'FIRST_PROTECTED_WORKER.json')
+         and worker['admission'] == terminal['admission'] and worker['producer_invocation_id'] == iid
+         and exited['_PID'] == '1' and exited['UNIT'] == admission['producer_unit'] == UNIT
+         and exited['INVOCATION_ID'] == iid and exited['EXIT_CODE'] == 'exited' and exited['EXIT_STATUS'] == '1'
+         and terminal['retained_run'] and not terminal['archive_ready'] and not terminal['publication_authorized']
+         and terminal['reservation_ending_bytes'] == drain['reservation_ending_bytes'] == 0
+         and plan['terminal'] == FAILED_TERMINAL and plan['no_live_producer']
+         and drain['producer'] == terminal['producer'], 'unbound epoch 170 terminal or retained booking')
+    producer, timer, guard = drain['producer'], drain['timer'], drain['guard']
+    need(producer['Id'] == UNIT and producer['LoadState'] == 'not-found'
+         and producer['MainPID'] == producer['ControlPID'] == '0' and not producer['Job']
+         and timer['Id'] == admission['timer_unit'] == TIMER and timer['ActiveState'] == 'inactive'
+         and not timer['Job'] and plan['timer']['InvocationID'] == admission['timer_invocation_id']
+         and guard['Id'] == TIMER.removesuffix('.timer') + '.service', 'different failed epoch 170 native owners')
+    need(show(UNIT, tuple(producer)) == producer and show(TIMER, tuple(timer)) == timer,
+         'failed epoch 170 native owners changed')
+    fields = ('Id', 'ActiveState', 'MainPID', 'ControlPID', 'Job')
+    guard_now = show(guard['Id'], fields)
+    need(guard_now['Id'] == guard['Id'] and guard_now['ActiveState'] in ('inactive', 'failed')
+         and guard_now['MainPID'] == guard_now['ControlPID'] == '0' and not guard_now['Job'],
+         'failed epoch 170 guard still active')
+    result = dict(terminal=FAILED_TERMINAL, guard_drain=FAILED_DRAIN,
+                  admission=terminal['admission'], first_worker=terminal['first_worker'],
+                  producer_invocation_id=iid, reservation_ending_bytes=0)
+    if fleet is not None:
+        prior = fleet.get(FIELD, {}).get('170')
+        if prior is not None:
+            need(FAILED_STATUS not in fleet and prior['admission'] == result['admission']
+                 and prior['first_worker'] == result['first_worker']
+                 and prior['actor']['producer_invocation_id'] == iid, 'different failed epoch 170 fleet owner')
+        else:
+            need(fleet.get(FAILED_STATUS) == result, 'missing prior epoch 170 owner or terminal adoption')
+    return result
+
+
 def roster(module, fleet_ref, fleet, terminal=None):
     checks = {166: retry166.check_generation, 167: cold167.check_generation, 170: check_generation}
     if cold168:
@@ -154,7 +210,7 @@ def roster(module, fleet_ref, fleet, terminal=None):
     for epoch, check in checks.items():
         state = module.native(epoch)
         if epoch == 170 and terminal:
-            need(state is None, 'committed cold170 producer still active')
+            need(state is None, 'terminal cold170 producer still active')
             continue
         if state is None:
             optional = {166: retry166}
@@ -178,7 +234,12 @@ def reconcile(c, observed_lane):
     c.commits = {}
     c.histories = {}
     terminal = terminal_route(c.fleet)
-    enrolled = roster(module, c.fleet_ref, c.fleet, terminal)
+    c.failed170 = failed_route(c.fleet)
+    need(not (terminal and c.failed170), 'conflicting epoch 170 commit and failure')
+    enrolled = roster(module, c.fleet_ref, c.fleet, terminal or c.failed170)
+    if c.failed170:
+        module.ROUTES.pop(170)
+        need(all(r['range'] != '170' for r in c.cfg['replays']), 'failed epoch 170 remained in sampled roster')
     if terminal:
         from copy import copy
         c.commits[170] = terminal
@@ -264,6 +325,15 @@ def install(c, fleet):
                    state='verification', no_live_producer_claimed=True, current_repair_owner='/root',
                    current_status_scope='Epoch 170 committed locally and awaits verification and public delivery.',
                    next_action='Verify and publish the retained epoch 170 archive.')
+    if c.failed170:
+        fleet[FAILED_STATUS] = c.failed170
+        row = next(v for v in fleet['epochs'] if v['epoch'] == 170)
+        previous = row.pop('current_home_floor_stop', row.get('original_home_floor_stop'))
+        need(previous['completion']['sha256'] == STOP, 'lost stopped predecessor of failed cold170')
+        row.update(original_home_floor_stop=previous, cold170_retry13_execution_failure=c.failed170,
+                   state='verification', no_live_producer_claimed=True, current_repair_owner='/root', repair_open=True,
+                   current_status_scope='Epoch 170 retry13 exited after a historical execution mismatch.',
+                   next_action='Diagnose the exact failed transaction and qualify bounded checkpoint replay.')
     fleet['useful_replay_count'] = cold167.counts(c)['current_replay_lanes']
     stops = {166: retry166.STOP, 167: cold167.STOP_SHA, 170: STOP}
     if cold168:

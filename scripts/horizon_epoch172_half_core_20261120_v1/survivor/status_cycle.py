@@ -22,6 +22,7 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
+FAILED170 = CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
 assert hashlib.sha256((PACKAGE/'deployment-seal-receipt.json').read_bytes()).hexdigest() == PARENT_SEAL
 sys.path.insert(0,str(PACKAGE))
 from evidence import bound, checked, content, durable, ensure_dir, lock, names, need, sealed, utc
@@ -94,6 +95,8 @@ def project(original, due, predecessor):
         route = getattr(cold_workers, 'cold168', None)
         need(route and owners_by_epoch['168']['producer_unit'] == route.UNIT, 'unregistered 168 observer')
     rows=[owners_by_epoch['172']] if historical else list(owners_by_epoch.values())
+    if FAILED170 and '170' in owners_by_epoch and cold_workers.failed_route():
+        rows=[row for row in rows if row['range']!='170']
     for row in rows:
         if row['range']!='172':
             cold_workers.projection(row)
@@ -659,6 +662,9 @@ def entry():
     if RESUMING:
         need(package == 'tools-cold168-retry4-v1', 'cadence resumption requires the qualified retry4 parent')
         package = 'tools-cold168-retry4-resume-v1'
+    if FAILED170:
+        need(package == 'tools-cold168-retry4-v1', '170 terminal cadence requires the qualified retry4 parent')
+        package = 'tools-cold168-retry4-failed170-v1'
     need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
     receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
     seal=checked(receipt)
@@ -687,6 +693,55 @@ def await_private136_owner(state, receipt):
          and new['program']==str(CURRENT) and new['unit']==state['Id'] and new['pid']==pid
          and new['start_ticks']==owners.ticks(pid) and new['invocation_id']==state['InvocationID'],
          'different live private 136 status owner')
+
+
+def failed170_resume(state, receipt, fd):
+    """Adopt the one sealed clock for the four surviving producers."""
+    ready = read_ref(ROOT/'FAILED170_CADENCE_READY.json')
+    need(ready['schema']=='horizon-epoch170-failed-cadence-ready-v1' and ready['package']==receipt,
+         'different failed epoch 170 cadence deployment')
+    fleet_ref = ready['fleet']
+    fleet = checked(fleet_ref)
+    failure = cold_workers.failed_route(fleet)
+    need(failure and ready['terminal']==failure['terminal'] and ready['guard_drain']==failure['guard_drain'],
+         'different failed epoch 170 terminal evidence')
+    old_owner = ready['old_owner']
+    need(old_owner==bound(ROOT/'COLD168_RETRY4_V1_STATUS_RESUME_ACTIVE.json'), 'different incumbent cadence owner')
+    old = checked(old_owner)['new']
+    lock_stat = os.fstat(fd)
+    need(state['Id']==old['unit']==CONTROLLER and state['ActiveState']=='active' and not state['Job']
+         and state['ControlGroup']=='/system.slice/'+CONTROLLER and state['MainPID']==str(os.getpid())
+         and state['InvocationID'] and state['InvocationID']!=old['invocation_id']
+         and (lock_stat.st_dev,lock_stat.st_ino)==(old['lock']['device'],old['lock']['inode']),
+         'successor does not hold the incumbent cadence lock')
+    old_pid = old['pid']
+    need(not Path(f'/proc/{old_pid}').exists() or owners.ticks(old_pid)!=old['start_ticks'],
+         'incumbent cadence process still present')
+    old_timer = ready['old_timer']
+    need(old_timer['Id']==fleet['sole_next_timer'] and old_timer['InvocationID'],
+         'different incumbent observer timer')
+    correction = checked(ready['correction'])
+    need(correction['previous_receipt']==fleet['complete_active_status_receipts']['170']
+         and correction['fleet_predecessor']==fleet_ref and correction['terminal']==ready['terminal']
+         and correction['guard_drain']==ready['guard_drain'] and correction['epoch']==170
+         and correction['conditional_header']=='If-Match' and correction['authenticated_readback']
+         and correction['after_status']['phase']=='verification' and correction['current_repair_owner']=='/root',
+         'different authenticated epoch 170 repair estimate')
+    config_ref = ready['config']
+    prior_config = sealed(fleet['sole_next_observer'])
+    cfg = sealed(config_ref)
+    due = cfg['not_before_utc']
+    need(cfg==project(prior_config,due,fleet['observer'])
+         and [row['range'] for row in cfg['replays']]==['166','167','168','172']
+         and utc(due)>=utc(checked(fleet['observer'])['recorded_at_utc'])+dt.timedelta(seconds=1800),
+         'wrong failed epoch 170 observer clock or population')
+    waiting = timer_names()
+    new_timer = names(due)['timer']
+    need(not waiting or waiting==[new_timer], 'another observer timer is still armed')
+    if waiting:
+        active = owners.show(new_timer,('InvocationID',))
+        need(active['InvocationID']!=old_timer['InvocationID'], 'incumbent observer timer is still armed')
+    return ready
 
 
 def main():
@@ -720,6 +775,8 @@ def main():
             await_private136_owner(state,receipt)
         elif RESUMING:
             resume=status_resume.await_owner(globals(),receipt,state,fd)
+        elif FAILED170:
+            resume=failed170_resume(state,receipt,fd)
         elif getattr(cold_workers, 'cold168', None):
             cold_workers.cold168.await_recovery(state,os.getpid())
         validate_package()
@@ -728,6 +785,8 @@ def main():
         if resume is None:
             initial=ROOT/'first-clock';ensure_dir(initial)
             head=proof['fleet'];ref=registered(initial,checked(head))
+        elif FAILED170:
+            head=resume['fleet'];ref=resume['config']
         else:
             head=one_cycle(resume['fleet'],resume['config'],proof,resume['completed_sample'])
             ref=checked(head)['sole_next_observer']
