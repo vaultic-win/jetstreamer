@@ -5163,6 +5163,11 @@ impl Bank {
             hash = extend_and_hash(&hash, &buf)
         }
 
+        #[cfg(feature = "epoch271-boundary-trace")]
+        if matches!(self.slot(), 117_071_999 | 117_072_004 | 117_072_005) {
+            self.trace_epoch271_boundary(&hash, &accounts_delta_hash.hash);
+        }
+
         info!(
             "bank frozen: {} hash: {} accounts_delta: {} signature_count: {} last_blockhash: {} capitalization: {}",
             self.slot(),
@@ -5179,6 +5184,67 @@ impl Bank {
             accounts_delta_hash.stats,
         );
         hash
+    }
+
+    #[cfg(feature = "epoch271-boundary-trace")]
+    fn trace_epoch271_boundary(&self, bank_hash: &Hash, accounts_delta_hash: &Hash) {
+        use solana_sdk::hash::Hasher;
+        use std::io::{self, Write};
+
+        let stderr = io::stderr();
+        let mut output = stderr.lock();
+        let _ = writeln!(
+            output,
+            "epoch271_bank slot={} parent_slot={} parent_hash={} bank_hash={} accounts_delta_hash={} signatures={} last_blockhash={} capitalization={}",
+            self.slot(),
+            self.parent_slot(),
+            self.parent_hash,
+            bank_hash,
+            accounts_delta_hash,
+            self.signature_count(),
+            self.last_blockhash(),
+            self.capitalization(),
+        );
+
+        let rewards = self.rewards.read().unwrap();
+        for kind in &[RewardType::Staking, RewardType::Voting] {
+            let mut records: Vec<_> = rewards
+                .iter()
+                .filter(|(_, reward)| reward.reward_type == *kind)
+                .map(|(address, reward)| {
+                    (
+                        address.to_bytes(),
+                        reward.lamports,
+                        reward.post_balance,
+                        reward.commission.map_or(256, u16::from),
+                    )
+                })
+                .collect();
+            records.sort_unstable();
+
+            // SHA-256 over sorted tuples of raw pubkey and little-endian i64,
+            // u64, u16. Commission 256 denotes an absent value.
+            let mut digest = Hasher::default();
+            let mut lamports = 0i128;
+            for (address, amount, balance, commission) in &records {
+                digest.hashv(&[
+                    address,
+                    &amount.to_le_bytes(),
+                    &balance.to_le_bytes(),
+                    &commission.to_le_bytes(),
+                ]);
+                lamports += i128::from(*amount);
+            }
+            let _ = writeln!(
+                output,
+                "epoch271_rewards slot={} kind={} records={} lamports={} sha256_base58={}",
+                self.slot(),
+                kind,
+                records.len(),
+                lamports,
+                digest.result(),
+            );
+        }
     }
 
     /// Recalculate the hash_internal_state from the account stores. Would be used to verify a

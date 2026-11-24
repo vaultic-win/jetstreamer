@@ -7,6 +7,7 @@ publish = false
 build = "build.rs"
 
 [features]
+epoch271-boundary-trace = ["solana-runtime/epoch271-boundary-trace"]
 # Test-only escape hatch used to exercise sha2 0.9.9's portable backend on
 # SHA-NI hosts. Production builds leave this disabled and runtime-dispatch.
 poh-force-soft = ["sha2-fast/force-soft"]
