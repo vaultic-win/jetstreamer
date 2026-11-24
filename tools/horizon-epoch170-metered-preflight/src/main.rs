@@ -1,5 +1,9 @@
 //! Compose and validate the evidence for a metered full-root epoch 170 route.
-//! This executable does not start, stop, publish, or allocate anything.
+//! The operator commands are read-only. The held service command can exec the
+//! exact producer only after the invocation-bound native guard release.
+mod admission;
+mod held;
+
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -371,7 +375,8 @@ fn inputs(
         "schema":"horizon-epoch170-full-metered-source-preflight-v1","epoch":170,
         "source":{"node":node,"worker":worker,"worker_target":WORKER_TARGET,"manifest":expected_manifest,
             "offline":reference(offline_path,OFFLINE_SHA),"diagnostic":reference(proof_path,DIAG_SHA),
-            "bootstrap":offline["bootstrap"],"canonical_root":offline["canonical_root"],"indexes":indexes},
+            "bootstrap":offline["bootstrap"],"bootstrap_identity":prepared["baseline"]["snapshot"],
+            "canonical_root":offline["canonical_root"],"indexes":indexes},
         "previous":{"prepared":reference(&prepared_path,PREPARED_SHA),"terminal":reference(&terminal_path,TERMINAL_SHA),"guard_drain":reference(&drain_path,DRAIN_SHA),"worker_sha256":OLD_WORKER_SHA},
         "actor":{"unit":UNIT,"run":target,"producer_argv_after_protection":argv,"requires_held_before_useful_work":true},
         "guard":{"timer":TIMER,"service":GUARD_UNIT,"producer_unit":UNIT,"worker_root":LANE,
@@ -658,7 +663,13 @@ fn same_route(proposed: &Value, enrollment: &Value) -> Result<()> {
 fn preflight(profile: &Value, guard_sha: &str, obs_sha: &str, price: &Value) -> Result<Value> {
     let guard = guard_ready(profile, guard_sha)?;
     let runtime = rt(BASE);
-    let enrollment_path = runtime.join("OBSERVER_ENROLLMENT.json");
+    let fleet_sha = string(&profile["observer"]["active_fleet"]["fleet"], "sha256")?;
+    let enrollment_path = admission::enrollment_path(fleet_sha);
+    let enrollment_path = if enrollment_path.exists() {
+        enrollment_path
+    } else {
+        runtime.join("OBSERVER_ENROLLMENT.json")
+    };
     let enrollment = doc(&enrollment_path, obs_sha, 0)?;
     let expected = &profile["observer"];
     let active = &expected["active_fleet"];
@@ -750,6 +761,45 @@ fn preflight(profile: &Value, guard_sha: &str, obs_sha: &str, price: &Value) -> 
 fn dispatch() -> Result<Value> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.as_slice() {
+        [mode, digest] if mode == "hold" => held::hold(digest),
+        [
+            mode,
+            offline,
+            proof,
+            fleet,
+            hash,
+            guard,
+            active_path,
+            active_sha,
+        ] if mode == "enroll" => {
+            let profile = inputs(Path::new(offline), Path::new(proof), Path::new(fleet), hash)?;
+            admission::enrollment(
+                &profile,
+                guard,
+                &reference(Path::new(active_path), active_sha),
+            )
+        }
+        [
+            mode,
+            offline,
+            proof,
+            fleet,
+            hash,
+            guard,
+            enrollment_sha,
+            route,
+            provider_sha,
+        ] if mode == "quote" => {
+            let profile = inputs(Path::new(offline), Path::new(proof), Path::new(fleet), hash)?;
+            let path = admission::enrollment_path(hash);
+            admission::quote(
+                &profile,
+                guard,
+                &reference(&path, enrollment_sha),
+                route,
+                provider_sha,
+            )
+        }
         [mode, path, digest] if mode == "cadence" => {
             cadence_registration(&reference(Path::new(path), digest))
         }
@@ -776,7 +826,7 @@ fn dispatch() -> Result<Value> {
             )
         }
         _ => bail!(
-            "usage: cadence ACTIVE ACTIVE_SHA | inputs OFFLINE DIAGNOSTIC FLEET FLEET_SHA | preflight OFFLINE DIAGNOSTIC FLEET FLEET_SHA GUARD_SHA OBSERVER_SHA PRICE PRICE_SHA"
+            "usage: cadence ACTIVE ACTIVE_SHA | inputs OFFLINE DIAGNOSTIC FLEET FLEET_SHA | enroll OFFLINE DIAGNOSTIC FLEET FLEET_SHA GUARD_SHA ACTIVE ACTIVE_SHA | quote OFFLINE DIAGNOSTIC FLEET FLEET_SHA GUARD_SHA ENROLLMENT_SHA PROVIDER_KIND PROVIDER_SEAL_SHA | preflight OFFLINE DIAGNOSTIC FLEET FLEET_SHA GUARD_SHA OBSERVER_SHA PRICE PRICE_SHA | hold PAYLOAD_SHA"
         ),
     }
 }

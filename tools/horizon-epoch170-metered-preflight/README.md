@@ -11,8 +11,13 @@ The Rust preflight uses the verified full-root input receipt and the independent
 ```text
 horizon-epoch170-metered-preflight inputs OFFLINE DIAGNOSTIC FLEET FLEET_SHA
 horizon-epoch170-metered-preflight cadence ACTIVE ACTIVE_SHA
+horizon-epoch170-metered-preflight enroll OFFLINE DIAGNOSTIC FLEET FLEET_SHA GUARD_SHA ACTIVE ACTIVE_SHA
+horizon-epoch170-metered-preflight quote OFFLINE DIAGNOSTIC FLEET FLEET_SHA GUARD_SHA ENROLLMENT_SHA PROVIDER_KIND PROVIDER_SEAL_SHA
 horizon-epoch170-metered-preflight preflight OFFLINE DIAGNOSTIC FLEET FLEET_SHA GUARD_SHA OBSERVER_SHA PRICE PRICE_SHA
+horizon-epoch170-metered-preflight hold PAYLOAD_SHA
 ```
+
+The held producer reads the sealed source profile at `/run/horizon-epoch170-full-metered/payload.json`. It checks the native service identity, resource limits, and read-only input projections before waiting. The operator must bind the live guard and its post-guard capacity quote before publishing the invocation ID at `/run/horizon-epoch170-full-metered/barrier/allow`. Both inputs are read-only to the held producer.
 
 The first pending native qualification is the new invocation route and `GUARD_QUALIFIED.json`. Publish the source changes on `account-updates`, stage the distinct HOME-backed root and its receipt, and build, seal, and qualify the route-specific guard using its installed image and native witness. The next preflight inputs are the enrolled candidate observer and the exact native fit quote. Use a fresh fleet receipt for this transition. The candidate provider and held release transaction still need integration with the current controller before a worker start.
 
