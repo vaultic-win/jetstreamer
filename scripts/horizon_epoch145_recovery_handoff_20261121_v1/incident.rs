@@ -450,10 +450,6 @@ fn original() -> Result<Value> {
     not(any(feature = "v5o-136-post", feature = "v5q-136-post"))
 ))]
 fn original() -> Result<Value> {
-    #[cfg(feature = "v5r-136-post")]
-    if cfg!(feature = "v5r-136-post") {
-        return encoded_semantic::selector_origin();
-    }
     let result = pinned(&rt(START), ADVANCING)?;
     let handoff = rt("epoch145-semantic-continuity-20261121-v1/v5n-name-handoff");
     let init = handoff.join("submission-intent.json");
@@ -491,7 +487,15 @@ fn original() -> Result<Value> {
     Ok(json!({"start":start_ref,"sample":sample,"result":result}))
 }
 
-#[cfg(any(feature = "v5o-136-post", feature = "v5q-136-post"))]
+#[cfg(feature = "v5r-136-post")]
+fn original() -> Result<Value> {
+    encoded_semantic::selector_origin()
+}
+
+#[cfg(all(
+    any(feature = "v5o-136-post", feature = "v5q-136-post"),
+    not(feature = "v5r-136-post")
+))]
 fn original() -> Result<Value> {
     let result = pinned(&rt(START), ADVANCING)?;
     let (handoff, intent_sha, predecessor, start_sha) = if cfg!(feature = "v5q-136-post") {
