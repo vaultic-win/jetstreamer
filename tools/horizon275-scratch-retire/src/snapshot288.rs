@@ -90,13 +90,17 @@ pub(super) fn lookup_receipt(path: &Path) -> Result<Option<(Binding, Value)>> {
 }
 
 pub(super) fn closed() -> Result<()> {
-    for unit in [UNIT, GUARD, TIMER] {
+    closed_units(UNIT, GUARD, TIMER)
+}
+
+fn closed_units(producer: &str, guard: &str, timer: &str) -> Result<()> {
+    for unit in [producer, guard, timer] {
         terminal_unit(unit)?;
     }
     let response = Command::new("/usr/bin/systemctl")
         .args([
             "show",
-            UNIT,
+            producer,
             "-p",
             "InvocationID,MainPID,ControlPID,ControlGroup,LoadState,SubState",
         ])
@@ -223,6 +227,63 @@ pub(super) fn run(apply: bool, self_sha: &str) -> Result<()> {
             && archive_stamp.logical_bytes == 6659827189,
         "changed partial archive or evolved bank directory"
     );
+    retire_verified(
+        apply,
+        self_sha,
+        VerifiedDuplicate {
+            epoch: 288,
+            proof_sha: PROOF_SHA,
+            invocation: INVOCATION,
+            scope: Path::new(ROOT),
+            state,
+            run,
+            pin: &pin,
+            copy: &copy,
+            archive: &archive,
+            archive_stamp: &archive_stamp,
+            bank: &bank,
+            bank_stamp: &bank_stamp,
+            parent_inode: 42149337,
+            closed,
+        },
+    )
+}
+
+struct VerifiedDuplicate<'a> {
+    epoch: u64,
+    proof_sha: &'a str,
+    invocation: &'a str,
+    scope: &'a Path,
+    state: &'a Path,
+    run: &'a Path,
+    pin: &'a Asset,
+    copy: &'a Asset,
+    archive: &'a Path,
+    archive_stamp: &'a Stamp,
+    bank: &'a Path,
+    bank_stamp: &'a Stamp,
+    parent_inode: u64,
+    closed: fn() -> Result<()>,
+}
+
+fn retire_verified(apply: bool, self_sha: &str, qualified: VerifiedDuplicate<'_>) -> Result<()> {
+    let VerifiedDuplicate {
+        epoch,
+        proof_sha,
+        invocation,
+        scope,
+        state,
+        run,
+        pin,
+        copy,
+        archive,
+        archive_stamp,
+        bank,
+        bank_stamp,
+        parent_inode,
+        closed,
+    } = qualified;
+    let snapshot_name = copy.path.file_name().context("missing bootstrap name")?;
     let check_path = state.join("check.json");
     let intent_path = state.join("intent.json");
     let completion_path = state.join("completion.json");
@@ -237,10 +298,11 @@ pub(super) fn run(apply: bool, self_sha: &str) -> Result<()> {
         .open(copy_parent)?;
     let parent_identity = identity(&parent.metadata()?);
     ensure!(
-        parent_identity.0 == copy.stamp.device && parent_identity.1 == 42149337,
+        parent_identity.0 == copy.stamp.device && parent_identity.1 == parent_inode,
         "bootstrap parent no longer matches the stopped run"
     );
-    let relative = PathBuf::from(format!("/proc/self/fd/{}", parent.as_raw_fd())).join(SNAPSHOT);
+    let relative =
+        PathBuf::from(format!("/proc/self/fd/{}", parent.as_raw_fd())).join(snapshot_name);
     let stable = || -> Result<()> {
         pin.stamp.at(&pin.path)?;
         archive_stamp.at(&archive)?;
@@ -250,8 +312,8 @@ pub(super) fn run(apply: bool, self_sha: &str) -> Result<()> {
     stable()?;
     closed()?;
     let anchors = json!({
-        "epoch":288, "qualification_sha256":PROOF_SHA, "self_sha256":self_sha,
-        "producer_invocation_id":INVOCATION, "copy":copy.path, "snapshot":pin.path,
+        "epoch":epoch, "qualification_sha256":proof_sha, "self_sha256":self_sha,
+        "producer_invocation_id":invocation, "copy":copy.path, "snapshot":pin.path,
         "archive":archive, "archive_stamp":archive_stamp, "bank":bank, "bank_stamp":bank_stamp,
     });
     if !apply {
@@ -303,7 +365,7 @@ pub(super) fn run(apply: bool, self_sha: &str) -> Result<()> {
         ensure!(
             previous["anchors"] == anchors
                 && previous["check"] == serde_json::to_value(&check_ref)?
-                && previous["allocated_bytes"] == COPY_BYTES,
+                && previous["allocated_bytes"] == copy.stamp.physical_bytes,
             "foreign retirement intent"
         );
         binding
@@ -317,8 +379,8 @@ pub(super) fn run(apply: bool, self_sha: &str) -> Result<()> {
         write_json(
             &intent_path,
             &json!({
-                "anchors":anchors, "check":check_ref, "allocated_bytes":COPY_BYTES,
-                "free_before_bytes":available(Path::new(ROOT))?, "scheduled":schedule, "consumers":consumers,
+                "anchors":anchors, "check":check_ref, "allocated_bytes":copy.stamp.physical_bytes,
+                "free_before_bytes":available(scope)?, "scheduled":schedule, "consumers":consumers,
             }),
         )?
     };
@@ -345,7 +407,7 @@ pub(super) fn run(apply: bool, self_sha: &str) -> Result<()> {
     );
     if present {
         copy.stamp.at(&relative)?;
-        let name = CString::new(Path::new(SNAPSHOT).as_os_str().as_bytes())?;
+        let name = CString::new(snapshot_name.as_bytes())?;
         let rc = unsafe { libc::unlinkat(parent.as_raw_fd(), name.as_ptr(), 0) };
         ensure!(
             rc == 0,
@@ -364,14 +426,159 @@ pub(super) fn run(apply: bool, self_sha: &str) -> Result<()> {
     let result = write_json(
         &completion_path,
         &json!({
-            "intent":intent, "epoch":288, "allocated_bytes_removed":COPY_BYTES,
-            "free_after_bytes":available(Path::new(ROOT))?, "scheduled":schedule, "consumers":consumers,
+            "intent":intent, "epoch":epoch, "allocated_bytes_removed":copy.stamp.physical_bytes,
+            "free_after_bytes":available(scope)?, "scheduled":schedule, "consumers":consumers,
             "original_snapshot_retained":true, "partial_archive_retained":true, "evolved_bank_retained":true,
             "r2_mutations":false, "remote_mutations":false, "publication_authorized":false,
         }),
     )?;
     println!("{}", serde_json::to_string(&result)?);
     Ok(())
+}
+
+pub(super) fn run292(apply: bool, self_sha: &str) -> Result<()> {
+    const PACKAGE: &str = "/var/lib/jetstreamer/horizon292-full-v322";
+    const STATE292: &str = "/var/lib/jetstreamer/horizon292-bootstrap-retirement-v336";
+    const ROOT292: &str = "/home/ubuntu/.jetstreamer-private/qualification-292-root-v322";
+    const UNIT292: &str = "horizon-qualify-292-root-singleton-v322.service";
+    const INVOCATION292: &str = "ed9666c18ff34ef3bb1cca59131a323b";
+    const PROOF292: &str = "00f87b81869a9254637a10c30cc699990818a879724c849325dfba2adb102a83";
+    const SNAPSHOT292: &str =
+        "snapshot-126142053-FTKNWkBEjEUiSnw5WiT58GfzsA6xNNs7vN57KGim9Rch.tar.zst";
+    fn stopped() -> Result<()> {
+        closed_units(
+            UNIT292,
+            "horizon-292-full-protective-v322.service",
+            "horizon-292-full-protective-v322.timer",
+        )
+    }
+
+    let state = Path::new(STATE292);
+    let mode = state.symlink_metadata()?;
+    ensure!(
+        state.canonicalize()? == state
+            && mode.is_dir()
+            && mode.uid() == 0
+            && mode.mode() & 0o077 == 0,
+        "unsafe epoch 292 receipt directory"
+    );
+    let package = Path::new(PACKAGE);
+    let scope = Path::new(ROOT292);
+    let proof: Value = read_bound(
+        &package.join("repair-status-v335/bootstrap-comparison.json"),
+        PROOF292,
+        JSON_LIMIT,
+    )?;
+    let terminal: Value = read_bound(
+        &package.join("terminal.json"),
+        "81cf3186abb14fb2033104606e761baa0b57b1d6468d206ca28511e1fffef48d",
+        JSON_LIMIT,
+    )?;
+    let profile: Value = read_bound(
+        &package.join("profile.json"),
+        "cc86277e0077ead9006f85e176a4d12c33b24d54abc64cfd522a8f4823add260",
+        JSON_LIMIT,
+    )?;
+    let exit = value(&terminal["native_exit"])?;
+    let registration = value(&terminal["registration"])?;
+    let custody = &exit["original_custody"];
+    let guard_sample = value(&custody["guard_sample"])?;
+    let stop_completion = value(&custody["completion"])?;
+    ensure!(
+        proof["epoch"] == 292
+            && proof["publication_authorized"] == false
+            && terminal["epoch"] == 292
+            && terminal["root_preserved"] == true
+            && terminal["publication_authorized"] == false
+            && terminal["producer"] == exit["producer"]
+            && terminal["producer"]["Id"] == UNIT292
+            && terminal["producer"]["LoadState"] == "not-found"
+            && terminal["guard_drained"]["ActiveState"] == "inactive"
+            && terminal["timer_drained"]["ActiveState"] == "inactive"
+            && registration["producer"] == UNIT292
+            && registration["invocation_id"] == INVOCATION292
+            && exit["invocation_id"] == INVOCATION292
+            && guard_sample["producer_invocation_id"] == INVOCATION292
+            && guard_sample["trip_reason"] == "root-physical-budget"
+            && stop_completion["producer_invocation_id"] == INVOCATION292
+            && stop_completion["scratch_deleted"] == false,
+        "epoch 292 proof does not bind a preserved, stopped run"
+    );
+
+    fn compared(raw: &Value) -> Result<Asset> {
+        Ok(serde_json::from_value(json!({
+            "path":raw["path"], "sha256":raw["sha256"], "device":raw["device"], "inode":raw["inode"],
+            "logical_bytes":raw["bytes"], "physical_bytes":raw["allocated_bytes"], "uid":raw["uid"],
+            "mode":raw["mode"], "links":1, "mtime_ns":raw["modified_ns"], "ctime_ns":raw["changed_ns"],
+        }))?)
+    }
+    let pin = compared(&proof["original"])?;
+    let copy = compared(&proof["duplicate"])?;
+    let run = scope.join("state/destination-37f4352dbc01b503f61315df89e21b5b3d475582c178776821f276972e4d0a2e/work/root-cohort-292-292/run-810645-1795554658368379640");
+    let parent = run.join("scratch/.historical-runtime/jetstreamer-historical-parent-fn5lCf");
+    let archive = run.join("archives/epoch-292.jet");
+    let bank = parent.join("jetstreamer-historical-v1.8.11-LKkCgn/accounts-state");
+    let archive_stamp = Stamp::of(&open_regular(&archive)?.metadata()?)?;
+    let bank_metadata = bank.symlink_metadata()?;
+    let bank_stamp = Stamp::of(&bank_metadata)?;
+    ensure!(
+        pin.path
+            == Path::new("/home/ubuntu/.jetstreamer-private/epoch292-pinned-root-v319")
+                .join(SNAPSHOT292)
+            && profile["snapshot"]["path"].as_str() == pin.path.to_str()
+            && profile["snapshot"]["device"] == pin.stamp.device
+            && profile["snapshot"]["inode"] == pin.stamp.inode
+            && profile["snapshot"]["bytes"] == pin.stamp.logical_bytes
+            && profile["snapshot"]["sha256"] == pin.sha256
+            && pin.stamp.uid == 0
+            && pin.stamp.mode & 0o222 == 0
+            && copy.path == parent.join("bound-bootstrap").join(SNAPSHOT292)
+            && copy.stamp.uid == 1000
+            && copy.stamp.device == pin.stamp.device
+            && copy.stamp.inode != pin.stamp.inode
+            && copy.stamp.logical_bytes == pin.stamp.logical_bytes
+            && copy.stamp.physical_bytes == 20_894_187_520
+            && copy.sha256 == pin.sha256,
+        "epoch 292 duplicate is outside the proved bootstrap binding"
+    );
+    for (stamp, recorded, path) in [
+        (&archive_stamp, &custody["files"]["archive"], &archive),
+        (&bank_stamp, &custody["files"]["evolved_accounts"], &bank),
+    ] {
+        ensure!(
+            recorded["path"].as_str() == path.to_str()
+                && recorded["device"] == stamp.device
+                && recorded["inode"] == stamp.inode
+                && recorded["logical_bytes"] == stamp.logical_bytes
+                && recorded["mtime_ns"] == stamp.mtime_ns
+                && recorded["ctime_ns"] == stamp.ctime_ns,
+            "epoch 292 retained state changed"
+        );
+    }
+    ensure!(
+        bank_metadata.is_dir() && bank.canonicalize()? == bank,
+        "epoch 292 bank path changed"
+    );
+    retire_verified(
+        apply,
+        self_sha,
+        VerifiedDuplicate {
+            epoch: 292,
+            proof_sha: PROOF292,
+            invocation: INVOCATION292,
+            scope,
+            state,
+            run: &run,
+            pin: &pin,
+            copy: &copy,
+            archive: &archive,
+            archive_stamp: &archive_stamp,
+            bank: &bank,
+            bank_stamp: &bank_stamp,
+            parent_inode: 27349434,
+            closed: stopped,
+        },
+    )
 }
 
 #[cfg(test)]

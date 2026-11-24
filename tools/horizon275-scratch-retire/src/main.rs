@@ -374,11 +374,16 @@ fn main() -> Result<()> {
         "usage: horizon275-scratch-retire MODE SELF_SHA256 [BATCH for --apply-unpacked-288]"
     );
     let apply = match args[1].as_str() {
-        "--check-only" | "--check-227" | "--check-bootstrap-288" | "--check-unpacked-288" => false,
+        "--check-only"
+        | "--check-227"
+        | "--check-bootstrap-288"
+        | "--check-bootstrap-292"
+        | "--check-unpacked-288" => false,
         "--apply"
         | "--retire-bootstrap-copy"
         | "--apply-227"
         | "--retire-bootstrap-288"
+        | "--retire-bootstrap-292"
         | "--apply-unpacked-288" => true,
         _ => anyhow::bail!("unknown operation"),
     };
@@ -391,6 +396,12 @@ fn main() -> Result<()> {
         "--check-bootstrap-288" | "--retire-bootstrap-288"
     ) {
         return snapshot288::run(apply, &args[2]);
+    }
+    if matches!(
+        args[1].as_str(),
+        "--check-bootstrap-292" | "--retire-bootstrap-292"
+    ) {
+        return snapshot288::run292(apply, &args[2]);
     }
     if args[1] == "--check-unpacked-288" {
         return selective288::run(&args[2], None);
