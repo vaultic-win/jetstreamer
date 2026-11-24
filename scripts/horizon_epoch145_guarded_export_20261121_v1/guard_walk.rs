@@ -84,24 +84,25 @@ fn measure(path: &Path, pinned: &File, cap: u64) -> Result<Option<u64>> {
     Ok(Some(bytes))
 }
 
-pub(super) fn lower_bound(path: &Path, cap: u64) -> Result<u64> {
-    let fd = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(path)?;
+fn two_complete_walks(mut walk: impl FnMut() -> Result<Option<u64>>) -> Result<Option<u64>> {
     let mut first: Option<u64> = None;
     for _ in 0..4 {
-        if let Some(bytes) = measure(path, &fd, cap)? {
+        if let Some(bytes) = walk()? {
             if let Some(previous) = first {
-                return Ok(previous.min(bytes));
+                return Ok(Some(previous.min(bytes)));
             }
             first = Some(bytes);
         }
     }
-    anyhow::bail!(
-        "no pair of complete allocation walks for {}",
-        path.display()
-    )
+    Ok(None)
+}
+
+pub(super) fn lower_bound(path: &Path, cap: u64) -> Result<Option<u64>> {
+    let fd = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)?;
+    two_complete_walks(|| measure(path, &fd, cap))
 }
 
 #[cfg(test)]
@@ -127,7 +128,7 @@ mod tests {
                 Ok(sum + fs::symlink_metadata(root.join(name))?.blocks() * 512)
             },
         )?;
-        assert_eq!(lower_bound(&root, cap)?, expected);
+        assert_eq!(lower_bound(&root, cap)?, Some(expected));
         assert!(lower_bound(&root, expected - 1).is_err());
         let alias = dir.path().join("root-link");
         symlink(&root, &alias)?;
@@ -136,6 +137,19 @@ mod tests {
         fs::rename(&root, dir.path().join("old-root"))?;
         fs::create_dir(&root)?;
         assert!(measure(&root, &pinned, cap).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn allocation_churn_needs_a_new_sample_without_granting_credit() -> Result<()> {
+        let mut torn = [None, Some(4096), None, None].into_iter();
+        assert_eq!(two_complete_walks(|| Ok(torn.next().unwrap()))?, None);
+        let mut partial = [None, Some(8192), None, Some(4096)].into_iter();
+        assert_eq!(
+            two_complete_walks(|| Ok(partial.next().unwrap()))?,
+            Some(4096)
+        );
+        assert!(two_complete_walks(|| Err(anyhow::anyhow!("different filesystem"))).is_err());
         Ok(())
     }
 }

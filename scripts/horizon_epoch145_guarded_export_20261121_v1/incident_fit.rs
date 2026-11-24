@@ -1040,7 +1040,12 @@ fn current_guard(
             ensure!(path.parent() == Some(Path::new("/home/sol/.jetstreamer-private"))
                 && path.metadata()?.dev() == Path::new("/home/sol").metadata()?.dev(),
                 "guard root differs from its HOME booking");
-            let measured = guard_walk::lower_bound(path, cap)?;
+            let measured = guard_walk::lower_bound(path, cap)?.ok_or_else(|| {
+                capacity::Reprice(format!(
+                    "no pair of complete allocation walks for {}; awaiting a fresh guard sample",
+                    path.display()
+                ))
+            })?;
             // Reopen the current native receipt after the two walks. A producer
             // trip, expired receipt or changed plan during measurement is fatal.
             let (_, current) = live_guard_sample(d, &p, &b, unit)?;
