@@ -50,7 +50,14 @@ def bound(path, expected=None):
 
 
 def command(*args):
-    return subprocess.check_output(args, text=True, timeout=10).strip()
+    try:
+        return subprocess.check_output(args, text=True, timeout=10).strip()
+    except subprocess.TimeoutExpired:
+        if args[:2] != ("/usr/bin/systemctl", "show"):
+            raise
+        # Retry only a read of PID 1. The caller still validates the actual
+        # unit, invocation and cgroup membership before using the quote.
+        return subprocess.check_output(args, text=True, timeout=10).strip()
 
 
 def image(name, size, ino, terminal):
