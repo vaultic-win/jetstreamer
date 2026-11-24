@@ -430,8 +430,7 @@ fn observe_root_for_import_prestart(plan: &Plan, unit: &Unit) -> bool {
         "horizon-import-239-current-20261117-v2.service"
             | "horizon-import-239-current-20261117-v3.service"
             | "horizon-import-244-current-20261117-v1.service"
-    )
-        && unit.active == "activating"
+    ) && unit.active == "activating"
         && unit.sub == "start-pre"
         && unit.pid == 0
 }
@@ -644,6 +643,22 @@ fn handoff_pin_matches(pin: &Value, plan_sha: &str, invocation: &str, handoff: &
 }
 
 fn supported_unit(plan: &Plan) -> bool {
+    if plan.unit == "horizon-perf-epoch271-reward-tuples@v299.service" {
+        return plan.filesystem == Path::new("/")
+            && plan.worker_root
+                == Path::new(
+                    "/home/ubuntu/.jetstreamer-private/qualification-271-reward-tuples-v299",
+                )
+            && plan.receipt_directory
+                == Path::new("/var/lib/jetstreamer/horizon271-reward-tuples-guard-receipts-v299")
+            && plan.minimum_free_bytes == 3_770_104_987_645
+            && plan.maximum_root_physical_bytes == Some(245_000_000_000)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.native_main.is_none()
+            && plan.bounded_measurement.is_none()
+            && plan.bounded_canary.is_none();
+    }
+
     if plan.unit.starts_with("horizon-qualify-228-demotion-") {
         return cfg!(feature = "epoch228-native-main-guard")
             && plan.unit == "horizon-qualify-228-demotion-root-tail-16d4b158-v1.service"
@@ -1353,7 +1368,10 @@ mod tests {
         prestart.active = "failed".into();
         assert!(!observe_root_for_import_prestart(&plan, &prestart));
         for (pointer, replacement) in [
-            ("/unit", json!("horizon-import-244-current-20261117-v2.service")),
+            (
+                "/unit",
+                json!("horizon-import-244-current-20261117-v2.service"),
+            ),
             ("/filesystem", json!("/other")),
             ("/worker_root", json!("/other")),
             ("/minimum_free_bytes", json!(1_999_999_999_999u64)),
@@ -1669,6 +1687,39 @@ mod tests {
             assert!(validate_plan(&bad).is_err(), "{key}");
         }
     }
+    #[test]
+    fn epoch271_reward_tuple_guard_requires_its_enrolled_scope() {
+        let plan = json!({
+            "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit": "horizon-perf-epoch271-reward-tuples@v299.service",
+            "invocation_id": "a".repeat(32),
+            "filesystem": "/",
+            "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-271-reward-tuples-v299",
+            "receipt_directory": "/var/lib/jetstreamer/horizon271-reward-tuples-guard-receipts-v299",
+            "minimum_free_bytes": 3_770_104_987_645u64,
+            "maximum_root_physical_bytes": 245_000_000_000u64,
+            "maximum_worker_vmas": 3_500_000,
+        });
+        assert!(validate_plan(&serde_json::from_value(plan.clone()).unwrap()).is_ok());
+        for (key, change) in [
+            ("unit", json!("horizon-perf-epoch271-other@v299.service")),
+            (
+                "worker_root",
+                json!("/home/ubuntu/.jetstreamer-private/other"),
+            ),
+            ("receipt_directory", json!("/var/lib/jetstreamer/other")),
+            ("minimum_free_bytes", json!(3_770_104_987_644u64)),
+            ("maximum_root_physical_bytes", json!(245_000_000_001u64)),
+        ] {
+            let mut invalid = plan.clone();
+            invalid[key] = change;
+            assert!(
+                validate_plan(&serde_json::from_value(invalid).unwrap()).is_err(),
+                "{key}"
+            );
+        }
+    }
+
     #[test]
     fn native203_guard_namespace_is_exact_and_keeps_all_resource_gates() {
         let mut p = Plan {
