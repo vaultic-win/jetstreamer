@@ -13,6 +13,7 @@ retry-post = ["fixture-post"]
 v5n-136-post = ["retry-post"]
 v5o-136-post = ["retry-post"]
 v5q-136-post = ["retry-post"]
+v5r-136-post = ["v5q-136-post"]
 
 [workspace]
 

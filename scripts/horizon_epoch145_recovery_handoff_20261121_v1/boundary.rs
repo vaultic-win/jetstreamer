@@ -69,12 +69,20 @@ pub(super) mod profile {
         pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261123-v9";
         pub(crate) const CLOSED: &str = env!("HORIZON_145_PREDECESSOR_DRAINED_SHA256");
     }
-    #[cfg(feature = "v5q-136-post")]
+    #[cfg(all(feature = "v5q-136-post", not(feature = "v5r-136-post")))]
     mod selected {
         pub(crate) const DIR: &str = "epoch145-v5q-136-dispatch-20261124-v1";
         pub(crate) const DISPATCH: &str = "horizon-145-v5q-136-dispatch-20261124-v1.service";
         pub(crate) const OLD: &str = "horizon-145-fixture-retry1-dispatch-20261122-v1.service";
         pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261124-v10";
+        pub(crate) const CLOSED: &str = env!("HORIZON_145_PREDECESSOR_DRAINED_SHA256");
+    }
+    #[cfg(feature = "v5r-136-post")]
+    mod selected {
+        pub(crate) const DIR: &str = "epoch145-v5r-136-dispatch-20261124-v1";
+        pub(crate) const DISPATCH: &str = "horizon-145-v5r-136-dispatch-20261124-v1.service";
+        pub(crate) const OLD: &str = "horizon-145-fixture-retry1-dispatch-20261122-v1.service";
+        pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261124-v11";
         pub(crate) const CLOSED: &str = env!("HORIZON_145_PREDECESSOR_DRAINED_SHA256");
     }
     pub(crate) use selected::*;
@@ -338,6 +346,11 @@ fn previous_locks() -> Result<Vec<PathBuf>> {
             "epoch145-v5o-136-dispatch-20261123-v1",
             "horizon-145-v5o-136-dispatch-20261123-v1.service",
         )]);
+        #[cfg(feature = "v5r-136-post")]
+        let retired = retired.chain([(
+            "epoch145-v5q-136-dispatch-20261124-v1",
+            "horizon-145-v5q-136-dispatch-20261124-v1.service",
+        )]);
         for (directory, unit) in retired {
             let owner = native(unit)?;
             drained(&owner, unit)?;
@@ -492,7 +505,13 @@ fn fixture_plan(plan: &Value) -> Result<()> {
     {
         let receipt = from_ref(&build)?;
         let family = rt("epoch145-semantic-continuity-20261121-v1");
-        let (key, name, hash) = if cfg!(feature = "v5q-136-post") {
+        let (key, name, hash) = if cfg!(feature = "v5r-136-post") {
+            (
+                "encoded_prefix_custody",
+                "v5r-name-handoff/ACTUAL_ADVANCING_AND_136_CUSTODY.json",
+                "1343de96384e52ff061262a2d80c217d187a1fc8b0ce0e07e32940ee88e89b3b",
+            )
+        } else if cfg!(feature = "v5q-136-post") {
             (
                 "audit_turnover_binding",
                 "V5Q_RUNTIME_BINDINGS.json",

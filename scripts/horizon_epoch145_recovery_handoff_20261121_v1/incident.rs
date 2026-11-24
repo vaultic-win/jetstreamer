@@ -193,7 +193,7 @@ pub(super) mod generation {
         pub(crate) const FIT_PKG: &str =
             "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5o-136-v1";
     }
-    #[cfg(feature = "v5q-136-post")]
+    #[cfg(all(feature = "v5q-136-post", not(feature = "v5r-136-post")))]
     mod selected {
         pub(crate) const SOURCE: &str = "cbacb5a17e6347509640846eccb95cb0";
         pub(crate) const START: &str =
@@ -204,6 +204,18 @@ pub(super) mod generation {
         pub(crate) const STATE_PATH: &str = "epoch145-v5q-136-dispatch-20261124-v1/state";
         pub(crate) const FIT_PKG: &str =
             "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5q-136-v1";
+    }
+    #[cfg(feature = "v5r-136-post")]
+    mod selected {
+        pub(crate) const SOURCE: &str = "8f2b9c06b62147babe83c9ade7271cd3";
+        pub(crate) const START: &str =
+            "epoch145-semantic-continuity-20261121-v1/v5r-name-handoff/submission-result.json";
+        pub(crate) const ADVANCING: &str =
+            "8c3e4d05c59f32545dff03258269e339cbde95ae4bcc5cc5a92aa8ae5514f68b";
+        pub(crate) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v13l";
+        pub(crate) const STATE_PATH: &str = "epoch145-v5r-136-dispatch-20261124-v1/state";
+        pub(crate) const FIT_PKG: &str =
+            "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5r-136-v1";
     }
     pub(crate) use selected::*;
     pub(crate) const SEAL: &str = env!("HORIZON_145_POST_SEAL_SHA256");
@@ -227,7 +239,9 @@ pub(super) mod generation {
         feature = "v5o-136-post",
         feature = "v5q-136-post"
     ))]
-    pub(crate) const IMAGE: &str = if cfg!(feature = "v5q-136-post") {
+    pub(crate) const IMAGE: &str = if cfg!(feature = "v5r-136-post") {
+        "ae9a99935ea5d3da94f6035e04694f13f148898c78e07d55cc69f535c942338b"
+    } else if cfg!(feature = "v5q-136-post") {
         "9e7be6067401af4b0f7e06d07540eb07ba06fee646843eee741a480cc520108e"
     } else if cfg!(feature = "v5o-136-post") {
         "7192fc4ea054340943dcf483b1d4b827052ec0e2feb60a2602e3cd4a58acc060"
@@ -239,7 +253,9 @@ pub(super) mod generation {
         feature = "v5o-136-post",
         feature = "v5q-136-post"
     ))]
-    pub(crate) const SEMANTIC: &str = if cfg!(feature = "v5q-136-post") {
+    pub(crate) const SEMANTIC: &str = if cfg!(feature = "v5r-136-post") {
+        "epoch145-semantic-continuity-20261121-v1/tools-v5r/export145"
+    } else if cfg!(feature = "v5q-136-post") {
         "epoch145-semantic-continuity-20261121-v1/tools-v5q/export145"
     } else if cfg!(feature = "v5o-136-post") {
         "epoch145-semantic-continuity-20261121-v1/tools-v5o/export145"
@@ -248,7 +264,9 @@ pub(super) mod generation {
     };
     pub(crate) const PIPELINE: &str =
         "0f29fd116ef54668698089c01f8cd50ffcf729b430e311bb90b989f4d5ad8e94";
-    pub(crate) const INSPECT: &str = if cfg!(feature = "v5q-136-post") {
+    pub(crate) const INSPECT: &str = if cfg!(feature = "v5r-136-post") {
+        "inspect-v5r"
+    } else if cfg!(feature = "v5q-136-post") {
         "inspect-v5q"
     } else if cfg!(feature = "v5o-136-post") {
         "inspect-v5o"
@@ -257,7 +275,9 @@ pub(super) mod generation {
     } else {
         "inspect-v5f"
     };
-    pub(crate) const FOLLOW: &str = if cfg!(feature = "v5q-136-post") {
+    pub(crate) const FOLLOW: &str = if cfg!(feature = "v5r-136-post") {
+        "follow-v5r"
+    } else if cfg!(feature = "v5q-136-post") {
         "follow-v5q"
     } else if cfg!(feature = "v5o-136-post") {
         "follow-v5o"
@@ -430,6 +450,10 @@ fn original() -> Result<Value> {
     not(any(feature = "v5o-136-post", feature = "v5q-136-post"))
 ))]
 fn original() -> Result<Value> {
+    #[cfg(feature = "v5r-136-post")]
+    if cfg!(feature = "v5r-136-post") {
+        return encoded_semantic::selector_origin();
+    }
     let result = pinned(&rt(START), ADVANCING)?;
     let handoff = rt("epoch145-semantic-continuity-20261121-v1/v5n-name-handoff");
     let init = handoff.join("submission-intent.json");
@@ -573,7 +597,9 @@ pub(super) fn completed_semantics() -> Result<Value> {
     {
         let inputs = check_member(&rt(PKG), SEAL, "post-inputs")?;
         let (current, handoff) = if cfg!(any(feature = "v5o-136-post", feature = "v5q-136-post")) {
-            let version = if cfg!(feature = "v5q-136-post") {
+            let version = if cfg!(feature = "v5r-136-post") {
+                "v5r-name-handoff"
+            } else if cfg!(feature = "v5q-136-post") {
                 "v5q-name-handoff"
             } else {
                 "v5o-name-handoff"
@@ -912,8 +938,13 @@ pub fn run(mode: &str) -> Result<()> {
         feature = "v5o-136-post",
         feature = "v5q-136-post"
     )) {
-        let inputs = check_member(&rt(PKG), SEAL, "post-inputs")?;
-        command(&inputs, &["capture"])?;
+        #[cfg(feature = "v5r-136-post")]
+        encoded_semantic::wait_for_capture(SOURCE)?;
+        #[cfg(not(feature = "v5r-136-post"))]
+        {
+            let inputs = check_member(&rt(PKG), SEAL, "post-inputs")?;
+            command(&inputs, &["capture"])?;
+        }
         let retained = completed_semantics()?;
         let _operation = boundary::before_post(&retained)?;
         platform::save(

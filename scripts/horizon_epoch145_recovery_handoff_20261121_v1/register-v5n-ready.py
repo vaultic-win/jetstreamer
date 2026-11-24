@@ -11,23 +11,26 @@ fixture = runpy.run_path(str(Path(__file__).with_name("register-fixture-ready.py
 common = fixture["common"]
 pin = fixture["pinned"]
 root = common.RT
+v5r = sys.argv[1:2] == ["--v5r"]
 v5q = sys.argv[1:2] == ["--v5q"]
 v5o = sys.argv[1:2] == ["--v5o"]
-generation = "v5q" if v5q else "v5o" if v5o else "v5n"
-date = "20261124" if v5q else "20261123"
+generation = "v5r" if v5r else "v5q" if v5q else "v5o" if v5o else "v5n"
+date = "20261124" if v5q or v5r else "20261123"
 directory = root / f"epoch145-{generation}-136-dispatch-{date}-v1"
 package = directory / "tools"
 unit = f"horizon-145-{generation}-136-dispatch-{date}-v1.service"
-writer = root / ("epoch136-joint-writer-20261124-v10" if v5q else
+writer = root / ("epoch136-joint-writer-20261124-v11" if v5r else "epoch136-joint-writer-20261124-v10" if v5q else
                  "epoch136-joint-writer-20261123-v9" if v5o else "epoch136-joint-writer-20261123-v8")
 provider = root / f"incident-replay-fit-20261121-v1/tools-homefloor-145-post-{generation}-136-v1"
 old_directory = root / "epoch145-fixture-retry1-dispatch-20261122-v1"
 old_plan = root / "epoch136-joint-writer-20261122-v7c/registered-production-plan.json"
 family = root / "epoch145-semantic-continuity-20261121-v1"
-post = family / ("tools-v13k" if v5q else "tools-v13j" if v5o else "tools-v13h")
-semantic = ("cbacb5a17e6347509640846eccb95cb0" if v5q else "f3474dfad55f4a05a64431421881db29" if v5o else
+post = family / ("tools-v13l" if v5r else "tools-v13k" if v5q else "tools-v13j" if v5o else "tools-v13h")
+semantic = ("8f2b9c06b62147babe83c9ade7271cd3" if v5r else
+            "cbacb5a17e6347509640846eccb95cb0" if v5q else "f3474dfad55f4a05a64431421881db29" if v5o else
             "f86e7e61f4b34dc7aedc4e08a128e713")
-submission = ("398f1a2d5d5a50ab4d35c0f27de035d7c07023b6c8d632ef326b9fcd169cb5e9" if v5q else
+submission = ("8c3e4d05c59f32545dff03258269e339cbde95ae4bcc5cc5a92aa8ae5514f68b" if v5r else
+              "398f1a2d5d5a50ab4d35c0f27de035d7c07023b6c8d632ef326b9fcd169cb5e9" if v5q else
               "4d80587d22ffa0883696f96c30958b54d30fb5455bde35050e96b50c8ba8c544" if v5o else
               "57eb2aadef0bd6e5591800c439fa0f2e6d701c2f4baa3dc45b5074fdddebd02e")
 
@@ -57,8 +60,10 @@ def inputs(compiled, handoff_sha):
     common.need(worker["sha256"] == submission and common.read_ref(worker)["invocation_id"] == semantic,
                 "different original semantic invocation")
     post_ref = compiled(post / "deployment-seal-receipt.json")
-    if v5o or v5q:
-        key, name, digest = (("audit_turnover_binding", "V5Q_RUNTIME_BINDINGS.json",
+    if v5o or v5q or v5r:
+        key, name, digest = (("encoded_prefix_custody", "v5r-name-handoff/ACTUAL_ADVANCING_AND_136_CUSTODY.json",
+                              "1343de96384e52ff061262a2d80c217d187a1fc8b0ce0e07e32940ee88e89b3b") if v5r else
+                             ("audit_turnover_binding", "V5Q_RUNTIME_BINDINGS.json",
                               "a5dc1d9973d950d36f7302b800f0b10421066e135e0912750fd92b98521cadc4") if v5q else
                              ("donor_pressure_binding", "V5O_RUNTIME_BINDINGS.json",
                               "d571da98684079bc937a2ddeed52dbcd457eb0a74010519171b851e3e5297137"))
@@ -118,10 +123,14 @@ def observed(dispatch_sha, compiled):
 def check_boundary():
     for folder in (directory, old_directory, root / "epoch145-fixture-phase-dispatch-20261122-v1", common.DIR):
         common.clean_boundary(folder / "state", folder)
-    retired_versions = ("v5n", "v5o") if v5q else ("v5n",) if v5o else ()
-    for version in retired_versions:
-        retired = root / f"epoch145-{version}-136-dispatch-20261123-v1"
-        common.drained(f"horizon-145-{version}-136-dispatch-20261123-v1.service")
+    retired_versions = (("v5n", "20261123"),) if v5o or v5q or v5r else ()
+    if v5q or v5r:
+        retired_versions += (("v5o", "20261123"),)
+    if v5r:
+        retired_versions += (("v5q", "20261124"),)
+    for version, prior_date in retired_versions:
+        retired = root / f"epoch145-{version}-136-dispatch-{prior_date}-v1"
+        common.drained(f"horizon-145-{version}-136-dispatch-{prior_date}-v1.service")
         common.clean_boundary(retired / "state", retired)
         common.need(not any(os.path.lexists(retired / name) for name in ("READY.json", "OFFER.json")),
                     "retired selector registered custody")
@@ -131,10 +140,10 @@ def check_boundary():
 
 
 def main():
-    args = sys.argv[2:] if v5o or v5q else sys.argv[1:]
+    args = sys.argv[2:] if v5o or v5q or v5r else sys.argv[1:]
     common.need(os.geteuid() == 0 and sys.flags.isolated and __debug__ and len(args) == 2 and
                 all(re.fullmatch("[a-f0-9]{64}", value) for value in args),
-                "register-v5n-ready.py [--v5o|--v5q] DISPATCH_SEAL_SHA256 PARENT_HANDOFF_SHA256")
+                "register-v5n-ready.py [--v5o|--v5q|--v5r] DISPATCH_SEAL_SHA256 PARENT_HANDOFF_SHA256")
     digest, handoff = args
     compiled = compiled_refs(digest)
 

@@ -14,6 +14,8 @@ const PROMOTED: &str =
 const VIEW: &str = "/home/sol/.jetstreamer-private/epoch145-prefix-extract-materialized-view-20261121-v1/epoch-145.jet";
 const SOURCE: &str = "/home/sol/.jetstreamer-private/epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet";
 const BYTES: u64 = 105_610_995_833;
+#[cfg(feature = "v5r-136-post")]
+const SELECTOR_CUSTODY: &str = "1343de96384e52ff061262a2d80c217d187a1fc8b0ce0e07e32940ee88e89b3b";
 
 fn load(reference: &Value, path: &Path) -> Result<Value> {
     ensure!(aspath(reference)? == path, "unexpected {}", path.display());
@@ -337,6 +339,32 @@ fn capture(custody_sha: &str) -> Result<Value> {
         platform::save(&out, &done)?;
     }
     Ok(done)
+}
+
+#[cfg(feature = "v5r-136-post")]
+pub(super) fn selector_origin() -> Result<Value> {
+    let scope = Semantic::load(SELECTOR_CUSTODY)?;
+    let start = &scope.custody["verifier_start"];
+    let receipt = from_ref(start)?;
+    Ok(json!({"start":start,"result":scope.submission,
+        "parent":receipt["fresh_fit"]["phase145"]["window"]["native_parent"]}))
+}
+
+#[cfg(feature = "v5r-136-post")]
+pub(super) fn wait_for_capture(iid: &str) -> Result<()> {
+    let path = rt(HANDOFF);
+    let receipt = pinned(
+        &path.join("SEMANTIC_WATCH_STARTED.json"),
+        "77193f986740740c15125df7ef6926cb472579a292954451f2fad670b089faca",
+    )?;
+    let unit = "horizon-145-v5r-semantic-capture-20261124-v1.service";
+    ensure!(
+        receipt["watching_invocation"] == iid && receipt["manager"]["Id"] == unit,
+        "different epoch 145 completion watcher"
+    );
+    let watcher = text(&receipt["manager"]["InvocationID"])?;
+    events::manager(unit, watcher)?;
+    Ok(())
 }
 
 pub(super) fn run(mode: &str, custody_sha: &str) -> Result<Option<Value>> {
