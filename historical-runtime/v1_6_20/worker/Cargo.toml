@@ -7,6 +7,8 @@ publish = false
 build = "build.rs"
 
 [features]
+# Private bank hash and account-delta capture for the epoch 229 parent comparison.
+epoch229-bank-trace = ["solana-runtime/epoch229-bank-trace"]
 # Test-only escape hatch used to exercise sha2 0.9.9's portable backend on
 # SHA-NI hosts. Production builds leave this disabled and runtime-dispatch.
 poh-force-soft = ["sha2-fast/force-soft"]

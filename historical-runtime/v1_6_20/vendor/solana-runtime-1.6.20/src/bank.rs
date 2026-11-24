@@ -2100,6 +2100,11 @@ impl Bank {
             // freeze is a one-way trip, idempotent
             self.freeze_started.store(true, Relaxed);
             *hash = self.hash_internal_state();
+            #[cfg(feature = "epoch229-bank-trace")]
+            if crate::epoch229_bank_trace::directory(self.slot()).is_some() {
+                crate::epoch229_bank_trace::capture_rewards(self.slot(), &self.rewards.read().unwrap())
+                    .expect("capture epoch 229 block rewards");
+            }
             #[cfg(feature = "epoch230-bank-trace")]
             if crate::epoch230_bank_trace::directory(self.slot()).is_some() {
                 crate::epoch230_bank_trace::capture_rewards(self.slot(), &self.rewards.read().unwrap())
@@ -4370,6 +4375,26 @@ impl Bank {
             hash = extend_and_hash(&hash, &buf)
         }
 
+        #[cfg(feature = "epoch229-bank-trace")]
+        if crate::epoch229_bank_trace::directory(self.slot()).is_some() {
+            let hard_fork = self
+                .hard_forks
+                .read()
+                .unwrap()
+                .get_hash_data(self.slot(), self.parent_slot());
+            eprintln!(
+                "epoch229_bank_hash slot={} parent_slot={} parent_hash={} bank_hash={} accounts_delta_hash={} signatures={} last_blockhash={} capitalization={} hard_fork={:?}",
+                self.slot(),
+                self.parent_slot(),
+                self.parent_hash,
+                hash,
+                accounts_delta_hash.hash,
+                self.signature_count(),
+                self.last_blockhash(),
+                self.capitalization(),
+                hard_fork,
+            );
+        }
         #[cfg(feature = "epoch230-bank-trace")]
         if crate::epoch230_bank_trace::directory(self.slot()).is_some() {
             let hard_fork = self

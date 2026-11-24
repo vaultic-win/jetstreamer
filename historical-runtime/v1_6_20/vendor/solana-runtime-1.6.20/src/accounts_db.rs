@@ -3927,6 +3927,9 @@ impl AccountsDb {
         };
         let dirty_keys = hashes.iter().map(|(pubkey, _hash)| *pubkey).collect();
 
+        #[cfg(feature = "epoch229-bank-trace")]
+        crate::epoch229_bank_trace::capture_account_hashes(slot, &hashes)
+            .expect("capture epoch 229 account hashes");
         #[cfg(feature = "epoch230-bank-trace")]
         crate::epoch230_bank_trace::capture_account_hashes(slot, &hashes)
             .expect("capture epoch 230 account hashes");
