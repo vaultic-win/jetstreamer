@@ -60,6 +60,7 @@ name = "solana_runtime"
 [features]
 # Read-only snapshot metadata decoder; not enabled by ordinary workers.
 snapshot-hard-fork-metadata = []
+epoch230-bank-trace = []
 
 [dev-dependencies]
 assert_matches = "1.3.0"

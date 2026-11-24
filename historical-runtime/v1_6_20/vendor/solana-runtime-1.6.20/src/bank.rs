@@ -4365,6 +4365,27 @@ impl Bank {
             hash = extend_and_hash(&hash, &buf)
         }
 
+        #[cfg(feature = "epoch230-bank-trace")]
+        if crate::epoch230_bank_trace::directory(self.slot()).is_some() {
+            let hard_fork = self
+                .hard_forks
+                .read()
+                .unwrap()
+                .get_hash_data(self.slot(), self.parent_slot());
+            eprintln!(
+                "epoch230_bank_hash slot={} parent_slot={} parent_hash={} bank_hash={} accounts_delta_hash={} signatures={} last_blockhash={} capitalization={} hard_fork={:?}",
+                self.slot(),
+                self.parent_slot(),
+                self.parent_hash,
+                hash,
+                accounts_delta_hash.hash,
+                self.signature_count(),
+                self.last_blockhash(),
+                self.capitalization(),
+                hard_fork,
+            );
+        }
+
         info!(
             "bank frozen: {} hash: {} accounts_delta: {} signature_count: {} last_blockhash: {} capitalization: {}",
             self.slot(),

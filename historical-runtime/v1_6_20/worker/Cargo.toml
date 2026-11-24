@@ -16,6 +16,8 @@ poh-force-soft = ["sha2-fast/force-soft"]
 diagnostic-singleton = []
 # Isolated read-only snapshot bank metadata example; never ordinary replay.
 snapshot-hard-fork-metadata = ["solana-runtime/snapshot-hard-fork-metadata"]
+# Capture bank hash inputs and dirty account hashes at the epoch 230 mismatch.
+epoch230-bank-trace = ["solana-runtime/epoch230-bank-trace"]
 # Private epoch 223 prefix using the original runtime and capped storage shrink
 # debt. No native transaction, fee, hash or account-loading semantics change.
 epoch223-prefix-qualification = []

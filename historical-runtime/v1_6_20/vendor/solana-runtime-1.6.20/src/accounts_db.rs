@@ -3927,6 +3927,9 @@ impl AccountsDb {
         };
         let dirty_keys = hashes.iter().map(|(pubkey, _hash)| *pubkey).collect();
 
+        #[cfg(feature = "epoch230-bank-trace")]
+        crate::epoch230_bank_trace::capture_account_hashes(slot, &hashes)
+            .expect("capture epoch 230 account hashes");
         let ret = AccountsHash::accumulate_account_hashes(hashes);
         accumulate.stop();
         let mut uncleaned_time = Measure::start("uncleaned_index");
