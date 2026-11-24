@@ -654,6 +654,9 @@ impl RuntimeState {
         let mut writes = self.freeze_root_and_drain()?;
         let child_poh_start = self.bank.last_blockhash();
         let leader = leader_schedule::slot_leader(&self.bank, slot, &mut self.leader_schedules)?;
+        #[cfg(feature = "epoch271-boundary-trace")]
+        let child = self.new_child_with_reward_trace(&leader, slot)?;
+        #[cfg(not(feature = "epoch271-boundary-trace"))]
         let child = Bank::new_from_parent(&self.bank, &leader, slot);
         self.bank = Arc::new(child);
         self.next_entry_index = 0;
@@ -661,6 +664,89 @@ impl RuntimeState {
         self.tick_hash_count = 0;
         writes.extend(self.drain_writes(None)?);
         Ok(writes)
+    }
+
+    #[cfg(feature = "epoch271-boundary-trace")]
+    fn new_child_with_reward_trace(&self, leader: &Pubkey, slot: u64) -> Result<Bank, String> {
+        use solana_runtime::bank::RewardCalculationEvent;
+        use solana_stake_program::stake_state::InflationPointCalculationEvent;
+        use std::{
+            fs::OpenOptions,
+            io::{BufWriter, Write},
+            sync::Mutex,
+        };
+
+        if slot != 117_072_004 {
+            return Ok(Bank::new_from_parent(&self.bank, leader, slot));
+        }
+        let directory = match env::var_os("JETSTREAMER_EPOCH271_STAKE_INPUT_DIR") {
+            Some(directory) => directory,
+            None => return Ok(Bank::new_from_parent(&self.bank, leader, slot)),
+        };
+
+        #[derive(Default)]
+        struct StakeInput {
+            voter: Option<Pubkey>,
+            commission: Option<u8>,
+            points: u128,
+            split: Option<[u64; 3]>,
+        }
+
+        let path = Path::new(&directory).join("stake-reward-inputs.bin");
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|error| format!("create {}: {}", path.display(), error))?;
+        let inputs = Mutex::new(HashMap::<Pubkey, StakeInput>::new());
+        let child = Bank::new_from_parent_with_tracer(&self.bank, leader, slot, |event| {
+            let RewardCalculationEvent::Staking(stake, event) = event;
+            let mut inputs = inputs.lock().unwrap();
+            let input = inputs.entry(**stake).or_default();
+            match event {
+                InflationPointCalculationEvent::Delegation(delegation, _) => {
+                    input.voter = Some(delegation.voter_pubkey);
+                }
+                InflationPointCalculationEvent::Commission(commission) => {
+                    input.commission = Some(*commission);
+                }
+                InflationPointCalculationEvent::CalculatedPoints(_, _, _, points) => {
+                    input.points = input.points.checked_add(*points).unwrap();
+                }
+                InflationPointCalculationEvent::SplitRewards(gross, voter, staker, _) => {
+                    input.split = Some([*gross, *voter, *staker]);
+                }
+                _ => {}
+            }
+        });
+        let mut inputs: Vec<_> = inputs.into_inner().unwrap().into_iter().collect();
+        inputs.sort_unstable_by_key(|(stake, _)| stake.to_bytes());
+
+        // A fixed 106-byte record holds the stake, voter, points, commission,
+        // split presence, and gross, voter and staker lamports from the callback.
+        let mut output = BufWriter::new(file);
+        let mut write_records = || -> std::io::Result<()> {
+            for (stake, input) in &inputs {
+                output.write_all(stake.as_ref())?;
+                output.write_all(input.voter.unwrap_or_default().as_ref())?;
+                output.write_all(&input.points.to_le_bytes())?;
+                output.write_all(&[input.commission.unwrap_or(u8::MAX)])?;
+                let split = input.split.unwrap_or_default();
+                output.write_all(&[u8::from(input.split.is_some())])?;
+                for amount in &split {
+                    output.write_all(&amount.to_le_bytes())?;
+                }
+            }
+            output.flush()?;
+            output.get_ref().sync_all()
+        };
+        write_records().map_err(|error| format!("write {}: {}", path.display(), error))?;
+        eprintln!(
+            "epoch271_stake_inputs slot={} records={}",
+            slot,
+            inputs.len()
+        );
+        Ok(child)
     }
 
     /// A completed bank is a canonical boundary in this linear replay. Drain
