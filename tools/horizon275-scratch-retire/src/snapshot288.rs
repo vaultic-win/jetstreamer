@@ -25,11 +25,11 @@ struct Asset {
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
-struct Stamp {
+pub(super) struct Stamp {
     device: u64,
     inode: u64,
     logical_bytes: u64,
-    physical_bytes: u64,
+    pub(super) physical_bytes: u64,
     uid: u32,
     mode: u32,
     links: u64,
@@ -38,7 +38,7 @@ struct Stamp {
 }
 
 impl Stamp {
-    fn of(m: &Metadata) -> Result<Self> {
+    pub(super) fn of(m: &Metadata) -> Result<Self> {
         let nanos = |seconds: i64, subsecond: i64| {
             seconds
                 .checked_mul(1_000_000_000)
@@ -58,7 +58,7 @@ impl Stamp {
         })
     }
 
-    fn at(&self, path: &Path) -> Result<()> {
+    pub(super) fn at(&self, path: &Path) -> Result<()> {
         ensure!(
             Self::of(&path.symlink_metadata()?)? == *self,
             "asset changed: {path:?}"
@@ -67,7 +67,7 @@ impl Stamp {
     }
 }
 
-fn lookup_receipt(path: &Path) -> Result<Option<(Binding, Value)>> {
+pub(super) fn lookup_receipt(path: &Path) -> Result<Option<(Binding, Value)>> {
     match path.symlink_metadata() {
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
         result => {
@@ -89,7 +89,7 @@ fn lookup_receipt(path: &Path) -> Result<Option<(Binding, Value)>> {
     )))
 }
 
-fn closed() -> Result<()> {
+pub(super) fn closed() -> Result<()> {
     for unit in [UNIT, GUARD, TIMER] {
         terminal_unit(unit)?;
     }
@@ -119,7 +119,7 @@ fn closed() -> Result<()> {
     Ok(())
 }
 
-fn run_path(copy: &Path) -> Result<&Path> {
+pub(super) fn run_path(copy: &Path) -> Result<&Path> {
     let parent = copy.parent().context("missing bootstrap copy parent")?;
     let worker = parent.parent().context("missing historical parent")?;
     let scratch = worker
