@@ -66,7 +66,7 @@ MISSED_RUNTIME_145 = GUARD_RUNTIME_145 or HERE == D / "tools-homefloor-145-misse
 LEASE_RUNTIME_145 = MISSED_RUNTIME_145 or HERE == D / "tools-homefloor-145-lease-rejoin-v1"
 STOPPED_V5R = HERE == D / "tools-homefloor-145-v5r-stopped-v1"
 STOPPED_V5S = HERE == D / "tools-homefloor-145-v5s-stopped-v1"
-FAILED170_BUILD_145 = HERE == D / "tools-homefloor-145-v5t-stopped-failed170-v1"
+FAILED170_BUILD_145 = HERE == D / "tools-homefloor-145-v5t-stopped-failed170-v2"
 STOPPED_V5T = FAILED170_BUILD_145 or HERE == D / "tools-homefloor-145-v5t-stopped-v1"
 STOPPED_GUARD_145 = STOPPED_V5R or STOPPED_V5S or STOPPED_V5T
 STOPPED_V5P = HERE == D / "tools-homefloor-145-v5p-stopped-v1"
@@ -195,6 +195,42 @@ def full172_terminal(fleet,rows):
            and proof["guard_retirement"]==fleet["full172_guard_retirement"] and proof["resource_credit_bytes"]==0,
            "foreign full 172 terminal, original guard or first worker")
     return proof
+
+def failed170_replay(fleet, rows):
+    failure = fleet.get("cold170_retry13_execution_failure")
+    if failure is None:
+        s.need(not FAILED170_BUILD_145, "epoch 170 failure absent from current fleet")
+        return None
+    s.need((FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145) and 170 not in rows,
+           "unsupported failed epoch 170 roster")
+    cadence = R / "survivor172-cadence-20261122-v1"
+    ready, _ = s.read(cadence / "FAILED170_CADENCE_READY.json")
+    root = R / "epoch170-retry13-rebook-20261122-v1"
+    failure_root = root / "failed-replay-20261124T123309Z"
+    terminal = s.bound(failure["terminal"], failure_root / "TERMINAL.json")
+    drain = s.bound(failure["guard_drain"], failure_root / "ORPHAN_GUARD_DRAINED.json")
+    admission = s.bound(failure["admission"], root / "ACTUAL_ADMISSION_AND_PROTECTION.json")
+    stop = s.bound(drain["intent"], failure_root / "ORPHAN_GUARD_STOP_INTENT.json")
+    iid = failure["producer_invocation_id"]
+    s.need(failure["terminal"] == ready["terminal"] == stop["terminal"]
+           and failure["guard_drain"] == ready["guard_drain"]
+           and terminal["admission"] == failure["admission"]
+           and terminal["first_worker"] == failure["first_worker"]
+           and terminal["manager_exit"]["INVOCATION_ID"] == admission["producer_invocation_id"] == iid
+           and terminal["manager_exit"]["EXIT_STATUS"] == "1"
+           and terminal["retained_run"] and not terminal["archive_ready"]
+           and failure["reservation_ending_bytes"] == drain["reservation_ending_bytes"] == 0,
+           "failed epoch 170 terminal or unreleased booking differs")
+    for observed in (drain["producer"], drain["timer"]):
+        raw = subprocess.check_output(["/usr/bin/systemctl", "show", observed["Id"],
+            "-p", ",".join(observed)], text=True, timeout=10)
+        s.need(dict(line.split("=", 1) for line in raw.splitlines()) == observed,
+               "failed epoch 170 producer or timer changed after drain")
+    guard = s.show(drain["guard"]["Id"])
+    s.need(guard["ActiveState"] in ("inactive", "failed")
+           and guard["MainPID"] == guard["ControlPID"] == "0" and not guard["Job"],
+           "failed epoch 170 guard still active")
+    return failure
 
 def full172_booking(proof):
     live=bound(proof["live"]);ad=bound(proof["admission"]);plan=bound(ad["actual_guard_plan"])
@@ -1127,6 +1163,7 @@ def capture_once(epoch,ref,prestart136=None):
         closed_before=closed_bootstrap["settled"](s,fit)
     stopped=proof_stops()
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
+    failed170 = failed170_replay(f, rows) if FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 else None
     terminal170 = None
     if PUBLISH170:
         s.need(epoch == 145 and prestart136 is None, "cold170 provider only prices terminal publication")
@@ -1185,7 +1222,7 @@ def capture_once(epoch,ref,prestart136=None):
             closed_prepaid[str(e)]=closed_allowance(e,settlement,row,root,run,effective,extension)
         # The predecessor's stopped allowance remains in closed_prepaid. The
         # retry consumed the same whole-tree allowance, not a second booking.
-        a=None if e == 170 and terminal170 else observe_actor(e,epoch,root,run,row,settlement)
+        a=None if e == 170 and (terminal170 or failed170) else observe_actor(e,epoch,root,run,row,settlement)
         active_run = cold167["RUN"] if HOMEFLOOR and e == 167 else run
         if RETRY11 and e == 166:
             active_run = retry11["RUN"]
@@ -1343,6 +1380,10 @@ def capture_once(epoch,ref,prestart136=None):
     if PUBLISH170:
         s.need(publication170["current"](f) == terminal170, "cold170 terminal changed during price")
         recovered_price["closed_cold170"] = terminal170
+    if failed170:
+        s.need(failed170_replay(f, rows) == failed170 and "170" not in rep,
+               "failed epoch 170 changed during capacity capture")
+        recovered_price["failed_cold170"] = failed170
     if COLD170:
         recovered_price["cold170"] = cold170["stable"](s)
     if RETRY11:
