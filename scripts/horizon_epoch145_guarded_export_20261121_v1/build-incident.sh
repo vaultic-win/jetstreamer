@@ -15,6 +15,11 @@ fi
 registered=false
 fixture_recovery=false
 fixture_post=false
+audit_turnover=false
+if [[ $flavor == audit-turnover-rejoin ]]; then
+  audit_turnover=true
+  flavor=status-owner-rejoin
+fi
 status_owner=false
 if [[ $flavor == status-owner-rejoin ]]; then
   status_owner=true
@@ -178,6 +183,10 @@ if $status_owner; then
   extra+=(--cfg incident_status_owner145_only)
   sources+=(v5o_stopped.py test_v5o_stopped.py)
 fi
+if $audit_turnover; then
+  extra+=(--cfg incident_audit_turnover145_only)
+  sources+=(v5p_stopped.py test_v5p_stopped.py)
+fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $v5j_post; then extra+=(--cfg incident_v5j_post145_only); sources+=(post_inputs.py test_post_inputs.py); fi
 if $v5k_post; then extra+=(--cfg incident_v5k_post145_only); fi
@@ -264,7 +273,11 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     signature=${3:?expected qualified terminal price digest}
     seal_digest=${4:?expected qualified terminal deployment digest}
     [[ $signature =~ ^[a-f0-9]{64}$ && $seal_digest =~ ^[a-f0-9]{64}$ ]]
-    if $status_owner; then
+    if $audit_turnover; then
+      [[ $native_package == tools-homefloor-145-v5p-stopped-v1 &&
+         $signature == 45b5f5371c6ef23ea900cb550c83406d12f4a32fe11edb268d617f50141502b3 &&
+         $seal_digest == b2febb131aa5c7e1ae42644a241311a8c0d30b82b4ecfb5946b884230d1ea888 ]]
+    elif $status_owner; then
       [[ $native_package == tools-homefloor-145-v5o-stopped-v1 &&
          $signature == 8c80997fccb17c1b10481c6a60f902078a5c9ae179d39dcfb03217f5c09dac27 &&
          $seal_digest == 48e7fbef4140b01a9ea80d2710b21f488f0ed1e8b0ab4f428a9c47a65581ed34 ]]
@@ -355,8 +368,13 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
         expired_probe=true
       fi
     fi
+    audit_probe=false
+    if $audit_turnover && [[ ! -s "$q/fit-$probe.json" &&
+         "$last" == 'public audit workers changed during capacity capture' ]]; then
+      audit_probe=true
+    fi
     [[ ( $flavor == current-post || $flavor == timeout-post || $focused == true ) && $probe -lt $maximum_attempts &&
-       ( "$last" == 'ValueError: foreign 145 descendants' || "$last" == 'ValueError: foreign recovery worker' || $manager_timeout == true || $expired_probe == true ) ]] ||
+       ( "$last" == 'ValueError: foreign 145 descendants' || "$last" == 'ValueError: foreign recovery worker' || $manager_timeout == true || $expired_probe == true || $audit_probe == true ) ]] ||
        { cat "$q/fit-$probe.stderr" >&2; exit 1; }
     sleep "$((2+probe))"
   done
@@ -375,6 +393,7 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
     if $guard_walk; then build_unit=horizon-145-guard-walk-rejoin-build-v1.service; fi
     if $donor_pressure; then build_unit=horizon-145-donor-pressure-rejoin-build-v1.service; fi
     if $status_owner; then build_unit=horizon-145-status-owner-rejoin-build-v1.service; fi
+    if $audit_turnover; then build_unit=horizon-145-audit-turnover-rejoin-build-v1.service; fi
     if $v5n_post; then build_unit=horizon-145-v5n-post-build-v1.service; fi
     if $v5n_136_post; then build_unit=horizon-145-v5n-136-post-build-v1.service; fi
     [[ $cg == "$slice/$build_unit" ]]
@@ -390,7 +409,17 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
       cmp "$q/feature159-before.json" "$q/feature159-after.json"
       /usr/bin/python3 -IB "$donor" build "$q/donor-before.json" "$q/before.json" > "$q/donor-combined-price.json"
     fi
-    if $status_owner; then
+    if $audit_turnover; then
+      jq -e '.phase145.InvocationID == "c01dc3ba08b74e3aa0d4b531601e9fda"
+             and .phase145.failure.sha256 == "fa6fb641253e22525916d591a39589c75b4d01aeda7bc04f58da7c5bf2936a67"
+             and .phase145.recovery.sha256 == "49b5c68ca1217ecd89af0a11f1ea96f9abe1dbec454b52783c7a541b9fa7e3fc"
+             and .phase145.public_audit_terminal.sha256 == "abda107d59f55823a92d3609cbc142dec21e7e63337d9b495f6f070dfe04de24"
+             and .phase145.candidate.inode == 103237059 and .phase145.candidate.bytes == 105610995833
+             and .phase145.retry_worker == null and .phase145.source_checkpoint_exists == false
+             and .status_registration.invocation_id == "d6d40746a4974ca186acd7f2d5a5cac4"
+             and .status_registration.consumer_seal.sha256 == "a608208cd09681d366f0994dfc43406b4f8430330e13919a88b3af031efaf160"
+             and .epoch159_donor_cover.credited_retirement_bytes == 0' "$q/before.json" >/dev/null
+    elif $status_owner; then
       jq -e '.phase145.InvocationID == "f3474dfad55f4a05a64431421881db29"
              and .phase145.failure.sha256 == "8b5c1b7024fec2fadbfedc14b59bd80bad97d3f3e98ee30f405f78d8c1798d27"
              and .phase145.recovery.sha256 == "e4b9e72a6481ea4f38b8fe7b49986463e2f93d37bc1dcb7f2156049930fd744b"
@@ -516,7 +545,10 @@ if $missed_rejoin; then /usr/bin/python3 -IB "$s/test_missed_clock.py"; fi
 if $guard_walk; then /usr/bin/python3 -IB "$s/test_v5n_feature_cover.py"; fi
 if $donor_pressure; then /usr/bin/python3 -IB "$s/test_v5n_stopped.py"; fi
 if $homefloor_rejoin; then
-  if $status_owner; then
+  if $audit_turnover; then
+    /usr/bin/python3 -IB "$s/test_v5p_stopped.py" -v
+    /usr/bin/python3 -IB "$s/homefloor-phase-test.py" -v
+  elif $status_owner; then
     /usr/bin/python3 -IB "$s/test_v5o_stopped.py" -v
     /usr/bin/python3 -IB "$s/homefloor-phase-test.py" -v
   else

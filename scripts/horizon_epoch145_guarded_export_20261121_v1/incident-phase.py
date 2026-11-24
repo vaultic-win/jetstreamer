@@ -8,7 +8,8 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-STATUS_OWNER_RECOVERY = VERSION == "tools-v5p"
+AUDIT_TURNOVER_RECOVERY = VERSION == "tools-v5q"
+STATUS_OWNER_RECOVERY = AUDIT_TURNOVER_RECOVERY or VERSION == "tools-v5p"
 DONOR_PRESSURE = STATUS_OWNER_RECOVERY or VERSION == "tools-v5o"
 GUARD_WALK = DONOR_PRESSURE or VERSION == "tools-v5n"
 MISSED_CLOCK = GUARD_WALK or VERSION == "tools-v5m"
@@ -21,6 +22,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5m": "tools-homefloor-145-missed-rejoin-v1",
                       "tools-v5n": "tools-homefloor-145-guard-walk-rejoin-v1",
                       "tools-v5p": "tools-homefloor-145-status-owner-rejoin-v1",
+                      "tools-v5q": "tools-homefloor-145-audit-turnover-rejoin-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -187,6 +189,19 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and {path.name for path in prior.iterdir()} == {"failed.json", "recovery-started.json"},
                "unqualified retry of the V5o status-owner failure")
         window.update(status_owner_failure=failure, status_owner_recovery=recovery, status_owner_terminal=terminal)
+    if AUDIT_TURNOVER_RECOVERY:
+        prior = STATE / "c01dc3ba08b74e3aa0d4b531601e9fda"
+        stop, terminal = s.read(BASE / "epoch145-semantic-continuity-20261121-v1"
+            / "c01dc3ba-stopped-public-audit-turnover-20261124" / "TERMINAL.json",
+            "abda107d59f55823a92d3609cbc142dec21e7e63337d9b495f6f070dfe04de24")
+        _, failure = s.read(prior / "failed.json", stop["failure"]["sha256"])
+        _, recovery = s.read(prior / "recovery-started.json", stop["startup"]["sha256"])
+        s.need(build["public_audit_terminal"] == terminal and stop["failure"] == failure
+               and stop["startup"] == recovery and stop["invocation_id"] == prior.name
+               and stop["source_checkpoint_exists"] is False and generation != prior.name
+               and {path.name for path in prior.iterdir()} == {"failed.json", "recovery-started.json"},
+               "unqualified retry of the V5p audit turnover failure")
+        window["public_audit_terminal"] = terminal
     if observed == (pid,):
         s.need(epoch == 145 and os.getpid() in members, "145 participant has no leased child")
         return {"invocation_id": generation, "stage": "controller", "window": window}
@@ -214,6 +229,9 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and all(started_fit["phase145"]["window"][key] == window[key] for key in
                        ("status_owner_failure", "status_owner_recovery", "status_owner_terminal")),
                "foreign status-owner pre-worker admission")
+    if AUDIT_TURNOVER_RECOVERY:
+        s.need(started_fit["phase145"]["window"]["public_audit_terminal"] == window["public_audit_terminal"],
+               "foreign audit turnover pre-worker admission")
     predecessor = ("failed_manager_query" if TIMEOUT_REJOIN else
                    "failed_fresh_census" if REJOIN else "failed_preincident_verifier")
     if FOCUSED_REJOIN:

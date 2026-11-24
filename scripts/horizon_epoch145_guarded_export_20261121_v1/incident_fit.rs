@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_status_owner145_only)]
+#[cfg(incident_audit_turnover145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-audit-turnover-rejoin-v1/post-stop-fit";
+#[cfg(all(incident_status_owner145_only, not(incident_audit_turnover145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-status-owner-rejoin-v1/post-stop-fit";
 #[cfg(all(incident_donor_pressure145_only, not(incident_status_owner145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-donor-pressure-rejoin-v1/post-stop-fit";
@@ -1516,19 +1518,24 @@ mod tests {
                 );
             } else if cfg!(incident_status_owner145_only) {
                 let phase = &before["phase145"];
-                assert_eq!(phase["InvocationID"], "f3474dfad55f4a05a64431421881db29");
-                assert_eq!(
-                    phase["failure"]["sha256"],
-                    "8b5c1b7024fec2fadbfedc14b59bd80bad97d3f3e98ee30f405f78d8c1798d27"
-                );
-                assert_eq!(
-                    phase["recovery"]["sha256"],
-                    "e4b9e72a6481ea4f38b8fe7b49986463e2f93d37bc1dcb7f2156049930fd744b"
-                );
-                assert_eq!(
-                    phase["status_owner_terminal"]["sha256"],
-                    "95fc24c89db925ca86fa1f918a6f61e665d3c124a7e4687ecf8ee44816b01f6f"
-                );
+                let (iid, failed, recovered, terminal_key, terminal) =
+                    if cfg!(incident_audit_turnover145_only) {
+                        ("c01dc3ba08b74e3aa0d4b531601e9fda",
+                         "fa6fb641253e22525916d591a39589c75b4d01aeda7bc04f58da7c5bf2936a67",
+                         "49b5c68ca1217ecd89af0a11f1ea96f9abe1dbec454b52783c7a541b9fa7e3fc",
+                         "public_audit_terminal",
+                         "abda107d59f55823a92d3609cbc142dec21e7e63337d9b495f6f070dfe04de24")
+                    } else {
+                        ("f3474dfad55f4a05a64431421881db29",
+                         "8b5c1b7024fec2fadbfedc14b59bd80bad97d3f3e98ee30f405f78d8c1798d27",
+                         "e4b9e72a6481ea4f38b8fe7b49986463e2f93d37bc1dcb7f2156049930fd744b",
+                         "status_owner_terminal",
+                         "95fc24c89db925ca86fa1f918a6f61e665d3c124a7e4687ecf8ee44816b01f6f")
+                    };
+                assert_eq!(phase["InvocationID"], iid);
+                assert_eq!(phase["failure"]["sha256"], failed);
+                assert_eq!(phase["recovery"]["sha256"], recovered);
+                assert_eq!(phase[terminal_key]["sha256"], terminal);
                 assert_eq!(phase["candidate"]["inode"], 103237059u64);
                 assert_eq!(phase["candidate"]["bytes"], 105_610_995_833u64);
                 assert_eq!(phase["source_checkpoint_exists"], false);

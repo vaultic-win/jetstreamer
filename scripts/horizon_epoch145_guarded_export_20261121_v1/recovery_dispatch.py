@@ -24,7 +24,9 @@ MISSED_PACKAGE = FIT / "tools-homefloor-145-handoff-v4"
 GUARD_PACKAGE = FIT / "tools-homefloor-145-handoff-v5"
 DONOR_PRESSURE_PACKAGE = FIT / "tools-homefloor-145-handoff-v6"
 STATUS_OWNER_PACKAGE = FIT / "tools-homefloor-145-handoff-v7"
-STATUS_OWNER_RETRY = Path(__file__).resolve().parent == STATUS_OWNER_PACKAGE
+AUDIT_TURNOVER_PACKAGE = FIT / "tools-homefloor-145-handoff-v8"
+AUDIT_TURNOVER_RETRY = Path(__file__).resolve().parent == AUDIT_TURNOVER_PACKAGE
+STATUS_OWNER_RETRY = AUDIT_TURNOVER_RETRY or Path(__file__).resolve().parent == STATUS_OWNER_PACKAGE
 DONOR_PRESSURE_RETRY = STATUS_OWNER_RETRY or Path(__file__).resolve().parent == DONOR_PRESSURE_PACKAGE
 GUARD_RETRY = DONOR_PRESSURE_RETRY or Path(__file__).resolve().parent == GUARD_PACKAGE
 MISSED_RETRY = GUARD_RETRY or Path(__file__).resolve().parent == MISSED_PACKAGE
@@ -70,6 +72,13 @@ if STATUS_OWNER_RETRY:
     OLD = "f3474dfad55f4a05a64431421881db29"
     IMAGE_SHA = "STATUS_OWNER_IMAGE_SHA"
     REVIEW_SHA = "STATUS_OWNER_REVIEW_SHA"
+if AUDIT_TURNOVER_RETRY:
+    PACKAGE = AUDIT_TURNOVER_PACKAGE
+    READER = SEMANTIC / "tools-v5q/export145"
+    HANDOFF = SEMANTIC / "v5q-name-handoff"
+    OLD = "c01dc3ba08b74e3aa0d4b531601e9fda"
+    IMAGE_SHA = "AUDIT_TURNOVER_IMAGE_SHA"
+    REVIEW_SHA = "AUDIT_TURNOVER_REVIEW_SHA"
 START = "39f53479d3a045ac8e11786248231fbf"
 BOOT = Path("/proc/sys/kernel/random/boot_id")
 PROPS = ("Id,Names,LoadState,ActiveState,SubState,FragmentPath,DropInPaths,InvocationID,"
@@ -317,9 +326,10 @@ def exact_price(price, current, review, attached=False, at=None):
                     ("candidate", "failure", "recovery", "retry_worker", "manager_exit", "source_checkpoint_exists", "resource_credit_bytes")),
             "different historical or live 145 price evidence")
     if STATUS_OWNER_RETRY:
-        require(phase["status_owner_terminal"] == review["failed_phase"]["status_owner_terminal"]
+        terminal_key = "public_audit_terminal" if AUDIT_TURNOVER_RETRY else "status_owner_terminal"
+        require(phase[terminal_key] == review["failed_phase"][terminal_key]
                 and price["status_registration"] == review["resumed_status"],
-                "different stopped V5o proof or resumed status writer")
+                "different stopped verifier proof or resumed status writer")
     for k in ("registered_retry11_holding", "registered_cold168_holding"):
         require(price[k]["stage"] == "completed-copy" and price[k]["resource_credit_bytes"] == 0
                 and price[k]["additional_reservation_bytes"] == 0, "holding still owns a phase")
@@ -329,17 +339,19 @@ def retry_phase():
     """Authenticate the same exhausted generation while attached or after reset."""
     review = json.loads(read(PACKAGE / "admission-review.json", REVIEW_SHA)[0])
     if STATUS_OWNER_RETRY:
-        archive = runpy.run_path(str(PACKAGE / "v5o_stopped.py"))
+        name = "v5p_stopped.py" if AUDIT_TURNOVER_RETRY else "v5o_stopped.py"
+        terminal_key = "public_audit_terminal" if AUDIT_TURNOVER_RETRY else "status_owner_terminal"
+        archive = runpy.run_path(str(PACKAGE / name))
         _, proof = archive["historical"]()
         phase = proof["failed_phase"]
         require(all(proof[k] == review[k] for k in ("failed_phase", "old_manager", "original_fragment"))
                 and proof["terminal"]["native_terminal"] == review["original_pid1_exit"]
                 and review["predecessor_receipts"] == {k: phase[k] for k in
-                    ("failure", "recovery", "status_owner_terminal")}
+                    ("failure", "recovery", terminal_key)}
                 and proof["predecessor_review"] == review["original_review"]
                 and review["reader"] == {"path": str(READER), "sha256": IMAGE_SHA}
                 and IMAGE_SHA != bound(proof["predecessor_review"])["reader"]["sha256"],
-                "different stopped V5o or successor image")
+                "different stopped verifier or successor image")
     elif MISSED_RETRY:
         name = "v5n_stopped.py" if DONOR_PRESSURE_RETRY else "v5m_stopped.py" if GUARD_RETRY else "v5k_stopped.py"
         archive = runpy.run_path(str(PACKAGE / name))
