@@ -171,17 +171,21 @@ pub(super) fn terminal_for(unit: &str, iid: &str) -> Result<()> {
 pub(super) trait VerificationGuard {
     fn topology(&self) -> Result<()>;
     fn current(&self, needed: u64) -> Result<Value>;
+    fn current_stopped(&self, needed: u64) -> Result<Value>;
     fn await_topology(&self) -> Result<()>;
     fn await_current(&self, needed: u64) -> Result<Value>;
 }
 macro_rules! implement_guard {
-    ($guard:ty) => {
+    ($guard:ty, $current_stopped:ident) => {
         impl VerificationGuard for $guard {
             fn topology(&self) -> Result<()> {
                 <$guard>::topology(self)
             }
             fn current(&self, n: u64) -> Result<Value> {
                 <$guard>::current(self, n)
+            }
+            fn current_stopped(&self, n: u64) -> Result<Value> {
+                <$guard>::$current_stopped(self, n)
             }
             fn await_topology(&self) -> Result<()> {
                 <$guard>::await_topology(self)
@@ -192,9 +196,9 @@ macro_rules! implement_guard {
         }
     };
 }
-implement_guard!(capacity::Fit);
+implement_guard!(capacity::Fit, current);
 #[cfg(incident145_only)]
-implement_guard!(crate::incident_fit::Fit);
+implement_guard!(crate::incident_fit::Fit, current_stopped);
 #[path = "lease_startup.rs"]
 pub(super) mod lease_startup;
 
@@ -235,7 +239,7 @@ pub(super) fn run_child_with_startup(
             let sample = while_stopped(pid, ticks, deadline, || {
                 lease.check()?;
                 fit.topology()?;
-                fit.current(0)
+                fit.current_stopped(0)
             })?;
             ensure!(
                 unsafe { libc::kill(pid.try_into()?, libc::SIGCONT) } == 0,
@@ -273,7 +277,7 @@ pub(super) fn run_child_with_startup(
                     }
                     Err(e) => return Err(e),
                 };
-            if wait || last.elapsed() >= Duration::from_secs(30) {
+            if wait {
                 if let Err(e) = freeze(pid) {
                     if child.try_wait()?.is_some_and(|s| s.success()) {
                         return lease.check();

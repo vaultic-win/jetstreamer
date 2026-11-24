@@ -359,5 +359,41 @@ class EncodedPrefixStop(TestCase):
                 observe.assert_not_called()
 
 
+class GuardTerminalSuccessor(TestCase):
+    def test_requires_the_first_native_start_after_the_guard_exit(self):
+        original, successor = "8f2b9c06b62147babe83c9ade7271cd3", "a" * 32
+        boot = "b" * 32
+        failed_ref = dict(path="/fixture/failed.json", sha256="1" * 64)
+        terminal_ref = dict(path="/fixture/terminal.json", sha256="2" * 64)
+        native = dict(_PID="1", UNIT=UNIT, INVOCATION_ID=original, EXIT_STATUS="1",
+                      EXIT_CODE="exited", _BOOT_ID=boot, __MONOTONIC_TIMESTAMP="100", __CURSOR="cursor")
+        terminal = dict(schema="horizon-epoch145-retained-guard-terminal-v1", native_terminal=native,
+                        failure=failed_ref, fully_verified=False, resource_credit_bytes=0)
+        failed = dict(iid=original, error="stopped worker fresh-census deadline")
+
+        class Reader(Status):
+            @staticmethod
+            def read(path, expected=None):
+                return (failed, failed_ref) if path.name == "failed.json" else (terminal, terminal_ref)
+
+        events = [
+            dict(native, MESSAGE_ID="d9b373ed55a64feb8242e02dbe79a49c", UNIT_RESULT="exit-code"),
+            dict(native, INVOCATION_ID=successor, MESSAGE_ID="7d4958e842da4a758f6c1cdc7b36dcc5",
+                 __MONOTONIC_TIMESTAMP="101", JOB_TYPE="start"),
+            dict(native, INVOCATION_ID=successor, MESSAGE_ID="39f53479d3a045ac8e11786248231fbf",
+                 __MONOTONIC_TIMESTAMP="102", JOB_TYPE="start", JOB_RESULT="done"),
+        ]
+        validate = runpy.run_path(str(SCRIPT))["guard_terminal_predecessor"]
+        build = dict(guard_terminal=terminal_ref)
+        for rows in (events, events[:-1], [events[0], *events], [events[0], events[2], events[1]]):
+            raw = "\n".join(map(json.dumps, rows))
+            with patch("subprocess.check_output", return_value=raw):
+                if rows is events:
+                    self.assertEqual(validate(Reader, build, successor), terminal_ref)
+                else:
+                    with self.assertRaisesRegex(ValueError, "different successor"):
+                        validate(Reader, build, successor)
+
+
 if __name__ == "__main__":
     main()

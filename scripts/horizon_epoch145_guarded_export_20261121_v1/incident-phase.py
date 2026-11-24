@@ -10,7 +10,8 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-ENCODED_PREFIX_RECOVERY = VERSION == "tools-v5r"
+GUARD_TERMINAL_RECOVERY = VERSION == "tools-v5s"
+ENCODED_PREFIX_RECOVERY = VERSION == "tools-v5r" or GUARD_TERMINAL_RECOVERY
 AUDIT_TURNOVER_RECOVERY = ENCODED_PREFIX_RECOVERY or VERSION == "tools-v5q"
 STATUS_OWNER_RECOVERY = AUDIT_TURNOVER_RECOVERY or VERSION == "tools-v5p"
 DONOR_PRESSURE = STATUS_OWNER_RECOVERY or VERSION == "tools-v5o"
@@ -27,6 +28,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5p": "tools-homefloor-145-status-owner-rejoin-v1",
                       "tools-v5q": "tools-homefloor-145-audit-turnover-rejoin-v1",
                       "tools-v5r": "tools-homefloor-145-encoded-prefix-rejoin-v1",
+                      "tools-v5s": "tools-homefloor-145-v5r-guard-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -121,6 +123,44 @@ def encoded_prefix_stop(s, build, successor):
            and all(witness["records"][key] == row for key, row in stopped["records"].items()),
            "encoded-prefix successor does not follow the recorded native stop")
     return reference
+
+
+def guard_terminal_predecessor(s, build, successor):
+    proof = PKG.parent / "v5r-name-handoff" / "V5R_GUARD_TERMINAL_095224.json"
+    terminal, ref = s.read(proof, build["guard_terminal"]["sha256"])
+    original = "8f2b9c06b62147babe83c9ade7271cd3"
+    state = STATE / original
+    native = terminal["native_terminal"]
+    failed, failed_ref = s.read(state / "failed.json", terminal["failure"]["sha256"])
+    s.need(build["guard_terminal"] == ref and successor != original
+           and terminal["schema"] == "horizon-epoch145-retained-guard-terminal-v1"
+           and native["UNIT"] == UNIT and native["_PID"] == "1"
+           and native["INVOCATION_ID"] == failed["iid"] == original and native["EXIT_STATUS"] == "1"
+           and native["EXIT_CODE"] == "exited" and failed_ref == terminal["failure"]
+           and failed["error"] == "stopped worker fresh-census deadline"
+           and terminal["fully_verified"] is False and terminal["resource_credit_bytes"] == 0,
+           "unqualified recovery after the epoch 145 guard exit")
+    boot = native["_BOOT_ID"]
+    floor = int(native["__MONOTONIC_TIMESTAMP"])
+    failure = "d9b373ed55a64feb8242e02dbe79a49c"
+    starting = "7d4958e842da4a758f6c1cdc7b36dcc5"
+    started = "39f53479d3a045ac8e11786248231fbf"
+    raw = subprocess.check_output([
+        "/usr/bin/journalctl", "--no-pager", "-o", "json",
+        "--after-cursor=" + native["__CURSOR"], "_PID=1", "_BOOT_ID=" + boot, "UNIT=" + UNIT,
+        "MESSAGE_ID=" + failure, "MESSAGE_ID=" + starting, "MESSAGE_ID=" + started,
+    ], timeout=10)
+    rows = [json.loads(line) for line in raw.splitlines()]
+    s.need([(row["INVOCATION_ID"], row["MESSAGE_ID"]) for row in rows] ==
+           [(original, failure), (successor, starting), (successor, started)],
+           "the epoch 145 guard exit has a different successor")
+    end, begin, active = rows
+    s.need(all((row["_PID"], row["_BOOT_ID"], row["UNIT"]) == ("1", boot, UNIT) for row in rows)
+           and floor <= int(end["__MONOTONIC_TIMESTAMP"]) < int(begin["__MONOTONIC_TIMESTAMP"])
+           <= int(active["__MONOTONIC_TIMESTAMP"])
+           and end["UNIT_RESULT"] == "exit-code" and begin["JOB_TYPE"] == active["JOB_TYPE"] == "start"
+           and active["JOB_RESULT"] == "done", "invalid epoch 145 successor events")
+    return ref
 
 
 def inspect(s, leased, m, members, epoch, provider, profile):
@@ -239,7 +279,9 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and {path.name for path in prior.iterdir()} == {"failed.json", "recovery-started.json"},
                "unqualified retry of the V5p audit turnover failure")
         window["public_audit_terminal"] = terminal
-    if ENCODED_PREFIX_RECOVERY:
+    if GUARD_TERMINAL_RECOVERY:
+        window["guard_terminal_predecessor"] = guard_terminal_predecessor(s, build, generation)
+    elif ENCODED_PREFIX_RECOVERY:
         window["encoded_prefix_predecessor_stop"] = encoded_prefix_stop(s, build, generation)
     if observed == (pid,):
         s.need(epoch == 145 and os.getpid() in members, "145 participant has no leased child")
@@ -271,7 +313,10 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     if AUDIT_TURNOVER_RECOVERY:
         s.need(started_fit["phase145"]["window"]["public_audit_terminal"] == window["public_audit_terminal"],
                "foreign audit turnover pre-worker admission")
-    if ENCODED_PREFIX_RECOVERY:
+    if GUARD_TERMINAL_RECOVERY:
+        s.need(started_fit["phase145"]["window"]["guard_terminal_predecessor"]
+               == window["guard_terminal_predecessor"], "foreign pre-worker guard terminal")
+    elif ENCODED_PREFIX_RECOVERY:
         s.need(started_fit["phase145"]["window"]["encoded_prefix_predecessor_stop"]
                == window["encoded_prefix_predecessor_stop"], "foreign encoded-prefix pre-worker admission")
     predecessor = ("failed_manager_query" if TIMEOUT_REJOIN else

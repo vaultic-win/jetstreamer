@@ -47,7 +47,10 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-ENCODED_PREFIX_RECOVERY_145 = HERE == D / "tools-homefloor-145-encoded-prefix-rejoin-v1"
+GUARD_TERMINAL_RECOVERY_145 = HERE == D / "tools-homefloor-145-v5r-guard-recovery-v1"
+ENCODED_PREFIX_RECOVERY_145 = (
+    GUARD_TERMINAL_RECOVERY_145 or HERE == D / "tools-homefloor-145-encoded-prefix-rejoin-v1"
+)
 AUDIT_TURNOVER_RECOVERY_145 = ENCODED_PREFIX_RECOVERY_145 or HERE == D / "tools-homefloor-145-audit-turnover-rejoin-v1"
 STATUS_OWNER_RECOVERY_145 = AUDIT_TURNOVER_RECOVERY_145 or HERE == D / "tools-homefloor-145-status-owner-rejoin-v1"
 DONOR_PRESSURE_145 = STATUS_OWNER_RECOVERY_145 or HERE == D / "tools-homefloor-145-donor-pressure-rejoin-v1"
@@ -503,7 +506,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
         post_directory = fixture_post_directory(here)
         profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
-                    "lease-semantic": ("profile145-lease-semantic.json", "tools-v5r" if ENCODED_PREFIX_RECOVERY_145 else "tools-v5q" if AUDIT_TURNOVER_RECOVERY_145 else "tools-v5p" if STATUS_OWNER_RECOVERY_145 else "tools-v5o" if DONOR_PRESSURE_145 else "tools-v5n" if GUARD_RUNTIME_145 else "tools-v5m" if MISSED_RUNTIME_145 else "tools-v5k"),
+                    "lease-semantic": ("profile145-lease-semantic.json", "tools-v5s" if GUARD_TERMINAL_RECOVERY_145 else "tools-v5r" if ENCODED_PREFIX_RECOVERY_145 else "tools-v5q" if AUDIT_TURNOVER_RECOVERY_145 else "tools-v5p" if STATUS_OWNER_RECOVERY_145 else "tools-v5o" if DONOR_PRESSURE_145 else "tools-v5n" if GUARD_RUNTIME_145 else "tools-v5m" if MISSED_RUNTIME_145 else "tools-v5k"),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
                     "five-lane-semantic": ("profile145-five-lane-semantic.json", "tools-v5h"),
                     "homefloor-semantic": ("profile145-homefloor-semantic.json", "tools-v5g"),
@@ -546,12 +549,13 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch):
-    for active, name in ((STOPPED_V5R, "v5r_stopped.py"), (STOPPED_V5P, "v5p_stopped.py"), (STOPPED_V5O, "v5o_stopped.py"),
+    guard_terminal = STOPPED_V5R or (GUARD_TERMINAL_RECOVERY_145 and not fit.members(fit.A145))
+    for active, name in ((guard_terminal, "v5r_stopped.py"), (STOPPED_V5P, "v5p_stopped.py"), (STOPPED_V5O, "v5o_stopped.py"),
                          (STOPPED_V5N, "v5n_stopped.py"), (STOPPED_V5M, "v5m_stopped.py"),
                          (STOPPED_V5K, "v5k_stopped.py")):
         if active:
             s.need(epoch == 145, "stopped 145 provider is a read-only whole-fleet quote")
-            if STOPPED_V5R or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N:
+            if guard_terminal or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N:
                 seal, _ = s.read(HERE / "deployment-seal-receipt.json")
                 member, = [m for m in seal["members"] if m["name"] == name and m["mode"] == "0444"]
                 s.need(seal["destination"] == str(HERE), "unbound stopped 145 adapter")

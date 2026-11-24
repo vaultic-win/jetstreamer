@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_encoded_prefix145_only)]
+#[cfg(incident_v5r_guard_recovery145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5r-guard-recovery-v1/post-stop-fit";
+#[cfg(all(incident_encoded_prefix145_only, not(incident_v5r_guard_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-encoded-prefix-rejoin-v1/post-stop-fit";
 #[cfg(all(incident_audit_turnover145_only, not(incident_encoded_prefix145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-audit-turnover-rejoin-v1/post-stop-fit";
@@ -1099,7 +1101,7 @@ impl Fit {
         if next.as_ref().is_err_and(|e| e.is::<missed_clock::Pending>()) {
             // Read live guards, population, memory and physical HOME against the last paid
             // topology. This check cannot yield a price or resume a stopped worker.
-            self.limits(0, false).map_err(|e| anyhow::anyhow!("live guard refused the registered hold: {e:#}"))?;
+            self.limits(0, false, true).map_err(|e| anyhow::anyhow!("live guard refused the registered hold: {e:#}"))?;
         }
         *self.capture.borrow_mut() = next?;
         Ok(())
@@ -1125,9 +1127,12 @@ impl Fit {
         }
     }
     pub fn current(&self, needed: u64) -> Result<Value> {
-        self.limits(needed, true)
+        self.limits(needed, true, false)
     }
-    fn limits(&self, needed: u64, require_fresh: bool) -> Result<Value> {
+    pub fn current_stopped(&self, needed: u64) -> Result<Value> {
+        self.limits(needed, true, cfg!(incident_v5r_guard_recovery145_only))
+    }
+    fn limits(&self, needed: u64, require_fresh: bool, stopped_for_guard_walk: bool) -> Result<Value> {
         let last = self.capture.borrow();
         let s = &last.complete;
         ensure!(needed == 0, "frozen reader requested staging bytes");
@@ -1164,7 +1169,7 @@ impl Fit {
                 Some(&g["guard"]),
                 capacity::n(g, "remaining")?,
                 row["unit"].as_str().context("incumbent unit")?,
-                !require_fresh,
+                stopped_for_guard_walk,
             )?;
             required = required.checked_add(growth).context("incumbent growth")?;
             absolute = absolute.max(floor);
@@ -1179,7 +1184,7 @@ impl Fit {
                 Some(&row["guard"]),
                 capacity::n(b, "remaining_bytes")?,
                 row["producer_unit"].as_str().context("replacement unit")?,
-                !require_fresh,
+                stopped_for_guard_walk,
             )?;
             // A new deficit can affect the original physical baseline and the independent new-generation spending calculation.
             required = required
@@ -1206,7 +1211,7 @@ impl Fit {
                 sample,
                 capacity::n(booking, "remaining_bytes")?,
                 admitted["producer_unit"].as_str().context("168 unit")?,
-                !require_fresh,
+                stopped_for_guard_walk,
             )?;
             required = required.checked_add(growth).context("168 growth")?;
             absolute = absolute.max(floor);
