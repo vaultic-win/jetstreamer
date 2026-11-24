@@ -47,7 +47,10 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-HOURLY170_CADENCE = HERE == D / "tools-homefloor-170-metered-hourly-v4"
+HOURLY170_CADENCE = HERE in (
+    D / "tools-homefloor-170-metered-hourly-v4",
+    D / "tools-homefloor-170-metered-hourly-v5",
+)
 HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v2",
     D / "tools-homefloor-170-metered-hourly-v3",
