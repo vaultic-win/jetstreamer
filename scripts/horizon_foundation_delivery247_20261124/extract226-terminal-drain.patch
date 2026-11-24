@@ -1,0 +1,23 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -304,6 +304,20 @@
+     plan['gates']['226']['next_action'] = (
+         'Track the bound private extraction and source broker. Retain the verified prefix '
+         'for the separately admitted 535-slot bank replay.')
++    terminal = EXTRACTION226 / 'terminal-broker-drain.json'
++    if terminal.is_file():
++        drain = sealed_226_file(terminal)
++        report = bound(drain)
++        intent = bound(report['intent'])
++        assert report['schema'] == 'foundation-epoch226-original225-broker-terminal-drain-v1'
++        assert intent['launch'] == launch_ref and not report['prefix_complete']
++        assert report['producer']['InvocationID'] == launch['invocation_id']
++        broker = props(launch['broker_unit'], ['ActiveState', 'MainPID', 'ControlPID', 'ControlGroup', 'Job'])
++        assert broker == {'ActiveState': 'inactive', 'MainPID': '0', 'ControlPID': '0', 'ControlGroup': '', 'Job': ''}
++        gate = plan['gates']['226']
++        add(gate, drain)
++        gate['next_action'] = ('The extraction failed after the Original225 range connection timed out. '
++                               'Qualify the pinned range retry and admit a new extraction before replaying the suffix.')
+     deployed = bound(sealed_226_file(EXTRACTION226_BUILD / 'fleet-build.json'))
+     assert deployed['schema'] == 'foundation-epoch226-fleet-registration-deployment-v1'
+     binary = Path(deployed['image']['path'])
