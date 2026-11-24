@@ -306,13 +306,15 @@ def main():
     legacy = load("europe_diagnostic_admission", PREVIOUS / "admit.py")
     assert os.environ["CODEX_THREAD_ID"] == legacy.replay.THREAD
     measure = load("boundary_replay_capacity", V / "horizon230-full-v291/measure291.py")
-    measure.source.GUARDS[230] = V / "horizon230-full-guard-receipts-v291"
     os.umask(0o077)
     with legacy.partition.take(), (CONTROL / "cycle.lock").open("a+b") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         assert legacy.partition.locked(legacy.partition.LOCK, os.getpid())
         state = legacy.ops.props("foundation-publication-cadence-v222.service", ["ActiveState", "Job"])
         assert state["ActiveState"] in {"inactive", "failed"} and not state["Job"], state
+        _, _, fleet = measure.source.latest()
+        if any(row["epoch"] == 230 for row in fleet["active"]):
+            measure.source.GUARDS[230] = V / "horizon230-full-guard-receipts-v291"
         if args.operation == "prepare":
             prepare(legacy, measure)
         else:
