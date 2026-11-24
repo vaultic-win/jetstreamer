@@ -333,7 +333,9 @@ fn ready(epoch: u64, receipt: &Value, inventory: &Value) -> Result<()> {
 fn check_target(t: &Target) -> Result<()> {
     let scope = match t.epoch {
         #[cfg(feature = "anza-closed-canaries")]
-        130 | 195 => anza_closed_canaries::is_target(t),
+        130 | 134 | 195 => anza_closed_canaries::is_target(t),
+        #[cfg(feature = "anza-closed-canaries")]
+        154 if anza_closed_canaries::is_target(t) => true,
         #[cfg(feature = "anza-closed-154")]
         154 => anza_closed_154::is_target(t),
         #[cfg(feature = "anza-parked-183")]
@@ -730,7 +732,9 @@ fn run() -> Result<()> {
         ensure!(p.holding_custody.is_none(), "unexpected holding custody");
     }
     #[cfg(feature = "anza-closed-154")]
-    if epochs.contains(&154) {
+    let closed_154 = p.targets.iter().any(anza_closed_154::is_target);
+    #[cfg(feature = "anza-closed-154")]
+    if closed_154 {
         anza_closed_154::verify_scope(&p, &lock)?;
     }
     #[cfg(feature = "anza-closed-canaries")]
@@ -747,8 +751,8 @@ fn run() -> Result<()> {
     let horizon = Path::new(HOME_ROOT).join("horizon");
     let range = (*epochs.first().unwrap(), *epochs.last().unwrap());
     #[cfg(feature = "anza-closed-154")]
-    let range = if epochs.contains(&154) {
-        (153, 155)
+    let range = if closed_154 {
+        (range.0.min(153), range.1.max(155))
     } else {
         range
     };
@@ -779,7 +783,7 @@ fn run() -> Result<()> {
         ready(proof.epoch, &r, &inventory)?;
     }
     #[cfg(feature = "anza-closed-154")]
-    if epochs.contains(&154) {
+    if closed_154 {
         anza_closed_154::verify_delivery(&receipts, &inventory)?;
     }
     #[cfg(feature = "anza-closed-canaries")]
@@ -823,7 +827,7 @@ fn run() -> Result<()> {
             anza_parked_183::check_owners()?;
         }
         #[cfg(feature = "anza-closed-154")]
-        if t.epoch == 154 {
+        if anza_closed_154::is_target(t) {
             anza_closed_154::check_owners()?;
         }
         #[cfg(feature = "anza-closed-canaries")]

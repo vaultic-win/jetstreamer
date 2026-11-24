@@ -2,10 +2,16 @@ use super::*;
 
 const REVIEW: &str = "/home/sol/.jetstreamer-private/epoch145-v5t-stopped-price-20261124.zjcggc_6/RETIREMENT_CANDIDATES_130_195.json";
 const REVIEW_SHA: &str = "6b4563c22f4d586bb8c2fc38c91e4a5c1b8180463b7b27de8de2fa1b115a1291";
+const FOLLOWUP_REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_data/closed-canaries-retirement-134-154-20261124-v1/REVIEW.json";
+const FOLLOWUP_REVIEW_SHA: &str =
+    "3e4fb8c99b53cbec9ad8e8d2b0d63862c22a21d191229d539d3124f262710474";
+const FOLLOWUP_SCHEMA: &str = "horizon-closed-canary-retirement-review-v1";
 const INVENTORY: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/uploader-tools/jetstreamer-r2";
 const INVENTORY_SHA: &str = "eb448ede557144f04446dbe00a2d2ec7ad88c934a7a227797d0569a15307a904";
 const DIAGNOSTIC: &str = "diagnostic-epoch130-v1417-qualification-v1";
 const BENCHMARK: &str = "performance-ab-195-rayon-20261009-v2";
+const DIAGNOSTIC_134: &str = "diagnostic-epoch134-v1419-status-probe-v1";
+const BENCHMARK_154: &str = "performance-ab-154-v158-rayon-20261009-v3";
 
 pub(super) fn is_target(t: &Target) -> bool {
     let root = Path::new(HOME_ROOT).join(".jetstreamer-private");
@@ -16,6 +22,19 @@ pub(super) fn is_target(t: &Target) -> bool {
                     .join(DIAGNOSTIC)
                     .join("output/epoch-130-v1417-qualification.jet")
         }
+        134 => {
+            t.path
+                == root
+                    .join(DIAGNOSTIC_134)
+                    .join("output/epoch-134-through-58019044.jet")
+        }
+        154 => ["control64", "candidate10"].iter().any(|case| {
+            t.path
+                == root
+                    .join(BENCHMARK_154)
+                    .join(case)
+                    .join("output/epoch-154-through-66958784.jet")
+        }),
         195 => ["control32", "candidate8"].iter().any(|case| {
             t.path
                 == root
@@ -38,29 +57,48 @@ fn identity(t: &Target) -> Value {
 }
 
 pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Result<Option<Value>> {
-    if !epochs.iter().any(|&epoch| matches!(epoch, 130 | 195)) {
-        return Ok(None);
-    }
+    let (path, sha256, schema, expected_epochs) =
+        if epochs.iter().any(|&epoch| matches!(epoch, 130 | 195)) {
+            (
+                REVIEW,
+                REVIEW_SHA,
+                "horizon-epoch145-disk-recovery-candidates-v1",
+                [130, 195],
+            )
+        } else if p
+            .targets
+            .iter()
+            .any(|target| matches!(target.epoch, 134 | 154) && is_target(target))
+        {
+            (
+                FOLLOWUP_REVIEW,
+                FOLLOWUP_REVIEW_SHA,
+                FOLLOWUP_SCHEMA,
+                [134, 154],
+            )
+        } else {
+            return Ok(None);
+        };
     let m = lock.metadata()?;
     ensure!(
         (m.dev(), m.ino(), m.uid(), m.gid()) == (64512, 101135013, 1001, 1003),
         "different shared mutation lock"
     );
     ensure!(
-        epochs.iter().all(|&epoch| matches!(epoch, 130 | 195))
+        epochs.iter().all(|epoch| expected_epochs.contains(epoch))
             && p.inventory_binary.path == Path::new(INVENTORY)
             && p.inventory_binary.sha256 == INVENTORY_SHA,
         "different canary retirement scope or inventory reader"
     );
     let review: Value = serde_json::from_slice(&bound(
         &Bound {
-            path: REVIEW.into(),
-            sha256: REVIEW_SHA.into(),
+            path: path.into(),
+            sha256: sha256.into(),
         },
         LIMIT,
     )?)?;
     ensure!(
-        review["schema"] == "horizon-epoch145-disk-recovery-candidates-v1"
+        review["schema"] == schema
             && review["actual_reclaimed_bytes"] == 0
             && review["retirement_authorized"] == false,
         "different canary review"
@@ -94,14 +132,19 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
 }
 
 pub(super) fn check_owners(review: &Value) -> Result<()> {
+    let (diagnostic, benchmark) = if review["schema"] == FOLLOWUP_SCHEMA {
+        (DIAGNOSTIC_134, BENCHMARK_154)
+    } else {
+        (DIAGNOSTIC, BENCHMARK)
+    };
     let scan = Command::new("/usr/bin/rg")
         .args([
             "--files-with-matches",
             "--fixed-strings",
             "-e",
-            DIAGNOSTIC,
+            diagnostic,
             "-e",
-            BENCHMARK,
+            benchmark,
             "/etc/systemd/system",
             "/run/systemd/transient",
             "/usr/lib/systemd/system",
