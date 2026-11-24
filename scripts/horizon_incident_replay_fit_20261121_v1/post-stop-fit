@@ -47,10 +47,11 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
+FAILED166_CADENCE = HERE in (D / "tools-homefloor-170-metered-hourly-v6", D / "tools-homefloor-170-metered-hourly-v7")
 HOURLY170_CADENCE = HERE in (
     D / "tools-homefloor-170-metered-hourly-v4",
     D / "tools-homefloor-170-metered-hourly-v5",
-)
+) or FAILED166_CADENCE
 HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v2",
     D / "tools-homefloor-170-metered-hourly-v3",
@@ -962,6 +963,11 @@ def registered_status():
                     R / "survivor172-cadence-20261122-v1/failed170-retry13-cadence-20261124-v1/ACTIVE.json"
                 ).exists():
                     failed = writer168v4["registered_failed170_writer"](scope,retry4)
+                    if FAILED166_CADENCE:
+                        adopted = writer168v4["registered_hourly170_writer"](scope, failed, failed166=True)
+                        if (R / "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V2_ACTIVE.json").exists():
+                            return writer168v4["registered_failed166_rejoin"](scope, adopted)
+                        return adopted
                     if HOURLY170_CADENCE and (
                         R / "survivor172-cadence-20261122-v1/HOURLY170_CADENCE_ACTIVE.json"
                     ).exists():
@@ -1193,6 +1199,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
     stopped=proof_stops()
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
     failed170 = failed170_replay(f, rows) if V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 else None
+    failed166 = retry11["failed"](s, fit, f, rows) if FAILED166_CADENCE else None
     terminal170 = None
     if PUBLISH170:
         s.need(epoch == 145 and prestart136 is None, "cold170 provider only prices terminal publication")
@@ -1264,7 +1271,8 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
             closed_prepaid[str(e)]=closed_allowance(e,settlement,row,root,run,effective,extension)
         # The predecessor's stopped allowance remains in closed_prepaid. The
         # retry consumed the same whole-tree allowance, not a second booking.
-        a=None if e == 170 and (terminal170 or failed170) else observe_actor(e,epoch,root,run,row,settlement)
+        failed = (e == 166 and failed166) or (e == 170 and (terminal170 or failed170))
+        a=None if failed else observe_actor(e,epoch,root,run,row,settlement)
         active_run = cold167["RUN"] if HOMEFLOOR and e == 167 else run
         if RETRY11 and e == 166:
             active_run = retry11["RUN"]
@@ -1431,6 +1439,10 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
         s.need(failed170_replay(f, rows) == failed170 and "170" not in rep,
                "failed epoch 170 changed during capacity capture")
         recovered_price["failed_cold170"] = failed170
+    if failed166:
+        s.need(retry11["failed"](s, fit, f, rows) == failed166 and "166" not in rep,
+               "failed epoch 166 changed during capacity capture")
+        recovered_price["failed_cold166"] = failed166
     if COLD170:
         recovered_price["cold170"] = cold170["stable"](s)
     if RETRY11:
