@@ -223,6 +223,12 @@ fn required_environment() -> Result<()> {
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root operator");
     let args = std::env::args().skip(1).collect::<Vec<_>>();
+    if let [mode, iid, after] = args.as_slice()
+        && mode == "inspect-native-stop"
+    {
+        println!("{}", events::inspect_native_stop(E, iid, after.parse()?)?);
+        return Ok(());
+    }
     #[cfg(feature = "fixture-post")]
     ensure!(
         matches!(args.as_slice(), [mode] if incident::handles(mode))
