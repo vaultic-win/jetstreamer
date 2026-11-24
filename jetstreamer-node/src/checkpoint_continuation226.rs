@@ -461,17 +461,18 @@ fn extract(p: &Plan) -> Result<Value, String> {
             && original.terminal == expected_root(),
         "226 original combined source scope differs",
     )?;
-    let (source, identity, digest): (Box<dyn SeekableArchive>, _, _) = if let Some(object) = &held {
-        let mut reader = object.open().map_err(|e| e.to_string())?;
-        let digest = hash_seekable(&mut reader)?;
-        (Box::new(reader), None, digest)
-    } else {
-        let mut reader =
-            open_regular_nofollow(&original_archive.path).map_err(|e| e.to_string())?;
-        let identity = archive_file_identity(&reader).map_err(|e| e.to_string())?;
-        let digest = hash_handle(&mut reader)?;
-        (Box::new(reader), Some(identity), digest)
-    };
+    let (source, identity, digest): (Box<dyn SeekableArchive + '_>, _, _) =
+        if let Some(object) = &held {
+            let mut reader = object.open().map_err(|e| e.to_string())?;
+            let digest = hash_seekable(&mut reader)?;
+            (Box::new(reader), None, digest)
+        } else {
+            let mut reader =
+                open_regular_nofollow(&original_archive.path).map_err(|e| e.to_string())?;
+            let identity = archive_file_identity(&reader).map_err(|e| e.to_string())?;
+            let digest = hash_handle(&mut reader)?;
+            (Box::new(reader), Some(identity), digest)
+        };
     require(
         digest == sha(ORIGINAL_SHA)?,
         "226 actual extraction handle differs from the authenticated whole source",
