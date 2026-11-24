@@ -2009,7 +2009,6 @@ impl Bank {
             validator_rate,
             epoch_duration_in_years,
             validator_rewards,
-            &validator_point_value,
         );
 
         if !self
@@ -2116,7 +2115,6 @@ impl Bank {
             validator_rate,
             epoch_duration_in_years,
             validator_rewards,
-            &validator_point_value,
         );
 
         if !self
@@ -2193,20 +2191,32 @@ impl Bank {
         validator_rate: f64,
         epoch_years: f64,
         budget: u64,
-        point_value: &PointValue,
     ) {
         use std::io::{self, Write};
 
         if self.slot() == 117_072_004 {
             let _ = writeln!(
                 io::stderr().lock(),
-                "epoch271_inflation slot={} capitalization={} slot_in_year_bits={} rate_bits={} epoch_years_bits={} budget={} rewards={} points={}",
+                "epoch271_inflation slot={} capitalization={} slot_in_year_bits={} rate_bits={} epoch_years_bits={} budget={}",
                 self.slot(),
                 capitalization,
                 slot_in_year.to_bits(),
                 validator_rate.to_bits(),
                 epoch_years.to_bits(),
                 budget,
+            );
+        }
+    }
+
+    #[cfg(feature = "epoch271-boundary-trace")]
+    fn trace_epoch271_reward_points(&self, point_value: &PointValue) {
+        use std::io::{self, Write};
+
+        if self.slot() == 117_072_004 {
+            let _ = writeln!(
+                io::stderr().lock(),
+                "epoch271_reward_points slot={} rewards={} points={}",
+                self.slot(),
                 point_value.rewards,
                 point_value.points,
             );
@@ -2422,6 +2432,8 @@ impl Bank {
         }
 
         let point_value = PointValue { rewards, points };
+        #[cfg(feature = "epoch271-boundary-trace")]
+        self.trace_epoch271_reward_points(&point_value);
 
         let mut rewards = vec![];
         // pay according to point value
@@ -2552,6 +2564,8 @@ impl Bank {
 
         // pay according to point value
         let point_value = PointValue { rewards, points };
+        #[cfg(feature = "epoch271-boundary-trace")]
+        self.trace_epoch271_reward_points(&point_value);
         let vote_account_rewards: DashMap<Pubkey, (AccountSharedData, u8, u64, bool)> =
             DashMap::with_capacity(vote_and_stake_accounts.len());
         let stake_delegation_iterator = vote_and_stake_accounts.into_par_iter().flat_map(
