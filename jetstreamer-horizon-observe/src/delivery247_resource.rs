@@ -464,6 +464,10 @@ const STAGED211_IMAGE_SHA: &str =
     "7271de0e309c83f8fa2f35cf9091280a8b04f66c51d3175ad1d6ff02faa4c59d";
 const STAGED211_ETAG: &str = "7ee07c0c0517ba9265a8c43c01903e95-1760";
 const STAGED211_BYTES: &str = "118062008962";
+const PUBLISHED211_PLAN: &str =
+    "/var/lib/jetstreamer/horizon211-staged-published-v256/epoch-211-plan.json";
+const PUBLISHED211_PLAN_SHA: &str =
+    "fc0b4882fa46ec57ef612a9e811f7aed14b3b748333563fc4a42546aab9980e0";
 const PINNED247: &str = "horizon-upload-247-pinned-public-v254.service";
 const PINNED247_ETAG: &str = "c1be2474b6c9ba8d0ac11405a97ebee3-2688";
 const PINNED247_BYTES: &str = "180370916960";
@@ -682,13 +686,8 @@ impl DeliveryClaim {
             "ordinary delivery claim changed"
         );
         let claim: Value = serde_json::from_slice(&bytes)?;
-        let args = epoch.argv();
-        let command = self.claim_command(epoch, &args, &claim)?;
         let actual = fs::read(format!("/proc/{}/cmdline", self.pid))?;
-        ensure!(
-            actual == (args.join("\0") + "\0").as_bytes(),
-            "ordinary delivery process command mismatch"
-        );
+        let command = self.checked_process_command(epoch, &claim, &actual)?;
         let current = Command::new("/usr/bin/systemctl")
             .args(["show", epoch.unit(), "--property=ExecStart", "--value"])
             .output()?;
@@ -698,6 +697,26 @@ impl DeliveryClaim {
             "ordinary delivery manager command changed"
         );
         Ok(())
+    }
+
+    fn checked_process_command<'a>(
+        &self,
+        epoch: OrdinaryEpoch,
+        claim: &'a Value,
+        actual: &[u8],
+    ) -> Result<&'a str> {
+        let mut args = epoch.argv();
+        if matches!(epoch, OrdinaryEpoch::Staged211)
+            && actual != (args.join("\0") + "\0").as_bytes()
+        {
+            args[8] = PUBLISHED211_PLAN.into();
+            args[10] = PUBLISHED211_PLAN_SHA.into();
+        }
+        ensure!(
+            actual == (args.join("\0") + "\0").as_bytes(),
+            "ordinary delivery process command mismatch"
+        );
+        self.claim_command(epoch, &args, claim)
     }
 }
 
@@ -887,6 +906,29 @@ mod tests {
             "expected_exec_start": cmd,
         });
         assert!(claim.claim_command(staged, &args, &payload).is_ok());
+        let original_process = args.join("\0") + "\0";
+        assert!(
+            claim
+                .checked_process_command(staged, &payload, original_process.as_bytes())
+                .is_ok()
+        );
+        let published_command = cmd
+            .replace(&args[8], PUBLISHED211_PLAN)
+            .replace(staged.digest(), PUBLISHED211_PLAN_SHA);
+        let published_process = original_process
+            .replace(&args[8], PUBLISHED211_PLAN)
+            .replace(staged.digest(), PUBLISHED211_PLAN_SHA);
+        payload["expected_exec_start"] = json!(published_command);
+        assert!(
+            claim
+                .checked_process_command(staged, &payload, published_process.as_bytes())
+                .is_ok()
+        );
+        assert!(
+            claim
+                .checked_process_command(staged, &payload, original_process.as_bytes())
+                .is_err()
+        );
         payload["expected_exec_start"] = json!(cmd.replace(STAGED211_ETAG, "incorrect"));
         assert!(claim.claim_command(staged, &args, &payload).is_err());
         payload["expected_exec_start"] = json!(cmd.replace(staged.digest(), original.digest()));
