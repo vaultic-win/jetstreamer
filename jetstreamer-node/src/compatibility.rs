@@ -1246,7 +1246,8 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
             feature = "epoch224-v1-6-25-diagnostic",
             feature = "epoch224-v1-6-25-qualification",
             feature = "epoch225-v1-6-25-diagnostic",
-            feature = "epoch225-v1-6-25-qualification"
+            feature = "epoch225-v1-6-25-qualification",
+            feature = "epoch226-checkpoint-continuation-diagnostic"
         )) {
             "solana-v1.6.25"
         } else {
@@ -1257,7 +1258,8 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
             feature = "epoch224-v1-6-25-diagnostic",
             feature = "epoch224-v1-6-25-qualification",
             feature = "epoch225-v1-6-25-diagnostic",
-            feature = "epoch225-v1-6-25-qualification"
+            feature = "epoch225-v1-6-25-qualification",
+            feature = "epoch226-checkpoint-continuation-diagnostic"
         )) {
             SOLANA_V1_6_25_REVISION
         } else {
@@ -1279,7 +1281,8 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
             feature = "epoch224-v1-6-25-diagnostic",
             feature = "epoch224-v1-6-25-qualification",
             feature = "epoch225-v1-6-25-diagnostic",
-            feature = "epoch225-v1-6-25-qualification"
+            feature = "epoch225-v1-6-25-qualification",
+            feature = "epoch226-checkpoint-continuation-diagnostic"
         )) {
             "jetstreamer-historical-worker-v1-6-25"
         } else {
@@ -1290,7 +1293,8 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
             feature = "epoch224-v1-6-25-diagnostic",
             feature = "epoch224-v1-6-25-qualification",
             feature = "epoch225-v1-6-25-diagnostic",
-            feature = "epoch225-v1-6-25-qualification"
+            feature = "epoch225-v1-6-25-qualification",
+            feature = "epoch226-checkpoint-continuation-diagnostic"
         )) {
             "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
         } else {
@@ -1301,7 +1305,8 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
             feature = "epoch224-v1-6-25-diagnostic",
             feature = "epoch224-v1-6-25-qualification",
             feature = "epoch225-v1-6-25-diagnostic",
-            feature = "epoch225-v1-6-25-qualification"
+            feature = "epoch225-v1-6-25-qualification",
+            feature = "epoch226-checkpoint-continuation-diagnostic"
         )) {
             "../historical-runtime/v1_6_25/target/release/jetstreamer-historical-worker-v1-6-25"
         } else {
@@ -2927,7 +2932,8 @@ mod tests {
                     feature = "epoch224-v1-6-25-diagnostic",
                     feature = "epoch224-v1-6-25-qualification",
                     feature = "epoch225-v1-6-25-diagnostic",
-                    feature = "epoch225-v1-6-25-qualification"
+                    feature = "epoch225-v1-6-25-qualification",
+                    feature = "epoch226-checkpoint-continuation-diagnostic"
                 )) {
                     SOLANA_V1_6_25_REVISION
                 } else {
@@ -2938,7 +2944,8 @@ mod tests {
                     feature = "epoch224-v1-6-25-diagnostic",
                     feature = "epoch224-v1-6-25-qualification",
                     feature = "epoch225-v1-6-25-diagnostic",
-                    feature = "epoch225-v1-6-25-qualification"
+                    feature = "epoch225-v1-6-25-qualification",
+                    feature = "epoch226-checkpoint-continuation-diagnostic"
                 )) {
                     "JETSTREAMER_HISTORICAL_WORKER_V1_6_25"
                 } else {
@@ -2949,7 +2956,8 @@ mod tests {
                     feature = "epoch224-v1-6-25-diagnostic",
                     feature = "epoch224-v1-6-25-qualification",
                     feature = "epoch225-v1-6-25-diagnostic",
-                    feature = "epoch225-v1-6-25-qualification"
+                    feature = "epoch225-v1-6-25-qualification",
+                    feature = "epoch226-checkpoint-continuation-diagnostic"
                 )) {
                     "../historical-runtime/v1_6_25/target/release/jetstreamer-historical-worker-v1-6-25"
                 } else {

@@ -7,8 +7,7 @@
 
 use {
     crate::archive_checksum::{
-        ArchiveFileIdentity, archive_file_identity, open_regular_nofollow,
-        path_matches_archive_identity,
+        archive_file_identity, open_regular_nofollow, path_matches_archive_identity,
     },
     jetstreamer_horizon::{
         account_updates::AccountUpdateView,
@@ -347,14 +346,58 @@ pub fn read_and_validate_segment_manifest_from(
     manifest_path: impl AsRef<Path>,
 ) -> Result<HistoricalSegmentManifest, SegmentManifestError> {
     let archive_path = archive_path.as_ref();
-    let sidecar_path = manifest_path.as_ref();
+    let manifest = read_validated_manifest(manifest_path.as_ref())?;
+    let mut archive = open_regular_file(archive_path, "opening archive")?;
+    verify_archive_digest(archive_path, &mut archive, &manifest)?;
+    validate_horizon_source(archive_path, archive, &manifest)?;
+    Ok(manifest)
+}
+
+/// Validates a segment carried by a seekable transport. Every opener must bind
+/// the same immutable object identity, including its complete length. The
+/// caller owns that binding and authentication of the separately held manifest.
+#[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+pub fn read_and_validate_seekable_segment_manifest<R: Read + Seek>(
+    archive_label: &Path,
+    manifest_path: &Path,
+    maximum_workers: std::num::NonZeroUsize,
+    open_reader: impl Fn() -> Result<R, SegmentManifestError> + Sync,
+    recheck_identity: impl FnOnce() -> Result<(), SegmentManifestError>,
+) -> Result<HistoricalSegmentManifest, SegmentManifestError> {
+    let manifest = read_validated_manifest(manifest_path)?;
+    let mut archive = open_reader()?;
+    verify_archive_digest(archive_label, &mut archive, &manifest)?;
+    validate_source_with_progress(&manifest, |progress| {
+        validate_horizon_source_with_readers(
+            archive_label,
+            archive,
+            &manifest,
+            maximum_workers.get(),
+            open_reader,
+            progress,
+        )?;
+        progress.phase("identity_recheck_started");
+        recheck_identity()
+    })?;
+    Ok(manifest)
+}
+
+fn read_validated_manifest(
+    sidecar_path: &Path,
+) -> Result<HistoricalSegmentManifest, SegmentManifestError> {
     let bytes = read_bounded_manifest(sidecar_path)?;
     let manifest: HistoricalSegmentManifest =
         serde_json::from_slice(&bytes).map_err(SegmentManifestError::JsonDecode)?;
     manifest.validate()?;
+    Ok(manifest)
+}
 
-    let mut archive = open_regular_file(archive_path, "opening archive")?;
-    let actual = sha256_reader(&mut archive, archive_path)?;
+fn verify_archive_digest<R: Read + Seek>(
+    label: &Path,
+    archive: &mut R,
+    manifest: &HistoricalSegmentManifest,
+) -> Result<(), SegmentManifestError> {
+    let actual = sha256_reader(archive, label)?;
     if actual != manifest.archive_sha256 {
         return Err(SegmentManifestError::ArchiveDigestMismatch {
             expected: sha256_hex_string(&manifest.archive_sha256),
@@ -363,9 +406,8 @@ pub fn read_and_validate_segment_manifest_from(
     }
     archive
         .seek(SeekFrom::Start(0))
-        .map_err(|source| io_err("rewinding archive", archive_path, source))?;
-    validate_horizon_source(archive_path, archive, &manifest)?;
-    Ok(manifest)
+        .map_err(|source| io_err("rewinding archive", label, source))?;
+    Ok(())
 }
 
 fn validate_horizon_source(
@@ -373,8 +415,51 @@ fn validate_horizon_source(
     archive: File,
     manifest: &HistoricalSegmentManifest,
 ) -> Result<(), SegmentManifestError> {
+    validate_source_with_progress(manifest, |progress| {
+        let initial_identity = archive_file_identity(&archive)
+            .map_err(|source| io_err("identifying archive", archive_path, source))?;
+        let open_worker = || {
+            let archive = open_regular_nofollow(archive_path).map_err(|source| {
+                io_err("opening parallel archive worker", archive_path, source)
+            })?;
+            let identity = archive_file_identity(&archive).map_err(|source| {
+                io_err("identifying parallel archive worker", archive_path, source)
+            })?;
+            if identity != initial_identity {
+                return Err(invalid(format!(
+                    "Horizon source {} changed before parallel validation",
+                    archive_path.display()
+                )));
+            }
+            Ok(BufReader::with_capacity(8 * 1024 * 1024, archive))
+        };
+        validate_horizon_source_with_readers(
+            archive_path,
+            BufReader::new(archive),
+            manifest,
+            SEGMENT_VALIDATION_THREADS,
+            open_worker,
+            progress,
+        )?;
+        progress.phase("identity_recheck_started");
+        if !path_matches_archive_identity(archive_path, initial_identity)
+            .map_err(|source| io_err("rechecking archive identity", archive_path, source))?
+        {
+            return Err(invalid(format!(
+                "Horizon source {} changed during parallel validation",
+                archive_path.display()
+            )));
+        }
+        Ok(())
+    })
+}
+
+fn validate_source_with_progress(
+    manifest: &HistoricalSegmentManifest,
+    validate: impl FnOnce(&crate::segment_progress::SegmentProgress) -> Result<(), SegmentManifestError>,
+) -> Result<(), SegmentManifestError> {
     let progress = crate::segment_progress::SegmentProgress::new(manifest.epoch);
-    let result = validate_horizon_source_with_progress(archive_path, archive, manifest, &progress);
+    let result = validate(&progress);
     progress.phase(if result.is_ok() {
         "source_validation_completed"
     } else {
@@ -383,16 +468,15 @@ fn validate_horizon_source(
     result
 }
 
-fn validate_horizon_source_with_progress(
+fn validate_horizon_source_with_readers<R: Read + Seek>(
     archive_path: &Path,
-    archive: File,
+    archive: R,
     manifest: &HistoricalSegmentManifest,
+    maximum_workers: usize,
+    open_worker: impl Fn() -> Result<R, SegmentManifestError> + Sync,
     progress: &crate::segment_progress::SegmentProgress,
 ) -> Result<(), SegmentManifestError> {
-    let initial_identity = archive_file_identity(&archive)
-        .map_err(|source| io_err("identifying archive", archive_path, source))?;
-    let reader =
-        ArchiveReader::open(BufReader::new(archive)).map_err(SegmentManifestError::Archive)?;
+    let reader = ArchiveReader::open(archive).map_err(SegmentManifestError::Archive)?;
     let header = reader.header().clone();
     if header.format_version != FORMAT_VERSION_V2 {
         return Err(invalid(format!(
@@ -487,6 +571,7 @@ fn validate_horizon_source_with_progress(
 
     let bucket_count = reader.bucket_count();
     let worker_count = SEGMENT_VALIDATION_THREADS
+        .min(maximum_workers)
         .min(bucket_count.max(1))
         .min(std::thread::available_parallelism().map_or(1, usize::from));
     let buckets_per_worker = bucket_count.div_ceil(worker_count);
@@ -512,7 +597,7 @@ fn validate_horizon_source_with_progress(
             .map(|(first_bucket, end_bucket)| {
                 validate_horizon_bucket_range(
                     archive_path,
-                    initial_identity,
+                    open_worker()?,
                     first_bucket,
                     end_bucket,
                     manifest.emitted_raw_write_versions.clone(),
@@ -527,15 +612,6 @@ fn validate_horizon_source_with_progress(
         return Err(invalid(format!(
             "Horizon source decoded {decoded_slots} slots, expected {}",
             manifest.output_slot_count
-        )));
-    }
-    progress.phase("identity_recheck_started");
-    if !path_matches_archive_identity(archive_path, initial_identity)
-        .map_err(|source| io_err("rechecking archive identity", archive_path, source))?
-    {
-        return Err(invalid(format!(
-            "Horizon source {} changed during parallel validation",
-            archive_path.display()
         )));
     }
     Ok(())
@@ -754,26 +830,15 @@ impl SlotVisitor for SegmentBucketVisitor {
     }
 }
 
-fn validate_horizon_bucket_range(
+fn validate_horizon_bucket_range<R: Read + Seek>(
     archive_path: &Path,
-    expected_identity: ArchiveFileIdentity,
+    archive: R,
     first_bucket: usize,
     end_bucket: usize,
     expected_writes: Range<u64>,
     progress: &crate::segment_progress::SegmentProgress,
 ) -> Result<SegmentBucketRangeEvidence, SegmentManifestError> {
-    let archive = open_regular_nofollow(archive_path)
-        .map_err(|source| io_err("opening parallel archive worker", archive_path, source))?;
-    let identity = archive_file_identity(&archive)
-        .map_err(|source| io_err("identifying parallel archive worker", archive_path, source))?;
-    if identity != expected_identity {
-        return Err(invalid(format!(
-            "Horizon source {} changed before parallel validation",
-            archive_path.display()
-        )));
-    }
-    let mut reader = ArchiveReader::open(BufReader::with_capacity(8 * 1024 * 1024, archive))
-        .map_err(SegmentManifestError::Archive)?;
+    let mut reader = ArchiveReader::open(archive).map_err(SegmentManifestError::Archive)?;
     if end_bucket > reader.bucket_count() || first_bucket >= end_bucket {
         return Err(invalid(format!(
             "Horizon source {} received invalid parallel bucket range {first_bucket}..{end_bucket}",
@@ -919,7 +984,10 @@ fn read_bounded_manifest(path: &Path) -> Result<Vec<u8>, SegmentManifestError> {
     Ok(bytes)
 }
 
-fn sha256_reader(file: &mut File, path: &Path) -> Result<[u8; 32], SegmentManifestError> {
+fn sha256_reader(
+    file: &mut (impl Read + Seek),
+    path: &Path,
+) -> Result<[u8; 32], SegmentManifestError> {
     file.seek(SeekFrom::Start(0))
         .map_err(|source| io_err("rewinding archive for hashing", path, source))?;
     let mut hasher = Sha256::new();
@@ -1270,6 +1338,83 @@ mod tests {
         assert!(matches!(
             read_and_validate_segment_manifest_from(&archive, &separate),
             Err(SegmentManifestError::ArchiveDigestMismatch { .. })
+        ));
+    }
+
+    #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+    #[test]
+    fn seekable_source_preserves_complete_validation_and_rechecks_identity() {
+        use std::{
+            io::Cursor,
+            num::NonZeroUsize,
+            sync::atomic::{AtomicUsize, Ordering},
+        };
+
+        let directory = TempDir::new().unwrap();
+        let archive = write_archive(&directory);
+        let (sidecar, written) = write_segment_manifest(&archive, manifest()).unwrap();
+        let bytes = fs::read(&archive).unwrap();
+        fs::remove_file(&archive).unwrap();
+        let label = Path::new("authenticated-private-archive");
+        let mut rechecked = false;
+        let opens = AtomicUsize::new(0);
+        let from_bytes = || {
+            opens.fetch_add(1, Ordering::Relaxed);
+            Ok(Cursor::new(bytes.as_slice()))
+        };
+        let workers = NonZeroUsize::new(2).unwrap();
+        assert_eq!(
+            read_and_validate_seekable_segment_manifest(
+                label,
+                &sidecar,
+                workers,
+                from_bytes,
+                || {
+                    assert!(opens.load(Ordering::Relaxed) >= 2);
+                    rechecked = true;
+                    Ok(())
+                }
+            )
+            .unwrap(),
+            written
+        );
+        assert!(rechecked);
+        assert!(matches!(
+            read_and_validate_seekable_segment_manifest(
+                label, &sidecar, workers, from_bytes,
+                || Err(invalid("object identity changed at final check")),
+            ),
+            Err(SegmentManifestError::Invalid(message))
+                if message == "object identity changed at final check"
+        ));
+
+        let mut different = bytes.clone();
+        different[0] ^= 1;
+        let bad_opens = AtomicUsize::new(0);
+        assert!(matches!(
+            read_and_validate_seekable_segment_manifest(
+                label,
+                &sidecar,
+                workers,
+                || {
+                    bad_opens.fetch_add(1, Ordering::Relaxed);
+                    Ok(Cursor::new(different.as_slice()))
+                },
+                || panic!("cannot confirm an archive after a failed complete SHA-256"),
+            ),
+            Err(SegmentManifestError::ArchiveDigestMismatch { .. })
+        ));
+        assert_eq!(bad_opens.load(Ordering::Relaxed), 1);
+
+        let mut wrong_runtime = written;
+        wrong_runtime.runtime.runtime_revision = "different-revision".into();
+        fs::write(&sidecar, serde_json::to_vec(&wrong_runtime).unwrap()).unwrap();
+        assert!(matches!(
+            read_and_validate_seekable_segment_manifest(
+                label, &sidecar, workers, from_bytes,
+                || panic!("cannot confirm an archive after failed deep validation"),
+            ),
+            Err(SegmentManifestError::Invalid(message)) if message.contains("runtime_revision")
         ));
     }
 

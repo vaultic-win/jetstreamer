@@ -1,3 +1,31 @@
+#[cfg(all(
+    feature = "epoch226-checkpoint-continuation-diagnostic",
+    any(
+        feature = "epoch136-actual-input-diagnostic",
+        feature = "epoch169-v1-5-8-diagnostic",
+        feature = "epoch163-first-output128-diagnostic",
+        feature = "epoch228-called-program-demotion-qualification",
+        feature = "epoch207-singleton-qualification",
+        feature = "epochs209-212-singleton-qualification",
+        feature = "epoch141-original-entry-qualification",
+        feature = "epoch140-suffix-recording",
+        feature = "epoch140-native-restore-diagnostic",
+        feature = "epoch144-native-restore-diagnostic",
+        feature = "epoch203-native-restore-diagnostic",
+        feature = "epoch205-native-restore-diagnostic",
+        feature = "epoch213-checkpoint-continuation-diagnostic",
+        feature = "epoch144-checkpoint-continuation-diagnostic",
+        feature = "epoch203-checkpoint-continuation-diagnostic",
+        feature = "epoch223-v1-6-25-qualification",
+        feature = "epoch223-v1-6-20-prefix-qualification",
+        feature = "epoch224-account-delta-diagnostic",
+        feature = "epoch224-v1-6-25-diagnostic",
+        feature = "epoch224-v1-6-25-qualification",
+        feature = "epoch225-v1-6-25-diagnostic",
+        feature = "epoch225-v1-6-25-qualification",
+    )
+))]
+compile_error!("epoch 226 scoped repair requires its own exclusive private build");
 #[cfg(feature = "epoch228-called-program-demotion-qualification")]
 mod epoch228_demotion;
 #[cfg(all(
@@ -34,6 +62,10 @@ use checkpoint_export::{
 mod checkpoint_continuation;
 mod checkpoint_continuation144;
 mod checkpoint_continuation203;
+#[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+mod checkpoint_continuation226;
+#[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+mod epoch226_interior;
 #[cfg(all(
     feature = "epoch140-suffix-recording",
     any(
@@ -19952,6 +19984,11 @@ async fn run_epoch_range_supervisor_serial(
 #[tokio::main]
 async fn main() {
     let probe_args: Vec<_> = env::args().skip(1).collect();
+    #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+    if let Err(error) = checkpoint_continuation226::validate_entrypoint(&probe_args) {
+        eprintln!("{error}");
+        exit(2);
+    }
     #[cfg(feature = "epoch140-suffix-recording")]
     let suffix_invocation = epoch140_suffix_recording::parse(&probe_args).unwrap_or_else(|error| {
         eprintln!("{error}");
@@ -20474,7 +20511,8 @@ async fn main() {
     if cfg!(any(
         feature = "epoch213-checkpoint-continuation-diagnostic",
         feature = "epoch144-checkpoint-continuation-diagnostic",
-        feature = "epoch203-checkpoint-continuation-diagnostic"
+        feature = "epoch203-checkpoint-continuation-diagnostic",
+        feature = "epoch226-checkpoint-continuation-diagnostic"
     )) || continuation_plan.is_some()
         || continuation_plan_sha256.is_some()
     {
@@ -20509,6 +20547,15 @@ async fn main() {
                 feature = "epoch225-v1-6-25-diagnostic",
                 feature = "epoch225-v1-6-25-qualification"
             ));
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        let validation = checkpoint_continuation226::validate_cli(
+            (start_epoch, end_epoch),
+            explicit_verify,
+            verify_option_count,
+            explicit_destination,
+            forbidden,
+        );
+        #[cfg(not(feature = "epoch226-checkpoint-continuation-diagnostic"))]
         let validation = if cfg!(feature = "epoch203-checkpoint-continuation-diagnostic") {
             checkpoint_continuation203::validate_cli(
                 (start_epoch, end_epoch),
@@ -20543,6 +20590,17 @@ async fn main() {
             eprintln!("private continuation requires both plan and SHA-256 options");
             exit(2);
         };
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        let result = checkpoint_continuation226::run(
+            plan,
+            hash,
+            dest_dir,
+            shutdown,
+            cursor,
+            restart_tracker,
+        )
+        .await;
+        #[cfg(not(feature = "epoch226-checkpoint-continuation-diagnostic"))]
         let result = if cfg!(feature = "epoch203-checkpoint-continuation-diagnostic") {
             checkpoint_continuation203::run(plan, hash, dest_dir, shutdown, cursor, restart_tracker)
                 .await
