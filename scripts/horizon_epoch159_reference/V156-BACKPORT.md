@@ -59,9 +59,9 @@ JETSTREAMER_HISTORICAL_WORKER_V1_5_6="$sealed_worker" \
   "$sealed_node" 159 "$private_destination" --verify \
   --snapshot-archive="$bound_snapshot" --epoch-hashes="$bound_checkpoints" \
   --replay-scratch="$private_scratch" --qualification-end-slot=68688001 \
-  --horizon-output="$private_destination/epoch-159-prefix.jet"
+  --horizon-output="$private_destination/epoch-159-through-68688001.jet"
 ```
 
-Require the standard producer to reach and verify all four post-bootstrap accounts checkpoints. Compare its terminal native checkpoint to the signed reference and check the emitted segment's bootstrap and terminal evidence, sealed worker digest, exact coverage of slots 68,688,000–68,688,001, anchored PoH and current-reader decode. Join transaction 78 in the second block by full signature and require success and the 5,000-lamport fee. A source mismatch should identify the first failing block and compare its CID-qualified entries against the existing bounded reference before introducing a source adapter.
+Require the standard producer to reach and verify all four post-bootstrap accounts checkpoints. Compare its terminal native checkpoint to the signed reference and check the emitted segment's bootstrap and terminal evidence, sealed worker digest, exact coverage of slots 68,688,000–68,688,001, anchored PoH and current-reader decode. Pass `--expected-successful-transaction=68688001,78,SIGNATURE,5000` to `jetstreamer-qualification-verify`, using the full signature from the bound reference. A source mismatch should identify the first failing block and compare its CID-qualified entries against the existing bounded reference before introducing a source adapter.
 
 The retained epoch-159 root at 69,119,821 precedes epoch end. A full candidate still needs all 432,000 output slots and a canonical end-of-epoch or successor checkpoint that covers the tail. The existing production route supports an explicit verification tail, subject to its qualified terminal evidence and one-owner constraints. Qualify that full route and independently verify the complete archive before considering publication.

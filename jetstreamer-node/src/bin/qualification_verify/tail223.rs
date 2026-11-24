@@ -80,6 +80,7 @@ mod tests {
             expected_runtime_profile: "solana-v1.6.25".into(),
             expected_worker_sha256: WORKER.into(),
             expected_conflict: None,
+            expected_successful_transaction: None,
         }
     }
     #[test]

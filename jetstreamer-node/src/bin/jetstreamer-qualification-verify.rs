@@ -8,7 +8,12 @@ mod prefix223;
 mod tail223;
 
 use {
-    jetstreamer_horizon::archive::{ArchiveReader, ExpectedConflictWrite, verify_conflict_slot},
+    jetstreamer_horizon::{
+        archive::{
+            ArchiveReader, Consumption, ExpectedConflictWrite, SlotVisitor, verify_conflict_slot,
+        },
+        transactions::Transaction,
+    },
     jetstreamer_node::{
         archive_checksum::archive_checksum_path,
         segment_manifest::{
@@ -38,6 +43,35 @@ struct ConflictExpectation {
 }
 
 #[derive(Debug, Eq, PartialEq)]
+struct SuccessfulTransaction {
+    slot: u64,
+    index: u32,
+    signature: Signature,
+    fee: u64,
+}
+
+struct TransactionVisitor<'a> {
+    expected: &'a SuccessfulTransaction,
+    matched: bool,
+}
+
+impl SlotVisitor for TransactionVisitor<'_> {
+    fn on_transaction(&mut self, slot: u64, index: u32, tx: &Transaction) {
+        if slot == self.expected.slot && index == self.expected.index {
+            self.matched = tx.signatures.first() == Some(&self.expected.signature)
+                && tx.status.is_ok()
+                && tx.fee == self.expected.fee;
+        }
+    }
+
+    fn consumption(&self) -> Consumption {
+        Consumption::all()
+            .without_account_update_data()
+            .without_block_account_update_arenas()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
 struct Arguments {
     archive: PathBuf,
     private_root: PathBuf,
@@ -49,6 +83,7 @@ struct Arguments {
     expected_runtime_profile: String,
     expected_worker_sha256: String,
     expected_conflict: Option<ConflictExpectation>,
+    expected_successful_transaction: Option<SuccessfulTransaction>,
 }
 
 fn usage(program: &str) -> String {
@@ -62,6 +97,7 @@ fn usage(program: &str) -> String {
   --expected-runtime-profile=NAME \
   --expected-worker-sha256=HEX \
   [--receipt=/PRIVATE/epoch-N.validation.json] \
+  [--expected-successful-transaction=SLOT,INDEX,SIGNATURE,FEE] \
   [--expected-conflict-slot=SLOT \
    --expected-conflict-account=ADDRESS \
    --expected-conflict-first=INDEX,SIGNATURE,LAMPORTS \
@@ -125,6 +161,28 @@ fn parse_conflict_write(value: &str, name: &str) -> Result<ExpectedConflictWrite
     })
 }
 
+fn parse_successful_transaction(value: &str) -> Result<SuccessfulTransaction, String> {
+    let mut fields = value.split(',');
+    let (Some(slot), Some(index), Some(signature), Some(fee), None) = (
+        fields.next(),
+        fields.next(),
+        fields.next(),
+        fields.next(),
+        fields.next(),
+    ) else {
+        return Err("--expected-successful-transaction requires SLOT,INDEX,SIGNATURE,FEE".into());
+    };
+    Ok(SuccessfulTransaction {
+        slot: parse_u64(slot, "expected-successful-transaction slot")?,
+        index: index
+            .parse()
+            .map_err(|error| format!("invalid successful transaction index: {error}"))?,
+        signature: Signature::from_str(signature)
+            .map_err(|error| format!("invalid successful transaction signature: {error}"))?,
+        fee: parse_u64(fee, "expected-successful-transaction fee")?,
+    })
+}
+
 fn parse_arguments<I>(arguments: I) -> Result<Arguments, String>
 where
     I: IntoIterator<Item = String>,
@@ -142,6 +200,7 @@ where
     let mut expected_conflict_account = None;
     let mut expected_conflict_first = None;
     let mut expected_conflict_second = None;
+    let mut expected_successful_transaction = None;
 
     for argument in arguments {
         if let Some(value) = argument.strip_prefix("--private-root=") {
@@ -211,6 +270,12 @@ where
                 value,
                 "expected-conflict-second",
             )?;
+        } else if let Some(value) = argument.strip_prefix("--expected-successful-transaction=") {
+            take_once(
+                &mut expected_successful_transaction,
+                parse_successful_transaction(value)?,
+                "expected-successful-transaction",
+            )?;
         } else if argument.starts_with('-') {
             return Err(format!("unknown option {argument:?}"));
         } else {
@@ -260,6 +325,7 @@ where
         expected_worker_sha256: expected_worker_sha256
             .ok_or_else(|| "missing --expected-worker-sha256".to_string())?,
         expected_conflict,
+        expected_successful_transaction,
     })
 }
 
@@ -521,6 +587,44 @@ fn verify(arguments: &Arguments) -> Result<serde_json::Value, String> {
         &manifest.runtime.runtime_revision,
     )?;
 
+    let successful_transaction = if let Some(expected) = &arguments.expected_successful_transaction
+    {
+        if !(arguments.expected_output_start_slot..=arguments.expected_terminal_slot)
+            .contains(&expected.slot)
+        {
+            return Err(format!(
+                "expected transaction slot {} is outside the validated output range",
+                expected.slot
+            ));
+        }
+        let file = File::open(&archive)
+            .map_err(|error| format!("failed to open archive for transaction check: {error}"))?;
+        let mut reader = ArchiveReader::open(BufReader::new(file))
+            .map_err(|error| format!("failed to open archive for transaction check: {error}"))?;
+        let mut visitor = TransactionVisitor {
+            expected,
+            matched: false,
+        };
+        let slots = reader
+            .read_slots(expected.slot, 1, &mut visitor)
+            .map_err(|error| format!("transaction check failed: {error}"))?;
+        if slots != 1 || !visitor.matched {
+            return Err(format!(
+                "transaction {} at slot {} does not match the expected successful signature and fee",
+                expected.index, expected.slot
+            ));
+        }
+        Some(json!({
+            "validation": "pass",
+            "slot": expected.slot,
+            "transaction_index": expected.index,
+            "signature": expected.signature.to_string(),
+            "fee": expected.fee
+        }))
+    } else {
+        None
+    };
+
     let conflict_write_gate = if let Some(expected) = &arguments.expected_conflict {
         let output_end = manifest
             .output_slot_start
@@ -608,6 +712,9 @@ fn verify(arguments: &Arguments) -> Result<serde_json::Value, String> {
     });
     tail223::annotate(arguments, &mut receipt);
     prefix223::annotate(arguments, &mut receipt);
+    if let Some(tx) = successful_transaction {
+        receipt["successful_transaction"] = tx;
+    }
     Ok(receipt)
 }
 
@@ -788,6 +895,50 @@ mod tests {
         assert!(validate_sha256(&"A".repeat(64)).is_err());
         assert!(validate_sha256(&"a".repeat(63)).is_err());
         assert!(validate_sha256(&format!("{}g", "a".repeat(63))).is_err());
+    }
+
+    #[test]
+    fn successful_transaction_requires_the_exact_observed_signature_status_and_fee() {
+        let signature = Signature::from([9; 64]);
+        let raw = format!("68688001,78,{signature},5000");
+        let expected = parse_successful_transaction(&raw).unwrap();
+        assert!(parse_successful_transaction(&format!("{raw},1")).is_err());
+        let mut args = valid_arguments();
+        args.push(format!("--expected-successful-transaction={raw}"));
+        assert_eq!(
+            parse_arguments(args)
+                .unwrap()
+                .expected_successful_transaction,
+            Some(SuccessfulTransaction {
+                slot: 68_688_001,
+                index: 78,
+                signature,
+                fee: 5_000,
+            })
+        );
+        let mut visitor = TransactionVisitor {
+            expected: &expected,
+            matched: false,
+        };
+        let mut tx = Transaction::new_boxed();
+        tx.signatures.push(signature);
+        tx.fee = 5_000;
+        visitor.on_transaction(expected.slot, expected.index - 1, &tx);
+        assert!(!visitor.matched);
+        visitor.on_transaction(expected.slot, expected.index, &tx);
+        assert!(visitor.matched);
+        tx.fee = 4_999;
+        visitor.on_transaction(expected.slot, expected.index, &tx);
+        assert!(!visitor.matched);
+        tx.fee = 5_000;
+        tx.status.error_code = 1;
+        visitor.on_transaction(expected.slot, expected.index, &tx);
+        assert!(!visitor.matched);
+        tx.status.clear();
+        tx.signatures.clear();
+        tx.signatures.push(Signature::from([8; 64]));
+        visitor.on_transaction(expected.slot, expected.index, &tx);
+        assert!(!visitor.matched);
     }
 
     #[test]
@@ -1046,6 +1197,7 @@ mod tests {
             expected_worker_sha256:
                 "cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819".into(),
             expected_conflict: None,
+            expected_successful_transaction: None,
         };
         assert!(retained_prefix_157(&args));
         validate_archive_name(&args, &args.archive).unwrap();
@@ -1201,6 +1353,7 @@ mod tests {
             expected_runtime_profile: "solana-v1.6.16".to_string(),
             expected_worker_sha256: sha256_hex_string(&TEST_WORKER_DIGEST),
             expected_conflict: None,
+            expected_successful_transaction: None,
         };
         let receipt = verify(&arguments).unwrap();
         assert_eq!(receipt["validation"], "pass");
@@ -1261,6 +1414,19 @@ mod tests {
         });
         assert!(verify(&arguments).unwrap_err().contains("expected a block"));
         arguments.expected_conflict = None;
+
+        arguments.expected_successful_transaction = Some(SuccessfulTransaction {
+            slot: TEST_OUTPUT_START,
+            index: 0,
+            signature: Signature::from([9; 64]),
+            fee: 5_000,
+        });
+        assert!(
+            verify(&arguments)
+                .unwrap_err()
+                .contains("expected successful signature and fee")
+        );
+        arguments.expected_successful_transaction = None;
 
         let checksum = archive_checksum_path(&archive).unwrap();
         fs::write(&checksum, b"publication marker must be rejected\n").unwrap();
