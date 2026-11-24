@@ -1,10 +1,11 @@
-// The retry10 operators identified these exact retired generations in the published
+// The retirement reviews identified these exact retired generations in the published
 // graph. Their service names, command lines, fragment digests and terminal IDs
 // are compiled inputs, never values supplied by a retirement request.
 use super::*;
 use std::{ffi::OsStr, io::ErrorKind, process::Command};
 
 const RETRY10_PARK: &str = "horizon-closed166-retry10-park-20261122-v1.service";
+const RETRY8_PARK: &str = "horizon-closed166-retry8-park-20261120-v1.service";
 const METERED168_PARK: &str = "horizon-closed168-full-metered-park-20261122-v1.service";
 const METERED168_DROPIN_OWNERS: [&str; 9] = [
     "horizon-observer-root144959-live166167170-20261121-v1.service",
@@ -20,7 +21,7 @@ const METERED168_DROPIN_OWNERS: [&str; 9] = [
 const METERED168_FAILED_OBSERVER: &str =
     "horizon-observer-root174010-live166167170-20261122-v1.service";
 const REGISTRY: &str = include_str!("holding_epoch166_reviewed_managers.json");
-const PROPERTIES: &str = "Id,Names,Job,NeedDaemonReload,Transient,LoadState,ActiveState,SubState,CanStart,UnitFileState,FragmentPath,DropInPaths,InvocationID,ExecStart,ExecMainPID,ExecMainExitTimestampMonotonic,ExecMainCode,ExecMainStatus,MainPID,ControlPID,ControlGroup,NRestarts,Result,Restart,RequiredBy,Requisite,RequisiteOf,WantedBy,BoundBy,UpheldBy,ConsistsOf,OnSuccessOf,OnFailureOf,TriggeredBy,Triggers";
+const PROPERTIES: &str = "Id,Names,Job,NeedDaemonReload,Transient,LoadState,ActiveState,SubState,CanStart,UnitFileState,FragmentPath,DropInPaths,InvocationID,ExecMainPID,ExecMainExitTimestampMonotonic,ExecMainCode,ExecMainStatus,MainPID,ControlPID,ControlGroup,NRestarts,Result,Restart,RequiredBy,Requisite,RequisiteOf,WantedBy,BoundBy,UpheldBy,ConsistsOf,OnSuccessOf,OnFailureOf,TriggeredBy,Triggers";
 const BACKLINKS: [&str; 9] = [
     "RequiredBy",
     "WantedBy",
@@ -43,6 +44,7 @@ struct Terminal {
     state: String,
     substate: String,
     result: String,
+    code: Option<String>,
     status: String,
     argv: String,
     requisite: Vec<String>,
@@ -59,6 +61,9 @@ impl Registered {
     pub(super) fn profile(park_name: &str) -> Result<Self> {
         match park_name {
             RETRY10_PARK => Ok(serde_json::from_str(REGISTRY)?),
+            RETRY8_PARK => Ok(serde_json::from_str(include_str!(
+                "holding_epoch166_retry8_reviewed_managers.json"
+            ))?),
             METERED168_PARK => {
                 // These same retired observers also reference the old 168 run.
                 // Keep retry10's own terminal/census units out of the 168 registry.
@@ -157,7 +162,7 @@ impl Registered {
                     && row["InvocationID"] == t.invocation
                     && row["ExecMainExitTimestampMonotonic"] == t.exit_us
                     && row["ExecMainPID"] == t.pid
-                    && row["ExecMainCode"] == "1"
+                    && row["ExecMainCode"] == t.code.as_deref().unwrap_or("1")
                     && row["Result"] == t.result
                     && row["ExecMainStatus"] == t.status
                     && row["MainPID"] == "0"
@@ -300,14 +305,27 @@ impl Registered {
                     "duplicate manager property"
                 );
             }
-            let row = Value::Object(fields);
+            let mut row = Value::Object(fields);
             let name = row["Id"].as_str().context("missing manager identity")?;
             ensure!(
                 targets.contains(name) && seen.insert(name.to_owned()),
                 "unknown or duplicate manager"
             );
-            self.state(name, &row)?;
-            group_empty(&cgroups.join(name))?;
+            let name = name.to_owned();
+            if self.terminal(&name) {
+                // Shell commands in older transient units may contain literal
+                // newlines. Read this property independently of the scalar fields.
+                let exec = output(Command::new("/usr/bin/systemctl").args([
+                    "show",
+                    &name,
+                    "-pExecStart",
+                    "--value",
+                ]))?;
+                row["ExecStart"] = json!(exec.trim_end_matches('\n'));
+            }
+            self.state(&name, &row)?;
+            group_empty(&cgroups.join(&name))?;
+            group_empty(&Path::new("/sys/fs/cgroup/horizonaudit.slice").join(&name))?;
         }
         ensure!(seen == targets, "incomplete manager readback");
         Ok(())
@@ -644,7 +662,7 @@ mod tests {
     #[test]
     #[ignore = "read-only proof against the selected dev-samjohnson historical service registry"]
     fn actual_retired_managers_and_activation_namespace() {
-        assert!(matches!(PARK, RETRY10_PARK | METERED168_PARK));
+        assert!(matches!(PARK, RETRY8_PARK | RETRY10_PARK | METERED168_PARK));
         Registered::profile(PARK).unwrap().verify().unwrap();
     }
 }
