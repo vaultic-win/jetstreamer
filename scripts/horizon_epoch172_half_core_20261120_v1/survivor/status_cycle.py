@@ -20,6 +20,7 @@ CLOSED = (166, 167, 168, 170)
 GUARD169 = BASE/'epoch169-focused-terminal-20261121-v1'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
+RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
 assert hashlib.sha256((PACKAGE/'deployment-seal-receipt.json').read_bytes()).hexdigest() == PARENT_SEAL
 sys.path.insert(0,str(PACKAGE))
 from evidence import bound, checked, content, durable, ensure_dir, lock, names, need, sealed, utc
@@ -565,10 +566,15 @@ def advance_sample(head,fleet,ref):
         durable(replacement/'REGISTERED.json',dict(config=replacement_ref,terminal=bound(log)))
         ref=replacement_ref
 
-def one_cycle(head,ref,bridge):
+def one_cycle(head,ref,bridge,completed_sample=None):
     fleet=checked(head);closure_members(head,bridge)
-    config_ref,sample,already=advance_sample(head,fleet,ref)
-    if already:return already
+    if completed_sample is None:
+        config_ref,sample,already=advance_sample(head,fleet,ref)
+        if already:return already
+    else:
+        config_ref,sample=ref,completed_sample
+        need(ref==fleet['sole_next_observer'] and sealed(ref)['output']==sample['path'],
+             'different resumed observer registration')
     cfg=sealed(config_ref);out=names(cfg['not_before_utc'])['out'];ensure_dir(out)
     c=make_context(head,fleet,sample,cfg,out)
     observed=census(c,bridge)
@@ -609,6 +615,9 @@ def entry():
     if PRIVATE136:
         need(package == 'tools-cold168-retry4-v1', '136 cadence requires the qualified retry4 parent')
         package = 'tools-cold168-retry4-136-v1'
+    if RESUMING:
+        need(package == 'tools-cold168-retry4-v1', 'cadence resumption requires the qualified retry4 parent')
+        package = 'tools-cold168-retry4-resume-v1'
     need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
     receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
     seal=checked(receipt)
@@ -644,6 +653,20 @@ def main():
     if sys.argv[1:]==['--check-entry']:
         print(json.dumps(receipt))
         return
+    if RESUMING:
+        member, = (row for row in checked(receipt)['members'] if row['name']=='status_resume.py')
+        need(member['mode']=='0444' and bound(CURRENT.with_name(member['name']))['sha256']==member['sha256'],
+             'unsealed cadence recovery bootstrap')
+        import status_resume
+        if sys.argv[1:] in (['--resume-prepare'], ['--resume-register']):
+            os.umask(0o077)
+            fd=lock(ROOT/'cold167-status-handoff.lock')
+            try:
+                action = status_resume.mark_intent if sys.argv[1]=='--resume-prepare' else status_resume.mark_active
+                print(json.dumps(action(globals(),receipt)))
+                return
+            finally:
+                os.close(fd)
     need(len(sys.argv)==1,'unexpected cadence argument')
     os.umask(0o077)
     fd=lock(BASE/'stable-cadence-controller-20261120-v1/consumer.lock')
@@ -651,15 +674,22 @@ def main():
         state=owners.show(CONTROLLER,('Id','InvocationID','MainPID','ControlGroup','Job','ActiveState'))
         need(state['MainPID']==str(os.getpid()) and Path('/proc/self/cgroup').read_text().strip()=='0::'+state['ControlGroup'],
              'outside original status service')
+        resume=None
         if PRIVATE136:
             await_private136_owner(state,receipt)
+        elif RESUMING:
+            resume=status_resume.await_owner(globals(),receipt,state,fd)
         elif getattr(cold_workers, 'cold168', None):
             cold_workers.cold168.await_recovery(state,os.getpid())
         validate_package()
         proof=handoff()
         durable(ROOT/'HANDOFF.json',proof)
-        initial=ROOT/'first-clock';ensure_dir(initial)
-        head=proof['fleet'];ref=registered(initial,checked(head))
+        if resume is None:
+            initial=ROOT/'first-clock';ensure_dir(initial)
+            head=proof['fleet'];ref=registered(initial,checked(head))
+        else:
+            head=one_cycle(resume['fleet'],resume['config'],proof,resume['completed_sample'])
+            ref=checked(head)['sole_next_observer']
         while True:
             head=one_cycle(head,ref,proof);ref=checked(head)['sole_next_observer']
     finally:
