@@ -2,6 +2,7 @@ mod leader_schedule;
 mod poh_backend;
 mod runtime;
 mod epoch228_profile;
+mod epoch230_profile;
 mod snapshot;
 
 #[cfg(all(
@@ -22,6 +23,20 @@ compile_error!("epoch 227 capped requires an exclusive qualification build");
 #[cfg(all(feature = "epoch228-capped-qualification", any(feature = "epoch227-capped-qualification", feature = "epoch223-prefix-qualification", feature = "diagnostic-singleton")))]
 compile_error!("epoch 228 capped requires an exclusive qualification build");
 
+#[cfg(all(
+    feature = "epoch230-called-program-demotion",
+    any(
+        feature = "diagnostic-singleton",
+        feature = "epoch223-prefix-qualification",
+        feature = "epoch227-capped-qualification",
+        feature = "epoch228-capped-qualification",
+        feature = "epoch230-bank-trace",
+        feature = "poh-force-soft",
+        feature = "snapshot-hard-fork-metadata",
+    )
+))]
+compile_error!("epoch 230 called-program demotion requires an exclusive qualification build");
+
 use jetstreamer_historical_protocol::{
     read_frame, write_frame, AccountWrite, BackendQualification, EntryProcessed,
     EntryProcessedChunk, EntryProcessedChunkBody, EntryRequest, Handshake, Request, RequestBody,
@@ -35,10 +50,17 @@ use std::{io, mem};
 // Reject transitive SDK feature unification into an ordinary worker.
 const _: [(); 1] = [(); (cfg!(feature = "epoch228-called-program-demotion")
     == solana_sdk::message::EPOCH228_CALLED_PROGRAM_DEMOTION) as usize];
-#[cfg(not(feature = "epoch228-called-program-demotion"))]
+const _: [(); 1] = [(); (cfg!(feature = "epoch230-called-program-demotion")
+    == solana_sdk::message::EPOCH230_CALLED_PROGRAM_DEMOTION) as usize];
+#[cfg(not(any(
+    feature = "epoch228-called-program-demotion",
+    feature = "epoch230-called-program-demotion",
+)))]
 const BACKEND_ID: &str = "solana-v1.6.20";
 #[cfg(feature = "epoch228-called-program-demotion")]
 const BACKEND_ID: &str = "solana-v1.6.20-epoch228-called-program-demotion-candidate";
+#[cfg(feature = "epoch230-called-program-demotion")]
+const BACKEND_ID: &str = "solana-v1.6.20-epoch230-called-program-demotion-candidate";
 const SOLANA_TAG: &str = "v1.6.20";
 const SOLANA_COMMIT: &str = "77bdb45d4af61fc687161ec06cc0178ff79726d5";
 const ENTRY_CHUNK_TARGET_BYTES: u64 = (MAX_FRAME_BYTES / 2) as u64;

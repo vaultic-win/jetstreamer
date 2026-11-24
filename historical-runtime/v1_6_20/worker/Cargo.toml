@@ -32,6 +32,8 @@ epoch227-capped-warmup-diagnostic = ["epoch227-capped-qualification"]
 epoch228-capped-qualification = []
 # Demote invoked program IDs only for the closed epoch 228 worker.
 epoch228-called-program-demotion = ["epoch228-capped-qualification", "solana-program/epoch228-called-program-demotion"]
+# Private epoch 230 replay through its independently verified hourly root.
+epoch230-called-program-demotion = ["solana-program/epoch230-called-program-demotion"]
 
 [[example]]
 name = "snapshot_hard_forks"

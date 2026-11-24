@@ -39,6 +39,8 @@ fn worker_remains_alive_across_framed_requests() -> io::Result<()> {
         ResponseBody::Handshake(handshake) => {
             let expected = if cfg!(feature = "epoch228-called-program-demotion") {
                 "solana-v1.6.20-epoch228-called-program-demotion-candidate"
+            } else if cfg!(feature = "epoch230-called-program-demotion") {
+                "solana-v1.6.20-epoch230-called-program-demotion-candidate"
             } else {
                 "solana-v1.6.20"
             };

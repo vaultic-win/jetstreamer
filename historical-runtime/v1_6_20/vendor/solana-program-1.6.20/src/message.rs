@@ -19,6 +19,10 @@ use std::{convert::TryFrom, str::FromStr};
 pub const EPOCH228_CALLED_PROGRAM_DEMOTION: bool =
     cfg!(feature = "epoch228-called-program-demotion");
 
+/// Private epoch 230 worker policy with the upgradeable-loader exception.
+pub const EPOCH230_CALLED_PROGRAM_DEMOTION: bool =
+    cfg!(feature = "epoch230-called-program-demotion");
+
 lazy_static! {
     // Copied keys over since direct references create cyclical dependency.
     static ref BUILTIN_PROGRAMS_KEYS: [Pubkey; 10] = {
@@ -367,6 +371,12 @@ impl Message {
         self.program_position(i).is_some()
     }
 
+    fn is_key_called_as_program(&self, i: usize) -> bool {
+        self.instructions
+            .iter()
+            .any(|ix| ix.program_id_index as usize == i)
+    }
+
     pub fn is_writable(&self, i: usize, demote_sysvar_write_locks: bool) -> bool {
         (i < (self.header.num_required_signatures - self.header.num_readonly_signed_accounts)
             as usize
@@ -378,11 +388,12 @@ impl Message {
                 demote_sysvar_write_locks
                     && (sysvar::is_sysvar_id(&key) || BUILTIN_PROGRAMS_KEYS.contains(&key))
             }
-            && !(EPOCH228_CALLED_PROGRAM_DEMOTION
-                && self
-                    .instructions
-                    .iter()
-                    .any(|ix| ix.program_id_index as usize == i))
+            && !(EPOCH228_CALLED_PROGRAM_DEMOTION && self.is_key_called_as_program(i))
+            // September 29, 2021 Solana backport a005a6b8164b12e335012ba03bbdbd37a04b8a62.
+            && !(EPOCH230_CALLED_PROGRAM_DEMOTION
+                && demote_sysvar_write_locks
+                && self.is_key_called_as_program(i)
+                && !self.account_keys.contains(&bpf_loader_upgradeable::id()))
     }
 
     pub fn is_signer(&self, i: usize) -> bool {
