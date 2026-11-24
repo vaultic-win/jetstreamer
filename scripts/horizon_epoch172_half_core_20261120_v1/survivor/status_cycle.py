@@ -24,8 +24,10 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4)
-                          if CURRENT.parent == ROOT / f'tools-cold168-retry4-failed166-v{version}'), 0)
+ENTRY146_PACKAGE = 'tools-cold168-retry4-failed166-v4-entry146'
+FAILED166_VERSION = 4 if CURRENT.parent == ROOT / ENTRY146_PACKAGE else next(
+    (version for version in (1, 2, 3)
+     if CURRENT.parent == ROOT / f'tools-cold168-retry4-failed166-v{version}'), 0)
 FAILED166 = bool(FAILED166_VERSION)
 HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
 FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
@@ -719,7 +721,7 @@ def entry():
         need(package == 'tools-cold168-retry4-v1', '170 terminal cadence requires the qualified retry4 parent')
         package = 'tools-cold168-retry4-failed170-hourly170-v1' if HOURLY170 else 'tools-cold168-retry4-failed170-v1'
     if FAILED166:
-        package = f'tools-cold168-retry4-failed166-v{FAILED166_VERSION}'
+        package = ENTRY146_PACKAGE if FAILED166_VERSION == 4 else f'tools-cold168-retry4-failed166-v{FAILED166_VERSION}'
     need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
     receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
     seal=checked(receipt)

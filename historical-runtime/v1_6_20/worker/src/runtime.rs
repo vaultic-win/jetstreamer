@@ -235,6 +235,11 @@ impl RuntimeState {
                     &additional_builtins,
                 )?;
                 validate_candidate_snapshot_slot(loaded.bank.slot())?;
+                if cfg!(feature = "epoch230-called-program-demotion")
+                    && !loaded.bank.demote_sysvar_write_locks()
+                {
+                    return Err("epoch 230 snapshot lacks the active write-lock demotion feature".into());
+                }
                 let source = InitializedSource::SnapshotArchive {
                     archive_path: archive_path.clone(),
                     expected_accounts_hash: loaded.expected_accounts_hash.as_ref().to_vec(),
@@ -332,7 +337,8 @@ impl RuntimeState {
 
         if (cfg!(feature = "epoch223-prefix-qualification")
             || cfg!(feature = "epoch227-capped-qualification")
-            || cfg!(feature = "epoch228-capped-qualification"))
+            || cfg!(feature = "epoch228-capped-qualification")
+            || cfg!(feature = "epoch230-called-program-demotion"))
             && self.enforce_candidate_range
         {
             for request in &requests {
@@ -874,6 +880,9 @@ impl RuntimeState {
 }
 
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
+    if cfg!(feature = "epoch230-called-program-demotion") {
+        crate::epoch230_profile::validate_snapshot(slot)?;
+    }
     if cfg!(feature = "epoch228-capped-qualification") {
         crate::epoch228_profile::validate_snapshot(slot)?;
     }
@@ -905,7 +914,9 @@ fn validate_candidate_entry_slot(slot: u64) -> Result<(), String> {
 }
 
 fn effective_max_supported_entry_slot_exclusive() -> u64 {
-    if cfg!(feature = "epoch228-capped-qualification") {
+    if cfg!(feature = "epoch230-called-program-demotion") {
+        crate::epoch230_profile::END_EXCLUSIVE
+    } else if cfg!(feature = "epoch228-capped-qualification") {
         crate::epoch228_profile::END_EXCLUSIVE
     } else if cfg!(feature = "epoch227-capped-warmup-diagnostic") {
         98_063_481
@@ -923,7 +934,9 @@ fn effective_max_supported_entry_slot_exclusive() -> u64 {
 }
 
 fn effective_min_supported_entry_slot() -> u64 {
-    if cfg!(feature = "epoch228-capped-qualification") {
+    if cfg!(feature = "epoch230-called-program-demotion") {
+        crate::epoch230_profile::BOOTSTRAP_SLOT + 1
+    } else if cfg!(feature = "epoch228-capped-qualification") {
         crate::epoch228_profile::FIRST_ENTRY_SLOT
     } else if cfg!(feature = "epoch227-capped-qualification") {
         98_063_465
@@ -1555,7 +1568,10 @@ mod tests {
             .any(|i| i.program_id_index == 6));
         assert!(transaction.message.is_key_passed_to_program(6));
         assert!(transaction.message.is_non_loader_key(&key, 6));
-        let expected = !cfg!(feature = "epoch228-called-program-demotion");
+        let expected = !cfg!(any(
+            feature = "epoch228-called-program-demotion",
+            feature = "epoch230-called-program-demotion",
+        ));
         assert_eq!(transaction.message.is_writable(6, true), expected);
         let attribution = writable_key_attribution(&[transaction], true).unwrap();
         assert_eq!(attribution.contains_key(key.as_ref()), expected);
@@ -1689,7 +1705,11 @@ mod tests {
 
     #[test]
     fn candidate_range_is_closed_at_both_ends() {
-        if cfg!(feature = "epoch228-capped-qualification") {
+        if cfg!(feature = "epoch230-called-program-demotion") {
+            assert!(validate_candidate_snapshot_slot(99_359_376).is_ok());
+            assert!(validate_candidate_snapshot_slot(99_359_375).is_err());
+            assert!(validate_candidate_snapshot_slot(99_359_377).is_err());
+        } else if cfg!(feature = "epoch228-capped-qualification") {
             assert!(validate_candidate_snapshot_slot(98_495_291).is_ok());
             assert!(validate_candidate_snapshot_slot(98_495_290).is_err());
             assert!(validate_candidate_snapshot_slot(98_495_292).is_err());
@@ -1715,7 +1735,9 @@ mod tests {
         assert!(validate_candidate_entry_slot(entry_end).is_err());
         assert_eq!(
             entry_end,
-            if cfg!(feature = "epoch228-capped-qualification") {
+            if cfg!(feature = "epoch230-called-program-demotion") {
+                99_375_856
+            } else if cfg!(feature = "epoch228-capped-qualification") {
                 98_928_279
             } else if cfg!(feature = "epoch227-capped-warmup-diagnostic") {
                 98_063_481
@@ -2983,3 +3005,7 @@ mod tests {
 #[cfg(all(test, feature = "epoch228-called-program-demotion"))]
 #[path = "epoch228_bank.rs"]
 mod epoch228_bank;
+
+#[cfg(test)]
+#[path = "epoch230_bank.rs"]
+mod epoch230_bank;

@@ -193,14 +193,17 @@ def registered_hourly170_writer(s, prior, *, failed166=False):
 
 def registered_failed166_rejoin(s, prior, version=2):
     old_package, old_seal, old_iid, old = prior
-    s.need(version in (2, 3), 'unknown epoch 166 cadence rejoin')
+    s.need(version in (2, 3, 4), 'unknown epoch 166 cadence rejoin')
     name = f'FAILED166_CADENCE_V{version}'
     previous_name = 'FAILED166_CADENCE' if version == 2 else f'FAILED166_CADENCE_V{version - 1}'
     active, _ = s.read(STATUS / f'{name}_ACTIVE.json')
     ready = s.bound(active['ready'], STATUS / f'{name}_READY.json')
     previous = s.bound(ready['old_owner'], STATUS / f'{previous_name}_ACTIVE.json')
     fleet = s.bound(ready['fleet'], Path(ready['fleet']['path']))
-    package = STATUS / f'tools-cold168-retry4-failed166-v{version}'
+    package_name = f'tools-cold168-retry4-failed166-v{version}'
+    if version == 4:
+        package_name += '-entry146'
+    package = STATUS / package_name
     seal = s.bound(ready['package'], package / 'deployment-seal-receipt.json')
     actor = active['new']
     s.need(old_package == STATUS / f'tools-cold168-retry4-failed166-v{version - 1}'

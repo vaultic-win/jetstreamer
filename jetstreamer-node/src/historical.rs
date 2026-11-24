@@ -216,6 +216,10 @@ fn backend_supports_entry_batches(backend_id: &str) -> bool {
     if backend_id == crate::epoch228_demotion::BACKEND {
         return true;
     }
+    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
+    if backend_id == crate::epoch230_demotion::BACKEND {
+        return true;
+    }
 
     matches!(
         backend_id,
@@ -1408,6 +1412,11 @@ impl HistoricalRuntimeClient {
         #[cfg(feature = "epoch228-called-program-demotion-qualification")]
         if profile.backend_id == crate::epoch228_demotion::BACKEND {
             crate::epoch228_demotion::validate_worker_digest(bound_executable.sha256)
+                .map_err(|message| io::Error::new(io::ErrorKind::InvalidInput, message))?;
+        }
+        #[cfg(feature = "epoch230-called-program-demotion-qualification")]
+        if profile.backend_id == crate::epoch230_demotion::BACKEND {
+            crate::epoch230_demotion::validate_worker_digest(bound_executable.sha256)
                 .map_err(|message| io::Error::new(io::ErrorKind::InvalidInput, message))?;
         }
         let (ledger_path, initial_state, expected_source) = match initialization {
