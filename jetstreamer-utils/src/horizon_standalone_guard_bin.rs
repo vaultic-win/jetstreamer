@@ -650,6 +650,11 @@ fn supported_unit(plan: &Plan) -> bool {
             "/var/lib/jetstreamer/horizon229-trace-ram-v325/guard-receipts",
             170_000_000_000,
         )),
+        "horizon-perf-epoch229-bank-delta@v334.service" => Some((
+            "/home/ubuntu/.jetstreamer-private/epoch229-bank-delta-tmpfs-v334",
+            "/var/lib/jetstreamer/horizon229-bank-delta-v334/guard-receipts",
+            170_000_000_000,
+        )),
         "horizon-perf-epoch230-program-demotion@v328.service" => Some((
             "/home/ubuntu/.jetstreamer-private/epoch230-demotion-tmpfs-v328",
             "/var/lib/jetstreamer/horizon230-program-demotion-ram-v328/guard-receipts",
@@ -1745,6 +1750,35 @@ mod tests {
         assert!(validate_plan(&serde_json::from_value(plan.clone()).unwrap()).is_ok());
         for (key, change) in [
             ("unit", json!("horizon-perf-epoch229-slot-hash@other.service")),
+            ("filesystem", json!("/")),
+            ("worker_root", json!("/home/ubuntu/.jetstreamer-private/other")),
+            ("receipt_directory", json!("/var/lib/jetstreamer/other")),
+            ("minimum_free_bytes", json!((2u64 << 30) - 1)),
+            ("maximum_root_physical_bytes", json!(170_000_000_001u64)),
+            ("maximum_worker_vmas", json!(3_500_001)),
+        ] {
+            let mut invalid = plan.clone();
+            invalid[key] = change;
+            assert!(validate_plan(&serde_json::from_value(invalid).unwrap()).is_err(), "{key}");
+        }
+    }
+
+    #[test]
+    fn epoch229_bank_delta_guard_requires_its_enrolled_tmpfs_scope() {
+        let plan = json!({
+            "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit": "horizon-perf-epoch229-bank-delta@v334.service",
+            "invocation_id": "a".repeat(32),
+            "filesystem": "/home/ubuntu/.jetstreamer-private/epoch229-bank-delta-tmpfs-v334",
+            "worker_root": "/home/ubuntu/.jetstreamer-private/epoch229-bank-delta-tmpfs-v334/run",
+            "receipt_directory": "/var/lib/jetstreamer/horizon229-bank-delta-v334/guard-receipts",
+            "minimum_free_bytes": 2u64 << 30,
+            "maximum_root_physical_bytes": 170_000_000_000u64,
+            "maximum_worker_vmas": 3_500_000,
+        });
+        assert!(validate_plan(&serde_json::from_value(plan.clone()).unwrap()).is_ok());
+        for (key, change) in [
+            ("unit", json!("horizon-perf-epoch229-bank-delta@other.service")),
             ("filesystem", json!("/")),
             ("worker_root", json!("/home/ubuntu/.jetstreamer-private/other")),
             ("receipt_directory", json!("/var/lib/jetstreamer/other")),
