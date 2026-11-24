@@ -51,7 +51,7 @@ def cpus(value):
     return result
 
 
-def sandbox(plan):
+def sandbox(plan, public_origin):
     ssh = os.environ["SSH_AUTH_SOCK"]
     subprocess.run(["/usr/bin/ssh-add", "-l"], check=True, stdout=subprocess.DEVNULL, timeout=5)
     writable = [route.STATE / name for name in ("tmp", "playback", "receipts")]
@@ -67,6 +67,7 @@ def sandbox(plan):
         "--property=AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SETUID CAP_SETGID",
         "--setenv=SSH_AUTH_SOCK=" + ssh, "--setenv=GIT_TERMINAL_PROMPT=0",
         "--setenv=TMPDIR=" + str(route.STATE / "tmp"),
+        "--setenv=HORIZON_PUBLIC_BASE_URL=" + public_origin,
     ]
 
 
@@ -142,7 +143,8 @@ def preflight():
         if event["MESSAGE_ID"] == publication_handoff.STARTED
         and event["INVOCATION_ID"] == origin["unit"]["InvocationID"]
     ]
-    return original, original_spec, release, plan_ref, auth, price, peers, available, start, sandbox(plan)
+    options = sandbox(plan, original_spec["public_origin"])
+    return original, original_spec, release, plan_ref, auth, price, peers, available, start, options
 
 
 def launch():
