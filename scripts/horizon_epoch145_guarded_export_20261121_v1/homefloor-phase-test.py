@@ -361,20 +361,34 @@ class EncodedPrefixStop(TestCase):
 
 class GuardTerminalSuccessor(TestCase):
     def test_requires_the_first_native_start_after_the_guard_exit(self):
-        original, successor = "8f2b9c06b62147babe83c9ade7271cd3", "a" * 32
+        self.check_successor(
+            "8f2b9c06b62147babe83c9ade7271cd3", "V5R_GUARD_TERMINAL_095224.json",
+            "horizon-epoch145-retained-guard-terminal-v1", fresh_census=False)
+
+    def test_fresh_census_recovery_binds_its_actual_parent(self):
+        self.check_successor(
+            "370b4b620c7647528380d2c0a9fb7b56", "V5T_FRESH_CENSUS_TERMINAL_105315.json",
+            "horizon-epoch145-fresh-census-terminal-v1", fresh_census=True)
+
+    def check_successor(self, original, name, schema, *, fresh_census):
+        successor = "a" * 32
         boot = "b" * 32
         failed_ref = dict(path="/fixture/failed.json", sha256="1" * 64)
         terminal_ref = dict(path="/fixture/terminal.json", sha256="2" * 64)
         native = dict(_PID="1", UNIT=UNIT, INVOCATION_ID=original, EXIT_STATUS="1",
                       EXIT_CODE="exited", _BOOT_ID=boot, __MONOTONIC_TIMESTAMP="100", __CURSOR="cursor")
-        terminal = dict(schema="horizon-epoch145-retained-guard-terminal-v1", native_terminal=native,
-                        failure=failed_ref, fully_verified=False, resource_credit_bytes=0)
+        terminal = dict(schema=schema, native_terminal=native, failure=failed_ref,
+                        fully_verified=False, resource_credit_bytes=0, archive_publication_authorized=False)
         failed = dict(iid=original, error="stopped worker fresh-census deadline")
 
         class Reader(Status):
             @staticmethod
             def read(path, expected=None):
-                return (failed, failed_ref) if path.name == "failed.json" else (terminal, terminal_ref)
+                if path.name == "failed.json":
+                    return failed, failed_ref
+                if path.name != name:
+                    raise ValueError("different guard terminal pathname")
+                return terminal, terminal_ref
 
         events = [
             dict(native, MESSAGE_ID="d9b373ed55a64feb8242e02dbe79a49c", UNIT_RESULT="exit-code"),
@@ -385,14 +399,16 @@ class GuardTerminalSuccessor(TestCase):
         ]
         validate = runpy.run_path(str(SCRIPT))["guard_terminal_predecessor"]
         build = dict(guard_terminal=terminal_ref)
-        for rows in (events, events[:-1], [events[0], *events], [events[0], events[2], events[1]]):
-            raw = "\n".join(map(json.dumps, rows))
-            with patch("subprocess.check_output", return_value=raw):
-                if rows is events:
-                    self.assertEqual(validate(Reader, build, successor), terminal_ref)
-                else:
-                    with self.assertRaisesRegex(ValueError, "different successor"):
-                        validate(Reader, build, successor)
+        with patch.dict(validate.__globals__, {"FRESH_CENSUS_RECOVERY": fresh_census,
+                                               "GUARD_WALK_RECOVERY": fresh_census}):
+            for rows in (events, events[:-1], [events[0], *events], [events[0], events[2], events[1]]):
+                raw = "\n".join(map(json.dumps, rows))
+                with patch("subprocess.check_output", return_value=raw):
+                    if rows is events:
+                        self.assertEqual(validate(Reader, build, successor), terminal_ref)
+                    else:
+                        with self.assertRaisesRegex(ValueError, "different successor"):
+                            validate(Reader, build, successor)
 
 
 if __name__ == "__main__":

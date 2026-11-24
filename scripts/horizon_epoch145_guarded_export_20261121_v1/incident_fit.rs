@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_v5s_guard_recovery145_only)]
+#[cfg(incident_v5t_guard_recovery145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5t-guard-recovery-v1/post-stop-fit";
+#[cfg(all(incident_v5s_guard_recovery145_only, not(incident_v5t_guard_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5s-guard-recovery-v1/post-stop-fit";
 #[cfg(all(incident_v5r_guard_recovery145_only, not(incident_v5s_guard_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5r-guard-recovery-v1/post-stop-fit";

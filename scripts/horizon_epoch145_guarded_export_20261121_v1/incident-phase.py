@@ -10,7 +10,8 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-GUARD_WALK_RECOVERY = VERSION == "tools-v5t"
+FRESH_CENSUS_RECOVERY = VERSION == "tools-v5u"
+GUARD_WALK_RECOVERY = VERSION == "tools-v5t" or FRESH_CENSUS_RECOVERY
 GUARD_TERMINAL_RECOVERY = VERSION == "tools-v5s" or GUARD_WALK_RECOVERY
 ENCODED_PREFIX_RECOVERY = VERSION == "tools-v5r" or GUARD_TERMINAL_RECOVERY
 AUDIT_TURNOVER_RECOVERY = ENCODED_PREFIX_RECOVERY or VERSION == "tools-v5q"
@@ -31,6 +32,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5r": "tools-homefloor-145-encoded-prefix-rejoin-v1",
                       "tools-v5s": "tools-homefloor-145-v5r-guard-recovery-v1",
                       "tools-v5t": "tools-homefloor-145-v5s-guard-recovery-v1",
+                      "tools-v5u": "tools-homefloor-145-v5t-guard-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -128,7 +130,12 @@ def encoded_prefix_stop(s, build, successor):
 
 
 def guard_terminal_predecessor(s, build, successor):
-    if GUARD_WALK_RECOVERY:
+    if FRESH_CENSUS_RECOVERY:
+        name = "V5T_FRESH_CENSUS_TERMINAL_105315.json"
+        original = "370b4b620c7647528380d2c0a9fb7b56"
+        schema = "horizon-epoch145-fresh-census-terminal-v1"
+        error = "stopped worker fresh-census deadline"
+    elif GUARD_WALK_RECOVERY:
         name = "V5S_GUARD_WALK_TERMINAL_103041.json"
         original = "c31fbc8288104da4bd78e10f8ada7196"
         schema = "horizon-epoch145-guard-walk-terminal-v1"
