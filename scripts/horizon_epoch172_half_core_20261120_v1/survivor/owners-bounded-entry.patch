@@ -1,0 +1,40 @@
+--- a/owners.py
++++ b/owners.py
+@@ -61,7 +61,7 @@
+     assert f["latest_terminal170_observation"]["sha256"]==RETRY7_SHA
+     assert f["latest_terminal_retry8_170"]==pair(EVENT,EVENT_SHA)
+     return {"retry7":closed(old7["lane"]["producer_unit"],old7["lane"]["expected_producer_invocation_id"]),"retry8":closed(UNIT,IID)}
+-def replay_census(rows,focused,full=None,closed168_owner=False,previous_normal=None,restored=None,metered_commit=None):
++def replay_census(rows,focused,full=None,closed168_owner=False,previous_normal=None,restored=None,metered_commit=None,entry_lease=None):
+     import focused169 as active
+     expected={r["unit"]["Id"] for r in rows}
+     if focused: expected.add(active.UNIT)
+@@ -73,16 +73,27 @@
+     if actor: expected.add(cadence168.status168.U)
+     restored = restored or {}
+     expected.update(r["unit"]["Id"] for r in restored.values())
++    qualified = None
+     found={}
+     for entry in Path("/proc").iterdir():
+         if not entry.name.isdecimal(): continue
+         try: exe=(entry/"exe").readlink().name.removesuffix(" (deleted)")
+         except FileNotFoundError: continue
+         if exe!="jetstreamer-node" and exe!="historical-worker" and not exe.startswith("jetstreamer-historical-worker-") and exe not in ("gate168","horizon-168-trace-gate","gate169","horizon-169-focused-gate","horizon-169-focused-node"): continue
+-        name=(entry/"cgroup").read_text().strip().removeprefix("0::/system.slice/")
++        group=(entry/"cgroup").read_text().strip()
++        name=group.removeprefix("0::/system.slice/")
+         if name==private136.UNIT:
+             private136.census_child(int(entry.name))
+             continue
++        if entry_lease is not None and name not in expected:
++            import bounded142
++            pid = int(entry.name)
++            comm = (entry/"comm").read_text().strip()
++            observation = bounded142.observe146(cadence168.status168,pid,comm,ticks(pid),group,entry_lease)
++            if observation is not None:
++                need(qualified is None,"overlapping bounded entry probes")
++                qualified = observation
++                continue
+         assert name in expected,"additional replay owner requires fleet reconciliation"
+         if exe in ("jetstreamer-node","horizon-169-focused-node"):
+             need(name not in found,"duplicate producer in "+name);found[name]=int(entry.name)

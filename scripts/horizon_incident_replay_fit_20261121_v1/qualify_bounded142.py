@@ -4,6 +4,8 @@ from pathlib import Path
 import json
 import runpy
 import sys
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
 def verify(bounded, s):
@@ -41,8 +43,6 @@ def verify(bounded, s):
         s.need(bounded["observe"](s,pid,comm,0,group) is None,"foreign live probe accepted")
     # Replay just the census dispatch against a virtual /proc. Its positive identity was
     # reconstructed above; another parent or historical-worker must still take the denial path.
-    from types import SimpleNamespace
-    from unittest.mock import patch
     provider = runpy.run_path(str(Path(__file__).with_name("post-stop-fit")))
     census = provider["census"]
     class Entry:
@@ -92,6 +92,59 @@ def verify(bounded, s):
                 scope="Offline contract replay from native manager, input route and terminal receipt; no historical /proc image retained.")
 
 
+def verify146(bounded, s):
+    entry, entry_ref = s.read(bounded["ENTRY146"], bounded["ENTRY146_SHA"])
+    unit = bounded["PROBE146"]
+    group = "0::/horizonaudit.slice/" + unit
+    boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip().replace("-", "")
+    pid, ticks = 42, 12345
+    original = dict(schema="horizon-epoch146-bounded-entry-lease-v1", preflight=entry_ref,
+                    boot=boot, unit=unit, pid=pid, start_ticks=ticks,
+                    invocation_id="d1ac6c5e9ae14769801d74c299f5a599")
+    lease = deepcopy(original)
+    lease_ref = dict(path=str(bounded["LEASE146"]), sha256="1"*64)
+    accepted = []
+
+    def bound(ref, path):
+        s.need(ref == lease_ref and path == bounded["LEASE146"], "foreign test lease reference")
+        return lease
+
+    def live(reader, route, expected, start):
+        s.need(route["argv"] == entry["planned_argv"] and start == ticks, "wrong native test route")
+        s.need(expected["snapshot"][2] == 4459684282 and expected["inputs_readonly"]
+               and expected["worker_noexec"] and expected["private_network"]
+               and expected["scratch_bytes"] == 8<<20 and expected["scratch_tmpfs"]
+               and expected["manager"]["MemoryMax"] == str(192<<20)
+               and expected["manager"]["TasksMax"] == "64", "missing bounded entry envelope")
+        accepted.append(expected)
+
+    reader = SimpleNamespace(bound=bound, need=s.need, read=s.read)
+    observe = bounded["observe146"]
+    with patch.dict(observe.__globals__, verify_live=live):
+        claim = observe(reader,pid,"jetstreamer-nod",ticks,group,lease_ref)
+        s.need(claim["registration"] == lease_ref and claim["memory_bytes"] == 192<<20
+               and claim["scratch_bytes"] == 8<<20 and claim["additional_cpu_quota_micros"] == 0,
+               "incorrect bounded epoch 146 accounting")
+        variants = {"boot":"0"*32,"pid":pid+1,"start_ticks":ticks+1,"unit":"wrong.service",
+                    "preflight":dict(entry_ref,sha256="0"*64),"invocation_id":"0"*32}
+        for field,value in variants.items():
+            lease = dict(original, **{field:value})
+            try:
+                observe(reader,pid,"jetstreamer-nod",ticks,group,lease_ref)
+            except ValueError as exc:
+                s.need(str(exc)=="different bounded epoch 146 lease","unrelated epoch 146 fixture failure")
+            else:
+                raise ValueError("accepted changed bounded epoch 146 " + field)
+        s.need(observe(reader,pid,"historical-work",ticks,group,lease_ref) is None
+               and observe(reader,pid,"jetstreamer-nod",ticks,"0::/system.slice/"+unit,lease_ref) is None
+               and len(accepted)==1,"foreign process reached the epoch 146 live reader")
+    return dict(preflight=entry_ref, accepted_fixture=True, rejected_fields=sorted(variants),
+                live_node_executed=False)
+
+
 if __name__ == "__main__":
     module=runpy.run_path(str(Path(__file__).with_name("post-stop-fit")))
-    print(json.dumps(verify(module["bounded142"],module["s"]),sort_keys=True))
+    result=verify(module["bounded142"],module["s"])
+    if sys.argv[1:] == ["--with-146"]:
+        result["bounded146"]=verify146(module["bounded142"],module["s"])
+    print(json.dumps(result,sort_keys=True))

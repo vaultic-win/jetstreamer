@@ -762,7 +762,7 @@ def closed168_tree():
     s.need(first==second and os.path.samestat(m,run.stat()),"retained metered 168 allocation changed during walk")
     return dict(physical_bytes=first,root=str(s.TREE),cap=fit.CAP)
 
-def census(peers,replacements,extra,c136,own,stops,hourly=None):
+def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None):
     expect={v["unit"]:v["processes"] for v in peers.values()}
     expect.update({v["producer_unit"]:v["processes"] for v in replacements.values()})
     if extra and extra["actor"]:
@@ -804,7 +804,10 @@ def census(peers,replacements,extra,c136,own,stops,hourly=None):
             # attested one-process replacement; any other executable is foreign.
             parent,start,group=s.process(int(p.name))
             bounded=bounded142["observe"](s,int(p.name),comm,start,group)
+            if bounded is None and entry_lease is not None:
+                bounded=bounded142["observe146"](s,int(p.name),comm,start,group,entry_lease)
             if bounded is not None:
+                s.need(qualification is None,"overlapping bounded entry probes")
                 qualification=bounded
                 continue
             item=next(((int(k),v) for k,v in replacements.items() if len(v["processes"])==1 and
@@ -1221,7 +1224,8 @@ def capture_once(epoch,ref,prestart136=None):
         books["168"]["stable_root"] = cold168["stable"](s)
         census_stops = {**stopped, "168": interrupted[168]}
     hourly = hourly169["archival_roster"](f)[1] if HOURLY169 else None
-    population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly)
+    entry_lease=f.get("epoch146_bounded_entry_lease")
+    population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease)
     if closed169:books["169"]=focused169_booking(closed169)
     if closed172:books["172"]=full172_booking(closed172)
     raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
@@ -1232,7 +1236,8 @@ def capture_once(epoch,ref,prestart136=None):
     needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
-    s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,census_stops,hourly)==(population,qualification),
+    s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and
+           census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease)==(population,qualification),
            "capacity generation changed during collection")
     if prestart136 is None and not c136["occupied"]:
         s.need(registered136(f,status["registration"])==c136,"136 idle or release generation changed during collection")

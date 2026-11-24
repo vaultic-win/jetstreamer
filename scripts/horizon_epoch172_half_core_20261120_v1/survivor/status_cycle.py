@@ -361,10 +361,13 @@ def make_context(head,fleet,sample_ref,cfg,out):
     need(c.full172['observer']==sample_ref and c.full172['fleet']==head and c.full172['identity']==ident,'foreign guard evidence')
     full172.reconcile_sample(c,cycle.observed_lane)
     cold_workers.reconcile(c,cycle.observed_lane)
+    lease = fleet.get('epoch146_bounded_entry_lease')
+    entry = {'entry_lease': lease} if lease is not None else {}
     if getattr(cold_workers, 'cold168', None):
-        cold_workers.cold168.census(owners, ident, c.recovered_owners)
+        cold_workers.cold168.census(owners, ident, c.recovered_owners, **entry)
     else:
-        owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True,restored=c.recovered_owners)
+        owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True,
+                             restored=c.recovered_owners,**entry)
     return c
 
 def baselines(head,fleet,bridge):

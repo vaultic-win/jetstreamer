@@ -551,10 +551,28 @@ fn reserved_memory(_complete: &Value) -> Result<u64> {
     let qualification_memory = match &_complete["bounded_qualification"] {
         Value::Null => 0,
         q => {
-            ensure!(
+            let valid_owner = if q["unit"]
+                == "horizon-146-full-local-qualification-20261124-v1.service"
+            {
+                q["invocation_id"]
+                    .as_str()
+                    .is_some_and(|id| custody::hex(id, 32) && id.bytes().any(|b| b != b'0'))
+                    && q["pid"]
+                        .as_u64()
+                        .is_some_and(|pid| (2..=i32::MAX as u64).contains(&pid))
+                    && q["start_ticks"].as_u64().is_some_and(|ticks| ticks > 0)
+                    && q["registration"]["path"]
+                        == "/var/lib/jetstreamer/horizon_runtime_data/epoch146-singleton-20261122-v1/BOUNDED_ENTRY_LEASE.json"
+                    && q["registration"]["sha256"]
+                        .as_str()
+                        .is_some_and(|sha| custody::hex(sha, 64))
+            } else {
                 q["unit"] == "horizon-142-full-local-qualification-20261122-v1.service"
                     && q["invocation_id"] == "42466cf599e7429889a778a68376c5ed"
                     && q["pid"] == 227497
+            };
+            ensure!(
+                valid_owner
                     && q["memory_bytes"] == 192u64 << 20
                     && q["scratch_bytes"] == 8u64 << 20
                     && q["additional_cpu_quota_micros"] == 0,
@@ -1478,6 +1496,24 @@ mod tests {
             HOST_MEMORY + (192 << 20)
         );
         observed["bounded_qualification"]["pid"] = 42.into();
+        assert!(reserved_memory(&observed).is_err());
+
+        observed["bounded_qualification"] = json!({
+            "unit": "horizon-146-full-local-qualification-20261124-v1.service",
+            "invocation_id": "d1ac6c5e9ae14769801d74c299f5a599",
+            "pid": 42, "start_ticks": 12345,
+            "memory_bytes": 192u64 << 20, "scratch_bytes": 8u64 << 20,
+            "additional_cpu_quota_micros": 0,
+            "registration": {
+                "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch146-singleton-20261122-v1/BOUNDED_ENTRY_LEASE.json",
+                "sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+            }
+        });
+        assert_eq!(
+            reserved_memory(&observed).unwrap(),
+            HOST_MEMORY + (192 << 20)
+        );
+        observed["bounded_qualification"]["registration"] = Value::Null;
         assert!(reserved_memory(&observed).is_err());
     }
     #[test]

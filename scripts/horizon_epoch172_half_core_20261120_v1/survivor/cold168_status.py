@@ -237,7 +237,7 @@ def projection(row):
          'foreign 168 worker row')
 
 
-def census(owners, full, recovered):
+def census(owners, full, recovered, entry_lease=None):
     # The shared process census counts native nodes. The pre-admission Python
     # gate has its own single-process and executable checks.
     native_owners = recovered
@@ -248,7 +248,9 @@ def census(owners, full, recovered):
         held = (proc/'exe').samefile('/usr/bin/python3')
         if held:
             native_owners = {k:v for k,v in recovered.items() if k != '168'}
-    owners.replay_census([], None, full=full, closed168_owner=True, metered_commit=True, restored=native_owners)
+    entry = {"entry_lease": entry_lease} if entry_lease is not None else {}
+    owners.replay_census([], None, full=full, closed168_owner=True, metered_commit=True,
+                         restored=native_owners, **entry)
     if held:
         from cold167_status import reader
         current = native(reader().ACTOR)
