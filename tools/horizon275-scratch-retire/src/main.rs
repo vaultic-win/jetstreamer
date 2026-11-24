@@ -251,15 +251,127 @@ fn available(path: &Path) -> Result<u64> {
     s.f_bavail.checked_mul(s.f_frsize).context("space overflow")
 }
 
+fn retire_bootstrap(
+    receipts: &Path,
+    scope: &Path,
+    target: &Path,
+    source: &Path,
+    snapshot: &Value,
+    self_sha: &str,
+) -> Result<()> {
+    let previous: Value = read_bound(
+        &receipts.join("completion.json"),
+        "afd0e7d1ab808916f91b1aec31fe71196360207765eaf3dccc1dab2c9f0f922e",
+        JSON_LIMIT,
+    )?;
+    ensure!(
+        previous["empty_root_retained"] == true,
+        "AccountsDb retirement is not closed"
+    );
+    let parent = target
+        .parent()
+        .and_then(Path::parent)
+        .context("missing retired run parent")?
+        .join("bound-bootstrap");
+    let name = source.file_name().context("missing bootstrap name")?;
+    let copy = parent.join(name);
+    ensure!(
+        copy.starts_with(scope) && parent.canonicalize()? == parent && copy != source,
+        "wrong bootstrap copy scope"
+    );
+    let mut retained = open_regular(source)?;
+    let mut candidate = open_regular(&copy)?;
+    let keep = retained.metadata()?;
+    let remove = candidate.metadata()?;
+    let expected = snapshot["sha256"]
+        .as_str()
+        .context("missing bootstrap hash")?;
+    ensure!(
+        identity(&keep) != identity(&remove)
+            && keep.uid() == 0
+            && keep.mode() & 0o222 == 0
+            && remove.uid() == 1000
+            && snapshot["bytes"] == keep.len()
+            && keep.len() == remove.len()
+            && digest(&mut retained)? == expected
+            && digest(&mut candidate)? == expected,
+        "bootstrap copy and sealed input differ"
+    );
+    for unit in [UNIT, GUARD, TIMER] {
+        terminal_unit(unit)?;
+    }
+    assert_no_nested_mount(&copy)?;
+    let schedule = scheduled(scope, &copy)?;
+    let consumers = process_references::scan(Path::new("/proc"), &copy)?;
+    ensure!(
+        consumers.inspected_processes > 0 && consumers.references.is_empty(),
+        "live bootstrap-copy references"
+    );
+    let dir = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(&parent)?;
+    let relative = PathBuf::from(format!("/proc/self/fd/{}", dir.as_raw_fd())).join(name);
+    let stable = |a: &Metadata, opened: &File, pathname: &Path| -> Result<bool> {
+        Ok(identity(a) == identity(&opened.metadata()?)
+            && identity(a) == identity(&pathname.symlink_metadata()?))
+    };
+    ensure!(
+        stable(&remove, &candidate, &relative)? && stable(&keep, &retained, source)?,
+        "bootstrap identity changed"
+    );
+    let removed_bytes = remove
+        .blocks()
+        .checked_mul(512)
+        .context("bootstrap allocation overflow")?;
+    let free_before = available(scope)?;
+    let intent = write_json(
+        &receipts.join("bootstrap-intent.json"),
+        &json!({
+            "copy":copy,"device":remove.dev(),"inode":remove.ino(),"sha256":expected,"retained_snapshot":snapshot,
+            "self_sha256":self_sha,"allocated_bytes":removed_bytes,"free_at_attempt_start_bytes":free_before,
+            "scheduled":schedule,"consumers":consumers,
+        }),
+    )?;
+    ensure!(
+        stable(&remove, &candidate, &relative)? && stable(&keep, &retained, source)?,
+        "bootstrap changed after durable intent"
+    );
+    use std::{ffi::CString, os::unix::ffi::OsStrExt as _};
+    let name = CString::new(name.as_bytes())?;
+    ensure!(
+        unsafe { libc::unlinkat(dir.as_raw_fd(), name.as_ptr(), 0) } == 0,
+        "unlink bootstrap copy: {}",
+        io::Error::last_os_error()
+    );
+    drop(candidate);
+    dir.sync_all()?;
+    ensure!(
+        copy.symlink_metadata()
+            .is_err_and(|e| e.kind() == io::ErrorKind::NotFound)
+            && stable(&keep, &retained, source)?,
+        "bootstrap custody failed after unlink"
+    );
+    let report = write_json(
+        &receipts.join("bootstrap-completion.json"),
+        &json!({
+            "intent":intent,"allocated_bytes_removed":removed_bytes,"free_after_bytes":available(scope)?,
+            "retained_snapshot":snapshot,"r2_mutations":false,
+        }),
+    )?;
+    println!("{}", serde_json::to_string(&report)?);
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     ensure!(
         unsafe { libc::geteuid() } == 0 && args.len() == 3,
-        "usage: horizon275-scratch-retire --check-only|--apply SELF_SHA256"
+        "usage: horizon275-scratch-retire --check-only|--apply|--retire-bootstrap-copy SELF_SHA256"
     );
     let apply = match args[1].as_str() {
         "--check-only" => false,
-        "--apply" => true,
+        "--apply" | "--retire-bootstrap-copy" => true,
         _ => anyhow::bail!("unknown operation"),
     };
     ensure!(
@@ -362,6 +474,16 @@ fn main() -> Result<()> {
             && closed["archive"]["sha256"] == digest(&mut partial)?,
         "retained archive changed"
     );
+    if args[1] == "--retire-bootstrap-copy" {
+        return retire_bootstrap(
+            state,
+            scope,
+            target,
+            snapshot,
+            &profile["snapshot"],
+            &args[2],
+        );
+    }
     let check = state.join("check.json");
     let pending = state.join("intent.json");
     let complete = state.join("completion.json");
