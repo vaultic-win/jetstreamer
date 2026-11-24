@@ -315,6 +315,16 @@ def main():
         _, _, fleet = measure.source.latest()
         if any(row["epoch"] == 230 for row in fleet["active"]):
             measure.source.GUARDS[230] = V / "horizon230-full-guard-receipts-v291"
+        for row in fleet["active"]:
+            if row["epoch"] == 275:
+                import replay275
+
+                registration, _, _, _ = replay275.evidence()
+                owner = row["producer"]
+                assert (owner["Id"], owner["InvocationID"]) == (
+                    registration["producer"], registration["invocation_id"]
+                )
+                measure.source.GUARDS[275] = replay275.GUARD_RECEIPTS
         if args.operation == "prepare":
             prepare(legacy, measure)
         else:
