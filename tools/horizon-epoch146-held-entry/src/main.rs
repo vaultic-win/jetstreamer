@@ -22,6 +22,8 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+mod release;
+
 const UNIT: &str = "horizon-146-full-local-qualification-20261124-v1.service";
 const GROUP: &str =
     "0::/horizonaudit.slice/horizon-146-full-local-qualification-20261124-v1.service";
@@ -58,7 +60,7 @@ struct Lease {
     start_ticks: u64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Permit {
     schema: String,
@@ -102,6 +104,10 @@ fn is_lower_hex(text: &str, length: usize) -> bool {
 }
 
 fn read_sealed(path: &Path) -> Result<Option<Vec<u8>>> {
+    read_root_file(path, MAXIMUM_RECEIPT, 0o222)
+}
+
+fn read_root_file(path: &Path, maximum: u64, forbidden_mode: u32) -> Result<Option<Vec<u8>>> {
     let file = match OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
@@ -115,9 +121,9 @@ fn read_sealed(path: &Path) -> Result<Option<Vec<u8>>> {
     ensure!(
         before.is_file()
             && before.uid() == 0
-            && before.mode() & 0o222 == 0
+            && before.mode() & forbidden_mode == 0
             && before.nlink() == 1
-            && (1..=MAXIMUM_RECEIPT).contains(&before.len()),
+            && (1..=maximum).contains(&before.len()),
         "unsealed receipt {}",
         path.display()
     );
@@ -213,7 +219,11 @@ fn accept_permit(raw: &[u8], own: &Lease) -> Result<Bound> {
     );
     let lease: Lease = serde_json::from_str(&permit.lease_json)?;
     ensure!(&lease == own, "release names a different held invocation");
-    let fleet = &permit.accepted_fleet;
+    check_fleet_binding(&permit.accepted_fleet)?;
+    Ok(permit.accepted_fleet)
+}
+
+fn check_fleet_binding(fleet: &Bound) -> Result<()> {
     let directory = fleet.path.parent().context("no accepted fleet directory")?;
     ensure!(
         directory.parent() == Some(Path::new(FLEET))
@@ -226,7 +236,7 @@ fn accept_permit(raw: &[u8], own: &Lease) -> Result<Bound> {
             && is_lower_hex(&fleet.sha256, 64),
         "release lacks the accepted fleet binding"
     );
-    Ok(permit.accepted_fleet)
+    Ok(())
 }
 
 fn verify_inputs(plan: &Preflight) -> Result<()> {
@@ -318,11 +328,12 @@ fn event(phase: &str, own: &Lease, started: Instant, detail: serde_json::Value) 
 }
 
 fn main() -> Result<()> {
+    let args = env::args_os().skip(1).collect::<Vec<_>>();
+    if args.first().is_some_and(|arg| arg == "--issue-release") {
+        return release::issue(&args[1..]);
+    }
     let started = Instant::now();
-    ensure!(
-        env::args_os().len() == 1,
-        "unexpected bounded entry argument"
-    );
+    ensure!(args.is_empty(), "unexpected bounded entry argument");
     let own = identity()?;
     let raw = read_sealed(Path::new(PREFLIGHT))?.context("missing bounded preflight")?;
     ensure!(digest(&raw) == PREFLIGHT_SHA, "different bounded preflight");
