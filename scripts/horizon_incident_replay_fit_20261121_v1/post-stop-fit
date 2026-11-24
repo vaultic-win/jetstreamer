@@ -55,11 +55,12 @@ GUARDED_HANDOFF_145 = HERE.name in ("tools-homefloor-145-handoff-v5", "tools-hom
 LATE_HANDOFF_145 = GUARDED_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v4"
 MISSED_RUNTIME_145 = GUARD_RUNTIME_145 or HERE == D / "tools-homefloor-145-missed-rejoin-v1"
 LEASE_RUNTIME_145 = MISSED_RUNTIME_145 or HERE == D / "tools-homefloor-145-lease-rejoin-v1"
+STOPPED_V5P = HERE == D / "tools-homefloor-145-v5p-stopped-v1"
 STOPPED_V5O = HERE == D / "tools-homefloor-145-v5o-stopped-v1"
 STOPPED_V5N = HERE == D / "tools-homefloor-145-v5n-stopped-v1"
 STOPPED_V5M = HERE == D / "tools-homefloor-145-v5m-stopped-v1"
 STOPPED_V5K = HERE == D / "tools-homefloor-145-v5k-stopped-v1"
-LEASE_BUILD_145 = STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or STOPPED_V5K or HERE == D / "tools-homefloor-145-lease-build-v1"
+LEASE_BUILD_145 = STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or STOPPED_V5K or HERE == D / "tools-homefloor-145-lease-build-v1"
 RETRY_HANDOFF_145 = LATE_HANDOFF_145 or HERE in (D / "tools-homefloor-145-handoff-v2", D / "tools-homefloor-145-handoff-v3")
 DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
 V5N_136 = HERE == D / "tools-homefloor-145-post-v5n-136-v1"
@@ -538,11 +539,12 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch):
-    for active, name in ((STOPPED_V5O, "v5o_stopped.py"), (STOPPED_V5N, "v5n_stopped.py"), (STOPPED_V5M, "v5m_stopped.py"),
+    for active, name in ((STOPPED_V5P, "v5p_stopped.py"), (STOPPED_V5O, "v5o_stopped.py"),
+                         (STOPPED_V5N, "v5n_stopped.py"), (STOPPED_V5M, "v5m_stopped.py"),
                          (STOPPED_V5K, "v5k_stopped.py")):
         if active:
             s.need(epoch == 145, "stopped 145 provider is a read-only whole-fleet quote")
-            if STOPPED_V5O or STOPPED_V5N:
+            if STOPPED_V5P or STOPPED_V5O or STOPPED_V5N:
                 seal, _ = s.read(HERE / "deployment-seal-receipt.json")
                 member, = [m for m in seal["members"] if m["name"] == name and m["mode"] == "0444"]
                 s.need(seal["destination"] == str(HERE), "unbound stopped 145 adapter")
@@ -1062,8 +1064,12 @@ def capture_once(epoch,ref,prestart136=None):
     extension=extensions["funding"](s,epoch)
     closed=replacement_terminals(f,rows)
     interrupted = recover["settled"](f, bound, loader["load_package"]) if HOMEFLOOR else {}
+    # Some successor packages replace the provider while retaining the donor's
+    # sealed helper. Such packages still require the historical worker roster.
+    fresh_public = post_price and HOMEFLOOR and "validate_public" in recover
+    public_options = {"fresh_workers": True} if fresh_public else {}
     obligations = recover["obligations"](f, ref, bound, loader["load_package"],
-                                         fresh_workers=post_price) if HOMEFLOOR else None
+                                         **public_options) if HOMEFLOOR else None
     s.need(not (closed.keys() & interrupted.keys()), "committed and interrupted producer overlap")
     closed_prepaid={}
     rep={};books={}
@@ -1212,13 +1218,13 @@ def capture_once(epoch,ref,prestart136=None):
                                 remaining_prefix140_bytes=growth, prefix_before=prefix_before, prefix_after=prefix_after)
     recovered_price = {}
     if HOMEFLOOR:
-        after = recover["obligations"](f, ref, bound, loader["load_package"], fresh_workers=post_price)
+        after = recover["obligations"](f, ref, bound, loader["load_package"], **public_options)
         s.need(recover["settled"](f, bound, loader["load_package"]) == interrupted and
                all(after[k] == obligations[k] for k in ("mirror_inputs", "public_owner")) and
                after["prefix"]["registration"] == obligations["prefix"]["registration"] and
                after["prefix"]["child"] == obligations["prefix"]["child"], "recovery owner changed during price")
         if after["public_workers"] != obligations["public_workers"]:
-            if post_price:
+            if fresh_public:
                 raise PublicReaderTurnover("public audit workers changed during capacity capture")
             s.need(False, "public audit workers changed during price")
         prefix_growth = max(after["prefix"]["remaining_DATA_growth_bytes"], obligations["prefix"]["remaining_DATA_growth_bytes"])
@@ -1285,7 +1291,7 @@ def capture_native(epoch,ref,prestart136=None):
     return result
 
 def capture(epoch, ref, prestart136=None):
-    if STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or LATE_HANDOFF_145:
+    if STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or LATE_HANDOFF_145:
         s.need(epoch == 145 and (prestart136 is None or V5N_136), "unexpected missed-census pricing scope")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
         module = HERE / "build_159_price.py"
@@ -1294,7 +1300,7 @@ def capture(epoch, ref, prestart136=None):
         fit.binary(module,member["sha256"])
         donor = runpy.run_path(str(module))
         before = donor["snapshot"]() if prestart136 is None else None
-        guarded = STOPPED_V5O or STOPPED_V5N or GUARD_RUNTIME_145 or V5N_POST or GUARDED_HANDOFF_145
+        guarded = STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or GUARD_RUNTIME_145 or V5N_POST or GUARDED_HANDOFF_145
         if guarded:
             feature = HERE/"v5n_feature_cover.py"
             source, = [m for m in seal["members"] if m["name"] == feature.name and m["mode"] == "0444"]

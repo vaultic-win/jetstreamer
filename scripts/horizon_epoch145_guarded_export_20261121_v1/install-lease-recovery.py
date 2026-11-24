@@ -10,6 +10,7 @@ import sys
 
 FAMILY = Path("scripts/horizon_epoch145_guarded_export_20261121_v1")
 PROVIDER = "scripts/horizon_incident_replay_fit_20261121_v1/post-stop-fit"
+HOMEFLOOR = str(Path(PROVIDER).with_name("homefloor_fit.py"))
 FIT = Path("/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1")
 SEM = FIT.parent / "epoch145-semantic-continuity-20261121-v1"
 DONOR = FIT / "tools-homefloor-145-rejoin-v4"
@@ -67,7 +68,7 @@ def main(commit, iid, flavor="lease-rejoin"):
         historical = dict(historical, original_pid1_exit=historical["terminal"]["native_terminal"],
                           receipts={key: phase[key] for key in ("failure", "recovery", "status_owner_terminal")})
     prior = previous["bound"](historical["predecessor_review"])
-    need(not git("diff","--name-only",commit,"origin/account-updates","--",str(FAMILY),PROVIDER,
+    need(not git("diff","--name-only",commit,"origin/account-updates","--",str(FAMILY),PROVIDER,HOMEFLOOR,
                  "scripts/horizon_epoch145_private_prefix_v8","scripts/horizon_epoch166_delivery_20261121_v1",
                  *([RETRY4_STATUS] if status_owner else [])),
          "superseding build inputs on account-updates")
@@ -187,6 +188,8 @@ def main(commit, iid, flavor="lease-rejoin"):
         need(members[name]["sha256"] == row["sha256"], "changed donor member " + name)
     provider = write(q/"lease-provider",git("show",commit+":"+PROVIDER))
     members["post-stop-fit"] = item("post-stop-fit",provider,0o555)
+    homefloor = write(q/"lease-homefloor.py",git("show",commit+":"+HOMEFLOOR))
+    members["homefloor_fit.py"] = item("homefloor_fit.py",homefloor,0o444)
     profile = dict(build_sha256=ref(worker_dir/"build-proof.json")["sha256"],image_sha256=image,
                    adapter_sha256=ref(worker_dir/"incident-phase.py")["sha256"],seal_sha256=worker["sha256"])
     members["profile145-lease-semantic.json"] = item("profile145-lease-semantic.json",record(q/"lease-runtime-profile.json",profile),0o444)
