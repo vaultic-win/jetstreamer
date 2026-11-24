@@ -98,7 +98,7 @@ def load(original):
     observer = sealed(OBSERVER)
     assert observer["sha256"] == OBSERVER_SHA
     return dict(data, registration=pointer, observer=observer, configuration={
-        "pid": pid, "invocation_id": iid, "claim_sha256": data["claim"]["sha256"], "retry_unit": UNIT,
+        "pid": pid, "invocation_id": iid, "claim_sha256": data["claim"]["sha256"],
     })
 
 
