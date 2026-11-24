@@ -119,6 +119,37 @@ def registered_resume_writer(s, prior):
     return RESUME,package,actor['invocation_id'],actor
 
 
+def registered_failed170_writer(s, prior):
+    """Bind the terminal-aware writer without giving up the old producer booking."""
+    old_package, old_seal, old_iid, old = prior
+    evidence = STATUS / 'failed170-retry13-cadence-20261124-v1'
+    package = STATUS / 'tools-cold168-retry4-failed170-v1'
+    active, _ = s.read(evidence / 'ACTIVE.json')
+    switch = s.bound(active['intent'], evidence / 'SWITCH_INTENT.json')
+    ready = s.bound(active['ready'], STATUS / 'FAILED170_CADENCE_READY.json')
+    drained = s.bound(switch['drained'], evidence / 'DRAINED.json')
+    transition = s.bound(drained['intent'], evidence / 'DRAIN_INTENT.json')
+    seal = s.bound(ready['package'], package / 'deployment-seal-receipt.json')
+    prior_owner = s.bound(ready['old_owner'], STATUS / (PREFIX + 'RESUME_ACTIVE.json'))
+    actor = active['new']
+    s.need(old_package == RESUME and old_seal['path'] == str(RESUME / 'deployment-seal-receipt.json')
+           and prior_owner['new'] == transition['old_actor'] == active['dropped_owner'] == old
+           and old_iid == transition['old_owner']['InvocationID'] == old['invocation_id']
+           and active['ready'] == switch['ready'] and ready['fleet'] == transition['fleet']
+           and ready['old_timer'] == transition['old_timer'] and ready['terminal'] == transition['terminal']
+           and ready['guard_drain'] == transition['guard_drain'] and ready['correction'] == transition['status']
+           and drained['sole_lock_released'] and drained['reservation_ending_bytes'] == 0
+           and seal['destination'] == str(package) and seal['remote_mutations'] is False,
+           'foreign epoch 170 failure or status writer handoff')
+    s.need(active['producer_mutations'] is False and switch['producer_mutations'] is False
+           and actor['program'] == str(package / 'status_cycle.py') and actor['unit'] == old['unit']
+           and s.iid(actor['invocation_id']) and actor['invocation_id'] != old_iid
+           and actor['pid'] > 1 and actor['start_ticks'] > old['start_ticks']
+           and all(actor['lock'][key] == old['lock'][key] for key in ('path', 'inode', 'device')),
+           'different terminal-aware cadence owner or lock')
+    return package, ready['package'], actor['invocation_id'], actor
+
+
 def registered_136_writer(s, prior):
     oldpkg, old_seal, _, old = prior
     s.need(oldpkg in (STATUS / 'tools-cold168-retry4-v1', RESUME) and old is not None,

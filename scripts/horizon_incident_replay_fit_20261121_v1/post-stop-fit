@@ -66,7 +66,8 @@ MISSED_RUNTIME_145 = GUARD_RUNTIME_145 or HERE == D / "tools-homefloor-145-misse
 LEASE_RUNTIME_145 = MISSED_RUNTIME_145 or HERE == D / "tools-homefloor-145-lease-rejoin-v1"
 STOPPED_V5R = HERE == D / "tools-homefloor-145-v5r-stopped-v1"
 STOPPED_V5S = HERE == D / "tools-homefloor-145-v5s-stopped-v1"
-STOPPED_V5T = HERE == D / "tools-homefloor-145-v5t-stopped-v1"
+FAILED170_BUILD_145 = HERE == D / "tools-homefloor-145-v5t-stopped-failed170-v1"
+STOPPED_V5T = FAILED170_BUILD_145 or HERE == D / "tools-homefloor-145-v5t-stopped-v1"
 STOPPED_GUARD_145 = STOPPED_V5R or STOPPED_V5S or STOPPED_V5T
 STOPPED_V5P = HERE == D / "tools-homefloor-145-v5p-stopped-v1"
 STOPPED_V5O = HERE == D / "tools-homefloor-145-v5o-stopped-v1"
@@ -897,6 +898,10 @@ def registered_status():
                                              "a608208cd09681d366f0994dfc43406b4f8430330e13919a88b3af031efaf160")
                            and retry4[2] == "d6d40746a4974ca186acd7f2d5a5cac4",
                            "different cadence predecessor for 145 handoff")
+                if FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 and (
+                    R / "survivor172-cadence-20261122-v1/failed170-retry13-cadence-20261124-v1/ACTIVE.json"
+                ).exists():
+                    return writer168v4["registered_failed170_writer"](scope,retry4)
                 return writer168v4["registered_136_writer"](scope,retry4) if POST_136 else retry4
             if RETRY3_168:
                 return writer168["registered_writer"](scope,retry2,cold168["PREPARED_SHA"],cold168["GUARD_QUAL_SHA"])
