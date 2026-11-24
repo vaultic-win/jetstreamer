@@ -430,7 +430,8 @@ fn observe_root_for_import_prestart(plan: &Plan, unit: &Unit) -> bool {
         "horizon-import-239-current-20261117-v2.service"
             | "horizon-import-239-current-20261117-v3.service"
             | "horizon-import-244-current-20261117-v1.service"
-    ) && unit.active == "activating"
+    )
+        && unit.active == "activating"
         && unit.sub == "start-pre"
         && unit.pid == 0
 }
@@ -1412,10 +1413,7 @@ mod tests {
         prestart.active = "failed".into();
         assert!(!observe_root_for_import_prestart(&plan, &prestart));
         for (pointer, replacement) in [
-            (
-                "/unit",
-                json!("horizon-import-244-current-20261117-v2.service"),
-            ),
+            ("/unit", json!("horizon-import-244-current-20261117-v2.service")),
             ("/filesystem", json!("/other")),
             ("/worker_root", json!("/other")),
             ("/minimum_free_bytes", json!(1_999_999_999_999u64)),
@@ -1746,15 +1744,9 @@ mod tests {
         });
         assert!(validate_plan(&serde_json::from_value(plan.clone()).unwrap()).is_ok());
         for (key, change) in [
-            (
-                "unit",
-                json!("horizon-perf-epoch229-slot-hash@other.service"),
-            ),
+            ("unit", json!("horizon-perf-epoch229-slot-hash@other.service")),
             ("filesystem", json!("/")),
-            (
-                "worker_root",
-                json!("/home/ubuntu/.jetstreamer-private/other"),
-            ),
+            ("worker_root", json!("/home/ubuntu/.jetstreamer-private/other")),
             ("receipt_directory", json!("/var/lib/jetstreamer/other")),
             ("minimum_free_bytes", json!((2u64 << 30) - 1)),
             ("maximum_root_physical_bytes", json!(170_000_000_001u64)),
@@ -1762,10 +1754,7 @@ mod tests {
         ] {
             let mut invalid = plan.clone();
             invalid[key] = change;
-            assert!(
-                validate_plan(&serde_json::from_value(invalid).unwrap()).is_err(),
-                "{key}"
-            );
+            assert!(validate_plan(&serde_json::from_value(invalid).unwrap()).is_err(), "{key}");
         }
     }
 
