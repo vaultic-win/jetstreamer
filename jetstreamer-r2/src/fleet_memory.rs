@@ -13,6 +13,7 @@ const PINNED_247_IMAGE: &str = "/var/lib/jetstreamer/horizon211-staged-recovery-
 const PINNED_247_IMAGE_SHA: &str =
     "7271de0e309c83f8fa2f35cf9091280a8b04f66c51d3175ad1d6ff02faa4c59d";
 const PINNED_247_MEMORY_CAP: u64 = 24 << 30;
+const STAGED_211_RETRY_UNIT: &str = "horizon-upload-211-staged-recovery-v2.service";
 const STAGED_250_UNIT: &str = "horizon-upload-250-staged-public-v257.service";
 const STAGED_250_MEMORY_CAP: u64 = 10 << 30;
 
@@ -121,6 +122,7 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
         .strip_suffix(".service")
         .context("delivery unit name")?;
     let pinned_cap = match (epoch, name) {
+        (211, STAGED_211_RETRY_UNIT) => Some(10 << 30),
         (247, PINNED_247_UNIT) => Some(PINNED_247_MEMORY_CAP),
         (250, STAGED_250_UNIT) => Some(STAGED_250_MEMORY_CAP),
         _ => None,
@@ -321,10 +323,12 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         let name = row["producer_after"]["unit"]
             .as_str()
             .context("observed memory owner")?;
-        if matches!(name, PINNED_247_UNIT | STAGED_250_UNIT)
-            || (owners.contains_key(fourth::V221_UNIT)
-                && name.starts_with("horizon-upload-")
-                && name.contains("-ordinary-"))
+        if matches!(
+            name,
+            PINNED_247_UNIT | STAGED_211_RETRY_UNIT | STAGED_250_UNIT
+        ) || (owners.contains_key(fourth::V221_UNIT)
+            && name.starts_with("horizon-upload-")
+            && name.contains("-ordinary-"))
         {
             ordinary_delivery_join(row, ledger, o, name)?;
         }

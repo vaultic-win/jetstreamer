@@ -346,6 +346,20 @@ fn bound_json(bound: &Bound) -> Result<Value> {
     Ok(serde_json::from_slice(&bound_bytes(bound)?)?)
 }
 
+fn full211_delivery_owner(epoch: u64, binding: &Binding) -> bool {
+    epoch == 211
+        && match binding.unit.as_str() {
+            "horizon-upload-211-ordinary-v221.service" => {
+                binding.invocation_id == "b358151a70854e99918d76c4883e276e"
+            }
+            "horizon-upload-211-staged-recovery-v1.service"
+            | "horizon-upload-211-staged-recovery-v2.service" => {
+                binding.claim_phase == "upload-readback"
+            }
+            _ => false,
+        }
+}
+
 // A legacy controller need not have the newer diagnostic launch schema. Its
 // authenticated replay status receipt and exact historical v2 observer prove
 // the original invocation without inventing a launch event or resetting elapsed
@@ -374,9 +388,7 @@ fn validate_replay_origin(
             && receipt.producer_invocation_id == binding.origin_invocation_id,
         "elapsed-time origin is not the authenticated original replay"
     );
-    if epoch == 211
-        && binding.unit == "horizon-upload-211-ordinary-v221.service"
-        && binding.invocation_id == "b358151a70854e99918d76c4883e276e"
+    if full211_delivery_owner(epoch, binding)
         && let Some((unit, iid)) = fleet::full211_status_inactive_owner(receipt)?
     {
         ensure!(
@@ -440,10 +452,10 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                     && unit != jetstreamer_horizon_observe::full265::UNIT)
                     || (((full211_origin && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
                         || (exact247_uploader
-                        && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"
-                        && s.starts_with(
-                            "Started horizon-upload-247-singleton-20261119-v1.service - ",
-                        ))
+                            && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"
+                            && s.starts_with(
+                                "Started horizon-upload-247-singleton-20261119-v1.service - ",
+                            ))
                         || (unit == jetstreamer_horizon_observe::full265::UNIT
                             && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
                         || (unit == super::cohort_finalization::CONTROLLER

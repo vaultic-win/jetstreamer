@@ -1,5 +1,6 @@
 """Bind the epoch 250 staged publisher to its predecessor and the existing cadence."""
 
+from dataclasses import dataclass
 import re
 from pathlib import Path
 
@@ -26,90 +27,128 @@ OLD_STATUS = {
 }
 
 
-def expected_argv(spec):
+
+@dataclass(frozen=True)
+class Profile:
+    epoch: int
+    unit: str
+    predecessor: str
+    package: Path
+    plan: Path
+    plan_sha: str
+    state: Path
+    image: Path
+    image_sha: str
+    etag: str
+    size: int
+    memory_cap: int
+    old_status: dict[str, str]
+    cpus: str
+
+    @property
+    def root(self):
+        return D / self.unit.removesuffix(".service")
+
+    @property
+    def registration(self):
+        return self.root / "cadence-registration.json"
+
+    @property
+    def key(self):
+        return f"epoch-{self.epoch}.epoch-status.json"
+
+
+PROFILE = Profile(
+    epoch=EPOCH, unit=UNIT, predecessor=PREDECESSOR, package=PACKAGE, plan=PLAN, plan_sha=PLAN_SHA,
+    state=STATE, image=IMAGE, image_sha=IMAGE_SHA, etag=ETAG, size=SIZE, memory_cap=MEMORY_CAP,
+    old_status=OLD_STATUS, cpus="48-55",
+)
+
+
+def expected_argv(spec, profile=PROFILE):
     return [
-        str(IMAGE), "sync", spec["archive_directory"], "--epochs", "250-250",
-        "--receipt-directory", str(STATE / "receipts"), "--current-reader-plan", str(PLAN),
-        "--current-reader-plan-sha256", PLAN_SHA, "--concurrency", "2",
-        "--staged-archive-etag", ETAG, "--staged-archive-bytes", str(SIZE),
+        str(profile.image), "sync", spec["archive_directory"], "--epochs", f"{profile.epoch}-{profile.epoch}",
+        "--receipt-directory", str(profile.state / "receipts"), "--current-reader-plan", str(profile.plan),
+        "--current-reader-plan-sha256", profile.plan_sha, "--concurrency", "2",
+        "--staged-archive-etag", profile.etag, "--staged-archive-bytes", str(profile.size),
     ]
 
 
-def load(original):
-    if not REGISTRATION.exists():
-        assert not REGISTRATION.is_symlink()
+def load(original, profile=PROFILE):
+    if not profile.registration.exists():
+        assert not profile.registration.is_symlink()
         return None
-    pointer = sealed(REGISTRATION)
+    pointer = sealed(profile.registration)
     registration = bound(pointer)
     assert set(registration) == {
         "schema", "epoch", "predecessor", "predecessor_status", "claim", "spec", "initial_status",
     }
-    assert registration["schema"] == "foundation-staged-250-cadence-registration-v1"
-    assert registration["epoch"] == EPOCH and registration["predecessor"] == original["claim"]
-    assert registration["predecessor_status"] == OLD_STATUS
+    assert registration["schema"] == f"foundation-staged-{profile.epoch}-cadence-registration-v1"
+    assert registration["epoch"] == profile.epoch and registration["predecessor"] == original["claim"]
+    assert registration["predecessor_status"] == profile.old_status
     prior = bound(original["claim"])
-    assert prior["unit"] == PREDECESSOR and prior["epoch"] == EPOCH
-    terminal = props(PREDECESSOR, ["InvocationID", "ActiveState", "MainPID", "ControlPID",
+    assert prior["unit"] == profile.predecessor and prior["epoch"] == profile.epoch
+    terminal = props(profile.predecessor, ["InvocationID", "ActiveState", "MainPID", "ControlPID",
                                    "ControlGroup", "Job", "NRestarts"])
     assert terminal["InvocationID"] == prior["invocation_id"] and terminal["ActiveState"] == "failed"
     assert terminal["MainPID"] == terminal["ControlPID"] == terminal["NRestarts"] == "0"
     assert not terminal["ControlGroup"] and not terminal["Job"]
 
-    assert registration["claim"] == sealed(ROOT / "pipeline-claim.json")
-    assert registration["spec"] == sealed(ROOT / "publication-spec.json")
+    assert registration["claim"] == sealed(profile.root / "pipeline-claim.json")
+    assert registration["spec"] == sealed(profile.root / "publication-spec.json")
     claim = bound(registration["claim"])
     iid = claim["invocation_id"]
-    assert claim["epoch"] == EPOCH and claim["unit"] == UNIT and claim["phase"] == "upload-readback"
+    assert claim["epoch"] == profile.epoch and claim["unit"] == profile.unit and claim["phase"] == "upload-readback"
     assert re.fullmatch(r"[0-9a-f]{32}", iid) and iid != prior["invocation_id"]
-    assert claim["evidence"] == [sealed(ROOT / "booking.json"), sealed(ROOT / "launch.json")]
+    assert claim["evidence"] == [sealed(profile.root / "booking.json"), sealed(profile.root / "launch.json")]
     booking, launch = map(bound, claim["evidence"])
     assert booking["handoff"] == original["handoff"] and launch["booking"] == claim["evidence"][0]
 
-    proof = bound(sealed(PACKAGE / "acceptance.json"))
-    assert proof["schema"] == "foundation-staged-250-publisher-release-v1"
-    observer = sealed(PACKAGE / "jetstreamer-horizon-observe")
-    fleet = sealed(PACKAGE / "jetstreamer-r2")
-    plan = sealed(PLAN)
+    proof = bound(sealed(profile.package / "acceptance.json"))
+    assert proof["schema"] == f"foundation-staged-{profile.epoch}-publisher-release-v1"
+    observer = sealed(profile.package / "jetstreamer-horizon-observe")
+    fleet = sealed(profile.package / "jetstreamer-r2")
+    plan = sealed(profile.plan)
     assert proof["observer"] == observer and proof["fleet"] == fleet
-    assert proof["plan"] == plan and plan["sha256"] == PLAN_SHA
-    assert sealed(IMAGE)["sha256"] == IMAGE_SHA
+    assert proof["plan"] == plan and plan["sha256"] == profile.plan_sha
+    assert sealed(profile.image)["sha256"] == profile.image_sha
     previous_spec = bound(original["spec"])
-    args = expected_argv(previous_spec)
-    assert booking["argv"] == args and previous_spec["archive_bytes"] == SIZE
+    args = expected_argv(previous_spec, profile)
+    assert booking["argv"] == args and previous_spec["archive_bytes"] == profile.size
     assert claim["expected_exec_start"].startswith(
         f"{{ path={args[0]} ; argv[]={' '.join(args)} ; ignore_errors=no ; start_time="
     )
     started = launch["unit"]
-    assert started["Id"] == UNIT and started["InvocationID"] == iid
+    assert started["Id"] == profile.unit and started["InvocationID"] == iid
     assert started["ExecStart"] == claim["expected_exec_start"] and started["ActiveState"] == "active"
     pid = int(started["MainPID"])
-    assert pid > 1 and int(started["MemoryMax"]) == MEMORY_CAP
+    assert pid > 1 and int(started["MemoryMax"]) == profile.memory_cap
     assert bound(registration["spec"]) == dict(
-        previous_spec, uploader_pid=pid, reader_plan=plan, receipt_directory=str(STATE / "receipts"),
+        previous_spec, uploader_pid=pid, reader_plan=plan, receipt_directory=str(profile.state / "receipts"),
     )
 
-    assert registration["initial_status"] == sealed(ROOT / "initial-status/completion.json")
+    assert registration["initial_status"] == sealed(profile.root / "initial-status/completion.json")
     initial = bound(registration["initial_status"])
     intent = bound(initial["intent"])
     status = bound(initial["readback"])
-    assert initial["key"] == "epoch-250.epoch-status.json" and initial["authenticated_exact_byte_readback"]
-    assert intent["previous"] == OLD_STATUS and intent["key"] == initial["key"]
+    assert initial["key"] == profile.key and initial["authenticated_exact_byte_readback"]
+    assert intent["previous"] == profile.old_status and intent["key"] == initial["key"]
     assert intent["payload"] == status
-    assert status["epoch"] == EPOCH and status["phase"] == "verification" and status["jet_size_bytes"] == SIZE
+    assert status["epoch"] == profile.epoch and status["phase"] == "verification" and status["jet_size_bytes"] == profile.size
     assert status["estimated_remaining_millis"] > 0
-    assert status["sampled_at_utc"] > bound(bound(OLD_STATUS)["readback"])["sampled_at_utc"]
-    assert intent["owner"] == dict(claim=registration["claim"], unit=UNIT, invocation_id=iid)
+    assert status["sampled_at_utc"] > bound(bound(profile.old_status)["readback"])["sampled_at_utc"]
+    assert intent["owner"] == dict(claim=registration["claim"], unit=profile.unit, invocation_id=iid)
     return dict(registration, registration=pointer, observer=observer, fleet=fleet, configuration={
-        "pid": pid, "invocation_id": iid, "claim_sha256": registration["claim"]["sha256"], "retry_unit": UNIT,
+        "pid": pid, "invocation_id": iid, "claim_sha256": registration["claim"]["sha256"], "retry_unit": profile.unit,
     })
 
 
-def adopt_status(current, successor):
-    if current == OLD_STATUS:
+def adopt_status(current, successor, profile=PROFILE):
+    if current == profile.old_status:
         return successor["initial_status"]
     if current is not None:
         owner = bound(bound(current)["intent"])["owner"]
         assert owner == dict(
-            claim=successor["claim"], unit=UNIT, invocation_id=successor["configuration"]["invocation_id"],
+            claim=successor["claim"], unit=profile.unit, invocation_id=successor["configuration"]["invocation_id"],
         )
     return current
