@@ -2336,7 +2336,7 @@ pub(super) fn census(
             || ((first_epoch..=last_epoch).contains(&212) && name == native212::UNIT)
             || ((first_epoch..=last_epoch).contains(&261) && name == native261::UNIT)
             || ((first_epoch..=last_epoch).contains(&265) && name == native265::UNIT)
-            || ((first_epoch..=last_epoch).contains(&226) && name == extract226::BROKER)
+            || ((first_epoch..=last_epoch).contains(&226) && extract226::broker_unit(name))
         {
             ensure!(
                 names.contains(name),
@@ -3041,7 +3041,7 @@ pub(super) async fn run() -> Result<()> {
         }
         names.insert(claim.unit.clone());
         if extract226::namespace(claim) {
-            names.insert(extract226::BROKER.into());
+            names.insert(extract226::broker_for(claim)?.into());
         }
     }
     let auxiliary_launch = if let Some(claim) = &plan.epoch203_ram_auxiliary {
@@ -3550,7 +3550,7 @@ pub(super) async fn run() -> Result<()> {
         let is_active = (current["ActiveState"] == "active" && current["SubState"] == "running")
             || (retained220::namespace(claim) && retained220::live(current));
         let extraction_resources = if extract226::namespace(claim) {
-            let broker = &before[extract226::BROKER];
+            let broker = &before[extract226::broker_for(claim)?];
             if is_active {
                 let launch = checked_diagnostic_launch(claim)?;
                 Some(extract226::live(claim, &launch, current, broker)?)
