@@ -230,6 +230,15 @@ fn run() -> Result<()> {
         println!("{}", encoded_cutover::inspect(stage_sha, fleet, fleet_sha)?);
         return Ok(());
     }
+    if let [mode, stage_sha, fleet, fleet_sha] = args.as_slice()
+        && mode == "activate-encoded-prefix-cutover"
+    {
+        println!(
+            "{}",
+            encoded_cutover::activate(stage_sha, fleet, fleet_sha)?
+        );
+        return Ok(());
+    }
     if let [mode, iid, after, remainder @ ..] = args.as_slice()
         && mode == "inspect-native-stop"
     {
