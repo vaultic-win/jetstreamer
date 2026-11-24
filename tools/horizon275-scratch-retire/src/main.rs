@@ -1,6 +1,7 @@
-//! Retire only the closed epoch 275 worker's disposable AccountsDb tree.
+//! Retire individually qualified files and AccountsDb trees from stopped workers.
 #[path = "../../../scripts/horizon_standard_backfill_scratch_retirement_20261110_v1/source/process_references.rs"]
 mod process_references;
+mod snapshot288;
 mod stopped_bootstrap;
 #[path = "../../../scripts/horizon_standard_backfill_scratch_retirement_20261110_v1/source/stopped_tree.rs"]
 mod stopped_tree;
@@ -368,17 +369,20 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     ensure!(
         unsafe { libc::geteuid() } == 0 && args.len() == 3,
-        "usage: horizon275-scratch-retire --check-only|--apply|--retire-bootstrap-copy|--check-227|--apply-227 SELF_SHA256"
+        "usage: horizon275-scratch-retire --check-only|--apply|--retire-bootstrap-copy|--check-227|--apply-227|--check-bootstrap-288|--retire-bootstrap-288 SELF_SHA256"
     );
     let apply = match args[1].as_str() {
-        "--check-only" | "--check-227" => false,
-        "--apply" | "--retire-bootstrap-copy" | "--apply-227" => true,
+        "--check-only" | "--check-227" | "--check-bootstrap-288" => false,
+        "--apply" | "--retire-bootstrap-copy" | "--apply-227" | "--retire-bootstrap-288" => true,
         _ => anyhow::bail!("unknown operation"),
     };
     ensure!(
         digest(&mut File::open("/proc/self/exe")?)? == args[2],
         "self digest differs"
     );
+    if matches!(args[1].as_str(), "--check-bootstrap-288" | "--retire-bootstrap-288") {
+        return snapshot288::run(apply, &args[2]);
+    }
     let _cycle = lock(CYCLE_LOCK)?;
     let _mutation = lock(LOCAL_LOCK)?;
     if matches!(args[1].as_str(), "--check-227" | "--apply-227") {
