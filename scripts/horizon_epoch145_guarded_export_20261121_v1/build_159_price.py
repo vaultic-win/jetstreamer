@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import stat
 import subprocess
+import sys
 import time
 
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
@@ -179,8 +180,11 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
     # Keep the complete external allowance and take no scratch-retirement credit on the reference budget.
     required += 32 * MIB + build_bytes
     margin = min(free - required, orig["remaining_home_bytes"] - build_bytes)
-    need(margin >= 0 and native["available_memory_bytes"] >= native["required_available_memory_bytes"] + build_ram,
-         "insufficient HOME or general-slot memory")
+    memory_margin = native["available_memory_bytes"] - native["required_available_memory_bytes"] - build_ram
+    if margin < 0 or memory_margin < 0:
+        print(f"epoch145 donor capacity: home_shortfall_bytes={max(0, -margin)} "
+              f"memory_shortfall_bytes={max(0, -memory_margin)}", file=sys.stderr, flush=True)
+        raise ValueError("insufficient HOME or general-slot memory")
     return dict(schema="horizon-145-drained-159-donor-cover-v1", diagnostic=after, fleet=ref,
                 native_recorded_unix_seconds=native["recorded_unix_seconds"], original_donor_price_sha256=PRICE,
                 build_HOME_bytes=build_bytes, build_RAM_bytes=build_ram, remaining_home_bytes=margin,
@@ -191,7 +195,6 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
 
 
 if __name__ == "__main__":
-    import sys
     action, *args = sys.argv[1:]
     if action == "snapshot" and not args:
         print(json.dumps(snapshot(), sort_keys=True))

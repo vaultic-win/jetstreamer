@@ -529,17 +529,30 @@ pub fn timer_inspection_timeout(stderr: &str, provider: &str) -> bool {
 }
 
 #[cfg(incident_guard_walk145_only)]
-fn retained_donor_pressure(stderr: &str, provider: &str) -> bool {
-    let Some(directory) = Path::new(provider).parent() else {
-        return false;
+fn retained_donor_pressure<'a>(stderr: &'a str, provider: &str) -> Option<&'a str> {
+    let directory = Path::new(provider).parent()?;
+    let (detail, trace) = match stderr.strip_prefix("epoch145 donor capacity: ") {
+        Some(with_detail) => {
+            let (detail, trace) = with_detail.split_once('\n')?;
+            let (home, memory) = detail
+                .strip_prefix("home_shortfall_bytes=")?
+                .split_once(" memory_shortfall_bytes=")?;
+            let home = home.parse::<u64>().ok()?;
+            let memory = memory.parse::<u64>().ok()?;
+            if home == 0 && memory == 0 {
+                return None;
+            }
+            (detail, trace)
+        }
+        None => ("", stderr),
     };
     let frame = format!("  File \"{provider}\", line ");
     let donor_frame = format!(
         "  File \"{}\", line ",
         directory.join("build_159_price.py").display()
     );
-    let mut lines = stderr.trim_end().lines();
-    lines.next() == Some("Traceback (most recent call last):")
+    let mut lines = trace.trim_end().lines();
+    let recognized = lines.next() == Some("Traceback (most recent call last):")
         && lines
             .next()
             .is_some_and(|line| line.starts_with(&frame) && line.ends_with(", in <module>"))
@@ -547,7 +560,8 @@ fn retained_donor_pressure(stderr: &str, provider: &str) -> bool {
         && lines
             .clone()
             .any(|line| line.starts_with(&frame) && line.ends_with(", in capture"))
-        && lines.any(|line| line.starts_with(&donor_frame) && line.ends_with(", in cover"))
+        && lines.any(|line| line.starts_with(&donor_frame) && line.ends_with(", in cover"));
+    recognized.then_some(detail)
 }
 
 fn reserved_memory(_complete: &Value) -> Result<u64> {
@@ -772,12 +786,17 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         #[cfg(incident_guard_walk145_only)]
         if out.status.code() == Some(1)
             && out.stdout.is_empty()
-            && retained_donor_pressure(&err, PROVIDER)
+            && let Some(detail) = retained_donor_pressure(&err, PROVIDER)
         {
             // The original guarded stop window still applies. Only a new
             // complete fit can resume the worker, and no new worker is admitted.
-            return Err(anyhow::Error::new(capacity::GuardInFlight)
-                .context("retained donor HOME or general-slot memory is temporarily insufficient"));
+            let err = anyhow::Error::new(capacity::GuardInFlight)
+                .context("retained donor HOME or general-slot memory is temporarily insufficient");
+            return Err(if detail.is_empty() {
+                err
+            } else {
+                err.context(detail.to_owned())
+            });
         }
         if cfg!(any(incident_rejoin145_only, incident_post145_only))
             && out.status.signal() == Some(libc::SIGALRM)
@@ -1390,19 +1409,44 @@ mod tests {
         let trace = format!(
             "Traceback (most recent call last):\n  File \"{provider}\", line 1320, in <module>\n  File \"{provider}\", line 1260, in capture\n  File \"/sealed/fit/build_159_price.py\", line 150, in cover\nValueError: insufficient HOME or general-slot memory\n"
         );
-        assert!(retained_donor_pressure(&trace, provider));
-        assert!(!retained_donor_pressure(
-            &trace.replace("/sealed/fit/build_159_price.py", "/unsealed/build_159_price.py"),
-            provider
-        ));
-        assert!(!retained_donor_pressure(
-            &trace.replace(", in cover", ", in snapshot"),
-            provider
-        ));
-        assert!(!retained_donor_pressure(
-            &trace.replace("insufficient HOME or general-slot memory", "different donor or producer topology"),
-            provider
-        ));
+        assert_eq!(retained_donor_pressure(&trace, provider), Some(""));
+        let detail = "home_shortfall_bytes=1 memory_shortfall_bytes=0";
+        let with_detail = format!("epoch145 donor capacity: {detail}\n{trace}");
+        assert_eq!(
+            retained_donor_pressure(&with_detail, provider),
+            Some(detail)
+        );
+        assert!(
+            retained_donor_pressure(
+                &with_detail.replace("memory_shortfall_bytes=0", "memory_shortfall_bytes=unknown"),
+                provider
+            )
+            .is_none()
+        );
+        assert!(
+            retained_donor_pressure(
+                &trace.replace(
+                    "/sealed/fit/build_159_price.py",
+                    "/unsealed/build_159_price.py"
+                ),
+                provider
+            )
+            .is_none()
+        );
+        assert!(
+            retained_donor_pressure(&trace.replace(", in cover", ", in snapshot"), provider)
+                .is_none()
+        );
+        assert!(
+            retained_donor_pressure(
+                &trace.replace(
+                    "insufficient HOME or general-slot memory",
+                    "different donor or producer topology"
+                ),
+                provider
+            )
+            .is_none()
+        );
     }
     #[cfg(incident_five_lane145_only)]
     #[test]
