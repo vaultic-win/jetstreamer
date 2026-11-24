@@ -8,7 +8,8 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-DONOR_PRESSURE = VERSION == "tools-v5o"
+STATUS_OWNER_RECOVERY = VERSION == "tools-v5p"
+DONOR_PRESSURE = STATUS_OWNER_RECOVERY or VERSION == "tools-v5o"
 GUARD_WALK = DONOR_PRESSURE or VERSION == "tools-v5n"
 MISSED_CLOCK = GUARD_WALK or VERSION == "tools-v5m"
 LEASE_START = MISSED_CLOCK or VERSION == "tools-v5k"
@@ -19,6 +20,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5j": "tools-homefloor-145-rejoin-v4",
                       "tools-v5m": "tools-homefloor-145-missed-rejoin-v1",
                       "tools-v5n": "tools-homefloor-145-guard-walk-rejoin-v1",
+                      "tools-v5p": "tools-homefloor-145-status-owner-rejoin-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -170,6 +172,21 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and {path.name for path in prior.iterdir()} == {"failed.json", "recovery-started.json"},
                "unqualified retry of the V5n donor pressure failure")
         window.update(donor_pressure_failure=failure, donor_pressure_recovery=recovery)
+    if STATUS_OWNER_RECOVERY:
+        prior = STATE / "f3474dfad55f4a05a64431421881db29"
+        failed_owner, failure = s.read(prior / "failed.json", "8b5c1b7024fec2fadbfedc14b59bd80bad97d3f3e98ee30f405f78d8c1798d27")
+        _, recovery = s.read(prior / "recovery-started.json", "e4b9e72a6481ea4f38b8fe7b49986463e2f93d37bc1dcb7f2156049930fd744b")
+        stop, terminal = s.read(BASE / "epoch145-semantic-continuity-20261121-v1"
+            / "f3474dfa-stopped-status-owner-20261123" / "TERMINAL.json",
+            "95fc24c89db925ca86fa1f918a6f61e665d3c124a7e4687ecf8ee44816b01f6f")
+        s.need(build["status_owner_failure"] == failure and build["status_owner_recovery"] == recovery
+               and build["status_owner_terminal"] == terminal
+               and failed_owner["iid"] == stop["invocation_id"] == prior.name and generation != prior.name
+               and stop["failure"] == failure and stop["startup"] == recovery
+               and failed_owner["error"].rstrip().endswith("ValueError: different status writer invocation")
+               and {path.name for path in prior.iterdir()} == {"failed.json", "recovery-started.json"},
+               "unqualified retry of the V5o status-owner failure")
+        window.update(status_owner_failure=failure, status_owner_recovery=recovery, status_owner_terminal=terminal)
     if observed == (pid,):
         s.need(epoch == 145 and os.getpid() in members, "145 participant has no leased child")
         return {"invocation_id": generation, "stage": "controller", "window": window}
@@ -192,6 +209,11 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and started_fit["phase145"]["window"]["failed_predecessor"] == failed
                and started_fit["provider_seal"]["path"] == str(BASE / "incident-replay-fit-20261121-v1"
                    / HOMEFLOOR_PROVIDER / "deployment-seal-receipt.json"), "foreign 145 pre-worker admission")
+    if STATUS_OWNER_RECOVERY:
+        s.need(started_fit["status_registration"] == build["resumed_status"]
+               and all(started_fit["phase145"]["window"][key] == window[key] for key in
+                       ("status_owner_failure", "status_owner_recovery", "status_owner_terminal")),
+               "foreign status-owner pre-worker admission")
     predecessor = ("failed_manager_query" if TIMEOUT_REJOIN else
                    "failed_fresh_census" if REJOIN else "failed_preincident_verifier")
     if FOCUSED_REJOIN:

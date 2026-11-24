@@ -12,6 +12,8 @@ from unittest.mock import patch
 SCRIPT = Path(__file__).with_name("incident-phase.py")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 GROUP = "0::/system.slice/" + UNIT
+V5O_IID = "f3474dfad55f4a05a64431421881db29"
+V5O_TERMINAL = "epoch145-semantic-continuity-20261121-v1/f3474dfa-stopped-status-owner-20261123/TERMINAL.json"
 
 
 class Status:
@@ -38,6 +40,13 @@ class Status:
     same_file = staticmethod(os.path.samefile)
 
 
+class StatusOwnerFixture(Status):
+    @staticmethod
+    def read(path, expected=None):
+        # The synthetic state directory links to the real read-only stopped record.
+        return Status.read(path.resolve() if path.parent.name == V5O_IID else path, expected)
+
+
 class HomefloorPhase(TestCase):
     version = "tools-v5g"
     def setUp(self):
@@ -48,6 +57,7 @@ class HomefloorPhase(TestCase):
         pkg.mkdir()
         (pkg / SCRIPT.name).write_bytes(SCRIPT.read_bytes())
         self.reader = runpy.run_path(str(pkg / SCRIPT.name))["inspect"]
+        self.status = StatusOwnerFixture if self.version == "tools-v5p" else Status
         g = self.reader.__globals__
         self.assertTrue(g["HOMEFLOOR_REJOIN"])
         self.generation = "1" * 32
@@ -87,6 +97,11 @@ class HomefloorPhase(TestCase):
                         (state / prior).symlink_to(g["STATE"] / prior, target_is_directory=True)
                         meta["donor_pressure_failure"] = Status.read(state / prior / "failed.json")[1]
                         meta["donor_pressure_recovery"] = Status.read(state / prior / "recovery-started.json")[1]
+        if g["STATUS_OWNER_RECOVERY"]:
+            (state / V5O_IID).symlink_to(g["STATE"] / V5O_IID, target_is_directory=True)
+            terminal, meta["status_owner_terminal"] = Status.read(g["BASE"] / V5O_TERMINAL)
+            meta.update(status_owner_failure=terminal["failure"], status_owner_recovery=terminal["startup"],
+                        resumed_status=dict(invocation_id="d6d40746a4974ca186acd7f2d5a5cac4"))
         build = record(pkg / "build-proof.json", meta)
         seal = record(pkg / "deployment-seal-receipt.json",
                       dict(destination=str(pkg), members=[dict(name="export145", sha256=self.sha),
@@ -125,11 +140,15 @@ class HomefloorPhase(TestCase):
                                    window=dict(native_parent=dict(pid=10,start_ticks=110),failed_predecessor=self.old)),
                                 provider_seal=dict(path=str(self.provider.with_name("deployment-seal-receipt.json")))),
                             prior_frozen_recovery=dict(failed_retry1=dict(current_boot_failure=dict(failure=self.old))))
+        if g["STATUS_OWNER_RECOVERY"]:
+            self.started["fresh_fit"]["phase145"]["window"].update(
+                {key:value for key,value in meta.items() if key.startswith("status_owner_")})
+            self.started["fresh_fit"]["status_registration"] = meta["resumed_status"]
         self.write = lambda: record(self.session / "recovery-started.json", self.started)
 
     def inspect(self, members):
         # Only the kernel self-probe is replaced. All phase and original inode checks use production code.
-        return self.reader(Status, lambda pid, obj: {str(k[1]):pid for k in obj}, self.manager,
+        return self.reader(self.status, lambda pid, obj: {str(k[1]):pid for k in obj}, self.manager,
                            members, 145, self.provider, self.profile)
 
     def test_bootstrap_and_leased_worker(self):
@@ -262,6 +281,34 @@ class DonorPressurePhase(HomefloorPhase):
             with self.subTest(field=key), patch.object(Status, "read", side_effect=wrong):
                 with self.assertRaisesRegex(ValueError, "unqualified retry of the V5n donor pressure failure"):
                     self.inspect((10, 20))
+
+
+class StatusOwnerPhase(HomefloorPhase):
+    version = "tools-v5p"
+
+    def test_binds_v5o_stop_and_preworker_admission(self):
+        self.assertEqual(self.provider.parent.name, "tools-homefloor-145-status-owner-rejoin-v1")
+        self.write()
+        window = self.inspect((10,20))["window"]
+        self.assertEqual(window["status_owner_terminal"]["sha256"],
+                         "95fc24c89db925ca86fa1f918a6f61e665d3c124a7e4687ecf8ee44816b01f6f")
+        for key in ("status_owner_failure", "status_owner_recovery", "status_owner_terminal"):
+            original = Status.read
+            def wrong(path, expected=None):
+                data, ref = original(path, expected)
+                if path.name == "build-proof.json":
+                    data[key] = {}
+                return data, ref
+            with self.subTest(key=key), patch.object(Status, "read", side_effect=wrong):
+                with self.assertRaisesRegex(ValueError, "unqualified retry of the V5o status-owner failure"):
+                    self.inspect((10,20))
+
+    def test_rejects_preworker_price_from_the_predecessor_status_writer(self):
+        self.started["fresh_fit"]["status_registration"] = dict(
+            invocation_id="e83c7741fbb843029b110f1369e973a4")
+        self.write()
+        with self.assertRaisesRegex(ValueError, "foreign status-owner pre-worker admission"):
+            self.inspect((10,20))
 
 
 if __name__ == "__main__":

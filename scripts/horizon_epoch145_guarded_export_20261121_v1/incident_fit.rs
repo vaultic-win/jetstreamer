@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_donor_pressure145_only)]
+#[cfg(incident_status_owner145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-status-owner-rejoin-v1/post-stop-fit";
+#[cfg(all(incident_donor_pressure145_only, not(incident_status_owner145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-donor-pressure-rejoin-v1/post-stop-fit";
 #[cfg(all(incident_guard_walk145_only, not(incident_donor_pressure145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-guard-walk-rejoin-v1/post-stop-fit";
@@ -1503,6 +1505,30 @@ mod tests {
                 assert_ne!(
                     started["invocation_id"],
                     intent["original"]["INVOCATION_ID"]
+                );
+            } else if cfg!(incident_status_owner145_only) {
+                let phase = &before["phase145"];
+                assert_eq!(phase["InvocationID"], "f3474dfad55f4a05a64431421881db29");
+                assert_eq!(
+                    phase["failure"]["sha256"],
+                    "8b5c1b7024fec2fadbfedc14b59bd80bad97d3f3e98ee30f405f78d8c1798d27"
+                );
+                assert_eq!(
+                    phase["recovery"]["sha256"],
+                    "e4b9e72a6481ea4f38b8fe7b49986463e2f93d37bc1dcb7f2156049930fd744b"
+                );
+                assert_eq!(
+                    phase["status_owner_terminal"]["sha256"],
+                    "95fc24c89db925ca86fa1f918a6f61e665d3c124a7e4687ecf8ee44816b01f6f"
+                );
+                assert_eq!(phase["candidate"]["inode"], 103237059u64);
+                assert_eq!(phase["candidate"]["bytes"], 105_610_995_833u64);
+                assert_eq!(phase["source_checkpoint_exists"], false);
+                assert!(phase["retry_worker"].is_null());
+                assert_eq!(before["status_registration"]["invocation_id"], "d6d40746a4974ca186acd7f2d5a5cac4");
+                assert_eq!(
+                    before["status_registration"]["consumer_seal"]["sha256"],
+                    "a608208cd09681d366f0994dfc43406b4f8430330e13919a88b3af031efaf160"
                 );
             } else if cfg!(incident_donor_pressure145_only) {
                 let phase = &before["phase145"];

@@ -13,15 +13,20 @@ PROVIDER = "scripts/horizon_incident_replay_fit_20261121_v1/post-stop-fit"
 FIT = Path("/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1")
 SEM = FIT.parent / "epoch145-semantic-continuity-20261121-v1"
 DONOR = FIT / "tools-homefloor-145-rejoin-v4"
+RETRY4_STATUS = str(Path(PROVIDER).with_name("retry4_status.py"))
+RESUMED_IID = "d6d40746a4974ca186acd7f2d5a5cac4"
+RESUMED_PACKAGE = FIT.parent / "survivor172-cadence-20261122-v1/tools-cold168-retry4-resume-v1"
+RESUMED_SEAL_SHA = "a608208cd09681d366f0994dfc43406b4f8430330e13919a88b3af031efaf160"
 
 
 def main(commit, iid, flavor="lease-rejoin"):
     if not (os.geteuid() == 0 and sys.flags.isolated and __debug__ and re.fullmatch("[0-9a-f]{40}", commit)
             and re.fullmatch("[0-9a-f]{32}", iid)):
         raise ValueError("expected exact merged COMMIT and successful BUILD_IID")
-    if flavor not in ("lease-rejoin", "missed-rejoin", "guard-walk-rejoin", "donor-pressure-rejoin"):
+    if flavor not in ("lease-rejoin", "missed-rejoin", "guard-walk-rejoin", "donor-pressure-rejoin", "status-owner-rejoin"):
         raise ValueError("unknown recovery build")
-    donor_pressure = flavor == "donor-pressure-rejoin"
+    status_owner = flavor == "status-owner-rejoin"
+    donor_pressure = status_owner or flavor == "donor-pressure-rejoin"
     guard_walk = donor_pressure or flavor == "guard-walk-rejoin"
     missed = guard_walk or flavor == "missed-rejoin"
     census = FIT / ("tools-homefloor-145-guard-walk-rejoin-v1" if guard_walk else "tools-homefloor-145-missed-rejoin-v1" if missed else "tools-homefloor-145-lease-rejoin-v1")
@@ -39,6 +44,13 @@ def main(commit, iid, flavor="lease-rejoin"):
         build_price = FIT / "tools-homefloor-145-v5n-stopped-v1"
         price_sha = "a43da5f9618b8a5af9750e4201c67447a2fe50aa830d1445e6a896ad37e88dbf"
         history_name = "v5n_stopped.py"
+    if status_owner:
+        census = FIT / "tools-homefloor-145-status-owner-rejoin-v1"
+        dispatch_dir = FIT / "tools-homefloor-145-handoff-v7"
+        worker_dir = SEM / "tools-v5p"
+        build_price = FIT / "tools-homefloor-145-v5o-stopped-v1"
+        price_sha = "48e7fbef4140b01a9ea80d2710b21f488f0ed1e8b0ab4f428a9c47a65581ed34"
+        history_name = "v5o_stopped.py"
     local = Path(__file__).resolve().parent
     def git(*args):
         return subprocess.check_output(["runuser","-u","sol","--","git","-C","/home/sol/workspace/jetstreamer",*args])
@@ -50,9 +62,14 @@ def main(commit, iid, flavor="lease-rejoin"):
     fail = runpy.run_path(str(local/history_name))
     need, ref, item, install, write, record = (util[k] for k in ("require","ref","item","install","write","record"))
     previous, historical = fail["historical"]()
+    if status_owner:
+        phase = historical["failed_phase"]
+        historical = dict(historical, original_pid1_exit=historical["terminal"]["native_terminal"],
+                          receipts={key: phase[key] for key in ("failure", "recovery", "status_owner_terminal")})
     prior = previous["bound"](historical["predecessor_review"])
     need(not git("diff","--name-only",commit,"origin/account-updates","--",str(FAMILY),PROVIDER,
-                 "scripts/horizon_epoch145_private_prefix_v8","scripts/horizon_epoch166_delivery_20261121_v1"),
+                 "scripts/horizon_epoch145_private_prefix_v8","scripts/horizon_epoch166_delivery_20261121_v1",
+                 *([RETRY4_STATUS] if status_owner else [])),
          "superseding build inputs on account-updates")
     q = SEM / ("incident-build-" + iid)
     need(q.resolve(strict=True) == q and q.lstat().st_uid == 0 and q.lstat().st_mode & 0o077 == 0, "untrusted build directory")
@@ -82,6 +99,15 @@ def main(commit, iid, flavor="lease-rejoin"):
     need(ref(build_price/"deployment-seal-receipt.json")["sha256"] == price_sha
          and ref(DONOR/"deployment-seal-receipt.json")["sha256"] == util["DONOR_SHA"]
          and ref(util["SEALER"])["sha256"] == util["SEAL_SHA"], "different donor or capacity provider")
+    if status_owner:
+        resumed = price["status_registration"]
+        need(resumed["invocation_id"] == RESUMED_IID and
+             resumed["consumer_seal"] == ref(RESUMED_PACKAGE/"deployment-seal-receipt.json") ==
+             dict(path=str(RESUMED_PACKAGE/"deployment-seal-receipt.json"), sha256=RESUMED_SEAL_SHA) and
+             util["digest"](git("show",commit+":"+RETRY4_STATUS)) ==
+             ref(build_price/"retry4_status.py")["sha256"] and
+             ref(build_price/history_name)["sha256"] == ref(local/history_name)["sha256"],
+             "different recovered status writer, registry or stopped proof source")
     prior_seal = previous["bound"](prior["seal"])
     original_build_sha, = [r["sha256"] for r in prior_seal["members"] if r["name"] == "build-proof.json"]
     original_build = previous["bound"]({"path": str(Path(prior["reader"]["path"]).with_name("build-proof.json")),
@@ -90,7 +116,7 @@ def main(commit, iid, flavor="lease-rejoin"):
     existing = original_build["native_fixture_names"]
     readiness = [line.split(" ... ")[0].removeprefix("test ") for line in tests.splitlines()
                  if "lease_startup::tests::" in line and line.endswith(" ... ok")]
-    phase_count = 20 if guard_walk else 17 if missed else 14
+    phase_count = 27 if status_owner else 20 if guard_walk else 17 if missed else 14
     phase_tests = any(int(n) >= phase_count for n in re.findall(r"^Ran (\d+) tests in ", tests, re.M))
     need(len(set(readiness)) >= 2 and "test result: FAILED" not in tests and phase_tests and
          all(name+" ... ok" in tests for name in existing), "missing original or lease-readiness build tests")
@@ -115,7 +141,7 @@ def main(commit, iid, flavor="lease-rejoin"):
                      startup_failure=original_build["startup_failure"],
                      missed_clock_failure=original_build["missed_clock_failure"] if donor_pressure else historical["receipts"]["failure"],
                      missed_clock_rejection=original_build["missed_clock_rejection"] if donor_pressure else historical["receipts"]["cadence"],
-                     leased_sample=historical["receipts"]["worker_sample"])
+                     leased_sample=original_build["leased_sample"] if status_owner else historical["receipts"]["worker_sample"])
     if guard_walk:
         need(str(FAMILY/"guard_walk.rs") in sources and "guard_walk::tests::" in tests, "missing registered-hold tests")
         proof.update(schema="horizon-epoch145-registered-guard-walk-build-v1",
@@ -131,20 +157,33 @@ def main(commit, iid, flavor="lease-rejoin"):
              "missing V5n failure or pressure fixtures")
         proof.update(schema="horizon-epoch145-donor-pressure-recovery-build-v1",
                      previous_recovery=original_build["previous_recovery"],
-                     donor_pressure_failure=historical["receipts"]["failure"],
-                     donor_pressure_recovery=historical["receipts"]["recovery"])
+                     donor_pressure_failure=original_build["donor_pressure_failure"] if status_owner else historical["receipts"]["failure"],
+                     donor_pressure_recovery=original_build["donor_pressure_recovery"] if status_owner else historical["receipts"]["recovery"])
+    if status_owner:
+        need(all(str(FAMILY / name) in sources for name in ("v5o_stopped.py", "test_v5o_stopped.py"))
+             and all(any(line.startswith(name + " (") and line.endswith(" ... ok")
+                         for line in tests.splitlines()) for name in (
+                 "test_original_inode_and_failure", "test_binds_v5o_stop_and_preworker_admission",
+                 "test_rejects_preworker_price_from_the_predecessor_status_writer")),
+             "missing V5o stop or pre-worker tests")
+        proof.update(schema="horizon-epoch145-status-owner-recovery-build-v1",
+                     status_owner_failure=historical["receipts"]["failure"],
+                     status_owner_recovery=historical["receipts"]["recovery"],
+                     status_owner_terminal=historical["receipts"]["status_owner_terminal"],
+                     resumed_status=resumed)
     need(proof["memory_peak"] <= 805306368 and proof["physical_scratch"] <= 73400320, "build exceeded its envelope")
     script = (source/"run-incident.sh").read_bytes()
     need(script.count(b"PINNED_INCIDENT_SHA") == 1, "unbound launcher")
     launcher = write(q/"lease-ready-launcher",script.replace(b"PINNED_INCIDENT_SHA",image.encode()))
     worker = install(worker_dir, [item("export145",tool,0o555),item("incident-phase.py",source/"incident-phase.py",0o444),
         item("run-recovery",launcher,0o555),item("build-proof.json",record(q/"lease-build-proof.json",proof),0o444)], q/"lease-semantic-plan.json")
-    donor = json.loads((DONOR/"deployment-seal-receipt.json").read_bytes())
+    donor_root = build_price if status_owner else DONOR
+    donor = json.loads((donor_root/"deployment-seal-receipt.json").read_bytes())
     members = {}
     for row in donor["members"]:
         name = row["name"]
         need(name == Path(name).name and name not in members, "duplicate or indirect donor")
-        members[name] = item(name,DONOR/name,int(row["mode"],8))
+        members[name] = item(name,donor_root/name,int(row["mode"],8))
         need(members[name]["sha256"] == row["sha256"], "changed donor member " + name)
     provider = write(q/"lease-provider",git("show",commit+":"+PROVIDER))
     members["post-stop-fit"] = item("post-stop-fit",provider,0o555)
@@ -168,10 +207,12 @@ def main(commit, iid, flavor="lease-rejoin"):
                   original_pid1_exit=historical["original_pid1_exit"],original_fragment=historical["original_fragment"],
                   failed_phase=historical["failed_phase"],predecessor_receipts=historical["receipts"],original_review=historical["predecessor_review"],
                   reader=ref(worker_dir/"export145"),stock_launcher=ref(worker_dir/"run-recovery"),seal=worker,provider=runtime,sealed_service_argv=cmd)
+    if status_owner:
+        review["resumed_status"] = resumed
     staged = record(q/"lease-dispatch-review.json",review)
     digest = ref(staged)["sha256"]
     dispatcher = git("show",commit+":"+str(FAMILY/"recovery_dispatch.py"))
-    prefix = b"DONOR_PRESSURE_" if donor_pressure else b"GUARD_WALK_" if guard_walk else b"MISSED_CLOCK_" if missed else b"LEASE_START_"
+    prefix = b"STATUS_OWNER_" if status_owner else b"DONOR_PRESSURE_" if donor_pressure else b"GUARD_WALK_" if guard_walk else b"MISSED_CLOCK_" if missed else b"LEASE_START_"
     for needle,replacement in [(prefix+b"IMAGE_SHA",image),(prefix+b"REVIEW_SHA",digest)]:
         need(dispatcher.count(needle) == 1, "different dispatcher template")
         dispatcher = dispatcher.replace(needle,replacement.encode())
@@ -183,11 +224,11 @@ def main(commit, iid, flavor="lease-rejoin"):
     dispatch = install(dispatch_dir,list(members.values()),q/"lease-dispatch-plan.json")
     new = runpy.run_path(str(dispatch_dir/"run-recovery"))
     need(new["PACKAGE"] == dispatch_dir and new["LEASE_RETRY"] and new["MISSED_RETRY"] == missed and new["GUARD_RETRY"] == guard_walk and new["READER"] == worker_dir/"export145"
-         and new["REVIEW_SHA"] == digest and new["IMAGE_SHA"] == image and new["OLD"] == fail["IID"]
+         and new["STATUS_OWNER_RETRY"] == status_owner and new["REVIEW_SHA"] == digest and new["IMAGE_SHA"] == image and new["OLD"] == fail["IID"]
          and new["original_command"](review,price["fleet"])[-5:] == [str(worker_dir/"export145"),"recover-full-output",
                   price["fleet"]["path"],price["fleet"]["sha256"],image], "different deployed repair")
     if guard_walk:
-        generation = "v5o" if donor_pressure else "v5n"
+        generation = "v5p" if status_owner else "v5o" if donor_pressure else "v5n"
         record(SEM/f"{generation.upper()}_RUNTIME_BINDINGS.json",dict(schema=f"horizon-145-qualified-{generation}-runtime-v1", source_commit=commit,
                 build=ref(worker_dir/"build-proof.json"), build_iid=iid, prior_dispatch=historical["predecessor_dispatch"],
                 prior_stopped=ref(build_price/"deployment-seal-receipt.json"), worker=worker, reader=review["reader"],

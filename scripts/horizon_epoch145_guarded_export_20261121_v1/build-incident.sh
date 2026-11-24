@@ -15,6 +15,11 @@ fi
 registered=false
 fixture_recovery=false
 fixture_post=false
+status_owner=false
+if [[ $flavor == status-owner-rejoin ]]; then
+  status_owner=true
+  flavor=donor-pressure-rejoin
+fi
 donor_pressure=false
 if [[ $flavor == donor-pressure-rejoin ]]; then
   donor_pressure=true
@@ -169,6 +174,10 @@ if $donor_pressure; then
   extra+=(--cfg incident_donor_pressure145_only)
   sources+=(v5n_stopped.py test_v5n_stopped.py)
 fi
+if $status_owner; then
+  extra+=(--cfg incident_status_owner145_only)
+  sources+=(v5o_stopped.py test_v5o_stopped.py)
+fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $v5j_post; then extra+=(--cfg incident_v5j_post145_only); sources+=(post_inputs.py test_post_inputs.py); fi
 if $v5k_post; then extra+=(--cfg incident_v5k_post145_only); fi
@@ -255,6 +264,11 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     signature=${3:?expected qualified terminal price digest}
     seal_digest=${4:?expected qualified terminal deployment digest}
     [[ $signature =~ ^[a-f0-9]{64}$ && $seal_digest =~ ^[a-f0-9]{64}$ ]]
+    if $status_owner; then
+      [[ $native_package == tools-homefloor-145-v5o-stopped-v1 &&
+         $signature == 8c80997fccb17c1b10481c6a60f902078a5c9ae179d39dcfb03217f5c09dac27 &&
+         $seal_digest == 48e7fbef4140b01a9ea80d2710b21f488f0ed1e8b0ab4f428a9c47a65581ed34 ]]
+    fi
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == "$seal_digest" ]]
     jq -e --arg hash "$signature" --arg dir "${provider%/*}" '
       .destination == $dir and .remote_mutations == false
@@ -360,6 +374,7 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
     if $v5m_post; then build_unit=horizon-145-v5m-post-build-v1.service; fi
     if $guard_walk; then build_unit=horizon-145-guard-walk-rejoin-build-v1.service; fi
     if $donor_pressure; then build_unit=horizon-145-donor-pressure-rejoin-build-v1.service; fi
+    if $status_owner; then build_unit=horizon-145-status-owner-rejoin-build-v1.service; fi
     if $v5n_post; then build_unit=horizon-145-v5n-post-build-v1.service; fi
     if $v5n_136_post; then build_unit=horizon-145-v5n-136-post-build-v1.service; fi
     [[ $cg == "$slice/$build_unit" ]]
@@ -375,7 +390,17 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
       cmp "$q/feature159-before.json" "$q/feature159-after.json"
       /usr/bin/python3 -IB "$donor" build "$q/donor-before.json" "$q/before.json" > "$q/donor-combined-price.json"
     fi
-    if $donor_pressure; then
+    if $status_owner; then
+      jq -e '.phase145.InvocationID == "f3474dfad55f4a05a64431421881db29"
+             and .phase145.failure.sha256 == "8b5c1b7024fec2fadbfedc14b59bd80bad97d3f3e98ee30f405f78d8c1798d27"
+             and .phase145.recovery.sha256 == "e4b9e72a6481ea4f38b8fe7b49986463e2f93d37bc1dcb7f2156049930fd744b"
+             and .phase145.status_owner_terminal.sha256 == "95fc24c89db925ca86fa1f918a6f61e665d3c124a7e4687ecf8ee44816b01f6f"
+             and .phase145.candidate.inode == 103237059 and .phase145.candidate.bytes == 105610995833
+             and .phase145.retry_worker == null and .phase145.source_checkpoint_exists == false
+             and .status_registration.invocation_id == "d6d40746a4974ca186acd7f2d5a5cac4"
+             and .status_registration.consumer_seal.sha256 == "a608208cd09681d366f0994dfc43406b4f8430330e13919a88b3af031efaf160"
+             and .epoch159_donor_cover.credited_retirement_bytes == 0' "$q/before.json" >/dev/null
+    elif $donor_pressure; then
       [[ $native_package == tools-homefloor-145-v5n-stopped-v1 && $seal_digest == a43da5f9618b8a5af9750e4201c67447a2fe50aa830d1445e6a896ad37e88dbf ]]
       jq -e '.phase145.InvocationID == "f86e7e61f4b34dc7aedc4e08a128e713"
              and .phase145.failure.sha256 == "553c2d9be55bf4688dd1c8b42bc497ba2f6ea985305e42b7fb7db951f400bd36"
@@ -491,7 +516,12 @@ if $missed_rejoin; then /usr/bin/python3 -IB "$s/test_missed_clock.py"; fi
 if $guard_walk; then /usr/bin/python3 -IB "$s/test_v5n_feature_cover.py"; fi
 if $donor_pressure; then /usr/bin/python3 -IB "$s/test_v5n_stopped.py"; fi
 if $homefloor_rejoin; then
-  /usr/bin/python3 -IB "$s/homefloor-phase-test.py"
+  if $status_owner; then
+    /usr/bin/python3 -IB "$s/test_v5o_stopped.py" -v
+    /usr/bin/python3 -IB "$s/homefloor-phase-test.py" -v
+  else
+    /usr/bin/python3 -IB "$s/homefloor-phase-test.py"
+  fi
   # Both the real source inode and its read-only test mounts are inside this build's own image.
   projection="$out/tmp/paid-projection"
   mkdir -m0700 "$projection" "$projection/view"
