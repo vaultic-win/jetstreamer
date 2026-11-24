@@ -25,14 +25,14 @@ horizon-retire-completed PLAN PLAN_SHA256 SELF_SHA256
 Both invocations acquire the existing local mutation lock, inspect consumers,
 and obtain fresh authenticated inventory. Execution repeats identity and consumer
 checks and fsyncs intent/completion records around each unlink. It refuses
-symlinks, multiply linked files, small metadata and files outside the private
-root, except the exact obsolete epoch 246 bootstrap snapshot selected by the
-`external_bootstrap_review` route. That route permits one hard-coded path and
-epoch, requires an immutable Main review binding its exact identity, original
-copy completion, staged-consumer evidence and all four original consumer units,
-and hashes the file against its original accepted SHA-256. It retains all normal
-R2 readiness, no-consumer, mutation-lock and identity checks. It does not allow
-retiring the deployment directory, sibling metadata, or any other external file.
+symlinks, multiply linked files and small metadata. Outside the private root,
+`external_bootstrap_review` supports only the exact sealed obsolete bootstrap
+file registered for each of epochs 246, 249 and 251. The immutable review binds
+the file identity, original copy evidence and every registered consumer unit.
+Epochs 249 and 251 also require authenticated metadata for their exact GCS
+snapshot generation. The tool hashes the local bootstrap and checks the
+canonical R2 archive and sidecar, the consumer state and the shared mutation
+lock before removing the selected snapshot.
 The audit is created without overwriting any existing evidence. If a run
 is interrupted, retain its audit and prepare a new exact plan and audit filename
 for only the remaining files; never reuse an old identity or claim a planned

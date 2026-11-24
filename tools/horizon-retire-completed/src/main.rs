@@ -37,16 +37,52 @@ const LIMIT: u64 = 16 << 20;
 const EPOCH246_BOOTSTRAP: &str = "/var/lib/jetstreamer/horizon246-bootstrap-copy1636-work-v2/projection/bootstrap/snapshot-106271618-6LSJUywaryX8vRn53cbWqLJiTwBCCb3wnNTPevWfqtQD.tar.zst";
 const EPOCH246_BOOTSTRAP_SHA: &str =
     "c5abfce5d852b78860d22d71f1ce57f6752f45bb428257a73e037895ec6a03e7";
-const EPOCH249_BOOTSTRAP: &str = "/var/lib/jetstreamer/horizon-contiguous-249-251-current-46b4b4a-v1/snapshot-107567592-DBPics19TxLy8wawfQYvS65d72vKvFGLCW9HZv5q6GeH.tar.zst";
-const EPOCH249_BOOTSTRAP_SHA: &str =
-    "f9e582d104477e52b6327e26fe011dcfdde437254b953f1a13b78ad43fdef64a";
-const EPOCH249_BOOTSTRAP_BYTES: u64 = 13_571_383_805;
-const EPOCH249_BOOTSTRAP_KEY: &str =
-    "107567592/snapshot-107567592-DBPics19TxLy8wawfQYvS65d72vKvFGLCW9HZv5q6GeH.tar.zst";
-const EPOCH249_BOOTSTRAP_UNITS: [&str; 2] = [
-    "horizon-249-cached-fingerprint-capability2418-v1.service",
-    "horizon-qualify-249-reboot-20261117-v1.service",
-];
+struct CloudBootstrap {
+    review_schema: &'static str,
+    path: &'static str,
+    sha256: &'static str,
+    bytes: u64,
+    key: &'static str,
+    generation: &'static str,
+    md5: &'static str,
+    crc32c: &'static str,
+    inactive_units: &'static [&'static str],
+}
+
+const EPOCH249_BOOTSTRAP: CloudBootstrap = CloudBootstrap {
+    review_schema: "horizon249-obsolete-bootstrap-main-review-v1",
+    path: "/var/lib/jetstreamer/horizon-contiguous-249-251-current-46b4b4a-v1/snapshot-107567592-DBPics19TxLy8wawfQYvS65d72vKvFGLCW9HZv5q6GeH.tar.zst",
+    sha256: "f9e582d104477e52b6327e26fe011dcfdde437254b953f1a13b78ad43fdef64a",
+    bytes: 13_571_383_805,
+    key: "107567592/snapshot-107567592-DBPics19TxLy8wawfQYvS65d72vKvFGLCW9HZv5q6GeH.tar.zst",
+    generation: "1637611511896161",
+    md5: "5T7R2/oARnVkrPc85kobgA==",
+    crc32c: "wUO8lg==",
+    inactive_units: &[
+        "horizon-249-cached-fingerprint-capability2418-v1.service",
+        "horizon-qualify-249-reboot-20261117-v1.service",
+    ],
+};
+
+const EPOCH251_BOOTSTRAP: CloudBootstrap = CloudBootstrap {
+    review_schema: "horizon251-obsolete-bootstrap-main-review-v1",
+    path: "/var/lib/jetstreamer/horizon251-native-input-20261118-v1/snapshot-108431365-C5eqGwzDFEDfeBovidro6WnY3Drw7caJ2p2mjnJbGJVE.tar.zst",
+    sha256: "b7af2058dd498bdf8c0f7e2a717a0d7c8153c20027eca2c3c2de15351b87b311",
+    bytes: 13_928_359_507,
+    key: "108431365/snapshot-108431365-C5eqGwzDFEDfeBovidro6WnY3Drw7caJ2p2mjnJbGJVE.tar.zst",
+    generation: "1638079985418599",
+    md5: "uCcKc7cq/a7rkM5Xgz7dng==",
+    crc32c: "ij8kmw==",
+    inactive_units: &[
+        "horizon-251-captured-node-fingerprint-20261118-v1.service",
+        "horizon-251-captured-node-fingerprint-20261118-v2.service",
+        "horizon-qualify-251-replacement-20261118-v1.service",
+        "horizon211-drain-recheck-v191-a1-closed-251.service",
+        "horizon211-drain-recheck-v191-a1-wrong-drain.service",
+        "horizon251-native-input-small-20261118-v1.service",
+        "horizon251-native-input-test-20261118-v1.service",
+    ],
+};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -266,13 +302,13 @@ fn check_target(t: &Target) -> Result<()> {
         }
         let completion: Value =
             serde_json::from_slice(&bound(&review.original_copy_completion, LIMIT)?)?;
-        if t.epoch == 249 {
+        if let Some(profile) = cloud_bootstrap(t.epoch) {
             let generation = review
                 .original_generation
                 .as_ref()
-                .context("epoch 249 needs an authenticated generation lookup")?;
+                .context("external bootstrap needs an authenticated generation lookup")?;
             let metadata: Value = serde_json::from_slice(&bound(generation, LIMIT)?)?;
-            validate_epoch249_source(&completion, &metadata)?;
+            validate_cloud_source(profile, &completion, &metadata)?;
         } else {
             ensure!(
                 completion["schema"]
@@ -298,17 +334,29 @@ fn ordinary_private_path(path: &Path) -> bool {
     let private = Path::new(HOME_ROOT).join(".jetstreamer-private");
     path.starts_with(&private) && !path.starts_with(private.join("r2-receipts"))
 }
-fn external_bootstrap_sha(epoch: u64, path: &Path) -> Option<&'static str> {
+fn cloud_bootstrap(epoch: u64) -> Option<&'static CloudBootstrap> {
     match epoch {
-        246 if path == Path::new(EPOCH246_BOOTSTRAP) => Some(EPOCH246_BOOTSTRAP_SHA),
-        249 if path == Path::new(EPOCH249_BOOTSTRAP) => Some(EPOCH249_BOOTSTRAP_SHA),
+        249 => Some(&EPOCH249_BOOTSTRAP),
+        251 => Some(&EPOCH251_BOOTSTRAP),
         _ => None,
     }
 }
 
+fn external_bootstrap_sha(epoch: u64, path: &Path) -> Option<&'static str> {
+    if epoch == 246 && path == Path::new(EPOCH246_BOOTSTRAP) {
+        return Some(EPOCH246_BOOTSTRAP_SHA);
+    }
+    let profile = cloud_bootstrap(epoch)?;
+    (path == Path::new(profile.path)).then_some(profile.sha256)
+}
+
 fn validate_bootstrap_review(t: &Target, r: &BootstrapReview) -> Result<()> {
-    let (schema, size, required_units): (&str, u64, &[&str]) = match t.epoch {
-        246 => (
+    let profile = cloud_bootstrap(t.epoch);
+    let (schema, size, required_units): (&str, u64, &[&str]) = if let Some(profile) = profile {
+        (profile.review_schema, profile.bytes, profile.inactive_units)
+    } else {
+        ensure!(t.epoch == 246, "unsupported external bootstrap review");
+        (
             "horizon246-obsolete-bootstrap-main-review-v1",
             13_110_128_323,
             &[
@@ -317,13 +365,7 @@ fn validate_bootstrap_review(t: &Target, r: &BootstrapReview) -> Result<()> {
                 "horizon-monitor-246-bootstrap-copy1636-v2.service",
                 "horizon-monitor-246-bootstrap-copy1636-v2.timer",
             ],
-        ),
-        249 => (
-            "horizon249-obsolete-bootstrap-main-review-v1",
-            EPOCH249_BOOTSTRAP_BYTES,
-            &EPOCH249_BOOTSTRAP_UNITS,
-        ),
-        _ => anyhow::bail!("unsupported external bootstrap review"),
+        )
     };
     let digest = external_bootstrap_sha(t.epoch, &t.path).context("unexpected bootstrap path")?;
     ensure!(
@@ -335,7 +377,7 @@ fn validate_bootstrap_review(t: &Target, r: &BootstrapReview) -> Result<()> {
             && r.no_staged_consumers_confirmed
             && t.identity.uid == 0
             && t.identity.len == size
-            && r.original_generation.is_some() == (t.epoch == 249)
+            && r.original_generation.is_some() == profile.is_some()
             && !r.evidence.is_empty(),
         "invalid external bootstrap review"
     );
@@ -347,31 +389,31 @@ fn validate_bootstrap_review(t: &Target, r: &BootstrapReview) -> Result<()> {
     }
     Ok(())
 }
-fn validate_epoch249_source(seal: &Value, metadata: &Value) -> Result<()> {
-    let path = Path::new(EPOCH249_BOOTSTRAP);
+fn validate_cloud_source(profile: &CloudBootstrap, seal: &Value, metadata: &Value) -> Result<()> {
+    let path = Path::new(profile.path);
     let members = seal["members"]
         .as_array()
         .context("missing sealed members")?;
-    let members: Vec<_> = members
+    let mut matching = members
         .iter()
-        .filter(|member| member["name"].as_str() == path.file_name().and_then(|n| n.to_str()))
-        .collect();
+        .filter(|member| member["name"].as_str() == path.file_name().and_then(|n| n.to_str()));
+    let member = matching.next().context("missing sealed bootstrap member")?;
     ensure!(
         seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
             && seal["destination"].as_str() == path.parent().and_then(Path::to_str)
-            && members.len() == 1
-            && members[0]["sha256"] == EPOCH249_BOOTSTRAP_SHA
-            && members[0]["bytes"] == EPOCH249_BOOTSTRAP_BYTES,
-        "epoch 249 bootstrap is outside the original sealed deployment"
+            && matching.next().is_none()
+            && member["sha256"] == profile.sha256
+            && member["bytes"] == profile.bytes,
+        "bootstrap is outside the original sealed deployment"
     );
     ensure!(
         metadata["bucket"] == "mainnet-beta-ledger-us-ny5"
-            && metadata["name"] == EPOCH249_BOOTSTRAP_KEY
-            && metadata["generation"] == "1637611511896161"
-            && metadata["size"] == EPOCH249_BOOTSTRAP_BYTES
-            && metadata["md5_hash"] == "5T7R2/oARnVkrPc85kobgA=="
-            && metadata["crc32c_hash"] == "wUO8lg==",
-        "epoch 249 bootstrap generation differs from the catalog"
+            && metadata["name"] == profile.key
+            && metadata["generation"] == profile.generation
+            && metadata["size"] == profile.bytes
+            && metadata["md5_hash"] == profile.md5
+            && metadata["crc32c_hash"] == profile.crc32c,
+        "bootstrap generation differs from the catalog"
     );
     Ok(())
 }
@@ -741,10 +783,10 @@ mod tests {
             Some(EPOCH246_BOOTSTRAP_SHA)
         );
         assert_eq!(
-            external_bootstrap_sha(249, Path::new(EPOCH249_BOOTSTRAP)),
-            Some(EPOCH249_BOOTSTRAP_SHA)
+            external_bootstrap_sha(249, Path::new(EPOCH249_BOOTSTRAP.path)),
+            Some(EPOCH249_BOOTSTRAP.sha256)
         );
-        assert!(external_bootstrap_sha(246, Path::new(EPOCH249_BOOTSTRAP)).is_none());
+        assert!(external_bootstrap_sha(246, Path::new(EPOCH249_BOOTSTRAP.path)).is_none());
         for path in [
             "/var/lib/jetstreamer/other/snapshot.tar.zst",
             "/var/lib/jetstreamer/horizon246-bootstrap-copy1636-work-v2/projection/bootstrap/deployment-seal-receipt.json",
@@ -794,31 +836,35 @@ mod tests {
         assert!(validate_bootstrap_review(&t, &r).is_err());
     }
     #[test]
-    fn obsolete_249_bootstrap_requires_its_original_snapshot_and_generation() {
-        let path = Path::new(EPOCH249_BOOTSTRAP);
-        let mut seal = json!({
-            "schema": "jetstreamer-sealed-deployment-receipt-v1",
-            "destination": path.parent().unwrap(),
-            "members": [{
-                "name": path.file_name().unwrap().to_str().unwrap(),
-                "bytes": EPOCH249_BOOTSTRAP_BYTES,
-                "sha256": EPOCH249_BOOTSTRAP_SHA,
-            }],
-        });
-        let mut metadata = json!({
-            "bucket": "mainnet-beta-ledger-us-ny5",
-            "name": EPOCH249_BOOTSTRAP_KEY,
-            "generation": "1637611511896161",
-            "size": EPOCH249_BOOTSTRAP_BYTES,
-            "md5_hash": "5T7R2/oARnVkrPc85kobgA==",
-            "crc32c_hash": "wUO8lg==",
-        });
-        validate_epoch249_source(&seal, &metadata).unwrap();
-        metadata["generation"] = json!("1637611511896160");
-        assert!(validate_epoch249_source(&seal, &metadata).is_err());
-        metadata["generation"] = json!("1637611511896161");
-        seal["members"][0]["bytes"] = json!(EPOCH249_BOOTSTRAP_BYTES - 1);
-        assert!(validate_epoch249_source(&seal, &metadata).is_err());
+    fn cloud_bootstrap_requires_its_exact_epoch_file_and_generation() {
+        for (epoch, profile) in [(249, &EPOCH249_BOOTSTRAP), (251, &EPOCH251_BOOTSTRAP)] {
+            let path = Path::new(profile.path);
+            assert_eq!(external_bootstrap_sha(epoch, path), Some(profile.sha256));
+            assert!(external_bootstrap_sha(epoch + 1, path).is_none());
+            let mut seal = json!({
+                "schema": "jetstreamer-sealed-deployment-receipt-v1",
+                "destination": path.parent().unwrap(),
+                "members": [{
+                    "name": path.file_name().unwrap().to_str().unwrap(),
+                    "bytes": profile.bytes,
+                    "sha256": profile.sha256,
+                }],
+            });
+            let mut metadata = json!({
+                "bucket": "mainnet-beta-ledger-us-ny5",
+                "name": profile.key,
+                "generation": profile.generation,
+                "size": profile.bytes,
+                "md5_hash": profile.md5,
+                "crc32c_hash": profile.crc32c,
+            });
+            validate_cloud_source(profile, &seal, &metadata).unwrap();
+            metadata["generation"] = json!("1234567890");
+            assert!(validate_cloud_source(profile, &seal, &metadata).is_err());
+            metadata["generation"] = json!(profile.generation);
+            seal["members"][0]["bytes"] = json!(profile.bytes - 1);
+            assert!(validate_cloud_source(profile, &seal, &metadata).is_err());
+        }
     }
 
     #[test]
