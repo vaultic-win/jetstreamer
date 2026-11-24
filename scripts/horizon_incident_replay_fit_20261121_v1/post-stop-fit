@@ -47,7 +47,7 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-FAILED166_CADENCE = HERE in tuple(D / f"tools-homefloor-170-metered-hourly-v{version}" for version in (6, 7, 8, 9))
+FAILED166_CADENCE = HERE in tuple(D / f"tools-homefloor-170-metered-hourly-v{version}" for version in (6, 7, 8, 9, 10))
 HOURLY170_CADENCE = HERE in (
     D / "tools-homefloor-170-metered-hourly-v4",
     D / "tools-homefloor-170-metered-hourly-v5",
@@ -972,7 +972,7 @@ def registered_status():
                     failed = writer168v4["registered_failed170_writer"](scope,retry4)
                     if RETAIN_FAILED166:
                         adopted = writer168v4["registered_hourly170_writer"](scope, failed, failed166=True)
-                        for version in (2, 3, 4):
+                        for version in (2, 3, 4, 5):
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():
                                 adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, version)

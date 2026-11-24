@@ -20,7 +20,11 @@ STOP = 'd670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a'
 FIELD = 'current_homefloor_cold166_167_170_owners'
 BINDING = LOCAL / f'{ATTEMPT}-170-generation.json'
 FAILED_RUN = ROOT / 'failed-replay-20261124T123309Z'
-FAILED166_CADENCE = LOCAL.name in tuple(f'tools-cold168-retry4-failed166-v{version}' for version in (1, 2, 3))
+FAILED166_CADENCE = LOCAL.name in (
+    'tools-cold168-retry4-failed166-v1', 'tools-cold168-retry4-failed166-v2',
+    'tools-cold168-retry4-failed166-v3', 'tools-cold168-retry4-failed166-v4-entry146',
+    'tools-cold168-retry4-failed166-v5-entry146',
+)
 FAILED_CADENCE = FAILED166_CADENCE or LOCAL.name == 'tools-cold168-retry4-failed170-v1'
 FAILED_STATUS = 'cold170_retry13_execution_failure'
 FAILED_TERMINAL = {'path': str(FAILED_RUN/'TERMINAL.json'),

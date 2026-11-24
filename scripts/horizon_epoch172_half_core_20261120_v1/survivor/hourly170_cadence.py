@@ -19,6 +19,7 @@ if Path(__file__).resolve().parent.name == "tools-cold168-retry4-failed166-v2":
     PROVIDER_SEAL = "91a9c718e062c1dafe8516023c10bc4bec054b1ccb7c59eebc2ad6cba71fba16"
 if Path(__file__).resolve().parent.name in (
     "tools-cold168-retry4-failed166-v3", "tools-cold168-retry4-failed166-v4-entry146",
+    "tools-cold168-retry4-failed166-v5-entry146",
 ):
     PROVIDER = PROVIDER.with_name("tools-homefloor-170-metered-hourly-v8")
     PROVIDER_SEAL = "e927fbd7c9bd096933e7fea73bbbb82ed5105443afdf3f0c27077398059dcaaf"
