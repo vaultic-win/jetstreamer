@@ -27,9 +27,9 @@ and obtain fresh authenticated inventory. Execution repeats identity and consume
 checks and fsyncs intent/completion records around each unlink. It refuses
 symlinks, multiply linked files and small metadata. Outside the private root,
 `external_bootstrap_review` supports only the exact sealed obsolete bootstrap
-file registered for each of epochs 207, 210, 246–249 and 251. The immutable review binds
+file registered for each of epochs 207, 210, 246–249, 251 and 265. The immutable review binds
 the file identity, original copy evidence and every registered consumer unit.
-Epochs 207, 210, 247–249 and 251 also require authenticated metadata for their exact GCS
+Epochs 207, 210, 247–249, 251 and 265 also require authenticated metadata for their exact GCS
 snapshot generation. The tool hashes the local bootstrap and checks the
 canonical R2 archive and sidecar, the consumer state and the shared mutation
 lock before removing the selected snapshot.

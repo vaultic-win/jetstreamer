@@ -151,6 +151,25 @@ const EPOCH251_BOOTSTRAP: CloudBootstrap = CloudBootstrap {
     ],
 };
 
+const EPOCH265_BOOTSTRAP: CloudBootstrap = CloudBootstrap {
+    review_schema: "horizon265-obsolete-bootstrap-main-review-v1",
+    path: "/var/lib/jetstreamer/horizon-contiguous-265-265-current-46b4b4a-v1/snapshot-114479281-Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW.tar.zst",
+    sha256: "04eb59e2dbbc2b0d4f1535741fa9d56794c32ad18e14c98df4fa76a5ae397641",
+    bytes: 16_483_458_670,
+    key: "114479281/snapshot-114479281-Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW.tar.zst",
+    generation: "1641500477962489",
+    md5: "Q0FEYKFkXAJiwZNXZtq6rQ==",
+    crc32c: "+0CPhA==",
+    inactive_units: &[
+        "horizon-focused-export-cli-directory-20261119-v1.service",
+        "horizon-focused-export-cli-handoff-20261119-v1.service",
+        "horizon-checkpoint-node-capability265-20261119-v1.service",
+        "horizon-checkpoint-node-capability265-20261119-v2.service",
+        "horizon-265-production-node-filename-20261119-v1.service",
+        "horizon-qualify-265-replacement-20261119-v3.service",
+    ],
+};
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -413,6 +432,7 @@ fn cloud_bootstrap(epoch: u64) -> Option<&'static CloudBootstrap> {
         248 => Some(&EPOCH248_BOOTSTRAP),
         249 => Some(&EPOCH249_BOOTSTRAP),
         251 => Some(&EPOCH251_BOOTSTRAP),
+        265 => Some(&EPOCH265_BOOTSTRAP),
         _ => None,
     }
 }
@@ -937,6 +957,7 @@ mod tests {
             (248, &EPOCH248_BOOTSTRAP),
             (249, &EPOCH249_BOOTSTRAP),
             (251, &EPOCH251_BOOTSTRAP),
+            (265, &EPOCH265_BOOTSTRAP),
         ] {
             let path = Path::new(profile.path);
             assert_eq!(external_bootstrap_sha(epoch, path), Some(profile.sha256));
