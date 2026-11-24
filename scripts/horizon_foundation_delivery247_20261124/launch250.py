@@ -19,6 +19,7 @@ from seven_status import publisher_fields, verify_publisher
 import staged211retry
 import staged248
 import staged250
+import staged265
 from staged250 import PROFILE
 from staged211 import sealed
 
@@ -72,7 +73,7 @@ def sandbox(plan, public_origin, profile=PROFILE):
     ]
 
 
-def capacity(price, plan, profile, staged_peer):
+def capacity(price, plan, profile, staged_peers):
     priced = bound(price)
     fleet = bound(priced["fleet"])
     when = datetime.fromisoformat(fleet["sampled_at_utc"]).timestamp()
@@ -83,12 +84,17 @@ def capacity(price, plan, profile, staged_peer):
         if row["phase"] == "private-held-extraction":
             broker = row["capacity_owners"]["broker"]
             identities.append(dict(Id=broker["unit"], InvocationID=broker["invocation_id"], MainPID=str(broker["pid"])))
-    peer_scratch = SCRATCH if staged_peer else 0
-    if staged_peer and not any(p["Id"] == staged250.UNIT for p in identities):
+    peer_scratch = 0
+    for staged_peer in staged_peers:
+        if not staged_peer:
+            continue
         peer_claim = bound(staged_peer["claim"])
+        peer_scratch += SCRATCH
+        if any(p["Id"] == peer_claim["unit"] for p in identities):
+            continue
         booking, launch = map(bound, peer_claim["evidence"])
         peer = launch["unit"]
-        assert peer["Id"] == staged250.UNIT and peer["InvocationID"] == peer_claim["invocation_id"]
+        assert peer["Id"] == peer_claim["unit"] and peer["InvocationID"] == peer_claim["invocation_id"]
         assert when < launch["time"] and booking["scratch_bytes"] == SCRATCH
         identities.append(peer)
     peers = {}
@@ -127,10 +133,15 @@ def preflight(profile):
 
     release = sealed(profile.package / "acceptance.json")
     proof = bound(release)
-    if profile.epoch == 248:
+    if profile.epoch in (248, 265):
         recovery = bound(proof["range_recovery"])
         assert recovery["epoch"] == profile.epoch and recovery["archive_etag"] == profile.etag
         assert recovery["archive_length"] == profile.size and not recovery["sidecar_authorized"]
+    if profile.epoch == 265:
+        repair = bound(proof["custody_repair"])
+        expected = bound(repair["expectation"])["independent_evidence"]
+        assert len(expected) == 8
+        assert expected == [sealed(Path(row["path"])) for row in expected]
     if profile.epoch == 211:
         repair = bound(proof["custody_repair"])
         expected = bound(repair["expectation"])["independent_evidence"]
@@ -159,7 +170,8 @@ def preflight(profile):
     assert remote["ETag"].strip('"') == profile.etag and remote["Size"] == profile.size
     assert objects[profile.key]["ETag"] == auth["etag"]
     price = sealed(Path(os.environ[f"HORIZON_{profile.epoch}_CAPACITY_RECEIPT"]))
-    peers, available = capacity(price, plan, profile, staged_250)
+    staged_peers = (staged_250, definitions["248"].get("staged_retry"), definitions["265"].get("staged_retry"))
+    peers, available = capacity(price, plan, profile, staged_peers)
     origin = bound(original["handoff"])["producer"]
     start, = [
         int(event["__REALTIME_TIMESTAMP"]) // 1000 for event in origin["events"]
@@ -235,7 +247,7 @@ def launch(profile):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--check-only", action="store_true")
-    profiles = {211: staged211retry.PROFILE, 248: staged248.PROFILE, 250: PROFILE}
+    profiles = {211: staged211retry.PROFILE, 248: staged248.PROFILE, 250: PROFILE, 265: staged265.PROFILE}
     parser.add_argument("--epoch", type=int, choices=profiles, default=250)
     args = parser.parse_args()
     profile = profiles[args.epoch]

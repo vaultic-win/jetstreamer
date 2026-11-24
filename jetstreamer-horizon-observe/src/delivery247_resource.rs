@@ -29,7 +29,7 @@ impl Owner<'_> {
             UNIT249 => "249-249",
             UNIT250 | STAGED250 => "250-250",
             UNIT251 => "251-251",
-            UNIT265 | RETRY265 => "265-265",
+            UNIT265 | RETRY265 | STAGED265 => "265-265",
             _ => "247-247",
         }
     }
@@ -459,6 +459,9 @@ const STAGED250_BYTES: &str = "185599540324";
 const UNIT251: &str = "horizon-upload-251-ordinary-v221.service";
 const UNIT265: &str = "horizon-upload-265-ordinary-v215.service";
 const RETRY265: &str = "horizon-upload-265-ordinary-retry-v216.service";
+const STAGED265: &str = "horizon-upload-265-staged-public-v260.service";
+const STAGED265_ETAG: &str = "2bda3226eb3c4bbd11c9bb7b52053f21-2825";
+const STAGED265_BYTES: &str = "189538254413";
 const UNIT249: &str = "horizon-upload-249-ordinary-v214.service";
 const UNIT211: &str = "horizon-upload-211-ordinary-v221.service";
 const STAGED211: &str = "horizon-upload-211-staged-recovery-v1.service";
@@ -495,6 +498,7 @@ pub(super) enum OrdinaryEpoch {
     Epoch251,
     Epoch265,
     Retry265,
+    Staged265,
 }
 impl OrdinaryEpoch {
     fn number(self) -> u64 {
@@ -505,7 +509,7 @@ impl OrdinaryEpoch {
             Self::Epoch249 => 249,
             Self::Epoch250 | Self::Staged250 => 250,
             Self::Epoch251 => 251,
-            Self::Epoch265 | Self::Retry265 => 265,
+            Self::Epoch265 | Self::Retry265 | Self::Staged265 => 265,
         }
     }
     fn unit(self) -> &'static str {
@@ -522,6 +526,7 @@ impl OrdinaryEpoch {
             Self::Epoch251 => UNIT251,
             Self::Epoch265 => UNIT265,
             Self::Retry265 => RETRY265,
+            Self::Staged265 => STAGED265,
         }
     }
     fn image(self) -> (&'static str, &'static str) {
@@ -530,7 +535,8 @@ impl OrdinaryEpoch {
             | Self::Staged211Retry
             | Self::Pinned247
             | Self::Staged248
-            | Self::Staged250 => (STAGED211_IMAGE, STAGED211_IMAGE_SHA),
+            | Self::Staged250
+            | Self::Staged265 => (STAGED211_IMAGE, STAGED211_IMAGE_SHA),
             _ => (IMAGE248, SHA248),
         }
     }
@@ -548,6 +554,7 @@ impl OrdinaryEpoch {
             Self::Epoch265 | Self::Retry265 => {
                 "801acbb79784fb29fda64a572b6b0a1ed1396cdad4216b6d39b36b1dad86a544"
             }
+            Self::Staged265 => "7032695fedca1d632ac2ff20c0830b7c49eed183bfc4ded8ff25fc0f56555203",
             Self::Epoch249 => "03e16ae1dada49958ff00a7dda1c3ef31c2f37c7503b02b7e0a677bb40863e07",
         }
     }
@@ -559,6 +566,7 @@ impl OrdinaryEpoch {
             (Self::Epoch248, Some(STAGED248)) => Ok(Self::Staged248),
             (Self::Epoch250, Some(STAGED250)) => Ok(Self::Staged250),
             (Self::Epoch265, Some(RETRY265)) => Ok(Self::Retry265),
+            (Self::Epoch265, Some(STAGED265)) => Ok(Self::Staged265),
             _ => anyhow::bail!("unknown retry unit for ordinary epoch {}", self.number()),
         }
     }
@@ -574,6 +582,11 @@ impl OrdinaryEpoch {
                 "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v3/output".to_owned(),
                 "/home/ubuntu/.jetstreamer-private/current-reader-delivery-265-v215/receipts".to_owned(),
                 "/var/lib/jetstreamer/horizon265-ordinary-reader-v215/epoch-265-plan.json".to_owned(),
+            ),
+            Self::Staged265 => (
+                "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v3/output".to_owned(),
+                "/home/ubuntu/.jetstreamer-private/current-reader-delivery-265-staged-recovery-v259/receipts".to_owned(),
+                "/var/lib/jetstreamer/horizon265-staged-recovery-v259/epoch-265-plan.json".to_owned(),
             ),
             Self::Epoch211 => (
                 "/home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1/output".to_owned(),
@@ -635,6 +648,7 @@ impl OrdinaryEpoch {
             Self::Pinned247 => Some((PINNED247_ETAG, PINNED247_BYTES)),
             Self::Staged248 => Some((STAGED248_ETAG, STAGED248_BYTES)),
             Self::Staged250 => Some((STAGED250_ETAG, STAGED250_BYTES)),
+            Self::Staged265 => Some((STAGED265_ETAG, STAGED265_BYTES)),
             _ => None,
         };
         if let Some((etag, bytes)) = staged_pin {
@@ -703,6 +717,7 @@ impl DeliveryClaim {
                         | OrdinaryEpoch::Pinned247
                         | OrdinaryEpoch::Staged248
                         | OrdinaryEpoch::Staged250
+                        | OrdinaryEpoch::Staged265
                 ) || (command.ends_with(" }") && command.matches("{ path=").count() == 1)),
             "ordinary delivery unexpected uploader command"
         );
@@ -906,6 +921,30 @@ mod tests {
                 STAGED250_ETAG,
                 "--staged-archive-bytes",
                 STAGED250_BYTES,
+            ]
+        );
+    }
+    #[test]
+    fn staged_265_uses_the_pinned_route_without_changing_the_replay_source() {
+        let claim = DeliveryClaim {
+            retry_unit: Some(STAGED265.into()),
+            invocation_id: "a".repeat(32),
+            pid: 1234,
+            claim_sha256: "b".repeat(64),
+        };
+        let retry = OrdinaryEpoch::Epoch265.select(&claim).unwrap();
+        assert!(OrdinaryEpoch::Epoch248.select(&claim).is_err());
+        assert_ne!(retry.claim_path(), OrdinaryEpoch::Retry265.claim_path());
+        let args = retry.argv();
+        assert_eq!(args[2], OrdinaryEpoch::Retry265.argv()[2]);
+        assert_eq!(args[10], retry.digest());
+        assert_eq!(
+            &args[13..],
+            &[
+                "--staged-archive-etag",
+                STAGED265_ETAG,
+                "--staged-archive-bytes",
+                STAGED265_BYTES
             ]
         );
     }

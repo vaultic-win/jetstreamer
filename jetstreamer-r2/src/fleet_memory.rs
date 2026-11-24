@@ -16,6 +16,7 @@ const PINNED_247_MEMORY_CAP: u64 = 24 << 30;
 const STAGED_211_RETRY_UNIT: &str = "horizon-upload-211-staged-recovery-v2.service";
 const STAGED_248_UNIT: &str = "horizon-upload-248-staged-public-v259.service";
 const STAGED_250_UNIT: &str = "horizon-upload-250-staged-public-v257.service";
+const STAGED_265_UNIT: &str = "horizon-upload-265-staged-public-v260.service";
 const STAGED_250_MEMORY_CAP: u64 = 10 << 30;
 
 fn registered_upload(fleet: &Value, owner: &successor::Owner) -> Result<()> {
@@ -127,6 +128,7 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
         (247, PINNED_247_UNIT) => Some(PINNED_247_MEMORY_CAP),
         (248, STAGED_248_UNIT) => Some(10 << 30),
         (250, STAGED_250_UNIT) => Some(STAGED_250_MEMORY_CAP),
+        (265, STAGED_265_UNIT) => Some(10 << 30),
         _ => None,
     };
     ensure!(
@@ -327,7 +329,11 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
             .context("observed memory owner")?;
         if matches!(
             name,
-            PINNED_247_UNIT | STAGED_211_RETRY_UNIT | STAGED_248_UNIT | STAGED_250_UNIT
+            PINNED_247_UNIT
+                | STAGED_211_RETRY_UNIT
+                | STAGED_248_UNIT
+                | STAGED_250_UNIT
+                | STAGED_265_UNIT
         ) || (owners.contains_key(fourth::V221_UNIT)
             && name.starts_with("horizon-upload-")
             && name.contains("-ordinary-"))
