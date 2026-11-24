@@ -2860,6 +2860,24 @@ struct RemoteReadSpec<'a> {
     concurrency: usize,
 }
 
+async fn retry_remote_range(
+    range: &str,
+    failures: &mut usize,
+    error: impl std::fmt::Debug,
+) -> Result<()> {
+    *failures += 1;
+    ensure!(
+        *failures <= MAX_REMOTE_READ_ATTEMPTS,
+        "remote range {range} failed after {MAX_REMOTE_READ_ATTEMPTS} retries: {error:?}"
+    );
+    eprintln!(
+        "warning: remote range {range} retry {failures}/{MAX_REMOTE_READ_ATTEMPTS}: {error:?}"
+    );
+    let delay = (1u64 << failures.saturating_sub(1).min(5)).min(30);
+    tokio::time::sleep(Duration::from_secs(delay)).await;
+    Ok(())
+}
+
 async fn read_remote_range(
     client: &Client,
     spec: RemoteReadSpec<'_>,
@@ -2870,12 +2888,15 @@ async fn read_remote_range(
         start < end && end <= spec.expected_length,
         "invalid remote range"
     );
-    let range_length = end - start;
-    let range = format!("bytes={start}-{}", end - 1);
-    let expected_content_range = format!("bytes {start}-{}/{}", end - 1, spec.expected_length);
-    let mut failures = 0usize;
+    let range_length = usize::try_from(end - start)?;
+    let mut bytes = Vec::with_capacity(range_length);
+    let mut failures = 0;
     loop {
-        let response = match client
+        let response_offset = bytes.len();
+        let next = start + u64::try_from(response_offset)?;
+        let range = format!("bytes={next}-{}", end - 1);
+        let expected_content_range = format!("bytes {next}-{}/{}", end - 1, spec.expected_length);
+        let mut response = match client
             .get_object()
             .bucket(spec.bucket)
             .key(spec.key)
@@ -2886,18 +2907,7 @@ async fn read_remote_range(
         {
             Ok(response) => response,
             Err(error) => {
-                failures += 1;
-                ensure!(
-                    failures <= MAX_REMOTE_READ_ATTEMPTS,
-                    "remote range {range} failed after {MAX_REMOTE_READ_ATTEMPTS} attempts: {error:?}"
-                );
-                eprintln!(
-                    "warning: remote range {range} retry {failures}/{MAX_REMOTE_READ_ATTEMPTS}: {error:?}"
-                );
-                tokio::time::sleep(std::time::Duration::from_secs(
-                    (1u64 << failures.saturating_sub(1).min(5)).min(30),
-                ))
-                .await;
+                retry_remote_range(&range, &mut failures, error).await?;
                 continue;
             }
         };
@@ -2905,7 +2915,7 @@ async fn read_remote_range(
             response
                 .content_length()
                 .and_then(|value| u64::try_from(value).ok())
-                == Some(range_length),
+                == Some(end - next),
             "remote range {range} length mismatch"
         );
         ensure!(
@@ -2916,30 +2926,31 @@ async fn read_remote_range(
             response.e_tag().map(normalize_etag) == Some(spec.etag),
             "remote range {range} ETag mismatch"
         );
-        match response.body.collect().await {
-            Ok(bytes) => {
-                let bytes = bytes.into_bytes();
-                ensure!(
-                    bytes.len() == usize::try_from(range_length)?,
-                    "remote range {range} body length mismatch"
-                );
-                return Ok(bytes.to_vec());
+        let error = loop {
+            match response.body.next().await {
+                Some(Ok(chunk)) => {
+                    ensure!(
+                        chunk.len() <= range_length - bytes.len(),
+                        "remote range {range} body exceeds the pinned length"
+                    );
+                    bytes.extend_from_slice(&chunk);
+                }
+                Some(Err(error)) => break error,
+                None => {
+                    ensure!(
+                        bytes.len() == range_length,
+                        "remote range {range} body length mismatch"
+                    );
+                    return Ok(bytes);
+                }
             }
-            Err(error) => {
-                failures += 1;
-                ensure!(
-                    failures <= MAX_REMOTE_READ_ATTEMPTS,
-                    "remote range {range} remained incomplete after {MAX_REMOTE_READ_ATTEMPTS} attempts: {error}"
-                );
-                eprintln!(
-                    "warning: remote range {range} stream retry {failures}/{MAX_REMOTE_READ_ATTEMPTS}: {error}"
-                );
-                tokio::time::sleep(std::time::Duration::from_secs(
-                    (1u64 << failures.saturating_sub(1).min(5)).min(30),
-                ))
-                .await;
-            }
+        };
+        // Preserve only a partial response. If the stream failed after yielding
+        // all its bytes, repeat that response and require a clean end.
+        if bytes.len() == range_length {
+            bytes.truncate(response_offset);
         }
+        retry_remote_range(&range, &mut failures, error).await?;
     }
 }
 
@@ -4783,55 +4794,82 @@ mod tests {
             "digest-mismatch",
             "writer-failure",
             "etag-mismatch",
+            "body-interrupted",
+            "resumed-etag-mismatch",
+            "resumed-content-range-mismatch",
         ] {
             let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
             let endpoint = format!("http://{}", listener.local_addr().unwrap());
             listener.set_nonblocking(true).unwrap();
             let server = std::thread::spawn(move || {
+                let cutoff = 5;
+                let offsets: &[usize] =
+                    if outcome == "body-interrupted" || outcome.starts_with("resumed-") {
+                        &[0, cutoff]
+                    } else {
+                        &[0]
+                    };
                 let deadline = Instant::now() + Duration::from_secs(10);
-                let mut connection = loop {
-                    match listener.accept() {
-                        Ok((connection, _)) => break connection,
-                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                            assert!(Instant::now() < deadline, "fixture request never arrived");
-                            std::thread::sleep(Duration::from_millis(5));
+                for &offset in offsets {
+                    let mut connection = loop {
+                        match listener.accept() {
+                            Ok((connection, _)) => break connection,
+                            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                                assert!(Instant::now() < deadline, "fixture request never arrived");
+                                std::thread::sleep(Duration::from_millis(5));
+                            }
+                            Err(error) => panic!("fixture accept failed: {error}"),
                         }
-                        Err(error) => panic!("fixture accept failed: {error}"),
+                    };
+                    connection
+                        .set_read_timeout(Some(Duration::from_secs(5)))
+                        .unwrap();
+                    let mut headers = Vec::new();
+                    while !headers.ends_with(b"\r\n\r\n") {
+                        let mut byte = [0];
+                        connection.read_exact(&mut byte).unwrap();
+                        headers.push(byte[0]);
+                        assert!(headers.len() < 16 * 1024);
                     }
-                };
-                connection
-                    .set_read_timeout(Some(Duration::from_secs(5)))
-                    .unwrap();
-                let mut headers = Vec::new();
-                while !headers.ends_with(b"\r\n\r\n") {
-                    let mut byte = [0];
-                    connection.read_exact(&mut byte).unwrap();
-                    headers.push(byte[0]);
-                    assert!(headers.len() < 16 * 1024);
+                    let headers = String::from_utf8(headers).unwrap().to_ascii_lowercase();
+                    let mut request_line = headers.lines().next().unwrap().split_whitespace();
+                    assert_eq!(request_line.next(), Some("get"));
+                    assert_eq!(
+                        request_line.next().unwrap().split('?').next(),
+                        Some("/fixture/epoch-144.jet")
+                    );
+                    assert!(
+                        headers.contains(&format!("range: bytes={offset}-{}\r\n", BODY.len() - 1))
+                    );
+                    assert!(headers.contains("if-match: \"fixture\"\r\n"));
+                    let etag = if outcome == "etag-mismatch"
+                        || (offset != 0 && outcome == "resumed-etag-mismatch")
+                    {
+                        "changed"
+                    } else {
+                        "fixture"
+                    };
+                    let reported_offset =
+                        if offset != 0 && outcome == "resumed-content-range-mismatch" {
+                            offset - 1
+                        } else {
+                            offset
+                        };
+                    let end = if offset == 0 && offsets.len() == 2 {
+                        cutoff
+                    } else {
+                        BODY.len()
+                    };
+                    let response = format!(
+                        "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {reported_offset}-{}/{}\r\nETag: \"{etag}\"\r\nConnection: close\r\n\r\n",
+                        BODY.len() - offset,
+                        BODY.len() - 1,
+                        BODY.len(),
+                    );
+                    connection
+                        .write_all(&[response.as_bytes(), &BODY[offset..end]].concat())
+                        .unwrap();
                 }
-                let headers = String::from_utf8(headers).unwrap().to_ascii_lowercase();
-                let mut request_line = headers.lines().next().unwrap().split_whitespace();
-                assert_eq!(request_line.next(), Some("get"));
-                assert_eq!(
-                    request_line.next().unwrap().split('?').next(),
-                    Some("/fixture/epoch-144.jet")
-                );
-                assert!(headers.contains(&format!("range: bytes=0-{}\r\n", BODY.len() - 1)));
-                assert!(headers.contains("if-match: \"fixture\"\r\n"));
-                let etag = if outcome == "etag-mismatch" {
-                    "changed"
-                } else {
-                    "fixture"
-                };
-                let response = format!(
-                    "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes 0-{}/{}\r\nETag: \"{etag}\"\r\nConnection: close\r\n\r\n",
-                    BODY.len(),
-                    BODY.len() - 1,
-                    BODY.len()
-                );
-                connection
-                    .write_all(&[response.as_bytes(), BODY].concat())
-                    .unwrap();
             });
             let client = Client::from_conf(
                 S3ConfigBuilder::new()
@@ -4878,7 +4916,7 @@ mod tests {
             .expect("local readback fixture timed out");
             server.join().unwrap();
             match outcome {
-                "success" => {
+                "success" | "body-interrupted" => {
                     result.unwrap();
                     assert_eq!(written, BODY);
                 }
@@ -4888,8 +4926,18 @@ mod tests {
                         .to_string()
                         .contains("remote SHA-256 mismatch")
                 ),
-                "etag-mismatch" => {
-                    assert!(result.unwrap_err().to_string().contains("ETag mismatch"))
+                "etag-mismatch" | "resumed-etag-mismatch" => {
+                    assert!(result.unwrap_err().to_string().contains("ETag mismatch"));
+                    assert!(written.is_empty());
+                }
+                "resumed-content-range-mismatch" => {
+                    assert!(
+                        result
+                            .unwrap_err()
+                            .to_string()
+                            .contains("Content-Range mismatch")
+                    );
+                    assert!(written.is_empty());
                 }
                 "writer-failure" => assert!(
                     result
