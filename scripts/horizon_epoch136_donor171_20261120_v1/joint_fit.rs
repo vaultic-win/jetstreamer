@@ -442,7 +442,9 @@ pub(super) fn inspect(
             .arg(serde_json::to_string(&plan["joint_fit_145"])?)
             .arg(serde_json::to_string(&fence)?)
             .args(
-                cfg!(feature = "fixture-semantic").then_some(if cfg!(feature = "v5q-semantic") {
+                cfg!(feature = "fixture-semantic").then_some(if cfg!(feature = "v5r-semantic") {
+                    "v5r-semantic"
+                } else if cfg!(feature = "v5q-semantic") {
                     "v5q-semantic"
                 } else if cfg!(feature = "v5o-semantic") {
                     "v5o-semantic"

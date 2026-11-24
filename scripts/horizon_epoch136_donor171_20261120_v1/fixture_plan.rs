@@ -64,20 +64,41 @@ mod profile {
     pub const POST: &str = "tools-v13j";
 }
 #[cfg(feature = "v5q-semantic")]
-const PRICE: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5q-136-v1";
+const PRICE: &str = if cfg!(feature = "v5r-semantic") {
+    "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5r-136-v1"
+} else {
+    "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5q-136-v1"
+};
 #[cfg(feature = "v5q-semantic")]
 mod profile {
+    #[cfg(feature = "v5r-semantic")]
+    pub const CONTROLLER: &str = "epoch136-joint-writer-20261124-v11/controller";
+    #[cfg(not(feature = "v5r-semantic"))]
     pub const CONTROLLER: &str = "epoch136-joint-writer-20261124-v10/controller";
-    pub const DISPATCHER: &str = "epoch145-v5q-136-dispatch-20261124-v1";
-    pub const WORKER: &str = "v5q-name-handoff/submission-result.json";
-    pub const POST: &str = "tools-v13k";
+    pub const DISPATCHER: &str = if cfg!(feature = "v5r-semantic") {
+        "epoch145-v5r-136-dispatch-20261124-v1"
+    } else {
+        "epoch145-v5q-136-dispatch-20261124-v1"
+    };
+    pub const WORKER: &str = if cfg!(feature = "v5r-semantic") {
+        "v5r-name-handoff/submission-result.json"
+    } else {
+        "v5q-name-handoff/submission-result.json"
+    };
+    pub const POST: &str = if cfg!(feature = "v5r-semantic") {
+        "tools-v13l"
+    } else {
+        "tools-v13k"
+    };
 }
 #[cfg(any(
     feature = "v5n-semantic",
     feature = "v5o-semantic",
     feature = "v5q-semantic"
 ))]
-const SUBMISSION: &str = if cfg!(feature = "v5q-semantic") {
+const SUBMISSION: &str = if cfg!(feature = "v5r-semantic") {
+    "8c3e4d05c59f32545dff03258269e339cbde95ae4bcc5cc5a92aa8ae5514f68b"
+} else if cfg!(feature = "v5q-semantic") {
     "398f1a2d5d5a50ab4d35c0f27de035d7c07023b6c8d632ef326b9fcd169cb5e9"
 } else if cfg!(feature = "v5o-semantic") {
     "4d80587d22ffa0883696f96c30958b54d30fb5455bde35050e96b50c8ba8c544"

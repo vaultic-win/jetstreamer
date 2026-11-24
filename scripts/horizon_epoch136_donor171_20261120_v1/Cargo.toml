@@ -11,6 +11,7 @@ retry-semantic = ["fixture-semantic"]
 v5n-semantic = ["fixture-semantic"]
 v5o-semantic = ["fixture-semantic"]
 v5q-semantic = ["fixture-semantic"]
+v5r-semantic = ["v5q-semantic"]
 
 [dependencies]
 anyhow = "1"
