@@ -6,6 +6,7 @@ use std::{ffi::OsStr, io::ErrorKind, process::Command};
 
 const RETRY10_PARK: &str = "horizon-closed166-retry10-park-20261122-v1.service";
 const RETRY8_PARK: &str = "horizon-closed166-retry8-park-20261120-v1.service";
+const RETRY8_SHELL_CENSUS: &str = "horizon-closed166-prefix-consumer-census-20261124-v1.service";
 const METERED168_PARK: &str = "horizon-closed168-full-metered-park-20261122-v1.service";
 const METERED168_DROPIN_OWNERS: [&str; 9] = [
     "horizon-observer-root144959-live166167170-20261121-v1.service",
@@ -49,6 +50,25 @@ struct Terminal {
     argv: String,
     requisite: Vec<String>,
     requisite_of: Vec<String>,
+}
+
+fn terminal_command_matches(unit: &str, terminal: &Terminal, command: &str) -> bool {
+    if command.matches("argv[]=").count() != 1 {
+        return false;
+    }
+    if command.contains(&format!("argv[]={0} ;", terminal.argv)) {
+        return true;
+    }
+    // Reloading the unchanged transient fragment re-escapes shell dollars in
+    // this one census command and clears its formatted attempt accounting.
+    // The caller still binds the fragment, native invocation and main result.
+    unit == RETRY8_SHELL_CENSUS
+        && terminal.invocation == "03a02108b42a4126852e7d74d686bd46"
+        && command
+            == format!(
+                "{{ path=/bin/bash ; argv[]={} ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}",
+                terminal.argv.replace('$', "$$"),
+            )
 }
 
 #[derive(Default, Deserialize)]
@@ -170,8 +190,7 @@ impl Registered {
                     && row["NRestarts"] == "0"
                     && row["ControlGroup"] == ""
                     && row["Restart"] == "no"
-                    && command.matches("argv[]=").count() == 1
-                    && command.contains(&format!("argv[]={0} ;", t.argv)),
+                    && terminal_command_matches(unit, t, command),
                 "historical terminal invocation, command or result changed: {unit}"
             );
         } else {
@@ -420,6 +439,31 @@ mod tests {
 
     fn actual() -> Registered {
         Registered::profile(RETRY10_PARK).unwrap()
+    }
+
+    #[test]
+    fn retry8_shell_census_accepts_only_its_exact_reloaded_command() {
+        let registry = Registered::profile(RETRY8_PARK).unwrap();
+        let terminal = &registry.terminals[RETRY8_SHELL_CENSUS];
+        let reset = format!(
+            "{{ path=/bin/bash ; argv[]={} ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}",
+            terminal.argv.replace('$', "$$"),
+        );
+        assert!(terminal_command_matches(
+            RETRY8_SHELL_CENSUS,
+            terminal,
+            &reset
+        ));
+        assert!(!terminal_command_matches(
+            "foreign.service",
+            terminal,
+            &reset
+        ));
+        assert!(!terminal_command_matches(
+            RETRY8_SHELL_CENSUS,
+            terminal,
+            &reset.replace("r8=$$?", "r8=0"),
+        ));
     }
 
     #[test]
