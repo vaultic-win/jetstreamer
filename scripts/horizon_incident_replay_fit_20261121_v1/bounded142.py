@@ -136,15 +136,50 @@ def reservation146(s, lease_ref):
     return lease146(s, lease_ref)[0]
 
 
+MANAGER146 = "Id,InvocationID,ExecMainPID,MainPID,ControlPID,ActiveState,SubState,Job,NRestarts,ControlGroup"
+
+
+def manager146(keys=MANAGER146):
+    raw = subprocess.check_output(["/usr/bin/systemctl", "show", "-p", keys, PROBE146],
+                                  text=True, timeout=10)
+    return dict(line.split("=", 1) for line in raw.splitlines())
+
+
+def held146(s, lease_ref):
+    """Check the live held invocation for accounting. The launcher owns release."""
+    claim, preflight, _ = lease146(s, lease_ref)
+    pid = claim["pid"]
+    proc = Path("/proc") / str(pid)
+    group = Path("/sys/fs/cgroup") / GROUP146.lstrip("/")
+    keys = MANAGER146 + ",MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec"
+    expected = dict(Id=PROBE146, InvocationID=claim["invocation_id"], ExecMainPID=str(pid),
+                    MainPID=str(pid), ControlPID="0", ActiveState="active", SubState="running",
+                    Job="", NRestarts="0", ControlGroup=GROUP146, MemoryMax=str(MEMORY),
+                    MemorySwapMax="0", CPUQuotaPerSecUSec="250ms", TasksMax="64", RuntimeMaxUSec="8min")
+
+    def identity():
+        return (s.process(pid)[1:], (group / "cgroup.procs").read_text().split(),
+                (proc / "comm").read_text().strip())
+
+    before = identity()
+    s.need(manager146(keys) == expected and before[:2] == ((claim["start_ticks"], "0::" + GROUP146), [str(pid)])
+           and before[2] not in ("jetstreamer-nod", "historical-work"), "different held epoch 146 invocation")
+    scratch_path = Path(preflight["planned_argv"][2]).parent
+    scratch = os.statvfs(proc / "root" / str(scratch_path).lstrip("/"))
+    mounts = (line.split() for line in (proc / "mountinfo").read_text().splitlines())
+    scratch_types = [row[row.index("-") + 1] for row in mounts if row[4] == str(scratch_path)]
+    quota, period = map(int, (group / "cpu.max").read_text().split())
+    s.need(scratch.f_frsize * scratch.f_blocks == SCRATCH and scratch_types == ["tmpfs"]
+           and (group / "memory.max").read_text().strip() == str(MEMORY)
+           and (group / "memory.swap.max").read_text().strip() == "0"
+           and (group / "pids.max").read_text().strip() == "64"
+           and period > 0 and quota * 4 == period, "different held epoch 146 capacity")
+    s.need(manager146(keys) == expected and identity() == before, "held epoch 146 changed during census")
+    return claim
+
+
 def terminal146(claim):
-    keys = "Id,InvocationID,ExecMainPID,MainPID,ControlPID,ActiveState,SubState,Job,NRestarts,ControlGroup"
-
-    def manager():
-        raw = subprocess.check_output(["/usr/bin/systemctl", "show", "-p", keys, PROBE146],
-                                      text=True, timeout=10)
-        return dict(line.split("=", 1) for line in raw.splitlines())
-
-    before = manager()
+    before = manager146()
     if not (before["Id"] == PROBE146 and before["InvocationID"] == claim["invocation_id"]
             and before["ExecMainPID"] == str(claim["pid"]) and before["MainPID"] == before["ControlPID"] == "0"
             and (before["ActiveState"], before["SubState"]) in (("inactive", "dead"), ("failed", "failed"))
@@ -159,7 +194,7 @@ def terminal146(claim):
             return False
     except FileNotFoundError:
         pass
-    return manager() == before and not proc.exists()
+    return manager146() == before and not proc.exists()
 
 
 def observe146(s, pid, comm, start, group, lease_ref):

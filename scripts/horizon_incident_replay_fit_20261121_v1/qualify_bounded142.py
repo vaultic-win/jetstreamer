@@ -1,4 +1,5 @@
 """Offline controls for the exact bounded 142 incident. No node is executed."""
+import ast
 from copy import deepcopy
 from pathlib import Path
 import json
@@ -224,6 +225,7 @@ def verify146(bounded, s, census):
                 transition_controls=["held", "native exec", "identified exit during scan", "identified exit during verification",
                                      "terminal reserved", "successor fleet release", "overlapping 142 rejected"],
                 terminal_controls=verify146_terminal(bounded, s, claim),
+                cadence_controls=verify146_cadence(s, claim),
                 live_node_executed=False)
 
 
@@ -278,6 +280,86 @@ def verify146_terminal(bounded, s, claim):
         cgroup_members = ""
         s.need(not fn(claim),"terminal accepted while manager changed")
     return controls
+
+
+def verify146_cadence(s, claim):
+    cadence = (Path(__file__).parents[1] / "horizon_epoch172_half_core_20261120_v1"
+               / "survivor" / "status_cycle.py")
+    wanted = {"epoch146_entry", "install_epoch146_entry"}
+    tree = ast.parse(cadence.read_text())
+    funcs = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in wanted]
+    s.need(len(funcs) == len(wanted), "missing epoch 146 cadence integration")
+    key = "epoch146_bounded_entry_lease"
+    ref = claim["registration"]
+    offer = None
+    terminal = False
+    hold_matches = True
+    owner = SimpleNamespace(cadence168=SimpleNamespace(status168=s))
+    c = SimpleNamespace(fleet={}, fleet_ref={"sha256": "2"*64}, sample_ref={"sha256": "3"*64})
+
+    class CyclePath:
+        def __truediv__(self, name):
+            s.need(name == "ENTRY146_LEASE_OFFER.json", "wrong epoch 146 offer name")
+            return self
+
+        def exists(self):
+            return offer is not None
+
+    def reservation(reader, lease):
+        s.need(reader is s and lease == ref, "different cadence reservation")
+        return claim
+
+    def held(reader, lease):
+        return reservation(reader, lease) if hold_matches else None
+
+    c.paths = {"out": CyclePath()}
+    adapter = SimpleNamespace(reservation146=reservation, held146=held, terminal146=lambda _:terminal)
+    ns = dict(ENTRY146_FIELD=key, owners=owner, need=s.need, read_ref=lambda _:offer)
+    exec(compile(ast.Module(body=funcs, type_ignores=[]), str(cadence), "exec"), ns)
+    choose, install = ns["epoch146_entry"], ns["install_epoch146_entry"]
+
+    def reject(call, text):
+        try:
+            call()
+        except ValueError as error:
+            s.need(str(error) == text, "unrelated epoch 146 cadence rejection")
+        else:
+            raise ValueError("epoch 146 cadence accepted " + text)
+
+    with patch.dict(sys.modules, bounded142=adapter):
+        s.need(choose(c) is None, "ordinary cadence consumed a missing offer")
+        offer = dict(schema="horizon-epoch146-cadence-offer-v1", lease=ref,
+                     fleet_predecessor=c.fleet_ref, observer={"sha256": "4"*64})
+        reject(lambda:choose(c), "foreign epoch 146 cadence offer")
+        offer["observer"] = c.sample_ref
+        hold_matches = False
+        reject(lambda:choose(c), "epoch 146 hold differs from its reservation")
+        hold_matches = True
+        c.entry146 = choose(c)
+        successor = {}
+        hold_matches = False
+        reject(lambda:install(c, successor), "epoch 146 hold changed before fleet publication")
+        s.need(not successor, "changed hold added a reservation")
+        hold_matches = True
+        install(c, successor)
+        s.need(successor == {key:ref}, "successor omitted the held lease")
+
+        c.fleet = successor
+        reject(lambda:choose(c), "overlapping epoch 146 lease offer")
+        offer = None
+        c.entry146 = choose(c)
+        install(c, successor)
+        s.need(not c.entry146["new"] and successor == {key:ref},
+               "current lease lost before terminal")
+        terminal = True
+        install(c, successor)
+        s.need(not successor, "successor retained the terminal lease")
+        offer = dict(schema="horizon-epoch146-cadence-offer-v1", lease=ref,
+                     fleet_predecessor=c.fleet_ref, observer=c.sample_ref)
+        s.need(choose(c) is None, "expired unadopted offer acquired a reservation")
+    return ["ordinary cycle", "crossed sample", "unmatched hold", "hold changed before publication",
+            "first fleet registration", "overlapping offer", "preserved live lease",
+            "terminal release", "terminal before admission"]
 
 
 if __name__ == "__main__":

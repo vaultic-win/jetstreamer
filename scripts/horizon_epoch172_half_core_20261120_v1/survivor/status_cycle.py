@@ -18,6 +18,7 @@ ROOT = BASE/'survivor172-cadence-20261122-v1'
 CONTROLLER = 'horizon-archive-status-cadence-after172-20261120-v1.service'
 CLOSED = (166, 167, 168, 170)
 GUARD169 = BASE/'epoch169-focused-terminal-20261121-v1'
+ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
@@ -342,6 +343,42 @@ def schedule(ref):
          and utc(due).strftime('%F %T UTC') in n['TimersCalendar'],'scheduled observer command differs')
     return timer
 
+def epoch146_entry(c):
+    prior = c.fleet.get(ENTRY146_FIELD)
+    offer_path = c.paths['out'] / 'ENTRY146_LEASE_OFFER.json'
+    if prior is None and not offer_path.exists():
+        return None
+    import bounded142
+    reader = owners.cadence168.status168
+    if prior is not None:
+        need(not offer_path.exists(), 'overlapping epoch 146 lease offer')
+        return dict(lease=prior, claim=bounded142.reservation146(reader, prior), new=False)
+    offer = read_ref(offer_path)
+    need(offer == dict(schema='horizon-epoch146-cadence-offer-v1', lease=offer['lease'],
+                      fleet_predecessor=c.fleet_ref, observer=c.sample_ref),
+         'foreign epoch 146 cadence offer')
+    lease = offer['lease']
+    claim = bounded142.reservation146(reader, lease)
+    if bounded142.terminal146(claim):
+        return None
+    need(bounded142.held146(reader, lease) == claim, 'epoch 146 hold differs from its reservation')
+    return dict(lease=lease, claim=claim, new=True)
+
+
+def install_epoch146_entry(c, fleet):
+    entry = c.entry146
+    if entry is None:
+        return
+    import bounded142
+    if bounded142.terminal146(entry['claim']):
+        fleet.pop(ENTRY146_FIELD, None)
+        return
+    if entry['new']:
+        need(bounded142.held146(owners.cadence168.status168, entry['lease']) == entry['claim'],
+             'epoch 146 hold changed before fleet publication')
+    fleet[ENTRY146_FIELD] = entry['lease']
+
+
 def make_context(head,fleet,sample_ref,cfg,out):
     sample=checked(sample_ref);when=check_sample(fleet,sample,cfg)
     c=SimpleNamespace(fleet_ref=head,fleet=fleet,stamp=when,now=utc(when),cfg=cfg,sample=sample,sample_ref=sample_ref,
@@ -361,8 +398,8 @@ def make_context(head,fleet,sample_ref,cfg,out):
     need(c.full172['observer']==sample_ref and c.full172['fleet']==head and c.full172['identity']==ident,'foreign guard evidence')
     full172.reconcile_sample(c,cycle.observed_lane)
     cold_workers.reconcile(c,cycle.observed_lane)
-    lease = fleet.get('epoch146_bounded_entry_lease')
-    entry = {'entry_lease': lease} if lease is not None else {}
+    c.entry146 = epoch146_entry(c)
+    entry = {'entry_lease': c.entry146['lease']} if c.entry146 is not None else {}
     if getattr(cold_workers, 'cold168', None):
         cold_workers.cold168.census(owners, ident, c.recovered_owners, **entry)
     else:
@@ -496,6 +533,7 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
     cold_workers.install(c,fleet)
     if PRIVATE136:
         private136.install(c,fleet)
+    install_epoch146_entry(c, fleet)
     if c.new_rows:
         active=', '.join(map(str,sorted([172,*c.new_rows])))
         pending=', '.join(map(str,sorted(set(CLOSED)-set(c.new_rows)-set(c.commits))))
