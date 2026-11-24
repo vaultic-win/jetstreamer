@@ -178,13 +178,29 @@ def drained145(s, fit):
                        any(r["MESSAGE_ID"] == EXIT and r.get("EXIT_STATUS") == "1" for r in events))),
          "different V5u outcome")
     v, vref = sealed(I145START.with_name("complete.json" if good else "failed.json"))
-    need(v["iid"] == I145 and not v["r2_mutations"], "V5u terminal receipt differs")
+    need(v["iid"] == I145, "V5u terminal receipt differs")
     if good:
+        need(v["r2_mutations"] is False, "V5u success did not preserve R2")
         leaf = binding(v["receipt"], I145START.with_name("extraction-complete.json"))
         need(leaf["actor_iid"] == I145 and leaf["recovery_evidence"] == start_ref
              and not leaf["archive_publication_authorized"] and not leaf["r2_mutations"],
              "different completed 145 candidate")
         binding(leaf["verified_frozen"], I145START.with_name("verified-frozen.json"))
+    else:
+        # The native failure journal contains only iid, at and error. The
+        # startup receipt and the unchanged private candidate bind this exit.
+        candidate = Path(started["file"])
+        expected = Path("/home/sol/.jetstreamer-private/epoch145-prefix-extract-funded-20261121-v1/.tmp36MvkN")
+        md = candidate.lstat()
+        need(set(v) == {"iid", "at", "error"}
+             and type(v["at"]) is int
+             and 0 <= int(terminal["__REALTIME_TIMESTAMP"]) // 1_000_000 - v["at"] <= 5
+             and v["error"].startswith("complete 145 capacity observation failed exit status: 1:")
+             and candidate == expected and candidate.resolve(strict=True) == candidate
+             and (md.st_dev, md.st_ino, md.st_size, md.st_mode, md.st_uid, md.st_gid, md.st_nlink)
+             == (64512, 103237059, 105610995833, stat.S_IFREG | 0o400, 0, 0, 1)
+             and not candidate.with_name("epoch-145.jet").exists(),
+             "different stopped V5u archive candidate or failure receipt")
     need(s.show(U145) == m and not fit.members(U145), "V5u name changed during terminal capture")
     return dict(stage="v5u-drained", native=m, terminal=terminal, result=vref)
 
