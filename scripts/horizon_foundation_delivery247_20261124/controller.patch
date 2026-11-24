@@ -164,7 +164,7 @@
  original={int(k):v['claim'] for k,v in definitions.items()}
  assert {r['epoch'] for r in sample_publishers}==set(map(int,states['active_claims'])) and len(sample_publishers)==len(states['active_claims'])
  import guarded_replays
-@@ -29,14 +31,17 @@
+@@ -29,23 +31,37 @@
          assert bound(ref(p))==v
          return ref(p)
      return funds.put(p,v)
@@ -175,6 +175,15 @@
 +closed=publication_handoff.collect(original,statuses,root,record,definitions)
  publishers=[r for r in sample_publishers if r['epoch'] not in closed]
 
++def status_directory(epoch):
++    if epoch == 247 and statuses[247] != states['statuses']['247']:
++        return output / '247-original-clock'
++    if epoch == 211:
++        return output / '211-full-origin'
++    if epoch == 251:
++        return output / '251-replay-origin'
++    return output / str(epoch)
++
  tool=V/'horizon265-delivery-consumers-v215-seven222a3-qualified/jetstreamer-r2'
  source={211:'20261120133744',247:'20261117045633',248:'20261117045633',249:'20261117045633',250:'20261117211823',251:'20261118215154',265:'20261120031251'}
  for row in publishers:
@@ -184,7 +193,10 @@
      assert obs in i['evidence'] and c['invocation_id']==row['unit']['InvocationID']
      b=bound(c['evidence'][0]);handoff=b['handoff'] if e!=247 else ref(V/'horizon-singleton-delivery247-20261119-v1/terminal-handoff.json')
      h=bound(handoff);origin=h['producer']['unit'];start,=[int(x['__REALTIME_TIMESTAMP'])//1000 for x in h['producer']['events'] if x.get('MESSAGE_ID')=='39f53479d3a045ac8e11786248231fbf' and x['INVOCATION_ID']==origin['InvocationID']]
-@@ -46,6 +51,8 @@
+     orig=ref(P/f'epoch-{e}.status-{source[e]}.json')
+-    wd=output/('211-full-origin' if e==211 else '251-replay-origin' if e==251 else str(e));wd.mkdir(mode=0o700,exist_ok=True);model=wd/'model.json'
++    wd=status_directory(e);wd.mkdir(mode=0o700,exist_ok=True);model=wd/'model.json'
+     v=dict(schema='jetstreamer-horizon-pipeline-status-plan-v1',epoch=e,phase=p['phase'],binding=dict(claim_phase=c['phase'],expected_exec_start=c['expected_exec_start'],unit=c['unit'],invocation_id=c['invocation_id'],origin_invocation_id=origin['InvocationID'],origin_unit=origin['Id'],model_path=str(model),model_sha256='',fleet_path=fleet['path'],fleet_sha256=fleet['sha256']),receipt_directory=str(P),observer=obs,fleet=fleet,origin_launch=orig,estimated_remaining_millis=p['estimated_remaining_millis'],expected_jet_size_bytes=p['jet_size_bytes'],jet_path=h['source']['archive']['path'],estimate_basis=i['basis'],estimate_evidence=[old['intent'],ref(root/str(e)/'timing.json'),claim],peer_units=[])
      if not model.exists():funds.put(model,v)
      assert bound(ref(model))==v
      status_tool=staged211.status_image() if e==211 and successor_211 else tool
@@ -193,3 +205,12 @@
      cmd=[status_tool,'status-publish-pipeline',model,'--plan-sha256',ref(model)['sha256']]
      if not (wd/'check.json').exists():
          r=sp.run([*cmd,'--check-only'],capture_output=True,text=True)
+@@ -68,7 +84,7 @@
+ checks={}
+ for row in publishers:
+     e=row['epoch']
+-    wd=output/('211-full-origin' if e==211 else '251-replay-origin' if e==251 else str(e))
++    wd=status_directory(e)
+     verified=ref(wd/'native.json')
+     r=bound(verified);native=bound(r['receipt'])
+     assert r['fleet']==fleet and native['pipeline_binding']['invocation_id']==row['unit']['InvocationID'] and native['authenticated_readback']
