@@ -29,7 +29,7 @@ def failed166_package(version):
     return name + '-entry146' if version >= 4 else name
 
 
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11)
                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
 FAILED166 = bool(FAILED166_VERSION)
 METERED_FULL170 = FAILED166_VERSION in (6, 7)
@@ -294,6 +294,8 @@ def publish(c,store,refs,out,epoch,archive=None):
                        estimated_remaining_millis=prior['estimated_remaining_millis']-age)
             extra.update(producer_invocation_id=None,measured_canonical_progress=False,current_repair_owner='/root',
                          estimate_model='Retain the absolute publication forecast of the authenticated predecessor.')
+            if epoch == 168 and getattr(c, 'failed168', None):
+                extra['cold168_retry4_root_physical_stop'] = c.failed168
         if PRIVATE136:
             extra.update(private136.status_fields(c,epoch))
         if HOURLY170 and epoch == 170 and c.hourly170:
@@ -534,6 +536,9 @@ def census(c,bridge):
             cap['current_cold170_full_metered_startup'] = c.recovered_ref
     if FAILED166:
         cap['retained_cold166_retry11_reservation'] = c.failed166
+    if getattr(c, 'failed168', None):
+        cap.pop('current_cold168_retry4_protection', None)
+        cap['retained_cold168_retry4_reservation'] = c.failed168
     durable(path,witness)
     return witness
 
@@ -820,7 +825,7 @@ def entry():
     if FAILED166_VERSION >= 4:
         need(cold_workers.FAILED166_CADENCE, 'cold worker census omits the drained epoch 166')
         validate_epoch146_modules(seal)
-    if FAILED166_VERSION == 10:
+    if FAILED166_VERSION in (10, 11):
         need(getattr(cold_workers, 'cold168_commit', None), 'missing cold168 terminal cadence')
         path = CURRENT.with_name('cold168_commit.py')
         member, = (item for item in seal['members'] if item['name'] == path.name)
@@ -1011,7 +1016,7 @@ def rejoin_failed166_cadence(state, receipt, fd):
     previous = 'FAILED166_CADENCE' if FAILED166_VERSION == 2 else f'FAILED166_CADENCE_V{FAILED166_VERSION - 1}'
     if FAILED166_VERSION == 8 or (HOLDING185 and ready['old_owner']['path'] == str(ROOT/'FAILED166_CADENCE_V5_ACTIVE.json')):
         previous = 'FAILED166_CADENCE_V5'
-    if FAILED166_VERSION == 10:
+    if FAILED166_VERSION in (10, 11):
         previous = 'FAILED166_CADENCE_V8'
     incumbent_ref = bound(ROOT/f'{previous}_ACTIVE.json')
     need(ready['schema'] == 'horizon-epoch166-cadence-rejoin-ready-v1'
@@ -1044,6 +1049,18 @@ def rejoin_failed166_cadence(state, receipt, fd):
          'epoch 166 cadence rejoin lost its latest fleet or observer clock')
     if FAILED166_VERSION == 8:
         check_v8_recovery_sample(ready, fleet)
+    if FAILED166_VERSION == 11:
+        stopped_writer = checked(ready['failed_writer'])
+        need(stopped_writer['invocation_id'] == old['invocation_id']
+             and stopped_writer['unit'] == CONTROLLER and stopped_writer['exit_status'] == 1
+             and stopped_writer['sample'] == ready['completed_sample']
+             and stopped_writer['failure'] == 'missing admitted cold worker 168',
+             'different previous cadence terminal')
+        completed = checked(ready['completed_sample'])
+        need(cfg['output'] == ready['completed_sample']['path'] and not timer_names(),
+             'epoch 168 stop recovery requires the original completed sample')
+        check_sample(fleet, completed, cfg)
+        cold_workers.cold168_commit.guard_stop(fleet, cfg)
     pid = os.getpid()
     actor = dict(unit=CONTROLLER, program=str(CURRENT), invocation_id=state['InvocationID'],
                  pid=pid, start_ticks=owners.ticks(pid), lock=dict(old['lock'], fd=fd))

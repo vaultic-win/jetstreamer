@@ -25,6 +25,11 @@ FIRST = dict(path=str(SOURCE/'FIRST_PROTECTED_WORKER.json'),
 CAP = 288 << 30
 STOP = '1fba7a686be4387737b8c7776a5ed92a59bff82c15ced77496e9214c94710f62'
 SHARED = BASE / 'epoch170-cold-delivery-20261122-v13/guard-closure-tools'
+FAILED_FIELD = 'cold168_retry4_root_physical_stop'
+FAILED_INTENT = dict(path=str(SOURCE/'guard-receipts/stop-intent.json'),
+                     sha256='b3dab5e0a743cfd42a7380cfa623db61c978e15c1d9b0b034d7760eead1d2926')
+FAILED_COMPLETION = dict(path=str(SOURCE/'guard-receipts/stop-completion.json'),
+                         sha256='b0538a4dee05df924a8d04f8562866df701c03996498963552a932059826cdab')
 
 
 def closure():
@@ -140,6 +145,79 @@ def retained_booking(proof):
     return dict(terminal=proof['terminal'], guard_retirement=proof.get('guard_retirement'),
                 admission=ADMISSION, post_guard_capacity=admission['post_guard_capacity'],
                 retained_cap_bytes=CAP, resource_credit_bytes=0, reservation_ending_bytes=0)
+
+
+def guard_stop(fleet, config):
+    from owners import show
+
+    intent, stopped = checked(FAILED_INTENT), checked(FAILED_COMPLETION)
+    admission, first = checked(ADMISSION), checked(FIRST)
+    plan = checked(admission['actual_guard_plan'])
+    terminal, sample = stopped['terminal'], intent['sample']
+    observed = sample['root_physical_observation']
+    need(intent['schema'] == 'jetstreamer-horizon-standalone-stop-intent-v1'
+         and stopped['schema'] == 'jetstreamer-horizon-standalone-stop-completion-v1'
+         and stopped['intent'] == FAILED_INTENT['path']
+         and stopped['plan_sha256'] == intent['plan_sha256'] == sample['plan_sha256']
+         == admission['actual_guard_plan']['sha256']
+         and first['admission'] == ADMISSION and plan['unit'] == UNIT and admission['timer_unit'] == TIMER
+         and admission['timer_invocation_id'] == TIMER_IID
+         and stopped['producer_invocation_id'] == intent['producer_invocation_id']
+         == sample['producer_invocation_id'] == terminal['invocation_id'] == plan['invocation_id']
+         == first['producer_invocation_id'] == IID
+         and intent['reason'] == sample['trip_reason'] == 'root-physical-budget'
+         and plan['maximum_root_physical_bytes'] == observed['maximum_physical_bytes'] == CAP
+         and observed['exceeds_budget'] and observed['conservative_physical_bytes'] > CAP
+         and terminal['active'] == 'inactive' and terminal['sub'] == 'dead' and terminal['pid'] == 0
+         and terminal['restarts'] == 0 and terminal['restart_policy'] == 'no'
+         and stopped['scratch_deleted'] is False and stopped['r2_mutations'] is False
+         and stopped['remote_mutations'] is False and not TERMINAL.exists() and not DRAINED.exists(),
+         'different epoch 168 retry4 guard stop')
+    for unit in (UNIT, TIMER.removesuffix('.timer') + '.service'):
+        fields = ('ActiveState', 'MainPID', 'ControlPID', 'ControlGroup', 'Job', 'InvocationID')
+        state = show(unit, fields)
+        need(state['ActiveState'] == 'inactive' and state['MainPID'] == state['ControlPID'] == '0'
+             and not state['Job'] and not state['ControlGroup'] and not state['InvocationID'],
+             'epoch 168 producer or guard is present after the stop')
+    need(show(TIMER, ('ActiveState', 'Job', 'InvocationID')) ==
+         dict(ActiveState='inactive', Job='', InvocationID=''), 'epoch 168 timer remains active')
+    need(not Path('/sys/fs/cgroup/system.slice', UNIT).exists(), 'epoch 168 cgroup remains present')
+    result = dict(terminal=FAILED_COMPLETION, stop_intent=FAILED_INTENT, admission=ADMISSION,
+                  first_worker=FIRST, producer_invocation_id=IID, retired_guard_timer=TIMER,
+                  measured_physical_bytes=observed['conservative_physical_bytes'],
+                  retained_cap_bytes=CAP, resource_credit_bytes=0, reservation_ending_bytes=0)
+    retained_booking(result)
+    live = [row for rows in ('actual_executing_replays', 'actual_active_bootstraps',
+                             'actual_active_private_diagnostics') for row in fleet[rows] if row['epoch'] == 168]
+    scheduled = [row for row in config['replays'] if row['range'] == '168']
+    owner = fleet.get(OWNERS, {}).get('168')
+    if FAILED_FIELD in fleet:
+        check_owner(fleet.get(HISTORY))
+        need(fleet[FAILED_FIELD] == result and not owner and not live and not scheduled,
+             'changed adopted epoch 168 guard stop')
+    else:
+        check_owner(owner)
+        need(len(live) == 1 and live[0]['admission'] == ADMISSION and live[0]['unit']['Id'] == UNIT
+             and live[0]['unit']['InvocationID'] == IID
+             and live[0]['start_ticks'] == owner['actor']['start_ticks']
+             and scheduled == [first['observer_row']], 'different pre-stop epoch 168 census')
+    return result
+
+
+def install_guard_stop(predecessor, fleet, proof):
+    need(not fleet.get(OWNERS, {}).get('168'), 'stopped epoch 168 still has a live owner')
+    previous_owner = predecessor.get(HISTORY) if FAILED_FIELD in predecessor else predecessor[OWNERS]['168']
+    fleet[HISTORY] = check_owner(previous_owner)
+    fleet[FAILED_FIELD] = proof
+    row = next(item for item in fleet['epochs'] if item['epoch'] == 168)
+    prior_stop = row.pop('current_home_floor_stop', row.get('original_home_floor_stop'))
+    need(prior_stop['completion']['sha256'] == STOP, 'lost epoch 168 predecessor')
+    row.pop('current_replay', None)
+    row.update(original_home_floor_stop=prior_stop, state='failed-needs-repair',
+               no_live_producer_claimed=True, repair_open=True, current_repair_owner='/root',
+               current_status_scope='Epoch 168 retry4 stopped when its replay tree exceeded its disk budget.',
+               next_action='Qualify an exact guarded replay from the retained bootstrap.',
+               **{FAILED_FIELD: proof})
 
 
 def install(predecessor, fleet, proof):

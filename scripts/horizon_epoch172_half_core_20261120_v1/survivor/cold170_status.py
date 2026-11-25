@@ -29,7 +29,7 @@ FAILED166_CADENCE = METERED_FULL or LOCAL.name in (
     'tools-cold168-retry4-failed166-v1', 'tools-cold168-retry4-failed166-v2',
     'tools-cold168-retry4-failed166-v3', 'tools-cold168-retry4-failed166-v4-entry146',
     'tools-cold168-retry4-failed166-v5-entry146', 'tools-cold168-retry4-failed166-v8-entry146',
-    'tools-cold168-retry4-failed166-v10-entry146',
+    'tools-cold168-retry4-failed166-v10-entry146', 'tools-cold168-retry4-failed166-v11-entry146',
 )
 FAILED_CADENCE = FAILED166_CADENCE or LOCAL.name == 'tools-cold168-retry4-failed170-v1'
 FAILED_STATUS = 'cold170_retry13_execution_failure'
@@ -258,7 +258,9 @@ def reconcile(c, observed_lane):
     c.commits = {}
     c.histories = {}
     terminal = terminal_route(c.fleet) if not METERED_FULL else None
-    terminal168 = cold168_commit.current(c.fleet, c.cfg) if cold168_commit else None
+    stopped168 = LOCAL.name == 'tools-cold168-retry4-failed166-v11-entry146'
+    c.failed168 = cold168_commit.guard_stop(c.fleet, c.cfg) if stopped168 else None
+    terminal168 = cold168_commit.current(c.fleet, c.cfg) if cold168_commit and not stopped168 else None
     c.failed170 = failed_route(c.fleet)
     c.failed166 = retry166.failed_route(c.fleet) if FAILED166_CADENCE else None
     need(not (terminal and c.failed170), 'conflicting epoch 170 commit and failure')
@@ -266,7 +268,8 @@ def reconcile(c, observed_lane):
         need(c.failed170, 'missing retained retry13 failure')
         full170.historical_diagnostic(c.fleet)
     blocking170 = terminal or (c.failed170 if not METERED_FULL else None)
-    enrolled = roster(module, c.fleet_ref, c.fleet, blocking170, c.failed166, terminal168=terminal168)
+    enrolled = roster(module, c.fleet_ref, c.fleet, blocking170, c.failed166,
+                      terminal168=terminal168 or c.failed168)
     if c.failed166:
         module.ROUTES.pop(166)
         need(all(r['range'] != '166' for r in c.cfg['replays']), 'failed epoch 166 remained in sampled roster')
@@ -277,16 +280,20 @@ def reconcile(c, observed_lane):
         c.commits[170] = terminal
     if terminal168:
         c.commits[168] = terminal168
-    if c.commits:
+    ended = dict(c.commits)
+    if c.failed168:
+        ended[168] = c.failed168
+    if ended:
         from copy import copy
-        committed = {str(epoch) for epoch in c.commits}
-        for epoch in c.commits:
+        removed = {str(epoch) for epoch in ended}
+        for epoch in ended:
             module.ROUTES.pop(epoch)
         # A same-sample retry can already have frozen the original live set.
         # Keep that record and bind the reduced capture separately.
         prior = c.paths['out']/'RECOVERED_WORKERS.json'
-        suffix = '-'.join(sorted(committed))
-        closed_dir = c.paths['out']/f'after-cold{suffix}-commit'
+        suffix = '-'.join(sorted(removed))
+        event = 'stop' if c.failed168 else 'commit'
+        closed_dir = c.paths['out']/f'after-cold{suffix}-{event}'
         if prior.exists():
             from evidence import durable, ensure_dir
             prior_ref = bound(prior)
@@ -294,20 +301,21 @@ def reconcile(c, observed_lane):
             need(earlier['fleet'] == c.fleet_ref and earlier['sample'] == c.sample_ref
                  and set(earlier['measured']) <= earlier['owners'].keys(),
                  'different pre-terminal cold worker capture')
-            for epoch, proof in c.commits.items():
+            for epoch, proof in ended.items():
                 old = earlier['owners'].get(str(epoch))
-                if epoch == 168 and cold168_commit.FIELD in c.fleet:
+                if epoch == 168 and (cold168_commit.FIELD in c.fleet or
+                                     cold168_commit.FAILED_FIELD in c.fleet):
                     need(old is None, 'adopted cold168 appeared in a later live capture')
                     continue
                 need(old and old['admission'] == proof['admission'] and old['first_worker'] == proof['first_worker']
                      and old['actor']['producer_invocation_id'] == proof['producer_invocation_id'],
                      'pre-terminal capture names a foreign cold worker')
-            kept = {k:v for k,v in earlier['owners'].items() if k not in committed}
+            kept = {k:v for k,v in earlier['owners'].items() if k not in removed}
             need(kept == module.ownership(c.fleet), 'surviving workers changed after cold commit')
             ensure_dir(closed_dir)
             target=closed_dir/'RECOVERED_WORKERS.json'
             reduced = dict(fleet=c.fleet_ref, sample=c.sample_ref, owners=kept,
-                           measured={k:v for k,v in earlier['measured'].items() if k not in committed},
+                           measured={k:v for k,v in earlier['measured'].items() if k not in removed},
                            prior_same_sample_capture=prior_ref)
             if target.exists(): need(checked(bound(target)) == reduced, 'changed terminal recovery capture')
             else: durable(target,reduced)
@@ -315,12 +323,12 @@ def reconcile(c, observed_lane):
         # The inherited capture helper recognizes only the predecessor retry10 field.
         sample_context.commits = {}
         sample_context.paths = dict(c.paths, out=closed_dir)
-        c.next_cfg['replays'] = [row for row in c.next_cfg['replays'] if row['range'] not in committed]
+        c.next_cfg['replays'] = [row for row in c.next_cfg['replays'] if row['range'] not in removed]
     else:
         sample_context = c
     c.next_cfg['replays'] = [row for row in c.next_cfg['replays'] if int(row['range']) not in enrolled]
     module.sample_rows(sample_context, observed_lane)
-    if c.commits:
+    if ended:
         for attr in ('recovered_ref','recovered_owners','new_rows'):
             setattr(c,attr,getattr(sample_context,attr))
     need(set(c.recovered_owners) == {str(e) for e in enrolled}, 'cold owner roster changed during capture')
@@ -384,6 +392,8 @@ def install(c, fleet):
                    next_action='Verify and publish the retained epoch 170 archive.')
     if 168 in c.commits:
         cold168_commit.install(c.fleet, fleet, c.commits[168])
+    if c.failed168:
+        cold168_commit.install_guard_stop(c.fleet, fleet, c.failed168)
     if c.failed170:
         fleet[FAILED_STATUS] = c.failed170
     if c.failed170 and '170' not in c.recovered_owners:
