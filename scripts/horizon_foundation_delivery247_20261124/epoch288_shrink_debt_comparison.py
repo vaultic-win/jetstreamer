@@ -54,6 +54,8 @@ LAYERED226_BROKER = 'foundation-226-original225-broker-v3.service'
 LAYERED226_LAUNCH_SHA = '30f1fd1a0009ff63c22f1aac39438caf570acaddfaf90bd656331e2895294df8'
 STAGING292_HELPER = V / 'horizon292-appendvec-restage-capacity-v308/epoch226_layered_capacity.py'
 STAGING292_HELPER_SHA = 'b77c611c5bc628779787dffed0b53f4e19c82179372f1b0154558edffd4e2976'
+PARK292_UNIT = 'foundation-292-appendvec-custody-v308.service'
+PARK292_START = V / 'horizon292-closed-appendvec-staging-v308/custody-start.json'
 SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
 SUFFIX226_STATE = V / 'horizon226-suffix-v1'
 CONTINUATION230_GUARDS = {
@@ -278,6 +280,33 @@ def latest_accepted_fleet(kit):
     return completion, fleet_ref, fleet
 
 
+def active_292_custody(ops):
+    owner = ops.props(PARK292_UNIT, [
+        'Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID', 'ControlGroup',
+        'AllowedCPUs', 'MemoryMax', 'MemoryCurrent', 'NRestarts',
+    ])
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup']
+        assert not (Path('/sys/fs/cgroup/system.slice') / PARK292_UNIT).exists()
+        return None
+    start_ref = binding(PARK292_START)
+    start = read(start_ref)
+    intent = read(start['intent'])
+    assert owner['ActiveState'] == 'active' and owner['SubState'] == 'running'
+    assert start['schema'] == 'foundation-epoch292-appendvec-custody-start-v1'
+    assert intent['schema'] == 'foundation-epoch292-appendvec-custody-start-intent-v1'
+    assert start['epoch'] == intent['epoch'] == 292
+    assert owner['Id'] == intent['unit'] == PARK292_UNIT and start['verified_executed_binary']
+    assert {key: owner[key] for key in start['owner']} == start['owner']
+    binary = checked(intent['binary'])
+    assert Path(f"/proc/{int(owner['MainPID'])}/exe").resolve(strict=True) == binary
+    booked = intent['capacity']
+    assert booked['booked_nvme_metadata_bytes'] == 64 << 20
+    assert booked['candidate_memory_bytes'] == int(owner['MemoryMax']) == 2 << 30
+    assert not start['local_retirement_authorized'] and not intent['local_retirement_authorized']
+    return dict(start=start_ref, owner=owner, remaining_bytes=booked['booked_nvme_metadata_bytes'])
+
+
 def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
     assert not demotion_retry or candidate_epoch == 229
     ram_quote = DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch)
@@ -341,9 +370,12 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
                                                   'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
         assert (broker['ActiveState'], broker['SubState'], int(broker['MainPID'])) == ('active', 'running', broker_record['broker_pid'])
         live.append(broker)
+    custody = active_292_custody(kit.ops)
+    if custody is not None:
+        live.append(custody['owner'])
     census = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
         '--no-pager', '--no-legend', '--plain', 'horizon-qualify-*', 'horizon-perf-*', 'horizon-upload-*',
-        'horizon-restore-*', 'foundation-*-broker-*'], text=True, timeout=10)
+        'horizon-restore-*', 'foundation-*-broker-*', PARK292_UNIT], text=True, timeout=10)
     assert {line.split()[0] for line in census.splitlines() if line.strip()} == {row['Id'] for row in live}, census
     assert all(r['AllowedCPUs'] and not (candidate_cpus & helper.cpus(r['AllowedCPUs'])) for r in live)
     mem = {k: int(value.split()[0]) * 1024 for k, value in
@@ -363,6 +395,8 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
     assert RUN.parent.stat().st_dev == root_device
     free = device.f_bavail * device.f_frsize
     protected = floor + sum(row['remaining_growth_bytes'] for row in disk_growth.values()) + helper.PUBLICATION_SCRATCH
+    if custody is not None:
+        protected += custody['remaining_bytes']
     staging = None
     if extract_state == LAYERED226_STATE:
         source = checked(fixed(STAGING292_HELPER, STAGING292_HELPER_SHA))
@@ -370,6 +404,7 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         start, owner, disk, memory = module.staging_cost(kit.ops, root_device, device.f_frsize)
+        assert custody is None or (owner['ActiveState'] == 'inactive' and disk == memory == 0)
         protected += disk
         memory_room -= memory
         staging = dict(start=start, owner=owner, remaining_bytes=disk, memory_cap=memory)
@@ -383,7 +418,7 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
     result = dict(epoch=candidate_epoch, fleet=fleet_ref, completion=completion, sampled_unix_seconds=int(time.time()),
                 live_units=owners, broker=broker, guards=growth, free_bytes=free, protected_disk_bytes=protected,
                 reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref, extraction226_terminal=terminal226,
-                staging292=staging,
+                staging292=staging, custody292=custody,
                 guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=candidate_disk,
                 candidate_memory_max_bytes=candidate_memory, candidate_cpus=sorted(candidate_cpus),
                 disk_shortfall_bytes=max(0, protected + candidate_disk - free),

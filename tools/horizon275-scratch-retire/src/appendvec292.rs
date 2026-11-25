@@ -1,5 +1,7 @@
 //! Local retirement of the one stopped AccountsDb tree proven by R2 restoration.
 use super::{selective_accounts::record, snapshot288::Stamp, *};
+#[path = "appendvec292_failed_stage.rs"]
+mod failed;
 
 const STATE: &str = "/var/lib/jetstreamer/horizon292-appendvec-retirement-v308";
 const ISSUER_LOCK: &str = "/run/horizon292-300-finite-v205-a1/issuer.lock";
@@ -114,7 +116,38 @@ fn require_census(target: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn run(apply: bool, self_sha: &str, comparison: Binding) -> Result<()> {
+fn file_stamp(metadata: &Metadata) -> Result<Value> {
+    let mut stamp = serde_json::to_value(Stamp::of(metadata)?)?;
+    stamp["mode"] = json!(metadata.mode() & 0o7777);
+    Ok(stamp)
+}
+
+fn check_retained_archive(metadata: &Metadata, expected: &Value) -> Result<Value> {
+    let actual = file_stamp(metadata)?;
+    for key in [
+        "device",
+        "inode",
+        "logical_bytes",
+        "physical_bytes",
+        "uid",
+        "mode",
+        "mtime_ns",
+        "ctime_ns",
+    ] {
+        ensure!(
+            actual[key] == expected[key],
+            "retained stopped archive changed"
+        );
+    }
+    Ok(actual)
+}
+
+pub(super) fn run(
+    apply: bool,
+    failed_stage: bool,
+    self_sha: &str,
+    comparison: Binding,
+) -> Result<()> {
     let issuer = open_regular(Path::new(ISSUER_LOCK))?;
     let mode = issuer.metadata()?;
     ensure!(
@@ -209,23 +242,7 @@ pub(super) fn run(apply: bool, self_sha: &str, comparison: Binding) -> Result<()
     );
     let kept = open_regular(archive)?;
     let a = kept.metadata()?;
-    let stamp = |m: &Metadata| -> Result<Value> { Ok(serde_json::to_value(Stamp::of(m)?)?) };
-    let retained_stamp = stamp(&a)?;
-    for key in [
-        "device",
-        "inode",
-        "logical_bytes",
-        "physical_bytes",
-        "uid",
-        "mode",
-        "mtime_ns",
-        "ctime_ns",
-    ] {
-        ensure!(
-            retained_stamp[key] == retained["archive"][key],
-            "retained stopped archive changed"
-        );
-    }
+    let retained_stamp = check_retained_archive(&a, &retained["archive"])?;
     let bundle = open_regular(Path::new(BUNDLE))?;
     let b = bundle.metadata()?;
     ensure!(
@@ -240,16 +257,9 @@ pub(super) fn run(apply: bool, self_sha: &str, comparison: Binding) -> Result<()
         .as_u64()
         .context("missing source inode")?;
     let root = stopped_tree::open_root(target, device, inode)?;
-    assert_no_nested_mount(target)?;
-    let schedule = scheduled(run, target)?;
-    let consumers = process_references::scan(Path::new("/proc"), target)?;
-    ensure!(
-        consumers.inspected_processes > 0 && consumers.references.is_empty(),
-        "live 292 source consumers"
-    );
     let anchors = json!({
         "self_sha256":self_sha,"comparison":comparison_ref,"restore_start":start_ref,
-        "target":target,"device":device,"inode":inode,"retained_archive":retained_stamp,"local_bundle":stamp(&b)?,
+        "target":target,"device":device,"inode":inode,"retained_archive":retained_stamp,"local_bundle":file_stamp(&b)?,
     });
     let state = Path::new(STATE);
     let permissions = state.symlink_metadata()?;
@@ -261,6 +271,20 @@ pub(super) fn run(apply: bool, self_sha: &str, comparison: Binding) -> Result<()
         "unsafe retirement state"
     );
     let capture = || stopped_tree::capture(&root, device, 1000, 1000);
+    assert_no_nested_mount(target)?;
+    if failed_stage {
+        let (tree_ref, done) = snapshot288::lookup_receipt(&state.join("completion.json"))?
+            .context("original AccountsDb retirement must be complete")?;
+        ensure!(
+            done["authorization"]["anchors"] == anchors
+                && done["epoch"] == 292
+                && done["empty_root_retained"] == true
+                && capture()?.len() == 1,
+            "failed-stage cleanup requires the same AccountsDb retirement and an empty root"
+        );
+        return failed::run(apply, state, &result, tree_ref);
+    }
+    let readers = failed::accounts_readers(run, target)?;
     let ledger_path = state.join("ledger.json");
     if !apply {
         ensure!(
@@ -283,7 +307,7 @@ pub(super) fn run(apply: bool, self_sha: &str, comparison: Binding) -> Result<()
             record(
                 &ledger_path,
                 &json!({
-                    "anchors":anchors,"entries":entries,"scheduled":schedule,"consumers":consumers,
+                    "anchors":anchors,"entries":entries,"scheduled":readers["scheduled"],"consumers":readers["processes"],
                 }),
             )?
         };
@@ -371,6 +395,16 @@ mod tests {
             entries.len() == FILES + 5,
             "wrong original 292 tree member count"
         );
+        let terminal: Value = read_bound(Path::new(TERMINAL), TERMINAL_SHA, JSON_LIMIT)?;
+        let native = value(&terminal["native_exit"])?;
+        let expected_archive = &native["original_custody"]["files"]["archive"];
+        let archive = Path::new(
+            expected_archive["path"]
+                .as_str()
+                .context("missing retained archive path")?,
+        );
+        check_retained_archive(&open_regular(archive)?.metadata()?, expected_archive)?;
+        failed::accounts_readers(Path::new(snapshot288::RUN292), target)?;
         Ok(())
     }
 }
