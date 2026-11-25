@@ -59,7 +59,7 @@ PARK292_UNIT = 'foundation-292-appendvec-custody-v308.service'
 PARK292_START = V / 'horizon292-closed-appendvec-staging-v308/custody-start.json'
 STAGE228_UNIT = 'foundation-228-sparse-bundle-v1.service'
 STAGE228 = V / 'horizon228-private-guest-staging-v1'
-STAGE288_UNIT = 'foundation-288-appendvec-stage-v1.service'
+STAGE288_UNIT = 'foundation-288-appendvec-stage-v2.service'
 STAGE288 = V / 'horizon288-closed-appendvec-study-v1'
 PUBLIC_AUDIT = V / 'horizon-foundation-public-audit-148-156-v1'
 PUBLIC_AUDIT_RELEASE_SHA = 'ea750bf0be9c6742af0ca1503e8cba094594557e1b5225ad8ff93f693f2a344d'
@@ -358,7 +358,7 @@ def active_288_staging(ops):
         assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
         return None
     assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (STAGE288_UNIT, 'active', 'running')
-    start_ref = binding(STAGE288 / 'staging-start.json')
+    start_ref = binding(STAGE288 / 'staging-start-v2.json')
     start = read(start_ref)
     assert start['schema'] == 'foundation-epoch288-appendvec-staging-start-v1'
     assert owner['ControlGroup'] == '/system.slice/' + STAGE288_UNIT
@@ -485,7 +485,8 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
     census = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
         '--no-pager', '--no-legend', '--plain', 'horizon-qualify-*', 'horizon-perf-*', 'horizon-upload-*',
         'horizon-restore-*', 'foundation-*-broker-*', 'foundation-public-audit-*',
-        'foundation-*-ext4-*', PARK292_UNIT, STAGE228_UNIT, STAGE288_UNIT], text=True, timeout=10)
+        'foundation-*-ext4-*', PARK292_UNIT, STAGE228_UNIT, 'foundation-288-appendvec-stage-*'],
+        text=True, timeout=10)
     listed_units = {line.split()[0] for line in census.splitlines() if line.strip()}
     public_audit = active_public_audit(helper, listed_units)
     if public_audit is not None:

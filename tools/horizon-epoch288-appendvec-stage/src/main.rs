@@ -30,7 +30,7 @@ const STATE: &str = "/var/lib/jetstreamer/horizon288-closed-appendvec-study-v1";
 const TERMINAL: &str = "/var/lib/jetstreamer/horizon288-full-v303/terminal.json";
 const PRODUCER: &str = "horizon-qualify-288-root-singleton-v303.service";
 const TIMER: &str = "horizon-288-full-protective-v303.timer";
-const UNIT: &str = "foundation-288-appendvec-stage-v1.service";
+const UNIT: &str = "foundation-288-appendvec-stage-v2.service";
 const FILE: &str = "epoch-288-closed-appendvecs.pax.zst";
 const CAP: u64 = 96 << 30;
 const SAMPLE_SHA: &str = "5c07a84b6b2c7fd38dd5c3eb74db191b826d53b8827b5b9735d5c214188d6272";
@@ -195,11 +195,11 @@ fn guarded_invocation() -> Result<String> {
     }
     let io_limit = fs::read_to_string(cgroup.join("io.max"))?;
     ensure!(
-        io_limit.lines().any(|line| line.starts_with("259:1 ")
+        io_limit.lines().any(|line| line.starts_with("259:0 ")
             && line
                 .split_ascii_whitespace()
                 .any(|field| field == "rbps=134217728")),
-        "staging source bandwidth limit differs"
+        "staging source bandwidth limit differs: {io_limit}"
     );
     let invocation = std::env::var("INVOCATION_ID")?;
     ensure!(
