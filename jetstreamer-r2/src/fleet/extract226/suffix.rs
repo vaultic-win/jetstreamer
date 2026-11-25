@@ -441,14 +441,50 @@ fn start_guard(guard_plan: &Value) -> Result<()> {
     start(&args)
 }
 
+fn registration_receipt(id: &str, pid: u64, owner: &Value, token: &Value, sample: &Value) -> Value {
+    json!({
+        "schema": "jetstreamer-historical-performance-launch-receipt-v1",
+        "kind": "epoch226-checkpoint-suffix",
+        "epoch": 226,
+        "unit": UNIT,
+        "invocation_id": id,
+        "main_pid": pid,
+        "node_path": NODE,
+        "run_root": ROOT,
+        "bootstrap_slot": 98063464,
+        "first_slot": 98063465,
+        "last_slot": 98063999,
+        "worker_sha256": WORKER_SHA,
+        "launched": true,
+        "entry_replay_requested": true,
+        "source_prefix_retained": true,
+        "canonical_epoch_publication_authorized": false,
+        "remote_mutations": false,
+        "r2_mutations": false,
+        "admission": token["admission"],
+        "plan": token["plan"],
+        "guard_plan": token["guard_plan"],
+        "launch_token": token,
+        "active_guard": sample,
+        "evidence": {"units": [{
+            "unit": UNIT,
+            "invocation_id": id,
+            "main_pid": pid,
+            "active_state": owner["ActiveState"],
+            "sub_state": owner["SubState"],
+            "load_state": owner["LoadState"],
+            "result": owner["Result"],
+            "restarts": 0,
+        }]},
+    })
+}
+
 fn registration(prestart: &Value, token: &Value) -> Result<Value> {
     let id = prestart["InvocationID"]
         .as_str()
         .context("suffix invocation id")?;
     let launch_token = sealed_json(token, &path(&format!("tokens/{id}/guard-admission.json")))?;
     let guard = &launch_token["guard_plan"];
-    let admission = &launch_token["admission"];
-    let plan = &launch_token["plan"];
     ensure!(
         launch_token["invocation_id"] == id && launch_token["unit"] == UNIT,
         "suffix token owner changed"
@@ -487,11 +523,7 @@ fn registration(prestart: &Value, token: &Value) -> Result<Value> {
         .parse()?;
     record(
         &path("cadence-registration.json"),
-        &json!({"schema":"jetstreamer-historical-performance-launch-receipt-v1",
-        "kind":"epoch226-checkpoint-suffix","epoch":226,"unit":UNIT,"invocation_id":id,"main_pid":pid,"node_path":NODE,"run_root":ROOT,
-        "bootstrap_slot":98063464,"first_slot":98063465,"last_slot":98063999,"worker_sha256":WORKER_SHA,"launched":true,
-        "entry_replay_requested":true,"source_prefix_retained":true,"canonical_epoch_publication_authorized":false,"remote_mutations":false,
-        "admission":admission,"plan":plan,"guard_plan":guard,"launch_token":token,"active_guard":sample}),
+        &registration_receipt(id, pid, &owner, &launch_token, &sample),
     )
 }
 
@@ -730,4 +762,35 @@ fn suffix_launch_returns_to_the_controller_before_prestart_releases_the_node() -
         &format!("--checkpoint-continuation-plan-sha256={hash}")
     );
     Ok(())
+}
+
+#[cfg(test)]
+#[test]
+fn epoch226_suffix_registration_matches_the_fleet_validator() -> Result<()> {
+    use crate::fleet::{BoundFile, DiagnosticClaim, validate_diagnostic_launch};
+
+    let claim = DiagnosticClaim {
+        epoch: 226,
+        unit: UNIT.into(),
+        invocation_id: "a".repeat(32),
+        scratch_path: ROOT.into(),
+        launch_receipt: BoundFile {
+            path: path("cadence-registration.json"),
+            sha256: "b".repeat(64),
+        },
+    };
+    let owner = json!({
+        "ActiveState": "active",
+        "SubState": "running",
+        "LoadState": "loaded",
+        "Result": "success",
+    });
+    let receipt = registration_receipt(
+        &claim.invocation_id,
+        123,
+        &owner,
+        &Value::Null,
+        &Value::Null,
+    );
+    validate_diagnostic_launch(&receipt, &claim)
 }
