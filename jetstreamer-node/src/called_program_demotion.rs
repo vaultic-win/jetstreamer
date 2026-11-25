@@ -1,4 +1,4 @@
-//! Private replay of epoch 230 through the first independent root after the bank divergence.
+//! Private called-program demotion replays through independently verified accounts roots.
 use crate::{
     BankHashExpectation, QualificationPlan, ReadyEntry, compatibility as c, historical as h,
 };
@@ -15,21 +15,23 @@ use std::{
     },
 };
 
-pub(crate) const BOOTSTRAP: u64 = 99_359_376;
-const FIRST: u64 = 99_360_000;
-const END: u64 = 99_375_855;
-pub(crate) const DIVERGENT_SLOT: u64 = 99_368_201;
-pub(crate) const BACKEND: &str = "solana-v1.6.20-epoch230-called-program-demotion-candidate";
-const WORKER_ENV: &str = "JETSTREAMER_HISTORICAL_WORKER_EPOCH230_DEMOTION";
-const WORKER_SHA: Option<&str> = option_env!("JETSTREAMER_EPOCH230_DEMOTION_WORKER_SHA256");
-const RUN_ROOT: &str = "/home/ubuntu/.jetstreamer-private/epoch230-demotion-tmpfs-v328/run";
-const OUTPUT: &str = "epoch-230-program-demotion-diagnostic.jet";
-const BOOT_ACCOUNTS: &str = "CykUWyU9f91ZqjX3tbHTsU4XK1zyBjLYTkkxvb2VdsUn";
-const TERMINAL_ACCOUNTS: &str = "HouDs53rM8iQ8fuUwyZRFEukWj9ZW6HoHx4fXCSFQRBJ";
-const DIVERGENT_BANK: &str = "89zqtixCP9j6kauK8iKNHLveCsSQY5LBynQiXXew5FQ5";
-const SNAPSHOT_SHA: &str = "583a053d2a20a11aa232f4e848717ed75a3974ab2de564536f015b8fc9018669";
-const WIRE: &[u8] = include_bytes!("../../historical-runtime/fixtures/epoch230-99368201-tx680.bin");
-const TRANSACTION_INDEX: usize = 680;
+#[cfg(all(
+    feature = "epoch229-called-program-demotion-qualification",
+    feature = "epoch230-called-program-demotion-qualification",
+))]
+compile_error!("choose one called-program demotion qualification epoch");
+
+#[cfg_attr(
+    feature = "epoch229-called-program-demotion-qualification",
+    path = "called_program_demotion/epoch229.rs"
+)]
+#[cfg_attr(
+    not(feature = "epoch229-called-program-demotion-qualification"),
+    path = "called_program_demotion/epoch230.rs"
+)]
+mod profile;
+use profile::*;
+pub(crate) use profile::{BACKEND, BOOTSTRAP, CAPABILITY_ARG, DIVERGENT_SLOT, EPOCH};
 
 #[cfg(any(
     original_entry_replay,
@@ -55,11 +57,13 @@ const TRANSACTION_INDEX: usize = 680;
     feature = "epoch228-called-program-demotion-qualification",
     feature = "epochs209-212-singleton-qualification",
 ))]
-compile_error!("epoch 230 demotion requires its own private parent build");
+compile_error!("called-program demotion requires its own private parent build");
 
 pub(crate) fn validate_worker_digest(actual: [u8; 32]) -> Result<(), String> {
     if actual == [0; 32] || WORKER_SHA != Some(sha256_hex_string(&actual).as_str()) {
-        return Err("epoch 230 requires the candidate worker SHA-256 pinned at build time".into());
+        return Err(format!(
+            "epoch {EPOCH} requires the candidate worker SHA-256 pinned at build time"
+        ));
     }
     Ok(())
 }
@@ -74,7 +78,9 @@ pub(crate) fn select(
     allow: bool,
 ) -> Result<c::RuntimeSelection, String> {
     if !focused || !allow || !selected(&range) {
-        return Err("epoch 230 demotion requires the exact focused replay range".into());
+        return Err(format!(
+            "epoch {EPOCH} demotion requires the exact focused replay range"
+        ));
     }
     static DESCRIPTOR: OnceLock<c::RuntimeDescriptor> = OnceLock::new();
     let descriptor = DESCRIPTOR.get_or_init(|| {
@@ -83,7 +89,7 @@ pub(crate) fn select(
         value.worker = Some(c::WorkerExecutable {
             identity: "jetstreamer-historical-worker-v1-6-20",
             environment_override: WORKER_ENV,
-            default_manifest_relative_path: "/nonexistent/epoch230-demotion-requires-bound-worker",
+            default_manifest_relative_path: "/nonexistent/demotion-requires-bound-worker",
         });
         value
     });
@@ -103,7 +109,7 @@ pub(crate) fn worker_profile(
             .worker
             .is_none_or(|worker| worker.environment_override != WORKER_ENV)
     {
-        return Err("epoch 230 candidate worker identity differs".into());
+        return Err(format!("epoch {EPOCH} candidate worker identity differs"));
     }
     Ok(h::WorkerProfile {
         backend_id: BACKEND,
@@ -111,13 +117,13 @@ pub(crate) fn worker_profile(
     })
 }
 
-pub(crate) const CAPABILITY_ARG: &str = "--epoch230-demotion-capability";
-
 pub(crate) fn entrypoint(args: &[String]) -> Result<(), String> {
     if args.len() == 1 && matches!(args[0].as_str(), "-h" | "--help" | CAPABILITY_ARG) {
         return Ok(());
     }
-    if !matches!(args.first().map(String::as_str), Some("230" | "230-230"))
+    if !args
+        .first()
+        .is_some_and(|epoch| EPOCH_ARGS.contains(&epoch.as_str()))
         || args.iter().filter(|arg| arg.starts_with("--")).any(|arg| {
             [
                 "recover",
@@ -135,7 +141,9 @@ pub(crate) fn entrypoint(args: &[String]) -> Result<(), String> {
             .any(|option| arg.contains(option))
         })
     {
-        return Err("epoch 230 requires its focused private entrypoint".into());
+        return Err(format!(
+            "epoch {EPOCH} requires its focused private entrypoint"
+        ));
     }
     Ok(())
 }
@@ -154,15 +162,20 @@ pub(crate) fn launch(
             p.replay_start,
             p.output_slot_start,
             p.end_inclusive,
-        ) == (230, BOOTSTRAP, BOOTSTRAP + 1, FIRST, END)
+        ) == (EPOCH, BOOTSTRAP, BOOTSTRAP + 1, FIRST, END)
     });
-    if (first, last) != (230, 230) || !exact_plan || incompatible_mode {
-        return Err("epoch 230 candidate requires its exact cold-through-root invocation".into());
+    if (first, last) != (EPOCH, EPOCH) || !exact_plan || incompatible_mode {
+        return Err(format!(
+            "epoch {EPOCH} candidate requires its exact cold-through-root invocation"
+        ));
     }
-    let (ledger, output, scratch) = paths.ok_or("explicit private epoch 230 paths required")?;
+    let (ledger, output, scratch) =
+        paths.ok_or_else(|| format!("explicit private epoch {EPOCH} paths required"))?;
     let ledger_path = Path::new(RUN_ROOT).join("output");
     if ledger != ledger_path || scratch != ledger_path || output != ledger_path.join(OUTPUT) {
-        return Err("epoch 230 requires the guarded v328 ledger, scratch and output".into());
+        return Err(format!(
+            "epoch {EPOCH} requires the guarded ledger, scratch and output"
+        ));
     }
     Ok(())
 }
@@ -171,7 +184,9 @@ pub(crate) fn fresh_filesystem(ledger: &Path) -> Result<(), String> {
     let root = Path::new(RUN_ROOT);
     let state = root.join("state");
     if std::env::var_os(crate::PRIVATE_RUN_ROOT_ENV).as_deref() != Some(state.as_os_str()) {
-        return Err("epoch 230 requires the guarded v328 private run state".into());
+        return Err(format!(
+            "epoch {EPOCH} requires the guarded private run state"
+        ));
     }
     let indexes = ledger.join("compact-indexes");
     for path in [
@@ -179,8 +194,8 @@ pub(crate) fn fresh_filesystem(ledger: &Path) -> Result<(), String> {
         ledger,
         &state,
         &indexes,
-        &indexes.join("229"),
-        &indexes.join("230"),
+        &indexes.join((EPOCH - 1).to_string()),
+        &indexes.join(EPOCH.to_string()),
     ] {
         let metadata = std::fs::symlink_metadata(path).map_err(|error| error.to_string())?;
         if !metadata.is_dir()
@@ -189,7 +204,7 @@ pub(crate) fn fresh_filesystem(ledger: &Path) -> Result<(), String> {
             || path.canonicalize().map_err(|error| error.to_string())? != path
         {
             return Err(format!(
-                "epoch 230 requires an owner-only directory at {}",
+                "epoch {EPOCH} requires an owner-only directory at {}",
                 path.display()
             ));
         }
@@ -197,13 +212,15 @@ pub(crate) fn fresh_filesystem(ledger: &Path) -> Result<(), String> {
     let genesis = ledger.join("genesis.tar.bz2");
     let metadata = std::fs::symlink_metadata(&genesis).map_err(|error| error.to_string())?;
     if !metadata.is_file() || metadata.mode() & 0o222 != 0 {
-        return Err("epoch 230 requires the prebound read-only genesis".into());
+        return Err(format!(
+            "epoch {EPOCH} requires the prebound read-only genesis"
+        ));
     }
     for entry in std::fs::read_dir(ledger).map_err(|error| error.to_string())? {
         let entry = entry.map_err(|error| error.to_string())?;
         if entry.path() != genesis && entry.path() != indexes {
             return Err(format!(
-                "epoch 230 refuses existing output {}",
+                "epoch {EPOCH} refuses existing output {}",
                 entry.path().display()
             ));
         }
@@ -213,7 +230,7 @@ pub(crate) fn fresh_filesystem(ledger: &Path) -> Result<(), String> {
         .next()
         .is_some()
     {
-        return Err("epoch 230 refuses occupied private run state".into());
+        return Err(format!("epoch {EPOCH} refuses occupied private run state"));
     }
     Ok(())
 }
@@ -238,7 +255,9 @@ pub(crate) fn expectations(
         || expected.get(&BOOTSTRAP) != Some(&boot)
         || expected.get(&END) != Some(&terminal)
     {
-        return Err("epoch 230 requires the two independently pinned snapshot roots".into());
+        return Err(format!(
+            "epoch {EPOCH} requires the two independently pinned snapshot roots"
+        ));
     }
     Ok(expected)
 }
@@ -247,12 +266,12 @@ pub(crate) fn bind_initialization(
     mut initialization: h::HistoricalInitialization,
 ) -> Result<h::HistoricalInitialization, String> {
     let h::HistoricalInitialization::SnapshotArchive(snapshot) = &mut initialization else {
-        return Err("epoch 230 requires the exact cold snapshot".into());
+        return Err(format!("epoch {EPOCH} requires the exact cold snapshot"));
     };
     if snapshot.expected_slot != BOOTSTRAP
         || Hash::new_from_array(snapshot.expected_accounts_hash).to_string() != BOOT_ACCOUNTS
     {
-        return Err("epoch 230 cold snapshot commitment differs".into());
+        return Err(format!("epoch {EPOCH} cold snapshot commitment differs"));
     }
     let mut sha256 = [0; 32];
     for (index, byte) in sha256.iter_mut().enumerate() {
@@ -260,7 +279,7 @@ pub(crate) fn bind_initialization(
             .map_err(|error| error.to_string())?;
     }
     snapshot.expected_archive_sha256 = Some(sha256);
-    snapshot.expected_archive_size = Some(10_888_743_994);
+    snapshot.expected_archive_size = Some(SNAPSHOT_BYTES);
     Ok(initialization)
 }
 
@@ -270,9 +289,9 @@ pub(crate) fn validate_initialized(client: &h::HistoricalRuntimeClient) -> Resul
     if initialization.source != h::HistoricalInitializedSource::SnapshotArchive
         || initialization.slot != BOOTSTRAP
         || initialization.ticks_per_slot != 64
-        || initialization.next_write_version != 116_194_083_839
+        || initialization.next_write_version != BOOT_WRITE_VERSION
     {
-        return Err("epoch 230 cold worker initialization differs".into());
+        return Err(format!("epoch {EPOCH} cold worker initialization differs"));
     }
     Ok(())
 }
@@ -288,7 +307,9 @@ impl Verification {
             .compare_exchange(previous, next, Ordering::SeqCst, Ordering::SeqCst)
             .map(|_| ())
             .map_err(|actual| {
-                format!("epoch 230 qualification stage {actual} differs from expected {previous}")
+                format!(
+                    "epoch {EPOCH} qualification stage {actual} differs from expected {previous}"
+                )
             })
     }
 
@@ -306,18 +327,22 @@ impl Verification {
         let Some(transaction) = entry.txs.get(offset) else {
             return Ok(());
         };
-        let actual = outcomes.get(offset).ok_or("epoch 230 outcome missing")?;
+        let actual = outcomes
+            .get(offset)
+            .ok_or("called-program demotion outcome missing")?;
         if transaction.expected_status != Some(Ok(()))
             || actual.error.is_some()
             || actual.fee != 5_000
             || bincode::serialize(&transaction.tx).map_err(|error| error.to_string())? != WIRE
         {
-            return Err(
-                "epoch 230 transaction 680 differs from its signed successful record".into(),
-            );
+            return Err(format!(
+                "epoch {EPOCH} transaction {TRANSACTION_INDEX} differs from its signed successful record"
+            ));
         }
         self.advance(1, 2)?;
-        log::info!("epoch 230 verified exact signed transaction 680 at slot {DIVERGENT_SLOT}");
+        log::info!(
+            "epoch {EPOCH} verified exact signed transaction {TRANSACTION_INDEX} at slot {DIVERGENT_SLOT}"
+        );
         Ok(())
     }
 
@@ -329,31 +354,32 @@ impl Verification {
                 if !checkpoint.slot_complete
                     || !checkpoint.writes.is_empty()
                     || accounts.to_string() != BOOT_ACCOUNTS
-                    || bank.to_string() != "7PocVnyaKWeyXuqpEYMx6ERoycKrwcTLJaLMPAB52azc"
-                    || Hash::new_from_array(checkpoint.last_blockhash).to_string()
-                        != "8b45DY4RaBLFCYcgsbAkJwFGzytVDVYYcnYgo7cqfuYF"
-                    || checkpoint.capitalization != 505_325_492_931_098_515
-                    || checkpoint.transaction_count != 30_839_958_954
-                    || checkpoint.tick_height != 6_359_000_128
-                    || checkpoint.next_write_version != 116_194_083_839
+                    || bank.to_string() != BOOT_BANK
+                    || Hash::new_from_array(checkpoint.last_blockhash).to_string() != BOOT_POH
+                    || checkpoint.capitalization != BOOT_CAPITALIZATION
+                    || checkpoint.transaction_count != BOOT_TRANSACTIONS
+                    || checkpoint.tick_height != BOOT_TICK_HEIGHT
+                    || checkpoint.next_write_version != BOOT_WRITE_VERSION
                 {
-                    return Err(
-                        "epoch 230 candidate differs from the pinned cold checkpoint".into(),
-                    );
+                    return Err(format!(
+                        "epoch {EPOCH} candidate differs from the pinned cold checkpoint"
+                    ));
                 }
                 self.advance(0, 1)?;
             }
             DIVERGENT_SLOT => {
                 if !checkpoint.slot_complete || bank.to_string() != DIVERGENT_BANK {
                     return Err(format!(
-                        "epoch 230 bank hash at {DIVERGENT_SLOT} is {bank}, expected {DIVERGENT_BANK}"
+                        "epoch {EPOCH} bank hash at {DIVERGENT_SLOT} is {bank}, expected {DIVERGENT_BANK}"
                     ));
                 }
                 self.advance(2, 3)?;
             }
             END => {
                 if !checkpoint.slot_complete || accounts.to_string() != TERMINAL_ACCOUNTS {
-                    return Err("epoch 230 candidate differs from the pinned terminal root".into());
+                    return Err(format!(
+                        "epoch {EPOCH} candidate differs from the pinned terminal root"
+                    ));
                 }
                 self.advance(3, 4)?;
             }
@@ -367,12 +393,14 @@ impl Verification {
         outcome: h::HistoricalShutdownOutcome,
     ) -> Result<(), String> {
         if self.stage.load(Ordering::SeqCst) != 4 {
-            return Err("epoch 230 qualification ended before the terminal root passed".into());
+            return Err(format!(
+                "epoch {EPOCH} qualification ended before the terminal root passed"
+            ));
         }
         match outcome {
             h::HistoricalShutdownOutcome::Reaped { forced: false, .. } => Ok(()),
             other => Err(format!(
-                "epoch 230 candidate did not exit naturally: {other:?}"
+                "epoch {EPOCH} candidate did not exit naturally: {other:?}"
             )),
         }
     }
@@ -385,8 +413,8 @@ pub(crate) fn capability() -> Result<serde_json::Value, String> {
     let actual = h::measure_executable_sha256(&executable).map_err(|error| error.to_string())?;
     validate_worker_digest(actual)?;
     Ok(serde_json::json!({
-        "schema": "jetstreamer-private-epoch230-demotion-parent-capability-v1",
-        "epoch": 230,
+        "schema": CAPABILITY_SCHEMA,
+        "epoch": EPOCH,
         "runtime_profile": BACKEND,
         "worker_executable": executable,
         "worker_sha256": WORKER_SHA,
@@ -410,11 +438,11 @@ mod tests {
     fn rejects_foreign_cli_and_mismatched_work_paths() {
         assert!(entrypoint(&["--help".into()]).is_ok());
         assert!(entrypoint(&[CAPABILITY_ARG.into()]).is_ok());
-        assert!(entrypoint(&["229".into()]).is_err());
-        assert!(entrypoint(&["230".into(), "--checkpoint-export=anything".into()]).is_err());
+        assert!(entrypoint(&["201".into()]).is_err());
+        assert!(entrypoint(&[EPOCH.to_string(), "--checkpoint-export=anything".into()]).is_err());
 
         let expected = QualificationPlan {
-            epoch: 230,
+            epoch: EPOCH,
             bootstrap_slot: BOOTSTRAP,
             replay_start: BOOTSTRAP + 1,
             output_slot_start: FIRST,
@@ -423,18 +451,18 @@ mod tests {
         let ledger = Path::new(RUN_ROOT).join("output");
         let output = ledger.join(OUTPUT);
         let paths = Some((ledger.as_path(), output.as_path(), ledger.as_path()));
-        assert!(launch(230, 230, Some(expected), false, paths).is_ok());
-        assert!(launch(230, 231, Some(expected), false, paths).is_err());
-        assert!(launch(230, 230, Some(expected), true, paths).is_err());
+        assert!(launch(EPOCH, EPOCH, Some(expected), false, paths).is_ok());
+        assert!(launch(EPOCH, EPOCH + 1, Some(expected), false, paths).is_err());
+        assert!(launch(EPOCH, EPOCH, Some(expected), true, paths).is_err());
         let earlier_end = QualificationPlan {
             end_inclusive: DIVERGENT_SLOT,
             ..expected
         };
-        assert!(launch(230, 230, Some(earlier_end), false, paths).is_err());
+        assert!(launch(EPOCH, EPOCH, Some(earlier_end), false, paths).is_err());
         assert!(
             launch(
-                230,
-                230,
+                EPOCH,
+                EPOCH,
                 Some(expected),
                 false,
                 Some((&ledger, &output, Path::new("/tmp")))
@@ -452,15 +480,15 @@ mod tests {
         let raw = |hash: &str| hash.parse::<Hash>().unwrap().to_bytes();
         let mut checkpoint = h::HistoricalCheckpoint {
             slot: BOOTSTRAP,
-            bank_hash: raw("7PocVnyaKWeyXuqpEYMx6ERoycKrwcTLJaLMPAB52azc"),
+            bank_hash: raw(BOOT_BANK),
             accounts_hash: raw(BOOT_ACCOUNTS),
-            last_blockhash: raw("8b45DY4RaBLFCYcgsbAkJwFGzytVDVYYcnYgo7cqfuYF"),
-            capitalization: 505_325_492_931_098_515,
-            transaction_count: 30_839_958_954,
-            tick_height: 6_359_000_128,
+            last_blockhash: raw(BOOT_POH),
+            capitalization: BOOT_CAPITALIZATION,
+            transaction_count: BOOT_TRANSACTIONS,
+            tick_height: BOOT_TICK_HEIGHT,
             slot_complete: true,
             writes: vec![],
-            next_write_version: 116_194_083_839,
+            next_write_version: BOOT_WRITE_VERSION,
         };
         let gate = Verification::default();
         let clean = h::HistoricalShutdownOutcome::Reaped {

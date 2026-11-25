@@ -28,8 +28,8 @@
 compile_error!("epoch 226 scoped repair requires its own exclusive private build");
 #[cfg(feature = "epoch228-called-program-demotion-qualification")]
 mod epoch228_demotion;
-#[cfg(feature = "epoch230-called-program-demotion-qualification")]
-mod epoch230_demotion;
+#[cfg(called_program_demotion_replay)]
+mod called_program_demotion;
 #[cfg(all(
     feature = "epoch163-first-output128-diagnostic",
     any(
@@ -5853,9 +5853,9 @@ fn select_runtime_for_invocation(
     if focused_qualification && epoch228_demotion::selected(&range) {
         return epoch228_demotion::select(range, focused_qualification, allow_candidate_runtime);
     }
-    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-    if focused_qualification && epoch230_demotion::selected(&range) {
-        return epoch230_demotion::select(range, focused_qualification, allow_candidate_runtime);
+    #[cfg(called_program_demotion_replay)]
+    if focused_qualification && called_program_demotion::selected(&range) {
+        return called_program_demotion::select(range, focused_qualification, allow_candidate_runtime);
     }
     if focused_qualification
         || epoch207_singleton::selected(&range)
@@ -5884,12 +5884,15 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
             allow_candidate_runtime,
         );
     }
-    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-    if focused_qualification && epoch230_demotion::selected(&output_range) {
-        if replay_start != epoch230_demotion::BOOTSTRAP + 1 {
-            return Err("private epoch 230 requires its exact cold replay start".into());
+    #[cfg(called_program_demotion_replay)]
+    if focused_qualification && called_program_demotion::selected(&output_range) {
+        if replay_start != called_program_demotion::BOOTSTRAP + 1 {
+            return Err(format!(
+                "private epoch {} requires its exact cold replay start",
+                called_program_demotion::EPOCH
+            ));
         }
-        return epoch230_demotion::select(
+        return called_program_demotion::select(
             output_range,
             focused_qualification,
             allow_candidate_runtime,
@@ -5920,9 +5923,9 @@ fn runtime_span_selection(
     if epoch228_demotion::selected(&span.slots) {
         return epoch228_demotion::select(span.slots.clone(), true, true);
     }
-    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-    if epoch230_demotion::selected(&span.slots) {
-        return epoch230_demotion::select(span.slots.clone(), true, true);
+    #[cfg(called_program_demotion_replay)]
+    if called_program_demotion::selected(&span.slots) {
+        return called_program_demotion::select(span.slots.clone(), true, true);
     }
     let compatibility::EraBackend::Available(descriptor) = span.execution.backend else {
         return Err(format!(
@@ -8010,9 +8013,9 @@ fn historical_worker_profile(
     if descriptor.identity.name == epoch228_demotion::BACKEND {
         return epoch228_demotion::worker_profile(descriptor);
     }
-    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-    if descriptor.identity.name == epoch230_demotion::BACKEND {
-        return epoch230_demotion::worker_profile(descriptor);
+    #[cfg(called_program_demotion_replay)]
+    if descriptor.identity.name == called_program_demotion::BACKEND {
+        return called_program_demotion::worker_profile(descriptor);
     }
     let profile = match descriptor.backend {
         compatibility::RuntimeBackend::SolanaV1_0_7 => historical::SOLANA_V1_0_7_CANDIDATE,
@@ -12318,8 +12321,8 @@ async fn run_geyser_replay(
             Some((ledger_dir, &horizon_output, replay_scratch_dir)),
         )?;
     }
-    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-    epoch230_demotion::launch(
+    #[cfg(called_program_demotion_replay)]
+    called_program_demotion::launch(
         epoch,
         epoch,
         qualification,
@@ -12883,8 +12886,8 @@ async fn run_geyser_replay(
                         };
                     #[cfg(feature = "epoch228-called-program-demotion-qualification")]
                     let initialization = epoch228_demotion::bind_initialization(initialization)?;
-                    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-                    let initialization = epoch230_demotion::bind_initialization(initialization)?;
+                    #[cfg(called_program_demotion_replay)]
+                    let initialization = called_program_demotion::bind_initialization(initialization)?;
                     let spawn = historical::WorkerSpawn {
                         executable,
                         initialization,
@@ -15318,9 +15321,9 @@ fn qualification_expectations(
     if plan.epoch == 228 {
         return epoch228_demotion::expectations(expected, plan, snapshot_archive, bootstrap);
     }
-    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-    if plan.epoch == 230 {
-        return epoch230_demotion::expectations(expected, plan, snapshot_archive, bootstrap);
+    #[cfg(called_program_demotion_replay)]
+    if plan.epoch == called_program_demotion::EPOCH {
+        return called_program_demotion::expectations(expected, plan, snapshot_archive, bootstrap);
     }
     epoch141_suffix::recheck_roots(&expected)?;
     let (snapshot_slot, snapshot_expectation) =
@@ -20058,14 +20061,14 @@ async fn main() {
             return;
         }
     }
-    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
+    #[cfg(called_program_demotion_replay)]
     {
-        if let Err(error) = epoch230_demotion::entrypoint(&probe_args) {
+        if let Err(error) = called_program_demotion::entrypoint(&probe_args) {
             eprintln!("error: {error}");
             exit(2);
         }
-        if probe_args.as_slice() == [epoch230_demotion::CAPABILITY_ARG] {
-            match epoch230_demotion::capability() {
+        if probe_args.as_slice() == [called_program_demotion::CAPABILITY_ARG] {
+            match called_program_demotion::capability() {
                 Ok(report) => println!("{report}"),
                 Err(error) => {
                     eprintln!("error: {error}");
@@ -21122,8 +21125,8 @@ async fn main() {
         eprintln!("error: {error}");
         exit(2);
     }
-    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-    if let Err(error) = epoch230_demotion::launch(
+    #[cfg(called_program_demotion_replay)]
+    if let Err(error) = called_program_demotion::launch(
         start_epoch,
         end_epoch,
         qualification,
@@ -21146,7 +21149,7 @@ async fn main() {
             (dest_dir.as_path(), output, scratch)
         }),
     )
-    .and_then(|_| epoch230_demotion::fresh_filesystem(&dest_dir))
+    .and_then(|_| called_program_demotion::fresh_filesystem(&dest_dir))
     {
         eprintln!("error: {error}");
         exit(2);

@@ -270,8 +270,8 @@ impl TryFrom<&HistoricalCheckpoint> for HistoricalCheckpointSummary {
 /// checkpointing from racing a future caller.
 pub(crate) struct HistoricalReplay {
     state: Mutex<HistoricalReplayState>,
-    #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-    epoch230: crate::epoch230_demotion::Verification,
+    #[cfg(called_program_demotion_replay)]
+    called_program_demotion: crate::called_program_demotion::Verification,
     snapshot_verifier: Option<Arc<SnapshotVerifier>>,
     checkpoint_slots: Mutex<BTreeSet<Slot>>,
     failure: Arc<ReplayFailure>,
@@ -309,18 +309,18 @@ impl HistoricalReplay {
         let mut client = client;
         #[cfg(feature = "epoch228-called-program-demotion-qualification")]
         crate::epoch228_demotion::initialize(&mut client)?;
-        #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-        crate::epoch230_demotion::validate_initialized(&client)?;
+        #[cfg(called_program_demotion_replay)]
+        crate::called_program_demotion::validate_initialized(&client)?;
         let current_slot = client.initialized().slot;
         let initialized_source = client.initialized().source;
         let checkpoint_slots: BTreeSet<Slot> = snapshot_verifier
             .as_ref()
             .map(|verifier| verifier.legacy_checkpoint_slots().into_iter().collect())
             .unwrap_or_default();
-        #[cfg(feature = "epoch230-called-program-demotion-qualification")]
+        #[cfg(called_program_demotion_replay)]
         let checkpoint_slots = {
             let mut slots = checkpoint_slots;
-            slots.insert(crate::epoch230_demotion::DIVERGENT_SLOT);
+            slots.insert(crate::called_program_demotion::DIVERGENT_SLOT);
             slots
         };
         let diagnostic_warmup_target = bounded_epoch223_warmup_target(
@@ -339,8 +339,8 @@ impl HistoricalReplay {
             );
         }
         let replay = Self {
-            #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-            epoch230: crate::epoch230_demotion::Verification::default(),
+            #[cfg(called_program_demotion_replay)]
+            called_program_demotion: crate::called_program_demotion::Verification::default(),
             state: Mutex::new(HistoricalReplayState {
                 client: Some(client),
                 current_slot,
@@ -426,8 +426,8 @@ impl HistoricalReplay {
             .map(|verifier| verifier.legacy_checkpoint_slots().into_iter().collect())
             .unwrap_or_default();
         Ok(Self {
-            #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-            epoch230: crate::epoch230_demotion::Verification::default(),
+            #[cfg(called_program_demotion_replay)]
+            called_program_demotion: crate::called_program_demotion::Verification::default(),
             state: Mutex::new(HistoricalReplayState {
                 client: Some(client),
                 current_slot: bootstrap_checkpoint.slot,
@@ -546,8 +546,8 @@ impl HistoricalReplay {
                 self.failure.record(error);
                 return;
             }
-            #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-            if let Err(error) = self.epoch230.outcomes(&entry, &processed.outcomes) {
+            #[cfg(called_program_demotion_replay)]
+            if let Err(error) = self.called_program_demotion.outcomes(&entry, &processed.outcomes) {
                 self.failure.record(error);
                 return;
             }
@@ -783,8 +783,8 @@ impl HistoricalReplay {
                         if !outcomes_verified {
                             Self::verify_outcomes(entry, &current_outcomes)?;
                         }
-                        #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-                        self.epoch230.outcomes(entry, &current_outcomes)?;
+                        #[cfg(called_program_demotion_replay)]
+                        self.called_program_demotion.outcomes(entry, &current_outcomes)?;
                         #[cfg(feature = "epoch224-account-delta-diagnostic")]
                         verify_epoch224_changed_lamport_writes(
                             entry,
@@ -975,17 +975,17 @@ impl HistoricalReplay {
                 .map_err(|error| format!("qualification worker shutdown failed: {error}"))?;
             crate::epoch228_demotion::require_natural_close(result)
         }
-        #[cfg(feature = "epoch230-called-program-demotion-qualification")]
+        #[cfg(called_program_demotion_replay)]
         {
-            let client = state.client.as_mut().ok_or("missing epoch 230 candidate worker")?;
+            let client = state.client.as_mut().ok_or("missing called-program demotion candidate worker")?;
             let outcome = client
                 .shutdown_with_cleanup_grace(std::time::Duration::from_secs(300))
                 .map_err(|error| format!("epoch 230 candidate shutdown failed: {error}"))?;
-            self.epoch230.require_natural_close(outcome)
+            self.called_program_demotion.require_natural_close(outcome)
         }
         #[cfg(not(any(
             feature = "epoch228-called-program-demotion-qualification",
-            feature = "epoch230-called-program-demotion-qualification",
+            called_program_demotion_replay,
         )))]
         match state.client.as_mut() {
             Some(client) => client
@@ -1159,8 +1159,8 @@ impl HistoricalReplay {
         let summary = HistoricalCheckpointSummary::try_from(&checkpoint)?;
         #[cfg(feature = "epoch228-called-program-demotion-qualification")]
         crate::epoch228_demotion::checkpoint(&checkpoint)?;
-        #[cfg(feature = "epoch230-called-program-demotion-qualification")]
-        self.epoch230.checkpoint(&checkpoint)?;
+        #[cfg(called_program_demotion_replay)]
+        self.called_program_demotion.checkpoint(&checkpoint)?;
         self.verify_checkpoint(&checkpoint);
         self.emit_writes(checkpoint.writes);
         state.emitted_write_versions = emitted_write_versions;

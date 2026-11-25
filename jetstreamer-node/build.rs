@@ -53,6 +53,12 @@ fn hex_prefix(bytes: &[u8], take: usize) -> String {
 fn main() {
     let suffix_recording = env::var_os("CARGO_FEATURE_EPOCH140_SUFFIX_RECORDING").is_some();
     println!("cargo:rustc-check-cfg=cfg(original_entry_replay)");
+    println!("cargo:rustc-check-cfg=cfg(called_program_demotion_replay)");
+    if env::var_os("CARGO_FEATURE_EPOCH229_CALLED_PROGRAM_DEMOTION_QUALIFICATION").is_some()
+        || env::var_os("CARGO_FEATURE_EPOCH230_CALLED_PROGRAM_DEMOTION_QUALIFICATION").is_some()
+    {
+        println!("cargo:rustc-cfg=called_program_demotion_replay");
+    }
     if suffix_recording
         || env::var_os("CARGO_FEATURE_EPOCH141_ORIGINAL_ENTRY_QUALIFICATION").is_some()
     {
