@@ -9,7 +9,8 @@ import stat
 from pathlib import Path
 
 R = Path('/var/lib/jetstreamer/horizon_runtime_data')
-RETRY4 = globals().get('RETRY4',False)
+RETRY5 = globals().get('RETRY5', False)
+RETRY4 = globals().get('RETRY4',False) or RETRY5
 RETRY3 = globals().get('RETRY3',False) or RETRY4
 RETRY2_DIRECTORY = 'epoch168-retry2-rebook-20261122-v1'
 DIRECTORY = RETRY2_DIRECTORY
@@ -66,11 +67,75 @@ if RETRY4:
             or not re.fullmatch('[0-9a-f]{64}',generation[k]['sha256']) for k,path in expected.items()):
         raise ValueError('foreign epoch 168 retry4 generation')
     PREPARED_SHA,LOG_SHA,GUARD_QUAL_SHA,GATE_SHA,ROOT_SHA=(generation[k]['sha256'] for k in ('prepared','log','guard','gate','root'))
+    RETRY4_PREPARED_SHA, RETRY4_GUARD_SHA = PREPARED_SHA, GUARD_QUAL_SHA
     common_mount=runpy.run_path(str(Path(__file__).with_name('cold168_common_mount.py')))
     spent=runpy.run_path(str(Path(__file__).with_name('closed_retry3.py')))
     if ROOT_SHA != '713e94750dd3d430c2f54c1ccb2af7ed708dec802af5cbf210ee4963a992d0f4':
         raise ValueError('unbound new epoch168 root')
     ROOT_INODE, LOG_INODE = 103481722, 103481750
+
+
+if RETRY5:
+    DIRECTORY = 'epoch168-retry5-rebook-20261125-v1'
+    NAME = '168-full-metered-cold-v5-20261125'
+    UNIT = 'horizon-qualify-' + NAME + '.service'
+    GUARD = R / 'epoch168-cold-guard-20261125-v5'
+    RUN = RUN.with_name('cold-retry5-20261125')
+    ALIAS = Path('/run/horizon-full168-cold-v5')
+    ROOT_SHA = '4cd544fddda40cd81c94358b8c455feac24247b14f56e8fdb8ede2727c54af25'
+    PREPARED_SHA = '2320e810781b070887acb47874bb2eeb24670a43f7fb71684728169b00af0241'
+    LOG_SHA = '116d48dde43a51ef04a0e0c7e6e9fa5ac6f175f5795d8648010c1dc94d6ad988'
+    GATE_SHA = '6bd4746b5d205ccfd857c88d7fdaa56e9e9826bf987ad408f3d1f8f0c4304f21'
+    GUARD_QUAL_SHA = 'e237ca579a8921adaae0081ef71a82b35377e4ff80acaf8539c03cd68e3aa696'
+    ROOT_INODE, LOG_INODE = 109396827, 109396830
+    RETAINED_RETRY4 = R / 'incident-replay-fit-20261121-v1/STOPPED168_RETRY5_RETAINED_SOURCE_CONTROL_20261125.json'
+    RETAINED_RETRY4_SHA = '488dbd9e630511b97a0ad0704241a0a1fdec71a614caf17c6cd1d3a63b3dc0b2'
+    HOME_STOP_SHA = '1fba7a686be4387737b8c7776a5ed92a59bff82c15ced77496e9214c94710f62'
+    CAP = 512 << 30
+    OUTSIDE_CAP_STOP_ALLOWANCE = 8 << 30
+
+
+def retry5_stop(s, fit):
+    retained, ref = s.read(RETAINED_RETRY4, RETAINED_RETRY4_SHA)
+    stop = retained['stop']
+    retry4 = R / 'epoch168-retry4-rebook-20261123-v1'
+    terminal = s.bound(stop['terminal'], retry4 / 'guard-receipts/stop-completion.json')
+    intent = s.bound(stop['stop_intent'], retry4 / 'guard-receipts/stop-intent.json')
+    admission = s.bound(stop['admission'], retry4 / 'ACTUAL_ADMISSION_AND_PROTECTION.json')
+    sample = intent['sample']['root_physical_observation']
+    s.need(retained['epoch'] == 168 and stop['producer_invocation_id'] ==
+           terminal['producer_invocation_id'] == intent['producer_invocation_id'] ==
+           admission['producer_invocation_id'] == '913443d7f9f44d7e9d3e0eec420acfab' and
+           intent['reason'] == 'root-physical-budget' and terminal['terminal']['pid'] == 0 and
+           terminal['terminal']['active'] == 'inactive' and terminal['scratch_deleted'] is False and
+           stop['resource_credit_bytes'] == stop['reservation_ending_bytes'] == 0 and
+           stop['retained_cap_bytes'] == sample['maximum_physical_bytes'] == 288 << 30 and
+           stop['measured_physical_bytes'] == sample['conservative_physical_bytes'] > stop['retained_cap_bytes'],
+           'foreign retained retry4 guard stop')
+    timer = stop['retired_guard_timer']
+    for unit in (admission['producer_unit'], timer, timer.removesuffix('.timer') + '.service'):
+        manager = s.show(unit)
+        s.need(manager['ActiveState'] == 'inactive' and not manager['InvocationID'] and
+               not manager['Job'] and not fit.members(unit), 'stopped retry4 owner returned')
+    return stop, ref
+
+
+def retry5_preparation(s, root, prepared):
+    stop = OLD / 'guard-receipts/stop-completion.json'
+    terminal, stop_ref = s.read(stop, HOME_STOP_SHA)
+    control, control_ref = s.read(RETAINED_RETRY4, RETAINED_RETRY4_SHA)
+    baseline = prepared['baseline']
+    s.need(root['schema'] == 'horizon-epoch168-retry5-successor-root-v1' and
+           root['root_immutable'] is True and common_mount['immutable'](RUN) and
+           all(not common_mount['immutable'](RUN / k) for k in ('private', 'output')) and
+           baseline['retained_source_control'] == control_ref and
+           root['source_control_sha256'] == control_ref['sha256'] and
+           root['whole_tree_cap_bytes'] == prepared['profile']['payload']['whole_root_cap'] == CAP and
+           baseline['predecessor_stop'] == stop_ref and
+           baseline['retry4_root_physical_stop'] == control['stop'] and
+           terminal['producer_invocation_id'] == PRIOR_IID and terminal['terminal']['pid'] == 0,
+           'different retry5 namespace or stopped custody')
+    return stop_ref, control['stop']
 
 
 def failed_retry2(s,root):
@@ -128,6 +193,10 @@ def stable(s):
                observed.st_size==0, 'cold 168 append log changed before observer registration')
     s.need(candidate['inode']==ROOT_INODE and root['log']['inode']==LOG_INODE and root['worker_launched'] is False,
            'wrong cold 168 generation')
+    if RETRY5:
+        s.need(log_record.exists(), 'retry5 requires the prepared append log')
+        retry5_preparation(s, root, prepared)
+        return ref
     if RETRY4:
         previous=R/'epoch168-retry3-rebook-20261123-v1'
         fixture = previous/'COMMON_MOUNT_REGRESSION/RESULT.json'
@@ -158,6 +227,15 @@ def stable(s):
 def observe(s,fit,native_actor,own):
     rootref = stable(s)
     root = s.bound(rootref,R / DIRECTORY / 'SUCCESSOR_ROOT.json')
+    if RETRY5:
+        prepared, _ = s.read(R / DIRECTORY / 'PREPARED.json', PREPARED_SHA)
+        home_stop, retry4 = retry5_preparation(s, root, prepared)
+        s.need(retry5_stop(s, fit)[0] == retry4, 'different retry5 predecessor')
+        predecessor = dict(original=dict(producer_invocation_id=PRIOR_IID), stop_completion=home_stop)
+        actor = native_actor(168, own, LANE, RUN, predecessor, generation=(DIRECTORY, NAME))
+        s.need(actor is None or actor['producer_invocation_id'] != retry4['producer_invocation_id'],
+               'spent retry4 invocation cannot admit retry5')
+        return actor
     stopped=set(root['stopped_units'])
     if RETRY3:
         # The creation receipt includes the successor before admission. native_actor checks it below.
@@ -235,6 +313,8 @@ def check_profile(s, d, profile, original, translated):
     intended['producer_unit'] = UNIT
     intended['guard_unit'] = 'horizon-guard-'+NAME
     intended['regular_node_argv'] = expected
+    if RETRY5:
+        intended['whole_root_cap'] = CAP
     intended['environment']['JETSTREAMER_PRIVATE_RUN_ROOT'] = str(RUN/'private')
     intended['environment']['JETSTREAMER_HISTORICAL_WORKER_V1_5_6'] = str(ALIAS/'jetstreamer-historical-worker-v1-5-6')
     for row in intended['indexes']:
@@ -367,6 +447,7 @@ def guard(s,profile):
     witness=s.bound(terms['qualified_native_witness'],GUARD/'NATIVE_WITNESS.json')
     schema='horizon-168-cold-v3-native-guard-qualified-v1' if RETRY3 else 'horizon-168-cold-v2-native-guard-qualified-v1'
     if RETRY4: schema='horizon-168-cold-v4-native-guard-qualified-v1'
+    if RETRY5: schema='horizon-168-cold-v5-native-guard-qualified-v1'
     s.need(qualified['schema']==schema and qualified['guard']==dict(path=str(image),sha256=digest) and
            seal['destination']==str(image.parent) and any(x['name']=='guard' and x['sha256']==digest for x in seal['members']) and
            witness['native_identity']['executable']==str(image) and witness['native_identity']['executable_sha256']==digest and

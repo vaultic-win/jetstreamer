@@ -219,6 +219,9 @@ fn v5w_semantic_owner(export: &str) -> Result<()> {
     terminal(export)
 }
 
+#[cfg(all(incident_v7_post145_only, not(incident_v5z_post145_only)))]
+compile_error!("the V7 post verifier requires the qualified HTTP retry reader");
+
 #[cfg(all(incident_v5z_post145_only, not(incident_v5x_post145_only)))]
 compile_error!("the V5z post verifier requires the sealed successor reader");
 
@@ -229,12 +232,23 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
         "foreign V5x semantic export"
     );
     let family = Path::new(RUNTIME).join("epoch145-semantic-continuity-20261121-v1");
+    const V7_IID: &str = "f7043fd6595a4151b659d4b098bede11";
+    const V7_SEAL: &str = "589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b";
+    const V7_START: &str = "4c83262f7bb705f30f1850dcc1274a549b2f08b80618bc23c3c9955fae4f4163";
+    let v7 = cfg!(incident_v7_post145_only);
+    if v7 {
+        ensure!(export == V7_IID, "foreign V7 semantic export");
+    }
     let (generation, schema) = if cfg!(incident_v5z_post145_only) {
         ("v5z", "horizon-epoch145-v5z-custody-successor-semantic-completion-v1")
     } else {
         ("v5x", "horizon-epoch145-v5x-donor-successor-semantic-completion-v1")
     };
-    let authority = family.join(format!("tools-{generation}"));
+    let authority = if v7 {
+        family.join("tools-v7-168-stop-v2")
+    } else {
+        family.join(format!("tools-{generation}"))
+    };
     let helper = authority.join("v5v_semantic_completion.py");
     let (seal_ref, seal) =
         publication::frozen_json(&authority.join("deployment-seal-receipt.json"))?;
@@ -268,8 +282,18 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
         "foreign V5x semantic package"
     );
     custody::bytes(&binding, 128 << 10, true)?;
-    let handoff = family.join(format!("{generation}-name-handoff"));
+    let handoff = if v7 {
+        family.join("v7-168-stop-name-handoff")
+    } else {
+        family.join(format!("{generation}-name-handoff"))
+    };
     let (start, _) = publication::frozen_json(&handoff.join("START_RESULT.json"))?;
+    if v7 {
+        ensure!(
+            seal_ref.sha256 == V7_SEAL && start.sha256 == V7_START,
+            "different authenticated V7 semantic owner"
+        );
+    }
     let report = capacity::run(
         "/usr/bin/python3",
         &[
@@ -286,6 +310,7 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
         result == captured
             && result["schema"] == schema
             && result["invocation_id"] == export
+            && (!v7 || result["start"] == json!(start))
             && result["publication_authorized"] == false
             && result["r2_mutations"] == false
             && result["startup_evidence"]["submission_result"] == json!(start)

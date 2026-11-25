@@ -25,10 +25,12 @@ METERED_FULL = LOCAL.name in ('tools-cold168-retry4-failed166-v6-entry146',
 if METERED_FULL:
     import full170_status as full170
 
-FAILED166_CADENCE = METERED_FULL or LOCAL.name in (
+RETRY5_168 = LOCAL.name == 'tools-cold168-retry5-failed166-v12-entry146'
+FAILED166_CADENCE = RETRY5_168 or METERED_FULL or LOCAL.name in (
     'tools-cold168-retry4-failed166-v1', 'tools-cold168-retry4-failed166-v2',
     'tools-cold168-retry4-failed166-v3', 'tools-cold168-retry4-failed166-v4-entry146',
     'tools-cold168-retry4-failed166-v5-entry146', 'tools-cold168-retry4-failed166-v8-entry146',
+    'tools-cold168-retry4-failed166-v10-entry146', 'tools-cold168-retry4-failed166-v11-entry146',
 )
 FAILED_CADENCE = FAILED166_CADENCE or LOCAL.name == 'tools-cold168-retry4-failed170-v1'
 FAILED_STATUS = 'cold170_retry13_execution_failure'
@@ -84,11 +86,16 @@ def generation():
 
 # Earlier sealed packages continue to follow their original lane populations.
 cold168 = None
-generation168 = [n for n in (2, 3, 4) if (LOCAL/f'retry{n}-168-generation.json').is_file()]
-need(len(generation168)<=1, 'overlapping 168 receiver generations')
+cold168_commit = None
+generation168 = [n for n in (2, 3, 4, 5) if (LOCAL/f'retry{n}-168-generation.json').is_file()]
+need(len(generation168)<=1 and RETRY5_168 == (generation168 == [5]),
+     'different or overlapping 168 receiver generations')
 if generation168:
     need(ATTEMPT == 'retry13' and (LOCAL/'cold170_commit.py').is_file(), 'wrong 170 generation for 168')
     import cold168_status as cold168
+    if (LOCAL/'cold168_commit.py').is_file():
+        need(cold168.ATTEMPT in (4, 5), 'cold168 terminal support requires retry4 custody')
+        import cold168_commit
 
 
 def reader():
@@ -216,14 +223,14 @@ def failed_route(fleet=None):
     return result
 
 
-def roster(module, fleet_ref, fleet, terminal=None, failed166=None):
+def roster(module, fleet_ref, fleet, terminal=None, failed166=None, terminal168=None):
     checks = {166: retry166.check_generation, 167: cold167.check_generation, 170: check_generation}
     if cold168:
         checks[168] = lambda ref, data, state: cold168.check_generation(ref, data, state, cold167.EVENT)
     enrolled = set()
     for epoch, check in checks.items():
         state = module.native(epoch)
-        if (epoch == 170 and terminal) or (epoch == 166 and failed166):
+        if (epoch == 170 and terminal) or (epoch == 166 and failed166) or (epoch == 168 and terminal168):
             need(state is None, f'terminal cold{epoch} producer still active')
             continue
         if METERED_FULL and epoch == 170:
@@ -253,6 +260,12 @@ def reconcile(c, observed_lane):
     c.commits = {}
     c.histories = {}
     terminal = terminal_route(c.fleet) if not METERED_FULL else None
+    stopped168 = LOCAL.name == 'tools-cold168-retry4-failed166-v11-entry146'
+    c.failed168 = cold168_commit.guard_stop(c.fleet, c.cfg) if stopped168 else None
+    c.retained168 = (cold168_commit.guard_stop(c.fleet, c.cfg, successor=cold168) if RETRY5_168
+                     else c.failed168)
+    terminal168 = (cold168_commit.current(c.fleet, c.cfg)
+                   if cold168_commit and not (stopped168 or RETRY5_168) else None)
     c.failed170 = failed_route(c.fleet)
     c.failed166 = retry166.failed_route(c.fleet) if FAILED166_CADENCE else None
     need(not (terminal and c.failed170), 'conflicting epoch 170 commit and failure')
@@ -260,7 +273,8 @@ def reconcile(c, observed_lane):
         need(c.failed170, 'missing retained retry13 failure')
         full170.historical_diagnostic(c.fleet)
     blocking170 = terminal or (c.failed170 if not METERED_FULL else None)
-    enrolled = roster(module, c.fleet_ref, c.fleet, blocking170, c.failed166)
+    enrolled = roster(module, c.fleet_ref, c.fleet, blocking170, c.failed166,
+                      terminal168=terminal168 or c.failed168)
     if c.failed166:
         module.ROUTES.pop(166)
         need(all(r['range'] != '166' for r in c.cfg['replays']), 'failed epoch 166 remained in sampled roster')
@@ -268,29 +282,45 @@ def reconcile(c, observed_lane):
         module.ROUTES.pop(170)
         need(all(r['range'] != '170' for r in c.cfg['replays']), 'failed epoch 170 remained in sampled roster')
     if terminal:
-        from copy import copy
         c.commits[170] = terminal
-        module.ROUTES.pop(170)
+    if terminal168:
+        c.commits[168] = terminal168
+    ended = dict(c.commits)
+    if c.failed168:
+        ended[168] = c.failed168
+    if ended:
+        from copy import copy
+        removed = {str(epoch) for epoch in ended}
+        for epoch in ended:
+            module.ROUTES.pop(epoch)
         # A same-sample retry can already have frozen the original live set.
         # Keep that record and bind the reduced capture separately.
         prior = c.paths['out']/'RECOVERED_WORKERS.json'
-        closed_dir = c.paths['out']/'after-cold170-commit'
+        suffix = '-'.join(sorted(removed))
+        event = 'stop' if c.failed168 else 'commit'
+        closed_dir = c.paths['out']/f'after-cold{suffix}-{event}'
         if prior.exists():
             from evidence import durable, ensure_dir
             prior_ref = bound(prior)
             earlier = checked(prior_ref)
-            old = earlier['owners'].get('170')
             need(earlier['fleet'] == c.fleet_ref and earlier['sample'] == c.sample_ref
-                 and old and old['admission'] == terminal['admission'] and old['first_worker'] == terminal['first_worker']
-                 and old['actor']['producer_invocation_id'] == terminal['producer_invocation_id']
                  and set(earlier['measured']) <= earlier['owners'].keys(),
-                 'different pre-terminal cold170 capture')
-            kept = {k:v for k,v in earlier['owners'].items() if k != '170'}
-            need(kept == module.ownership(c.fleet), 'surviving workers changed after cold170 commit')
+                 'different pre-terminal cold worker capture')
+            for epoch, proof in ended.items():
+                old = earlier['owners'].get(str(epoch))
+                if epoch == 168 and (cold168_commit.FIELD in c.fleet or
+                                     cold168_commit.FAILED_FIELD in c.fleet):
+                    need(old is None, 'adopted cold168 appeared in a later live capture')
+                    continue
+                need(old and old['admission'] == proof['admission'] and old['first_worker'] == proof['first_worker']
+                     and old['actor']['producer_invocation_id'] == proof['producer_invocation_id'],
+                     'pre-terminal capture names a foreign cold worker')
+            kept = {k:v for k,v in earlier['owners'].items() if k not in removed}
+            need(kept == module.ownership(c.fleet), 'surviving workers changed after cold commit')
             ensure_dir(closed_dir)
             target=closed_dir/'RECOVERED_WORKERS.json'
             reduced = dict(fleet=c.fleet_ref, sample=c.sample_ref, owners=kept,
-                           measured={k:v for k,v in earlier['measured'].items() if k != '170'},
+                           measured={k:v for k,v in earlier['measured'].items() if k not in removed},
                            prior_same_sample_capture=prior_ref)
             if target.exists(): need(checked(bound(target)) == reduced, 'changed terminal recovery capture')
             else: durable(target,reduced)
@@ -298,12 +328,12 @@ def reconcile(c, observed_lane):
         # The inherited capture helper recognizes only the predecessor retry10 field.
         sample_context.commits = {}
         sample_context.paths = dict(c.paths, out=closed_dir)
-        c.next_cfg['replays'] = [row for row in c.next_cfg['replays'] if row['range'] != '170']
+        c.next_cfg['replays'] = [row for row in c.next_cfg['replays'] if row['range'] not in removed]
     else:
         sample_context = c
     c.next_cfg['replays'] = [row for row in c.next_cfg['replays'] if int(row['range']) not in enrolled]
     module.sample_rows(sample_context, observed_lane)
-    if terminal:
+    if ended:
         for attr in ('recovered_ref','recovered_owners','new_rows'):
             setattr(c,attr,getattr(sample_context,attr))
     need(set(c.recovered_owners) == {str(e) for e in enrolled}, 'cold owner roster changed during capture')
@@ -365,6 +395,12 @@ def install(c, fleet):
                    state='verification', no_live_producer_claimed=True, current_repair_owner='/root',
                    current_status_scope='Epoch 170 committed locally and awaits verification and public delivery.',
                    next_action='Verify and publish the retained epoch 170 archive.')
+    if 168 in c.commits:
+        cold168_commit.install(c.fleet, fleet, c.commits[168])
+    if c.failed168:
+        cold168_commit.install_guard_stop(c.fleet, fleet, c.failed168)
+    if RETRY5_168:
+        install_retry5(c, fleet)
     if c.failed170:
         fleet[FAILED_STATUS] = c.failed170
     if c.failed170 and '170' not in c.recovered_owners:
@@ -397,3 +433,25 @@ def install(c, fleet):
         need(original['completion']['sha256'] == stops[epoch], 'original cold guard stop lost')
         row['original_home_floor_stop'] = original
         row['next_action'] = 'Maintain the admitted worker and verify its resulting archive.'
+
+
+
+def install_retry5(c, fleet):
+    historical = cold168_commit.check_owner(c.fleet.get(cold168_commit.HISTORY))
+    need(c.retained168 == c.fleet[cold168_commit.FAILED_FIELD],
+         'retry5 changed the retained retry4 booking')
+    fleet[cold168_commit.HISTORY] = historical
+    fleet[cold168_commit.FAILED_FIELD] = c.retained168
+    fleet['retained_cold168_retry4_reservation'] = c.retained168
+    row = next(item for item in fleet['epochs'] if item['epoch'] == 168)
+    row[cold168_commit.FAILED_FIELD] = c.retained168
+    owner = c.recovered_owners.get('168')
+    if owner and 168 not in c.new_rows:
+        row.update(no_live_producer_claimed=False, state='bootstrap',
+                   current_status_scope='Epoch 168 retry5 is held for first-guard funding.',
+                   next_action='Bind the guarded retry5 admission before releasing replay.',
+                   current_cold168_retry5_held=owner)
+    else:
+        row.pop('current_cold168_retry5_held', None)
+    if 168 in c.new_rows:
+        row['current_status_scope'] = 'Epoch 168 retry5 is running under its admitted guard.'

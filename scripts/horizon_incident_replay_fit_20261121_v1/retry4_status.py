@@ -193,13 +193,16 @@ def registered_hourly170_writer(s, prior, *, failed166=False):
 
 def registered_failed166_rejoin(s, prior, version=2):
     old_package, old_seal, old_iid, old = prior
-    s.need(version in (2, 3, 4, 5, 6, 7, 8), 'unknown epoch 166 cadence rejoin')
+    s.need(version in (2, 3, 4, 5, 6, 7, 8, 11, 12), 'unknown epoch 166 cadence rejoin')
     def package_for(generation):
-        name = f'tools-cold168-retry4-failed166-v{generation}'
+        attempt = 5 if generation == 12 else 4
+        name = f'tools-cold168-retry{attempt}-failed166-v{generation}'
         return STATUS / (name + '-entry146' if generation >= 4 else name)
 
     name = f'FAILED166_CADENCE_V{version}'
-    predecessor = 5 if version == 8 or (version == 7 and old_package == package_for(5)) else version - 1
+    predecessor = {8: 5, 11: 8}.get(version, version - 1)
+    if version == 7 and old_package == package_for(5):
+        predecessor = 5
     previous_name = 'FAILED166_CADENCE' if version == 2 else f'FAILED166_CADENCE_V{predecessor}'
     active, _ = s.read(STATUS / f'{name}_ACTIVE.json')
     ready = s.bound(active['ready'], STATUS / f'{name}_READY.json')
@@ -228,6 +231,50 @@ def registered_failed166_rejoin(s, prior, version=2):
                and sample['cadence']['previous_sample_sha256'] == fleet['observer']['sha256']
                and sample['cadence']['configured_not_before_utc'] == config['not_before_utc'],
                'missed-sample rejoin does not bind the completed replacement')
+    if version == 11:
+        s.need(old_seal['sha256'] == '3ae90b99cc09e7b58d1f88bc5ed72e8150d0383c906c0a169e401f262dab370a'
+               and ready['package']['sha256'] == 'cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c',
+               'different epoch 168 guard-stop cadence deployment')
+        failure = s.bound(ready['failed_writer'], Path(ready['failed_writer']['path']))
+        preflight = s.bound(ready['native_preflight'], Path(ready['native_preflight']['path']))
+        config = s.bound(ready['config'], Path(ready['config']['path']))
+        sample = s.bound(ready['completed_sample'], Path(config['output']))
+        s.need(failure['schema'] == 'horizon-status-writer-epoch168-stop-terminal-v1'
+               and failure['unit'] == old['unit'] and failure['invocation_id'] == old_iid
+               and failure['exit_status'] == 1 and failure['failure'] == 'missing admitted cold worker 168'
+               and failure['sample'] == preflight['sample'] == ready['completed_sample']
+               and sample['cadence']['previous_sample_sha256'] == fleet['observer']['sha256']
+               and sample['cadence']['configured_not_before_utc'] == config['not_before_utc']
+               and preflight['fleet'] == ready['fleet'] and preflight['current_sample_accepted'] is False
+               and preflight['r2_mutations'] is False and preflight['replay_launch_authorized'] is False
+               and preflight['stopped_168']['resource_credit_bytes'] == 0
+               and preflight['stopped_168']['reservation_ending_bytes'] == 0,
+               'guard-stop cadence does not bind the failed writer and accepted sample')
+    if version == 12:
+        s.need(old_seal['sha256'] == 'cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c'
+               and ready['package']['sha256'] == '6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac',
+               'different retry5 cadence pair')
+        binding = package / 'retry5-168-generation.json'
+        member, = [m for m in seal['members'] if m['name'] == binding.name and m['mode'] == '0444']
+        s.need(ready['retry5_generation'] == s.ref(binding, member['sha256']),
+               'unsealed retry5 cadence generation')
+        generation = s.bound(ready['retry5_generation'], binding)
+        root = R / 'epoch168-retry5-rebook-20261125-v1'
+        prepared = s.bound(generation['prepared'], root / 'PREPARED.json')
+        successor = s.bound(generation['successor_root'], root / 'SUCCESSOR_ROOT.json')
+        guard = s.bound(generation['guard_qualification'], R / 'epoch168-cold-guard-20261125-v5/GUARD_QUALIFIED.json')
+        retained = s.bound(generation['retained_source'], R / 'incident-replay-fit-20261121-v1/STOPPED168_RETRY5_RETAINED_SOURCE_CONTROL_20261125.json')
+        terminal = s.bound(ready['retained_retry4_stop'], ROOT / 'guard-receipts/stop-completion.json')
+        stop = fleet['cold168_retry4_root_physical_stop']
+        s.need(retained['stop'] == stop == prepared['baseline']['retry4_root_physical_stop']
+               and stop['terminal'] == ready['retained_retry4_stop']
+               and stop['producer_invocation_id'] == terminal['producer_invocation_id']
+               and stop['resource_credit_bytes'] == stop['reservation_ending_bytes'] == 0
+               and successor['source_control_sha256'] == generation['retained_source']['sha256']
+               and prepared['baseline']['stable_roots'] == generation['successor_root']
+               and prepared['profile']['guard_binary_sha256'] == guard['guard']['sha256']
+               and successor['whole_tree_cap_bytes'] == prepared['profile']['payload']['whole_root_cap'] == 512 << 30,
+               'different retry5 namespace, guard or retained retry4 charge')
     s.need(old_package == package_for(predecessor)
            and old_seal['path'] == str(old_package / 'deployment-seal-receipt.json')
            and active['schema'] == 'horizon-epoch166-cadence-rejoin-active-v1'

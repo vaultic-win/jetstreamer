@@ -2,7 +2,8 @@ use super::*;
 
 mod closed_indexes;
 pub(super) use closed_indexes::{
-    is_index, is_singleton_index, lock_index_controllers, lock_singleton_controllers,
+    is_early_singleton_index, is_index, is_singleton_index, lock_early_singleton_controllers,
+    lock_index_controllers, lock_singleton_controllers,
 };
 
 const REVIEW: &str = "/home/sol/.jetstreamer-private/epoch145-v5t-stopped-price-20261124.zjcggc_6/RETIREMENT_CANDIDATES_130_195.json";
@@ -51,6 +52,13 @@ const SNAPSHOT_DIR: &str = "epochs191-194-bootstrap-revalidation-20261016-v1";
 const SNAPSHOT_NAME: &str =
     "snapshot-82511783-6wKFbWHJ2FFVaexQWuTrRVsGL53ef8k8CgNqPWvGuymm.tar.zst";
 const SNAPSHOT_KEEPER: &str = "/usr/local/lib/jetstreamer/deploy-epochs191-194-target5-20261016-v1";
+const BENCHMARK_BOOTSTRAP_REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch195-closed-bootstrap-retirement-20261125-v1/REVIEW.json";
+const BENCHMARK_BOOTSTRAP_REVIEW_SHA: &str =
+    "710cdf97b75b0d05ae527f06fd3a2203ace478081f468fcf66de2554748ee0fb";
+const BENCHMARK_BOOTSTRAP_SCHEMA: &str = "horizon-195-closed-benchmark-bootstrap-review-v1";
+const BENCHMARK_BOOTSTRAP_DIR: &str = "epoch195-rayon-qualification-v1";
+const BENCHMARK_BOOTSTRAP_NAME: &str =
+    "snapshot-84239250-GCANVakrcunYu9VRe1WdNd7xAPKGdoZNFgpQbagdB9zq.tar.zst";
 const BOOTSTRAP_REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch197-bootstrap-retirement-20261124-v1/REVIEW.json";
 const BOOTSTRAP_REVIEW_SHA: &str =
     "1a0fe33ab596047495bac621d14bab451034044b302a72230242a08771a15944";
@@ -65,12 +73,23 @@ const BENCHMARK: &str = "performance-ab-195-rayon-20261009-v2";
 const DIAGNOSTIC_134: &str = "diagnostic-epoch134-v1419-status-probe-v1";
 const BENCHMARK_154: &str = "performance-ab-154-v158-rayon-20261009-v3";
 
+fn is_benchmark_bootstrap(t: &Target) -> bool {
+    t.epoch == 195
+        && t.path
+            == Path::new(HOME_ROOT)
+                .join(".jetstreamer-private")
+                .join(BENCHMARK_BOOTSTRAP_DIR)
+                .join("inputs")
+                .join(BENCHMARK_BOOTSTRAP_NAME)
+}
+
 pub(super) fn is_target(t: &Target) -> bool {
     let root = Path::new(HOME_ROOT).join(".jetstreamer-private");
     match t.epoch {
         119 | 121 => FIRST_SWEEP_TARGETS.iter().any(|(epoch, relative)| {
             t.epoch == *epoch && t.path == root.join(FIRST_SWEEP).join(relative)
         }),
+        129 | 130 | 133 | 134 if is_early_singleton_index(t) => true,
         130 => {
             t.path
                 == root
@@ -93,6 +112,7 @@ pub(super) fn is_target(t: &Target) -> bool {
         191..=194 if is_index(t) => true,
         195..=197 if is_singleton_index(t) => true,
         191 => t.path == root.join(SNAPSHOT_DIR).join("inputs").join(SNAPSHOT_NAME),
+        195 if is_benchmark_bootstrap(t) => true,
         195 => ["control32", "candidate8"].iter().any(|case| {
             t.path
                 == root
@@ -117,7 +137,18 @@ fn identity(t: &Target) -> Value {
 
 pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Result<Option<Value>> {
     let (path, sha256, schema, expected_epochs): (&str, &str, &str, &[u64]) =
-        if p.targets.iter().any(is_singleton_index) {
+        if p.targets.iter().any(is_early_singleton_index) {
+            ensure!(
+                closed_indexes::complete_selection(&p.targets, 6, is_early_singleton_index),
+                "incomplete epoch 130 and 134 CAR index selection"
+            );
+            (
+                closed_indexes::EARLY_SINGLETON_REVIEW,
+                closed_indexes::EARLY_SINGLETON_SHA,
+                closed_indexes::EARLY_SINGLETON_SCHEMA,
+                &[129, 130, 133, 134],
+            )
+        } else if p.targets.iter().any(is_singleton_index) {
             ensure!(
                 closed_indexes::complete_selection(&p.targets, 6, is_singleton_index),
                 "incomplete singleton CAR index selection"
@@ -127,6 +158,17 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
                 closed_indexes::SINGLETON_SHA,
                 closed_indexes::SINGLETON_SCHEMA,
                 &[195, 196, 197],
+            )
+        } else if p.targets.iter().any(is_benchmark_bootstrap) {
+            ensure!(
+                closed_indexes::complete_selection(&p.targets, 1, is_benchmark_bootstrap),
+                "expected the single reviewed epoch 195 bootstrap"
+            );
+            (
+                BENCHMARK_BOOTSTRAP_REVIEW,
+                BENCHMARK_BOOTSTRAP_REVIEW_SHA,
+                BENCHMARK_BOOTSTRAP_SCHEMA,
+                &[195],
             )
         } else if epochs.iter().any(|&epoch| matches!(epoch, 130 | 195)) {
             (
@@ -236,7 +278,38 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
     if schema == BOOTSTRAP_SCHEMA {
         verify_gcs_bootstrap(&review, &p.targets[0])?;
     }
+    if schema == BENCHMARK_BOOTSTRAP_SCHEMA {
+        verify_benchmark_bootstrap(&review, &p.targets[0])?;
+    }
     Ok(Some(review))
+}
+
+fn verify_benchmark_bootstrap(review: &Value, target: &Target) -> Result<()> {
+    let item = &review["targets"][0];
+    let reference: Bound = serde_json::from_value(item["terminal"].clone())?;
+    let provenance: Value = serde_json::from_slice(&bound(&reference, LIMIT)?)?;
+    ensure!(
+        reference.path
+            == target
+                .path
+                .parent()
+                .and_then(Path::parent)
+                .context("missing benchmark parent")?
+                .join("checkpoint-provenance-84247825.json")
+            && provenance["schema"] == "jetstreamer-canonical-checkpoint-provenance-v1"
+            && provenance["bootstrap"]
+                == json!({"slot":84239250,"archive":BENCHMARK_BOOTSTRAP_NAME})
+            && provenance["checkpoint"]["slot"] == 84247825
+            && provenance["qualification"]["publication_authorized"] == false
+            && provenance["qualification"]["remote_mutations_authorized"] == false,
+        "different closed benchmark bootstrap provenance"
+    );
+    ensure!(
+        item["body_sha256"].as_str() == Some(digest(&target.path)?.as_str())
+            && stamp(&exact(&target.path)?) == target.identity,
+        "benchmark bootstrap changed after review"
+    );
+    Ok(())
 }
 
 fn verify_snapshot(review: &Value, target: &Target) -> Result<()> {
@@ -349,6 +422,7 @@ pub(super) fn check_owners(review: &Value) -> Result<()> {
         Some(FOLLOWUP_SCHEMA) => &[DIAGNOSTIC_134, BENCHMARK_154],
         Some(SNAPSHOT_SCHEMA) => &[SNAPSHOT_DIR],
         Some(BOOTSTRAP_SCHEMA) => &[BOOTSTRAP_DIR],
+        Some(BENCHMARK_BOOTSTRAP_SCHEMA) => &[BENCHMARK_BOOTSTRAP_DIR, BENCHMARK_BOOTSTRAP_NAME],
         _ => &[DIAGNOSTIC, BENCHMARK],
     };
     if review["schema"] == FIRST_SWEEP_SCHEMA {
@@ -378,7 +452,11 @@ pub(super) fn check_owners(review: &Value) -> Result<()> {
     }
     if matches!(
         review["schema"].as_str(),
-        Some(closed_indexes::SCHEMA | closed_indexes::SINGLETON_SCHEMA)
+        Some(
+            closed_indexes::SCHEMA
+                | closed_indexes::SINGLETON_SCHEMA
+                | closed_indexes::EARLY_SINGLETON_SCHEMA
+        )
     ) {
         return closed_indexes::check_owners(review);
     }

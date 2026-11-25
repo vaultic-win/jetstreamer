@@ -167,6 +167,23 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
     if failed170:
         failed166 = native.get("failed_cold166")
         running = {167, 168, 172}
+        stopped168 = native.get("stopped_cold168")
+        if stopped168:
+            book = native["bookings"]["168"]
+            capacity_ref = fleet["current_home_cycle_capacity"]
+            capacity, _ = bound(capacity_ref["path"], capacity_ref["sha256"])
+            writer = native["status_registration"]["consumer_seal"]
+            need(stopped168 == fleet["cold168_retry4_root_physical_stop"] ==
+                 capacity["retained_cold168_retry4_reservation"]
+                 and stopped168["resource_credit_bytes"] == stopped168["reservation_ending_bytes"] == 0
+                 and book["remaining_bytes"] == max(0, book["cap_bytes"] - book["physical_bytes"])
+                 and book["cap_bytes"] == stopped168["retained_cap_bytes"] == 288 * GIB
+                 and book["measurement"] == "two complete stopped-tree walks"
+                 and book["unreconciled_stop_bytes"] ==
+                 max(0, stopped168["measured_physical_bytes"] - max(book["cap_bytes"], book["physical_bytes"]))
+                 and writer["sha256"] == "cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c",
+                 "changed retained epoch 168 booking or cadence")
+            running.remove(168)
         if failed166:
             stopped166 = native["bookings"]["166"]
             need(failed166 == fleet["cold166_retry11_write_version_failure"]

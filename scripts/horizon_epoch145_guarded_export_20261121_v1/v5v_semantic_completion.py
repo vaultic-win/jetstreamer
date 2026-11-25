@@ -13,7 +13,8 @@ import sys
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FAMILY = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
 GENERATION = Path(__file__).resolve().parent.name
-WALK_RETRY = GENERATION in ("tools-v6-guard-walk", "tools-homefloor-145-v5z-guard-walk-build-v2")
+STOP_RETRY = GENERATION in ("tools-v7-168-stop-v2", "tools-homefloor-145-v6-stop-recovery-v2")
+WALK_RETRY = STOP_RETRY or GENERATION in ("tools-v6-guard-walk", "tools-homefloor-145-v5z-guard-walk-build-v2")
 MODE_RETRY = GENERATION in ("tools-v5z", "tools-homefloor-145-v5y-custody-build-v1") or WALK_RETRY
 SCHEMA_RETRY = GENERATION in ("tools-v5y", "tools-homefloor-145-v5x-schema-build-v1") or MODE_RETRY
 DONOR_RETRY = GENERATION == "tools-v5x" or SCHEMA_RETRY
@@ -25,9 +26,14 @@ V5X_HANDOFF = FAMILY / "v5x-name-handoff"
 V5Y_HANDOFF = FAMILY / "v5y-name-handoff"
 V5Z_HANDOFF = FAMILY / "v5z-name-handoff"
 V6_HANDOFF = FAMILY / "v6-guard-walk-name-handoff"
-PACKAGE = (FAMILY / "tools-v6-guard-walk" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
+V6 = "a71285e56d674de3bf793692f93dfbb3"
+V6_STOP = "cec8b4e1c2903ff7b26960df7e1a3910567a01d60c9dc3292b4733243d5e2b53"
+V7_HANDOFF = FAMILY / "v7-168-stop-name-handoff"
+V7_START_INTENT = "horizon-epoch145-v6-stop-successor-start-intent-v1"
+PACKAGE = (FAMILY / "tools-v7-168-stop-v2" if STOP_RETRY else FAMILY / "tools-v6-guard-walk" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
            FAMILY / "tools-v5y" if SCHEMA_RETRY else FAMILY / GENERATION if RETRY else V5V_PACKAGE)
-PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v5z-guard-walk-recovery-v1") if WALK_RETRY else
+PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v6-stop-recovery-v2") if STOP_RETRY else
+            V5V_PROVIDER.with_name("tools-homefloor-145-v5z-guard-walk-recovery-v1") if WALK_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5y-custody-recovery-v1") if MODE_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5x-schema-recovery-v1") if SCHEMA_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5w-donor-recovery-v1") if DONOR_RETRY else
@@ -48,7 +54,8 @@ V5V_CUSTODY = "f2ffaa9026eaeb5fc1616330f8e067742d7a06a96f6f46f12dac8354d7e35a9d"
 V5V_RESULT = "feaafe6fd9e0d474c385eadd48e9a57ecc4b29c16b7d20553ae0b62acb51f897"
 V5V_INTENT = "8659f84819e07aef5c9ca02fa0f435fc5c67fc021dd8278579dd9693241777ef"
 CORRECTED_V5U = "4a4bf1a64a85eeeae092d93643136b74d3fce3602393f34f2f28dea72eedb594"
-DONOR_SHA = "db0b9de9d848a525c0f2daf7810ac8dba85515253e99f8c358eb34e4ba2e5d7c"
+V7_DONOR_SHA = "667882d8f26e922fa15c3b87dcf738a43a29b3e73ffe9f0b42e50e9120643d9e"
+DONOR_SHA = V7_DONOR_SHA if STOP_RETRY else "db0b9de9d848a525c0f2daf7810ac8dba85515253e99f8c358eb34e4ba2e5d7c"
 V5U_IMAGE = "18f46b23edd8061eb7ed9ae1566134bc7ea2cbaa6fa7b85cdd1745488366dca4"
 V5U_START = "85dede3d71e27414b28369d1686fe4d7e9ee207bcf6ac4a2c083836961149549"
 V5U_FAILURE = "635ca9e4a87decf519815c27728b2b49884ff3f4e1149f2542d8f931f3731609"
@@ -432,6 +439,9 @@ def receipt_mode_failure(terminal_ref):
 
 
 def failed_predecessor(terminal_ref):
+    if STOP_RETRY:
+        terminal, failed = guard_stop_failure(terminal_ref)
+        return terminal["candidate"], failed
     if WALK_RETRY:
         terminal, failed = guard_walk_failure(terminal_ref)
         return terminal["candidate"], failed
@@ -499,6 +509,44 @@ def guard_walk_failure(terminal_ref):
     return terminal, events[-1]
 
 
+def guard_stop_failure(terminal_ref):
+    path = V6_HANDOFF / "V6_TERMINAL_FAILURE_168_STOP.json"
+    require(terminal_ref == reference(path, V6_STOP), "different V6 guard-stop terminal")
+    terminal = pinned_json(terminal_ref, path)
+    intent = pinned_json(terminal["start_intent"], V6_HANDOFF / "START_INTENT.json")
+    submitted = pinned_json(terminal["start_result"], V6_HANDOFF / "START_RESULT.json")
+    prior, prior_exit = guard_walk_failure(intent["terminal"])
+    state = STATE / V6
+    start = pinned_json(terminal["recovery_started"], state / "recovery-started.json")
+    failure = pinned_json(terminal["native_failure"], state / "failed.json")
+    stop = terminal["guard_stop_168"]
+    stopped = pinned_json(stop["terminal"], Path(stop["terminal"]["path"]))
+    require(terminal["schema"] == "horizon-epoch145-v6-terminal-168-guard-stop-v1"
+            and terminal["invocation_id"] == start["iid"] == failure["iid"] == V6
+            and terminal["unit"] == terminal["manager"]["Id"] == UNIT
+            and terminal["manager"]["InvocationID"] == submitted["manager"]["InvocationID"] == V6
+            and submitted["status"] == 0 and submitted["intent"] == terminal["start_intent"]
+            and intent["schema"] == V6_START_INTENT and start["image"] == intent["worker"]["sha256"]
+            and intent["worker_seal"] == terminal["worker_seal"]
+            and intent["provider_seal"] == terminal["provider_seal"]
+            and terminal["candidate"] == prior["candidate"] and start["file"] == str(PAID)
+            and failure["error"].rstrip().endswith("ValueError: replacement admission has no native producer")
+            and {p.name for p in state.iterdir()} == {"recovery-started.json", "failed.json"}
+            and stopped["producer_invocation_id"] == stop["producer_invocation_id"]
+            and stopped["scratch_deleted"] is False and stop["reservation_ending_bytes"] == 0
+            and terminal["resource_credit_bytes"] == 0
+            and terminal["semantic_completion"] is terminal["archive_publication_authorized"]
+            is terminal["r2_mutations"] is False, "different V6 terminal or retained allocation")
+    messages = (STARTING, STARTED, PROCESS_EXIT, FAILURE, SUCCESS, STOPPING, STOPPED)
+    events = journal(V6, *messages)
+    require([row["MESSAGE_ID"] for row in events] == [STARTING, STARTED, PROCESS_EXIT, FAILURE]
+            and events[2]["__CURSOR"] == terminal["native_exit"]["__CURSOR"]
+            and events[2]["EXIT_CODE"] == "exited" and events[2]["EXIT_STATUS"] == "1"
+            and events[3]["UNIT_RESULT"] == "exit-code", "different V6 PID 1 failure")
+    validate_start_events(V6, events[:2], intent["argv"][-5:], intent["not_before_monotonic_usec"], prior_exit)
+    return terminal, events[-1]
+
+
 def manager_properties(properties):
     output = subprocess.check_output(
         ["/usr/bin/systemctl", "show", "--property=" + ",".join(properties), "--", UNIT],
@@ -522,7 +570,17 @@ def predecessor_preflight(fleet_ref):
     expected = dict(Id=UNIT, ActiveState="failed", SubState="failed", InvocationID=V5U,
                     MainPID="0", ControlPID="0", Job="", NRestarts="0", ControlGroup="",
                     ExecMainStatus="1", Result="exit-code")
-    if WALK_RETRY:
+    if STOP_RETRY:
+        terminal_ref = reference(V6_HANDOFF / "V6_TERMINAL_FAILURE_168_STOP.json", V6_STOP)
+        terminal, native_failure = guard_stop_failure(terminal_ref)
+        startup_ref, failure_ref, candidate = terminal["recovery_started"], terminal_ref, terminal["candidate"]
+        expected = terminal["manager"]
+        properties = tuple(expected)
+        require(fleet["cold168_retry4_root_physical_stop"] == terminal["guard_stop_168"]
+                and not journal(None, STARTING, STARTED, PROCESS_EXIT, FAILURE, SUCCESS, STOPPING, STOPPED,
+                                after_cursor=native_failure["__CURSOR"]),
+                "V6 stop or failed owner changed")
+    elif WALK_RETRY:
         terminal_ref = reference(V5Z_HANDOFF / "V5Z_TERMINAL_FAILURE_GUARD_WALK.json", V5Z_WALK_TERMINAL)
         terminal, native_failure = guard_walk_failure(terminal_ref)
         startup_ref, failure_ref, candidate = terminal["recovery_started"], terminal_ref, terminal["candidate"]
@@ -571,7 +629,8 @@ def predecessor_preflight(fleet_ref):
             }.items())
             and file_stamp(m) == file_stamp(PAID.lstat()) and manager_properties(properties) == expected and not group.exists(),
             "paid candidate or failed owner changed during preflight")
-    return {"schema": ("horizon-epoch145-v6-predecessor-preflight-v1" if WALK_RETRY else
+    return {"schema": ("horizon-epoch145-v7-predecessor-preflight-v1" if STOP_RETRY else
+                       "horizon-epoch145-v6-predecessor-preflight-v1" if WALK_RETRY else
                        "horizon-epoch145-v5z-predecessor-preflight-v1" if MODE_RETRY else
                        "horizon-epoch145-v5y-predecessor-preflight-v1" if SCHEMA_RETRY else
                        "horizon-epoch145-v5x-predecessor-preflight-v1" if DONOR_RETRY else
@@ -588,7 +647,7 @@ def successor_manager(result, intent, *, retry=None):
     retry = RETRY if retry is None else retry
     manager = result["manager"]
     iid = manager["InvocationID"]
-    schema = V6_START_INTENT if WALK_RETRY else V5Z_START_INTENT if MODE_RETRY else V5Y_START_INTENT if SCHEMA_RETRY else "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
+    schema = V7_START_INTENT if STOP_RETRY else V6_START_INTENT if WALK_RETRY else V5Z_START_INTENT if MODE_RETRY else V5Y_START_INTENT if SCHEMA_RETRY else "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
         "horizon-epoch145-v5u-semantic-successor-start-intent-v1"
     )
     predecessor_invocations = (V5U, V5V, V5W) if retry and DONOR_RETRY else (V5U, V5V) if retry else (V5U,)
@@ -598,6 +657,8 @@ def successor_manager(result, intent, *, retry=None):
         predecessor_invocations += (V5Y,)
     if WALK_RETRY:
         predecessor_invocations += (V5Z,)
+    if STOP_RETRY:
+        predecessor_invocations += (V6,)
     require(result["status"] == 0 and manager["Id"] == intent["unit"] == UNIT
             and re.fullmatch(r"[a-f0-9]{32}", iid) and iid not in predecessor_invocations
             and manager["ActiveState"] == "active" and manager["SubState"] == "running"
@@ -609,7 +670,7 @@ def successor_manager(result, intent, *, retry=None):
 
 
 def startup(result_ref):
-    submission = (V6_HANDOFF if WALK_RETRY else V5Z_HANDOFF if MODE_RETRY else V5Y_HANDOFF if SCHEMA_RETRY
+    submission = (V7_HANDOFF if STOP_RETRY else V6_HANDOFF if WALK_RETRY else V5Z_HANDOFF if MODE_RETRY else V5Y_HANDOFF if SCHEMA_RETRY
                   else V5X_HANDOFF if DONOR_RETRY else FAMILY / "v5w-name-handoff" if RETRY else V5V_HANDOFF)
     result = pinned_json(result_ref, submission / "START_RESULT.json")
     intent_ref = result["intent"]
@@ -626,7 +687,7 @@ def startup(result_ref):
     require(launch_quote["fleet"] == bounds and launch_quote["fits"] is True
             and launch_quote["epoch"] == 145 and launch_quote["candidate"] is None
             and launch_quote["phase145"]["InvocationID"] ==
-                (V5Z if WALK_RETRY else V5Y if MODE_RETRY else V5X if SCHEMA_RETRY else V5W if DONOR_RETRY else V5V if RETRY else V5U)
+                (V6 if STOP_RETRY else V5Z if WALK_RETRY else V5Y if MODE_RETRY else V5X if SCHEMA_RETRY else V5W if DONOR_RETRY else V5V if RETRY else V5U)
             and launch_quote["phase145"]["guard_terminal"] == intent["terminal"]
             and launch_quote["resource_credit_bytes"] == 0
             and launch_quote["replay_launch_authorized"] is False,

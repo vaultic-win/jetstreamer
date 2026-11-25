@@ -13,6 +13,7 @@ const IMAGE: &str =
     feature = "epoch168-cold-v2",
     feature = "epoch168-cold-v3",
     feature = "epoch168-cold-v4",
+    feature = "epoch168-cold-v5",
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
     feature = "epoch170-retry13",
@@ -38,6 +39,12 @@ const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch166-write-ve
 #[cfg(feature = "epoch166-write-version-reproduction")]
 const REPRODUCTION_RUN: &str =
     "epoch166-independent-cold-20261120-v1/bounded-write-version-20261124-v1";
+#[cfg(feature = "epoch168-cold-v5")]
+const IMAGE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-cold-guard-20261125-v5/tools/guard";
+#[cfg(feature = "epoch168-cold-v5")]
+const RETRY5_RUN: &str =
+    "epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry5-20261125";
 #[cfg(feature = "epoch166-retry11")]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry11-guard-20261122-v1/tools/guard";
@@ -100,6 +107,13 @@ const LANES: &[Lane] = &[Lane {
     runtime: "epoch166-write-version-gap-20261124-v1",
     cap: 288 << 30,
 }];
+#[cfg(feature = "epoch168-cold-v5")]
+const LANES: &[Lane] = &[Lane {
+    unit: "horizon-qualify-168-full-metered-cold-v5-20261125.service",
+    tree: "epoch168-standard-lane-20261109-v1",
+    runtime: "epoch168-retry5-rebook-20261125-v1",
+    cap: 512 << 30,
+}];
 #[cfg(feature = "epoch166-retry11")]
 const LANES: &[Lane] = &[Lane {
     unit: "horizon-qualify-166-independent-retry11-20261122.service",
@@ -149,6 +163,7 @@ const LANES: &[Lane] = &[Lane {
     feature = "epoch168-cold-v2",
     feature = "epoch168-cold-v3",
     feature = "epoch168-cold-v4",
+    feature = "epoch168-cold-v5",
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
     feature = "epoch170-retry13",
@@ -207,6 +222,7 @@ pub(crate) fn validate(p: &Plan) -> Result<()> {
     feature = "epoch168-cold-v2",
     feature = "epoch168-cold-v3",
     feature = "epoch168-cold-v4",
+    feature = "epoch168-cold-v5",
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
     feature = "epoch170-retry13",
@@ -290,7 +306,7 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
             "epoch168-retry3-rebook-20261123-v1/SUCCESSOR_ROOT.json",
             "a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4",
         ),
-        #[cfg(feature = "epoch168-cold-v4")]
+        #[cfg(any(feature = "epoch168-cold-v4", feature = "epoch168-cold-v5"))]
         (
             "epoch168-retry4-rebook-20261123-v1/SUCCESSOR_ROOT.json",
             "713e94750dd3d430c2f54c1ccb2af7ed708dec802af5cbf210ee4963a992d0f4",
@@ -365,7 +381,7 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
             "epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry3-20261123",
             103481378,
         ),
-        #[cfg(feature = "epoch168-cold-v4")]
+        #[cfg(any(feature = "epoch168-cold-v4", feature = "epoch168-cold-v5"))]
         (
             "epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry4-20261123",
             103481722,
@@ -444,6 +460,40 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
                 && meta.gid() == 1003
                 && meta.mode() & 0o7777 == 0o700,
             "metered epoch 170 successor directory changed"
+        );
+        let reference = Bound {
+            path,
+            sha256: crate::sha(&bytes),
+        };
+        bound(&reference)?;
+        refs.push(reference);
+    }
+    #[cfg(feature = "epoch168-cold-v5")]
+    {
+        let path = Path::new(RUNTIME)
+            .join(LANES[0].runtime)
+            .join("SUCCESSOR_ROOT.json");
+        let bytes = crate::read_private(&path)?;
+        let evidence: Value = serde_json::from_slice(&bytes)?;
+        let root = Path::new(HOME).join(RETRY5_RUN);
+        let mut dir = root_directory()?;
+        for part in safe_components(&root)? {
+            dir = openat(&dir, part, true)?;
+        }
+        let meta = dir.metadata()?;
+        ensure!(
+            evidence["schema"] == "horizon-epoch168-retry5-successor-root-v1"
+                && evidence["root"] == json!(root)
+                && evidence["device"] == meta.dev()
+                && evidence["inode"] == meta.ino()
+                && evidence["source_control_sha256"]
+                    == "488dbd9e630511b97a0ad0704241a0a1fdec71a614caf17c6cd1d3a63b3dc0b2"
+                && evidence["whole_tree_cap_bytes"] == LANES[0].cap
+                && meta.dev() == 64512
+                && meta.uid() == 1001
+                && meta.gid() == 1003
+                && meta.mode() & 0o7777 == 0o700,
+            "retry5 epoch 168 successor directory changed"
         );
         let reference = Bound {
             path,
@@ -547,6 +597,19 @@ mod tests {
         ] {
             assert!(!is_route(other));
         }
+    }
+
+    #[cfg(feature = "epoch168-cold-v5")]
+    #[test]
+    fn metered168_retry5_requires_the_repriced_generation() {
+        assert_eq!(LANES.len(), 1);
+        assert_eq!(LANES[0].cap, 512 << 30);
+        assert!(is_route(
+            "horizon-qualify-168-full-metered-cold-v5-20261125.service"
+        ));
+        assert!(!is_route(
+            "horizon-qualify-168-full-metered-cold-v4-20261123.service"
+        ));
     }
 
     #[cfg(feature = "epoch166-retry11")]
@@ -676,6 +739,7 @@ mod tests {
             feature = "epoch168-cold-v2",
             feature = "epoch168-cold-v3",
             feature = "epoch168-cold-v4",
+            feature = "epoch168-cold-v5",
             feature = "epoch170-retry11",
             feature = "epoch170-retry12",
             feature = "epoch170-retry13"
@@ -686,7 +750,10 @@ mod tests {
         };
         let expected = if cfg!(feature = "epoch166-write-version-reproduction") {
             7
-        } else if cfg!(feature = "epoch170-full-metered") {
+        } else if cfg!(any(
+            feature = "epoch170-full-metered",
+            feature = "epoch168-cold-v5"
+        )) {
             5
         } else {
             expected
