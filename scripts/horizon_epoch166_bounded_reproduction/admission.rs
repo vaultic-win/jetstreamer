@@ -26,6 +26,15 @@ const INPUT_SHA: &str = "003af2196b0eba330a05ed78dafe3508c598bcc1566caf9528c6818
 const LOG_SHA: &str = "1aaeb6c60a550f276f739d0a4bbf1dd192372f2d16794684e37735ceb058428b";
 const GUARD: &str = "epoch166-write-version-reproduction-guard-20261124-v1/GUARD_QUALIFIED.json";
 const GUARD_SHA: &str = "0dae43f20cdfe992fa26cc9141a3e395db7a68a82116a9c4e84577eb9d2fe5a5";
+const V6_INVOCATION: &str = "a71285e56d674de3bf793692f93dfbb3";
+const V6_PROVIDER: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v6-build-v1";
+const V6_PROVIDER_SHA: &str = "197ba4e755875f01097446ab1a8958c604478e8e183769d451d968b269d7f349";
+const V8_INVOCATION: &str = "653a9e16d1de4fbd84bc50cfa85afe70";
+const V8_ACTIVE: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V8_ACTIVE.json";
+const V8_ACTIVE_SHA: &str = "5af272261eaf8c57abc806e03778cc0d6657a7fd118fd58476387ed7dd0d39b3";
+const V8_SEAL: &str = "survivor172-cadence-20261122-v1/tools-cold168-retry4-failed166-v8-entry146/deployment-seal-receipt.json";
+const V8_SEAL_SHA: &str = "3ae90b99cc09e7b58d1f88bc5ed72e8150d0383c906c0a169e401f262dab370a";
+const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 const CAP: u64 = 288 << 30;
 const MIN_FLOOR: u64 = 8_297_502_499_408;
 
@@ -650,12 +659,73 @@ fn reprice_held(
     Ok(())
 }
 
+fn v6_price_refs(native: &Value) -> Result<(&Value, &Value)> {
+    let root = Path::new(RT);
+    let phase = &native["phase145"];
+    let complete = &phase["completion"];
+    let checker = &phase["checker_seal"];
+    ensure!(
+        phase["stage"] == "v6-semantic-complete-drained"
+            && phase["completed_invocation_id"] == V6_INVOCATION
+            && complete["path"]
+                == json!(
+                    root.join("epoch145-guarded-export-20261121-v1/state")
+                        .join(V6_INVOCATION)
+                        .join("complete.json")
+                )
+            && *checker
+                == reference(
+                    &root.join(V6_PROVIDER).join("deployment-seal-receipt.json"),
+                    V6_PROVIDER_SHA,
+                ),
+        "epoch 166 requires the exact drained V6 verifier and completion provider"
+    );
+    let writer = &native["status_registration"];
+    ensure!(
+        writer["invocation_id"] == V8_INVOCATION
+            && writer["consumer_seal"] == reference(&root.join(V8_SEAL), V8_SEAL_SHA),
+        "epoch 166 V6 price requires the registered V8 writer"
+    );
+    Ok((complete, checker))
+}
+
+fn verify_v6_dependencies(native: &Value) -> Result<()> {
+    let (complete, checker) = v6_price_refs(native)?;
+    let root = Path::new(RT);
+    let package = bound(checker)?;
+    ensure!(
+        package["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && package["destination"] == json!(root.join(V6_PROVIDER))
+            && package["sealer_sha256"] == SEALER_SHA
+            && package["remote_mutations"] == false
+            && package["r2_mutations"] == false,
+        "foreign V6 completion provider seal"
+    );
+    member(&package, "incident-post-phase.py")?;
+    bound(complete)?;
+    let writer = &native["status_registration"];
+    let active = bound(&reference(&root.join(V8_ACTIVE), V8_ACTIVE_SHA))?;
+    let current = &active["new"];
+    ensure!(
+        active["schema"] == "horizon-epoch166-cadence-rejoin-active-v1"
+            && current["invocation_id"] == writer["invocation_id"]
+            && current["pid"] == writer["pid"]
+            && current["start_ticks"] == writer["start_ticks"],
+        "epoch 166 V8 writer identity changed"
+    );
+    bound(&writer["consumer_seal"])?;
+    Ok(())
+}
+
 fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Result<Value> {
     let f = current_fleet(fleet)?;
     let evidence = generation()?;
     let before = owner(mode, fleet, &evidence)?;
     ensure!(
-        matches!(generation_name, "v5w" | "post145" | "post145-v5z"),
+        matches!(
+            generation_name,
+            "v5w" | "post145" | "post145-v5z" | "post145-v6"
+        ),
         "unknown epoch 145 provider generation"
     );
     let deployment = Path::new(RT).join(format!(
@@ -666,8 +736,7 @@ fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Re
     ensure!(
         seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
             && seal["destination"] == json!(deployment)
-            && seal["sealer_sha256"]
-                == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+            && seal["sealer_sha256"] == SEALER_SHA,
         "foreign capacity deployment"
     );
     let program = member(&seal, "post-stop-fit")?;
@@ -698,9 +767,22 @@ fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Re
         n.get("reproduction166_owner") == Some(&before),
         "unbound held owner"
     );
+    let requires_v6 = generation_name == "post145-v6";
+    if requires_v6 {
+        verify_v6_dependencies(&n)?;
+    }
     let mut result = prestart_price(&n, fleet, &f, &evidence, now()?)?;
     if !before.is_null() {
-        reprice_held(&mut result, &n, &before, &bound(&before["prestart"])?, &f)?;
+        let prior = bound(&before["prestart"])?;
+        if requires_v6 {
+            ensure!(
+                v6_price_refs(&prior)? == v6_price_refs(&n)?
+                    && prior["epoch166_write_version_reproduction"]["native_capture"]["deployment"]
+                        == sr,
+                "V6 completion or native provider changed since epoch 166 prestart"
+            );
+        }
+        reprice_held(&mut result, &n, &before, &prior, &f)?;
     }
     result["epoch166_write_version_reproduction"]["native_capture"] =
         json!({"deployment":sr,"program":program,"stdout_sha256":digest(&out.stdout)});
@@ -737,6 +819,51 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn v6_price_requires_exact_completion_provider_and_v8_writer() {
+        let root = Path::new(RT);
+        let complete = reference(
+            &root
+                .join("epoch145-guarded-export-20261121-v1/state")
+                .join(V6_INVOCATION)
+                .join("complete.json"),
+            "completion",
+        );
+        let checker = reference(
+            &root.join(V6_PROVIDER).join("deployment-seal-receipt.json"),
+            V6_PROVIDER_SHA,
+        );
+        let price = json!({
+            "phase145":{
+                "stage":"v6-semantic-complete-drained",
+                "completed_invocation_id":V6_INVOCATION,
+                "completion":complete,
+                "checker_seal":checker,
+            },
+            "status_registration":{
+                "invocation_id":V8_INVOCATION,
+                "consumer_seal":reference(&root.join(V8_SEAL), V8_SEAL_SHA),
+            }
+        });
+        assert_eq!(v6_price_refs(&price).unwrap(), (&complete, &checker));
+        for (path, replacement) in [
+            ("/phase145/stage", json!("v5z-semantic-complete-drained")),
+            ("/phase145/completed_invocation_id", json!("foreign")),
+            ("/phase145/completion", Value::Null),
+            ("/phase145/checker_seal/path", json!("/different/receipt")),
+            ("/phase145/checker_seal/sha256", json!("foreign")),
+            ("/status_registration/invocation_id", json!("foreign")),
+            (
+                "/status_registration/consumer_seal/sha256",
+                json!("foreign"),
+            ),
+        ] {
+            let mut wrong = price.clone();
+            *wrong.pointer_mut(path).unwrap() = replacement;
+            assert!(v6_price_refs(&wrong).is_err(), "{path}");
+        }
+    }
 
     fn fixture() -> (Value, Value, Value, Value) {
         let fleet_ref = json!({"path":"/fleet","sha256":"test"});
