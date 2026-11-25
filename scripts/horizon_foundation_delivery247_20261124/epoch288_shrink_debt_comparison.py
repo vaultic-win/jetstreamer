@@ -37,6 +37,8 @@ PLAN_SHA = 'b345c5da0e420df8455793e5c1373fcd20dc385aabd85901a1818566ff7db30d'
 TERMINAL229 = V / 'horizon229-trace-ram-v325/terminal.json'
 TIMER_CORRECTION229 = TERMINAL229.with_name('terminal-timer-correction.json')
 RETIREMENT288 = V / 'horizon288-unpacked-retirement-v328/batch-039-completion.json'
+BANK_DELTA229_UNIT = 'horizon-perf-epoch229-bank-delta@v334.service'
+BANK_DELTA229_GUARDS = V / 'horizon229-bank-delta-v334/guard-receipts'
 GUARDS = {
     226: V / 'horizon226-extract-v2/guard-receipts',
     229: V / 'horizon229-trace-ram-v325/guard-receipts',
@@ -196,7 +198,7 @@ def capacity(kit):
     assert [(r['epoch'], r['state']) for r in fleet['inventory']['entries'] if r['epoch'] == 288] == [(288, 'missing')]
     assert all(r['epoch'] != 288 for r in fleet['active'])
     helper = kit.measure.source.helper
-    owners, growth, reconciled = {}, {}, {}
+    owners, growth, guard_paths, reconciled = {}, {}, {}, {}
     for row in fleet['active']:
         epoch, producer = row['epoch'], row['producer']
         assert epoch in GUARDS and epoch not in owners and epoch not in reconciled
@@ -206,7 +208,8 @@ def capacity(kit):
         owner = helper.active_props(producer['Id'], producer['InvocationID'])
         assert owner['MainPID'] == producer['MainPID']
         owners[epoch] = owner
-        growth[epoch] = kit.measure.source.growth_for(epoch, owner, GUARDS[epoch])
+        guard_paths[epoch] = BANK_DELTA229_GUARDS if producer['Id'] == BANK_DELTA229_UNIT else GUARDS[epoch]
+        growth[epoch] = kit.measure.source.growth_for(epoch, owner, guard_paths[epoch])
     broker_record = kit.ops.bound(kit.ops.ref(V / 'horizon226-extract-v2/held-broker.json'))
     broker_unit = 'foundation-226-original225-broker-v2.service'
     broker = kit.ops.props(broker_unit, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID', 'ControlGroup',
@@ -226,7 +229,7 @@ def capacity(kit):
     root_device = Path('/').stat().st_dev
     for epoch in (229, 230):
         if epoch in growth:
-            diagnostic = kit.ops.bound(kit.ops.ref(GUARDS[epoch].parent / 'guard-plan.json'))
+            diagnostic = kit.ops.bound(kit.ops.ref(guard_paths[epoch].parent / 'guard-plan.json'))
             assert Path(diagnostic['filesystem']).stat().st_dev != root_device
     disk_growth = {epoch: row for epoch, row in growth.items() if epoch not in (229, 230)}
     floor = max(row['floor_bytes'] for row in disk_growth.values())
