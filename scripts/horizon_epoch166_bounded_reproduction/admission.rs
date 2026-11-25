@@ -26,9 +26,6 @@ const INPUT_SHA: &str = "003af2196b0eba330a05ed78dafe3508c598bcc1566caf9528c6818
 const LOG_SHA: &str = "1aaeb6c60a550f276f739d0a4bbf1dd192372f2d16794684e37735ceb058428b";
 const GUARD: &str = "epoch166-write-version-reproduction-guard-20261124-v1/GUARD_QUALIFIED.json";
 const GUARD_SHA: &str = "0dae43f20cdfe992fa26cc9141a3e395db7a68a82116a9c4e84577eb9d2fe5a5";
-const V5W: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-v5v-custody-recovery-v1";
-const V5W_SEAL: &str = "d09996b143470c616b817301e3565a49a4c57c91cf1f8e09d16f63fb00243042";
-const V5W_PROGRAM: &str = "f6282c3a7715c4c1fb2ac3d9dbb16acec3f3b4069620210712e2b603fd0a57ec";
 const CAP: u64 = 288 << 30;
 const MIN_FLOOR: u64 = 8_297_502_499_408;
 
@@ -344,16 +341,21 @@ fn prestart_price(
         num(n, "protected_raw_floor_bytes")? <= base,
         "inconsistent native floor"
     );
-    let funded = num(donor, "native_home_required")?;
+    let current_donor = num(donor, "native_home_required")?;
+    let zero_native = num(n, "full166_zero_remaining_native_HOME_bytes")?;
     ensure!(
-        funded >= base,
-        "native donor requirement lost fleet commitments"
+        zero_native > 0 && zero_native <= base && base <= current_donor,
+        "inconsistent full-tree projection or donor requirement"
     );
-    let floor = absolute.max(
-        funded
-            .checked_sub(remaining)
-            .context("remaining tree exceeds whole fleet")?,
+    let zero_donor = zero_native
+        .checked_add(current_donor - base)
+        .context("donor floor overflow")?;
+    let funded = current_donor.max(
+        zero_donor
+            .checked_add(remaining)
+            .context("full-tree price overflow")?,
     );
+    let floor = absolute.max(funded - remaining);
     let required = floor
         .checked_add(remaining)
         .context("fleet price overflow")?;
@@ -362,8 +364,12 @@ fn prestart_price(
         "complete_cycle_conservative_available_DATA_bytes",
     )?);
     ensure!(
-        required <= available
-            && required - funded <= num(donor, "remaining_home_bytes")?
+        required <= available,
+        "epoch 166 HOME requires {required} bytes, available {available}, shortfall {} bytes, zero-remaining donor floor {zero_donor}, remaining {remaining}",
+        required.saturating_sub(available)
+    );
+    ensure!(
+        required - funded <= num(donor, "remaining_home_bytes")?
             && num(n, "available_memory_bytes")? >= num(n, "required_available_memory_bytes")?,
         "epoch 166 exceeds retained HOME, donor, or memory capacity"
     );
@@ -374,7 +380,7 @@ fn prestart_price(
     q["available_HOME_bytes"] = json!(available);
     q["bookings"]["166"]["run"] = json!(Path::new(LANE).join(RUN));
     q["epoch166_write_version_reproduction"] = json!({"stage":"prestart","evidence":evidence,"predecessor_booking":book,
-        "whole_tree_remaining_bytes":remaining,"absolute_incumbent_floor_bytes":absolute,"native_donor_requirement":funded,
+        "whole_tree_remaining_bytes":remaining,"absolute_incumbent_floor_bytes":absolute,"native_donor_requirement":funded,"zero_remaining_donor_floor_bytes":zero_donor,
         "additional_required_home_bytes":required-funded,"first_guard_required_before_release":true,
         "private_diagnostic":true,"archive_publication_authorized":false});
     Ok(q)
@@ -418,6 +424,10 @@ fn held(fleet: &Value, evidence: &Value) -> Result<Value> {
             && price["replay_launch_authorized"] == false
             && price["epoch166_write_version_reproduction"]["stage"] == "prestart"
             && price["epoch166_write_version_reproduction"]["evidence"] == *evidence
+            && num(
+                &price["epoch166_write_version_reproduction"],
+                "zero_remaining_donor_floor_bytes"
+            )? > 0
             && intent["armed_floor"] == price["protected_raw_floor_bytes"]
             && num(&intent, "armed_floor")? >= MIN_FLOOR
             && price["bookings"]["166"]["run"] == json!(lane_run)
@@ -582,7 +592,15 @@ fn reprice_held(
     let donor = &n["epoch159_donor_cover"];
     let funded = num(donor, "native_home_required")?
         .checked_add(extra)
-        .context("actual complete price overflow")?;
+        .context("actual complete price overflow")?
+        .max(
+            num(
+                &price["epoch166_write_version_reproduction"],
+                "zero_remaining_donor_floor_bytes",
+            )?
+            .checked_add(remaining)
+            .context("actual full-tree floor overflow")?,
+        );
     let armed = num(actor, "armed_floor")?;
     let absolute = num(
         &price["epoch166_write_version_reproduction"],
@@ -607,8 +625,7 @@ fn reprice_held(
     ensure!(
         required >= funded
             && required <= available
-            && required - num(donor, "native_home_required")?
-                <= num(donor, "remaining_home_bytes")?,
+            && required - funded <= num(donor, "remaining_home_bytes")?,
         "insufficient donor or measured HOME for remaining whole tree"
     );
     price["available_HOME_bytes"] = json!(available);
@@ -627,35 +644,23 @@ fn reprice_held(
     });
     detail["whole_tree_remaining_bytes"] = json!(remaining);
     detail["native_donor_requirement"] = json!(funded);
-    detail["additional_required_home_bytes"] =
-        json!(required - num(donor, "native_home_required")?);
+    detail["additional_required_home_bytes"] = json!(required - funded);
     detail["start_intent"] = actor["start_intent"].clone();
     detail["first_guard"] = first.clone();
     Ok(())
 }
 
-fn price(mode: &str, fleet: &Value, provider: Option<(&str, &str)>) -> Result<Value> {
+fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Result<Value> {
     let f = current_fleet(fleet)?;
     let evidence = generation()?;
     let before = owner(mode, fleet, &evidence)?;
-    let mut args = vec![];
-    let (deployment, seal_sha) = match provider {
-        None => {
-            ensure!(
-                mode == "prestart",
-                "original provider cannot price a held process"
-            );
-            (Path::new(RT).join(V5W), V5W_SEAL)
-        }
-        Some((generation, sha)) => {
-            ensure!(
-                matches!(generation, "v5w" | "post145"),
-                "unknown epoch 145 provider generation"
-            );
-            args.push(format!("--repro166={mode}"));
-            (Path::new(RT).join(format!("incident-replay-fit-20261121-v1/tools-homefloor-166-write-version-{generation}-v1")),sha)
-        }
-    };
+    ensure!(
+        matches!(generation_name, "v5w" | "post145"),
+        "unknown epoch 145 provider generation"
+    );
+    let deployment = Path::new(RT).join(format!(
+        "incident-replay-fit-20261121-v1/tools-homefloor-166-write-version-{generation_name}-v1"
+    ));
     let sr = reference(&deployment.join("deployment-seal-receipt.json"), seal_sha);
     let seal = bound(&sr)?;
     ensure!(
@@ -666,19 +671,15 @@ fn price(mode: &str, fleet: &Value, provider: Option<(&str, &str)>) -> Result<Va
         "foreign capacity deployment"
     );
     let program = member(&seal, "post-stop-fit")?;
-    if provider.is_none() {
-        ensure!(program["sha256"] == V5W_PROGRAM, "different V5w executable");
-    } else {
-        let local = fs::read_link("/proc/self/exe")?;
-        let sealed = member(&seal, "reproduction-admission")?;
-        ensure!(
-            digest(&trusted(&local)?) == text(&sealed, "sha256")?,
-            "native observer differs from sealed provider member"
-        );
-    }
+    let local = fs::read_link("/proc/self/exe")?;
+    let sealed = member(&seal, "reproduction-admission")?;
+    ensure!(
+        digest(&trusted(&local)?) == text(&sealed, "sha256")?,
+        "native observer differs from sealed provider member"
+    );
     let out = Command::new("/usr/bin/timeout")
         .args(["120", "/usr/bin/python3", "-IB", text(&program, "path")?])
-        .args(args)
+        .arg(format!("--repro166={mode}"))
         .args(["145", text(fleet, "path")?, text(fleet, "sha256")?])
         .output()?;
     ensure!(
@@ -693,12 +694,10 @@ fn price(mode: &str, fleet: &Value, provider: Option<(&str, &str)>) -> Result<Va
             && owner(mode, fleet, &evidence)? == before,
         "actor or fleet changed during native capacity capture"
     );
-    if provider.is_some() {
-        ensure!(
-            n.get("reproduction166_owner") == Some(&before),
-            "unbound held owner"
-        );
-    }
+    ensure!(
+        n.get("reproduction166_owner") == Some(&before),
+        "unbound held owner"
+    );
     let mut result = prestart_price(&n, fleet, &f, &evidence, now()?)?;
     if !before.is_null() {
         reprice_held(&mut result, &n, &before, &bound(&before["prestart"])?, &f)?;
@@ -715,9 +714,6 @@ fn dispatch() -> Result<Value> {
     );
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.as_slice() {
-        [op, path, sha] if op == "prestart" => {
-            price("prestart", &reference(Path::new(path), sha), None)
-        }
         [op, mode, path, sha]
             if op == "owner" && matches!(mode.as_str(), "prestart" | "held" | "post-guard") =>
         {
@@ -728,15 +724,9 @@ fn dispatch() -> Result<Value> {
         [op, mode, path, sha, provider, seal]
             if op == "quote" && matches!(mode.as_str(), "prestart" | "held" | "post-guard") =>
         {
-            price(
-                mode,
-                &reference(Path::new(path), sha),
-                Some((provider, seal)),
-            )
+            price(mode, &reference(Path::new(path), sha), provider, seal)
         }
-        _ => bail!(
-            "expected prestart FLEET SHA, owner STAGE FLEET SHA, or quote STAGE FLEET SHA PROVIDER SEAL_SHA"
-        ),
+        _ => bail!("expected owner STAGE FLEET SHA, or quote STAGE FLEET SHA PROVIDER SEAL_SHA"),
     }
 }
 fn main() -> Result<()> {
@@ -761,6 +751,7 @@ mod tests {
                 "physical_bytes":CAP-2000,"remaining_bytes":2000,"measurement":"two complete stopped-tree walks"}},
             "epoch159_donor_cover":{"fleet":fleet_ref,"native_recorded_unix_seconds":100,"schema":"horizon-145-drained-159-donor-cover-v1",
                 "native_home_required":MIN_FLOOR+10_000,"remaining_home_bytes":4000},
+            "full166_zero_remaining_native_HOME_bytes":MIN_FLOOR+4000,
             "active168_guard_floor":MIN_FLOOR,"survivors":{"172":{"guard":{"floor":MIN_FLOOR+3000}}},
             "candidate136":{"occupied":false},"replacements":{"167":{"floor":MIN_FLOOR+100}},
             "protected_raw_floor_bytes":MIN_FLOOR,"complete_required_HOME_bytes":MIN_FLOOR+6000,
@@ -782,6 +773,21 @@ mod tests {
         let q = prestart_price(&n, &r, &f, &e, 101).unwrap();
         assert_eq!(q["complete_required_HOME_bytes"], MIN_FLOOR + 11000);
         n["epoch159_donor_cover"]["remaining_home_bytes"] = json!(999);
+        assert!(prestart_price(&n, &r, &f, &e, 101).is_err());
+    }
+    #[test]
+    fn incumbent_commitments_remain_when_the_tree_reaches_its_cap() {
+        let (mut n, r, f, e) = fixture();
+        n["full166_zero_remaining_native_HOME_bytes"] = n["complete_required_HOME_bytes"].clone();
+        n["epoch159_donor_cover"]["remaining_home_bytes"] = json!(0);
+        let q = prestart_price(&n, &r, &f, &e, 101).unwrap();
+        assert_eq!(q["complete_required_HOME_bytes"], MIN_FLOOR + 12000);
+        assert_eq!(q["protected_raw_floor_bytes"], MIN_FLOOR + 10000);
+        n["available_HOME_bytes"] = json!(MIN_FLOOR + 11000);
+        assert!(prestart_price(&n, &r, &f, &e, 101).is_err());
+        n.as_object_mut()
+            .unwrap()
+            .remove("full166_zero_remaining_native_HOME_bytes");
         assert!(prestart_price(&n, &r, &f, &e, 101).is_err());
     }
     #[test]

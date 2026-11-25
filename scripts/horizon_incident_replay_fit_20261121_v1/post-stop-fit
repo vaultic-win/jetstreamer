@@ -1590,23 +1590,23 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=needmem,available_memory_bytes=mem["MemAvailable:"],
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,**recovered_price,active168_guard_floor=floor168,
         population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
-    if FULL170:
+    if FULL170 or REPRO166:
         # At zero remaining growth, the same paid tree has realized its full
         # allowance. Re-evaluate the existing absolute floors and every other
         # promise. Those branches may keep the incumbent floor from falling
         # by the candidate's entire allowance.
-        full_books = dict(books, **{"170": dict(books["170"],
-                          physical_bytes=books["170"]["cap_bytes"], remaining_bytes=0)})
+        lane = "166" if REPRO166 else "170"
+        full_books = {**books, lane: dict(books[lane], physical_bytes=books[lane]["cap_bytes"], remaining_bytes=0)}
         full_replacements = dict(budget_rep)
-        if not active170:
-            full_replacements["170"] = dict(prestart_remaining=books["170"]["remaining_bytes"], floor=0)
+        if lane not in full_replacements:
+            full_replacements[lane] = dict(prestart_remaining=books[lane]["remaining_bytes"], floor=0)
         full_need, _, _ = disk_budget(raw, c136, full_books, epoch, peers,
                                       full_replacements, floor168, closed_prepaid)
         full_zero, _, _ = disk_budget(raw, dict(remaining=0), full_books, epoch, peers,
                                       full_replacements, floor168, closed_prepaid)
         full_need = post145_floor(full_need, full_zero, c136, growth)
         full_need = max(full_need, post145_floor(0, full_zero, c136, prefix_growth)) + after["missing_mirror_bytes"]
-        native["full170_zero_remaining_native_HOME_bytes"] = full_need
+        native[f"full{lane}_zero_remaining_native_HOME_bytes"] = full_need
     if active170:
         native["active_full170"] = dict(
             producer_unit=hourly170_owner["producer_unit"],
