@@ -1,6 +1,9 @@
 //! Encrypted byte custody for the closed Foundation epoch 228 guest image.
 use super::*;
-use std::process::{Command, Stdio};
+use std::process::{ChildStdout, Command, Stdio};
+
+#[path = "holding_foundation_ext4_228_restore.rs"]
+mod restore;
 
 const PREPARE: &str = "holding-foundation-228-ext4-prepare";
 const PARK: &str = "holding-foundation-228-ext4-park";
@@ -27,7 +30,7 @@ struct Plan {
 }
 
 pub(super) fn command(action: &str) -> bool {
-    matches!(action, PREPARE | PARK)
+    matches!(action, PREPARE | PARK | restore::ACTION)
 }
 
 fn validate_stage(bound: &Bound) -> Result<()> {
@@ -124,7 +127,17 @@ fn gpg(key: &Path) -> Result<Command> {
     Ok(command)
 }
 
-fn verify_plaintext(mut plain: impl Read, length: u64, sha: &str) -> Result<()> {
+fn verify_plaintext(plain: impl Read, length: u64, sha: &str) -> Result<()> {
+    copy_verified_plaintext(plain, std::io::sink(), length, sha, || Ok(()))
+}
+
+fn copy_verified_plaintext(
+    mut plain: impl Read,
+    mut destination: impl Write,
+    length: u64,
+    sha: &str,
+    mut check_capacity: impl FnMut() -> Result<()>,
+) -> Result<()> {
     let mut digest = Sha256::new();
     let mut remaining = length;
     let mut buffer = vec![0; 1 << 20];
@@ -136,7 +149,9 @@ fn verify_plaintext(mut plain: impl Read, length: u64, sha: &str) -> Result<()> 
         remaining = remaining
             .checked_sub(count as u64)
             .context("decrypted bundle exceeds sealed length")?;
+        check_capacity()?;
         digest.update(&buffer[..count]);
+        destination.write_all(&buffer[..count])?;
     }
     ensure!(
         remaining == 0 && hex_lower(&digest.finalize()) == sha,
@@ -231,6 +246,18 @@ async fn verify_remote_restore(
     read: RemoteReadSpec<'_>,
     key: &Path,
 ) -> Result<()> {
+    read_decrypted(client, read, key, |output| {
+        verify_plaintext(output, CLEAR_LEN, CLEAR_SHA)
+    })
+    .await
+}
+
+async fn read_decrypted(
+    client: &Client,
+    read: RemoteReadSpec<'_>,
+    key: &Path,
+    consume: impl FnOnce(ChildStdout) -> Result<()> + Send + 'static,
+) -> Result<()> {
     let mut child = gpg(key)?
         .arg("--decrypt")
         .stdin(Stdio::piped())
@@ -238,7 +265,7 @@ async fn verify_remote_restore(
         .spawn()?;
     let mut input = child.stdin.take().context("missing OpenPGP input")?;
     let output = child.stdout.take().context("missing OpenPGP output")?;
-    let compare = std::thread::spawn(move || verify_plaintext(output, CLEAR_LEN, CLEAR_SHA));
+    let compare = std::thread::spawn(move || consume(output));
     let transfer = read_remote_sha256_resumable(client, read, &mut input).await;
     drop(input);
     let status = child.wait();
@@ -349,8 +376,13 @@ async fn park(client: &Client, plan: Plan, spec: &Bound) -> Result<()> {
 }
 
 pub(super) async fn run(action: &str, value: Value, spec: &Bound) -> Result<()> {
-    let plan: Plan = serde_json::from_value(value)?;
     private(Path::new(ROOT))?;
+    if action == restore::ACTION {
+        let r2 = r2_config_from_env()?;
+        ensure!(r2.bucket == BUCKET, "foreign epoch 228 holding bucket");
+        return restore::run(&s3_client(&r2), value, spec).await;
+    }
+    let plan: Plan = serde_json::from_value(value)?;
     let path = cipher_path();
     private(path.parent().context("missing encrypted bundle parent")?)?;
     validate_stage(&plan.staging)?;
