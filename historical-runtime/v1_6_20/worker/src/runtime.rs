@@ -888,6 +888,9 @@ fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
     if cfg!(feature = "epoch230-called-program-demotion") {
         crate::epoch230_profile::validate_snapshot(slot)?;
     }
+    if cfg!(feature = "epoch231-called-program-demotion") {
+        crate::epoch231_profile::validate_snapshot(slot)?;
+    }
     if cfg!(feature = "epoch228-capped-qualification") {
         crate::epoch228_profile::validate_snapshot(slot)?;
     }
@@ -923,6 +926,8 @@ fn effective_max_supported_entry_slot_exclusive() -> u64 {
         crate::epoch229_profile::END_EXCLUSIVE
     } else if cfg!(feature = "epoch230-called-program-demotion") {
         crate::epoch230_profile::END_EXCLUSIVE
+    } else if cfg!(feature = "epoch231-called-program-demotion") {
+        crate::epoch231_profile::END_EXCLUSIVE
     } else if cfg!(feature = "epoch228-capped-qualification") {
         crate::epoch228_profile::END_EXCLUSIVE
     } else if cfg!(feature = "epoch227-capped-warmup-diagnostic") {
@@ -945,6 +950,8 @@ fn effective_min_supported_entry_slot() -> u64 {
         crate::epoch229_profile::BOOTSTRAP_SLOT + 1
     } else if cfg!(feature = "epoch230-called-program-demotion") {
         crate::epoch230_profile::BOOTSTRAP_SLOT + 1
+    } else if cfg!(feature = "epoch231-called-program-demotion") {
+        crate::epoch231_profile::BOOTSTRAP_SLOT + 1
     } else if cfg!(feature = "epoch228-capped-qualification") {
         crate::epoch228_profile::FIRST_ENTRY_SLOT
     } else if cfg!(feature = "epoch227-capped-qualification") {
@@ -1720,6 +1727,10 @@ mod tests {
             assert!(validate_candidate_snapshot_slot(99_359_376).is_ok());
             assert!(validate_candidate_snapshot_slot(99_359_375).is_err());
             assert!(validate_candidate_snapshot_slot(99_359_377).is_err());
+        } else if cfg!(feature = "epoch231-called-program-demotion") {
+            assert!(validate_candidate_snapshot_slot(99_791_404).is_ok());
+            assert!(validate_candidate_snapshot_slot(99_791_403).is_err());
+            assert!(validate_candidate_snapshot_slot(99_791_405).is_err());
         } else if cfg!(feature = "epoch228-capped-qualification") {
             assert!(validate_candidate_snapshot_slot(98_495_291).is_ok());
             assert!(validate_candidate_snapshot_slot(98_495_290).is_err());
@@ -1750,6 +1761,8 @@ mod tests {
                 98_939_267
             } else if cfg!(feature = "epoch230-called-program-demotion") {
                 99_375_856
+            } else if cfg!(feature = "epoch231-called-program-demotion") {
+                99_803_090
             } else if cfg!(feature = "epoch228-capped-qualification") {
                 98_928_279
             } else if cfg!(feature = "epoch227-capped-warmup-diagnostic") {

@@ -4,6 +4,7 @@ mod runtime;
 mod epoch228_profile;
 mod epoch229_profile;
 mod epoch230_profile;
+mod epoch231_profile;
 mod snapshot;
 
 #[cfg(all(
@@ -55,6 +56,23 @@ compile_error!("epoch 229 called-program demotion requires an exclusive qualific
 ))]
 compile_error!("epoch 230 called-program demotion requires an exclusive qualification build");
 
+#[cfg(all(
+    feature = "epoch231-called-program-demotion",
+    any(
+        feature = "diagnostic-singleton",
+        feature = "epoch223-prefix-qualification",
+        feature = "epoch227-capped-qualification",
+        feature = "epoch228-capped-qualification",
+        feature = "epoch229-called-program-demotion",
+        feature = "epoch229-bank-trace",
+        feature = "epoch230-called-program-demotion",
+        feature = "epoch230-bank-trace",
+        feature = "poh-force-soft",
+        feature = "snapshot-hard-fork-metadata",
+    )
+))]
+compile_error!("epoch 231 called-program demotion requires an exclusive qualification build");
+
 use jetstreamer_historical_protocol::{
     read_frame, write_frame, AccountWrite, BackendQualification, EntryProcessed,
     EntryProcessedChunk, EntryProcessedChunkBody, EntryRequest, Handshake, Request, RequestBody,
@@ -71,6 +89,7 @@ const _: [(); 1] = [(); (cfg!(feature = "epoch228-called-program-demotion")
 const ACTIVATION_GATED_PROGRAM_DEMOTION: bool = cfg!(any(
     feature = "epoch229-called-program-demotion",
     feature = "epoch230-called-program-demotion",
+    feature = "epoch231-called-program-demotion",
 ));
 const _: [(); 1] = [(); (ACTIVATION_GATED_PROGRAM_DEMOTION
     == solana_sdk::message::EPOCH230_CALLED_PROGRAM_DEMOTION) as usize];
@@ -78,6 +97,7 @@ const _: [(); 1] = [(); (ACTIVATION_GATED_PROGRAM_DEMOTION
     feature = "epoch228-called-program-demotion",
     feature = "epoch229-called-program-demotion",
     feature = "epoch230-called-program-demotion",
+    feature = "epoch231-called-program-demotion",
 )))]
 const BACKEND_ID: &str = "solana-v1.6.20";
 #[cfg(feature = "epoch228-called-program-demotion")]
@@ -86,6 +106,8 @@ const BACKEND_ID: &str = "solana-v1.6.20-epoch228-called-program-demotion-candid
 const BACKEND_ID: &str = "solana-v1.6.20-epoch229-called-program-demotion-candidate";
 #[cfg(feature = "epoch230-called-program-demotion")]
 const BACKEND_ID: &str = "solana-v1.6.20-epoch230-called-program-demotion-candidate";
+#[cfg(feature = "epoch231-called-program-demotion")]
+const BACKEND_ID: &str = "solana-v1.6.20-epoch231-called-program-demotion-candidate";
 const SOLANA_TAG: &str = "v1.6.20";
 const SOLANA_COMMIT: &str = "77bdb45d4af61fc687161ec06cc0178ff79726d5";
 const ENTRY_CHUNK_TARGET_BYTES: u64 = (MAX_FRAME_BYTES / 2) as u64;

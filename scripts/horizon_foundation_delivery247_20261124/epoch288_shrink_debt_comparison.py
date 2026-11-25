@@ -86,7 +86,10 @@ REPLAY231_UNIT = 'horizon-perf-epoch231-capped-replay@v1.service'
 STOCK231 = V / 'horizon231-stock-warmup-v1'
 STOCK231_UNIT = 'horizon-perf-epoch231-stock-warmup@v1.service'
 STOCK231_MOUNT = Path('/home/ubuntu/.jetstreamer-private/epoch231-stock-warmup-tmpfs-v1')
-REPLAY231_PACKAGES = {REPLAY231_UNIT: REPLAY231, STOCK231_UNIT: STOCK231}
+DEMOTION231 = V / 'horizon231-demotion-v1'
+DEMOTION231_UNIT = 'horizon-perf-epoch231-program-demotion@v1.service'
+DEMOTION231_MOUNT = Path('/home/ubuntu/.jetstreamer-private/epoch231-demotion-tmpfs-v1')
+REPLAY231_PACKAGES = {REPLAY231_UNIT: REPLAY231, STOCK231_UNIT: STOCK231, DEMOTION231_UNIT: DEMOTION231}
 RAM_QUOTES = {
     229: (Path('/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1'),
           170_000_000_000, 395_000_000_000, frozenset(range(80, 88))),
@@ -441,12 +444,13 @@ def active_public_audit(helper, census):
     return dict(launch=launch_ref, owner=owner)
 
 
-def capacity(kit, candidate_epoch=288, *, demotion_retry=False, stock231=False):
+def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='capped'):
     assert not demotion_retry or candidate_epoch == 229
-    assert not stock231 or candidate_epoch == 231
+    assert replay231 == 'capped' or candidate_epoch == 231
     ram_quote = DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch)
-    if stock231:
-        ram_quote = (STOCK231_MOUNT, *RAM_QUOTES[231][1:])
+    if candidate_epoch == 231:
+        mount = {'capped': RAM_QUOTES[231][0], 'stock': STOCK231_MOUNT, 'demotion': DEMOTION231_MOUNT}[replay231]
+        ram_quote = (mount, *RAM_QUOTES[231][1:])
     extract_state, extract_unit, extract_broker = extraction226_scope()
     terminal226 = completed_extraction226(kit.ops, extract_state, extract_unit, extract_broker)
     if candidate_epoch == 226:
@@ -986,7 +990,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'capacity-continuation230',
                                           'capacity-demotion229', 'capacity-demotion229-retry',
-                                          'capacity-replay231', 'capacity-stock231',
+                                          'capacity-replay231', 'capacity-stock231', 'capacity-demotion231',
                                           'prepare', 'launch', 'launch-full'))
     parser.add_argument('reference', nargs='?')
     parser.add_argument('sha256', nargs='?')
@@ -1001,9 +1005,10 @@ def main():
     if options.action == 'capacity-continuation230':
         print(json.dumps(capacity(load_existing(), candidate_epoch=230)))
         return
-    if options.action in ('capacity-replay231', 'capacity-stock231'):
+    if options.action in ('capacity-replay231', 'capacity-stock231', 'capacity-demotion231'):
+        variant = options.action.removeprefix('capacity-').removesuffix('231')
         print(json.dumps(capacity(load_existing(), candidate_epoch=231,
-                                  stock231=options.action == 'capacity-stock231')))
+                                  replay231='capped' if variant == 'replay' else variant)))
         return
     if options.action in ('capacity-demotion229', 'capacity-demotion229-retry'):
         print(json.dumps(capacity(load_existing(), candidate_epoch=229,

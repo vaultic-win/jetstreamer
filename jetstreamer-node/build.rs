@@ -68,6 +68,7 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(called_program_demotion_replay)");
     if env::var_os("CARGO_FEATURE_EPOCH229_CALLED_PROGRAM_DEMOTION_QUALIFICATION").is_some()
         || env::var_os("CARGO_FEATURE_EPOCH230_CALLED_PROGRAM_DEMOTION_QUALIFICATION").is_some()
+        || env::var_os("CARGO_FEATURE_EPOCH231_CALLED_PROGRAM_DEMOTION_QUALIFICATION").is_some()
     {
         println!("cargo:rustc-cfg=called_program_demotion_replay");
     }

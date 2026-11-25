@@ -21,12 +21,28 @@ use std::{
 ))]
 compile_error!("choose one called-program demotion qualification epoch");
 
+#[cfg(all(
+    feature = "epoch231-called-program-demotion-qualification",
+    any(
+        feature = "epoch229-called-program-demotion-qualification",
+        feature = "epoch230-called-program-demotion-qualification",
+    ),
+))]
+compile_error!("epoch 231 requires its own called-program demotion qualification build");
+
 #[cfg_attr(
     feature = "epoch229-called-program-demotion-qualification",
     path = "called_program_demotion/epoch229.rs"
 )]
 #[cfg_attr(
-    not(feature = "epoch229-called-program-demotion-qualification"),
+    feature = "epoch231-called-program-demotion-qualification",
+    path = "called_program_demotion/epoch231.rs"
+)]
+#[cfg_attr(
+    not(any(
+        feature = "epoch229-called-program-demotion-qualification",
+        feature = "epoch231-called-program-demotion-qualification",
+    )),
     path = "called_program_demotion/epoch230.rs"
 )]
 mod profile;

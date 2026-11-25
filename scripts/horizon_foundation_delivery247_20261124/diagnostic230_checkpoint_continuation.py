@@ -24,9 +24,13 @@ STOCK231 = V / "horizon231-stock-warmup-v1"
 STOCK_UNIT231 = "horizon-perf-epoch231-stock-warmup@v1.service"
 STOCK_ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-stock-warmup-tmpfs-v1/run")
 STOCK_WORKER_SHA231 = "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c"
+DEMOTION231 = V / "horizon231-demotion-v1"
+DEMOTION_UNIT231 = "horizon-perf-epoch231-program-demotion@v1.service"
+DEMOTION_ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-demotion-tmpfs-v1/run")
 RUNS231 = {
     UNIT231: (REPLAY231, ROOT231, "epoch231-capped-checkpoint-replay"),
     STOCK_UNIT231: (STOCK231, STOCK_ROOT231, "epoch231-stock-warmup"),
+    DEMOTION_UNIT231: (DEMOTION231, DEMOTION_ROOT231, "epoch231-program-demotion"),
 }
 INPUTS231 = {
     "path": str(V / "horizon231-capped-replay-checkpoints-v1/inputs.json"),
@@ -99,6 +103,13 @@ def receipt231(unit):
     inputs = bound(INPUTS231)
     assert admission["admitted"] and admission["inputs"] == INPUTS231
     expected_worker = STOCK_WORKER_SHA231 if unit == STOCK_UNIT231 else inputs["worker_sha256"]
+    if unit == DEMOTION_UNIT231:
+        profile = bound(admission["profile"])
+        pair = bound(profile["pair"])
+        assert pair["schema"] == "foundation-epoch231-program-demotion-pair-v1"
+        assert pair["parent"] == profile["node"] and pair["worker"] == profile["worker"]
+        assert pair["parent"]["path"] == row["node_path"] and not pair["publication_authorized"]
+        expected_worker = pair["worker"]["sha256"]
     assert row["worker_sha256"] == expected_worker
     guard = bound(row["active_guard"])
     assert guard["producer_invocation_id"] == iid and guard["producer"]["pid"] == row["main_pid"]
@@ -226,6 +237,8 @@ def register_warmup231(plan, gate):
                 gate["evidence"].append(source)
             if unit == STOCK_UNIT231:
                 gate["next_action"] = "Measure the stock runtime at the finalized warmup vote in slot 99,791,499."
+            if unit == DEMOTION_UNIT231:
+                gate["next_action"] = "Compare Bank 99,791,498 with the finalized vote and verify the hourly AccountsDb root."
             terminal = package / "terminal.json"
             if terminal.is_file():
                 terminal_ref = ref(terminal)

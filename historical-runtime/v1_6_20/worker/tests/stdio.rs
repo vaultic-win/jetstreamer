@@ -43,6 +43,8 @@ fn worker_remains_alive_across_framed_requests() -> io::Result<()> {
                 "solana-v1.6.20-epoch229-called-program-demotion-candidate"
             } else if cfg!(feature = "epoch230-called-program-demotion") {
                 "solana-v1.6.20-epoch230-called-program-demotion-candidate"
+            } else if cfg!(feature = "epoch231-called-program-demotion") {
+                "solana-v1.6.20-epoch231-called-program-demotion-candidate"
             } else {
                 "solana-v1.6.20"
             };
