@@ -1,0 +1,21 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -762,6 +762,18 @@
+         assert release['schema'] == 'foundation-epoch230-final-tail-fleet-release-v1'
+         assert release['fleet']['path'] == str(root / 'jetstreamer-r2')
+         fleet_image = Path(publication_handoff.checked_image(release['fleet']))
++    delivery = V / 'horizon257-current-reader-delivery-v1/pipeline-claim.json'
++    if delivery.is_file():
++        claim_ref = sealed_226_file(delivery)
++        claim = bound(claim_ref)
++        assert (claim['epoch'], claim['phase'], claim['unit']) == (
++            257, 'upload-readback', 'horizon-upload-257-current-reader-v1.service')
++        assert claim['unit'] not in plan['tracked_units']
++        plan['tracked_units'].append(claim['unit'])
++        plan['pipeline_claims'].append(claim)
++        add(plan['gates']['257'], claim_ref, *claim['evidence'])
++        plan['gates']['257']['next_action'] = (
++            'Track the verified local archive through authenticated upload, public playback, and sidecar readback.')
+     binding=record(out/f'seven-owner-plan-{cohort}.json',plan)
+     target=Path(plan['output'])
+     if not target.exists():
