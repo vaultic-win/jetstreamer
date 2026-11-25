@@ -56,11 +56,13 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v2",
     D / "tools-homefloor-170-metered-hourly-v3",
 )
-FULL170 = HERE == D / "tools-homefloor-170-full-metered-v1"
+FULL170_V9 = HERE == D / "tools-homefloor-170-full-metered-v3"
+FULL170 = FULL170_V9 or HERE == D / "tools-homefloor-170-full-metered-v1"
 REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
 REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v1"
 REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
-REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
+REPRO166_POST_V9 = HERE == D / "tools-homefloor-166-write-version-post145-v9-v1"
+REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or REPRO166_POST_V9 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
 V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v2"
 V8_RUNTIME_145 = HERE == D / "tools-homefloor-145-v7-timeout-recovery-v1"
@@ -75,11 +77,13 @@ V9_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v4"
 V8_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v3"
 RETRY5_FIT_ROUTE = V9_RETRY5_FIT or V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
 V7_POST_145 = HERE == D / "tools-homefloor-145-post-v7-current-v1"
+V9_POST_145 = HERE == D / "tools-homefloor-145-post-v9-current-v1"
+RETRY5_POST_145 = V7_POST_145 or V9_POST_145
 V7_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v7-build-v1"
 V9_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v9-build-v1"
 RETRY5_POST_BUILD_145 = V7_POST_BUILD_145 or V9_POST_BUILD_145
-RETRY5_168 = RETRY5_FIT_ROUTE or V7_POST_145 or RETRY5_POST_BUILD_145
-STOPPED168_PRICE = RETRY5_168 or STOP_RECOVERY_145 or HERE == D / "tools-homefloor-168-stop-v1"
+RETRY5_168 = RETRY5_FIT_ROUTE or RETRY5_POST_145 or RETRY5_POST_BUILD_145 or REPRO166_POST_V9
+STOPPED168_PRICE = FULL170_V9 or RETRY5_168 or STOP_RECOVERY_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
 V6_POST_PROVIDER = D / "tools-homefloor-145-post-v6-build-v1"
@@ -94,7 +98,7 @@ V5Y_BUILD_145 = HERE == D / "tools-homefloor-145-v5x-schema-build-v1"
 V5X_145 = HERE == D / "tools-homefloor-145-v5w-donor-recovery-v1"
 V5X_BUILD_145 = HERE == D / "tools-homefloor-145-v5w-donor-build-v1"
 V5W_RECOVERY_145 = V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or REPRO166_LIVE or FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
-V5Z_POST_145 = V7_POST_145 or HERE in (D / "tools-homefloor-145-post-v5z-current-v1", D / "tools-homefloor-145-post-v6-current-v1")
+V5Z_POST_145 = RETRY5_POST_145 or HERE in (D / "tools-homefloor-145-post-v5z-current-v1", D / "tools-homefloor-145-post-v6-current-v1")
 CURRENT_HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v2"
 V6_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v6-build-v1"
 V5Z_POST_BUILD_145 = CURRENT_HOURLY169 or V6_POST_BUILD_145 or HERE == D / "tools-homefloor-145-post-v5z-build-v1"
@@ -197,10 +201,11 @@ class PublicReaderTurnover(Exception):
     pass
 
 
-if RETRY5_168:
+if RETRY5_168 or FULL170_V9:
     _, retry5_seal = s.read(HERE / "deployment-seal-receipt.json")
     loader["load_package"](HERE, retry5_seal["sha256"])
     retry5_fit = runpy.run_path(str(HERE / "retry5_fit.py"))
+if RETRY5_168:
     retry5_donor = runpy.run_path(str(HERE / "build_159_price.py"))
 if FIFTH168:
     cold168 = runpy.run_path(str(HERE / "cold168_actor.py"),
@@ -678,7 +683,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
             (MISSED_RUNTIME_145, "tools-v5m"),
             (True, "tools-v5k"),
         ) if enabled)
-        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13r" if V7_POST_145 else "tools-v13q" if V5Z_POST_145 else "tools-v13p" if V5X_POST_145 else "tools-v13o" if V5W_POST_145 else "tools-v13n" if V5U_GUARD_POST_145 else "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
+        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13s" if V9_POST_145 else "tools-v13r" if V7_POST_145 else "tools-v13q" if V5Z_POST_145 else "tools-v13p" if V5X_POST_145 else "tools-v13o" if V5W_POST_145 else "tools-v13n" if V5U_GUARD_POST_145 else "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
                     "lease-semantic": ("profile145-lease-semantic.json", lease_directory),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
@@ -746,10 +751,12 @@ def v12_stopped145(fleet):
 
 
 def phase145(epoch, fleet=None):
-    if RETRY5_FIT_ROUTE or RETRY5_POST_BUILD_145:
-        generation = "V9" if V9_RETRY5_FIT or V9_POST_BUILD_145 else "V8" if V8_RETRY5_FIT else "V7"
+    if FULL170_V9:
+        return retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit["V9"])
+    if RETRY5_FIT_ROUTE or RETRY5_POST_BUILD_145 or REPRO166_POST_V9:
+        generation = "V9" if V9_RETRY5_FIT or V9_POST_BUILD_145 or REPRO166_POST_V9 else "V8" if V8_RETRY5_FIT else "V7"
         phase = retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit[generation])
-        if RETRY5_POST_BUILD_145:
+        if RETRY5_POST_BUILD_145 or REPRO166_POST_V9:
             proof = bound(phase["completion"])
             phase["semantic_receipt"] = phase["completion"]
             phase["completion"] = proof["completion"]
@@ -773,7 +780,7 @@ def phase145(epoch, fleet=None):
         s.need(proof["native_failure"] == stopped["failure"] and proof["recovery_started"] == stopped["startup"],
                "different stopped epoch 145 proof")
         return dict(stopped, InvocationID=stopped["invocation_id"], guard_terminal=terminal)
-    if STOPPED168_PRICE and not V7_POST_145:
+    if STOPPED168_PRICE and not RETRY5_POST_145:
         return stopped145_phase()
     if PUBLISH168 and not fit.members(fit.A145):
         loader["load_package"](V6_POST_PROVIDER, "197ba4e755875f01097446ab1a8958c604478e8e183769d451d968b269d7f349")
@@ -870,7 +877,7 @@ def phase145(epoch, fleet=None):
     if HOURLY170 and not fit.members(fit.A145):
         return hourly170["drained145"](s, fit)
     guard_terminal = STOPPED_GUARD_145 or (
-        GUARD_TERMINAL_RECOVERY_145 and not V7_POST_145 and not fit.members(fit.A145)
+        GUARD_TERMINAL_RECOVERY_145 and not RETRY5_POST_145 and not fit.members(fit.A145)
     )
     for active, name in ((guard_terminal, "v5r_stopped.py"), (STOPPED_V5P, "v5p_stopped.py"), (STOPPED_V5O, "v5o_stopped.py"),
                          (STOPPED_V5N, "v5n_stopped.py"), (STOPPED_V5M, "v5m_stopped.py"),
@@ -1293,8 +1300,8 @@ def registered_status():
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():
                                 adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, version)
-                        if RETRY5_168 or V12_RECOVERY_145:
-                            if V12_RECOVERY_145:
+                        if RETRY5_168 or V12_RECOVERY_145 or FULL170_V9:
+                            if V12_RECOVERY_145 or FULL170_V9:
                                 scope.read(R / "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json",
                                            "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54")
                             adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, 12)
@@ -1606,12 +1613,13 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if FULL170:
         s.need(epoch == 145 and prestart136 is None and failed170,
                "full epoch 170 requires the exact retained retry13 terminal")
-        if full170_mode != "prestart":
+        if full170_mode != "prestart" and not FULL170_V9:
             s.need(phase["stage"] in ("v5w-semantic-complete-drained", "v5x-semantic-complete-drained",
                                      "v5z-semantic-complete-drained", "v6-semantic-complete-drained"),
                    "held or active full epoch 170 requires authenticated drained V5w")
         hourly170_owner, full170_guard = full170_capacity["ownership"](s, fit, full170, hourly170,
-                                                                       full170_mode, ref, status, f)
+                                                                       full170_mode, ref, status, f,
+                                                                       v9=FULL170_V9)
     if HOURLY170:
         s.need(epoch == 145 and prestart136 is None and hourly170_mode in ("prestart", "post-guard", "active")
                and failed170, "hourly 170 requires the positive retry 13 terminal")
@@ -1940,9 +1948,6 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=needmem,available_memory_bytes=mem["MemAvailable:"],
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,**recovered_price,active168_guard_floor=floor168,
         population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
-    if RETRY5_168:
-        donor = retry5_fit["donor_cover"](s, retry5_donor, retry5_donor_before, native, f)
-        return retry5_fit["price"](s, native, retry5_current, books["168"], donor, cold168)
     if FULL170 or REPRO166:
         # At zero remaining growth, the same paid tree has realized its full
         # allowance. Re-evaluate the existing absolute floors and every other
@@ -1954,9 +1959,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         if lane not in full_replacements:
             full_replacements[lane] = dict(prestart_remaining=books[lane]["remaining_bytes"], floor=0)
         full_need, _, _ = disk_budget(raw, c136, full_books, epoch, peers,
-                                      full_replacements, floor168, closed_prepaid)
+                                      full_replacements, budget_floor168, closed_prepaid)
         full_zero, _, _ = disk_budget(raw, dict(remaining=0), full_books, epoch, peers,
-                                      full_replacements, floor168, closed_prepaid)
+                                      full_replacements, budget_floor168, closed_prepaid)
         full_need = post145_floor(full_need, full_zero, c136, growth)
         full_need = max(full_need, post145_floor(0, full_zero, c136, prefix_growth)) + after["missing_mirror_bytes"]
         native[f"full{lane}_zero_remaining_native_HOME_bytes"] = full_need
@@ -1968,11 +1973,16 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
             admission=hourly170_owner["admission"], guard_receipt=full170_guard["receipt"])
         native["active_full170_guard"] = full170_guard
     if FULL170:
-        final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, f)
+        final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, f,
+                                              v9=FULL170_V9)
         full170_capacity["unchanged"](s, full170_mode, (hourly170_owner, full170_guard), final)
     if REPRO166:
         s.need(reproduction166_owner(repro166_mode, ref) == repro166, "epoch 166 gate or first guard changed during capture")
         native["reproduction166_owner"] = repro166
+    if RETRY5_168:
+        donor = retry5_fit["donor_cover"](s, retry5_donor, retry5_donor_before, native, f)
+        price = "price166" if REPRO166_POST_V9 else "price"
+        return retry5_fit[price](s, native, retry5_current, books["168"], donor, cold168)
     if not HOURLY170:
         return native
     s.need(hourly170["ready_contract"]() == hourly170_contract, "sealed diagnostic changed during native price")
@@ -2064,9 +2074,23 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         return native
     if RETRY5_168:
         s.need(epoch == (168 if RETRY5_FIT_ROUTE else 145) and prestart136 is None,
-               "wrong epoch for the sealed retry5 or V7 post provider")
+               "wrong epoch for the sealed retry5 or post provider")
+        if REPRO166_POST_V9:
+            holding_program = holding185_program()
+
+            def holding():
+                return json.loads(subprocess.check_output([holding_program, "reconcile"], timeout=30))
+
+            before = holding()
+            s.need(before["holding_reservation"] is None and before["active_transfer"] is None,
+                   "V9 epoch 166 requires the serial holding slot to drain")
+            native = capture_native(epoch, ref, repro166_mode=repro166_mode)
+            s.need(holding() == before and registered_status() == native["status_registration"],
+                   "serial holding or V12 writer changed during epoch 166 capture")
+            native["epoch185_lanel_holding"] = before
+            return native
         return capture_native(epoch, ref)
-    if STOPPED168_PRICE:
+    if STOPPED168_PRICE and not FULL170_V9:
         s.need(epoch in (145, 166, 167, 170) and prestart136 is None,
                "stopped epoch 168 pricing cannot fund a new epoch 168 producer")
         return capture_native(epoch, ref)
@@ -2081,7 +2105,8 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
                "unknown full epoch 170 capacity stage")
         fleet, _ = fleet_head(ref)
         status = registered_status()
-        actor, guard = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet)
+        actor, guard = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet,
+                                                     v9=FULL170_V9)
     if STOPPED_GUARD_145 or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or LATE_HANDOFF_145:
         s.need(epoch == 145 and (prestart136 is None or POST_136), "unexpected missed-census pricing scope")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
@@ -2124,7 +2149,9 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
             left, right = quotes[-2:]
             native["epoch159_donor_cover"] = donor["cover"](left,native,right,exclusive136=native["candidate136"])
         else:
-            options = {"full170": native["active_full170"]} if FULL170 and full170_mode == "active" else {}
+            options = {"v8": True} if FULL170_V9 else {}
+            if FULL170 and full170_mode == "active":
+                options["full170"] = native["active_full170"]
             native["epoch159_donor_cover"] = donor["cover"](before,donor_price,donor["snapshot"](), **options)
         if REPRO166 or FULL170:
             lane = "166" if REPRO166 else "170"
@@ -2137,7 +2164,8 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         if FULL170:
             s.need(registered_status() == status and fleet_head(ref)[0] == fleet,
                    "full epoch 170 fleet ownership changed after donor proof")
-            final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet)
+            final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet,
+                                                  v9=FULL170_V9)
             full170_capacity["unchanged"](s, full170_mode, (actor, guard), final)
             measured = guard
             if full170_mode == "active":

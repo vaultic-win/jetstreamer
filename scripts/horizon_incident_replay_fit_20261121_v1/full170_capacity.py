@@ -267,8 +267,9 @@ def current_guard(s, route, hourly, actor, record, first):
     raise ValueError('no completed active epoch 170 guard for the current worker')
 
 
-def active(s, fit, route, hourly, ref, status, fleet):
-    require_v6(s, status)
+def active(s, fit, route, hourly, ref, status, fleet, *, v9=False):
+    if not v9:
+        require_v6(s, status)
     intent, review, price = admission_basis(s, route)
     route['check_lineage'](ref, fleet)
     state = route['native'](ACTOR)
@@ -401,13 +402,25 @@ def require_v6(s, status):
            'full epoch 170 requires the registered v6 receiver or its qualified holding successor')
 
 
-def ownership(s, fit, route, hourly, mode, ref, status, fleet):
+def require_v12(s, status):
+    package = Path('/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1'
+                   '/tools-cold168-retry5-failed166-v12-entry146')
+    s.need(status['consumer_seal'] == dict(
+               path=str(package / 'deployment-seal-receipt.json'),
+               sha256='6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac'),
+           'full epoch 170 V9 pricing requires the registered V12 receiver')
+
+
+def ownership(s, fit, route, hourly, mode, ref, status, fleet, *, v9=False):
+    if v9:
+        require_v12(s, status)
     if mode == 'prestart':
         prestart(s, fit, route, hourly)
         return None, None
     if mode == 'active':
-        return active(s, fit, route, hourly, ref, status, fleet)
-    require_v6(s, status)
+        return active(s, fit, route, hourly, ref, status, fleet, v9=v9)
+    if not v9:
+        require_v6(s, status)
     actor = held(s, fit, route, ref, status)
     if mode == 'held':
         idle(s, fit, hourly, route['TIMER'])

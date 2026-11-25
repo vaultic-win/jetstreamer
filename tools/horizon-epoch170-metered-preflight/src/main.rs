@@ -696,6 +696,7 @@ fn preflight(profile: &Value, guard_sha: &str, obs_sha: &str, price: &Value) -> 
         "staged append log differs"
     );
     let provider = bound(&price["reference"], 0)?;
+    admission::validate_v9_price(&provider, &enrollment)?;
     let booking = &provider["bookings"]["170"];
     let proposal = &provider["epoch170_metered_full"];
     let remaining = number(booking, "remaining_bytes")?;

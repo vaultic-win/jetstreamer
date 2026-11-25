@@ -34,6 +34,18 @@ const V8_ACTIVE: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V8_AC
 const V8_ACTIVE_SHA: &str = "5af272261eaf8c57abc806e03778cc0d6657a7fd118fd58476387ed7dd0d39b3";
 const V8_SEAL: &str = "survivor172-cadence-20261122-v1/tools-cold168-retry4-failed166-v8-entry146/deployment-seal-receipt.json";
 const V8_SEAL_SHA: &str = "3ae90b99cc09e7b58d1f88bc5ed72e8150d0383c906c0a169e401f262dab370a";
+const V9_INVOCATION: &str = "ebdfc34db47c4e7699ea5ccbada5d604";
+const V9_CHECKER: &str = "epoch145-semantic-continuity-20261121-v1/tools-v9-census-recovery";
+const V9_CHECKER_SHA: &str = "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd";
+const V9_HANDOFF: &str = "epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff";
+const V9_SUBMISSION_SHA: &str = "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973";
+const V9_RECOVERY_SHA: &str = "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4";
+const V12_ACTIVE: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json";
+const V12_READY: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_READY.json";
+const V12_PACKAGE: &str =
+    "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v12-entry146";
+const V12_SEAL_SHA: &str = "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac";
+const V12_UNIT: &str = "horizon-archive-status-cadence-after172-20261120-v1.service";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 const CAP: u64 = 288 << 30;
 const MIN_FLOOR: u64 = 8_297_502_499_408;
@@ -289,12 +301,69 @@ fn current_fleet(fleet: &Value) -> Result<Value> {
     Ok(f)
 }
 
+fn home_funding(native: &Value, retry5: bool) -> Result<(u64, u64)> {
+    let donor = &native["epoch159_donor_cover"];
+    let donor_home = num(donor, "native_home_required")?;
+    let current = num(native, "complete_required_HOME_bytes")?;
+    let zero = num(native, "full166_zero_remaining_native_HOME_bytes")?;
+    if !retry5 {
+        ensure!(
+            zero > 0 && zero <= current && current <= donor_home,
+            "inconsistent full-tree projection or donor requirement"
+        );
+        return Ok((
+            donor_home,
+            zero.checked_add(donor_home - current)
+                .context("donor floor overflow")?,
+        ));
+    }
+
+    let projection = &native["full166_retry5_projection"];
+    let base = num(projection, "native_current_HOME_bytes")?;
+    let booking = &native["retry5_complete_booking"];
+    let lag = num(booking, "outside_cap_stop_allowance_bytes")?;
+    let growth = num(booking, "candidate_remaining_bytes")?;
+    let guard = num(native, "active168_guard_floor")?;
+    ensure!(
+        zero > 0
+            && zero <= base
+            && base <= donor_home
+            && projection["native_zero_remaining_HOME_bytes"] == zero
+            && projection["funded_current_HOME_bytes"] == current
+            && booking["schema"] == "horizon-168-retry5-complete-booking-v1"
+            && booking["funded"] == true
+            && booking["retained_source"] == native["retry5_retained_source"]
+            && booking["retained_base_HOME_bytes"] == donor_home
+            && booking["retained_guard_floor_bytes"] == guard
+            && booking["complete_required_HOME_bytes"] == current
+            && native["bookings"]["168"]["cap_bytes"] == (512u64 << 30)
+            && native["bookings"]["168"]["remaining_bytes"] == growth
+            && lag == (8u64 << 30)
+            && donor["credited_retirement_bytes"] == 0,
+        "incomplete retry5 reservation or epoch 166 projection"
+    );
+    let combined = |floor: u64| {
+        floor
+            .checked_add(lag)
+            .and_then(|value| value.max(guard).checked_add(growth))
+            .context("retry5 combined HOME overflow")
+    };
+    let zero_funded = combined(donor_home - (base - zero))?;
+    ensure!(
+        combined(donor_home)? == current
+            && projection["funded_zero_remaining_HOME_bytes"] == zero_funded,
+        "retry5 growth differs between epoch 166 projections"
+    );
+    Ok((current, zero_funded))
+}
+
 fn prestart_price(
     n: &Value,
     fleet_ref: &Value,
     fleet: &Value,
     evidence: &Value,
     now: u64,
+    retry5: bool,
 ) -> Result<Value> {
     let book = &n["bookings"]["166"];
     let used = num(book, "physical_bytes")?;
@@ -350,15 +419,7 @@ fn prestart_price(
         num(n, "protected_raw_floor_bytes")? <= base,
         "inconsistent native floor"
     );
-    let current_donor = num(donor, "native_home_required")?;
-    let zero_native = num(n, "full166_zero_remaining_native_HOME_bytes")?;
-    ensure!(
-        zero_native > 0 && zero_native <= base && base <= current_donor,
-        "inconsistent full-tree projection or donor requirement"
-    );
-    let zero_donor = zero_native
-        .checked_add(current_donor - base)
-        .context("donor floor overflow")?;
+    let (current_donor, zero_donor) = home_funding(n, retry5)?;
     let funded = current_donor.max(
         zero_donor
             .checked_add(remaining)
@@ -578,6 +639,7 @@ fn reprice_held(
     actor: &Value,
     prior: &Value,
     fleet: &Value,
+    retry5: bool,
 ) -> Result<()> {
     ensure!(
         n["population"][UNIT] == json!([[actor["producer_pid"], actor["start_ticks"]]])
@@ -599,7 +661,8 @@ fn reprice_held(
         .context("actual tree exceeds reservation")?;
     let extra = num(book, "physical_bytes")? - physical;
     let donor = &n["epoch159_donor_cover"];
-    let funded = num(donor, "native_home_required")?
+    let funded = home_funding(n, retry5)?
+        .0
         .checked_add(extra)
         .context("actual complete price overflow")?
         .max(
@@ -717,6 +780,125 @@ fn verify_v6_dependencies(native: &Value) -> Result<()> {
     Ok(())
 }
 
+fn v9_price_refs(native: &Value) -> Result<[&Value; 3]> {
+    let root = Path::new(RT);
+    let phase = &native["phase145"];
+    let complete = &phase["completion"];
+    let checker = &phase["checker_seal"];
+    let semantic = &phase["semantic_receipt"];
+    ensure!(
+        phase["stage"] == "v9-semantic-complete-drained"
+            && phase["completed_invocation_id"] == V9_INVOCATION
+            && complete["path"]
+                == json!(
+                    root.join("epoch145-guarded-export-20261121-v1/state")
+                        .join(V9_INVOCATION)
+                        .join("complete.json")
+                )
+            && semantic["path"] == json!(root.join(V9_HANDOFF).join("SEMANTIC_COMPLETION.json"))
+            && *checker
+                == reference(
+                    &root.join(V9_CHECKER).join("deployment-seal-receipt.json"),
+                    V9_CHECKER_SHA
+                )
+            && native["status_registration"]["consumer_seal"]
+                == reference(
+                    &root.join(V12_PACKAGE).join("deployment-seal-receipt.json"),
+                    V12_SEAL_SHA
+                ),
+        "epoch 166 requires the exact V9 semantic completion and V12 quote"
+    );
+    Ok([complete, checker, semantic])
+}
+
+fn v12_identity(writer: &Value, active: &Value, ready: &Value) -> Result<()> {
+    let root = Path::new(RT);
+    let actor = &active["new"];
+    ensure!(
+        active["schema"] == "horizon-epoch166-cadence-rejoin-active-v1"
+            && active["producer_mutations"] == false
+            && active["ready"]["path"] == json!(root.join(V12_READY))
+            && ready["schema"] == "horizon-epoch166-cadence-rejoin-ready-v1"
+            && ready["package"] == writer["consumer_seal"]
+            && actor["unit"] == V12_UNIT
+            && actor["program"] == json!(root.join(V12_PACKAGE).join("status_cycle.py"))
+            && token(text(actor, "invocation_id")?)
+            && num(actor, "pid")? > 1
+            && num(actor, "start_ticks")? > 0
+            && ["invocation_id", "pid", "start_ticks"]
+                .iter()
+                .all(|key| actor[*key] == writer[*key]),
+        "epoch 166 V12 writer identity changed"
+    );
+    Ok(())
+}
+
+fn verify_v9_dependencies(native: &Value) -> Result<Value> {
+    let [complete, checker, semantic] = v9_price_refs(native)?;
+    let root = Path::new(RT);
+    let package = bound(checker)?;
+    ensure!(
+        package["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && package["destination"] == json!(root.join(V9_CHECKER))
+            && package["sealer_sha256"] == SEALER_SHA
+            && package["remote_mutations"] == false
+            && package["r2_mutations"] == false,
+        "foreign V9 semantic checker seal"
+    );
+    member(&package, "v5v_semantic_completion.py")?;
+    let terminal = bound(semantic)?;
+    ensure!(
+        terminal["schema"] == "horizon-epoch145-v8-census-successor-semantic-completion-v1"
+            && terminal["invocation_id"] == V9_INVOCATION
+            && terminal["completion"] == *complete
+            && bound(complete)?["iid"] == V9_INVOCATION
+            && terminal["startup_evidence"]["worker_seal"] == *checker
+            && terminal["startup_evidence"]["submission_result"]
+                == reference(
+                    &root.join(V9_HANDOFF).join("START_RESULT.json"),
+                    V9_SUBMISSION_SHA
+                )
+            && terminal["start"] == terminal["startup_evidence"]["start"]
+            && terminal["start"]
+                == reference(
+                    &root.join("epoch145-guarded-export-20261121-v1/state")
+                        .join(V9_INVOCATION)
+                        .join("recovery-started.json"),
+                    V9_RECOVERY_SHA,
+                )
+            && terminal["native_success"]["INVOCATION_ID"] == V9_INVOCATION
+            && terminal["native_success"]["_PID"] == "1"
+            && terminal["native_success"]["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+            && terminal["publication_authorized"] == false
+            && terminal["r2_mutations"] == false,
+        "epoch 166 V9 semantic completion changed"
+    );
+    let writer = &native["status_registration"];
+    bound(&writer["consumer_seal"])?;
+    let (active, active_ref) = live_document(&root.join(V12_ACTIVE))?;
+    ensure!(
+        active["ready"]["path"] == json!(root.join(V12_READY)),
+        "foreign V12 ready path"
+    );
+    v12_identity(writer, &active, &bound(&active["ready"])?)?;
+    let pid = num(writer, "pid")?;
+    let manager = show(
+        V12_UNIT,
+        "Id,InvocationID,ActiveState,SubState,MainPID,NRestarts",
+    )?;
+    ensure!(
+        manager["Id"] == V12_UNIT
+            && manager["InvocationID"] == text(writer, "invocation_id")?
+            && manager["ActiveState"] == "active"
+            && manager["SubState"] == "running"
+            && manager["MainPID"] == pid.to_string()
+            && manager["NRestarts"] == "0"
+            && ticks(&Path::new("/proc").join(pid.to_string()))? == num(writer, "start_ticks")?,
+        "epoch 166 V12 live writer changed"
+    );
+    Ok(active_ref)
+}
+
 fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Result<Value> {
     let f = current_fleet(fleet)?;
     let evidence = generation()?;
@@ -724,7 +906,7 @@ fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Re
     ensure!(
         matches!(
             generation_name,
-            "v5w" | "post145" | "post145-v5z" | "post145-v6"
+            "v5w" | "post145" | "post145-v5z" | "post145-v6" | "post145-v9"
         ),
         "unknown epoch 145 provider generation"
     );
@@ -768,10 +950,16 @@ fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Re
         "unbound held owner"
     );
     let requires_v6 = generation_name == "post145-v6";
+    let requires_v9 = generation_name == "post145-v9";
     if requires_v6 {
         verify_v6_dependencies(&n)?;
     }
-    let mut result = prestart_price(&n, fleet, &f, &evidence, now()?)?;
+    let active_v12 = if requires_v9 {
+        Some(verify_v9_dependencies(&n)?)
+    } else {
+        None
+    };
+    let mut result = prestart_price(&n, fleet, &f, &evidence, now()?, requires_v9)?;
     if !before.is_null() {
         let prior = bound(&before["prestart"])?;
         if requires_v6 {
@@ -782,10 +970,22 @@ fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Re
                 "V6 completion or native provider changed since epoch 166 prestart"
             );
         }
-        reprice_held(&mut result, &n, &before, &prior, &f)?;
+        if let Some(active) = &active_v12 {
+            let saved = &prior["epoch166_write_version_reproduction"]["native_capture"];
+            ensure!(
+                v9_price_refs(&prior)? == v9_price_refs(&n)?
+                    && saved["deployment"] == sr
+                    && saved["cadence_active"] == *active,
+                "V9 completion, V12 receipt or native provider changed since epoch 166 prestart"
+            );
+        }
+        reprice_held(&mut result, &n, &before, &prior, &f, requires_v9)?;
     }
     result["epoch166_write_version_reproduction"]["native_capture"] =
         json!({"deployment":sr,"program":program,"stdout_sha256":digest(&out.stdout)});
+    if let Some(active) = active_v12 {
+        result["epoch166_write_version_reproduction"]["native_capture"]["cadence_active"] = active;
+    }
     Ok(result)
 }
 
@@ -888,34 +1088,118 @@ mod tests {
     }
 
     #[test]
+    fn v9_quote_keeps_retry5_at_prestart_held_and_postguard() {
+        let (mut n, r, mut f, e) = fixture();
+        let base = MIN_FLOOR + 6000;
+        let zero = MIN_FLOOR + 4000;
+        let donor = MIN_FLOOR + 10000;
+        let lag = 8u64 << 30;
+        let current = donor + lag + 2000;
+        n["complete_required_HOME_bytes"] = json!(current);
+        n["available_HOME_bytes"] = json!(current + 10000);
+        f["complete_cycle_conservative_available_DATA_bytes"] = json!(current + 9000);
+        n["epoch159_donor_cover"]["credited_retirement_bytes"] = json!(0);
+        n["retry5_retained_source"] = json!({"path":"/retained","sha256":"fixture"});
+        n["bookings"]["168"] = json!({"cap_bytes":512u64<<30,"remaining_bytes":2000});
+        n["retry5_complete_booking"] = json!({
+            "schema":"horizon-168-retry5-complete-booking-v1", "funded":true,
+            "outside_cap_stop_allowance_bytes":lag, "candidate_remaining_bytes":2000,
+            "retained_guard_floor_bytes":MIN_FLOOR, "retained_base_HOME_bytes":donor,
+            "retained_source":n["retry5_retained_source"], "complete_required_HOME_bytes":current
+        });
+        n["full166_retry5_projection"] = json!({
+            "native_current_HOME_bytes":base, "native_zero_remaining_HOME_bytes":zero,
+            "funded_current_HOME_bytes":current, "funded_zero_remaining_HOME_bytes":current-2000
+        });
+        let prior = prestart_price(&n, &r, &f, &e, 101, true).unwrap();
+        assert_eq!(prior["complete_required_HOME_bytes"], current);
+        assert_eq!(prior["phase145"], n["phase145"]);
+        assert_ne!(home_funding(&n, true).unwrap().0, donor);
+        assert!(home_funding(&n, false).is_err());
+        n["population"] = json!({(UNIT):[[17,45]]});
+        let mut actor = json!({"producer_pid":17,"start_ticks":45,"armed_floor":current-2000});
+        let mut held = prior.clone();
+        reprice_held(&mut held, &n, &actor, &prior, &f, true).unwrap();
+        assert_eq!(held["complete_required_HOME_bytes"], current);
+        actor["first_guard"] = json!({"physical_bytes":CAP-2100, "available_bytes":current+150});
+        let mut guarded = prior.clone();
+        reprice_held(&mut guarded, &n, &actor, &prior, &f, true).unwrap();
+        assert_eq!(guarded["complete_required_HOME_bytes"], current + 100);
+        assert_eq!(
+            guarded["retry5_complete_booking"],
+            n["retry5_complete_booking"]
+        );
+        actor["first_guard"]["available_bytes"] = json!(current + 99);
+        assert!(reprice_held(&mut guarded, &n, &actor, &prior, &f, true).is_err());
+        n["full166_retry5_projection"]["funded_zero_remaining_HOME_bytes"] = json!(current - 2001);
+        assert!(home_funding(&n, true).is_err());
+    }
+
+    #[test]
+    fn v9_rejects_crossed_completion_and_v12_process() {
+        let root = Path::new(RT);
+        let seal = reference(
+            &root.join(V12_PACKAGE).join("deployment-seal-receipt.json"),
+            V12_SEAL_SHA,
+        );
+        let writer = json!({"consumer_seal":seal,"invocation_id":"3".repeat(32),"pid":723,"start_ticks":931});
+        let mut n = json!({
+            "phase145":{
+                "stage":"v9-semantic-complete-drained","completed_invocation_id":V9_INVOCATION,
+                "completion":reference(&root.join("epoch145-guarded-export-20261121-v1/state")
+                    .join(V9_INVOCATION).join("complete.json"),"completion"),
+                "semantic_receipt":reference(&root.join(V9_HANDOFF).join("SEMANTIC_COMPLETION.json"),"semantics"),
+                "checker_seal":reference(&root.join(V9_CHECKER).join("deployment-seal-receipt.json"),V9_CHECKER_SHA)
+            },
+            "status_registration":writer
+        });
+        v9_price_refs(&n).unwrap();
+        n["phase145"]["completed_invocation_id"] = json!(V6_INVOCATION);
+        assert!(v9_price_refs(&n).is_err());
+        n["phase145"]["completed_invocation_id"] = json!(V9_INVOCATION);
+        n["status_registration"]["consumer_seal"] = json!({"path":V8_SEAL,"sha256":V8_SEAL_SHA});
+        assert!(v9_price_refs(&n).is_err());
+        let ready = json!({"schema":"horizon-epoch166-cadence-rejoin-ready-v1","package":seal});
+        let mut active = json!({
+            "schema":"horizon-epoch166-cadence-rejoin-active-v1","producer_mutations":false,
+            "ready":reference(&root.join(V12_READY),"ready"),
+            "new":{"unit":V12_UNIT,"program":root.join(V12_PACKAGE).join("status_cycle.py"),
+                "invocation_id":writer["invocation_id"],"pid":writer["pid"],"start_ticks":writer["start_ticks"] }
+        });
+        v12_identity(&writer, &active, &ready).unwrap();
+        active["new"]["start_ticks"] = json!(932);
+        assert!(v12_identity(&writer, &active, &ready).is_err());
+    }
+
+    #[test]
     fn transfers_one_whole_tree_and_preserves_donor_and_incumbents() {
         let (mut n, r, f, e) = fixture();
-        let q = prestart_price(&n, &r, &f, &e, 101).unwrap();
+        let q = prestart_price(&n, &r, &f, &e, 101, false).unwrap();
         assert_eq!(q["protected_raw_floor_bytes"], MIN_FLOOR + 8000);
         assert_eq!(q["complete_required_HOME_bytes"], MIN_FLOOR + 10000);
         assert_eq!(q["available_HOME_bytes"], MIN_FLOOR + 16000);
         assert_eq!(q["bookings"]["166"]["remaining_bytes"], 2000);
         assert_eq!(q["replay_launch_authorized"], false);
         n["replacements"]["167"]["floor"] = json!(MIN_FLOOR + 9000);
-        let q = prestart_price(&n, &r, &f, &e, 101).unwrap();
+        let q = prestart_price(&n, &r, &f, &e, 101, false).unwrap();
         assert_eq!(q["complete_required_HOME_bytes"], MIN_FLOOR + 11000);
         n["epoch159_donor_cover"]["remaining_home_bytes"] = json!(999);
-        assert!(prestart_price(&n, &r, &f, &e, 101).is_err());
+        assert!(prestart_price(&n, &r, &f, &e, 101, false).is_err());
     }
     #[test]
     fn incumbent_commitments_remain_when_the_tree_reaches_its_cap() {
         let (mut n, r, f, e) = fixture();
         n["full166_zero_remaining_native_HOME_bytes"] = n["complete_required_HOME_bytes"].clone();
         n["epoch159_donor_cover"]["remaining_home_bytes"] = json!(0);
-        let q = prestart_price(&n, &r, &f, &e, 101).unwrap();
+        let q = prestart_price(&n, &r, &f, &e, 101, false).unwrap();
         assert_eq!(q["complete_required_HOME_bytes"], MIN_FLOOR + 12000);
         assert_eq!(q["protected_raw_floor_bytes"], MIN_FLOOR + 10000);
         n["available_HOME_bytes"] = json!(MIN_FLOOR + 11000);
-        assert!(prestart_price(&n, &r, &f, &e, 101).is_err());
+        assert!(prestart_price(&n, &r, &f, &e, 101, false).is_err());
         n.as_object_mut()
             .unwrap()
             .remove("full166_zero_remaining_native_HOME_bytes");
-        assert!(prestart_price(&n, &r, &f, &e, 101).is_err());
+        assert!(prestart_price(&n, &r, &f, &e, 101, false).is_err());
     }
     #[test]
     fn rejects_foreign_spent_stale_and_underfunded_evidence() {
@@ -936,26 +1220,29 @@ mod tests {
         ] {
             let mut bad = n.clone();
             *bad.pointer_mut(path).unwrap() = value;
-            assert!(prestart_price(&bad, &r, &f, &e, 100).is_err(), "{path}");
+            assert!(
+                prestart_price(&bad, &r, &f, &e, 100, false).is_err(),
+                "{path}"
+            );
         }
-        assert!(prestart_price(&n, &r, &f, &e, 221).is_err());
+        assert!(prestart_price(&n, &r, &f, &e, 221, false).is_err());
     }
     #[test]
     fn guarded_quote_uses_smallest_measurement_and_checks_the_armed_floor() {
         let (mut n, r, f, e) = fixture();
-        let prior = prestart_price(&n, &r, &f, &e, 101).unwrap();
+        let prior = prestart_price(&n, &r, &f, &e, 101, false).unwrap();
         n["population"] = json!({(UNIT):[[17,45]]});
         let mut actor = json!({"producer_pid":17,"start_ticks":45,"armed_floor":MIN_FLOOR+8000,
             "first_guard":{"physical_bytes":CAP-2100,"available_bytes":MIN_FLOOR+14000}});
         let mut q = prior.clone();
-        reprice_held(&mut q, &n, &actor, &prior, &f).unwrap();
+        reprice_held(&mut q, &n, &actor, &prior, &f, false).unwrap();
         assert_eq!(q["bookings"]["166"]["remaining_bytes"], 2100);
         assert_eq!(q["complete_required_HOME_bytes"], MIN_FLOOR + 10100);
         assert_eq!(q["candidate"], actor);
         actor["armed_floor"] = json!(MIN_FLOOR + 7999);
-        assert!(reprice_held(&mut q, &n, &actor, &prior, &f).is_err());
+        assert!(reprice_held(&mut q, &n, &actor, &prior, &f, false).is_err());
         actor["armed_floor"] = json!(MIN_FLOOR + 8000);
         n["population"][UNIT] = json!([[17, 46]]);
-        assert!(reprice_held(&mut q, &n, &actor, &prior, &f).is_err());
+        assert!(reprice_held(&mut q, &n, &actor, &prior, &f, false).is_err());
     }
 }

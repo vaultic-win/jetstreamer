@@ -95,11 +95,21 @@ class V5wPostPhase(unittest.TestCase):
             "v6-guard-walk-name-handoff/V6_TERMINAL_FAILURE_168_STOP.json",
         )
 
+    def test_v9_post_binds_the_separate_submission_and_recovery_receipts(self):
+        self.check_successor(
+            "v9-census", "horizon-epoch145-v8-census-successor-semantic-completion-v1",
+            "state/failed.json",
+        )
+
     def check_successor(self, generation, schema, predecessor_path):
         root = Path("/private/runtime")
         family = root / "epoch145-semantic-continuity-20261121-v1"
         v7 = generation == "v7-168-stop"
-        authority = family / (f"tools-{generation}-v2" if v7 else f"tools-{generation}")
+        v9 = generation == "v9-census"
+        authority = family / {
+            "v7-168-stop": "tools-v7-168-stop-v2",
+            "v9-census": "tools-v9-census-recovery",
+        }.get(generation, f"tools-{generation}")
         handoff = family / f"{generation}-name-handoff"
         actor = "a" * 32
         state = root / "state"
@@ -114,10 +124,12 @@ class V5wPostPhase(unittest.TestCase):
             return {"path": str(path), "sha256": expected_hash}
 
         predecessor = ref(family / predecessor_path)
+        reconstruction_start = ref(state / actor / "recovery-started.json") if v9 else ref(start)
         result = {"schema":schema,
                   "invocation_id":actor, "completion":ref(done), "extraction":ref(extraction),
-                  "start":ref(start),
+                  "start":reconstruction_start,
                   "startup_evidence":{"invocation_id":actor,"submission_result":ref(start),
+                                      "start":reconstruction_start,
                                       "worker_build":ref(build),"worker_seal":ref(sealed),
                                       "predecessor_terminal":predecessor},
                   "r2_mutations":False, "publication_authorized":False}
@@ -145,7 +157,9 @@ class V5wPostPhase(unittest.TestCase):
         v6 = generation == "v6-guard-walk"
         with patch.dict(scope, ROOT=root, STATE=state, V5Z_POST=generation != "v5x", V6_POST=v6,
                         V6_INVOCATION=actor, V6_START_SHA=expected_hash, V6_SEAL_SHA=expected_hash,
-                        V7_POST=v7, V7_INVOCATION=actor, V7_START_SHA=expected_hash, V7_SEAL_SHA=expected_hash), \
+                        V7_POST=v7, V7_INVOCATION=actor, V7_START_SHA=expected_hash, V7_SEAL_SHA=expected_hash,
+                        V9_POST=v9, V9_INVOCATION=actor, V9_SUBMISSION_SHA=expected_hash,
+                        V9_RECOVERY_SHA=expected_hash, V9_SEAL_SHA=expected_hash), \
              patch.object(Path,"lstat",return_value=md), \
              patch.object(Path,"resolve",autospec=True,side_effect=lambda p,**_:p), \
              patch.object(Path,"read_bytes",return_value=b"sealed tool"), \
@@ -165,6 +179,15 @@ class V5wPostPhase(unittest.TestCase):
                 records[captured] = crossed
                 checked.return_value = json.dumps(crossed)
                 with self.assertRaisesRegex(ValueError, "foreign V5x semantic completion"):
+                    phase["v5x_completion"](status)
+            if v9:
+                with patch.dict(scope, V9_SUBMISSION_SHA="0" * 64):
+                    with self.assertRaisesRegex(ValueError, "different authenticated V9 semantic owner"):
+                        phase["v5x_completion"](status)
+                crossed = dict(result, start=ref(start))
+                records[captured] = crossed
+                checked.return_value = json.dumps(crossed)
+                with self.assertRaisesRegex(ValueError, "different authenticated V9 recovery start"):
                     phase["v5x_completion"](status)
             wrong = dict(result,schema="horizon-epoch145-v5w-donor-successor-semantic-completion-v1")
             records[captured] = wrong

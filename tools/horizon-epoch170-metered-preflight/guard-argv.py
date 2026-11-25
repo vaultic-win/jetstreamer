@@ -58,6 +58,14 @@ def start_intent(route, review_ref):
          and review["observer"]["path"] == str(ROOT / f"OBSERVER_ENROLLMENT-{fleet_ref['sha256']}.json")
          and profile["actor"]["unit"] == route["UNIT"]
          and not os.path.lexists(route["PERMIT"]), "epoch 170 start basis differs")
+    if price.get("phase145", {}).get("stage") == "v9-semantic-complete-drained":
+        status = price["status_registration"]
+        receiver = checked(status["consumer_seal"])
+        need(status["invocation_id"] == enrollment["incumbent"]["invocation_id"]
+             and str(Path(enrollment["incumbent"]["program"]).parent) == receiver["destination"]
+             and any(member["name"] == "full170_status.py" and member["mode"] == "0444"
+                     for member in receiver["members"]),
+             "current cadence cannot adopt the held full epoch 170 worker")
     predecessor = bound(PREDECESSOR)
     need(predecessor["sha256"] == PREDECESSOR_SHA, "original epoch 170 stop proof changed")
     return dict(schema="horizon-170-full-metered-start-intent-v1", epoch=170, fleet=fleet_ref,
