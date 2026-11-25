@@ -15,7 +15,9 @@ def floor(fleet,ledger,tree,peers):
            and audit["current_storage"]["remaining_DATA_growth_bytes"]==18*G and roots["root_cap_bytes"]==CAP,
            "changed complete host, holding, temporary or audit commitments")
     observe_cpu()
-    remaining=CAP-tree["physical_bytes"]
+    # Allocated bytes already reduce statvfs. An overrun cannot turn the unpaid
+    # part of a closed booking into negative growth or an admission credit.
+    remaining=max(0,CAP-tree["physical_bytes"])
     fixed=max(x["historical_floor_bytes"],audit["configured_free_floor_bytes"])
     other=(fixed+roots["peer_remaining_growth_bytes"]+10*G+x["auxiliary"]["remaining_growth_bytes"]+
            (64<<20)+x["independent166_whole_cap_bytes"]+18*G)

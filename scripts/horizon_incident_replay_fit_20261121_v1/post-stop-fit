@@ -62,6 +62,7 @@ REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v
 REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
 REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
+STOPPED168_PRICE = HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
 V6_POST_PROVIDER = D / "tools-homefloor-145-post-v6-build-v1"
@@ -83,8 +84,8 @@ V5Z_POST_BUILD_145 = CURRENT_HOURLY169 or V6_POST_BUILD_145 or HERE == D / "tool
 V5X_POST_145 = V5Z_POST_145 or HERE == D / "tools-homefloor-145-post-v5x-current-v1"
 V5W_POST_145 = V5X_POST_145 or V5Z_POST_BUILD_145 or REPRO166_POST or HERE == D / "tools-homefloor-145-post-v5w-current-v1"
 V5V_RECOVERY_145 = V5W_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
-FRESH_CENSUS_RECOVERY_145 = V5V_RECOVERY_145 or HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
-RETAIN_FAILED166 = FAILED166_CADENCE or V5V_RECOVERY_145 or V5W_POST_145
+FRESH_CENSUS_RECOVERY_145 = STOPPED168_PRICE or V5V_RECOVERY_145 or HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
+RETAIN_FAILED166 = STOPPED168_PRICE or FAILED166_CADENCE or V5V_RECOVERY_145 or V5W_POST_145
 GUARD_WALK_RECOVERY_145 = FRESH_CENSUS_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5s-guard-recovery-v1"
 GUARD_TERMINAL_RECOVERY_145 = (
     GUARD_WALK_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5r-guard-recovery-v1"
@@ -381,7 +382,7 @@ def tree_size(root,cap,exclude=None):
                                    text=True,timeout=50)
     amount,path=output.rstrip("\n").split("\t")
     size=int(amount)
-    s.need(path==str(root) and 0<size<=cap and os.path.samestat(start,root.stat()),"whole tree exceeds booking")
+    s.need(path==str(root) and size>0 and (cap is None or size<=cap) and os.path.samestat(start,root.stat()),"whole tree exceeds booking")
     return size
 
 
@@ -683,6 +684,8 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch, fleet=None):
+    if STOPPED168_PRICE:
+        return stopped145_phase()
     if PUBLISH168 and not fit.members(fit.A145):
         loader["load_package"](V6_POST_PROVIDER, "197ba4e755875f01097446ab1a8958c604478e8e183769d451d968b269d7f349")
         phase = runpy.run_path(str(V6_POST_PROVIDER / "post-stop-fit"))["phase145"](epoch, fleet)
@@ -1001,12 +1004,59 @@ def closed_allowance(epoch,proof,stop,root,run,cap,extension):
                s.bound(intent["booking"],d/"ACCEPTED_384_BOOKING.json")["prestart"]==pre,"missing original extended 170 funding")
     return book["remaining_bytes"]
 
-def closed168_tree():
+def stopped145_phase():
+    iid = "a71285e56d674de3bf793692f93dfbb3"
+    state = R / "epoch145-guarded-export-20261121-v1/state" / iid
+    failed, failure = s.read(state / "failed.json", "1ffd250fda46f068332e738759356e350849b93e209bddb5056b8616e1485d9f")
+    started, startup = s.read(state / "recovery-started.json", "ab2593f2a8b2cd6e738cb3adb9ea12cd0f0b61f1cc9ee05858aaee8e6ab79d68")
+    manager = s.show(fit.A145)
+    s.need(failed["iid"] == started["iid"] == manager["InvocationID"] == iid
+           and failed["error"].strip().endswith("ValueError: replacement admission has no native producer")
+           and not (state / "complete.json").exists()
+           and manager["ActiveState"] == manager["SubState"] == "failed"
+           and manager["Result"] == "exit-code" and manager["ExecMainStatus"] == "1"
+           and manager["MainPID"] == manager["ControlPID"] == "0"
+           and not any(manager[k] for k in ("Job", "ControlGroup", "TriggeredBy"))
+           and not fit.members(fit.A145)
+           and not (Path("/sys/fs/cgroup/system.slice") / fit.A145).exists(),
+           "different failed epoch 145 owner")
+    return dict(Id=fit.A145, MainPID="0", stage="v6-failed-168-guard-stop", invocation_id=iid,
+                failure=failure, startup=startup, resource_credit_bytes=0)
+
+
+def cold168_guard_stop(fleet, rows):
+    cadence = R / "survivor172-cadence-20261122-v1"
+    writer = cadence / "tools-cold168-retry4-failed166-v11-entry146"
+    evidence = R / "prefix140-status-cadence-20261122-v1/cadence-tools"
+    loader["load_package"](writer, "cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c")
+    loader["load_package"](evidence, "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e")
+    config = bound(fleet["sole_next_observer"])
+    s.need(168 not in rows and "cold168_retry4_root_physical_stop" in fleet
+           and not fleet.get("cold168_local_commit") and not fleet.get("metered168_local_commit"),
+           "expected stopped epoch 168 retry4")
+    sys.path.insert(0, str(evidence))
+    try:
+        module = runpy.run_path(str(writer / "cold168_commit.py"))
+        stopped = module["guard_stop"](fleet, config)
+        s.need(all(Path(sys.modules[name].__file__) == evidence / (name + ".py")
+                   for name in ("evidence", "owners")), "foreign epoch 168 evidence module")
+    finally:
+        sys.path.pop(0)
+    plan = bound(bound(stopped["admission"])["actual_guard_plan"])
+    s.need(plan["worker_root"] == str(s.TREE) and stopped["retained_cap_bytes"] == fit.CAP
+           and stopped["resource_credit_bytes"] == stopped["reservation_ending_bytes"] == 0,
+           "different stopped epoch 168 booking")
+    cold168["stable"](s)
+    return stopped
+
+
+def closed168_tree(*, allow_over_cap=False):
     stable=bound(STABLE[167])["normal168"]
     run=Path(stable["path"]);m=run.stat()
     s.need(run==s.RUN and run.parent==s.TREE and run.resolve(strict=True)==run and
            (m.st_dev,m.st_ino)==(stable["device"],stable["inode"]),"changed retained metered 168 namespace")
-    first=tree_size(s.TREE,fit.CAP);second=tree_size(s.TREE,fit.CAP)
+    walk_limit = None if allow_over_cap else fit.CAP
+    first=tree_size(s.TREE,walk_limit);second=tree_size(s.TREE,walk_limit)
     s.need(first==second and os.path.samestat(m,run.stat()),"retained metered 168 allocation changed during walk")
     return dict(physical_bytes=first,root=str(s.TREE),cap=fit.CAP)
 
@@ -1147,7 +1197,7 @@ def registered_status():
                         adopted = writer168v4["registered_hourly170_writer"](scope, failed, failed166=True)
                         versions = (2, 3, 4, 5, 6, 7) if REPRO166 or FULL170 or V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or V5X_POST_145 or V5Z_POST_BUILD_145 else (2, 3, 4, 5, 6)
                         if (R / "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V8_ACTIVE.json").exists():
-                            versions = (2, 3, 4, 5, 8)
+                            versions = (2, 3, 4, 5, 8, 11) if STOPPED168_PRICE else (2, 3, 4, 5, 8)
                         for version in versions:
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():
@@ -1434,6 +1484,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     failed166 = retry11["failed"](s, fit, f, rows) if RETAIN_FAILED166 else None
     hourly170_settled = settled_hourly170_for_145(f, ref, rows) if V5V_RECOVERY_145 or V5W_POST_145 else None
     terminal168 = None
+    stopped168 = cold168_guard_stop(f, rows) if STOPPED168_PRICE else None
     if PUBLISH168:
         s.need(epoch == 145 and prestart136 is None, "cold168 provider only prices terminal publication")
         terminal168 = publication168["current"](s, loader["load_package"], f)
@@ -1493,7 +1544,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     interrupted = recover["settled"](f, bound, loader["load_package"]) if HOMEFLOOR else {}
     # Some successor packages replace the provider while retaining the donor's
     # sealed helper. Such packages still require the historical worker roster.
-    fresh_public = (post_price or V5Q_136 or V5R_136) and HOMEFLOOR and "validate_public" in recover
+    fresh_public = (STOPPED168_PRICE or post_price or V5Q_136 or V5R_136) and HOMEFLOOR and "validate_public" in recover
     public_options = {"fresh_workers": True} if fresh_public else {}
     obligations = recover["obligations"](f, ref, bound, loader["load_package"],
                                          **public_options) if HOMEFLOOR else None
@@ -1560,7 +1611,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     tree_measurement="two complete stopped-tree walks"
     if FIFTH168:
         s.need(closed168 is None and 168 in interrupted and extra is None, "unexpected original 168 settlement")
-        a = None if terminal168 else observe_actor(168,epoch,s.TREE,cold168["RUN"],interrupted[168])
+        a = None if terminal168 or stopped168 else observe_actor(168,epoch,s.TREE,cold168["RUN"],interrupted[168])
         if a:
             rep["168"] = a
             if a["physical"] is not None:
@@ -1573,7 +1624,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
                 tree = dict(physical_bytes=size, root=str(s.TREE), cap=fit.CAP)
             floor168 = a["floor"]
         else:
-            tree = closed168_tree()
+            tree = closed168_tree(allow_over_cap=stopped168 is not None)
         if 168 in rows:
             s.need(a and a["admission"] and (rows[168]["unit"]["Id"],rows[168]["unit"]["InvocationID"]) ==
                    (a["producer_unit"],a["producer_invocation_id"]), "foreign cold 168 fleet row")
@@ -1608,7 +1659,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     else:tree=closed168_tree() if closed168 or 168 in interrupted else fit.measure_tree()
     if not FIFTH168 and 168 in rows:s.need(extra and extra["ordinary_canonical"] and extra["actor"]["producer_invocation_id"]==rows[168]["unit"]["InvocationID"],"foreign 168 fleet row")
     books["168"]=dict(root=str(s.TREE),cap_bytes=fit.CAP,physical_bytes=tree["physical_bytes"],measurement=tree_measurement,
-                       remaining_bytes=fit.CAP-tree["physical_bytes"],historical_realized_bytes=0)
+                       remaining_bytes=max(0, fit.CAP-tree["physical_bytes"]),historical_realized_bytes=0)
     if guard168:books["168"]["measured_guard"]=guard168["receipt"]
     census_stops = stopped
     if FIFTH168:
@@ -1624,6 +1675,12 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if closed172:books["172"]=full172_booking(closed172)
     raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
     raw+=extension["extra_bytes"] if extension else 0
+    if stopped168:
+        # The stop-time guard and the post-stop walk can measure different
+        # allocations. Hold the upper bound until explicit custody reconciliation.
+        unreconciled = max(0, stopped168["measured_physical_bytes"] - max(fit.CAP, tree["physical_bytes"]))
+        raw += unreconciled
+        books["168"]["unreconciled_stop_bytes"] = unreconciled
     budget_rep = dict(rep)
     if active170:
         budget_rep["170"] = dict(prestart_remaining=full170["CAP"] - hourly170_owner["prestart_physical_bytes"],
@@ -1693,6 +1750,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if CLOSED_RETRY3:
         s.need(closed_bootstrap["settled"](s,fit)==closed_before and "168" not in rep, "closed 168 changed")
         recovered_price["closed_retry3_bootstrap"]=closed_before
+    if stopped168:
+        s.need(cold168_guard_stop(f, rows) == stopped168, "epoch 168 guard stop changed during price")
+        recovered_price["stopped_cold168"] = stopped168
     if terminal168:
         s.need(publication168["current"](s, loader["load_package"], f) == terminal168,
                "cold168 terminal changed during price")
@@ -1837,6 +1897,10 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
     s.need(HOURLY170 == (hourly170_mode is not None), "hourly 170 mode requires its own sealed provider")
     s.need(FULL170 == (full170_mode is not None), "full epoch 170 mode requires its own sealed provider")
     s.need(CURRENT_HOURLY169 == (hourly169_mode is not None), "hourly 169 mode requires its own sealed provider")
+    if STOPPED168_PRICE:
+        s.need(epoch in (145, 166, 167, 170) and prestart136 is None,
+               "stopped epoch 168 pricing cannot fund a new epoch 168 producer")
+        return capture_native(epoch, ref)
     if CURRENT_HOURLY169:
         s.need(prestart136 is None, "conflicting epoch 136 and hourly 169 claims")
         return capture_hourly169(epoch, ref, hourly169_mode)
