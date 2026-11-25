@@ -1,15 +1,27 @@
-pub(crate) const EPOCH: u64 = 231;
+const RETAIN_EPOCH230: bool = cfg!(feature = "epoch230-final-tail-demotion-qualification");
+pub(crate) const EPOCH: u64 = if RETAIN_EPOCH230 { 230 } else { 231 };
 pub(crate) const BOOTSTRAP: u64 = 99_791_404;
-pub(super) const FIRST: u64 = 99_792_000;
+pub(super) const FIRST: u64 = if RETAIN_EPOCH230 {
+    BOOTSTRAP + 1
+} else {
+    99_792_000
+};
 pub(super) const END: u64 = 99_803_089;
 pub(crate) const DIVERGENT_SLOT: u64 = 99_791_498;
 pub(crate) const BACKEND: &str = "solana-v1.6.20-epoch231-called-program-demotion-candidate";
 pub(super) const WORKER_ENV: &str = "JETSTREAMER_HISTORICAL_WORKER_EPOCH231_DEMOTION";
 pub(super) const WORKER_SHA: Option<&str> =
     option_env!("JETSTREAMER_EPOCH231_DEMOTION_WORKER_SHA256");
-pub(super) const RUN_ROOT: &str =
-    "/home/ubuntu/.jetstreamer-private/epoch231-demotion-tmpfs-v1/run";
-pub(super) const OUTPUT: &str = "epoch-231-program-demotion-diagnostic.jet";
+pub(super) const RUN_ROOT: &str = if RETAIN_EPOCH230 {
+    "/home/ubuntu/.jetstreamer-private/epoch230-final-tail-tmpfs-v1/run"
+} else {
+    "/home/ubuntu/.jetstreamer-private/epoch231-demotion-tmpfs-v1/run"
+};
+pub(super) const OUTPUT: &str = if RETAIN_EPOCH230 {
+    "epoch-230-final-tail-with-231-verification.jet"
+} else {
+    "epoch-231-program-demotion-diagnostic.jet"
+};
 pub(super) const BOOT_ACCOUNTS: &str = "Hn6PFpfb4b63XELLfqGYLbFk8c8hJtujeQbFR1WmNW84";
 pub(super) const BOOT_BANK: &str = "D5S4nJLsTDc1iXdeVSnMNX4ncSexZr91RSAPf1o5Z8Bz";
 pub(super) const BOOT_POH: &str = "EUrfErKEdAKsWnvgh4TcseCN23E1eBVLczcLRP7ejnQM";
@@ -27,7 +39,22 @@ pub(super) const WIRE: &[u8] = include_bytes!(
     "../../../historical-runtime/v1_6_20/worker/tests/fixtures/epoch231-warmup-99791498-tx698.bin"
 );
 pub(super) const TRANSACTION_INDEX: usize = 698;
-pub(super) const EPOCH_ARGS: [&str; 2] = ["231", "231-231"];
-pub(crate) const CAPABILITY_ARG: &str = "--epoch231-demotion-capability";
-pub(super) const CAPABILITY_SCHEMA: &str =
-    "jetstreamer-private-epoch231-demotion-parent-capability-v1";
+pub(super) const EPOCH_ARGS: [&str; 2] = if RETAIN_EPOCH230 {
+    ["230", "230-230"]
+} else {
+    ["231", "231-231"]
+};
+pub(crate) const CAPABILITY_ARG: &str = if RETAIN_EPOCH230 {
+    "--epoch230-final-tail-demotion-capability"
+} else {
+    "--epoch231-demotion-capability"
+};
+pub(super) const CAPABILITY_SCHEMA: &str = if RETAIN_EPOCH230 {
+    "jetstreamer-private-epoch230-tail-demotion-parent-capability-v1"
+} else {
+    "jetstreamer-private-epoch231-demotion-parent-capability-v1"
+};
+
+#[cfg(feature = "epoch230-final-tail-demotion-qualification")]
+pub(super) const EPOCH230_ROOT: (u64, &str) =
+    (99_791_517, "DKgvuozL8g9VN91iThzeHhUypgxbJYLkQKLrGMWwwn7B");

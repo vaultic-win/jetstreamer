@@ -205,13 +205,18 @@ pub(crate) fn fresh_filesystem(ledger: &Path) -> Result<(), String> {
         ));
     }
     let indexes = ledger.join("compact-indexes");
+    let first_index_epoch = if cfg!(feature = "epoch230-final-tail-demotion-qualification") {
+        EPOCH
+    } else {
+        EPOCH - 1
+    };
     for path in [
         root,
         ledger,
         &state,
         &indexes,
-        &indexes.join((EPOCH - 1).to_string()),
-        &indexes.join(EPOCH.to_string()),
+        &indexes.join(first_index_epoch.to_string()),
+        &indexes.join((first_index_epoch + 1).to_string()),
     ] {
         let metadata = std::fs::symlink_metadata(path).map_err(|error| error.to_string())?;
         if !metadata.is_dir()
@@ -265,14 +270,33 @@ pub(crate) fn expectations(
             .parse()
             .map_err(|error| format!("{error}"))?,
     );
+    #[cfg(feature = "epoch230-final-tail-demotion-qualification")]
+    {
+        let canonical = BankHashExpectation::LegacyAccountsHash(
+            EPOCH230_ROOT
+                .1
+                .parse()
+                .map_err(|error| format!("{error}"))?,
+        );
+        if expected.get(&EPOCH230_ROOT.0) != Some(&canonical) {
+            return Err(
+                "epoch 230 requires its registered checkpoint during final-tail replay".into(),
+            );
+        }
+    }
+    let root_count = if cfg!(feature = "epoch230-final-tail-demotion-qualification") {
+        3
+    } else {
+        2
+    };
     if (plan.bootstrap_slot, plan.end_inclusive) != (BOOTSTRAP, END)
         || crate::snapshot_path_expectation(snapshot, bootstrap)? != (BOOTSTRAP, boot)
-        || expected.len() != 2
+        || expected.len() != root_count
         || expected.get(&BOOTSTRAP) != Some(&boot)
         || expected.get(&END) != Some(&terminal)
     {
         return Err(format!(
-            "epoch {EPOCH} requires the two independently pinned snapshot roots"
+            "epoch {EPOCH} requires the {root_count} independently pinned snapshot roots"
         ));
     }
     Ok(expected)
@@ -489,6 +513,47 @@ mod tests {
         assert!(select(FIRST..END + 1, false, true).is_err());
         assert!(select(FIRST..END + 1, true, false).is_err());
         assert!(worker_profile(&c::SOLANA_V1_6_20_RUNTIME).is_err());
+    }
+
+    #[cfg(feature = "epoch230-final-tail-demotion-qualification")]
+    #[test]
+    fn final_tail_scope_covers_230_and_requires_its_registered_root() {
+        assert!(entrypoint(&["230".into()]).is_ok());
+        assert!(entrypoint(&["231".into()]).is_err());
+        let name = format!("snapshot-{BOOTSTRAP}-{BOOT_ACCOUNTS}.tar.zst");
+        let snapshot = Path::new(&name);
+        let q = crate::qualification_plan(
+            230,
+            230,
+            Some(END),
+            Some(true),
+            Some(snapshot),
+            Some(Path::new("epoch-hashes.txt")),
+            Some(Path::new(OUTPUT)),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(q.output_slot_start, 99_791_405);
+        assert_eq!(99_791_999 - q.output_slot_start + 1, 595);
+        assert_eq!(q.end_inclusive, 99_803_089);
+        let roots = [
+            (BOOTSTRAP, BOOT_ACCOUNTS),
+            EPOCH230_ROOT,
+            (END, TERMINAL_ACCOUNTS),
+        ]
+        .into_iter()
+        .map(|(slot, hash)| {
+            (
+                slot,
+                BankHashExpectation::LegacyAccountsHash(hash.parse().unwrap()),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+        let bootstrap = c::SOLANA_V1_6_20_RUNTIME.bootstrap;
+        assert!(expectations(roots.clone(), q, snapshot, bootstrap).is_ok());
+        let mut incomplete = roots;
+        incomplete.remove(&EPOCH230_ROOT.0);
+        assert!(expectations(incomplete, q, snapshot, bootstrap).is_err());
     }
 
     #[test]
