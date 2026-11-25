@@ -2,7 +2,8 @@ use super::*;
 
 mod closed_indexes;
 pub(super) use closed_indexes::{
-    is_index, is_singleton_index, lock_index_controllers, lock_singleton_controllers,
+    is_early_singleton_index, is_index, is_singleton_index, lock_early_singleton_controllers,
+    lock_index_controllers, lock_singleton_controllers,
 };
 
 const REVIEW: &str = "/home/sol/.jetstreamer-private/epoch145-v5t-stopped-price-20261124.zjcggc_6/RETIREMENT_CANDIDATES_130_195.json";
@@ -71,6 +72,7 @@ pub(super) fn is_target(t: &Target) -> bool {
         119 | 121 => FIRST_SWEEP_TARGETS.iter().any(|(epoch, relative)| {
             t.epoch == *epoch && t.path == root.join(FIRST_SWEEP).join(relative)
         }),
+        129 | 130 | 133 | 134 if is_early_singleton_index(t) => true,
         130 => {
             t.path
                 == root
@@ -117,7 +119,18 @@ fn identity(t: &Target) -> Value {
 
 pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Result<Option<Value>> {
     let (path, sha256, schema, expected_epochs): (&str, &str, &str, &[u64]) =
-        if p.targets.iter().any(is_singleton_index) {
+        if p.targets.iter().any(is_early_singleton_index) {
+            ensure!(
+                closed_indexes::complete_selection(&p.targets, 6, is_early_singleton_index),
+                "incomplete epoch 130 and 134 CAR index selection"
+            );
+            (
+                closed_indexes::EARLY_SINGLETON_REVIEW,
+                closed_indexes::EARLY_SINGLETON_SHA,
+                closed_indexes::EARLY_SINGLETON_SCHEMA,
+                &[129, 130, 133, 134],
+            )
+        } else if p.targets.iter().any(is_singleton_index) {
             ensure!(
                 closed_indexes::complete_selection(&p.targets, 6, is_singleton_index),
                 "incomplete singleton CAR index selection"
@@ -378,7 +391,11 @@ pub(super) fn check_owners(review: &Value) -> Result<()> {
     }
     if matches!(
         review["schema"].as_str(),
-        Some(closed_indexes::SCHEMA | closed_indexes::SINGLETON_SCHEMA)
+        Some(
+            closed_indexes::SCHEMA
+                | closed_indexes::SINGLETON_SCHEMA
+                | closed_indexes::EARLY_SINGLETON_SCHEMA
+        )
     ) {
         return closed_indexes::check_owners(review);
     }

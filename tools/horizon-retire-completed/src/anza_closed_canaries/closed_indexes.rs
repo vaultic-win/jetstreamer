@@ -7,6 +7,11 @@ pub(crate) const SINGLETON_REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_
 pub(crate) const SINGLETON_SHA: &str =
     "6bf48f94de15194596c9b96cb84b9dd445ade610461d9decca180f3fe3aafdd8";
 pub(crate) const SINGLETON_SCHEMA: &str = "horizon-completed-singleton-196-197-car-index-review-v1";
+pub(crate) const EARLY_SINGLETON_REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_data/closed130134-index-retirement-20261125-v1/REVIEW.json";
+pub(crate) const EARLY_SINGLETON_SHA: &str =
+    "e2f0469eee9498186094183b367c17b3e5c04571e6220191745eb19fe81f1a91";
+pub(crate) const EARLY_SINGLETON_SCHEMA: &str =
+    "horizon-completed-singleton-130-134-car-index-review-v1";
 const CACHE: &str =
     "/home/sol/.jetstreamer-private/epochs-191-194-v4-20261009-v1/lane-a/output/compact-indexes";
 const CIDS: [(u64, &str); 4] = [
@@ -72,6 +77,38 @@ pub(crate) fn is_singleton_index(t: &Target) -> bool {
     })
 }
 
+pub(crate) fn is_early_singleton_index(t: &Target) -> bool {
+    let (lane, cid, own_epoch) = match t.epoch {
+        129 => (
+            "epoch130-v1417-production-20260930-v1",
+            "bafyreig4chl35gz4li7pe5vzcpawcdkdlpxixzwci2mld6mkbe7e4x4l7u",
+            false,
+        ),
+        130 => (
+            "epoch130-v1417-production-20260930-v1",
+            "bafyreiaebavqepkoxmlra3waxrww5shrrwqcfysdylwbjro5vry3muzioy",
+            true,
+        ),
+        133 => (
+            "epoch134-v1419-production-cd656ef-v1",
+            "bafyreiaesmtvsk765okuilqhnpnxsgbjjjxs5imu4fdxcmamwrs6xhldkq",
+            false,
+        ),
+        134 => (
+            "epoch134-v1419-production-cd656ef-v1",
+            "bafyreifx2sk2xvwnylotymgckkf4vwwcxd4mpu4pnwph3fdb7whhv2h4ge",
+            true,
+        ),
+        _ => return false,
+    };
+    let cache = Path::new(HOME_ROOT)
+        .join(".jetstreamer-private")
+        .join(lane)
+        .join("lane-a/output/compact-indexes");
+    (own_epoch && index_path(&cache, t.epoch, cid, SUFFIXES[0]) == t.path)
+        || index_path(&cache, t.epoch, cid, SUFFIXES[1]) == t.path
+}
+
 pub(super) fn complete_selection(
     targets: &[Target],
     count: usize,
@@ -111,6 +148,21 @@ pub(crate) fn lock_singleton_controllers() -> Result<[File; 2]> {
             2758432,
         )?,
     ])
+}
+
+pub(crate) fn lock_early_singleton_controllers() -> Result<Vec<File>> {
+    [
+        ("/var/lib/jetstreamer-root-sweep-epoch130-v1417-production-20260930-v4/controller.lock", 3801199),
+        ("/var/lib/jetstreamer-root-sweep-epoch130-v1417-production-20261002-v5-r2/controller.lock", 3801144),
+        ("/var/lib/jetstreamer-root-sweep-epoch130-v1417-production-20261004-v6-r2/controller.lock", 3802700),
+        ("/var/lib/jetstreamer-root-sweep-epoch134-v1419-production-20261007-cd656ef-v3-r2/controller.lock", 3802814),
+        ("/var/lib/jetstreamer-root-sweep-epoch134-v1419-production-20261011-cd656ef-v4-r2/controller.lock", 2758102),
+        ("/var/lib/jetstreamer-root-sweep-epoch134-v1419-production-20261011-cd656ef-v5-r2/controller.lock", 2758107),
+        ("/var/lib/jetstreamer-root-sweep-epoch134-v1419-production-20261011-cd656ef-v6-r2/controller.lock", 2758115),
+    ]
+    .into_iter()
+    .map(|(path, inode)| controller_lock(path, inode))
+    .collect()
 }
 
 fn evidence(entry: &Value) -> Result<Vec<u8>> {
@@ -184,7 +236,10 @@ fn check_marker(unit: &str, condition: &Value, loaded: bool) -> Result<()> {
 }
 
 pub(super) fn check_owners(review: &Value) -> Result<()> {
-    let screens: &[&str] = if review["schema"] == SINGLETON_SCHEMA {
+    let screens: &[&str] = if matches!(
+        review["schema"].as_str(),
+        Some(SINGLETON_SCHEMA | EARLY_SINGLETON_SCHEMA)
+    ) {
         for key in ["controller_evidence", "consumer_programs"] {
             for entry in review[key]
                 .as_array()
@@ -357,6 +412,21 @@ mod tests {
         assert!(!is_singleton_index(&target(
             196,
             Path::new(files[0].1).with_file_name("epoch-196.jet")
+        )));
+    }
+
+    #[test]
+    fn early_singleton_predecessor_allows_only_its_slot_index() {
+        let cache = Path::new(
+            "/home/sol/.jetstreamer-private/epoch130-v1417-production-20260930-v1/lane-a/output/compact-indexes",
+        );
+        let previous = "bafyreig4chl35gz4li7pe5vzcpawcdkdlpxixzwci2mld6mkbe7e4x4l7u";
+        let slot_index = index_path(cache, 129, previous, SUFFIXES[1]);
+        assert!(is_early_singleton_index(&target(129, slot_index.clone())));
+        assert!(!is_early_singleton_index(&target(130, slot_index)));
+        assert!(!is_early_singleton_index(&target(
+            129,
+            index_path(cache, 129, previous, SUFFIXES[0]),
         )));
     }
 
