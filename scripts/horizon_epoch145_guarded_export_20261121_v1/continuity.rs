@@ -124,7 +124,13 @@ pub fn predecessor() -> Result<Value> {
                 let v5x = crate::incident145::failed_v5x(&v5w).context("V5x predecessor custody")?;
                 #[cfg(incident_v5y_guard_recovery145_only)]
                 {
-                    evidence["failed_v5y"] = crate::incident145::failed_v5y(&v5x).context("V5y predecessor custody")?;
+                    let v5y = crate::incident145::failed_v5y(&v5x).context("V5y predecessor custody")?;
+                    #[cfg(incident_v5z_guard_recovery145_only)]
+                    {
+                        evidence["failed_v5z"] = crate::incident145::failed_v5z(&v5y)
+                            .context("V5z predecessor custody")?;
+                    }
+                    evidence["failed_v5y"] = v5y;
                 }
                 evidence["failed_v5x"] = v5x;
             }

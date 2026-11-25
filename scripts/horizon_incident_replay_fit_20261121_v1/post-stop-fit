@@ -61,8 +61,12 @@ REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
 REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v1"
 REPRO166_POST = REPRO166_POST_V5Z or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
-V5Z_145 = HERE == D / "tools-homefloor-145-v5y-custody-recovery-v1"
-V5Z_BUILD_145 = HERE == D / "tools-homefloor-145-v5y-custody-build-v1"
+V6_145 = HERE == D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
+V5Z_145 = HERE == D / "tools-homefloor-145-v5y-custody-recovery-v1" or V6_145
+V5Z_BUILD_145 = HERE in (
+    D / "tools-homefloor-145-v5y-custody-build-v1",
+    D / "tools-homefloor-145-v5z-guard-walk-build-v1",
+)
 V5Y_145 = HERE == D / "tools-homefloor-145-v5x-schema-recovery-v1"
 V5Y_BUILD_145 = HERE == D / "tools-homefloor-145-v5x-schema-build-v1"
 V5X_145 = HERE == D / "tools-homefloor-145-v5w-donor-recovery-v1"
@@ -610,6 +614,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     if focused is not None:
         post_directory = fixture_post_directory(here)
         lease_directory = next(directory for enabled, directory in (
+            (V6_145, "tools-v6"),
             (V5Z_145, "tools-v5z"),
             (V5Y_145, "tools-v5y"),
             (V5X_145, "tools-v5x"),

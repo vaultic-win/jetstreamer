@@ -317,7 +317,11 @@ pub(super) fn check_recovery_custody(sha: &str) -> Result<()> {
     prove_view(&candidate).context("read-only paid candidate view")?;
     ensure!(accepted_owner()?.is_none(), "a successful export already owns the paid archive");
     println!("{}", json!({
-        "schema":"horizon-epoch145-v5z-native-custody-preflight-v1",
+        "schema":if cfg!(incident_v5z_guard_recovery145_only) {
+            "horizon-epoch145-v6-native-custody-preflight-v1"
+        } else {
+            "horizon-epoch145-v5z-native-custody-preflight-v1"
+        },
         "predecessor":prior,
         "frozen_recovery":recovery,
         "candidate":candidate,

@@ -11,7 +11,8 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-V5Y_CUSTODY_RECOVERY = VERSION == "tools-v5z"
+V5Z_WALK_RECOVERY = VERSION == "tools-v6"
+V5Y_CUSTODY_RECOVERY = VERSION == "tools-v5z" or V5Z_WALK_RECOVERY
 V5X_SCHEMA_RECOVERY = VERSION == "tools-v5y" or V5Y_CUSTODY_RECOVERY
 V5W_DONOR_RECOVERY = VERSION == "tools-v5x" or V5X_SCHEMA_RECOVERY
 V5V_CUSTODY_RECOVERY = VERSION == "tools-v5w" or V5W_DONOR_RECOVERY
@@ -44,6 +45,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5x": "tools-homefloor-145-v5w-donor-recovery-v1",
                       "tools-v5y": "tools-homefloor-145-v5x-schema-recovery-v1",
                       "tools-v5z": "tools-homefloor-145-v5y-custody-recovery-v1",
+                      "tools-v6": "tools-homefloor-145-v5z-guard-walk-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -266,21 +268,31 @@ def schema_retry_stopped_phase(s, fit, fleet, package):
     reader = schema_retry_reader(s, package)
     observed = reader["predecessor_preflight"](fleet)
     custody_retry = reader["MODE_RETRY"]
-    expected = (reader["V5Y_HANDOFF"] / "V5Y_TERMINAL_FAILURE_RECEIPT_MODE.json" if custody_retry
-                else reader["V5X_HANDOFF"] / "V5X_TERMINAL_FAILURE_STARTUP_SCHEMA.json")
+    walk_retry = reader.get("WALK_RETRY", False)
+    if walk_retry:
+        expected = reader["V5Z_HANDOFF"] / "V5Z_TERMINAL_FAILURE_GUARD_WALK.json"
+        stage = "v5z-drained"
+    elif custody_retry:
+        expected = reader["V5Y_HANDOFF"] / "V5Y_TERMINAL_FAILURE_RECEIPT_MODE.json"
+        stage = "v5y-drained"
+    else:
+        expected = reader["V5X_HANDOFF"] / "V5X_TERMINAL_FAILURE_STARTUP_SCHEMA.json"
+        stage = "v5x-drained"
     terminal = s.bound(observed["failure"], expected)
     manager = reader["manager_properties"](tuple(observed["manager"]))
     s.need(not fit.members(UNIT) and observed["manager"] == manager,
-           "V5x manager or cgroup changed during price capture")
-    return dict(observed["manager"], stage="v5y-drained" if custody_retry else "v5x-drained",
+           "predecessor manager or cgroup changed during price capture")
+    return dict(observed["manager"], stage=stage,
                 guard_terminal=observed["failure"],
-                failure=observed["failure"] if custody_retry else terminal["native_failure"], recovery=observed["startup"], candidate=observed["candidate"])
+                failure=observed["failure"] if custody_retry and not walk_retry else terminal["native_failure"],
+                recovery=observed["startup"], candidate=observed["candidate"])
 
 
 def schema_retry_failed_owner(s, build, successor):
     reader = schema_retry_reader(s, PKG)
     reference = build["guard_terminal"]
-    verify = reader["receipt_mode_failure"] if V5Y_CUSTODY_RECOVERY else reader["startup_schema_failure"]
+    verify = (reader["guard_walk_failure"] if V5Z_WALK_RECOVERY else
+              reader["receipt_mode_failure"] if V5Y_CUSTODY_RECOVERY else reader["startup_schema_failure"])
     _terminal, exit_event = verify(reference)
     history = reader["journal"](None, *(reader[key] for key in
         ("STARTING", "STARTED", "PROCESS_EXIT", "FAILURE", "SUCCESS", "STOPPING", "STOPPED")),
@@ -496,14 +508,17 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                    / HOMEFLOOR_PROVIDER / "deployment-seal-receipt.json"), "foreign 145 pre-worker admission")
     if STATUS_OWNER_RECOVERY:
         if V5W_DONOR_RECOVERY:
-            handoff = PKG.parent / ("v5z-name-handoff" if V5Y_CUSTODY_RECOVERY else
+            handoff = PKG.parent / ("v6-name-handoff" if V5Z_WALK_RECOVERY else
+                                    "v5z-name-handoff" if V5Y_CUSTODY_RECOVERY else
                                     "v5y-name-handoff" if V5X_SCHEMA_RECOVERY else "v5x-name-handoff")
             intent, _ = s.read(handoff / "START_INTENT.json")
             quoted = s.bound(intent["capacity"], handoff / "FIT.json")
-            schema = ("horizon-epoch145-v5y-custody-successor-start-intent-v1" if V5Y_CUSTODY_RECOVERY else
+            schema = ("horizon-epoch145-v5z-guard-walk-successor-start-intent-v1" if V5Z_WALK_RECOVERY else
+                      "horizon-epoch145-v5y-custody-successor-start-intent-v1" if V5Y_CUSTODY_RECOVERY else
                       "horizon-epoch145-v5x-schema-successor-start-intent-v1" if V5X_SCHEMA_RECOVERY
                       else "horizon-epoch145-v5v-custody-successor-start-intent-v1")
-            predecessor_stage = ("v5y-drained" if V5Y_CUSTODY_RECOVERY else
+            predecessor_stage = ("v5z-drained" if V5Z_WALK_RECOVERY else
+                                 "v5y-drained" if V5Y_CUSTODY_RECOVERY else
                                  "v5x-drained" if V5X_SCHEMA_RECOVERY else "v5w-drained")
             s.need(intent["schema"] == schema
                    and intent["worker_seal"] == seal_ref
@@ -540,7 +555,8 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     if HOMEFLOOR_REJOIN:
         predecessor = "failed_retry1"
     if V5U_QUERY_RECOVERY:
-        predecessor_key = ("failed_v5y" if V5Y_CUSTODY_RECOVERY else "failed_v5x" if V5X_SCHEMA_RECOVERY else "failed_v5w" if V5W_DONOR_RECOVERY
+        predecessor_key = ("failed_v5z" if V5Z_WALK_RECOVERY else
+                           "failed_v5y" if V5Y_CUSTODY_RECOVERY else "failed_v5x" if V5X_SCHEMA_RECOVERY else "failed_v5w" if V5W_DONOR_RECOVERY
                            else "failed_v5v" if V5V_CUSTODY_RECOVERY else "failed_v5u")
         s.need(started["prior_frozen_recovery"][predecessor_key]["terminal"] == window["guard_terminal_predecessor"],
                "native worker has a different immediate predecessor")

@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_v5y_guard_recovery145_only)]
+#[cfg(incident_v5z_guard_recovery145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5z-guard-walk-recovery-v1/post-stop-fit";
+#[cfg(all(incident_v5y_guard_recovery145_only, not(incident_v5z_guard_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5y-custody-recovery-v1/post-stop-fit";
 #[cfg(all(incident_v5x_guard_recovery145_only, not(incident_v5y_guard_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5x-schema-recovery-v1/post-stop-fit";
@@ -924,7 +926,9 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         let observed: Bound = serde_json::from_value(
             complete["phase145"]["window"]["guard_terminal_predecessor"].clone(),
         )?;
-        #[cfg(incident_v5y_guard_recovery145_only)]
+        #[cfg(incident_v5z_guard_recovery145_only)]
+        let pinned = incident145::v5z_terminal()?;
+        #[cfg(all(incident_v5y_guard_recovery145_only, not(incident_v5z_guard_recovery145_only)))]
         let pinned = incident145::v5y_terminal()?;
         #[cfg(all(incident_v5x_guard_recovery145_only, not(incident_v5y_guard_recovery145_only)))]
         let pinned = incident145::v5x_terminal()?;
@@ -1115,12 +1119,81 @@ fn live_guard_sample(d: &Path, p: &Value, b: &Bound, unit: &str) -> Result<(Boun
     Ok((sample_ref, observed))
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GuardCheck {
+    Running,
+    Stopped,
+    RegisteredHold,
+}
+
+#[cfg(incident_guard_walk145_only)]
+fn guard_walk_allocation(
+    path: &Path,
+    measured: Result<Option<u64>>,
+    scan: &Value,
+    latest: impl FnOnce() -> Result<Value>,
+    check: GuardCheck,
+) -> Result<u64> {
+    let measured = measured?;
+    let current = latest()?;
+    let Some(mut paid) = measured else {
+        let message = format!(
+            "no pair of complete allocation walks for {}; awaiting a fresh guard sample",
+            path.display()
+        );
+        if check == GuardCheck::RegisteredHold {
+            // Keep the child stopped under the same registration. Charge the
+            // full allocation cap until a complete new price is available.
+            eprintln!("epoch145 registered hold: {message}");
+            return Ok(0);
+        }
+        return Err(capacity::Reprice(message).into());
+    };
+    for observation in [scan, &current["root_physical_observation"]] {
+        for pass in ["first", "second"] {
+            paid = paid.min(capacity::n(&observation[pass], "physical_bytes")?);
+        }
+    }
+    Ok(paid)
+}
+
+#[cfg(all(test, incident_guard_walk145_only))]
+#[test]
+fn registered_hold_charges_the_whole_cap_after_incomplete_walks() -> Result<()> {
+    let path = Path::new("/fixture/guard-root");
+    let scan = json!({"first": {"physical_bytes": 12}, "second": {"physical_bytes": 18}});
+    let latest = || Ok(json!({"root_physical_observation": scan}));
+    assert_eq!(
+        guard_walk_allocation(path, Ok(None), &scan, latest, GuardCheck::RegisteredHold)?,
+        0
+    );
+    assert!(
+        guard_walk_allocation(path, Ok(None), &scan, latest, GuardCheck::Stopped)
+            .unwrap_err()
+            .is::<capacity::Reprice>()
+    );
+    assert_eq!(
+        guard_walk_allocation(path, Ok(Some(21)), &scan, latest, GuardCheck::Stopped)?,
+        12
+    );
+
+    let invalid_walk = Err(anyhow::anyhow!("charged directory was replaced"));
+    let error = guard_walk_allocation(path, invalid_walk, &scan, latest, GuardCheck::RegisteredHold)
+        .unwrap_err();
+    assert_eq!(error.to_string(), "charged directory was replaced");
+    let tripped = || anyhow::bail!("invalid current guard for epoch172");
+    let error = guard_walk_allocation(path, Ok(None), &scan, tripped, GuardCheck::RegisteredHold)
+        .unwrap_err();
+    assert_eq!(error.to_string(), "invalid current guard for epoch172");
+    Ok(())
+}
+
 fn current_guard(
     plan: &Value,
     original_sample: Option<&Value>,
     expected_remaining: u64,
     unit: &str,
-    _stopped_for_clock: bool,
+    _check: GuardCheck,
 ) -> Result<(u64, u64)> {
     let b: Bound = serde_json::from_value(plan.clone())?;
     let p = custody::evidence(&b)?;
@@ -1145,27 +1218,20 @@ fn current_guard(
         expected_remaining
     } else {
         #[cfg(incident_guard_walk145_only)]
-        if _stopped_for_clock {
+        if _check != GuardCheck::Running {
             let path = Path::new(p["worker_root"].as_str().context("guard root path")?);
             ensure!(path.parent() == Some(Path::new("/home/sol/.jetstreamer-private"))
                 && path.metadata()?.dev() == Path::new("/home/sol").metadata()?.dev(),
                 "guard root differs from its HOME booking");
-            let measured = guard_walk::lower_bound(path, cap)?.ok_or_else(|| {
-                capacity::Reprice(format!(
-                    "no pair of complete allocation walks for {}; awaiting a fresh guard sample",
-                    path.display()
-                ))
-            })?;
-            // Reopen the current native receipt after the two walks. A producer
-            // trip, expired receipt or changed plan during measurement is fatal.
-            let (_, current) = live_guard_sample(d, &p, &b, unit)?;
-            let latest_scan = &current["root_physical_observation"];
-            let mut paid = measured;
-            for observation in [scan, latest_scan] {
-                for pass in ["first", "second"] {
-                    paid = paid.min(capacity::n(&observation[pass], "physical_bytes")?);
-                }
-            }
+            // A trip, expired receipt or changed plan during measurement must
+            // also be rejected when churn prevents a complete allocation walk.
+            let paid = guard_walk_allocation(
+                path,
+                guard_walk::lower_bound(path, cap),
+                scan,
+                || Ok(live_guard_sample(d, &p, &b, unit)?.1),
+                _check,
+            )?;
             let remaining = cap.checked_sub(paid).context("guard cap exceeded")?;
             return Ok((floor, remaining.saturating_sub(expected_remaining)));
         }
@@ -1216,7 +1282,8 @@ impl Fit {
         if next.as_ref().is_err_and(|e| e.is::<missed_clock::Pending>()) {
             // Read live guards, population, memory and physical HOME against the last paid
             // topology. This check cannot yield a price or resume a stopped worker.
-            self.limits(0, false, true).map_err(|e| anyhow::anyhow!("live guard refused the registered hold: {e:#}"))?;
+            self.limits(0, GuardCheck::RegisteredHold)
+                .map_err(|e| anyhow::anyhow!("live guard refused the registered hold: {e:#}"))?;
         }
         *self.capture.borrow_mut() = next?;
         Ok(())
@@ -1242,17 +1309,22 @@ impl Fit {
         }
     }
     pub fn current(&self, needed: u64) -> Result<Value> {
-        self.limits(needed, true, false)
+        self.limits(needed, GuardCheck::Running)
     }
     pub fn current_stopped(&self, needed: u64) -> Result<Value> {
-        self.limits(needed, true, cfg!(incident_v5r_guard_recovery145_only))
+        let check = if cfg!(incident_v5r_guard_recovery145_only) {
+            GuardCheck::Stopped
+        } else {
+            GuardCheck::Running
+        };
+        self.limits(needed, check)
     }
-    fn limits(&self, needed: u64, require_fresh: bool, stopped_for_guard_walk: bool) -> Result<Value> {
+    fn limits(&self, needed: u64, check: GuardCheck) -> Result<Value> {
         let last = self.capture.borrow();
         let s = &last.complete;
         ensure!(needed == 0, "frozen reader requested staging bytes");
         let age = last.captured.elapsed();
-        if require_fresh && age > Duration::from_secs(45) {
+        if check != GuardCheck::RegisteredHold && age > Duration::from_secs(45) {
             return Err(capacity::Reprice(format!("full capture age {age:?}")).into());
         }
         let actual = active_population()?;
@@ -1284,7 +1356,7 @@ impl Fit {
                 Some(&g["guard"]),
                 capacity::n(g, "remaining")?,
                 row["unit"].as_str().context("incumbent unit")?,
-                stopped_for_guard_walk,
+                check,
             )?;
             required = required.checked_add(growth).context("incumbent growth")?;
             absolute = absolute.max(floor);
@@ -1299,7 +1371,7 @@ impl Fit {
                 Some(&row["guard"]),
                 capacity::n(b, "remaining_bytes")?,
                 row["producer_unit"].as_str().context("replacement unit")?,
-                stopped_for_guard_walk,
+                check,
             )?;
             // A new deficit can affect the original physical baseline and the independent new-generation spending calculation.
             required = required
@@ -1326,7 +1398,7 @@ impl Fit {
                 sample,
                 capacity::n(booking, "remaining_bytes")?,
                 admitted["producer_unit"].as_str().context("168 unit")?,
-                stopped_for_guard_walk,
+                check,
             )?;
             required = required.checked_add(growth).context("168 growth")?;
             absolute = absolute.max(floor);
@@ -1846,7 +1918,7 @@ mod tests {
             assert_eq!(before["population"], json!(observed));
         }
         assert!(
-            current_guard(&json!({"path":p,"sha256":"f".repeat(64)}), None, 0, "bogus", false).is_err()
+            current_guard(&json!({"path":p,"sha256":"f".repeat(64)}), None, 0, "bogus", GuardCheck::Running).is_err()
         );
     }
 }

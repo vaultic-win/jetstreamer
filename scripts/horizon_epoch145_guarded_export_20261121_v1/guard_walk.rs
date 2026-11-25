@@ -102,7 +102,9 @@ pub(super) fn lower_bound(path: &Path, cap: u64) -> Result<Option<u64>> {
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(path)?;
-    two_complete_walks(|| measure(path, &fd, cap))
+    let measured = two_complete_walks(|| measure(path, &fd, cap))?;
+    check_root(path, &fd)?;
+    Ok(measured)
 }
 
 #[cfg(test)]

@@ -25,7 +25,12 @@ compile_error!("the startup-schema retry requires the V5x verifier guard");
 #[cfg(all(incident_v5y_guard_recovery145_only, not(incident_v5x_guard_recovery145_only)))]
 compile_error!("the receipt-mode retry requires the V5y verifier guard");
 
-#[cfg(incident_v5y_guard_recovery145_only)]
+#[cfg(all(incident_v5z_guard_recovery145_only, not(incident_v5y_guard_recovery145_only)))]
+compile_error!("the allocation-walk hold retry requires the V5z verifier guard");
+
+#[cfg(incident_v5z_guard_recovery145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v6/export145";
+#[cfg(all(incident_v5y_guard_recovery145_only, not(incident_v5z_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5z/export145";
 #[cfg(all(incident_v5x_guard_recovery145_only, not(incident_v5y_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5y/export145";
@@ -358,6 +363,60 @@ pub(super) fn failed_v5y(prior: &Value) -> Result<Value> {
         "V5y failed before the paid verifier read"
     );
     Ok(json!({"terminal":terminal,"predecessor":prior_terminal}))
+}
+
+#[cfg(incident_v5z_guard_recovery145_only)]
+pub(super) fn v5z_terminal() -> Result<Bound> {
+    let terminal = custody::binding(&Path::new(RUNTIME).join(
+        "epoch145-semantic-continuity-20261121-v1/v5z-name-handoff/V5Z_TERMINAL_FAILURE_GUARD_WALK.json",
+    ))?;
+    ensure!(
+        terminal.sha256 == "80d048defbb9d65e6ab15010705235ebe0f94541ed271f8baa4368ac7c3e7183",
+        "V5z terminal custody changed"
+    );
+    Ok(terminal)
+}
+
+#[cfg(incident_v5z_guard_recovery145_only)]
+pub(super) fn failed_v5z(prior: &Value) -> Result<Value> {
+    let iid = "4b6a40fe7a4441c28c229ad2b59e2503";
+    let terminal = v5z_terminal()?;
+    let proof = custody::evidence(&terminal)?;
+    let state = Path::new(BASE).join("state").join(iid);
+    let startup = custody::binding(&state.join("recovery-started.json"))?;
+    let start = custody::evidence(&startup)?;
+    let native = continuity::failure(iid)?;
+    let prior_terminal: Bound = serde_json::from_value(prior["terminal"].clone())?;
+    let prior_proof = custody::evidence(&prior_terminal)?;
+    let intent: Bound = serde_json::from_value(proof["start_intent"].clone())?;
+    let intent = custody::evidence(&intent)?;
+    ensure!(
+        proof["schema"] == "horizon-epoch145-v5z-terminal-guard-walk-failure-v1"
+            && proof["invocation_id"] == iid
+            && proof["unit"] == UNIT
+            && proof["manager"]["InvocationID"] == iid
+            && proof["manager"]["MainPID"] == "0"
+            && proof["manager"]["Result"] == "exit-code"
+            && proof["recovery_started"] == json!(startup)
+            && proof["native_failure"] == native["failure"]
+            && proof["native_events"][2]["__CURSOR"] == native["native"]["__CURSOR"]
+            && proof["boot_id"] == native["native"]["_BOOT_ID"]
+            && proof["candidate"] == prior_proof["candidate"]
+            && intent["terminal"] == json!(prior_terminal)
+            && intent["worker_seal"] == proof["worker_seal"]
+            && intent["provider_seal"] == proof["provider_seal"]
+            && start["iid"] == iid
+            && start["file"] == proof["candidate"]["path"]
+            && start["image"] == intent["worker"]["sha256"]
+            && !state.join("verified-frozen.json").try_exists()?
+            && !state.join("extraction-complete.json").try_exists()?
+            && proof["resource_credit_bytes"] == 0
+            && proof["semantic_completion"] == false
+            && proof["archive_publication_authorized"] == false
+            && proof["r2_mutations"] == false,
+        "V5z guard-walk terminal and paid candidate do not agree"
+    );
+    Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
 }
 
 pub fn predecessor() -> Result<Value> {

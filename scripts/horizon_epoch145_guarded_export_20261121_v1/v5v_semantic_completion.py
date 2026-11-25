@@ -13,7 +13,8 @@ import sys
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FAMILY = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
 GENERATION = Path(__file__).resolve().parent.name
-MODE_RETRY = GENERATION in ("tools-v5z", "tools-homefloor-145-v5y-custody-build-v1")
+WALK_RETRY = GENERATION in ("tools-v6", "tools-homefloor-145-v5z-guard-walk-build-v1")
+MODE_RETRY = GENERATION in ("tools-v5z", "tools-homefloor-145-v5y-custody-build-v1") or WALK_RETRY
 SCHEMA_RETRY = GENERATION in ("tools-v5y", "tools-homefloor-145-v5x-schema-build-v1") or MODE_RETRY
 DONOR_RETRY = GENERATION == "tools-v5x" or SCHEMA_RETRY
 RETRY = GENERATION == "tools-v5w" or DONOR_RETRY
@@ -23,11 +24,17 @@ V5V_PROVIDER = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-v5
 V5X_HANDOFF = FAMILY / "v5x-name-handoff"
 V5Y_HANDOFF = FAMILY / "v5y-name-handoff"
 V5Z_HANDOFF = FAMILY / "v5z-name-handoff"
-PACKAGE = FAMILY / "tools-v5z" if MODE_RETRY else FAMILY / "tools-v5y" if SCHEMA_RETRY else FAMILY / GENERATION if RETRY else V5V_PACKAGE
-PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v5y-custody-recovery-v1") if MODE_RETRY else
+V6_HANDOFF = FAMILY / "v6-name-handoff"
+PACKAGE = (FAMILY / "tools-v6" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
+           FAMILY / "tools-v5y" if SCHEMA_RETRY else FAMILY / GENERATION if RETRY else V5V_PACKAGE)
+PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v5z-guard-walk-recovery-v1") if WALK_RETRY else
+            V5V_PROVIDER.with_name("tools-homefloor-145-v5y-custody-recovery-v1") if MODE_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5x-schema-recovery-v1") if SCHEMA_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5w-donor-recovery-v1") if DONOR_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5v-custody-recovery-v1") if RETRY else V5V_PROVIDER)
+V5Z = "4b6a40fe7a4441c28c229ad2b59e2503"
+V5Z_WALK_TERMINAL = "80d048defbb9d65e6ab15010705235ebe0f94541ed271f8baa4368ac7c3e7183"
+V6_START_INTENT = "horizon-epoch145-v5z-guard-walk-successor-start-intent-v1"
 V5Y = "39e0be627a994249915dc8f7a185b438"
 V5Y_MODE_TERMINAL = "6e4e62c15adea128211437bc57f9b768ad8f91ac75b720e41e6b267dfc30620d"
 V5Z_START_INTENT = "horizon-epoch145-v5y-custody-successor-start-intent-v1"
@@ -425,6 +432,9 @@ def receipt_mode_failure(terminal_ref):
 
 
 def failed_predecessor(terminal_ref):
+    if WALK_RETRY:
+        terminal, failed = guard_walk_failure(terminal_ref)
+        return terminal["candidate"], failed
     if MODE_RETRY:
         terminal, failed = receipt_mode_failure(terminal_ref)
         return terminal["candidate"], failed
@@ -438,6 +448,55 @@ def failed_predecessor(terminal_ref):
         terminal, failed = pre_read_failure(terminal_ref)
         return terminal["candidate"], failed
     return v5u_predecessor(terminal_ref)
+
+
+def guard_walk_failure(terminal_ref):
+    path = V5Z_HANDOFF / "V5Z_TERMINAL_FAILURE_GUARD_WALK.json"
+    require(terminal_ref == reference(path, V5Z_WALK_TERMINAL), "different V5z guard-walk terminal")
+    terminal = pinned_json(terminal_ref, path)
+    intent = pinned_json(terminal["start_intent"], V5Z_HANDOFF / "START_INTENT.json")
+    result = pinned_json(terminal["start_result"], V5Z_HANDOFF / "START_RESULT.json")
+    prior, prior_exit = receipt_mode_failure(intent["terminal"])
+    state = STATE / V5Z
+    start = pinned_json(terminal["recovery_started"], state / "recovery-started.json")
+    failure = pinned_json(terminal["native_failure"], state / "failed.json")
+    manager = terminal["manager"]
+    require(terminal["schema"] == "horizon-epoch145-v5z-terminal-guard-walk-failure-v1"
+            and terminal["boot_id"] == BOOT and terminal["unit"] == manager["Id"] == UNIT
+            and terminal["invocation_id"] == manager["InvocationID"] == result["manager"]["InvocationID"] == V5Z
+            and manager["ActiveState"] == manager["SubState"] == "failed"
+            and manager["MainPID"] == manager["ControlPID"] == manager["NRestarts"] == "0"
+            and manager["Result"] == "exit-code" and manager["ExecMainStatus"] == "1"
+            and not (manager["ControlGroup"] or manager["Job"])
+            and terminal["candidate"] == prior["candidate"] and terminal["resource_credit_bytes"] == 0
+            and terminal["semantic_completion"] is terminal["archive_publication_authorized"]
+            is terminal["r2_mutations"] is False
+            and result["status"] == 0 and result["intent"] == terminal["start_intent"]
+            and intent["schema"] == V5Z_START_INTENT and start["image"] == intent["worker"]["sha256"]
+            and intent["worker_seal"] == terminal["worker_seal"]
+            and intent["provider_seal"] == terminal["provider_seal"]
+            and start["iid"] == failure["iid"] == V5Z and start["file"] == str(PAID)
+            and failure["error"] == "live guard refused the registered hold: no pair of complete allocation walks for "
+                "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1; awaiting a fresh guard sample"
+            and {item.name for item in state.iterdir()} == {"recovery-started.json", "failed.json"},
+            "different V5z terminal or paid candidate")
+    messages = (STARTING, STARTED, PROCESS_EXIT, FAILURE, SUCCESS, STOPPING, STOPPED)
+    events = journal(V5Z, *messages)
+    require([row["MESSAGE_ID"] for row in events] == [STARTING, STARTED, PROCESS_EXIT, FAILURE]
+            and len(events) == len(terminal["native_events"])
+            and all(all(saved[key] == value for key, value in current.items())
+                    for saved, current in zip(terminal["native_events"], events)),
+            "different V5z PID1 terminal sequence")
+    validate_start_events(V5Z, events[:2], intent["argv"][-5:], intent["not_before_monotonic_usec"], prior_exit)
+    scope_event(events[2], V5Z, PROCESS_EXIT)
+    scope_event(events[3], V5Z, FAILURE)
+    require(events[2]["EXIT_CODE"] == "exited" and events[2]["EXIT_STATUS"] == "1"
+            and events[3]["UNIT_RESULT"] == "exit-code", "different V5z PID1 exit")
+    history = journal(None, *messages, after_cursor=prior_exit["__CURSOR"])
+    cutoff = int(events[-1]["__MONOTONIC_TIMESTAMP"])
+    require([row for row in history if int(row["__MONOTONIC_TIMESTAMP"]) <= cutoff] == events,
+            "another native owner intervened before V5z failed")
+    return terminal, events[-1]
 
 
 def manager_properties(properties):
@@ -463,7 +522,15 @@ def predecessor_preflight(fleet_ref):
     expected = dict(Id=UNIT, ActiveState="failed", SubState="failed", InvocationID=V5U,
                     MainPID="0", ControlPID="0", Job="", NRestarts="0", ControlGroup="",
                     ExecMainStatus="1", Result="exit-code")
-    if MODE_RETRY:
+    if WALK_RETRY:
+        terminal_ref = reference(V5Z_HANDOFF / "V5Z_TERMINAL_FAILURE_GUARD_WALK.json", V5Z_WALK_TERMINAL)
+        terminal, native_failure = guard_walk_failure(terminal_ref)
+        startup_ref, failure_ref, candidate = terminal["recovery_started"], terminal_ref, terminal["candidate"]
+        expected = terminal["manager"]
+        properties = tuple(expected)
+        require(not journal(None, STARTING, STARTED, PROCESS_EXIT, FAILURE, SUCCESS, STOPPING, STOPPED,
+                            after_cursor=native_failure["__CURSOR"]), "another owner followed failed V5z")
+    elif MODE_RETRY:
         terminal_ref = reference(V5Y_HANDOFF / "V5Y_TERMINAL_FAILURE_RECEIPT_MODE.json", V5Y_MODE_TERMINAL)
         terminal, native_failure = receipt_mode_failure(terminal_ref)
         startup_ref, failure_ref, candidate = terminal["start_result"], terminal_ref, terminal["candidate"]
@@ -504,7 +571,8 @@ def predecessor_preflight(fleet_ref):
             }.items())
             and file_stamp(m) == file_stamp(PAID.lstat()) and manager_properties(properties) == expected and not group.exists(),
             "paid candidate or failed owner changed during preflight")
-    return {"schema": ("horizon-epoch145-v5z-predecessor-preflight-v1" if MODE_RETRY else
+    return {"schema": ("horizon-epoch145-v6-predecessor-preflight-v1" if WALK_RETRY else
+                       "horizon-epoch145-v5z-predecessor-preflight-v1" if MODE_RETRY else
                        "horizon-epoch145-v5y-predecessor-preflight-v1" if SCHEMA_RETRY else
                        "horizon-epoch145-v5x-predecessor-preflight-v1" if DONOR_RETRY else
                        "horizon-epoch145-v5w-predecessor-preflight-v1" if RETRY else
@@ -520,7 +588,7 @@ def successor_manager(result, intent, *, retry=None):
     retry = RETRY if retry is None else retry
     manager = result["manager"]
     iid = manager["InvocationID"]
-    schema = V5Z_START_INTENT if MODE_RETRY else V5Y_START_INTENT if SCHEMA_RETRY else "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
+    schema = V6_START_INTENT if WALK_RETRY else V5Z_START_INTENT if MODE_RETRY else V5Y_START_INTENT if SCHEMA_RETRY else "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
         "horizon-epoch145-v5u-semantic-successor-start-intent-v1"
     )
     predecessor_invocations = (V5U, V5V, V5W) if retry and DONOR_RETRY else (V5U, V5V) if retry else (V5U,)
@@ -528,6 +596,8 @@ def successor_manager(result, intent, *, retry=None):
         predecessor_invocations += (V5X,)
     if MODE_RETRY:
         predecessor_invocations += (V5Y,)
+    if WALK_RETRY:
+        predecessor_invocations += (V5Z,)
     require(result["status"] == 0 and manager["Id"] == intent["unit"] == UNIT
             and re.fullmatch(r"[a-f0-9]{32}", iid) and iid not in predecessor_invocations
             and manager["ActiveState"] == "active" and manager["SubState"] == "running"
@@ -539,7 +609,8 @@ def successor_manager(result, intent, *, retry=None):
 
 
 def startup(result_ref):
-    submission = V5Z_HANDOFF if MODE_RETRY else V5Y_HANDOFF if SCHEMA_RETRY else V5X_HANDOFF if DONOR_RETRY else FAMILY / "v5w-name-handoff" if RETRY else V5V_HANDOFF
+    submission = (V6_HANDOFF if WALK_RETRY else V5Z_HANDOFF if MODE_RETRY else V5Y_HANDOFF if SCHEMA_RETRY
+                  else V5X_HANDOFF if DONOR_RETRY else FAMILY / "v5w-name-handoff" if RETRY else V5V_HANDOFF)
     result = pinned_json(result_ref, submission / "START_RESULT.json")
     intent_ref = result["intent"]
     intent = pinned_json(intent_ref, submission / "START_INTENT.json")
@@ -554,7 +625,8 @@ def startup(result_ref):
     launch_quote = pinned_json(intent["capacity"], submission / "FIT.json")
     require(launch_quote["fleet"] == bounds and launch_quote["fits"] is True
             and launch_quote["epoch"] == 145 and launch_quote["candidate"] is None
-            and launch_quote["phase145"]["InvocationID"] == (V5Y if MODE_RETRY else V5X if SCHEMA_RETRY else V5W if DONOR_RETRY else V5V if RETRY else V5U)
+            and launch_quote["phase145"]["InvocationID"] ==
+                (V5Z if WALK_RETRY else V5Y if MODE_RETRY else V5X if SCHEMA_RETRY else V5W if DONOR_RETRY else V5V if RETRY else V5U)
             and launch_quote["phase145"]["guard_terminal"] == intent["terminal"]
             and launch_quote["resource_credit_bytes"] == 0
             and launch_quote["replay_launch_authorized"] is False,
