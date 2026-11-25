@@ -15,6 +15,8 @@ INPUTS = {
 }
 WORKER_SHA = "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c"
 FIELDS = ["Id", "ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup"]
+JOIN = V / "horizon230-continuation-join-7f90bbed-v1/completion.json"
+SUCCESSOR = V / "horizon231-232-input-readmission-v300"
 
 
 def receipt():
@@ -86,9 +88,49 @@ def register(plan):
         if terminal_ref not in gate["evidence"]:
             gate["evidence"].append(terminal_ref)
         gate["next_action"] = completed["next_action"]
+    if JOIN.is_file():
+        join_ref = ref(JOIN)
+        assert join_ref["sha256"] == "37622f493445c37c4b38e07e4f58cac680b24b3a4a28c7b46e9b633d740a01f7"
+        join = bound(join_ref)
+        assert join["native"]["consensus_handoff_passed"] and join["native"]["merge"]["slots"] == 23_573
+        assert join["remaining_slots"] == 408_427 and not join["canonical_publication_authorized"]
+        if join_ref not in gate["evidence"]:
+            gate["evidence"].append(join_ref)
+        gate["next_action"] = (
+            "The private join passed through slot 99,383,572. Fund the remaining 408,427 slots "
+            "and qualify the full archive assembly and publication route."
+        )
     deployment = bound(ref(PACKAGE / "fleet-tool.json"))
     assert deployment["schema"] == "foundation-epoch230-checkpoint-continuation-fleet-tool-v1"
     return deployment["artifact"]
+
+
+def register_successor_inputs(plan):
+    if not (SUCCESSOR / "compact-acquisition-complete.json").is_file():
+        return
+    pins = {
+        "completion.json": "64d9a4d7bc6aba0f8e0662dd8763ad96804647504b6d3e6b5a3788a1f876f174",
+        "compact-acquisition-complete.json": "8ddf2dfcb03f8b2c3dfae805d616519ab6bcffb76be0344f656806fbc59c9018",
+        "native-manifest-controls.json": "8b21a5d3b5f2bffbc66e7817c8593dfb7b8fc46da6a1669e1a2b0a51509a40a2",
+        "root-catalog.json": "c48c23ca0cd9fee2bf0ec318661dd5d14c5446a4dba0a026d8dd157bdabd8eb2",
+        "source-boundary-231.json": "5bc465ecaaa5d52ef71bcd1b2217e607615e67fd807ee56a481bcaddfa165aee",
+        "source-boundary-232.json": "d274111912011c5540d7c8710edab747d1059b56648cabadf9cfeb8b7c4b16a5",
+        "source-boundary-233.json": "30470045346a504c8f6b0bda47870435d6e75a57c6818cfd23ba4a98c8800ac7",
+    }
+    evidence = [dict(path=str(SUCCESSOR / name), sha256=sha) for name, sha in pins.items()]
+    restore, indexes, manifest, *_ = map(bound, evidence)
+    assert restore["epochs"] == manifest["epochs"] == [231, 232]
+    assert len(indexes["indexes"]) == 5 and not indexes["replay_started"]
+    for epoch in ("231", "232"):
+        gate = plan["gates"][epoch]
+        for receipt in evidence:
+            if receipt not in gate["evidence"]:
+                gate["evidence"].append(receipt)
+        if gate["state"] == "not-yet-staged":
+            gate["next_action"] = (
+                "The generation-pinned bootstrap, five compact indexes, original cohort manifest and native "
+                "source edges are ready. Book the two-epoch replay and output capacity, then qualify the guarded producer."
+            )
 
 
 def owns(row):

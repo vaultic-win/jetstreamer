@@ -87,6 +87,17 @@ def register_demotion(plan):
     if source not in gate["evidence"]:
         gate["evidence"].append(source)
     gate["next_action"] = "Check the signed Bank hash at 98,931,633, then the terminal accounts root and private archive close at 98,939,266."
+    first_checkpoint = DEMOTION_PACKAGE / "signed-transaction-and-bank.json"
+    if first_checkpoint.is_file():
+        checkpoint_ref = ref(first_checkpoint)
+        assert checkpoint_ref["sha256"] == "5e8b05e035fd73c2acfd89103c6070ba4989e5feda9f951318683cbef268442d"
+        checkpoint = bound(checkpoint_ref)
+        assert checkpoint["registration"] == source and checkpoint["worker_sha256"] == WORKER_SHA
+        assert (checkpoint["epoch"], checkpoint["slot"], checkpoint["transaction_index"]) == (229, 98_931_633, 1764)
+        assert checkpoint["bank_hash"] == "7eZpcd8gDPTZ7cGasN6K6YpFiQGbGPJvGeovtAbBrorU"
+        if checkpoint_ref not in gate["evidence"]:
+            gate["evidence"].append(checkpoint_ref)
+        gate["next_action"] = "The signed transaction and Bank hash matched at slot 98,931,633. Verify the independent accounts root at 98,939,266 and close the private segment."
     terminal = DEMOTION_PACKAGE / "terminal.json"
     if terminal.is_file():
         terminal_ref = ref(terminal)
