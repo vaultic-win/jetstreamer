@@ -190,7 +190,7 @@ fn v5w_semantic_owner(export: &str) -> Result<()> {
     let authority = family.join("tools-v5w");
     let helper = authority.join("v5v_semantic_completion.py");
     let helper_hash = "42118f1624e540ed5973d37e358ad4a9f0ba68e3c8c2100c9f777e01c0f2a9bf";
-    let (seal, seal_ref) = publication::frozen_json(&authority.join("deployment-seal-receipt.json"))?;
+    let (seal_ref, seal) = publication::frozen_json(&authority.join("deployment-seal-receipt.json"))?;
     ensure!(
         seal_ref.sha256 == "8768935daed0a99dd01d467da957dabdb218c3741c04f6597cf663dbcf36314e"
             && seal["destination"] == json!(authority)
@@ -208,7 +208,7 @@ fn v5w_semantic_owner(export: &str) -> Result<()> {
           start.to_str().context("V5w start result")?,
           "5671b19df2e673656d4ddca27c6218b60a7f5b60f4e9bea72f69792a0af5c379"], "45")?;
     let result: Value = serde_json::from_str(&report)?;
-    let (captured, _) = publication::frozen_json(&handoff.join("SEMANTIC_COMPLETION.json"))?;
+    let (_, captured) = publication::frozen_json(&handoff.join("SEMANTIC_COMPLETION.json"))?;
     ensure!(
         result == captured
             && result["schema"] == "horizon-epoch145-v5v-custody-successor-semantic-completion-v1"
