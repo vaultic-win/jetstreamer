@@ -1104,6 +1104,8 @@ def registered_status():
                     if RETAIN_FAILED166:
                         adopted = writer168v4["registered_hourly170_writer"](scope, failed, failed166=True)
                         versions = (2, 3, 4, 5, 6, 7) if REPRO166 or FULL170 or V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or V5X_POST_145 or V5Z_POST_BUILD_145 else (2, 3, 4, 5, 6)
+                        if (R / "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V8_ACTIVE.json").exists():
+                            versions = (2, 3, 4, 5, 8)
                         for version in versions:
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():

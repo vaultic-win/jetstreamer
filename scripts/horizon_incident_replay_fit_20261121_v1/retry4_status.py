@@ -193,13 +193,13 @@ def registered_hourly170_writer(s, prior, *, failed166=False):
 
 def registered_failed166_rejoin(s, prior, version=2):
     old_package, old_seal, old_iid, old = prior
-    s.need(version in (2, 3, 4, 5, 6, 7), 'unknown epoch 166 cadence rejoin')
+    s.need(version in (2, 3, 4, 5, 6, 7, 8), 'unknown epoch 166 cadence rejoin')
     def package_for(generation):
         name = f'tools-cold168-retry4-failed166-v{generation}'
         return STATUS / (name + '-entry146' if generation >= 4 else name)
 
     name = f'FAILED166_CADENCE_V{version}'
-    predecessor = 5 if version == 7 and old_package == package_for(5) else version - 1
+    predecessor = 5 if version == 8 or (version == 7 and old_package == package_for(5)) else version - 1
     previous_name = 'FAILED166_CADENCE' if version == 2 else f'FAILED166_CADENCE_V{predecessor}'
     active, _ = s.read(STATUS / f'{name}_ACTIVE.json')
     ready = s.bound(active['ready'], STATUS / f'{name}_READY.json')
@@ -214,6 +214,20 @@ def registered_failed166_rejoin(s, prior, version=2):
         s.need(old_seal['sha256'] == allowed[predecessor]
                and ready['package']['sha256'] == 'c1b777be3164beca0db8afc9777a02bbbd8f7babc09acf063acb00297cd51504',
                'different epoch 185 holding cadence deployment')
+    if version == 8:
+        s.need(old_seal['sha256'] == '3f36fd3f6f51da689953d091aeafd620a6296d480ff0c0ee8111414d98a3b286'
+               and ready['package']['sha256'] == '3ae90b99cc09e7b58d1f88bc5ed72e8150d0383c906c0a169e401f262dab370a',
+               'different missed-sample cadence deployment')
+        recovery_dir = STATUS / ('recover-' + ready['config']['sha256'][:20])
+        registration = s.bound(ready['recovery_registration'], recovery_dir / 'REGISTERED.json')
+        failure = s.bound(registration['terminal'], recovery_dir / 'TERMINAL.json')
+        config = s.bound(registration['config'], recovery_dir / 'sealed-next' / 'observer.json')
+        sample = s.bound(ready['recovery_sample'], Path(config['output']))
+        s.need(failure['fleet'] == ready['fleet'] and failure['prior_config'] == ready['config']
+               and failure['error'] == 'native HOST RSS unavailable'
+               and sample['cadence']['previous_sample_sha256'] == fleet['observer']['sha256']
+               and sample['cadence']['configured_not_before_utc'] == config['not_before_utc'],
+               'missed-sample rejoin does not bind the completed replacement')
     s.need(old_package == package_for(predecessor)
            and old_seal['path'] == str(old_package / 'deployment-seal-receipt.json')
            and active['schema'] == 'horizon-epoch166-cadence-rejoin-active-v1'
