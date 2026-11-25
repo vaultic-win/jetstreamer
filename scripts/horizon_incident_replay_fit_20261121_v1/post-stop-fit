@@ -68,8 +68,9 @@ V5X_145 = HERE == D / "tools-homefloor-145-v5w-donor-recovery-v1"
 V5X_BUILD_145 = HERE == D / "tools-homefloor-145-v5w-donor-build-v1"
 V5W_RECOVERY_145 = V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or REPRO166_LIVE or FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
 V5Z_POST_145 = HERE == D / "tools-homefloor-145-post-v5z-current-v1"
+V5Z_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v5z-build-v1"
 V5X_POST_145 = V5Z_POST_145 or HERE == D / "tools-homefloor-145-post-v5x-current-v1"
-V5W_POST_145 = V5X_POST_145 or REPRO166_POST or HERE == D / "tools-homefloor-145-post-v5w-current-v1"
+V5W_POST_145 = V5X_POST_145 or V5Z_POST_BUILD_145 or REPRO166_POST or HERE == D / "tools-homefloor-145-post-v5w-current-v1"
 V5V_RECOVERY_145 = V5W_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
 FRESH_CENSUS_RECOVERY_145 = V5V_RECOVERY_145 or HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
 RETAIN_FAILED166 = FAILED166_CADENCE or V5V_RECOVERY_145 or V5W_POST_145
@@ -659,6 +660,31 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch, fleet=None):
+    if V5Z_POST_BUILD_145:
+        s.need(epoch == 145 and fleet is not None, "epoch 145 post build requires the current accepted fleet")
+        manager = s.show(fit.A145)
+        group = Path("/sys/fs/cgroup/system.slice") / fit.A145
+        s.need(manager["Id"] == fit.A145 and manager["ActiveState"] == "inactive"
+               and manager["SubState"] == "dead" and manager["LoadState"] in ("loaded", "not-found")
+               and manager["Result"] == "success" and manager["MainPID"] == manager["ControlPID"] == "0"
+               and not any(manager[key] for key in ("Job", "ControlGroup", "TriggeredBy"))
+               and not fit.members(fit.A145) and not group.exists(),
+               "the epoch 145 verifier still owns the post build slot")
+        seal, _ = s.read(HERE / "deployment-seal-receipt.json")
+        adapter = HERE / "incident-post-phase.py"
+        member, = (row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444")
+        s.need(seal["destination"] == str(HERE), "foreign epoch 145 post build provider")
+        fit.binary(adapter, member["sha256"])
+        adapter_scope = runpy.run_path(str(adapter))
+        s.need(adapter_scope["V5Z_POST"], "the post build must authenticate V5z completion")
+        complete, _ = adapter_scope["v5x_completion"](s)
+        owner = Path(complete["path"]).parent.name
+        s.need(s.iid(owner) and manager["InvocationID"] in ("", owner)
+               and Path(complete["path"]) == R / "epoch145-guarded-export-20261121-v1/state" / owner / "complete.json"
+               and s.show(fit.A145) == manager and not fit.members(fit.A145) and not group.exists(),
+               "the successful epoch 145 owner changed during post build admission")
+        return {"Id": fit.A145, "MainPID": "0", "stage": "v5z-semantic-complete-drained",
+                "completed_invocation_id": owner, "completion": complete}
     if V5Z_BUILD_145 or V5Y_BUILD_145:
         s.need(epoch == 145 and fleet is not None and not fit.members(fit.A145),
                "V5y build cannot price an occupied verifier")
@@ -1056,7 +1082,7 @@ def registered_status():
                     failed = writer168v4["registered_failed170_writer"](scope,retry4)
                     if RETAIN_FAILED166:
                         adopted = writer168v4["registered_hourly170_writer"](scope, failed, failed166=True)
-                        versions = (2, 3, 4, 5, 6, 7) if REPRO166 or FULL170 or V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or V5X_POST_145 else (2, 3, 4, 5, 6)
+                        versions = (2, 3, 4, 5, 6, 7) if REPRO166 or FULL170 or V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or V5X_POST_145 or V5Z_POST_BUILD_145 else (2, 3, 4, 5, 6)
                         for version in versions:
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():

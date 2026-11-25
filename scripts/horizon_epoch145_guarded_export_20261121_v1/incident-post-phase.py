@@ -12,7 +12,7 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-V5Z_POST = VERSION == "tools-v13q"
+V5Z_POST = VERSION in ("tools-v13q", "tools-homefloor-145-post-v5z-build-v1")
 V5X_POST = VERSION == "tools-v13p" or V5Z_POST
 V5W_POST = VERSION == "tools-v13o" or V5X_POST
 V5U_POST = VERSION in ("tools-v13m", "tools-v13n") or V5W_POST
