@@ -34,7 +34,12 @@ compile_error!("the epoch 168 stop recovery requires the complete V6 verifier gu
 #[cfg(all(incident_v7_timeout_recovery145_only, not(incident_v6_stop_recovery145_only)))]
 compile_error!("the PID 1 timeout recovery requires the complete V7 verifier guard");
 
-#[cfg(incident_v7_timeout_recovery145_only)]
+#[cfg(all(incident_v8_census_recovery145_only, not(incident_v7_timeout_recovery145_only)))]
+compile_error!("the census recovery requires the complete V8 verifier guard");
+
+#[cfg(incident_v8_census_recovery145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v9-census-recovery/export145";
+#[cfg(all(incident_v7_timeout_recovery145_only, not(incident_v8_census_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v8-pid1-timeout/export145";
 #[cfg(all(incident_v6_stop_recovery145_only, not(incident_v7_timeout_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7-168-stop-v2/export145";
@@ -561,6 +566,81 @@ pub(super) fn failed_v7(prior: &Value) -> Result<Value> {
             && !Path::new(OUTPUT).join("epoch-145.jet").try_exists()?
             && names == ["failed.json", "recovery-started.json"].map(std::ffi::OsString::from).into(),
         "V7 PID 1 timeout and paid candidate do not agree"
+    );
+    Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
+}
+
+#[cfg(incident_v8_census_recovery145_only)]
+const V8: &str = "e0aa2fa7d85e41578b8489eddd8695b5";
+
+#[cfg(incident_v8_census_recovery145_only)]
+pub(super) fn v8_terminal() -> Result<Bound> {
+    let terminal = Bound {
+        path: Path::new(BASE).join("state").join(V8).join("failed.json"),
+        sha256: "2ca11551a3f8a9ec55d67366182f3caae3cb089240dff36b3dbb13a131c7f2e5".into(),
+    };
+    custody::bytes(&terminal, 1 << 20, false).context("V8 census failure custody changed")?;
+    Ok(terminal)
+}
+
+#[cfg(incident_v8_census_recovery145_only)]
+pub(super) fn failed_v8(prior: &Value) -> Result<Value> {
+    let terminal = v8_terminal()?;
+    let failure = custody::evidence(&terminal)?;
+    let state = terminal.path.parent().context("V8 state directory")?;
+    let startup = Bound {
+        path: state.join("recovery-started.json"),
+        sha256: "e3fedd1fb256f88f0a98175f122a0d140c291b109f6abc88e3a1b906de1c64ab".into(),
+    };
+    let start = custody::evidence(&startup)?;
+    let handoff = Path::new(RUNTIME)
+        .join("epoch145-semantic-continuity-20261121-v1/v8-pid1-timeout-name-handoff");
+    let submission = Bound {
+        path: handoff.join("START_RESULT.json"),
+        sha256: "6209b4b6a1c8a95803b82dc4d7e385e67ce59519e53b608ce146032eedf915b6".into(),
+    };
+    let result = custody::evidence(&submission)?;
+    let checked = custody::evidence(&Bound {
+        path: handoff.join("NATIVE_START_CHECK.json"),
+        sha256: "c740b4d17cc95481c9d6381985de148e87d77aa5c2d18fdcce7fcdb99c5ec10b".into(),
+    })?;
+    let anchors = &checked["startup_evidence"];
+    let candidate = &anchors["candidate"];
+    let file = Path::new(OUTPUT).join(".tmp36MvkN");
+    let paid = custody::frozen_identity(&file)?;
+    let native = continuity::failure(V8)?;
+    let names = fs::read_dir(state)?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<std::io::Result<std::collections::BTreeSet<_>>>()?;
+    ensure!(
+        native["failure"] == json!(terminal)
+            && native["native"]["__CURSOR"]
+                == "s=7f76387dd96140468b39dcf01e726fea;i=397e3d9;b=763ea84ca81f4dddad364b1ea2ba36dd;m=39fd67e4398;t=6611fa351a0d0;x=cf965a2c6213f3bb"
+            && failure["error"].as_str().is_some_and(|error| error.trim_end().ends_with("ValueError: unregistered replay process 3187912"))
+            && checked["invocation_id"] == V8
+            && checked["native_success"].is_null()
+            && checked["publication_authorized"] == false
+            && anchors["submission_result"] == json!(submission)
+            && anchors["submission_intent"] == result["intent"]
+            && anchors["start"] == json!(startup)
+            && anchors["predecessor_terminal"] == prior["terminal"]
+            && result["manager"]["InvocationID"] == V8
+            && result["status"] == 0
+            && start["iid"] == V8
+            && start["image"] == anchors["worker"]["sha256"]
+            && start["file"] == candidate["path"]
+            && start["r2_mutations"] == false
+            && candidate["path"] == json!(file)
+            && candidate["device"] == paid.device
+            && candidate["inode"] == paid.inode
+            && candidate["bytes"] == paid.bytes
+            && candidate["mtime_ns"].as_i64().map(i128::from) == Some(paid.mtime_ns)
+            && candidate["ctime_ns"].as_i64().map(i128::from) == Some(paid.ctime_ns)
+            && paid.mode == 0o100400
+            && !Path::new(OUTPUT).join("epoch-145.jet").try_exists()?
+            && !handoff.join("SEMANTIC_COMPLETION.json").try_exists()?
+            && names == ["failed.json", "recovery-started.json"].map(std::ffi::OsString::from).into(),
+        "V8 native census failure and paid candidate do not agree"
     );
     Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
 }
