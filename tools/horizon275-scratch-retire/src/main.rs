@@ -1,5 +1,7 @@
 //! Retire individually qualified files and AccountsDb trees from stopped workers.
+mod appendvec288;
 mod appendvec292;
+mod parked_accounts;
 #[path = "../../../scripts/horizon_standard_backfill_scratch_retirement_20261110_v1/source/process_references.rs"]
 mod process_references;
 mod selective_accounts;
@@ -385,11 +387,13 @@ fn main() -> Result<()> {
                 | "--retire-parked-292"
                 | "--check-failed-stage-292"
                 | "--retire-failed-stage-292"
+                | "--check-parked-288"
+                | "--retire-parked-288"
         )
     ) {
         ensure!(
             unsafe { libc::geteuid() } == 0 && args.len() == 5,
-            "usage: horizon275-scratch-retire --check-parked-292|--retire-parked-292|--check-failed-stage-292|--retire-failed-stage-292 SELF_SHA256 COMPARISON COMPARISON_SHA256"
+            "usage: horizon275-scratch-retire --check-parked-EPOCH|--retire-parked-EPOCH|--check-failed-stage-292|--retire-failed-stage-292 SELF_SHA256 COMPARISON COMPARISON_SHA256"
         );
         let binary = File::open("/proc/self/exe")?;
         let metadata = binary.metadata()?;
@@ -397,14 +401,19 @@ fn main() -> Result<()> {
             metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut &binary)? == args[2],
             "unsealed retirement image"
         );
+        let apply = args[1].starts_with("--retire-");
+        let comparison = Binding {
+            path: args[3].clone().into(),
+            sha256: args[4].clone(),
+        };
+        if args[1].ends_with("-288") {
+            return appendvec288::run(apply, &args[2], comparison);
+        }
         return appendvec292::run(
-            args[1].starts_with("--retire-"),
+            apply,
             args[1].ends_with("-failed-stage-292"),
             &args[2],
-            Binding {
-                path: args[3].clone().into(),
-                sha256: args[4].clone(),
-            },
+            comparison,
         );
     }
     ensure!(

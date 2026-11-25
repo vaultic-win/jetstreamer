@@ -1,5 +1,9 @@
 //! Local retirement of the one stopped AccountsDb tree proven by R2 restoration.
-use super::{selective_accounts::record, snapshot288::Stamp, *};
+use super::{
+    parked_accounts::{self, sealed},
+    snapshot288::Stamp,
+    *,
+};
 #[path = "appendvec292_failed_stage.rs"]
 mod failed;
 
@@ -20,25 +24,6 @@ const BUNDLE: &str = "/var/lib/jetstreamer/horizon292-closed-appendvec-staging-v
 const FILES: usize = 249_167;
 const ALLOCATION: u64 = 432_056_471_552;
 const CENSUS_SHA: &str = "ee80e57c04c0cc124272a5267905ccea878ba00f51bb1f5fa94d36e8d0c7f98a";
-
-#[derive(Deserialize)]
-struct Qualified {
-    anchors: Value,
-    entries: stopped_tree::Ledger,
-}
-
-fn sealed(path: &Path, limit: u64) -> Result<Binding> {
-    let mut file = open_regular(path)?;
-    let m = file.metadata()?;
-    ensure!(
-        m.uid() == 0 && m.mode() & 0o222 == 0 && m.len() <= limit,
-        "unsealed retirement evidence"
-    );
-    Ok(Binding {
-        path: path.into(),
-        sha256: digest(&mut file)?,
-    })
-}
 
 fn require_restore_exit(invocation: &str) -> Result<()> {
     ensure!(
@@ -73,46 +58,6 @@ fn require_restore_exit(invocation: &str) -> Result<()> {
         }
     }
     ensure!(clean == 1, "RAM restore lacks a unique clean manager exit");
-    Ok(())
-}
-
-fn require_census(target: &Path) -> Result<()> {
-    let output = Command::new("/usr/bin/find")
-        .env("LC_ALL", "C")
-        .current_dir(target)
-        .args([
-            "0",
-            "1",
-            "2",
-            "3",
-            "-xdev",
-            "-mindepth",
-            "1",
-            "-maxdepth",
-            "1",
-            "-printf",
-            "%p\t%y\t%n\t%U\t%G\t%m\t%D\t%i\t%s\t%b\t%T@\t%C@\n",
-        ])
-        .output()?;
-    ensure!(
-        output.status.success(),
-        "cannot capture original 292 stamps"
-    );
-    let rows = output
-        .stdout
-        .strip_suffix(b"\n")
-        .context("empty 292 source census")?;
-    let mut rows: Vec<_> = rows.split(|b| *b == b'\n').collect();
-    rows.sort_unstable();
-    let mut hash = Sha256::new();
-    for row in &rows {
-        hash.update(row);
-        hash.update(b"\n");
-    }
-    ensure!(
-        rows.len() == FILES && format!("{:x}", hash.finalize()) == CENSUS_SHA,
-        "292 source no longer matches the staging inode, allocation and timestamp census"
-    );
     Ok(())
 }
 
@@ -285,93 +230,29 @@ pub(super) fn run(
         return failed::run(apply, state, &result, tree_ref);
     }
     let readers = failed::accounts_readers(run, target)?;
-    let ledger_path = state.join("ledger.json");
-    if !apply {
-        ensure!(
-            !state.join("intent.json").exists(),
-            "retirement has already started"
-        );
-        let entries = capture()?;
-        require_census(target)?;
-        stopped_tree::validate_remaining(&entries, &capture()?, false)?;
-        ensure!(entries.len() == FILES + 5, "wrong 292 source entry count");
-        let reference = if ledger_path.try_exists()? {
-            let reference = sealed(&ledger_path, LEDGER_LIMIT)?;
-            let prior: Qualified = read_bound(&reference.path, &reference.sha256, LEDGER_LIMIT)?;
+    parked_accounts::run(
+        apply,
+        parked_accounts::Tree {
+            epoch: 292,
+            state,
+            root: &root,
+            target,
+            device,
+            files: FILES,
+            allocation: ALLOCATION,
+            census_sha: CENSUS_SHA,
+            anchors,
+            readers,
+        },
+        || {
             ensure!(
-                prior.anchors == anchors && prior.entries == entries,
-                "conflicting 292 ledger"
+                identity(&a) == identity(&archive.symlink_metadata()?)
+                    && identity(&b) == identity(&Path::new(BUNDLE).symlink_metadata()?),
+                "retained 292 evidence changed"
             );
-            reference
-        } else {
-            record(
-                &ledger_path,
-                &json!({
-                    "anchors":anchors,"entries":entries,"scheduled":readers["scheduled"],"consumers":readers["processes"],
-                }),
-            )?
-        };
-        println!("{}", serde_json::to_string(&reference)?);
-        return Ok(());
-    }
-    let ledger = sealed(&ledger_path, LEDGER_LIMIT)?;
-    let qualified: Qualified = read_bound(&ledger.path, &ledger.sha256, LEDGER_LIMIT)?;
-    ensure!(
-        qualified.anchors == anchors,
-        "source or retained evidence changed since check"
-    );
-    let expected = qualified.entries;
-    ensure!(
-        expected.len() == FILES + 5,
-        "wrong qualified 292 source entry count"
-    );
-    let intent_path = state.join("intent.json");
-    let complete_path = state.join("completion.json");
-    let authorization = json!({"ledger":ledger,"anchors":anchors});
-    let pending = snapshot288::lookup_receipt(&intent_path)?;
-    if let Some((_, intent)) = &pending {
-        ensure!(
-            intent["authorization"] == authorization,
-            "conflicting retirement intent"
-        );
-    }
-    let current = capture()?;
-    stopped_tree::validate_remaining(&expected, &current, pending.is_some())?;
-    if let Some((reference, done)) = snapshot288::lookup_receipt(&complete_path)? {
-        ensure!(
-            pending.is_some() && done["authorization"] == authorization && current.len() == 1,
-            "retirement completion and remaining source disagree"
-        );
-        println!("{}", serde_json::to_string(&reference)?);
-        return Ok(());
-    }
-    let free_before = available(target)?;
-    let intent = match pending {
-        Some((prior, _)) => prior,
-        None => record(
-            &intent_path,
-            &json!({"authorization":authorization,"free_before_bytes":free_before}),
-        )?,
-    };
-    drop(current);
-    let removed = stopped_tree::remove_contents(&root, &expected, device, 1000, 1000)?;
-    ensure!(
-        root.metadata()?.ino() == target.symlink_metadata()?.ino()
-            && identity(&a) == identity(&archive.symlink_metadata()?)
-            && identity(&b) == identity(&Path::new(BUNDLE).symlink_metadata()?),
-        "source root or retained evidence changed"
-    );
-    let completion = record(
-        &complete_path,
-        &json!({
-            "authorization":authorization,"intent":intent,"epoch":292,"removed_entries_this_attempt":removed,
-            "verified_allocated_bytes_removed":ALLOCATION,"free_at_attempt_start_bytes":free_before,
-            "free_after_bytes":available(target)?,"empty_root_retained":true,"r2_mutations":false,
-            "publication_authorized":false,
-        }),
-    )?;
-    println!("{}", serde_json::to_string(&completion)?);
-    Ok(())
+            Ok(())
+        },
+    )
 }
 
 #[cfg(test)]
@@ -390,7 +271,7 @@ mod tests {
         let inode = expected["inode"].as_u64().context("missing source inode")?;
         let root = stopped_tree::open_root(target, device, inode)?;
         let entries = stopped_tree::capture(&root, device, 1000, 1000)?;
-        require_census(target)?;
+        parked_accounts::require_census(target, FILES, CENSUS_SHA)?;
         ensure!(
             entries.len() == FILES + 5,
             "wrong original 292 tree member count"

@@ -1,5 +1,6 @@
 //! Reclaim the failed staging file after the verified replacement retires its source tree.
 use super::*;
+use crate::selective_accounts::record;
 use std::ffi::CString;
 
 const STAGING: &str = "/var/lib/jetstreamer/horizon292-closed-appendvec-staging-v304";
