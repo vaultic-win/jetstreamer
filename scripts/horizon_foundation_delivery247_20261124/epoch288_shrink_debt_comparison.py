@@ -76,6 +76,10 @@ HOLDING288_UNITS = {
 }
 BOOTSTRAP231_UNIT = 'foundation-231-capped-bootstrap-parity-v2.service'
 BOOTSTRAP231 = V / 'horizon231-capped-bootstrap-parity-v2'
+BOOTSTRAP230_UNIT = 'foundation-230-capped-bootstrap-v1.service'
+BOOTSTRAP230 = V / 'horizon230-native-restart-v1'
+BOOTSTRAP_CPUS = '118-121'
+BOOTSTRAP_MEMORY = 160 << 30
 PUBLIC_AUDIT = V / 'horizon-foundation-public-audit-148-156-v1'
 PUBLIC_AUDIT_RELEASE_SHA = 'ea750bf0be9c6742af0ca1503e8cba094594557e1b5225ad8ff93f693f2a344d'
 SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
@@ -435,22 +439,22 @@ def active_229_staging(ops):
     return dict(start=start_ref, owner=owner, remaining_bytes=remaining)
 
 
-def active_231_bootstrap_parity(ops):
-    owner = ops.props(BOOTSTRAP231_UNIT, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
+def active_bootstrap(ops, unit, state, schema):
+    owner = ops.props(unit, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
                                         'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
-    group = Path('/sys/fs/cgroup/system.slice') / BOOTSTRAP231_UNIT
+    group = Path('/sys/fs/cgroup/system.slice') / unit
     if owner['ActiveState'] in ('inactive', 'failed'):
         assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
         return None
-    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (BOOTSTRAP231_UNIT, 'active', 'running')
-    start_ref = binding(BOOTSTRAP231 / 'start.json')
+    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (unit, 'active', 'running')
+    start_ref = binding(state / 'start.json')
     start = read(start_ref)
-    assert start['schema'] == 'foundation-epoch231-capped-bootstrap-parity-start-v1'
-    assert owner['ControlGroup'] == '/system.slice/' + BOOTSTRAP231_UNIT
+    assert start['schema'] == schema
+    assert owner['ControlGroup'] == '/system.slice/' + unit
     assert all(owner[key] == start['owner'][key] for key in ('InvocationID', 'MainPID', 'ControlGroup'))
     assert Path('/proc', owner['MainPID'], 'exe').samefile(checked(start['binary']))
-    assert int(owner['MemoryMax']) == start['memory_max_bytes'] == 160 << 30
-    assert owner['AllowedCPUs'] == start['cpus'] == '118-121'
+    assert int(owner['MemoryMax']) == start['memory_max_bytes'] == BOOTSTRAP_MEMORY
+    assert owner['AllowedCPUs'] == start['cpus'] == BOOTSTRAP_CPUS
     assert start['replay_launch_authorized'] is False
     return dict(start=start_ref, owner=owner)
 
@@ -482,11 +486,12 @@ def active_public_audit(helper, census):
     return dict(launch=launch_ref, owner=owner)
 
 
-def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='capped', stage229=False):
+def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='capped', stage229=False, probe230=False):
     assert not demotion_retry or candidate_epoch == 229
     assert replay231 == 'capped' or candidate_epoch == 231
     assert not stage229 or (candidate_epoch == 229 and not demotion_retry)
-    ram_quote = None if stage229 else (DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch))
+    assert not probe230 or candidate_epoch == 230
+    ram_quote = None if stage229 or probe230 else (DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch))
     if candidate_epoch == 231:
         mount = {'capped': RAM_QUOTES[231][0], 'stock': STOCK231_MOUNT, 'demotion': DEMOTION231_MOUNT}[replay231]
         ram_quote = (mount, *RAM_QUOTES[231][1:])
@@ -506,6 +511,9 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
         candidate_cpus = kit.measure.source.helper.cpus(affinity)
     elif stage229:
         candidate_disk, candidate_memory, candidate_cpus = STAGE229_CAP + STAGE229_METADATA, 2 << 30, {78, 79}
+    elif probe230:
+        candidate_disk, candidate_memory = 64 << 20, BOOTSTRAP_MEMORY
+        candidate_cpus = kit.measure.source.helper.cpus(BOOTSTRAP_CPUS)
     elif ram_quote is not None:
         _, _, candidate_memory, candidate_cpus = ram_quote
         candidate_disk = 0
@@ -596,14 +604,16 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
                   if (item := active_288_holding(kit.ops, unit)) is not None}
     assert len(holding288) <= 1, 'epoch 288 holding phases overlap'
     live.extend(item['owner'] for item in holding288.values())
-    bootstrap231 = active_231_bootstrap_parity(kit.ops)
-    if bootstrap231 is not None:
-        live.append(bootstrap231['owner'])
+    bootstrap231 = active_bootstrap(kit.ops, BOOTSTRAP231_UNIT, BOOTSTRAP231,
+                                    'foundation-epoch231-capped-bootstrap-parity-start-v1')
+    bootstrap230 = active_bootstrap(kit.ops, BOOTSTRAP230_UNIT, BOOTSTRAP230,
+                                    'foundation-epoch230-capped-bootstrap-start-v1')
+    live.extend(bootstrap['owner'] for bootstrap in (bootstrap231, bootstrap230) if bootstrap is not None)
     census = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
         '--no-pager', '--no-legend', '--plain', 'horizon-qualify-*', 'horizon-perf-*', 'horizon-upload-*',
         'horizon-restore-*', 'foundation-*-broker-*', 'foundation-public-audit-*',
         'foundation-*-ext4-*', PARK292_UNIT, STAGE228_UNIT, STAGE229_UNIT, 'foundation-288-appendvec-*',
-        'foundation-231-capped-bootstrap-parity-*'],
+        'foundation-231-capped-bootstrap-parity-*', BOOTSTRAP230_UNIT],
         text=True, timeout=10)
     listed_units = {line.split()[0] for line in census.splitlines() if line.strip()}
     public_audit = active_public_audit(helper, listed_units)
@@ -657,6 +667,7 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
                 reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref, extraction226_terminal=terminal226,
                 staging292=staging, custody292=custody, staging228=stage228, staging229=accounts_stage,
                 staging288=holding288.get(STAGE288_UNIT), holding288=holding288, bootstrap231=bootstrap231,
+                bootstrap230=bootstrap230,
                 public_audit=public_audit,
                 guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=candidate_disk,
                 candidate_memory_max_bytes=candidate_memory, candidate_cpus=sorted(candidate_cpus),
@@ -1036,7 +1047,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'capacity-continuation230',
                                           'capacity-demotion229', 'capacity-demotion229-retry',
-                                          'capacity-stage229',
+                                          'capacity-stage229', 'capacity-bootstrap230',
                                           'capacity-replay231', 'capacity-stock231', 'capacity-demotion231',
                                           'prepare', 'launch', 'launch-full'))
     parser.add_argument('reference', nargs='?')
@@ -1054,6 +1065,9 @@ def main():
         return
     if options.action == 'capacity-stage229':
         print(json.dumps(capacity(load_existing(), candidate_epoch=229, stage229=True)))
+        return
+    if options.action == 'capacity-bootstrap230':
+        print(json.dumps(capacity(load_existing(), candidate_epoch=230, probe230=True)))
         return
     if options.action in ('capacity-replay231', 'capacity-stock231', 'capacity-demotion231'):
         variant = options.action.removeprefix('capacity-').removesuffix('231')
