@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_v7_timeout_recovery145_only)]
+#[cfg(incident_v8_census_recovery145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v8-census-recovery-v1/post-stop-fit";
+#[cfg(all(incident_v7_timeout_recovery145_only, not(incident_v8_census_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v7-timeout-recovery-v1/post-stop-fit";
 #[cfg(all(incident_v6_stop_recovery145_only, not(incident_v7_timeout_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v6-stop-recovery-v2/post-stop-fit";
@@ -937,7 +939,9 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         let observed: Bound = serde_json::from_value(
             complete["phase145"]["window"]["guard_terminal_predecessor"].clone(),
         )?;
-        #[cfg(incident_v7_timeout_recovery145_only)]
+        #[cfg(incident_v8_census_recovery145_only)]
+        let pinned = incident145::v8_terminal()?;
+        #[cfg(all(incident_v7_timeout_recovery145_only, not(incident_v8_census_recovery145_only)))]
         let pinned = incident145::v7_terminal()?;
         #[cfg(all(incident_v6_stop_recovery145_only, not(incident_v7_timeout_recovery145_only)))]
         let pinned = incident145::v6_terminal()?;

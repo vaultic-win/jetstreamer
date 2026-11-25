@@ -65,8 +65,12 @@ REPRO166 = REPRO166_LIVE or REPRO166_POST
 V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v2"
 V8_RUNTIME_145 = HERE == D / "tools-homefloor-145-v7-timeout-recovery-v1"
 V8_BUILD_145 = HERE == D / "tools-homefloor-145-v7-timeout-build-v2"
+V9_RUNTIME_145 = HERE == D / "tools-homefloor-145-v8-census-recovery-v1"
+V9_BUILD_145 = HERE == D / "tools-homefloor-145-v8-census-build-v1"
+V9_145 = V9_RUNTIME_145 or V9_BUILD_145
 V8_145 = V8_RUNTIME_145 or V8_BUILD_145
-STOP_RECOVERY_145 = V7_145 or V8_145
+V12_RECOVERY_145 = V8_145 or V9_145
+STOP_RECOVERY_145 = V7_145 or V12_RECOVERY_145
 V8_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v3"
 RETRY5_FIT_ROUTE = V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
 V7_POST_145 = HERE == D / "tools-homefloor-145-post-v7-current-v1"
@@ -651,6 +655,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     if focused is not None:
         post_directory = fixture_post_directory(here)
         lease_directory = next(directory for enabled, directory in (
+            (V9_RUNTIME_145, "tools-v9-census-recovery"),
             (V8_RUNTIME_145, "tools-v8-pid1-timeout"),
             (V7_145, "tools-v7-168-stop-v2"),
             (V6_145, "tools-v6-guard-walk"),
@@ -714,9 +719,11 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     fit.binary(adapter,cfg["adapter_sha256"]);fit.binary(image,cfg["image_sha256"])
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
-def v8_stopped145(fleet):
-    package = HERE if V8_BUILD_145 else R / "epoch145-semantic-continuity-20261121-v1/tools-v8-pid1-timeout"
-    expected_seal = None if V8_BUILD_145 else s.read(HERE / "profile145-lease-semantic.json")[0]["seal_sha256"]
+def v12_stopped145(fleet):
+    version = "tools-v9-census-recovery" if V9_145 else "tools-v8-pid1-timeout"
+    build = V8_BUILD_145 or V9_BUILD_145
+    package = HERE if build else R / "epoch145-semantic-continuity-20261121-v1" / version
+    expected_seal = None if build else s.read(HERE / "profile145-lease-semantic.json")[0]["seal_sha256"]
     seal, _ = s.read(package / "deployment-seal-receipt.json", expected_seal)
     checker = package / "v5v_semantic_completion.py"
     member, = (row for row in seal["members"] if row["name"] == checker.name)
@@ -726,9 +733,11 @@ def v8_stopped145(fleet):
            and checker.resolve(strict=True) == checker, "unsealed V8 journal reader")
     fit.binary(checker, member["sha256"])
     observed = runpy.run_path(str(checker))["predecessor_preflight"](fleet)
-    s.need(observed["schema"] == "horizon-epoch145-v8-predecessor-preflight-v1",
+    version = "v9" if V9_145 else "v8"
+    stage = "v8-drained-census-failure" if V9_145 else "v7-drained-pid1-timeout"
+    s.need(observed["schema"] == f"horizon-epoch145-{version}-predecessor-preflight-v1",
            "wrong stopped epoch 145 generation")
-    return dict(observed["manager"], stage="v7-drained-pid1-timeout", guard_terminal=observed["failure"],
+    return dict(observed["manager"], stage=stage, guard_terminal=observed["failure"],
                 invocation_id=observed["manager"]["InvocationID"], failure=observed["failure"],
                 recovery=observed["startup"], candidate=observed["candidate"], resource_credit_bytes=0)
 
@@ -744,15 +753,15 @@ def phase145(epoch, fleet=None):
     if STOP_RECOVERY_145:
         members = fit.members(fit.A145)
         if members:
-            s.need(epoch == 145 and not V8_BUILD_145, "live epoch 145 requires its own capacity probe")
+            s.need(epoch == 145 and not (V8_BUILD_145 or V9_BUILD_145), "live epoch 145 requires its own capacity probe")
             profile, adapter, _ = profile145(HERE, focused="lease-semantic")
             manager = s.show(fit.A145)
             phase = runpy.run_path(str(adapter))["inspect"](
                 s, fit.overlap.leases, manager, members, epoch, Path(__file__).resolve(), profile)
             s.need(phase is not None, "different live epoch 145 verifier")
             return phase
-        if V8_145:
-            return v8_stopped145(fleet)
+        if V12_RECOVERY_145:
+            return v12_stopped145(fleet)
         stopped = stopped145_phase()
         proof, terminal = s.read(
             R / "epoch145-semantic-continuity-20261121-v1/v6-guard-walk-name-handoff/V6_TERMINAL_FAILURE_168_STOP.json",
@@ -1280,8 +1289,8 @@ def registered_status():
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():
                                 adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, version)
-                        if RETRY5_168 or V8_145:
-                            if V8_145:
+                        if RETRY5_168 or V12_RECOVERY_145:
+                            if V12_RECOVERY_145:
                                 scope.read(R / "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json",
                                            "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54")
                             adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, 12)
@@ -2039,14 +2048,14 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         module = HERE / "build_159_price.py"
         member, = [row for row in seal["members"] if row["name"] == module.name and row["mode"] == "0444"]
         s.need(seal["destination"] == str(HERE), "unbound epoch 145 recovery donor price")
-        if V8_145:
+        if V12_RECOVERY_145:
             s.need(member["sha256"] == "d4441d0184a8e9c93ed7bc1df6a0a672bc41a86923eec8bc4934178596062ad8",
                    "different epoch 145 V8 donor")
         fit.binary(module, member["sha256"])
         donor = runpy.run_path(str(module))
         before = donor["snapshot"]()
         native = capture_native(epoch, ref)
-        options = {"v8": True} if V8_145 else {}
+        options = {"v8": True} if V12_RECOVERY_145 else {}
         native["epoch159_donor_cover"] = donor["cover"](before, native, donor["snapshot"](), **options)
         return native
     if RETRY5_168:
