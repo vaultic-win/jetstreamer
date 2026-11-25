@@ -61,6 +61,13 @@ fn stage_invocation(receipt: &Binding, staged: &Value) -> Result<Binding> {
         "stage report, invocation, or admitted implementation differs"
     );
     terminal_unit(STAGE_UNIT)?;
+    let binary_path = binary.path.to_str().context("non-UTF-8 stage image path")?;
+    let started = journal_event(&[
+        "_PID=1".into(),
+        format!("UNIT={STAGE_UNIT}"),
+        format!("INVOCATION_ID={invocation}"),
+        format!("MESSAGE=Started {STAGE_UNIT} - [systemd-run] {binary_path} stage-229."),
+    ])?;
     let manager = journal_event(&[
         "_PID=1".into(),
         format!("UNIT={STAGE_UNIT}"),
@@ -74,7 +81,12 @@ fn stage_invocation(receipt: &Binding, staged: &Value) -> Result<Binding> {
         format!("MESSAGE={}", receipt.path.display()),
     ])?;
     ensure!(
-        manager["_SYSTEMD_UNIT"] == "init.scope" && report["_EXE"].as_str() == binary.path.to_str(),
+        started["_SYSTEMD_UNIT"] == "init.scope"
+            && manager["_SYSTEMD_UNIT"] == "init.scope"
+            && report["_SYSTEMD_CGROUP"] == start["owner"]["ControlGroup"]
+            && report["_UID"] == "0"
+            && report["_TRANSPORT"] == "stdout"
+            && (report["_EXE"].is_null() || report["_EXE"] == binary_path),
         "stage report did not come from the clean exact invocation"
     );
     Ok(start_ref)
