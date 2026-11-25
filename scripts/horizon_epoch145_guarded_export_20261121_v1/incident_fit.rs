@@ -497,8 +497,12 @@ fn pending_join(error: &str) -> Result<Option<u64>> {
 pub fn manager_timeout<'a>(stderr: &'a str, provider: &str) -> Option<&'a str> {
     let trace = stderr.trim_end();
     let entry = format!("Traceback (most recent call last):\n  File \"{provider}\", line ");
+    let manager = [
+        "  File \"/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v3/status168.py\", line 61, in show",
+        "  File \"/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v4-registered136/status168.py\", line 61, in show",
+    ];
     if !trace.starts_with(&entry)
-        || !trace.contains("  File \"/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v3/status168.py\", line 61, in show\n")
+        || !trace.lines().any(|line| manager.contains(&line))
         || !trace.contains("  File \"/usr/lib/python3.12/subprocess.py\", line 1253, in _check_timeout\n    raise TimeoutExpired(") {
         return None;
     }
@@ -507,6 +511,7 @@ pub fn manager_timeout<'a>(stderr: &'a str, provider: &str) -> Option<&'a str> {
         || [
             "166-independent-recovery-20261121-v1",
             "167-source-index-v1-20261121",
+            "167-source-index-v3-20261122",
             "168-full-metered-20261121-v1",
             "169-focused-20261120-v4",
             "170-replacement-local3retry10-20261121-v1",
@@ -1568,6 +1573,31 @@ fn remaining136(sample: &Value) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(any(incident_timeout145_only, incident_timeout_post145_only))]
+    #[test]
+    fn monitored_pid1_timeouts_accept_both_sealed_manager_frames() {
+        let provider = "/sealed/provider/post-stop-fit";
+        let unit = "horizon-qualify-172-full-half-core-20261120-v1.service";
+        let trace = format!(
+            "Traceback (most recent call last):\n  File \"{provider}\", line 2117, in <module>\n  File \"/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v4-registered136/status168.py\", line 61, in show\n  File \"/usr/lib/python3.12/subprocess.py\", line 1253, in _check_timeout\n    raise TimeoutExpired(\nsubprocess.TimeoutExpired: Command '['/usr/bin/systemctl', 'show', '-p', 'Id,LoadState,ActiveState,SubState,InvocationID,Description,MainPID,StartLimitAction,ControlPID,ControlGroup,Job,NRestarts,Triggers,TriggeredBy,Result,ExecMainStatus,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec', '{unit}']' timed out after 10 seconds\n"
+        );
+        assert_eq!(manager_timeout(&trace, provider), Some(unit));
+        let original = trace.replace("session-v4-registered136", "session-v3");
+        assert_eq!(manager_timeout(&original, provider), Some(unit));
+        let current167 = "horizon-qualify-167-source-index-v3-20261122.service";
+        let trace167 = trace.replace(unit, current167);
+        assert_eq!(manager_timeout(&trace167, provider), Some(current167));
+        for changed in [
+            trace.replace("session-v4-registered136", "unsealed"),
+            trace.replace(unit, "horizon-unregistered.service"),
+            trace.replace("'show'", "'stop'"),
+            trace.replace("after 10 seconds", "after 11 seconds"),
+        ] {
+            assert_eq!(manager_timeout(&changed, provider), None);
+        }
+        assert_eq!(manager_timeout(&trace, "/unsealed/post-stop-fit"), None);
+    }
 
     #[cfg(incident_guard_walk145_only)]
     #[test]
