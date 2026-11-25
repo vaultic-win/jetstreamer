@@ -648,6 +648,10 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch, fleet=None):
+    if FULL170 and not fit.members(fit.A145) and (
+        R / "epoch145-semantic-continuity-20261121-v1/v5w-name-handoff/SEMANTIC_COMPLETION.json"
+    ).exists():
+        return full170_capacity["drained145"](s, fit, R)
     if V5V_RECOVERY_145 and not fit.members(fit.A145):
         s.need(epoch == 145 and fleet is not None, "V5v requires the accepted fleet and paid predecessor")
         profile, adapter, _ = profile145(HERE, focused="lease-semantic")
@@ -1290,7 +1294,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         s.need(epoch==166 and prestart136 is None,"closed retry3 quote is for independent 166 only")
         closed_before=closed_bootstrap["settled"](s,fit)
     stopped=proof_stops()
-    f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
+    f,fleet_rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
+    active170 = FULL170 and full170_mode == "active"
+    rows = {e: row for e, row in fleet_rows.items() if not (active170 and e == 170)}
     failed170 = failed170_replay(f, rows) if V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 else None
     failed166 = retry11["failed"](s, fit, f, rows) if RETAIN_FAILED166 else None
     hourly170_settled = settled_hourly170_for_145(f, ref, rows) if V5V_RECOVERY_145 or V5W_POST_145 else None
@@ -1311,8 +1317,11 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if FULL170:
         s.need(epoch == 145 and prestart136 is None and failed170,
                "full epoch 170 requires the exact retained retry13 terminal")
+        if full170_mode != "prestart":
+            s.need(phase["stage"] == "v5w-semantic-complete-drained",
+                   "held or active full epoch 170 requires authenticated drained V5w")
         hourly170_owner, full170_guard = full170_capacity["ownership"](s, fit, full170, hourly170,
-                                                                       full170_mode, ref, status)
+                                                                       full170_mode, ref, status, f)
     if HOURLY170:
         s.need(epoch == 145 and prestart136 is None and hourly170_mode in ("prestart", "post-guard", "active")
                and failed170, "hourly 170 requires the positive retry 13 terminal")
@@ -1382,7 +1391,12 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
             active_run = cold170["RUN"]
 
         if a:rep[str(e)]=a
-        if e == 170 and hourly170_guard is not None:
+        if e == 170 and active170:
+            s.need(root == full170["LANE"] and effective == full170["CAP"], "different active epoch 170 booking")
+            active_run = full170["RUN"]
+            physical = full170_guard["physical_bytes"]
+            measurement = "bound full epoch 170 active native guard whole-tree observation"
+        elif e == 170 and hourly170_guard is not None:
             s.need(root == hourly170["LANE"] and effective == hourly170["CAP"],
                    "different original 170 whole-tree booking")
             physical = hourly170_guard["measured_bytes"]
@@ -1470,13 +1484,19 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if closed172:books["172"]=full172_booking(closed172)
     raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
     raw+=extension["extra_bytes"] if extension else 0
-    need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,rep,floor168,closed_prepaid)
+    budget_rep = dict(rep)
+    if active170:
+        budget_rep["170"] = dict(prestart_remaining=full170["CAP"] - hourly170_owner["prestart_physical_bytes"],
+                                 floor=0)
+    need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,budget_rep,floor168,closed_prepaid)
     resident={e:joined_resident(v) for e,v in rep.items()}
+    if active170 and hourly170_owner["admission"]:
+        resident["170"] = joined_resident(hourly170_owner)
     if resident168:resident["168"]=resident168
     needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
-    s.need(fleet_head(ref)[1]==rows and phase145(epoch, ref)==phase and registered_status()==status and
+    s.need(fleet_head(ref)[1]==fleet_rows and phase145(epoch, ref)==phase and registered_status()==status and
            census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner,repro166)==(population,qualification),
            "capacity generation changed during collection")
     if prestart136 is None and not c136["occupied"]:
@@ -1498,7 +1518,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
                prefix_before["child"]["InvocationID"] == prefix_after["child"]["InvocationID"],
                "prefix140 generation changed during 145 capture")
         growth = max(p["remaining_DATA_growth_bytes"] for p in (prefix_before, prefix_after))
-        zero, _, _ = disk_budget(raw, dict(remaining=0), books, epoch, peers, rep, floor168, closed_prepaid)
+        zero, _, _ = disk_budget(raw, dict(remaining=0), books, epoch, peers, budget_rep, floor168, closed_prepaid)
         old_need = need
         need = post145_floor(old_need, zero, c136, growth)
         protected += need - old_need
@@ -1522,7 +1542,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         # The candidate guard already contains the 136 and mirror promises
         # from prestart. Repricing after its first guard must not stack those
         # same promises on top of its own protected floor.
-        other_floors = {k: (dict(v, floor=0) if int(k) == epoch else v) for k, v in rep.items()}
+        other_floors = {k: (dict(v, floor=0) if int(k) == epoch else v) for k, v in budget_rep.items()}
         zero, _, _ = disk_budget(raw, dict(remaining=0), books, 145, peers, other_floors,
                                  0 if epoch == 168 else floor168, closed_prepaid)
         required = max(need + (0 if post_price else prefix_growth),
@@ -1571,8 +1591,32 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,**recovered_price,active168_guard_floor=floor168,
         population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
     if FULL170:
-        s.need(full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status)
-               == (hourly170_owner, full170_guard), "full epoch 170 hold or first guard changed during price")
+        # At zero remaining growth, the same paid tree has realized its full
+        # allowance. Re-evaluate the existing absolute floors and every other
+        # promise. Those branches may keep the incumbent floor from falling
+        # by the candidate's entire allowance.
+        full_books = dict(books, **{"170": dict(books["170"],
+                          physical_bytes=books["170"]["cap_bytes"], remaining_bytes=0)})
+        full_replacements = dict(budget_rep)
+        if not active170:
+            full_replacements["170"] = dict(prestart_remaining=books["170"]["remaining_bytes"], floor=0)
+        full_need, _, _ = disk_budget(raw, c136, full_books, epoch, peers,
+                                      full_replacements, floor168, closed_prepaid)
+        full_zero, _, _ = disk_budget(raw, dict(remaining=0), full_books, epoch, peers,
+                                      full_replacements, floor168, closed_prepaid)
+        full_need = post145_floor(full_need, full_zero, c136, growth)
+        full_need = max(full_need, post145_floor(0, full_zero, c136, prefix_growth)) + after["missing_mirror_bytes"]
+        native["full170_zero_remaining_native_HOME_bytes"] = full_need
+    if active170:
+        native["active_full170"] = dict(
+            producer_unit=hourly170_owner["producer_unit"],
+            producer_invocation_id=hourly170_owner["producer_invocation_id"],
+            post_guard_capacity=hourly170_owner["post_guard_capacity"],
+            admission=hourly170_owner["admission"], guard_receipt=full170_guard["receipt"])
+        native["active_full170_guard"] = full170_guard
+    if FULL170:
+        final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, f)
+        full170_capacity["unchanged"](s, full170_mode, (hourly170_owner, full170_guard), final)
     if REPRO166:
         s.need(reproduction166_owner(repro166_mode, ref) == repro166, "epoch 166 gate or first guard changed during capture")
         native["reproduction166_owner"] = repro166
@@ -1616,18 +1660,18 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
     s.need(HOURLY170 == (hourly170_mode is not None), "hourly 170 mode requires its own sealed provider")
     s.need(FULL170 == (full170_mode is not None), "full epoch 170 mode requires its own sealed provider")
     if FULL170:
-        s.need(epoch == 145 and prestart136 is None and full170_mode in ("prestart", "held", "post-guard"),
+        s.need(epoch == 145 and prestart136 is None and full170_mode in ("prestart", "held", "post-guard", "active"),
                "unknown full epoch 170 capacity stage")
         fleet, _ = fleet_head(ref)
         status = registered_status()
-        actor, guard = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status)
+        actor, guard = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet)
     if STOPPED_GUARD_145 or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or LATE_HANDOFF_145:
         s.need(epoch == 145 and (prestart136 is None or POST_136), "unexpected missed-census pricing scope")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
         module = HERE / "build_159_price.py"
         member, = [v for v in seal["members"] if v["name"] == module.name]
         s.need(seal["destination"] == str(HERE) and member["mode"] == "0444", "unbound donor price")
-        if V5V_RECOVERY_145 or V5W_POST_145:
+        if (V5V_RECOVERY_145 or V5W_POST_145) and not FULL170:
             s.need(member["sha256"] == "db0b9de9d848a525c0f2daf7810ac8dba85515253e99f8c358eb34e4ba2e5d7c",
                    "V5v requires the published epoch 159 donor retry")
         fit.binary(module,member["sha256"])
@@ -1663,16 +1707,23 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
             left, right = quotes[-2:]
             native["epoch159_donor_cover"] = donor["cover"](left,native,right,exclusive136=native["candidate136"])
         else:
-            native["epoch159_donor_cover"] = donor["cover"](before,donor_price,donor["snapshot"]())
+            options = {"full170": native["active_full170"]} if FULL170 and full170_mode == "active" else {}
+            native["epoch159_donor_cover"] = donor["cover"](before,donor_price,donor["snapshot"](), **options)
         if REPRO166:
             s.need(registered_status() == native["status_registration"]
                    and reproduction166_owner(repro166_mode, ref) == native["reproduction166_owner"],
                    "changed epoch 166 claim after donor pricing")
         if FULL170:
-            s.need(registered_status() == status and fleet_head(ref)[0] == fleet
-                   and full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status)
-                       == (actor, guard), "full epoch 170 ownership changed after donor proof")
-            return full170_capacity["price"](s, full170, native, full170_mode, actor, guard,
+            s.need(registered_status() == status and fleet_head(ref)[0] == fleet,
+                   "full epoch 170 fleet ownership changed after donor proof")
+            final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet)
+            full170_capacity["unchanged"](s, full170_mode, (actor, guard), final)
+            measured = guard
+            if full170_mode == "active":
+                basis = native["active_full170_guard"]
+                measured = dict(basis, available_bytes=min(basis["available_bytes"], guard["available_bytes"],
+                                                          final[1]["available_bytes"]))
+            return full170_capacity["price"](s, full170, native, full170_mode, actor, measured,
                                               fleet["complete_cycle_conservative_available_DATA_bytes"])
         return native
     if HOURLY169:

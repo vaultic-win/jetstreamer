@@ -698,6 +698,23 @@ fn preflight(profile: &Value, guard_sha: &str, obs_sha: &str, price: &Value) -> 
     let provider = bound(&price["reference"], 0)?;
     let booking = &provider["bookings"]["170"];
     let proposal = &provider["epoch170_metered_full"];
+    let remaining = number(booking, "remaining_bytes")?;
+    let floor = number(&provider, "protected_raw_floor_bytes")?;
+    let required = number(&provider, "complete_required_HOME_bytes")?;
+    let donor = &provider["epoch159_donor_cover"];
+    let donor_required = number(donor, "native_home_required")?;
+    let donor_growth = donor_required
+        .checked_sub(number(proposal, "original_complete_required_home_bytes")?)
+        .context("unbound donor floor")?;
+    let zero_donor = number(&provider, "full170_zero_remaining_native_HOME_bytes")?
+        .checked_add(donor_growth)
+        .context("zero remaining donor floor overflow")?;
+    let protected_basis = donor_required.max(
+        zero_donor
+            .checked_add(remaining)
+            .context("donor floor overflow")?,
+    );
+    let additional = required.checked_sub(protected_basis);
     ensure!(
         provider["schema"] == "horizon-incident-replay-fit-v1"
             && provider["epoch"] == 170
@@ -707,6 +724,13 @@ fn preflight(profile: &Value, guard_sha: &str, obs_sha: &str, price: &Value) -> 
             && provider["replay_launch_authorized"] == false
             && booking["root"] == LANE
             && booking["cap_bytes"] == CAP
+            && number(booking, "physical_bytes")?.checked_add(remaining) == Some(CAP)
+            && floor.checked_add(remaining) == Some(required)
+            && proposal["zero_remaining_donor_floor_bytes"] == zero_donor
+            && proposal["donor_required_HOME_bytes"] == protected_basis
+            && additional == Some(number(proposal, "additional_reservation_bytes")?)
+            && number(proposal, "additional_reservation_bytes")?
+                <= number(donor, "remaining_home_bytes")?
             && proposal["producer_unit"] == UNIT
             && proposal["guard_timer"] == TIMER
             && proposal["guard_qualification"] == guard["qualification"]

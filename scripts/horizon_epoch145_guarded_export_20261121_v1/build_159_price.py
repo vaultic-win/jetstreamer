@@ -145,7 +145,7 @@ def snapshot(exclusive136=None):
     return proof
 
 
-def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=None):
+def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=None, full170=None):
     need(before == after and before["invocation_id"] == IID and before["grant_sha256"] == GRANT and
          before["driver_exit"] == EXIT and 0 <= build_bytes <= 104 * MIB and 0 <= build_ram <= 768 * MIB,
          "transition during pricing or unqualified build bound")
@@ -186,10 +186,25 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
                         and diagnostic["additive_charge_bytes"] == diagnostic["additive_memory_bytes"]
                         == diagnostic["additive_cpu_quota_micros"] == 0
                         and diagnostic["receipt"] is not None and diagnostic["intent"] is not None)
+        active_count = 0
+        replay_rows = fleet["actual_executing_replays"]
+        if full170 is not None:
+            rows = [row for key in ("actual_executing_replays", "actual_active_bootstraps")
+                    for row in fleet[key] if row["epoch"] == 170]
+            own = native["active_full170"]
+            need(full170 == own and full170["producer_unit"] == "horizon-qualify-170-full-metered-20261124-v1.service"
+                 and full170["post_guard_capacity"] and full170["guard_receipt"]
+                 and not any(row["epoch"] == 170 for row in fleet["actual_active_private_diagnostics"])
+                 and len(rows) <= 1 and all(row["unit"]["InvocationID"] == full170["producer_invocation_id"]
+                                           and row["admission"] == full170["admission"] for row in rows),
+                 "foreign active full epoch 170 donor claimant")
+            measured = booking["measurement"] == "bound full epoch 170 active native guard whole-tree observation"
+            active_count = len(rows)
+            replay_rows = [row for row in replay_rows if row["epoch"] != 170]
         need(exclusive136 is None and failed170 == fleet["cold170_retry13_execution_failure"]
              and failed170["reservation_ending_bytes"] == 0
-             and fleet["canonical_producer_count"] == len(fleet["actual_executing_replays"]) == len(running)
-             and {row["epoch"] for row in fleet["actual_executing_replays"]} == running
+             and fleet["canonical_producer_count"] == len(replay_rows) + active_count == len(running) + active_count
+             and {row["epoch"] for row in replay_rows} == running
              and set(native["replacements"]) == {str(epoch) for epoch in running - {172}}
              and set(native["survivors"]) == {"172"}
              and booking["cap_bytes"] == 384 * GIB
@@ -229,7 +244,8 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
     return dict(schema="horizon-145-drained-159-donor-cover-v1", diagnostic=after, fleet=ref,
                 native_recorded_unix_seconds=native["recorded_unix_seconds"], original_donor_price_sha256=PRICE,
                 build_HOME_bytes=build_bytes, build_RAM_bytes=build_ram, remaining_home_bytes=margin,
-                native_home_required=required, general_slot_cpu_micros=1_000_000, general_slot_memory_bytes=2 * GIB,
+                native_home_required=required, native_home_available=free,
+                general_slot_cpu_micros=1_000_000, general_slot_memory_bytes=2 * GIB,
                 original_guard_memory_bytes=GIB, original_guard_cpu_micros=1_000_000,
                 original_producer_cpu_micros=3_000_000, original_producer_memory_bytes=68 * GIB,
                 credited_retirement_bytes=0, replay_launch_authorized=False)

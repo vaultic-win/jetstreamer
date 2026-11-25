@@ -146,9 +146,23 @@ fn retained_booking(
             && remaining > 0,
         "native capture does not fund the exact retained epoch 170 booking"
     );
-    let available = number(native, "available_HOME_bytes")?;
     let needed = number(native, "complete_required_HOME_bytes")?;
     let fully_booked_floor = number(native, "protected_raw_floor_bytes")?;
+    let donor = &native["epoch159_donor_cover"];
+    let donor_required = number(donor, "native_home_required")?;
+    let available =
+        number(native, "available_HOME_bytes")?.min(number(donor, "native_home_available")?);
+    let zero_native = number(native, "full170_zero_remaining_native_HOME_bytes")
+        .context("provider lacks the full-epoch zero remaining-allowance calculation")?;
+    ensure!(
+        donor["schema"] == "horizon-145-drained-159-donor-cover-v1"
+            && donor["fleet"] == active["fleet"]
+            && donor["native_recorded_unix_seconds"] == native["recorded_unix_seconds"]
+            && donor["credited_retirement_bytes"] == 0
+            && donor["replay_launch_authorized"] == false
+            && donor_required >= needed,
+        "native donor cover does not bind the complete prepaid budget"
+    );
     let mut absolute = MIN_FLOOR.max(number(native, "active168_guard_floor")?);
     if let Some(floor) = native["candidate136"]["guard_floor"].as_u64() {
         absolute = absolute.max(floor);
@@ -174,24 +188,41 @@ fn retained_booking(
         fully_booked_floor <= needed,
         "invalid complete-fleet capture"
     );
-    let floor = needed
-        .checked_sub(remaining)
-        .context("candidate exceeds funded whole-fleet requirement")?
-        .max(absolute);
-    let complete = needed.max(
-        floor
+    ensure!(
+        zero_native <= needed,
+        "zero-growth native floor exceeds the current requirement"
+    );
+    let donor_overhead = donor_required - needed;
+    let zero_donor = zero_native
+        .checked_add(donor_overhead)
+        .context("zero-growth donor floor overflow")?;
+    let protected_basis = donor_required.max(
+        zero_donor
             .checked_add(remaining)
-            .context("candidate budget overflow")?,
+            .context("protected prepaid booking overflow")?,
+    );
+    let floor = (protected_basis - remaining).max(absolute);
+    let complete = floor
+        .checked_add(remaining)
+        .context("candidate budget overflow")?;
+    let extra = complete - protected_basis;
+    ensure!(
+        available >= complete,
+        "full metered 170 HOME requirement {complete} exceeds {available} available bytes at protected floor {floor}"
     );
     ensure!(
-        available >= complete
-            && number(native, "available_memory_bytes")?
-                >= number(native, "required_available_memory_bytes")?,
-        "full metered 170 does not fit within the retained whole-tree booking"
+        extra <= number(donor, "remaining_home_bytes")?,
+        "full metered 170 extra reservation of {extra} bytes exceeds the donor remainder"
+    );
+    ensure!(
+        number(native, "available_memory_bytes")?
+            >= number(native, "required_available_memory_bytes")?,
+        "full metered 170 does not fit within the retained memory booking"
     );
     let mut quote = native.clone();
     quote["epoch"] = json!(170);
     quote["protected_raw_floor_bytes"] = json!(floor);
+    quote["available_HOME_bytes"] = json!(available);
     quote["complete_required_HOME_bytes"] = json!(complete);
     quote["bookings"]["170"]["run"] = profile["actor"]["run"].clone();
     quote["epoch170_metered_full"] = json!({"stage":"prestart", "producer_unit":UNIT,"guard_timer":TIMER,
@@ -200,6 +231,8 @@ fn retained_booking(
         "observer_enrollment":enrollment_ref,"retained_retry13_terminal":terminal,
         "prior_run":book["run"],"prestart_whole_tree_physical_bytes":physical,"remaining_whole_tree_bytes":remaining,
         "original_complete_required_home_bytes":needed,"reassigned_prepaid_bookings":1,
+        "donor_required_HOME_bytes":protected_basis,"zero_remaining_donor_floor_bytes":zero_donor,
+        "additional_reservation_bytes":extra,
         "absolute_incumbent_floor_bytes":absolute,"first_guard_required_before_release":true,
         "resource_credit_bytes":0});
     Ok(quote)
@@ -310,6 +343,11 @@ mod tests {
             "bounded_qualification":null,"status_registration":{"invocation_id":"writer"},"failed_cold170":{"terminal":terminal,"reservation_ending_bytes":0},
             "resource_credit_bytes":0,"replay_launch_authorized":false,"complete_cpu_quota_micros":HOST_CPU_MICROS,"complete_memory_plus_reserve_bytes":HOST_MEMORY_WITH_RESERVE,
             "bookings":{"170":{"root":LANE,"run":run(OLD_RUN),"cap_bytes":CAP,"measurement":"two complete stopped-tree walks","physical_bytes":CAP-(2<<30),"remaining_bytes":2u64<<30}},
+            "epoch159_donor_cover":{"schema":"horizon-145-drained-159-donor-cover-v1","fleet":fleet,
+                "native_recorded_unix_seconds":1000,"credited_retirement_bytes":0,"replay_launch_authorized":false,
+                "native_home_required":MIN_FLOOR+(5u64<<30),"native_home_available":MIN_FLOOR+(16u64<<30),
+                "remaining_home_bytes":1u64<<30},
+            "full170_zero_remaining_native_HOME_bytes":MIN_FLOOR+(3u64<<30),
             "available_HOME_bytes":MIN_FLOOR+(6u64<<30),"complete_required_HOME_bytes":MIN_FLOOR+(5u64<<30),
             "protected_raw_floor_bytes":MIN_FLOOR+(5u64<<30),"active168_guard_floor":MIN_FLOOR+(4u64<<30),
             "candidate136":{"guard_floor":MIN_FLOOR+177},"survivors":{},"replacements":{},"available_memory_bytes":123,"required_available_memory_bytes":111});
@@ -335,6 +373,46 @@ mod tests {
         assert_eq!(q["complete_required_HOME_bytes"], MIN_FLOOR + (6u64 << 30));
         assert_eq!(q["epoch170_metered_full"]["observer_enrollment"], r);
         assert_eq!(q["resource_credit_bytes"], 0);
+    }
+
+    #[test]
+    fn quote_arms_the_donor_floor_without_recharging_the_prepaid_booking() {
+        let (mut base, profile, enrollment, reference) = case();
+        let donor_required = MIN_FLOOR + (8u64 << 30);
+        base["epoch159_donor_cover"]["native_home_required"] = json!(donor_required);
+        assert!(retained_booking(&base, &profile, &enrollment, &reference, 1010).is_err());
+        base["available_HOME_bytes"] = json!(donor_required);
+        let quote = retained_booking(&base, &profile, &enrollment, &reference, 1010).unwrap();
+        assert_eq!(quote["complete_required_HOME_bytes"], donor_required);
+        assert_eq!(
+            quote["protected_raw_floor_bytes"],
+            donor_required - (2u64 << 30)
+        );
+        assert_eq!(
+            quote["epoch170_metered_full"]["additional_reservation_bytes"],
+            0
+        );
+    }
+
+    #[test]
+    fn quote_preserves_the_donor_floor_at_full_prepaid_growth() {
+        let (mut base, profile, enrollment, reference) = case();
+        let zero_native = MIN_FLOOR + (5u64 << 30);
+        base["full170_zero_remaining_native_HOME_bytes"] = json!(zero_native);
+        base["epoch159_donor_cover"]["native_home_required"] = json!(zero_native + (1u64 << 30));
+        let protected = zero_native + (1u64 << 30);
+        assert!(retained_booking(&base, &profile, &enrollment, &reference, 1010).is_err());
+        base["available_HOME_bytes"] = json!(protected + (2u64 << 30));
+        let quote = retained_booking(&base, &profile, &enrollment, &reference, 1010).unwrap();
+        assert_eq!(quote["protected_raw_floor_bytes"], protected);
+        assert_eq!(
+            quote["complete_required_HOME_bytes"],
+            protected + (2u64 << 30)
+        );
+        assert_eq!(
+            quote["epoch170_metered_full"]["additional_reservation_bytes"],
+            0
+        );
     }
 
     #[test]
