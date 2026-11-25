@@ -201,7 +201,8 @@ pub(super) fn run(apply: bool, self_sha: &str, receipt: Binding) -> Result<()> {
         "retirement source is not tmpfs"
     );
     assert_no_nested_mount(&target)?;
-    let scheduled = scheduled(run, &target)?;
+    let mount_root = run.parent().context("missing epoch 229 tmpfs root")?;
+    let scheduled = scheduled(mount_root, &target)?;
     let processes = process_references::scan(Path::new("/proc"), &target)?;
     ensure!(
         processes.inspected_processes > 0 && processes.references.is_empty(),
