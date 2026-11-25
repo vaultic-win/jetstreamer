@@ -3,6 +3,9 @@
 use super::*;
 use std::{io::Read, os::unix::fs::MetadataExt};
 
+mod drain;
+pub(crate) use drain::run as drain_completed;
+
 pub(super) const SCHEMA: &str = "foundation-epoch226-held-extraction-launch-v1";
 const PREFIX: &str = "horizon-qualify-226-checkpoint-continuation-extract-";
 const SOCKET: &str = "/run/jetstreamer-horizon-epoch226-holding-v1/source.sock";

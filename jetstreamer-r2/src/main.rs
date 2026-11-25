@@ -3929,6 +3929,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("fleet-reconcile") {
         return fleet::run().await;
     }
+    if env::args().nth(1).as_deref() == Some("drain-epoch226-extraction") {
+        return fleet::extract226::drain_completed();
+    }
     if env::args().nth(1).as_deref() == Some("admit-singleton227") {
         return fleet::admit_singleton227();
     }
