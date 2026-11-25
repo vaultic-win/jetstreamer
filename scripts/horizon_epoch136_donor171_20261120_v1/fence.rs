@@ -2,8 +2,8 @@
 //! Runtime masks persist after this writer exits. Release only reconciles the same mask inode.
 use super::*;
 use crate::standard169_cpu_lease::REGISTRY_136 as REG;
+use crate::systemd_owned_mask::{HIGH, check_destinations, id, install_links, linked_to, safe_dir};
 use std::os::unix::fs::{DirBuilderExt, symlink};
-const HIGH: &str = "/run/systemd/system.control";
 const LEGACY: &str = "jetstreamer-epochs159-173-target1-controller-v1-r2.service";
 const RECIPE: &str = "/usr/local/lib/jetstreamer/horizon-local-replacement171-local2-prepare-plan-20261110-v14-r4/plan.json";
 const RECIPE_SHA: &str = "27a6a140a26481c65e80876a79da1221617e5927a26225eb9acaf1570bd2b700";
@@ -58,34 +58,11 @@ fn paths() -> Result<BTreeSet<String>> {
     }
     Ok(units)
 }
-fn safe_dir(path: &Path) -> Result<()> {
-    let m = fs::symlink_metadata(path)?;
-    ensure!(
-        m.is_dir() && path.canonicalize()? == path && m.uid() == 0 && m.mode() & 0o022 == 0,
-        "unsafe fence dir {}",
-        path.display()
-    );
-    Ok(())
-}
 fn anchor() -> PathBuf {
     Path::new(REG).join("mask")
 }
-fn id(path: &Path) -> Result<(u64, u64)> {
-    let m = fs::symlink_metadata(path)?;
-    Ok((m.dev(), m.ino()))
-}
 fn own_link(path: &Path) -> Result<bool> {
     linked_to(path, &anchor())
-}
-fn linked_to(path: &Path, anchor: &Path) -> Result<bool> {
-    match fs::symlink_metadata(path) {
-        Ok(m) => Ok(m.file_type().is_symlink()
-            && m.uid() == 0
-            && id(path)? == id(anchor)?
-            && fs::read_link(path)? == Path::new("/dev/null")),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(e) => Err(e.into()),
-    }
 }
 fn list_dynamic() -> Result<()> {
     // The old sweep chooses a sequence at runtime. Its sole controller is masked too.
@@ -222,33 +199,6 @@ fn verified_masks(cpu: bool) -> Result<Value> {
     Ok(result)
 }
 
-fn check_destinations(dir: &Path, anchor: &Path, units: &BTreeSet<String>) -> Result<()> {
-    for u in units {
-        let dst = dir.join(u);
-        match fs::symlink_metadata(&dst) {
-            Ok(_) => ensure!(
-                linked_to(&dst, anchor)?,
-                "existing foreign unit fragment at {u}"
-            ),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
-            Err(e) => return Err(e.into()),
-        }
-    }
-    Ok(())
-}
-
-fn install_links(dir: &Path, anchor: &Path, units: &BTreeSet<String>) -> Result<()> {
-    for u in units {
-        let dst = dir.join(u);
-        if !linked_to(&dst, anchor)? {
-            fs::hard_link(anchor, &dst)
-                .with_context(|| format!("preexisting foreign mask/fragment for {u}"))?;
-        }
-    }
-    fs::File::open(dir)?.sync_all()?;
-    Ok(())
-}
-
 pub fn establish(cpu: bool) -> Result<Value> {
     let q: Value = serde_json::from_slice(&root_file(&Path::new(BASE).join(QREC), 1 << 20)?)?;
     ensure!(
@@ -303,7 +253,7 @@ pub fn establish(cpu: bool) -> Result<Value> {
     );
     // Inspect the whole name set for collisions before adding the first mask.
     // A previously interrupted transaction can resume with its original inode.
-    check_destinations(Path::new(HIGH), &anchor(), &units)?;
+    check_destinations(Path::new(HIGH), Some(&anchor()), &units)?;
     if let Some(routes) = &cpu_routes {
         ensure!(
             routes.iter().all(|s| standard169::valid_name(s))
@@ -336,7 +286,7 @@ pub fn release() -> Result<()> {
     let recorded = recorded_cpu_routes()?;
     let us = combined(&paths()?, recorded.as_ref());
     safe_dir(Path::new(REG))?;
-    check_destinations(Path::new(HIGH), &anchor(), &us)?;
+    check_destinations(Path::new(HIGH), Some(&anchor()), &us)?;
     for u in &us {
         let p = Path::new(HIGH).join(u);
         match fs::symlink_metadata(&p) {
@@ -567,13 +517,13 @@ mod tests {
         let first = dir.join(units.first().unwrap());
         let last = dir.join(units.last().unwrap());
         symlink("/dev/null", &last).unwrap();
-        assert!(check_destinations(&dir, &anchor, &units).is_err());
+        assert!(check_destinations(&dir, Some(&anchor), &units).is_err());
         assert!(fs::symlink_metadata(&first).is_err());
         fs::remove_file(&last).unwrap();
         fs::hard_link(&anchor, &first).unwrap();
-        check_destinations(&dir, &anchor, &units).unwrap();
+        check_destinations(&dir, Some(&anchor), &units).unwrap();
         install_links(&dir, &anchor, &units).unwrap();
-        check_destinations(&dir, &anchor, &units).unwrap();
+        check_destinations(&dir, Some(&anchor), &units).unwrap();
         install_links(&dir, &anchor, &units).unwrap();
         assert_eq!(
             fs::symlink_metadata(&anchor).unwrap().nlink() as usize,

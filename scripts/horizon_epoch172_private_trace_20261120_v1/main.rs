@@ -10,6 +10,14 @@ mod peers;
 mod staged;
 #[path = "../horizon_standard169_cpu_lease.rs"]
 pub mod standard169_cpu_lease;
+#[cfg(feature = "epoch171")]
+#[path = "../horizon_standard169_lineage.rs"]
+mod standard169_lineage;
+#[cfg(feature = "epoch171")]
+mod standard169_native;
+#[cfg(feature = "epoch171")]
+#[path = "../horizon_systemd_owned_mask.rs"]
+pub mod systemd_owned_mask;
 use anyhow::{Context, Result, bail, ensure};
 use guard172::*;
 use serde_json::{Value, json};
@@ -92,6 +100,15 @@ fn exclusive(p: &Path, data: &[u8], mode: u32) -> Result<()> {
     Ok(())
 }
 fn run(prog: &str, args: &[String], deadline: Instant) -> Result<String> {
+    let (status, output) = run_status(prog, args, deadline)?;
+    ensure!(status.success(), "{prog} failed ({status})");
+    Ok(String::from_utf8(output)?)
+}
+fn run_status(
+    prog: &str,
+    args: &[String],
+    deadline: Instant,
+) -> Result<(std::process::ExitStatus, Vec<u8>)> {
     use std::os::{fd::OwnedFd, unix::net::UnixStream};
     const LIMIT: usize = 1 << 20;
     let (mut reader, writer) = UnixStream::pair()?;
@@ -125,8 +142,7 @@ fn run(prog: &str, args: &[String], deadline: Instant) -> Result<String> {
         }
         loop {
             if let Some(status) = child.try_wait()? {
-                ensure!(status.success(), "{prog} failed ({status})");
-                return Ok(String::from_utf8(output)?);
+                return Ok((status, output));
             }
             ensure!(Instant::now() < deadline, "bounded {prog} timed out");
             thread::sleep(Duration::from_millis(10));
@@ -335,6 +351,19 @@ fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    #[cfg(feature = "epoch171")]
+    if args
+        .get(1)
+        .is_some_and(|a| a == "--inspect-standard169-closure")
+    {
+        ensure!(
+            unsafe { libc::geteuid() } == 0 && args.len() == 2,
+            "usage: admit171 --inspect-standard169-closure"
+        );
+        let lock = standard169_native::OperationLock::acquire()?;
+        println!("{}", standard169_native::inspect(&lock)?);
+        return Ok(());
+    }
     if args.get(1).is_some_and(|a| a == "--close") {
         ensure!(
             unsafe { libc::geteuid() } == 0 && args.len() == 5,

@@ -17,8 +17,8 @@ pub const GUARD_171_CPU: u64 = 1_000_000;
 pub const BORROW_171_CPU: u64 = PRODUCER_171_CPU + GUARD_171_CPU;
 pub const RETAIN_STANDARD169_CPU: u64 = STANDARD169_CPU - BORROW_171_CPU;
 
-const COHORT_CONTROLLER: &str = "e159-173-t1-20261016-v1-r2";
-const DEDICATED_PREFIXES: &[&str] = &[
+pub const COHORT_CONTROLLER: &str = "e159-173-t1-20261016-v1-r2";
+pub const DEDICATED_PREFIXES: &[&str] = &[
     "horizon-qualify-169-",
     "horizon-guard-169-",
     "horizon-guard-replacement-169-",
@@ -36,7 +36,7 @@ pub fn require_unclaimed(registry: &Path) -> Result<()> {
     }
 }
 
-fn dedicated_standard169(name: &str) -> bool {
+pub fn dedicated_standard169(name: &str) -> bool {
     let base = name
         .strip_suffix(".service")
         .or_else(|| name.strip_suffix(".timer"));

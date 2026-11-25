@@ -9,6 +9,10 @@ mod session;
 mod standard169;
 #[path = "../horizon_standard169_cpu_lease.rs"]
 pub mod standard169_cpu_lease;
+#[path = "../horizon_standard169_lineage.rs"]
+mod standard169_lineage;
+#[path = "../horizon_systemd_owned_mask.rs"]
+mod systemd_owned_mask;
 mod topology;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
