@@ -145,7 +145,37 @@ def snapshot(exclusive136=None):
     return proof
 
 
-def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=None, full170=None):
+def stopped168_writer(status, *, v8):
+    writer = status["consumer_seal"]
+    if not v8:
+        return writer["sha256"] == "cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c"
+    cadence = RUNTIME / "survivor172-cadence-20261122-v1"
+    package = cadence / "tools-cold168-retry5-failed166-v12-entry146"
+    seal = {
+        "path": str(package / "deployment-seal-receipt.json"),
+        "sha256": "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac",
+    }
+    registration = {
+        "path": str(RUNTIME / "epoch166-post168-cadence-20261121-v1/METERED168_STATUS_REGISTERED.json"),
+        "sha256": "02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba",
+    }
+    if writer != seal or status["registration"] != registration:
+        return False
+    active, _ = bound(cadence / "FAILED166_CADENCE_V12_ACTIVE.json",
+                      "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54")
+    ready = active["ready"]
+    need(ready["path"] == str(cadence / "FAILED166_CADENCE_V12_READY.json"), "foreign V12 ready receipt")
+    qualified, _ = bound(ready["path"], ready["sha256"])
+    actor = active["new"]
+    return (active["schema"] == "horizon-epoch166-cadence-rejoin-active-v1"
+            and active["producer_mutations"] is False
+            and qualified["schema"] == "horizon-epoch166-cadence-rejoin-ready-v1"
+            and qualified["package"] == writer
+            and actor["program"] == str(package / "status_cycle.py")
+            and all(status[key] == actor[key] for key in ("invocation_id", "pid", "start_ticks")))
+
+
+def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=None, full170=None, v8=False):
     need(before == after and before["invocation_id"] == IID and before["grant_sha256"] == GRANT and
          before["driver_exit"] == EXIT and 0 <= build_bytes <= 104 * MIB and 0 <= build_ram <= 768 * MIB,
          "transition during pricing or unqualified build bound")
@@ -164,6 +194,9 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
              and candidate["loan_micros"] in (0, 4_250_000) and not build_bytes and not build_ram,
              "unqualified 136 donor or reduced reservation")
     failed170 = native.get("failed_cold170")
+    if v8:
+        need(native["epoch"] == 145 and failed170 and native.get("stopped_cold168"),
+             "V8 donor requires the retained epoch 168 and 170 bookings")
     if failed170:
         failed166 = native.get("failed_cold166")
         running = {167, 168, 172}
@@ -172,7 +205,6 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
             book = native["bookings"]["168"]
             capacity_ref = fleet["current_home_cycle_capacity"]
             capacity, _ = bound(capacity_ref["path"], capacity_ref["sha256"])
-            writer = native["status_registration"]["consumer_seal"]
             need(stopped168 == fleet["cold168_retry4_root_physical_stop"] ==
                  capacity["retained_cold168_retry4_reservation"]
                  and stopped168["resource_credit_bytes"] == stopped168["reservation_ending_bytes"] == 0
@@ -181,7 +213,7 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
                  and book["measurement"] == "two complete stopped-tree walks"
                  and book["unreconciled_stop_bytes"] ==
                  max(0, stopped168["measured_physical_bytes"] - max(book["cap_bytes"], book["physical_bytes"]))
-                 and writer["sha256"] == "cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c",
+                 and stopped168_writer(native["status_registration"], v8=v8),
                  "changed retained epoch 168 booking or cadence")
             running.remove(168)
         if failed166:

@@ -64,7 +64,7 @@ REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-home
 REPRO166 = REPRO166_LIVE or REPRO166_POST
 V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v2"
 V8_RUNTIME_145 = HERE == D / "tools-homefloor-145-v7-timeout-recovery-v1"
-V8_BUILD_145 = HERE == D / "tools-homefloor-145-v7-timeout-build-v1"
+V8_BUILD_145 = HERE == D / "tools-homefloor-145-v7-timeout-build-v2"
 V8_145 = V8_RUNTIME_145 or V8_BUILD_145
 STOP_RECOVERY_145 = V7_145 or V8_145
 RETRY5_FIT_ROUTE = HERE == D / "tools-homefloor-cold168-retry5-v2"
@@ -2039,13 +2039,14 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         member, = [row for row in seal["members"] if row["name"] == module.name and row["mode"] == "0444"]
         s.need(seal["destination"] == str(HERE), "unbound epoch 145 recovery donor price")
         if V8_145:
-            s.need(member["sha256"] == "667882d8f26e922fa15c3b87dcf738a43a29b3e73ffe9f0b42e50e9120643d9e",
+            s.need(member["sha256"] == "d4441d0184a8e9c93ed7bc1df6a0a672bc41a86923eec8bc4934178596062ad8",
                    "different epoch 145 V8 donor")
         fit.binary(module, member["sha256"])
         donor = runpy.run_path(str(module))
         before = donor["snapshot"]()
         native = capture_native(epoch, ref)
-        native["epoch159_donor_cover"] = donor["cover"](before, native, donor["snapshot"]())
+        options = {"v8": True} if V8_145 else {}
+        native["epoch159_donor_cover"] = donor["cover"](before, native, donor["snapshot"](), **options)
         return native
     if RETRY5_168:
         s.need(epoch == (168 if RETRY5_FIT_ROUTE else 145) and prestart136 is None,

@@ -284,9 +284,41 @@ class QualifiedSuccessor(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "foreign successful"):
                 manager(result(), dict(intent, schema=scope["V7_START_INTENT"]))
 
+    def test_v8_donor_checks_the_exact_v12_registration_and_preserves_v11(self):
+        writer = runpy.run_path(str(DIRECTORY / "build_159_price.py"))["stopped168_writer"]
+        v11, v12 = scope["V7_STATUS_REGISTRATION"], scope["V8_STATUS_REGISTRATION"]
+        seal = v12["consumer_seal"]
+        package = Path(seal["path"]).parent
+        ready = {"path": str(package.parent / "FAILED166_CADENCE_V12_READY.json"), "sha256": "a" * 64}
+        active = {"ready": ready, "schema": "horizon-epoch166-cadence-rejoin-active-v1",
+                  "producer_mutations": False,
+                  "new": {key: v12[key] for key in ("invocation_id", "pid", "start_ticks")}}
+        active["new"]["program"] = str(package / "status_cycle.py")
+        qualified = {"schema": "horizon-epoch166-cadence-rejoin-ready-v1", "package": seal}
+        with patch.dict(writer.__globals__, bound=lambda path, digest: self.fail("unneeded receipt read")):
+            self.assertTrue(writer(v11, v8=False))
+            self.assertFalse(writer(v12, v8=False))
+            self.assertFalse(writer(v11, v8=True))
+            self.assertFalse(writer(dict(v12, registration={}), v8=True))
+
+        def receipt(path, digest):
+            if Path(path).name == "FAILED166_CADENCE_V12_ACTIVE.json":
+                self.assertEqual(digest, "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54")
+                return active, digest
+            self.assertEqual((path, digest), (ready["path"], ready["sha256"]))
+            return qualified, digest
+
+        with patch.dict(writer.__globals__, bound=receipt):
+            self.assertTrue(writer(v12, v8=True))
+            self.assertFalse(writer(dict(v12, invocation_id="c" * 32), v8=True))
+            self.assertFalse(writer(dict(v12, pid=4242), v8=True))
+            self.assertFalse(writer(dict(v12, start_ticks=1), v8=True))
+            qualified["package"] = v11["consumer_seal"]
+            self.assertFalse(writer(v12, v8=True))
+
     def test_published_donor_retries_only_the_identical_read_once(self):
         source = DIRECTORY / "build_159_price.py"
-        self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), scope["V7_DONOR_SHA"])
+        self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), scope["V8_DONOR_SHA"])
         command = runpy.run_path(str(source))["command"]
         query = ("/usr/bin/systemctl", "show", "-p",
                  "Id,ActiveState,SubState,InvocationID,MainPID,ControlPID,Job,NRestarts",
