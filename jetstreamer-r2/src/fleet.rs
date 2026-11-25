@@ -1495,6 +1495,15 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
     } else if bounded205::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| bounded205::guard_matches(claim, &receipt, plan))
+    } else if claim.epoch == 230 && claim.unit == "horizon-qualify-230-final-tail-v1.service" {
+        plan.get("bounded_canary").is_none_or(Value::is_null)
+            && plan.get("bounded_measurement").is_none_or(Value::is_null)
+            && plan["filesystem"]
+                == "/home/ubuntu/.jetstreamer-private/epoch230-final-tail-tmpfs-v1"
+            && plan["receipt_directory"]
+                == "/var/lib/jetstreamer/horizon230-final-tail-v1/guard-receipts"
+            && plan["minimum_free_bytes"] == 2u64 << 30
+            && plan["maximum_root_physical_bytes"] == 150_000_000_000u64
     } else if native144::namespace(claim) {
         plan.get("bounded_canary").is_none()
             && plan.get("bounded_measurement").is_none_or(Value::is_null)
@@ -2107,6 +2116,28 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["last_slot"] == 99_383_572
             && receipt["worker_sha256"]
                 == "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c"
+            && receipt["entry_replay_requested"] == true
+            && receipt["full_continuation_peak_qualified"] == false
+            && receipt["canonical_epoch_publication_authorized"] == false
+    } else if claim.unit == "horizon-qualify-230-final-tail-v1.service"
+        || receipt["kind"] == "epoch230-final-tail"
+    {
+        claim.epoch == 230
+            && claim.unit == "horizon-qualify-230-final-tail-v1.service"
+            && claim.scratch_path
+                == Path::new("/home/ubuntu/.jetstreamer-private/epoch230-final-tail-tmpfs-v1/run")
+            && receipt["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+            && receipt["kind"] == "epoch230-final-tail"
+            && receipt["epoch"] == 230
+            && receipt["unit"] == claim.unit
+            && receipt["invocation_id"] == claim.invocation_id
+            && receipt["run_root"].as_str() == claim.scratch_path.to_str()
+            && receipt["bootstrap_slot"] == 99_791_404
+            && receipt["first_slot"] == 99_791_405
+            && receipt["admissible_canonical_last_slot"] == 99_791_999
+            && receipt["last_slot"] == 99_803_089
+            && receipt["worker_sha256"]
+                == "afc9739c8753f97ad0d278c2829f2808f80a612bac7b1c83852c3548ba05dc08"
             && receipt["entry_replay_requested"] == true
             && receipt["full_continuation_peak_qualified"] == false
             && receipt["canonical_epoch_publication_authorized"] == false
@@ -6281,6 +6312,57 @@ mod tests {
         renamed["unit"] = json!(claim.unit);
         renamed["evidence"]["units"][0]["unit"] = json!(claim.unit);
         assert!(validate_diagnostic_launch(&renamed, &claim).is_err());
+    }
+
+    #[test]
+    fn epoch230_final_tail_claim_binds_the_private_range_and_guard() {
+        let claim = DiagnosticClaim {
+            epoch: 230,
+            unit: "horizon-qualify-230-final-tail-v1.service".into(),
+            invocation_id: "a".repeat(32),
+            scratch_path: "/home/ubuntu/.jetstreamer-private/epoch230-final-tail-tmpfs-v1/run"
+                .into(),
+            launch_receipt: BoundFile {
+                path: "/var/lib/jetstreamer/launch.json".into(),
+                sha256: "b".repeat(64),
+            },
+        };
+        let receipt = json!({
+            "schema": "jetstreamer-historical-performance-launch-receipt-v1",
+            "kind": "epoch230-final-tail", "epoch": 230,
+            "unit": claim.unit, "invocation_id": claim.invocation_id, "run_root": claim.scratch_path,
+            "bootstrap_slot": 99_791_404, "first_slot": 99_791_405, "last_slot": 99_803_089,
+            "admissible_canonical_last_slot": 99_791_999,
+            "worker_sha256": "afc9739c8753f97ad0d278c2829f2808f80a612bac7b1c83852c3548ba05dc08",
+            "entry_replay_requested": true, "canonical_epoch_publication_authorized": false,
+            "full_continuation_peak_qualified": false,
+            "launched": true, "remote_mutations": false, "r2_mutations": false,
+            "evidence": {"units": [{"unit": claim.unit, "invocation_id": claim.invocation_id,
+                "restarts": 0, "load_state": "loaded", "result": "success", "main_pid": 42,
+                "active_state": "active", "sub_state": "running"}]},
+        });
+        validate_diagnostic_launch(&receipt, &claim).unwrap();
+        for (field, value) in [
+            ("admissible_canonical_last_slot", json!(99_803_089)),
+            ("last_slot", json!(99_791_999)),
+            ("canonical_epoch_publication_authorized", json!(true)),
+        ] {
+            let mut invalid = receipt.clone();
+            invalid[field] = value;
+            assert!(
+                validate_diagnostic_launch(&invalid, &claim).is_err(),
+                "{field}"
+            );
+        }
+        let mut guard = json!({
+            "filesystem": "/home/ubuntu/.jetstreamer-private/epoch230-final-tail-tmpfs-v1",
+            "receipt_directory": "/var/lib/jetstreamer/horizon230-final-tail-v1/guard-receipts",
+            "minimum_free_bytes": 2u64 << 30,
+            "maximum_root_physical_bytes": 150_000_000_000u64,
+        });
+        assert!(diagnostic_guard_profile_matches(&claim, &guard));
+        guard["maximum_root_physical_bytes"] = json!(150_000_000_001u64);
+        assert!(!diagnostic_guard_profile_matches(&claim, &guard));
     }
 
     #[test]
