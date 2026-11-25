@@ -1,4 +1,5 @@
 //! Retire individually qualified files and AccountsDb trees from stopped workers.
+mod appendvec229;
 mod appendvec288;
 mod appendvec292;
 mod ext4_228;
@@ -404,7 +405,9 @@ fn main() -> Result<()> {
     if matches!(
         args.get(1).map(String::as_str),
         Some(
-            "--check-parked-292"
+            "--check-parked-229"
+                | "--retire-parked-229"
+                | "--check-parked-292"
                 | "--retire-parked-292"
                 | "--check-failed-stage-292"
                 | "--retire-failed-stage-292"
@@ -431,6 +434,9 @@ fn main() -> Result<()> {
         };
         if args[1].ends_with("-288-stage-bundle") {
             return appendvec288::retire_bundle(apply, &args[2], comparison);
+        }
+        if args[1].ends_with("-229") {
+            return appendvec229::run(apply, &args[2], comparison);
         }
         if args[1].ends_with("-288") {
             return appendvec288::run(apply, &args[2], comparison);

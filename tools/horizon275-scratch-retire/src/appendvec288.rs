@@ -24,17 +24,13 @@ const ALLOCATION: u64 = 421_629_886_464;
 const DEVICE: u64 = 66_305;
 const INODE: u64 = 54_691_869;
 
-fn journal_event(matches: &[String]) -> Result<Value> {
+pub(super) fn journal_event(matches: &[String]) -> Result<Value> {
     let output = Command::new("/usr/bin/journalctl")
         .args(["--quiet", "--no-pager", "-b", "--output=json", "--lines=2"])
         .args(matches)
         .output()?;
-    ensure!(
-        output.status.success(),
-        "cannot inspect epoch 288 restoration journal"
-    );
-    serde_json::from_slice(&output.stdout)
-        .context("missing unique epoch 288 restoration journal event")
+    ensure!(output.status.success(), "cannot inspect invocation journal");
+    serde_json::from_slice(&output.stdout).context("missing unique invocation journal event")
 }
 
 fn restore_start(comparison: &Binding, result: &Value) -> Result<Binding> {
@@ -87,7 +83,7 @@ fn restore_start(comparison: &Binding, result: &Value) -> Result<Binding> {
     Ok(reference)
 }
 
-fn lock_issuer() -> Result<File> {
+pub(super) fn lock_issuer() -> Result<File> {
     let issuer = open_regular(Path::new(ISSUER))?;
     let mode = issuer.metadata()?;
     ensure!(
@@ -95,7 +91,7 @@ fn lock_issuer() -> Result<File> {
             && mode.gid() == 0
             && mode.mode() & 0o777 == 0o644
             && unsafe { libc::flock(issuer.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-        "epoch 288 issuer lock is unsafe or busy"
+        "issuer lock is unsafe or busy"
     );
     Ok(issuer)
 }
