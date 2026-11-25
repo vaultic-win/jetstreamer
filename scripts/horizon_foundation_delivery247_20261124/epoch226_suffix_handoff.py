@@ -16,7 +16,6 @@ import time
 V = Path('/var/lib/jetstreamer')
 REPO = Path('/home/ubuntu/workspace/jetstreamer')
 PRIVATE = Path('/home/ubuntu/.jetstreamer-private')
-EXTRACT = PRIVATE / 'checkpoint-continuation-226-extract-v2'
 SUFFIX = PRIVATE / 'checkpoint-continuation-226-suffix-v1'
 SUFFIX_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
 SEALED = V / 'horizon226-suffix-stage-evidence-v1'
@@ -24,9 +23,15 @@ HANDOFF = V / 'horizon226-suffix-v1/source-handoff.json'
 PLAN_SCHEMA = 'jetstreamer-private-epoch226-scoped-repair-plan-v1'
 ADMISSION_SCHEMA = 'jetstreamer-epoch226-scoped-repair-admission-v1'
 SUCCESS = '7ad2d189f7e94e70a38c781354912448'
-LAUNCH = {
-    'path': str(V / 'horizon226-extract-v2/fleet-launch.json'),
-    'sha256': '4826797399fcd448e82bddb975cf31101d958df17126dc29013a9282e3bcf66c',
+LAUNCHES = {
+    'v2': {
+        'path': str(V / 'horizon226-extract-v2/fleet-launch.json'),
+        'sha256': '4826797399fcd448e82bddb975cf31101d958df17126dc29013a9282e3bcf66c',
+    },
+    'v3': {
+        'path': str(V / 'horizon226-extract-v3/fleet-launch.json'),
+        'sha256': '30f1fd1a0009ff63c22f1aac39438caf570acaddfaf90bd656331e2895294df8',
+    },
 }
 PREPARATION = {
     'path': str(V / 'horizon226-suffix-inputs-v1/preparation.json'),
@@ -122,7 +127,7 @@ def git(*args):
                                    text=True, timeout=20).strip()
 
 
-def static_inputs(full):
+def static_inputs(full, extraction='v2'):
     prep = document(PREPARATION)
     require(prep['schema'] == 'foundation-epoch226-pending-suffix-inputs-v1'
             and prep['epoch'] == 226 and prep['slot_range'] == [98063465, 98063999]
@@ -171,12 +176,14 @@ def static_inputs(full):
             row['name'] == path.name and row['sha256'] == ref['sha256'] and row['bytes'] == ref['bytes']
             for row in seal['members']), f'{name} lacks its deployment seal')
         images[name] = verified_file(ref, executable=name == 'worker', full=full or name != 'snapshot')
-    launch = document(LAUNCH)
+    launch_ref = LAUNCHES[extraction]
+    extract = PRIVATE / f'checkpoint-continuation-226-extract-{extraction}'
+    launch = document(launch_ref)
     extract_plan = document(launch['node_plan'])
     extract_admission = document(extract_plan['admission'])
     require(launch['epoch'] == extract_plan['epoch'] == 226 and launch['operation'] == 'extract'
             and launch['launched'] is True and launch['unit'] == extract_plan['producer_unit']
-            and launch['run_root'] == extract_plan['run_root'] == str(EXTRACT)
+            and launch['run_root'] == extract_plan['run_root'] == str(extract)
             and launch['node_sha256'] == extract_plan['node_sha256']
             and extract_plan['stage']['held_broker'] == launch['broker_pin']
             and stage_digest(extract_plan['stage']) == extract_admission['stage_sha256'],
@@ -228,7 +235,8 @@ def capture_terminal(launch):
 def validate_outputs(owner, extraction, manifest, launch, extract_plan, receipt_sha, manifest_sha, prefix):
     require(owner['producer_unit'] == launch['unit'] and owner['invocation_id'] == launch['invocation_id']
             and owner['operation'] == 'extract' and owner['plan'] == launch['node_plan']
-            and owner['receipt'] == str(EXTRACT / 'receipts/extract.json') and owner['receipt_sha256'] == receipt_sha
+            and owner['receipt'] == str(Path(launch['run_root']) / 'receipts/extract.json')
+            and owner['receipt_sha256'] == receipt_sha
             and owner['source_must_be_retained'] and not owner['publication_authorized'] and not owner['r2_mutations'],
             'output owner does not bind this invocation, plan and extraction receipt')
     require(extraction['schema'] == 'jetstreamer-private-epoch226-interior-extraction-v1'
@@ -278,12 +286,13 @@ def durable_seal(path, payload):
     return {'path': str(path), 'sha256': digest(payload)}
 
 
-def bind_static_to_output(prep, launch, extract_plan, static):
+def bind_static_to_output(prep, launch, extract_plan, static, launch_ref):
     terminal = capture_terminal(launch)
-    prefix = EXTRACT / 'output/epoch-226-prefix.jet'
+    extract = Path(launch['run_root'])
+    prefix = extract / 'output/epoch-226-prefix.jet'
     manifest = prefix.with_suffix('.jet.segment.json')
-    receipt = EXTRACT / 'receipts/extract.json'
-    owner = EXTRACT / 'receipts/owner.json'
+    receipt = extract / 'receipts/extract.json'
+    owner = extract / 'receipts/owner.json'
     prefix_identity = metadata(prefix, uid=1000, writable=0o022)
     require(prefix_identity[2] > 0 and not os.path.lexists(str(prefix) + '.sha256'),
             'prefix absent or has a canonical sidecar')
@@ -302,7 +311,7 @@ def bind_static_to_output(prep, launch, extract_plan, static):
     owner_pin = durable_seal(SEALED / owner.name, pieces[owner.name])
     require(metadata(prefix, uid=1000, writable=0o022) == prefix_identity, 'prefix identity changed during custody seal')
     return {'schema': 'foundation-epoch226-suffix-handoff-v1', 'epoch': 226, 'terminal': terminal,
-            'launch': LAUNCH, 'inputs': PREPARATION, 'static': static, 'original_output_owner': owner_pin,
+            'launch': launch_ref, 'inputs': PREPARATION, 'static': static, 'original_output_owner': owner_pin,
             'prefix_identity': prefix_identity, 'stage': stage, 'stage_sha256': stage_digest(stage),
             'producer_unit': SUFFIX_UNIT, 'run_root': str(SUFFIX), 'admission_issued': False,
             'guard_and_cadence_integration_required': True, 'work_started': False}
@@ -339,16 +348,18 @@ def plan_from_admission(handoff, admission_ref, admission):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('operation', choices=('verify-static', 'bind', 'emit-plan'))
+    parser.add_argument('--extraction', choices=LAUNCHES, default='v2')
     parser.add_argument('--admission', nargs=2, metavar=('PATH', 'SHA256'))
     parser.add_argument('--seal-handoff', action='store_true')
     args = parser.parse_args()
     require(os.geteuid() == 0, 'run with root read and sealed-custody permissions')
     require((args.operation == 'emit-plan') == bool(args.admission), 'only emit-plan accepts external admission evidence')
     require(not args.seal_handoff or args.operation == 'bind', 'only bind can seal the successful handoff')
-    prep, launch, extract_plan, static = static_inputs(full=args.operation == 'verify-static')
+    prep, launch, extract_plan, static = static_inputs(
+        full=args.operation == 'verify-static', extraction=args.extraction)
     result = static
     if args.operation != 'verify-static':
-        result = bind_static_to_output(prep, launch, extract_plan, static)
+        result = bind_static_to_output(prep, launch, extract_plan, static, LAUNCHES[args.extraction])
     if args.seal_handoff:
         # Outside the native node's writable generation; consumed by the scoped Rust drain.
         payload = (json.dumps(result, indent=2, sort_keys=True) + '\n').encode()

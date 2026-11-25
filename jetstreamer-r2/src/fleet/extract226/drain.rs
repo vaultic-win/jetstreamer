@@ -3,17 +3,63 @@ use super::*;
 use std::os::{fd::AsRawFd, unix::fs::OpenOptionsExt};
 
 pub(super) const HANDOFF: &str = "/var/lib/jetstreamer/horizon226-suffix-v1/source-handoff.json";
-const LAUNCH_SHA: &str = "4826797399fcd448e82bddb975cf31101d958df17126dc29013a9282e3bcf66c";
 pub(super) const CYCLE_LOCK: &str =
     "/var/lib/jetstreamer/horizon-seven-publication-controller-v222/cycle.lock";
-const GUARD: &str = "horizon-guard-226-checkpoint-continuation-extract-v2.service";
-const TIMER: &str = "horizon-guard-226-checkpoint-continuation-extract-v2.timer";
-const TIMER_ID: &str = "4bd82a58917b4c6dbbd3702391950200";
 pub(super) const GUARD_IMAGE: &str =
     "/var/lib/jetstreamer/horizon251-published-guard-20261118-v1/horizon251-standalone-guard";
 const SUCCESS_ID: &str = "7ad2d189f7e94e70a38c781354912448";
 const INTENT_SCHEMA: &str = "foundation-epoch226-extraction-success-drain-intent-v1";
 const COMPLETION_SCHEMA: &str = "foundation-epoch226-extraction-success-drain-v1";
+
+pub(super) struct Source {
+    pub(super) profile: &'static Profile,
+    launch_sha: &'static str,
+    guard: &'static str,
+    timer: &'static str,
+    timer_id: &'static str,
+}
+
+const V2: Source = Source {
+    profile: &RETRY,
+    launch_sha: "4826797399fcd448e82bddb975cf31101d958df17126dc29013a9282e3bcf66c",
+    guard: "horizon-guard-226-checkpoint-continuation-extract-v2.service",
+    timer: "horizon-guard-226-checkpoint-continuation-extract-v2.timer",
+    timer_id: "4bd82a58917b4c6dbbd3702391950200",
+};
+const V3: Source = Source {
+    profile: &LAYERED_RETRY,
+    launch_sha: "30f1fd1a0009ff63c22f1aac39438caf570acaddfaf90bd656331e2895294df8",
+    guard: "horizon-guard-226-checkpoint-continuation-extract-v3.service",
+    timer: "horizon-guard-226-checkpoint-continuation-extract-v3.timer",
+    timer_id: "8b7e93251e7b4491873cf33ac5bc759d",
+};
+
+impl Source {
+    pub(super) fn launch(&self) -> Value {
+        json!({"path":Path::new(self.profile.state).join("fleet-launch.json"), "sha256":self.launch_sha})
+    }
+
+    pub(super) fn completion(&self) -> PathBuf {
+        Path::new(self.profile.state).join("control/success-drain-completion.json")
+    }
+}
+
+pub(super) fn latest() -> Result<&'static Source> {
+    let path = Path::new(V3.profile.state).join("fleet-launch.json");
+    if path.try_exists()? {
+        sealed_json(&V3.launch(), &path)?;
+        Ok(&V3)
+    } else {
+        Ok(&V2)
+    }
+}
+
+pub(super) fn source(handoff: &Value) -> Result<&'static Source> {
+    [&V2, &V3]
+        .into_iter()
+        .find(|source| handoff["launch"] == source.launch())
+        .context("epoch 226 handoff does not identify a qualified extraction")
+}
 
 pub(super) fn show(name: &str) -> Result<Value> {
     let result = ProcessCommand::new("/usr/bin/systemctl").args([
@@ -48,11 +94,12 @@ fn quiet_service(unit_name: &str, row: &Value) -> bool {
             .exists()
 }
 
-fn exact_success(handoff: &Value, launch: &Value) -> Result<Value> {
+fn exact_success(source: &Source, handoff: &Value, launch: &Value) -> Result<Value> {
     let original = &handoff["terminal"];
-    let now = show(RETRY.unit)?;
+    let unit = source.profile.unit;
+    let now = show(unit)?;
     ensure!(
-        quiet_service(RETRY.unit, &now)
+        quiet_service(unit, &now)
             && now["ActiveState"] == "inactive"
             && now["SubState"] == "dead"
             && now["ExecMainStatus"] == "0"
@@ -72,7 +119,7 @@ fn exact_success(handoff: &Value, launch: &Value) -> Result<Value> {
             "json",
             "_PID=1",
             "_UID=0",
-            &format!("UNIT={}", RETRY.unit),
+            &format!("UNIT={unit}"),
             &format!("INVOCATION_ID={invocation}"),
             &format!("MESSAGE_ID={SUCCESS_ID}"),
         ])
@@ -85,22 +132,23 @@ fn exact_success(handoff: &Value, launch: &Value) -> Result<Value> {
             && event["__CURSOR"] == original["pid1_cursor"]
             && event["__REALTIME_TIMESTAMP"] == original["terminal_unix_microseconds"]
             && event["INVOCATION_ID"] == invocation
-            && event["UNIT"] == RETRY.unit,
+            && event["UNIT"] == unit,
         "epoch 226 PID 1 success differs from the sealed prefix handoff"
     );
     Ok(now)
 }
 
-fn authenticate_owners(launch: &Value) -> Result<Value> {
-    let timer = show(TIMER)?;
-    let guard = show(GUARD)?;
-    let broker = show(RETRY.broker)?;
+fn authenticate_owners(source: &Source, launch: &Value) -> Result<Value> {
+    let profile = source.profile;
+    let timer = show(source.timer)?;
+    let guard = show(source.guard)?;
+    let broker = show(profile.broker)?;
     ensure!(
         timer["Job"] == ""
             && (timer["ActiveState"] == "inactive"
                 || (timer["ActiveState"] == "active"
-                    && timer["Unit"] == GUARD
-                    && timer["InvocationID"] == TIMER_ID)),
+                    && timer["Unit"] == source.guard
+                    && timer["InvocationID"] == source.timer_id)),
         "epoch 226 extraction timer changed owner"
     );
     if guard["LoadState"] != "not-found" {
@@ -109,7 +157,7 @@ fn authenticate_owners(launch: &Value) -> Result<Value> {
             .context("guard plan digest")?;
         let args = format!(
             "argv[]={GUARD_IMAGE} {}/guard-plan.json --plan-sha256 {plan_hash} --self-sha256 {GUARD_SHA} ;",
-            RETRY.state
+            profile.state
         );
         ensure!(
             guard["ExecStart"]
@@ -120,20 +168,20 @@ fn authenticate_owners(launch: &Value) -> Result<Value> {
         );
     } else {
         ensure!(
-            quiet_service(GUARD, &guard),
+            quiet_service(source.guard, &guard),
             "epoch 226 missing guard has live state"
         );
     }
-    if !quiet_service(RETRY.broker, &broker) {
+    if !quiet_service(profile.broker, &broker) {
         let budget = launch["broker_range_budget_bytes"]
             .as_u64()
             .context("broker range budget")?
             .to_string();
         let effective = exact_process(
             &broker,
-            RETRY.broker,
+            profile.broker,
             &launch["broker_invocation_id"],
-            &[BROKER_IMAGE, RETRY.unit, &budget],
+            &[BROKER_IMAGE, profile.unit, &budget],
             BROKER_SHA,
             &launch["broker_memory_max"],
         )?;
@@ -171,17 +219,19 @@ pub(crate) fn run() -> Result<()> {
     let apply = args.len() == 6;
     let reference = json!({"path":HANDOFF, "sha256":args[4]});
     let handoff = sealed_json(&reference, Path::new(HANDOFF))?;
-    let state = Path::new(RETRY.state);
-    let original = json!({"path":state.join("fleet-launch.json"), "sha256":LAUNCH_SHA});
+    let source = source(&handoff)?;
+    let profile = source.profile;
+    let state = Path::new(profile.state);
+    let original = source.launch();
     let launch_record = sealed_json(&original, &state.join("fleet-launch.json"))?;
     let claim = DiagnosticClaim {
         epoch: 226,
-        unit: RETRY.unit.into(),
+        unit: profile.unit.into(),
         invocation_id: launch_record["invocation_id"]
             .as_str()
             .context("extraction launch invocation")?
             .into(),
-        scratch_path: RETRY.root.into(),
+        scratch_path: profile.root.into(),
         launch_receipt: serde_json::from_value(original.clone())?,
     };
     launch(&claim, &launch_record)?;
@@ -213,15 +263,15 @@ pub(crate) fn run() -> Result<()> {
     } else {
         None
     };
-    let producer = exact_success(&handoff, &launch_record)?;
+    let producer = exact_success(source, &handoff, &launch_record)?;
     let intent_path = state.join("control/success-drain-intent.json");
-    let complete_path = state.join("control/success-drain-completion.json");
-    let before = authenticate_owners(&launch_record)?;
+    let complete_path = source.completion();
+    let before = authenticate_owners(source, &launch_record)?;
     if !apply {
         println!(
             "{}",
             json!({"epoch":226, "handoff":reference, "producer":producer,
-            "exact_auxiliary_units": [TIMER, GUARD, RETRY.broker], "local_mutations":false})
+            "exact_auxiliary_units": [source.timer, source.guard, profile.broker], "local_mutations":false})
         );
         return Ok(());
     }
@@ -242,30 +292,30 @@ pub(crate) fn run() -> Result<()> {
     );
     if !complete_path.exists() {
         if before["timer"]["ActiveState"] != "inactive" {
-            stop(TIMER)?;
+            stop(source.timer)?;
         }
-        let after_timer = authenticate_owners(&launch_record)?;
+        let after_timer = authenticate_owners(source, &launch_record)?;
         ensure!(
             after_timer["timer"]["ActiveState"] == "inactive",
             "epoch 226 timer is still active"
         );
         if after_timer["guard"]["LoadState"] != "not-found" {
-            stop(GUARD)?;
+            stop(source.guard)?;
         }
-        let after_guard = authenticate_owners(&launch_record)?;
+        let after_guard = authenticate_owners(source, &launch_record)?;
         ensure!(
-            quiet_service(GUARD, &after_guard["guard"]),
+            quiet_service(source.guard, &after_guard["guard"]),
             "epoch 226 guard is still active"
         );
-        if !quiet_service(RETRY.broker, &after_guard["broker"]) {
-            stop(RETRY.broker)?;
+        if !quiet_service(profile.broker, &after_guard["broker"]) {
+            stop(profile.broker)?;
         }
     }
-    let after = authenticate_owners(&launch_record)?;
+    let after = authenticate_owners(source, &launch_record)?;
     ensure!(
         after["timer"]["ActiveState"] == "inactive"
-            && quiet_service(GUARD, &after["guard"])
-            && quiet_service(RETRY.broker, &after["broker"]),
+            && quiet_service(source.guard, &after["guard"])
+            && quiet_service(profile.broker, &after["broker"]),
         "epoch 226 auxiliary state did not drain"
     );
     if !complete_path.exists() {
@@ -292,23 +342,35 @@ pub(crate) fn run() -> Result<()> {
 #[test]
 #[ignore = "reads the live Foundation extraction and its sealed launch; no mutations"]
 fn authenticates_the_auxiliaries_and_rejects_a_live_extraction() -> Result<()> {
-    let state = Path::new(RETRY.state);
-    let launch = sealed_json(
-        &json!({"path":state.join("fleet-launch.json"), "sha256":LAUNCH_SHA}),
-        &state.join("fleet-launch.json"),
-    )?;
-    let owners = authenticate_owners(&launch)?;
-    assert_eq!(owners["timer"]["InvocationID"], TIMER_ID);
+    let state = Path::new(V3.profile.state);
+    let launch = sealed_json(&V3.launch(), &state.join("fleet-launch.json"))?;
+    let owners = authenticate_owners(&V3, &launch)?;
+    assert_eq!(owners["timer"]["InvocationID"], V3.timer_id);
     assert_eq!(
         owners["broker"]["InvocationID"],
         launch["broker_invocation_id"]
     );
-    assert_eq!(show(RETRY.unit)?["ActiveState"], "active");
-    let failure = exact_success(&Value::Null, &launch).unwrap_err();
+    assert_eq!(show(V3.profile.unit)?["ActiveState"], "active");
+    let failure = exact_success(&V3, &Value::Null, &launch).unwrap_err();
     assert!(
         failure
             .to_string()
             .contains("no clean terminal manager state")
     );
+    Ok(())
+}
+
+#[cfg(test)]
+#[test]
+fn extraction_source_requires_a_matching_path_and_digest() -> Result<()> {
+    for known in [&V2, &V3] {
+        assert_eq!(
+            source(&json!({"launch":known.launch()}))?.completion(),
+            known.completion()
+        );
+    }
+    let mut mixed = V3.launch();
+    mixed["sha256"] = json!(V2.launch_sha);
+    assert!(source(&json!({"launch": mixed})).is_err());
     Ok(())
 }

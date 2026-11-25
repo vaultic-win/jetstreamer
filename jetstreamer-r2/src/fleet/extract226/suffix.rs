@@ -23,6 +23,8 @@ const NODE_SHA: &str = "7e17105ad9429fccbeb53dcd38650adb3f469bc1d3fe797360afff2c
 const WORKER_SHA: &str = "7a831420bb1498ddb0268309ce69f615c7f0c6d90cfab940896a03dc38b5336a";
 const QUOTE: &str = "/var/lib/jetstreamer/horizon226-suffix-v1/capacity-epoch229-demotion-v2.py";
 const QUOTE_SHA: &str = "660da318035766590447436f12e8088efcc9c13044082218f79177df05763333";
+const LAYERED_QUOTE: &str = "/var/lib/jetstreamer/horizon226-suffix-v1/capacity-layered-v3.py";
+const LAYERED_QUOTE_SHA: &str = "296edbce4b4ff305d59e33422d0716d8d8d107dec715ce671f3b1131c67f5049";
 const THREAD: &str = "01a1f8f4-293b-7a91-a36e-2e7658bba721";
 
 fn path(name: &str) -> PathBuf {
@@ -208,6 +210,33 @@ fn service_args(template: &str, hash: &str) -> Result<Vec<String>> {
         "epoch 226 suffix executable changed"
     );
     Ok(args)
+}
+
+fn source_template(template: &str, extraction: &drain::Source) -> Result<String> {
+    let original = format!("{}/output", RETRY.root);
+    ensure!(
+        template
+            .lines()
+            .filter(|line| line.starts_with("ReadOnlyPaths="))
+            .flat_map(|line| line
+                .trim_start_matches("ReadOnlyPaths=")
+                .split_ascii_whitespace())
+            .filter(|path| *path == original.as_str())
+            .count()
+            == 1,
+        "sealed epoch 226 prefix projection changed"
+    );
+    Ok(template.replace(&original, &format!("{}/output", extraction.profile.root)))
+}
+
+fn quote(extraction: &drain::Source) -> Result<&'static str> {
+    let (path, sha) = if extraction.profile.unit == LAYERED_RETRY.unit {
+        (LAYERED_QUOTE, LAYERED_QUOTE_SHA)
+    } else {
+        (QUOTE, QUOTE_SHA)
+    };
+    bytes(&json!({"path":path,"sha256":sha}), Path::new(path), 1 << 20)?;
+    Ok(path)
 }
 
 fn start(args: &[String]) -> Result<()> {
@@ -536,19 +565,20 @@ pub(crate) fn run() -> Result<()> {
         "usage: jetstreamer-r2 launch-epoch226-suffix --check|--apply"
     );
     let (mut guard, template) = installed()?;
-    bytes(
-        &json!({"path":QUOTE,"sha256":QUOTE_SHA}),
-        Path::new(QUOTE),
-        1 << 20,
-    )?;
     let handoff_path = Path::new(drain::HANDOFF);
-    let drain_path = Path::new(RETRY.state).join("control/success-drain-completion.json");
     if args[2] == "--check" {
-        service_args(&template, &"a".repeat(64))?;
+        let handoff_present = handoff_path.try_exists()?;
+        let extraction = if handoff_present {
+            drain::source(&document(handoff_path)?)?
+        } else {
+            drain::latest()?
+        };
+        quote(extraction)?;
+        service_args(&source_template(&template, extraction)?, &"a".repeat(64))?;
         println!(
             "{}",
-            json!({"epoch":226,"static_launch_inputs_verified":true,"handoff_present":handoff_path.is_file(),
-            "extraction_drain_present":drain_path.is_file(),"launched":false})
+            json!({"epoch":226,"static_launch_inputs_verified":true,"handoff_present":handoff_present,
+            "extraction_unit":extraction.profile.unit,"extraction_drain_present":extraction.completion().is_file(),"launched":false})
         );
         return Ok(());
     }
@@ -582,6 +612,9 @@ pub(crate) fn run() -> Result<()> {
     }
     let handoff = document(handoff_path)?;
     let source = private157::file_binding(handoff_path)?;
+    let extraction = drain::source(&handoff)?;
+    let quote = quote(extraction)?;
+    let drain_path = extraction.completion();
     let released = document(&drain_path)?;
     ensure!(
         released["schema"] == "foundation-epoch226-extraction-success-drain-v1"
@@ -625,7 +658,7 @@ pub(crate) fn run() -> Result<()> {
         "suffix launch already has an intent"
     );
     let output = ProcessCommand::new("/usr/bin/python3")
-        .args(["-I", "-B", QUOTE, "capacity-suffix226"])
+        .args(["-I", "-B", quote, "capacity-suffix226"])
         .output()?;
     ensure!(
         output.status.success(),
@@ -670,7 +703,7 @@ pub(crate) fn run() -> Result<()> {
     )?;
     let plan_ref = reference(&path("plan.json"), &plan);
     let launch = service_args(
-        &template,
+        &source_template(&template, extraction)?,
         plan_ref["sha256"].as_str().context("pending plan digest")?,
     )?;
     let intent = record(
