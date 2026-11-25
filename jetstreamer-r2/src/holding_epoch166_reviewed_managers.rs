@@ -5,6 +5,7 @@ use super::*;
 use std::{ffi::OsStr, io::ErrorKind, process::Command};
 
 const RETRY10_PARK: &str = "horizon-closed166-retry10-park-20261122-v1.service";
+const RETRY7_PARK: &str = "horizon-closed166-retry7-park-20261120-v1.service";
 const RETRY8_PARK: &str = "horizon-closed166-retry8-park-20261120-v1.service";
 const RETRY8_SHELL_CENSUS: &str = "horizon-closed166-prefix-consumer-census-20261124-v1.service";
 const METERED168_PARK: &str = "horizon-closed168-full-metered-park-20261122-v1.service";
@@ -81,6 +82,20 @@ impl Registered {
     pub(super) fn profile(park_name: &str) -> Result<Self> {
         match park_name {
             RETRY10_PARK => Ok(serde_json::from_str(REGISTRY)?),
+            RETRY7_PARK => {
+                let mut registry = Self::profile(RETRY8_PARK)?;
+                registry.dropins.clear();
+                registry.terminals.retain(|unit, _| matches!(
+                    unit.as_str(),
+                    "horizon-custody166-terminal-census-20261120-v1.service"
+                        | "horizon-observer-live166retry8-first-20261119-v1.service"
+                ));
+                let observers: BTreeMap<String, Terminal> = serde_json::from_str(include_str!(
+                    "holding_epoch166_retry7_observers.json"
+                ))?;
+                registry.terminals.extend(observers);
+                Ok(registry)
+            }
             RETRY8_PARK => Ok(serde_json::from_str(include_str!(
                 "holding_epoch166_retry8_reviewed_managers.json"
             ))?),
@@ -467,6 +482,19 @@ mod tests {
     }
 
     #[test]
+    fn retry7_uses_only_its_four_historical_consumer_units() {
+        let registry = Registered::profile(RETRY7_PARK).unwrap();
+        assert!(registry.dropins.is_empty());
+        let owners: Vec<_> = registry.terminals.keys().map(String::as_str).collect();
+        assert_eq!(owners, [
+            "horizon-custody166-terminal-census-20261120-v1.service",
+            "horizon-observer-live166retry8-first-20261119-v1.service",
+            "horizon-observer-root0119-live166167-20261119-v1.service",
+            "horizon-observer-root0121-stopped166167-20261119-v1.service",
+        ]);
+    }
+
+    #[test]
     fn metered168_inherits_only_the_exact_shared_observer_definitions() {
         let all = actual();
         let metered = Registered::profile(METERED168_PARK).unwrap();
@@ -706,7 +734,7 @@ mod tests {
     #[test]
     #[ignore = "read-only proof against the selected dev-samjohnson historical service registry"]
     fn actual_retired_managers_and_activation_namespace() {
-        assert!(matches!(PARK, RETRY8_PARK | RETRY10_PARK | METERED168_PARK));
+        assert!(matches!(PARK, RETRY7_PARK | RETRY8_PARK | RETRY10_PARK | METERED168_PARK));
         Registered::profile(PARK).unwrap().verify().unwrap();
     }
 }

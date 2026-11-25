@@ -29,7 +29,7 @@ const EPOCH_LOCK: &str = "/home/sol/.jetstreamer-private/epoch166-standard-lane-
 const QUARANTINE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/retirements/epoch166-retry7-cc3eb610625824a178a802a316dc24a3dfbb81c967c81560417a8c3491f93544.jet";
 const STATE_SHA: &str = "ef63e2a2e443375f84b1c851c8d0ffc51454d3ef0f5bea03124f8ce3cd73e47a";
 const LIFECYCLE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry7-retirement-runtime-20261125-v1";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry7-retirement-runtime-20261125-v2";
 const EVIDENCE_ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry7-prefix-retirement-evidence-20261120-v1";
 const RUN_INODE: u64 = 104071228;
 const SCRATCH_INODE: u64 = 104071236;
