@@ -65,7 +65,7 @@ V6_145 = HERE == D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
 V5Z_145 = HERE == D / "tools-homefloor-145-v5y-custody-recovery-v1" or V6_145
 V5Z_BUILD_145 = HERE in (
     D / "tools-homefloor-145-v5y-custody-build-v1",
-    D / "tools-homefloor-145-v5z-guard-walk-build-v1",
+    D / "tools-homefloor-145-v5z-guard-walk-build-v2",
 )
 V5Y_145 = HERE == D / "tools-homefloor-145-v5x-schema-recovery-v1"
 V5Y_BUILD_145 = HERE == D / "tools-homefloor-145-v5x-schema-build-v1"
@@ -614,7 +614,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     if focused is not None:
         post_directory = fixture_post_directory(here)
         lease_directory = next(directory for enabled, directory in (
-            (V6_145, "tools-v6"),
+            (V6_145, "tools-v6-guard-walk"),
             (V5Z_145, "tools-v5z"),
             (V5Y_145, "tools-v5y"),
             (V5X_145, "tools-v5x"),

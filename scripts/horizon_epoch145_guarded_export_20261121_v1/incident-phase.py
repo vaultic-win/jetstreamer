@@ -11,7 +11,7 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-V5Z_WALK_RECOVERY = VERSION == "tools-v6"
+V5Z_WALK_RECOVERY = VERSION == "tools-v6-guard-walk"
 V5Y_CUSTODY_RECOVERY = VERSION == "tools-v5z" or V5Z_WALK_RECOVERY
 V5X_SCHEMA_RECOVERY = VERSION == "tools-v5y" or V5Y_CUSTODY_RECOVERY
 V5W_DONOR_RECOVERY = VERSION == "tools-v5x" or V5X_SCHEMA_RECOVERY
@@ -45,7 +45,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5x": "tools-homefloor-145-v5w-donor-recovery-v1",
                       "tools-v5y": "tools-homefloor-145-v5x-schema-recovery-v1",
                       "tools-v5z": "tools-homefloor-145-v5y-custody-recovery-v1",
-                      "tools-v6": "tools-homefloor-145-v5z-guard-walk-recovery-v1",
+                      "tools-v6-guard-walk": "tools-homefloor-145-v5z-guard-walk-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -508,7 +508,7 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                    / HOMEFLOOR_PROVIDER / "deployment-seal-receipt.json"), "foreign 145 pre-worker admission")
     if STATUS_OWNER_RECOVERY:
         if V5W_DONOR_RECOVERY:
-            handoff = PKG.parent / ("v6-name-handoff" if V5Z_WALK_RECOVERY else
+            handoff = PKG.parent / ("v6-guard-walk-name-handoff" if V5Z_WALK_RECOVERY else
                                     "v5z-name-handoff" if V5Y_CUSTODY_RECOVERY else
                                     "v5y-name-handoff" if V5X_SCHEMA_RECOVERY else "v5x-name-handoff")
             intent, _ = s.read(handoff / "START_INTENT.json")

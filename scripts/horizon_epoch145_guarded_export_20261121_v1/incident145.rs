@@ -29,7 +29,7 @@ compile_error!("the receipt-mode retry requires the V5y verifier guard");
 compile_error!("the allocation-walk hold retry requires the V5z verifier guard");
 
 #[cfg(incident_v5z_guard_recovery145_only)]
-pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v6/export145";
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v6-guard-walk/export145";
 #[cfg(all(incident_v5y_guard_recovery145_only, not(incident_v5z_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5z/export145";
 #[cfg(all(incident_v5x_guard_recovery145_only, not(incident_v5y_guard_recovery145_only)))]

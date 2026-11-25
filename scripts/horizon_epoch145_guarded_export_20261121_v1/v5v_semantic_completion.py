@@ -13,7 +13,7 @@ import sys
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FAMILY = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
 GENERATION = Path(__file__).resolve().parent.name
-WALK_RETRY = GENERATION in ("tools-v6", "tools-homefloor-145-v5z-guard-walk-build-v1")
+WALK_RETRY = GENERATION in ("tools-v6-guard-walk", "tools-homefloor-145-v5z-guard-walk-build-v2")
 MODE_RETRY = GENERATION in ("tools-v5z", "tools-homefloor-145-v5y-custody-build-v1") or WALK_RETRY
 SCHEMA_RETRY = GENERATION in ("tools-v5y", "tools-homefloor-145-v5x-schema-build-v1") or MODE_RETRY
 DONOR_RETRY = GENERATION == "tools-v5x" or SCHEMA_RETRY
@@ -24,8 +24,8 @@ V5V_PROVIDER = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-v5
 V5X_HANDOFF = FAMILY / "v5x-name-handoff"
 V5Y_HANDOFF = FAMILY / "v5y-name-handoff"
 V5Z_HANDOFF = FAMILY / "v5z-name-handoff"
-V6_HANDOFF = FAMILY / "v6-name-handoff"
-PACKAGE = (FAMILY / "tools-v6" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
+V6_HANDOFF = FAMILY / "v6-guard-walk-name-handoff"
+PACKAGE = (FAMILY / "tools-v6-guard-walk" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
            FAMILY / "tools-v5y" if SCHEMA_RETRY else FAMILY / GENERATION if RETRY else V5V_PACKAGE)
 PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v5z-guard-walk-recovery-v1") if WALK_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5y-custody-recovery-v1") if MODE_RETRY else
