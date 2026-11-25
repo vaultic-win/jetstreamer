@@ -1,0 +1,23 @@
+--- diagnostic230_program_demotion_ram.py
++++ diagnostic230_program_demotion_ram.py
+@@ -75,6 +75,20 @@
+         if terminal_ref not in gate_row["evidence"]:
+             gate_row["evidence"].append(terminal_ref)
+         gate_row["next_action"] = acceptance["next_action"]
++        recovery = PACKAGE / "private-segment-recovery-v1/completion.json"
++        if recovery.is_file():
++            recovered_ref = ref(recovery)
++            recovered = bound(recovered_ref)
++            assert recovered["schema"] == "foundation-epoch230-recovered-private-segment-v1"
++            assert recovered["epoch"] == 230 and recovered["terminal"] == terminal_ref
++            assert recovered["range"] == dict(first=99360000, last=99375855, slots=15856)
++            assert recovered["publication_authorized"] is False and recovered["remote_mutations"] is False
++            manifest = bound(recovered["manifest"])
++            assert manifest["archive_sha256"] == recovered["archive"]["sha256"]
++            assert manifest["terminal"]["slot"] == 99375855
++            if recovered_ref not in gate_row["evidence"]:
++                gate_row["evidence"].append(recovered_ref)
++            gate_row["next_action"] = "Qualify continuation from the verified 99,375,855 checkpoint and cover the remaining 416,144 slots before assembly."
+ 
+ 
+ def owns(row):
