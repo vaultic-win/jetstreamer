@@ -72,6 +72,27 @@ const DIAGNOSTIC: &str = "diagnostic-epoch130-v1417-qualification-v1";
 const BENCHMARK: &str = "performance-ab-195-rayon-20261009-v2";
 const DIAGNOSTIC_134: &str = "diagnostic-epoch134-v1419-status-probe-v1";
 const BENCHMARK_154: &str = "performance-ab-154-v158-rayon-20261009-v3";
+const BENCHMARK_INDEX_REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch195-closed-benchmark-index-retirement-20261125-v1/review/REVIEW.json";
+const BENCHMARK_INDEX_REVIEW_SHA: &str =
+    "73f73b5160aa42ab36ad582ceb4e5f4035a911ae0b1c12760f593cf504b4fd03";
+const BENCHMARK_INDEX_SCHEMA: &str = "horizon-195-closed-benchmark-index-review-v1";
+const BENCHMARK_INDEX_STEM: &str =
+    "epoch-195-bafyreigawutckkq5wvdzd4o57mns2242r3h7naw7poyweshqem2dbvbhvi-mainnet";
+
+fn benchmark_candidate() -> PathBuf {
+    Path::new(HOME_ROOT)
+        .join(".jetstreamer-private")
+        .join(BENCHMARK)
+        .join("candidate8")
+}
+
+fn is_benchmark_index(t: &Target) -> bool {
+    let indexes = benchmark_candidate().join("output/compact-indexes/195");
+    t.epoch == 195
+        && ["cid-to-offset-and-size", "slot-to-cid"]
+            .into_iter()
+            .any(|kind| t.path == indexes.join(format!("{BENCHMARK_INDEX_STEM}-{kind}.index")))
+}
 
 fn is_benchmark_bootstrap(t: &Target) -> bool {
     t.epoch == 195
@@ -111,6 +132,7 @@ pub(super) fn is_target(t: &Target) -> bool {
         }),
         191..=194 if is_index(t) => true,
         195..=197 if is_singleton_index(t) => true,
+        195 if is_benchmark_index(t) => true,
         191 => t.path == root.join(SNAPSHOT_DIR).join("inputs").join(SNAPSHOT_NAME),
         195 if is_benchmark_bootstrap(t) => true,
         195 => ["control32", "candidate8"].iter().any(|case| {
@@ -158,6 +180,17 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
                 closed_indexes::SINGLETON_SHA,
                 closed_indexes::SINGLETON_SCHEMA,
                 &[195, 196, 197],
+            )
+        } else if p.targets.iter().any(is_benchmark_index) {
+            ensure!(
+                closed_indexes::complete_selection(&p.targets, 2, is_benchmark_index),
+                "expected both reviewed index files from the closed epoch 195 benchmark"
+            );
+            (
+                BENCHMARK_INDEX_REVIEW,
+                BENCHMARK_INDEX_REVIEW_SHA,
+                BENCHMARK_INDEX_SCHEMA,
+                &[195],
             )
         } else if p.targets.iter().any(is_benchmark_bootstrap) {
             ensure!(
@@ -260,7 +293,10 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
             "different canary inode"
         );
         let terminal: Bound = serde_json::from_value(reviewed["terminal"].clone())?;
-        bound(&terminal, LIMIT)?;
+        let terminal_bytes = bound(&terminal, LIMIT)?;
+        if schema == BENCHMARK_INDEX_SCHEMA {
+            verify_benchmark_index(reviewed, target, &terminal, &terminal_bytes)?;
+        }
     }
     for proof in &p.proofs {
         let reference = &review["delivery_evidence"][proof.epoch.to_string()]["whole_object_receipts"]
@@ -282,6 +318,39 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
         verify_benchmark_bootstrap(&review, &p.targets[0])?;
     }
     Ok(Some(review))
+}
+
+fn verify_benchmark_index(
+    reviewed: &Value,
+    target: &Target,
+    terminal: &Bound,
+    terminal_bytes: &[u8],
+) -> Result<()> {
+    let candidate = benchmark_candidate();
+    let canary: Value = serde_json::from_slice(terminal_bytes)?;
+    ensure!(
+        terminal.path == candidate.join("canary-receipt.json")
+            && canary["schema"] == "jetstreamer-historical-performance-canary-v2"
+            && canary["systemd_invocation_id"] == "7f62af88bb2849cdacc577836059eb4b"
+            && canary["target_slot"] == 84_247_809
+            && canary["observed_stop_slot"]
+                .as_u64()
+                .is_some_and(|slot| slot >= 84_247_809)
+            && canary["target_reached"] == true
+            && canary["runner_return_code"] == 0
+            && canary["controlled_stop_signal"] == 2
+            && canary["external_signal"].is_null()
+            && canary["command"]
+                .as_array()
+                .is_some_and(|args| args.contains(&json!(candidate.join("output")))),
+        "different closed epoch 195 benchmark"
+    );
+    ensure!(
+        reviewed["body_sha256"].as_str() == Some(digest(&target.path)?.as_str())
+            && stamp(&exact(&target.path)?) == target.identity,
+        "benchmark index changed after review"
+    );
+    Ok(())
 }
 
 fn verify_benchmark_bootstrap(review: &Value, target: &Target) -> Result<()> {
@@ -423,6 +492,7 @@ pub(super) fn check_owners(review: &Value) -> Result<()> {
         Some(SNAPSHOT_SCHEMA) => &[SNAPSHOT_DIR],
         Some(BOOTSTRAP_SCHEMA) => &[BOOTSTRAP_DIR],
         Some(BENCHMARK_BOOTSTRAP_SCHEMA) => &[BENCHMARK_BOOTSTRAP_DIR, BENCHMARK_BOOTSTRAP_NAME],
+        Some(BENCHMARK_INDEX_SCHEMA) => &[BENCHMARK],
         _ => &[DIAGNOSTIC, BENCHMARK],
     };
     if review["schema"] == FIRST_SWEEP_SCHEMA {
@@ -605,6 +675,47 @@ fn controller_lock(path: &str, inode: u64) -> Result<File> {
 #[cfg(test)]
 mod first_sweep_tests {
     use super::*;
+
+    #[test]
+    fn benchmark_index_selection_is_limited_to_both_candidate8_indexes() {
+        let indexes = benchmark_candidate().join("output/compact-indexes/195");
+        let target = |kind| {
+            serde_json::from_value::<Target>(json!({
+                "epoch": 195, "path": indexes.join(format!("{BENCHMARK_INDEX_STEM}-{kind}.index")),
+                "reason": "test",
+                "identity": {
+                    "dev": 1, "ino": 2, "nlink": 1, "mode": 0o100600, "uid": 1001,
+                    "gid": 1003, "len": 10, "blocks": 1, "mtime": 1, "mtime_ns": 0,
+                    "ctime": 1, "ctime_ns": 0
+                }
+            }))
+            .unwrap()
+        };
+        let indexes = [target("cid-to-offset-and-size"), target("slot-to-cid")];
+        assert!(closed_indexes::complete_selection(
+            &indexes,
+            2,
+            is_benchmark_index
+        ));
+        assert!(!closed_indexes::complete_selection(
+            &indexes[..1],
+            2,
+            is_benchmark_index
+        ));
+        let duplicates = [target("slot-to-cid"), target("slot-to-cid")];
+        assert!(!closed_indexes::complete_selection(
+            &duplicates,
+            2,
+            is_benchmark_index
+        ));
+        let mut other_case = target("slot-to-cid");
+        other_case.path = other_case
+            .path
+            .to_string_lossy()
+            .replace("/candidate8/", "/control32/")
+            .into();
+        assert!(!is_benchmark_index(&other_case));
+    }
 
     #[test]
     fn first_sweep_selection_binds_both_epoch_and_exact_file() {
