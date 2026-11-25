@@ -171,7 +171,18 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
             .parse::<u64>()?;
         (&launch["unit"], micros / 10_000)
     };
-    let range = format!("{epoch}-{epoch}");
+    // The first 257 sample used the 247 default label. Only that immutable
+    // observation can use the old label; its actual owner is validated below.
+    let range = if current257
+        && fleet["observer_sha256"]
+            == "3e9646388780c95dd70b095b9b1b7d5567b9183f3ecba7900ac6cae0781808bd"
+        && fleet["observer_receipt"]
+            == "/home/ubuntu/.codex/diagnostics/horizon-resume-observer-20261120-v335.json"
+    {
+        "247-247".to_owned()
+    } else {
+        format!("{epoch}-{epoch}")
+    };
     ensure!(
         entries.next().is_none()
             && pid > 1

@@ -29,6 +29,7 @@ impl Owner<'_> {
             UNIT249 => "249-249",
             UNIT250 | STAGED250 => "250-250",
             UNIT251 => "251-251",
+            staged::CURRENT257_UNIT => "257-257",
             UNIT265 | RETRY265 | STAGED265 => "265-265",
             _ => "247-247",
         }
@@ -842,6 +843,7 @@ mod tests {
     fn current_257_telemetry_requires_the_exact_uploader_command() {
         let epoch = OrdinaryEpoch::Current257;
         let args = epoch.argv();
+        assert_eq!(Owner { unit: epoch.unit(), ..ORIGINAL }.range(), "257-257");
         let expected = format!(
             "{{ path={} ; argv[]={} ; ignore_errors=no ; start_time=test ; pid=17 ; code=(null) ; status=0/0 }}",
             epoch.image().0,
