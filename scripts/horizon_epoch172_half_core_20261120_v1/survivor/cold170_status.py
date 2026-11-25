@@ -20,7 +20,11 @@ STOP = 'd670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a'
 FIELD = 'current_homefloor_cold166_167_170_owners'
 BINDING = LOCAL / f'{ATTEMPT}-170-generation.json'
 FAILED_RUN = ROOT / 'failed-replay-20261124T123309Z'
-FAILED166_CADENCE = LOCAL.name in (
+METERED_FULL = LOCAL.name == 'tools-cold168-retry4-failed166-v6-entry146'
+if METERED_FULL:
+    import full170_status as full170
+
+FAILED166_CADENCE = METERED_FULL or LOCAL.name in (
     'tools-cold168-retry4-failed166-v1', 'tools-cold168-retry4-failed166-v2',
     'tools-cold168-retry4-failed166-v3', 'tools-cold168-retry4-failed166-v4-entry146',
     'tools-cold168-retry4-failed166-v5-entry146',
@@ -103,6 +107,8 @@ def reader():
     module.guard_budget = guard_budget
     if cold168:
         cold168.register(module)
+    if METERED_FULL:
+        full170.register(module)
     return module
 
 
@@ -144,6 +150,8 @@ def projection(row):
         return cold168.projection(row)
     if row['range'] != '170':
         return retry166.projection(row)
+    if METERED_FULL:
+        return full170.projection(row)
     first = checked(bound(ROOT/'FIRST_PROTECTED_WORKER.json'))
     need(first['admission'] == bound(ROOT/'ACTUAL_ADMISSION_AND_PROTECTION.json') and row == first['observer_row']
          and row['producer_unit'] == row['controller_unit'] == UNIT and
@@ -198,7 +206,7 @@ def failed_route(fleet=None):
                   producer_invocation_id=iid, reservation_ending_bytes=0)
     if fleet is not None:
         prior = fleet.get(FIELD, {}).get('170')
-        if prior is not None:
+        if prior is not None and not (METERED_FULL and prior['actor']['producer_unit'] == full170.UNIT):
             need(FAILED_STATUS not in fleet and prior['admission'] == result['admission']
                  and prior['first_worker'] == result['first_worker']
                  and prior['actor']['producer_invocation_id'] == iid, 'different failed epoch 170 fleet owner')
@@ -216,6 +224,11 @@ def roster(module, fleet_ref, fleet, terminal=None, failed166=None):
         state = module.native(epoch)
         if (epoch == 170 and terminal) or (epoch == 166 and failed166):
             need(state is None, f'terminal cold{epoch} producer still active')
+            continue
+        if METERED_FULL and epoch == 170:
+            if state is not None:
+                full170.check_lineage(fleet_ref, fleet)
+                enrolled.add(epoch)
             continue
         if state is None:
             optional = {166: retry166}
@@ -238,15 +251,19 @@ def reconcile(c, observed_lane):
     module = reader()
     c.commits = {}
     c.histories = {}
-    terminal = terminal_route(c.fleet)
+    terminal = terminal_route(c.fleet) if not METERED_FULL else None
     c.failed170 = failed_route(c.fleet)
     c.failed166 = retry166.failed_route(c.fleet) if FAILED166_CADENCE else None
     need(not (terminal and c.failed170), 'conflicting epoch 170 commit and failure')
-    enrolled = roster(module, c.fleet_ref, c.fleet, terminal or c.failed170, c.failed166)
+    if METERED_FULL:
+        need(c.failed170, 'missing retained retry13 failure')
+        full170.historical_diagnostic(c.fleet)
+    blocking170 = terminal or (c.failed170 if not METERED_FULL else None)
+    enrolled = roster(module, c.fleet_ref, c.fleet, blocking170, c.failed166)
     if c.failed166:
         module.ROUTES.pop(166)
         need(all(r['range'] != '166' for r in c.cfg['replays']), 'failed epoch 166 remained in sampled roster')
-    if c.failed170:
+    if c.failed170 and not METERED_FULL:
         module.ROUTES.pop(170)
         need(all(r['range'] != '170' for r in c.cfg['replays']), 'failed epoch 170 remained in sampled roster')
     if terminal:
@@ -290,15 +307,16 @@ def reconcile(c, observed_lane):
             setattr(c,attr,getattr(sample_context,attr))
     need(set(c.recovered_owners) == {str(e) for e in enrolled}, 'cold owner roster changed during capture')
     admitted = {int(k) for k,v in c.recovered_owners.items() if v['admission']}
-    need(set(c.new_rows) == admitted and enrolled-admitted <= {168}, 'cold admissions changed during capture')
+    waiting = {168, 170} if METERED_FULL else {168}
+    need(set(c.new_rows) == admitted and enrolled-admitted <= waiting, 'cold admissions changed during capture')
     for epoch in enrolled:
         key = str(epoch)
         for field in (cold167.FIELD, retry166.FIELD, FIELD, module.FIELD):
             prior = c.fleet.get(field, {}).get(key)
             if prior:
                 need(prior['actor'] == c.recovered_owners[key]['actor'], 'cold owner changed')
-        if epoch == 168 and (epoch not in admitted or not c.recovered_owners[key]['first_worker']):
-            need(epoch not in admitted or c.new_rows[epoch]['observer_config'] is None, 'unregistered 168 worker')
+        if epoch in waiting and (epoch not in admitted or not c.recovered_owners[key]['first_worker']):
+            need(epoch not in admitted or c.new_rows[epoch]['observer_config'] is None, 'unregistered guarded worker')
             continue
         projection(c.new_rows[epoch]['observer_config'])
     if cold168:
@@ -348,6 +366,7 @@ def install(c, fleet):
                    next_action='Verify and publish the retained epoch 170 archive.')
     if c.failed170:
         fleet[FAILED_STATUS] = c.failed170
+    if c.failed170 and '170' not in c.recovered_owners:
         row = next(v for v in fleet['epochs'] if v['epoch'] == 170)
         previous = row.pop('current_home_floor_stop', row.get('original_home_floor_stop'))
         need(previous['completion']['sha256'] == STOP, 'lost stopped predecessor of failed cold170')
@@ -355,6 +374,18 @@ def install(c, fleet):
                    state='verification', no_live_producer_claimed=True, current_repair_owner='/root', repair_open=True,
                    current_status_scope='Epoch 170 retry13 exited after a historical execution mismatch.',
                    next_action='Diagnose the exact failed transaction and qualify bounded checkpoint replay.')
+    if METERED_FULL:
+        candidate = c.recovered_owners.get('170')
+        row = next(v for v in fleet['epochs'] if v['epoch'] == 170)
+        if candidate is not None:
+            row.pop('cold170_retry13_execution_failure', None)
+            row['historical_cold170_retry13_execution_failure'] = c.failed170
+        if candidate is not None and 170 not in c.new_rows:
+            row.update(no_live_producer_claimed=False, current_status_scope='Epoch 170 is in guarded startup.',
+                       next_action='Bind the corrected epoch 170 guard and worker before scheduled observation.')
+            fleet[full170.FIELD] = candidate
+        else:
+            fleet.pop(full170.FIELD, None)
     fleet['useful_replay_count'] = cold167.counts(c)['current_replay_lanes']
     stops = {166: retry166.STOP, 167: cold167.STOP_SHA, 170: STOP}
     if cold168:

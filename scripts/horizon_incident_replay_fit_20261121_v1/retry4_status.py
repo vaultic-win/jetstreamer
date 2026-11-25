@@ -193,7 +193,7 @@ def registered_hourly170_writer(s, prior, *, failed166=False):
 
 def registered_failed166_rejoin(s, prior, version=2):
     old_package, old_seal, old_iid, old = prior
-    s.need(version in (2, 3, 4, 5), 'unknown epoch 166 cadence rejoin')
+    s.need(version in (2, 3, 4, 5, 6), 'unknown epoch 166 cadence rejoin')
     def package_for(generation):
         name = f'tools-cold168-retry4-failed166-v{generation}'
         return STATUS / (name + '-entry146' if generation >= 4 else name)

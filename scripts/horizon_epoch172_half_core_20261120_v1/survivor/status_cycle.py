@@ -29,9 +29,10 @@ def failed166_package(version):
     return name + '-entry146' if version >= 4 else name
 
 
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6)
                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
 FAILED166 = bool(FAILED166_VERSION)
+METERED_FULL170 = FAILED166_VERSION == 6
 HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
 FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
 assert hashlib.sha256((PACKAGE/'deployment-seal-receipt.json').read_bytes()).hexdigest() == PARENT_SEAL
@@ -109,7 +110,7 @@ def project(original, due, predecessor):
         route = getattr(cold_workers, 'cold168', None)
         need(route and owners_by_epoch['168']['producer_unit'] == route.UNIT, 'unregistered 168 observer')
     rows=[owners_by_epoch['172']] if historical else list(owners_by_epoch.values())
-    if FAILED170 and '170' in owners_by_epoch and cold_workers.failed_route():
+    if FAILED170 and not METERED_FULL170 and '170' in owners_by_epoch and cold_workers.failed_route():
         rows=[row for row in rows if row['range']!='170']
     if FAILED166 and '166' in owners_by_epoch:
         cold166_status.failed_route()
@@ -446,8 +447,17 @@ def make_context(head,fleet,sample_ref,cfg,out):
     entry = {'entry_lease': c.entry146['lease']} if c.entry146 is not None else {}
     census_owners = import_module('bounded_entry_owners') if entry else owners
     native_owners = c.recovered_owners
+    held170 = None
+    if METERED_FULL170:
+        from full170_status import held
+        candidate = native_owners.get('170')
+        if held(candidate):
+            held170 = candidate
+            native_owners = {key: value for key, value in native_owners.items() if key != '170'}
+        need(all(row['range'] != '170' for row in c.cfg['diagnostic_replays']),
+             'settled epoch 170 diagnostic remained in the schedule')
     if HOURLY170:
-        c.hourly170 = hourly170_cadence.observe(c)
+        c.hourly170 = None if METERED_FULL170 else hourly170_cadence.observe(c)
         hourly170_cadence.interpret(c,c.hourly170,cycle.observed_lane)
         private = c.hourly170.get('row') if c.hourly170 else None
         if private:
@@ -459,6 +469,10 @@ def make_context(head,fleet,sample_ref,cfg,out):
     else:
         census_owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True,
                                     restored=native_owners,**entry)
+    if held170:
+        from full170_status import native
+        need(native(cold_workers.reader().ACTOR) == (held170['unit'], held170['actor']) and held(held170),
+             'metered 170 hold changed during the census')
     return c
 
 def baselines(head,fleet,bridge):
@@ -506,7 +520,10 @@ def census(c,bridge):
             name = f'current_cold168_retry{cold_workers.cold168.ATTEMPT}_protection'
             cap[name]=c.recovered_ref
         if 170 in c.new_rows:
-            cap[f'current_cold170_{cold_workers.ATTEMPT}_protection']=c.recovered_ref
+            generation = 'full_metered' if METERED_FULL170 else cold_workers.ATTEMPT
+            cap[f'current_cold170_{generation}_protection']=c.recovered_ref
+        if METERED_FULL170 and '170' in c.recovered_owners and 170 not in c.new_rows:
+            cap['current_cold170_full_metered_startup'] = c.recovered_ref
     if FAILED166:
         cap['retained_cold166_retry11_reservation'] = c.failed166
     durable(path,witness)
@@ -739,6 +756,15 @@ def entry():
     if FAILED166_VERSION >= 4:
         need(cold_workers.FAILED166_CADENCE, 'cold worker census omits the drained epoch 166')
         validate_epoch146_modules(seal)
+    if METERED_FULL170:
+        import full170_status
+        need(cold_workers.METERED_FULL and full170_status.PACKAGE == package
+             and Path(full170_status.__file__) == CURRENT.with_name('full170_status.py'),
+             'missing metered epoch 170 receiver')
+        for name in ('full170_status.py', 'cold170_status.py'):
+            member, = (row for row in seal['members'] if row['name'] == name)
+            need(member['mode'] == '0444' and bound(CURRENT.with_name(name))['sha256'] == member['sha256'],
+                 'unsealed metered epoch 170 receiver')
     return receipt
 
 
@@ -929,6 +955,11 @@ def rejoin_failed166_cadence(state, receipt, fd):
     need(not still_running, 'incumbent epoch 166 cadence writer is still running')
     fleet = checked(ready['fleet'])
     cold166_status.failed_route(fleet)
+    if METERED_FULL170:
+        need(cold_workers.failed_route(fleet), 'missing retained epoch 170 retry13 failure')
+        cold_workers.full170.historical_diagnostic(fleet)
+        cold_workers.full170.generation()
+        cold_workers.full170.hold_image()
     cfg = sealed(ready['config'])
     need(ready['config'] == fleet['sole_next_observer'] and ready['timer'] == fleet['sole_next_timer']
          and ready['fleet']['path'] == str(max(BASE.glob('root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json'),
