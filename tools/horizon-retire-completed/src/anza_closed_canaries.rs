@@ -1,7 +1,9 @@
 use super::*;
 
 mod closed_indexes;
-pub(super) use closed_indexes::{is_index, lock_index_controllers};
+pub(super) use closed_indexes::{
+    is_index, is_singleton_index, lock_index_controllers, lock_singleton_controllers,
+};
 
 const REVIEW: &str = "/home/sol/.jetstreamer-private/epoch145-v5t-stopped-price-20261124.zjcggc_6/RETIREMENT_CANDIDATES_130_195.json";
 const REVIEW_SHA: &str = "6b4563c22f4d586bb8c2fc38c91e4a5c1b8180463b7b27de8de2fa1b115a1291";
@@ -89,6 +91,7 @@ pub(super) fn is_target(t: &Target) -> bool {
                     .join("output/epoch-154-through-66958784.jet")
         }),
         191..=194 if is_index(t) => true,
+        195..=197 if is_singleton_index(t) => true,
         191 => t.path == root.join(SNAPSHOT_DIR).join("inputs").join(SNAPSHOT_NAME),
         195 => ["control32", "candidate8"].iter().any(|case| {
             t.path
@@ -114,7 +117,18 @@ fn identity(t: &Target) -> Value {
 
 pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Result<Option<Value>> {
     let (path, sha256, schema, expected_epochs): (&str, &str, &str, &[u64]) =
-        if epochs.iter().any(|&epoch| matches!(epoch, 130 | 195)) {
+        if p.targets.iter().any(is_singleton_index) {
+            ensure!(
+                closed_indexes::complete_selection(&p.targets, 6, is_singleton_index),
+                "incomplete singleton CAR index selection"
+            );
+            (
+                closed_indexes::SINGLETON_REVIEW,
+                closed_indexes::SINGLETON_SHA,
+                closed_indexes::SINGLETON_SCHEMA,
+                &[195, 196, 197],
+            )
+        } else if epochs.iter().any(|&epoch| matches!(epoch, 130 | 195)) {
             (
                 REVIEW,
                 REVIEW_SHA,
@@ -141,7 +155,7 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
             )
         } else if p.targets.iter().any(is_index) {
             ensure!(
-                closed_indexes::complete_selection(&p.targets),
+                closed_indexes::complete_selection(&p.targets, 8, is_index),
                 "incomplete index retirement selection"
             );
             (
@@ -362,7 +376,10 @@ pub(super) fn check_owners(review: &Value) -> Result<()> {
             bound(&bound_file, LIMIT)?;
         }
     }
-    if review["schema"] == closed_indexes::SCHEMA {
+    if matches!(
+        review["schema"].as_str(),
+        Some(closed_indexes::SCHEMA | closed_indexes::SINGLETON_SCHEMA)
+    ) {
         return closed_indexes::check_owners(review);
     }
     let scan = Command::new("/usr/bin/rg")
