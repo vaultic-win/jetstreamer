@@ -43,4 +43,5 @@ Environment=RAYON_NUM_THREADS=8
 Environment=JETSTREAMER_HISTORICAL_POH_THREADS=8
 Environment=JETSTREAMER_REPLAY_THREADS=8
 Environment=TOKIO_WORKER_THREADS=8
+ExecStartPre=/usr/bin/bash /var/lib/jetstreamer/horizon226-suffix-v1/pre-start.sh 60 /var/lib/jetstreamer/horizon226-suffix-v1/tokens
 ExecStart=/run/foundation-epoch226-release.y35rokj7/jetstreamer-node 226 /home/ubuntu/.jetstreamer-private/checkpoint-continuation-226-suffix-v1/ledger --verify --checkpoint-continuation-plan=/var/lib/jetstreamer/horizon226-suffix-v1/plan.json --checkpoint-continuation-plan-sha256=__PLAN_SHA256__
