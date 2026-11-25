@@ -11,8 +11,9 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-V5V_CUSTODY_RECOVERY = VERSION == "tools-v5w"
-V5U_QUERY_RECOVERY = VERSION in ("tools-v5v", "tools-v5w")
+V5W_DONOR_RECOVERY = VERSION == "tools-v5x"
+V5V_CUSTODY_RECOVERY = VERSION == "tools-v5w" or V5W_DONOR_RECOVERY
+V5U_QUERY_RECOVERY = VERSION == "tools-v5v" or V5V_CUSTODY_RECOVERY
 FRESH_CENSUS_RECOVERY = VERSION == "tools-v5u" or V5U_QUERY_RECOVERY
 GUARD_WALK_RECOVERY = VERSION == "tools-v5t" or FRESH_CENSUS_RECOVERY
 GUARD_TERMINAL_RECOVERY = VERSION == "tools-v5s" or GUARD_WALK_RECOVERY
@@ -38,6 +39,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5u": "tools-homefloor-145-v5t-guard-recovery-v1",
                       "tools-v5v": "tools-homefloor-145-v5u-guard-recovery-v1",
                       "tools-v5w": "tools-homefloor-145-v5v-custody-recovery-v1",
+                      "tools-v5x": "tools-homefloor-145-v5w-donor-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -181,6 +183,67 @@ def v5v_stopped_phase(s, fit, fleet, profile):
     return dict(observed["manager"], stage=stage, guard_terminal=reference,
                 failure=observed["failure"], recovery=observed["startup"],
                 candidate=observed["candidate"])
+
+
+def v5w_failed_owner(s, build, successor=None):
+    iid = "97bd2045ebe449e3ae77330c7e4ec7b4"
+    handoff = PKG.parent / "v5w-name-handoff"
+    terminal, reference = s.read(handoff / "V5W_TERMINAL_FAILURE_DONOR.json",
+                                 "8d36ea63912877df362dc33c21d4a834236d4cf36717ee7de9dafadd2153f288")
+    s.need(build["guard_terminal"] == reference
+           and terminal["schema"] == "horizon-epoch145-v5w-terminal-donor-lock-failure-v1"
+           and terminal["invocation_id"] == iid and terminal["unit"] == UNIT
+           and terminal["resource_credit_bytes"] == 0
+           and terminal["semantic_completion"] is terminal["r2_mutations"] is terminal["archive_publication_authorized"] is False,
+           "foreign V5w donor-lock terminal")
+    old = STATE / iid
+    failure = s.bound(terminal["native_failure"], old / "failed.json")
+    started = s.bound(terminal["recovery_started"], old / "recovery-started.json")
+    s.need(failure["iid"] == started["iid"] == iid and started["file"] == str(OUTPUT)
+           and failure["error"].rstrip().endswith("ValueError: another actor holds the donor; requires its own enrollment")
+           and {item.name for item in old.iterdir()} == {"failed.json", "recovery-started.json"},
+           "different V5w paid read or failure")
+    candidate = terminal["candidate"]
+    meta = OUTPUT.lstat()
+    s.need(OUTPUT.resolve(strict=True) == OUTPUT and candidate["path"] == str(OUTPUT)
+           and (meta.st_dev, meta.st_ino, meta.st_size, meta.st_mtime_ns, meta.st_ctime_ns, meta.st_blocks * 512)
+               == tuple(candidate[key] for key in ("device", "inode", "bytes", "mtime_ns", "ctime_ns", "allocated_bytes"))
+           and (meta.st_uid, meta.st_gid, meta.st_nlink, meta.st_mode) == (0, 0, 1, stat.S_IFREG | 0o400)
+           and not os.path.lexists(OUTPUT.with_name("epoch-145.jet")), "V5w paid candidate changed")
+    package = PKG.parent / "tools-v5w"
+    seal, _ = s.read(package / "deployment-seal-receipt.json",
+                     "8768935daed0a99dd01d467da957dabdb218c3741c04f6597cf663dbcf36314e")
+    tool = package / "v5v_semantic_completion.py"
+    member, = [row for row in seal["members"] if row["name"] == tool.name]
+    digest = hashlib.sha256(tool.read_bytes()).hexdigest()
+    mode = tool.lstat()
+    s.need(seal["destination"] == str(package) and member["mode"] == "0444"
+           and member["sha256"] == digest == "42118f1624e540ed5973d37e358ad4a9f0ba68e3c8c2100c9f777e01c0f2a9bf"
+           and (mode.st_uid, mode.st_gid, mode.st_nlink, mode.st_mode) == (0, 0, 1, stat.S_IFREG | 0o444)
+           and tool.resolve(strict=True) == tool, "different original V5w journal reader")
+    checker = runpy.run_path(str(tool))
+    fields = ("STARTING", "STARTED", "PROCESS_EXIT", "FAILURE", "SUCCESS", "STOPPING", "STOPPED")
+    events = checker["journal"](iid, *(checker[field] for field in fields))
+    s.need(terminal["boot_id"] == checker["BOOT"] and len(events) == len(terminal["native_events"]) == 4
+           and all(all(saved[key] == value for key, value in event.items())
+                   for saved, event in zip(terminal["native_events"], events)), "different V5w native exit chronology")
+    following = checker["journal"](None, *(checker[field] for field in fields), after_cursor=events[-1]["__CURSOR"])
+    expected = [] if successor is None else [(successor, checker["STARTING"]), (successor, checker["STARTED"])]
+    s.need([(row["INVOCATION_ID"], row["MESSAGE_ID"]) for row in following] == expected,
+           "a different invocation reused the failed V5w owner")
+    return terminal, reference
+
+
+def v5w_stopped_phase(s, fit, build):
+    terminal, reference = v5w_failed_owner(s, build)
+    manager = s.show(UNIT)
+    expected = terminal["manager"]
+    fields = ("Id", "LoadState", "ActiveState", "SubState", "InvocationID", "MainPID", "ControlPID",
+              "ControlGroup", "Job", "NRestarts", "Result", "ExecMainStatus", "TriggeredBy")
+    s.need(all(manager[field] == expected[field] for field in fields) and not fit.members(UNIT),
+           "V5w failed manager or cgroup changed before V5x")
+    return dict(manager, stage="v5w-drained", guard_terminal=reference, failure=terminal["native_failure"],
+                recovery=terminal["recovery_started"], candidate=terminal["candidate"])
 
 
 def guard_terminal_predecessor(s, build, successor):
@@ -354,7 +417,9 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and {path.name for path in prior.iterdir()} == {"failed.json", "recovery-started.json"},
                "unqualified retry of the V5p audit turnover failure")
         window["public_audit_terminal"] = terminal
-    if V5U_QUERY_RECOVERY:
+    if V5W_DONOR_RECOVERY:
+        _, window["guard_terminal_predecessor"] = v5w_failed_owner(s, build, generation)
+    elif V5U_QUERY_RECOVERY:
         window["guard_terminal_predecessor"] = v5u_terminal_predecessor(s, seal, build, generation)
     elif GUARD_TERMINAL_RECOVERY:
         window["guard_terminal_predecessor"] = guard_terminal_predecessor(s, build, generation)
@@ -407,7 +472,7 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     if HOMEFLOOR_REJOIN:
         predecessor = "failed_retry1"
     if V5U_QUERY_RECOVERY:
-        predecessor_key = "failed_v5v" if V5V_CUSTODY_RECOVERY else "failed_v5u"
+        predecessor_key = "failed_v5w" if V5W_DONOR_RECOVERY else "failed_v5v" if V5V_CUSTODY_RECOVERY else "failed_v5u"
         s.need(started["prior_frozen_recovery"][predecessor_key]["terminal"] == window["guard_terminal_predecessor"],
                "native worker has a different immediate predecessor")
     s.need(started["iid"] == generation and started["image"] == image_sha

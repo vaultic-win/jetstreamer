@@ -116,6 +116,10 @@ pub fn predecessor() -> Result<Value> {
             }
             evidence["failed_v5u"] = v5u;
         }
+        #[cfg(incident_v5w_guard_recovery145_only)]
+        {
+            evidence["failed_v5w"] = crate::incident145::failed_v5w()?;
+        }
         evidence
     };
     Ok(previous)

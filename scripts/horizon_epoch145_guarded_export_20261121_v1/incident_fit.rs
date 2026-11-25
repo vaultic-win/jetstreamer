@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_v5v_guard_recovery145_only)]
+#[cfg(incident_v5w_guard_recovery145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5w-donor-recovery-v1/post-stop-fit";
+#[cfg(all(incident_v5v_guard_recovery145_only, not(incident_v5w_guard_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5v-custody-recovery-v1/post-stop-fit";
 #[cfg(all(incident_v5u_guard_recovery145_only, not(incident_v5v_guard_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5u-guard-recovery-v1/post-stop-fit";
@@ -576,6 +578,41 @@ fn retained_donor_pressure<'a>(stderr: &'a str, provider: &str) -> Option<&'a st
     recognized.then_some(detail)
 }
 
+#[cfg(incident_v5w_guard_recovery145_only)]
+fn retained_donor_lock_busy(stderr: &str, provider: &str) -> bool {
+    let Some(directory) = Path::new(provider).parent() else {
+        return false;
+    };
+    let quote_frame = format!("  File \"{provider}\", line ");
+    let donor_frame = format!("  File \"{}\", line ", directory.join("build_159_price.py").display());
+    let mut rows = stderr.trim_end().lines();
+    rows.next() == Some("Traceback (most recent call last):")
+        && rows.next().is_some_and(|row| row.starts_with(&quote_frame) && row.ends_with(", in <module>"))
+        && rows.next_back() == Some("ValueError: another actor holds the donor; requires its own enrollment")
+        && rows.clone().any(|row| row.starts_with(&quote_frame) && row.ends_with(", in capture"))
+        && rows.clone().any(|row| row.starts_with(&donor_frame) && row.ends_with(", in snapshot"))
+        && rows.any(|row| row.starts_with(&donor_frame) && row.ends_with(", in donor_users"))
+}
+
+#[cfg(all(test, incident_v5w_guard_recovery145_only))]
+#[test]
+fn donor_lock_busy_requires_the_sealed_quote_and_snapshot_frames() {
+    let provider = "/sealed/post-stop-fit";
+    let trace = concat!(
+        "Traceback (most recent call last):\n",
+        "  File \"/sealed/post-stop-fit\", line 1692, in <module>\n",
+        "  File \"/sealed/post-stop-fit\", line 1594, in capture\n",
+        "  File \"/sealed/build_159_price.py\", line 133, in snapshot\n",
+        "  File \"/sealed/build_159_price.py\", line 84, in donor_users\n",
+        "  File \"/sealed/build_159_price.py\", line 32, in need\n",
+        "ValueError: another actor holds the donor; requires its own enrollment\n",
+    );
+    assert!(retained_donor_lock_busy(trace, provider));
+    assert!(!retained_donor_lock_busy(trace, "/foreign/post-stop-fit"));
+    assert!(!retained_donor_lock_busy(&trace.replace("in donor_users", "in cover"), provider));
+    assert!(!retained_donor_lock_busy(&trace.replace("another actor holds the donor", "donor lock replaced"), provider));
+}
+
 fn reserved_memory(_complete: &Value) -> Result<u64> {
     #[cfg(any(incident_homefloor145_only, incident_v5j_post145_only))]
     let qualification_memory = match &_complete["bounded_qualification"] {
@@ -787,6 +824,14 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         .output()?;
     let err = String::from_utf8_lossy(&out.stderr);
     if !out.status.success() {
+        #[cfg(incident_v5w_guard_recovery145_only)]
+        if out.status.code() == Some(1)
+            && out.stdout.is_empty()
+            && retained_donor_lock_busy(&err, PROVIDER)
+        {
+            return Err(anyhow::Error::new(capacity::GuardInFlight)
+                .context("retained donor operation lock is held during the fresh price"));
+        }
         #[cfg(any(incident_homefloor145_only, incident_v5j_post145_only))]
         if out.status.code() == Some(75)
             && out.stdout.is_empty()
@@ -871,7 +916,9 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         let observed: Bound = serde_json::from_value(
             complete["phase145"]["window"]["guard_terminal_predecessor"].clone(),
         )?;
-        #[cfg(incident_v5v_guard_recovery145_only)]
+        #[cfg(incident_v5w_guard_recovery145_only)]
+        let pinned = incident145::v5w_terminal()?;
+        #[cfg(all(incident_v5v_guard_recovery145_only, not(incident_v5w_guard_recovery145_only)))]
         let pinned = incident145::v5v_terminal()?;
         #[cfg(not(incident_v5v_guard_recovery145_only))]
         let pinned = custody::binding(&Path::new(RUNTIME).join(

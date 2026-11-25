@@ -16,7 +16,12 @@ compile_error!("the timed-out V5u successor requires the previous fresh-census g
 #[cfg(all(incident_v5v_guard_recovery145_only, not(incident_v5u_guard_recovery145_only)))]
 compile_error!("the pre-read custody retry requires the entire V5v verifier guard");
 
-#[cfg(incident_v5v_guard_recovery145_only)]
+#[cfg(all(incident_v5w_guard_recovery145_only, not(incident_v5v_guard_recovery145_only)))]
+compile_error!("the donor-lock retry requires the V5w verifier guard");
+
+#[cfg(incident_v5w_guard_recovery145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5x/export145";
+#[cfg(all(incident_v5v_guard_recovery145_only, not(incident_v5w_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5w/export145";
 #[cfg(all(incident_v5u_guard_recovery145_only, not(incident_v5v_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5v/export145";
@@ -182,6 +187,69 @@ pub(super) fn failed_v5v(v5u: &Value) -> Result<Value> {
         "V5v pre-read failure and the immutable paid candidate do not agree"
     );
     Ok(json!({"terminal": terminal, "start": launch, "native_exit":exit}))
+}
+
+#[cfg(incident_v5w_guard_recovery145_only)]
+const V5W: &str = "97bd2045ebe449e3ae77330c7e4ec7b4";
+
+#[cfg(incident_v5w_guard_recovery145_only)]
+pub(super) fn v5w_terminal() -> Result<Bound> {
+    let pin = Bound {
+        path: Path::new(RUNTIME).join(
+            "epoch145-semantic-continuity-20261121-v1/v5w-name-handoff/V5W_TERMINAL_FAILURE_DONOR.json",
+        ),
+        sha256: "8d36ea63912877df362dc33c21d4a834236d4cf36717ee7de9dafadd2153f288".into(),
+    };
+    ensure!(custody::binding(&pin.path)? == pin, "V5w terminal custody changed");
+    Ok(pin)
+}
+
+#[cfg(incident_v5w_guard_recovery145_only)]
+pub(super) fn failed_v5w() -> Result<Value> {
+    let terminal = v5w_terminal()?;
+    let proof = custody::evidence(&terminal)?;
+    let state = Path::new(BASE).join("state").join(V5W);
+    let startup = Bound {
+        path: state.join("recovery-started.json"),
+        sha256: "ab3c4335da00c6ffa76f907406327754dc5253eae294886878ab4765995601bd".into(),
+    };
+    let start = custody::evidence(&startup)?;
+    let native = continuity::failure(V5W)?;
+    let failure = custody::binding(&state.join("failed.json"))?;
+    let error = custody::evidence(&failure)?;
+    let file = materialized::leaf()?;
+    let paid = custody::frozen_identity(&file)?;
+    ensure!(
+        proof["schema"] == "horizon-epoch145-v5w-terminal-donor-lock-failure-v1"
+            && proof["unit"] == UNIT
+            && proof["invocation_id"] == V5W
+            && proof["recovery_started"] == json!(startup)
+            && proof["native_failure"] == json!(failure)
+            && native["failure"] == json!(failure)
+            && proof["native_events"][2]["__CURSOR"] == native["native"]["__CURSOR"]
+            && proof["boot_id"] == native["native"]["_BOOT_ID"]
+            && error["error"].as_str().is_some_and(|error| error.trim_end().ends_with(
+                "ValueError: another actor holds the donor; requires its own enrollment"))
+            && start["iid"] == V5W
+            && start["image"] == "0e34c229dc3fd3354cb4e9343eb8657739d5079cc3cf353c54402fc57fdbd5d0"
+            && start["file"] == json!(file)
+            && start["r2_mutations"] == false
+            && proof["candidate"]["path"] == json!(file)
+            && proof["candidate"]["device"] == paid.device
+            && proof["candidate"]["inode"] == paid.inode
+            && proof["candidate"]["bytes"] == paid.bytes
+            && proof["candidate"]["mtime_ns"].as_i64().map(i128::from) == Some(paid.mtime_ns)
+            && proof["candidate"]["ctime_ns"].as_i64().map(i128::from) == Some(paid.ctime_ns)
+            && !state.join("verified-frozen.json").try_exists()?
+            && !state.join("source-semantics.json").try_exists()?
+            && !state.join("extraction-complete.json").try_exists()?
+            && proof["semantic_completion"] == false
+            && proof["resource_credit_bytes"] == 0
+            && proof["archive_publication_authorized"] == false
+            && proof["r2_mutations"] == false,
+        "V5w donor-lock failure or paid candidate changed"
+    );
+    Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
 }
 
 pub fn predecessor() -> Result<Value> {
