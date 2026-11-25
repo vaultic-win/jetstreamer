@@ -74,6 +74,16 @@ def gate(plan, configured):
             gate["evidence"].append(evidence)
     if UNIT not in plan["tracked_units"]:
         plan["tracked_units"].append(UNIT)
-    if configured:
+    terminal = STATE / "terminal.json"
+    if terminal.is_file():
+        result = ref(terminal)
+        closed = bound(result)
+        assert not configured and closed["launch"] == source and closed["guard_drained"]
+        assert closed["invocation_id"] == row["invocation_id"]
+        if result not in gate["evidence"]:
+            gate["evidence"].append(result)
+        gate["state"] = "failed-needs-repair"
+        gate["next_action"] = closed["next_action"]
+    elif configured:
         gate["state"] = "staged-admissible"
         gate["next_action"] = "Track the guarded replay and verify the AccountsDb root at slot 128,303,325."

@@ -1,0 +1,49 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -27,8 +27,10 @@
+ def samplepath(n):return D/f'horizon-resume-observer-20261120-v{n}.json'
+ def root(n):return D/f'horizon-foundation-seven-lane-v{n}'
+ from epoch292_cadence_cutoff import interrupted_cutoff
++from epoch296_cadence_cutoff import interrupted_cutoff as interrupted296_cutoff
+ n=222
+ preserved_cutoff=None
++preserved296_cutoff=None
+ while True:
+     if (root(n)/'status-audit.json').exists():
+         n+=1
+@@ -36,6 +38,11 @@
+     if n==291:
+         preserved_cutoff=interrupted_cutoff()
+         if preserved_cutoff is not None:
++            n+=1
++            continue
++    if n==331:
++        preserved296_cutoff=interrupted296_cutoff()
++        if preserved296_cutoff is not None:
+             n+=1
+             continue
+     break
+@@ -48,8 +55,12 @@
+ prior=bound(ref(old));next_time=max(dtval(prior['recorded_at_utc'])+1800,dtval(audit['sampled_at_utc'])+1800)
+ if n>222:
+     prior_index=290 if n==292 and preserved_cutoff is not None else n-1
++    if n==332 and preserved296_cutoff is not None:
++        prior_index=330
+     last=bound(ref(root(prior_index)/'status-audit.json'))
+     status_sources=preserved_cutoff['statuses'] if n==292 and preserved_cutoff is not None else last['statuses']
++    if n==332 and preserved296_cutoff is not None:
++        status_sources=preserved296_cutoff['statuses']
+     statuses={int(k):v for k,v in status_sources.items()}
+     prevfleet=last['previous_native_fleet']
+     previous_completion = root(prior_index) / 'completion.json'
+@@ -64,6 +75,10 @@
+         assert preserved_cutoff['observer']==ref(old)
+         assert preserved_cutoff['accepted_predecessor']==ref(previous_completion)
+         assert preserved_cutoff['previous_fleet']==prevfleet
++    if n==332 and preserved296_cutoff is not None:
++        assert preserved296_cutoff['observer']==ref(old)
++        assert preserved296_cutoff['accepted_predecessor']==ref(previous_completion)
++        assert preserved296_cutoff['previous_fleet']==prevfleet
+ else:prevfleet=audit['previous_fleet']
+ correction=D/'horizon257-full-capacity-status-v222-a1/completion.json'
+ if n==223 and correction.is_file():
