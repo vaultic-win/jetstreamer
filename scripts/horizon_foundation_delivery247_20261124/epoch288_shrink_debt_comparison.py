@@ -67,6 +67,8 @@ HOLDING288_UNITS = {
     'horizon-restore-288-appendvec-stream-v1.service': (
         'comparison-start.json', 'comparison-start-v1', '113-114', 2 << 30),
 }
+BOOTSTRAP231_UNIT = 'foundation-231-capped-bootstrap-parity-v1.service'
+BOOTSTRAP231 = V / 'horizon231-capped-bootstrap-parity-v1'
 PUBLIC_AUDIT = V / 'horizon-foundation-public-audit-148-156-v1'
 PUBLIC_AUDIT_RELEASE_SHA = 'ea750bf0be9c6742af0ca1503e8cba094594557e1b5225ad8ff93f693f2a344d'
 SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
@@ -381,6 +383,26 @@ def active_288_holding(ops, unit):
     return dict(start=start_ref, owner=owner)
 
 
+def active_231_bootstrap_parity(ops):
+    owner = ops.props(BOOTSTRAP231_UNIT, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
+                                        'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
+    group = Path('/sys/fs/cgroup/system.slice') / BOOTSTRAP231_UNIT
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
+        return None
+    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (BOOTSTRAP231_UNIT, 'active', 'running')
+    start_ref = binding(BOOTSTRAP231 / 'start.json')
+    start = read(start_ref)
+    assert start['schema'] == 'foundation-epoch231-capped-bootstrap-parity-start-v1'
+    assert owner['ControlGroup'] == '/system.slice/' + BOOTSTRAP231_UNIT
+    assert all(owner[key] == start['owner'][key] for key in ('InvocationID', 'MainPID', 'ControlGroup'))
+    assert Path('/proc', owner['MainPID'], 'exe').samefile(checked(start['binary']))
+    assert int(owner['MemoryMax']) == start['memory_max_bytes'] == 160 << 30
+    assert owner['AllowedCPUs'] == start['cpus'] == '118-121'
+    assert start['replay_launch_authorized'] is False
+    return dict(start=start_ref, owner=owner)
+
+
 def active_public_audit(helper, census):
     units = [name for name in census if name.startswith('foundation-public-audit-')]
     if not units:
@@ -494,10 +516,13 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
                   if (item := active_288_holding(kit.ops, unit)) is not None}
     assert len(holding288) <= 1, 'epoch 288 holding phases overlap'
     live.extend(item['owner'] for item in holding288.values())
+    bootstrap231 = active_231_bootstrap_parity(kit.ops)
+    if bootstrap231 is not None:
+        live.append(bootstrap231['owner'])
     census = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
         '--no-pager', '--no-legend', '--plain', 'horizon-qualify-*', 'horizon-perf-*', 'horizon-upload-*',
         'horizon-restore-*', 'foundation-*-broker-*', 'foundation-public-audit-*',
-        'foundation-*-ext4-*', PARK292_UNIT, STAGE228_UNIT, 'foundation-288-appendvec-*'],
+        'foundation-*-ext4-*', PARK292_UNIT, STAGE228_UNIT, 'foundation-288-appendvec-*', BOOTSTRAP231_UNIT],
         text=True, timeout=10)
     listed_units = {line.split()[0] for line in census.splitlines() if line.strip()}
     public_audit = active_public_audit(helper, listed_units)
@@ -548,7 +573,8 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
                 live_units=owners, broker=broker, guards=growth, free_bytes=free, protected_disk_bytes=protected,
                 reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref, extraction226_terminal=terminal226,
                 staging292=staging, custody292=custody, staging228=stage228,
-                staging288=holding288.get(STAGE288_UNIT), holding288=holding288, public_audit=public_audit,
+                staging288=holding288.get(STAGE288_UNIT), holding288=holding288, bootstrap231=bootstrap231,
+                public_audit=public_audit,
                 guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=candidate_disk,
                 candidate_memory_max_bytes=candidate_memory, candidate_cpus=sorted(candidate_cpus),
                 disk_shortfall_bytes=max(0, protected + candidate_disk - free),
