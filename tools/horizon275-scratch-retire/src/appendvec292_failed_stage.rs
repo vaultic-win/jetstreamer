@@ -29,9 +29,13 @@ const STOPPED: [(&str, &str, &str); 2] = [
     ),
 ];
 
-fn no_readers(scope: &Path, target: &Path) -> Result<Value> {
+pub(super) fn accounts_readers(scope: &Path, target: &Path) -> Result<Value> {
+    no_readers(scope, target, &STOPPED[..1])
+}
+
+fn no_readers(scope: &Path, target: &Path, stopped: &[(&str, &str, &str)]) -> Result<Value> {
     let report = scheduled_census(scope, target)?;
-    for (unit, invocation, _) in STOPPED {
+    for &(unit, invocation, _) in stopped {
         let output = Command::new("/usr/bin/systemctl")
             .args(["show", unit, "-p",
                 "LoadState,ActiveState,MainPID,ControlPID,ControlGroup,Job,InvocationID,Restart,RequiredBy,WantedBy,Triggers,TriggeredBy,NRestarts"])
@@ -81,18 +85,18 @@ fn no_readers(scope: &Path, target: &Path) -> Result<Value> {
         .context("invalid scheduled-reader response")?
     {
         ensure!(
-            STOPPED.iter().any(|(unit, _, digest)| {
+            stopped.iter().any(|(unit, _, digest)| {
                 referrer["origin"] == format!("/run/systemd/transient/{unit}")
                     && referrer["sha256"] == *digest
             }) && referrer["chain"] == json!([])
                 && referrer["targets"] == json!([target]),
-            "unexpected scheduled reference to failed stage"
+            "unexpected scheduled reference to epoch 292 scratch"
         );
     }
     let processes = process_references::scan(Path::new("/proc"), target)?;
     ensure!(
         processes.inspected_processes > 0 && processes.references.is_empty(),
-        "live failed-stage reference"
+        "live epoch 292 scratch reference"
     );
     Ok(json!({"scheduled":report,"processes":processes}))
 }
@@ -178,7 +182,7 @@ pub(super) fn run(apply: bool, state: &Path, restored: &Value, tree: Binding) ->
             && directory_mode.mode() & 0o777 == 0o700,
         "failed-stage directory permissions changed"
     );
-    let readers = no_readers(scope, &target)?;
+    let readers = no_readers(scope, &target, &STOPPED)?;
     let evidence = json!({"tree_retirement":tree,"failed_source":expected,
         "normalized_comparison":{"path":NORMALIZED,"sha256":NORMALIZED_SHA}});
     let check_path = state.join("failed-stage-check.json");
@@ -290,7 +294,7 @@ mod tests {
             &prefix["newer_bundle"]["stamp"]["bytes"],
         )?;
         ensure!(partial_stamp(&target.symlink_metadata()?)? == evidence["stamp"]);
-        no_readers(scope, &target)?;
+        no_readers(scope, &target, &STOPPED)?;
         Ok(())
     }
 }

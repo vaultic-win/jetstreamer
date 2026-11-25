@@ -284,12 +284,7 @@ pub(super) fn run(
         );
         return failed::run(apply, state, &result, tree_ref);
     }
-    let schedule = scheduled(run, target)?;
-    let consumers = process_references::scan(Path::new("/proc"), target)?;
-    ensure!(
-        consumers.inspected_processes > 0 && consumers.references.is_empty(),
-        "live 292 source consumers"
-    );
+    let readers = failed::accounts_readers(run, target)?;
     let ledger_path = state.join("ledger.json");
     if !apply {
         ensure!(
@@ -312,7 +307,7 @@ pub(super) fn run(
             record(
                 &ledger_path,
                 &json!({
-                    "anchors":anchors,"entries":entries,"scheduled":schedule,"consumers":consumers,
+                    "anchors":anchors,"entries":entries,"scheduled":readers["scheduled"],"consumers":readers["processes"],
                 }),
             )?
         };
@@ -409,6 +404,7 @@ mod tests {
                 .context("missing retained archive path")?,
         );
         check_retained_archive(&open_regular(archive)?.metadata()?, expected_archive)?;
+        failed::accounts_readers(Path::new(snapshot288::RUN292), target)?;
         Ok(())
     }
 }
