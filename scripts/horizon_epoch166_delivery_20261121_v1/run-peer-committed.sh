@@ -23,6 +23,9 @@ case "$delivery" in
     "$rt/epoch167-current-delivery-20261121-v1")
         epoch=167
         unit=horizon-publish-167-source-index-committed.service ;;
+    "$rt/epoch168-cold-delivery-20261123-v4")
+        epoch=168
+        unit=horizon-publish-168-cold-retry4-committed.service ;;
     "$rt/epoch170-cold-delivery-20261122-v13")
         epoch=170
         unit=horizon-publish-170-cold-retry13-committed.service ;;

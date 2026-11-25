@@ -19,16 +19,17 @@ spec.loader.exec_module(r)
 retry10 = "--retry10" in sys.argv[5:]
 metered168 = "--metered168" in sys.argv[5:]
 peers = {"--cold167": (167, "horizon-publish-167-cold-source-index-committed.service"),
+         "--cold168": (168, "horizon-publish-168-cold-retry4-committed.service"),
          "--cold170": (170, "horizon-publish-170-cold-retry13-committed.service"),
          "--source167": (167, "horizon-publish-167-source-index-committed.service"),
          "--retry170": (170, "horizon-publish-170-retry10-committed.service"),
          "--full172": (172, "horizon-publish-172-full-committed.service")}
-cold = {"--cold167": r.COLD167, "--cold170": r.COLD170}
+cold = {"--cold167": r.COLD167, "--cold168": r.COLD168, "--cold170": r.COLD170}
 peer = next((flag for flag in peers if flag in sys.argv[5:]), None)
 if peer:
     sys.argv.remove(peer)
     number, publication_unit = peers[peer]
-    live_root, original_sha, _, producer = cold.get(peer, r.PEERS[number])
+    live_root, original_sha, _, producer = cold[peer] if peer in cold else r.PEERS[number]
 elif metered168:
     sys.argv.remove("--metered168")
     live_root, original_sha, producer = r.METERED_ROOT, r.METERED_LIVE, r.METERED
@@ -140,12 +141,12 @@ if peer in cold:
     live_path.chmod(0o600)
     denied(f"writable-cold{epoch}-witness", run, "unsafe authority")
     live_path.chmod(live_mode)
-    previous = r.PEERS[epoch][3]
+    previous = r.METERED if epoch == 168 else r.PEERS[epoch][3]
     wrong = copy.deepcopy(terminal)
     wrong.update(producer_unit=previous.unit, producer_invocation_id=previous.invocation_id)
     wrong["manager_terminal"].update(UNIT=previous.unit, INVOCATION_ID=previous.invocation_id)
     put(term_path, wrong, 0o400)
-    previous_label = "old167-source-index" if epoch == 167 else "old170-retry10"
+    previous_label = {167: "old167-source-index", 168: "old168-metered", 170: "old170-retry10"}[epoch]
     denied(previous_label, run, "terminal authority or original producer differs")
 if epoch == 172:
     for label, unit, iid in [

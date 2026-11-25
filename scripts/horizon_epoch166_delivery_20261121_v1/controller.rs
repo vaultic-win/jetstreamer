@@ -20,14 +20,21 @@ const RT: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 compile_error!("cold167 requires the source167 singleton profile");
 #[cfg(all(feature = "cold170", not(feature = "retry170")))]
 compile_error!("cold170 requires the retry170 singleton profile");
-#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+#[cfg(any(
+    feature = "cold168",
+    feature = "source167",
+    feature = "retry170",
+    feature = "full172"
+))]
 #[cfg_attr(feature = "cold167", path = "cold167_profile.rs")]
+#[cfg_attr(feature = "cold168", path = "cold168_profile.rs")]
 #[cfg_attr(feature = "cold170", path = "cold170_profile.rs")]
 mod peer_profile;
 
 #[cfg(not(any(
     feature = "retry10",
     feature = "metered168",
+    feature = "cold168",
     feature = "source167",
     feature = "retry170",
     feature = "full172"
@@ -120,7 +127,12 @@ mod deployment {
         reader_package!("publisher-tools/publisher", "publisher-tools-v2/publisher");
 }
 
-#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+#[cfg(any(
+    feature = "cold168",
+    feature = "source167",
+    feature = "retry170",
+    feature = "full172"
+))]
 mod deployment {
     pub(super) use super::peer_profile::{DELIVERY, GENERATION, LIVE, ORIGIN, UNIT};
     pub(super) const WITNESS: &str = DELIVERY;
@@ -131,12 +143,18 @@ mod deployment {
     pub(super) const PUBLISHER: &str = env!("HORIZON_HELD_PUBLISHER_SHA256");
     pub(super) const PUBLISHER_PATH: &str = "publisher-tools/publisher";
 }
-#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+#[cfg(any(
+    feature = "cold168",
+    feature = "source167",
+    feature = "retry170",
+    feature = "full172"
+))]
 use peer_profile::EPOCH;
 #[cfg(feature = "metered168")]
 const EPOCH: u64 = 168;
 #[cfg(not(any(
     feature = "metered168",
+    feature = "cold168",
     feature = "source167",
     feature = "retry170",
     feature = "full172"
@@ -145,7 +163,11 @@ const EPOCH: u64 = 166;
 use deployment::*;
 const NATIVE: &str = "dea7acbfa01d0beae046549823ebce48e7086a7276349b4530ed35c04a2d4efb";
 const MEMORY: u64 = 2 << 30;
-const WITNESS_MODE: u32 = if cfg!(any(feature = "cold167", feature = "cold170")) {
+const WITNESS_MODE: u32 = if cfg!(any(
+    feature = "cold167",
+    feature = "cold168",
+    feature = "cold170"
+)) {
     0o400
 } else {
     0o600
@@ -244,7 +266,12 @@ fn put(path: &Path, doc: &Value) -> Result<Value> {
     Ok(binding(path, &sha(&bytes)))
 }
 fn validate_terminal(live: &Value, live_ref: &Value, t: &Value, boot: &str) -> Result<()> {
-    #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+    #[cfg(any(
+        feature = "cold168",
+        feature = "source167",
+        feature = "retry170",
+        feature = "full172"
+    ))]
     ensure!(
         live["schema"] == peer_profile::LIVE_SCHEMA,
         "wrong singleton live schema"
@@ -455,7 +482,12 @@ fn main() -> Result<()> {
         1 << 20,
     )?;
     validate_terminal(&live, &live_ref, &terminal, boot)?;
-    #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+    #[cfg(any(
+        feature = "cold168",
+        feature = "source167",
+        feature = "retry170",
+        feature = "full172"
+    ))]
     {
         let tool = rt
             .join(WITNESS)
@@ -525,7 +557,12 @@ fn main() -> Result<()> {
     dispatch.arg("-IB").arg(receiver);
     #[cfg(feature = "metered168")]
     dispatch.arg("--metered168");
-    #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+    #[cfg(any(
+        feature = "cold168",
+        feature = "source167",
+        feature = "retry170",
+        feature = "full172"
+    ))]
     dispatch.arg(peer_profile::controller::FLAG);
     Err(dispatch
         .arg(native)
@@ -547,7 +584,8 @@ mod tests {
         let root = Path::new("/fleet");
         assert_eq!(
             provider_path(root),
-            root.join(DELIVERY).join("capacity-tools-bounded/publication-fit")
+            root.join(DELIVERY)
+                .join("capacity-tools-bounded/publication-fit")
         );
     }
 
@@ -575,7 +613,12 @@ mod tests {
         let (terminal, term_ref) = read_json(&auth.join("TERMINAL_SUCCESS.json"), 0o400, 1 << 20)?;
         let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
         validate_terminal(&live, &live_ref, &terminal, boot.trim())?;
-        #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+        #[cfg(any(
+            feature = "cold168",
+            feature = "source167",
+            feature = "retry170",
+            feature = "full172"
+        ))]
         {
             let mut changed = live.clone();
             changed["schema"] = json!(format!("horizon-{EPOCH}-live-to-terminal-witness-v1"));
