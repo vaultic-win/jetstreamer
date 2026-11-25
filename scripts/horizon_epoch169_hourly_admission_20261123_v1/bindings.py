@@ -109,10 +109,14 @@ def grant():
     intent,iref=locked(C/"START_INTENT.json")
     post,pref=locked(C/"POST_GUARD_CAPACITY.json")
     pre,pre_ref,st=basis()
+    provider=pre["native"].get("hourly169_provider")
     need(post["fits"] and post["complete_cpu"]==a["CPU"] and post["complete_memory"]==a["RAM"] and
          post["private_actor"]["intent"]==iref and post["private_actor"]["held"] and
          post["private_actor"]["producer_iid"]==intent["producer_invocation_id"] and pre_ref==intent["original_prestart"]
-         and post["native"]["fleet"]==pre["fleet"] and 0<=time.time()-post["native"]["recorded_unix_seconds"]<=90,
+         and post["native"]["fleet"]==pre["fleet"]
+         and post["native"].get("hourly169_provider")==provider
+         and (provider is None or post["native"]["phase145"]==pre["native"]["phase145"])
+         and 0<=time.time()-post["native"]["recorded_unix_seconds"]<=90,
          "no fresh, held, independently priced actor")
     bound=a["before"](h["bound"](pre["fleet"]))
     need(bound==post["private_actor"] and verified_watcher()==intent["watcher"],"native actor or watcher changed")

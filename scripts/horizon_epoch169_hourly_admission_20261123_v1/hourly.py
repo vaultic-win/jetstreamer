@@ -138,13 +138,15 @@ def price(native, projection, account_staging=True):
         row = terminal[key]
         st = same_file(Path(row["path"]),row)
         need(st.st_ctime_ns == row["ctime_ns"], "original 169 evidence changed")
-    need(native["candidate136"]["occupied"] is False and native["candidate136"]["loan_micros"] == 0
-         and set(native["survivors"]) == {"172"} and set(native["replacements"]) == {"166","167","168","170"},
-         "different 136/171 donor or peer topology")
+    need(native["candidate136"]["occupied"] is False and native["candidate136"]["loan_micros"] == 0,
+         "different 136/171 donor")
     need(native["resource_credit_bytes"] == 0, "incomplete fleet or audit")
     need(projection["latest_fleet"] == native["fleet"], "different projection and price fleet")
-    public_workers = runpy.run_path(str(Path(__file__).with_name("actor.py")))["public_workers"]
-    workers = public_workers(native, bound(native["fleet"]))
+    actor = runpy.run_path(str(Path(__file__).with_name("actor.py")))
+    fleet = actor["pinned"](native["fleet"])
+    need(old_owner["terminal"] == fleet["focused169_terminal"], "different focused predecessor terminal")
+    actor["replay_peers"](native, fleet)
+    workers = actor["public_workers"](native, fleet)
     base = native["complete_required_HOME_bytes"]
     protected = max(base, base-native["recovery_obligations"]["missing_mirror_bytes"]+
                     projection["audit_growth_and_mirror_bytes"])

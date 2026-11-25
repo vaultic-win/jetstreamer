@@ -68,7 +68,8 @@ V5X_145 = HERE == D / "tools-homefloor-145-v5w-donor-recovery-v1"
 V5X_BUILD_145 = HERE == D / "tools-homefloor-145-v5w-donor-build-v1"
 V5W_RECOVERY_145 = V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or REPRO166_LIVE or FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
 V5Z_POST_145 = HERE == D / "tools-homefloor-145-post-v5z-current-v1"
-V5Z_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v5z-build-v1"
+CURRENT_HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v2"
+V5Z_POST_BUILD_145 = CURRENT_HOURLY169 or HERE == D / "tools-homefloor-145-post-v5z-build-v1"
 V5X_POST_145 = V5Z_POST_145 or HERE == D / "tools-homefloor-145-post-v5x-current-v1"
 V5W_POST_145 = V5X_POST_145 or V5Z_POST_BUILD_145 or REPRO166_POST or HERE == D / "tools-homefloor-145-post-v5w-current-v1"
 V5V_RECOVERY_145 = V5W_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
@@ -115,7 +116,14 @@ V5M_POST = V5N_POST or HERE == D / "tools-homefloor-145-post-v5m-v1"
 V5K_POST = V5M_POST or HERE == D / "tools-homefloor-145-post-v5k-v1"
 V5J_RETRY_POST = V5K_POST or HERE == D / "tools-homefloor-145-post-v5j-v2"
 V5J_POST = V5J_RETRY_POST or HERE == D / "tools-homefloor-145-post-v5j-v1"
-HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v1"
+HOURLY169 = CURRENT_HOURLY169 or HERE == D / "tools-homefloor-169-hourly-v1"
+if CURRENT_HOURLY169:
+    seal, hourly169_provider = s.read(HERE / "deployment-seal-receipt.json")
+    loader["load_package"](HERE, hourly169_provider["sha256"])
+    members = {row["name"]: row for row in seal["members"]}
+    s.need(members["hourly169_actor.py"]["mode"] == "0444" and members["post-stop-fit"]["mode"] == "0555",
+           "foreign hourly 169 provider members")
+    fit.binary(HERE / "post-stop-fit", members["post-stop-fit"]["sha256"])
 if HOURLY169:
     hourly169 = runpy.run_path(str(HERE / "hourly169_actor.py"))
 if HOURLY170 or V5V_RECOVERY_145 or V5W_POST_145:
@@ -205,7 +213,9 @@ def fleet_head(ref):
     mo=re.fullmatch(r"horizon-observer-(root[0-9]{6}[-a-zA-Z0-9]+)\.timer",name)
     s.need(mo and not (R/mo.group(1)/p.name).exists(),"superseded fleet")
     rows=[v for k in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for v in f[k]]
-    if HOURLY169:
+    if CURRENT_HOURLY169:
+        rows, _ = hourly169["roster"](f)
+    elif HOURLY169:
         rows, _ = hourly169["archival_roster"](f)
     if HOURLY170:
         rows, _ = hourly170["roster"](f, "active")
@@ -670,10 +680,12 @@ def phase145(epoch, fleet=None):
                and not any(manager[key] for key in ("Job", "ControlGroup", "TriggeredBy"))
                and not fit.members(fit.A145) and not group.exists(),
                "the epoch 145 verifier still owns the post build slot")
-        seal, _ = s.read(HERE / "deployment-seal-receipt.json")
-        adapter = HERE / "incident-post-phase.py"
+        package = D / "tools-homefloor-145-post-v5z-build-v1" if CURRENT_HOURLY169 else HERE
+        authority = "8e48c19a738a9ff4586c10fd4c7581b5c2a01133b5de5edbae8b7e26e241d4ea" if CURRENT_HOURLY169 else None
+        seal, _ = s.read(package / "deployment-seal-receipt.json", authority)
+        adapter = package / "incident-post-phase.py"
         member, = (row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444")
-        s.need(seal["destination"] == str(HERE), "foreign epoch 145 post build provider")
+        s.need(seal["destination"] == str(package), "foreign epoch 145 post build provider")
         fit.binary(adapter, member["sha256"])
         adapter_scope = runpy.run_path(str(adapter))
         s.need(adapter_scope["V5Z_POST"], "the post build must authenticate V5z completion")
@@ -1351,7 +1363,7 @@ def settled_hourly170_for_145(fleet, fleet_ref, rows):
     return {"observation": receipt, "terminal": terminal}
 
 
-def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None,repro166_mode=None):
+def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None,repro166_mode=None,hourly169_owner=None):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
     closed_before=None
     if CLOSED_RETRY3:
@@ -1545,7 +1557,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         books["168"]["run"] = str(cold168["RUN"])
         books["168"]["stable_root"] = cold168["stable"](s)
         census_stops = {**stopped, "168": interrupted[168]}
-    hourly = hourly169["archival_roster"](f)[1] if HOURLY169 else None
+    hourly = hourly169_owner
+    if HOURLY169 and not CURRENT_HOURLY169:
+        hourly = hourly169["archival_roster"](f)[1]
     entry_lease=f.get("epoch146_bounded_entry_lease")
     population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner,repro166)
     if closed169:books["169"]=focused169_booking(closed169)
@@ -1702,9 +1716,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     return hourly170["price"](native, hourly170_contract, hourly170_owner, hourly170_guard, hourly170_mode)
 
 
-def capture_native(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None,repro166_mode=None):
+def capture_native(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None,repro166_mode=None,hourly169_owner=None):
     try:
-        return capture_once(epoch,ref,prestart136,hourly170_mode,full170_mode,repro166_mode)
+        return capture_once(epoch,ref,prestart136,hourly170_mode,full170_mode,repro166_mode,hourly169_owner)
     except WorkerFork as fork:
         e,before=fork.epoch,fork.anchor
         after=confirm_fork(e,epoch,before,{} if FIFTH168 and e==168 else proof_stops()[str(e)])
@@ -1712,7 +1726,7 @@ def capture_native(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=N
         e,before,after=confirmed.epoch,confirmed.before,confirmed.after
     # Discard every earlier resource measurement. A second fork or a change of child
     # fails the capture instead of chaining unbounded retries.
-    result=capture_once(epoch,ref,prestart136,hourly170_mode,full170_mode,repro166_mode)
+    result=capture_once(epoch,ref,prestart136,hourly170_mode,full170_mode,repro166_mode,hourly169_owner)
     row=result["candidate"] if e==epoch else result["replacements"].get(str(e))
     s.need(row is not None,"replacement disappeared during complete reprice")
     same_fork(after,row,False)
@@ -1730,12 +1744,40 @@ def holding185_program():
     return program
 
 
-def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None, repro166_mode=None):
+def capture_hourly169(epoch, ref, mode):
+    s.need(epoch == 145 and mode in ("prestart", "post-guard"), "unknown hourly 169 price stage")
+    fleet, _ = fleet_head(ref)
+    _, row = hourly169["roster"](fleet)
+    if mode == "prestart":
+        s.need(row is None, "hourly 169 already has an observer claim")
+        before = None
+    else:
+        before = hourly169["before"](fleet, row)
+    native = capture_native(epoch, ref, hourly169_owner=before)
+    hourly169["replay_peers"](native, fleet)
+    hourly169["public_workers"](native, fleet)
+    s.need(native["candidate136"]["occupied"] is False and native["candidate136"]["loan_micros"] == 0,
+           "hourly 169 requires the idle 136 donor")
+    native["hourly169_provider"] = hourly169_provider
+    if mode == "prestart":
+        return native
+    sample, receipt = hourly169["newest_guard"](before)
+    result = hourly169["price"](native, fleet, before, sample)
+    s.need(hourly169["before"](fleet, row) == before, "hourly process generation changed during native capacity capture")
+    result["guard_receipt"] = receipt
+    return result
+
+
+def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None, repro166_mode=None, hourly169_mode=None):
     s.need(REPRO166 == (repro166_mode is not None) and (not REPRO166 or
            (epoch == 145 and prestart136 is None and repro166_mode in ("prestart", "held", "post-guard"))),
            "wrong bounded epoch 166 capture route")
     s.need(HOURLY170 == (hourly170_mode is not None), "hourly 170 mode requires its own sealed provider")
     s.need(FULL170 == (full170_mode is not None), "full epoch 170 mode requires its own sealed provider")
+    s.need(CURRENT_HOURLY169 == (hourly169_mode is not None), "hourly 169 mode requires its own sealed provider")
+    if CURRENT_HOURLY169:
+        s.need(prestart136 is None, "conflicting epoch 136 and hourly 169 claims")
+        return capture_hourly169(epoch, ref, hourly169_mode)
     if REPRO166 or FULL170:
         holding_program = holding185_program()
         holding_before = json.loads(subprocess.check_output([holding_program, "reconcile"], timeout=30))
@@ -1886,6 +1928,9 @@ if __name__=="__main__":
     if launching_post:
         s.need(POST_136, "post submission requires the 136-aware provider")
         args=args[1:]
+    hourly169_mode = None
+    if args and args[0].startswith("--hourly169="):
+        hourly169_mode = args.pop(0).split("=", 1)[1]
     hourly170_mode = None
     if args and args[0].startswith("--hourly170="):
         hourly170_mode = args.pop(0).split("=", 1)[1]
@@ -1912,7 +1957,8 @@ if __name__=="__main__":
         runpy.run_path(str(HERE / "run-recovery"))["check_quote_parent"](ref)
     handback = semantic136_post_window() if launching_post else None
     try:
-        result=capture(int(args[0]),ref,hourly170_mode=hourly170_mode,full170_mode=full170_mode,repro166_mode=repro166_mode)
+        result=capture(int(args[0]),ref,hourly170_mode=hourly170_mode,full170_mode=full170_mode,
+                       repro166_mode=repro166_mode,hourly169_mode=hourly169_mode)
     except PublicReaderTurnover as error:
         print(error, file=sys.stderr)
         sys.exit(os.EX_TEMPFAIL)

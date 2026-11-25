@@ -22,6 +22,12 @@ RAM=810_658_050_048
 GUARD_SHA="b2271db6f25696612c388297db3a10852f7911560887f67dcb404392d91f7016"
 IMAGE="b22fe558888143543594ddaf1bf7de0584a69448f7d27fde6803f8ae95d5bd92"
 WORKER="9665351525b7a6a8b67e985fc35ad896a5adbcb7aeda0cab379be16cf693796a"
+FAILED_PEERS = {
+    "166": ("failed_cold166", "cold166_retry11_write_version_failure", "pid1_exit",
+            "horizon-qualify-166-independent-retry11-20261122.service"),
+    "170": ("failed_cold170", "cold170_retry13_execution_failure", "manager_exit",
+            "horizon-qualify-170-replacement-local3retry13-20261122.service"),
+}
 
 
 def need(ok,msg):
@@ -124,14 +130,40 @@ def public_workers(native, fleet):
     return workers
 
 
+def replay_peers(native, fleet):
+    """Join the funded live peers and prove any missing retry is terminal."""
+    survivors = native["survivors"]
+    replacements = native["replacements"]
+    need(set(survivors) == {"172"} and {"167", "168"} <= set(replacements)
+         and set(replacements) <= {"166", "167", "168", "170"}, "unexpected native replay peers")
+    expected = {e: (row["unit"], row["invocation_id"]) for e, row in survivors.items()}
+    expected.update({e: (row["producer_unit"], row["producer_invocation_id"])
+                     for e, row in replacements.items()})
+    rows = fleet["actual_executing_replays"]
+    actual = {str(row["epoch"]): (row["unit"]["Id"], row["unit"]["InvocationID"]) for row in rows}
+    need(len(actual) == len(rows) and actual == expected, "native replay peers differ from the fleet")
+
+    for epoch, (native_key, fleet_key, event_key, unit) in FAILED_PEERS.items():
+        if epoch in replacements:
+            need(native_key not in native and fleet_key not in fleet, f"live retry {epoch} also appears terminal")
+            continue
+        failure = native.get(native_key)
+        need(failure and failure == fleet.get(fleet_key) and failure["reservation_ending_bytes"] == 0,
+             f"missing matching native and fleet terminal for {epoch}")
+        event = pinned(failure["terminal"])[event_key]
+        need(event["UNIT"] == unit and event["INVOCATION_ID"] == failure["producer_invocation_id"]
+             and event["_PID"] == "1" and event["EXIT_CODE"] == "exited" and event["EXIT_STATUS"] == "1",
+             f"foreign terminal invocation for {epoch}")
+
+
 def price(native, fleet, binding, guard):
-    """Keep the whole former 96 GiB root and all five canonical owners; count new growth once."""
+    """Retain the previous 96 GiB booking and count new growth once."""
     plan=pinned(binding["plan"])
     need(native["complete_cpu_quota_micros"]==CPU and native["complete_memory_plus_reserve_bytes"]==RAM and
          native["candidate136"]["occupied"] is False and native["candidate136"]["loan_micros"]==0 and
-         set(native["replacements"])=={"166","167","168","170"} and set(native["survivors"])=={"172"} and
          native["resource_credit_bytes"]==0 and native["closed_focused169"]["terminal"]==fleet["focused169_terminal"],
-         "different five-owner funding or donor")
+         "different funding, donor, or predecessor terminal")
+    replay_peers(native, fleet)
     public_workers(native, fleet)
     b=native["bookings"]["169"]
     need(b["cap_bytes"]==96*G==b["physical_bytes"]+b["remaining_bytes"],"lost original 169 disk obligation")
@@ -167,14 +199,18 @@ def price(native, fleet, binding, guard):
                 private_actor=binding,current_guard=guard["guard_invocation_id"],resource_credit_bytes=0,
                 canonical_publication_authorized=False)
 
-def archival_roster(fleet):
-    """Retain the closed G4 evidence in the ordinary roster and positively join its disjoint successor."""
+def roster(fleet):
     public=fleet["actual_executing_replays"]+fleet["actual_active_bootstraps"]
     private=fleet["actual_active_private_diagnostics"]
     own=[v for v in private if v["epoch"]==169]
     need(len(own)<=1 and not any(v["epoch"]==169 for v in public),"unexpected canonical 169 or duplicate private owner")
-    binding=before(fleet,own[0] if own else None)
-    return public+[v for v in private if v["epoch"]!=169],binding
+    return public+[v for v in private if v["epoch"]!=169],own[0] if own else None
+
+
+def archival_roster(fleet):
+    """Retain the closed G4 evidence and positively join its disjoint successor."""
+    peers, row = roster(fleet)
+    return peers, before(fleet, row)
 
 
 def newest_guard(binding):

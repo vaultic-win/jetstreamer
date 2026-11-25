@@ -12,6 +12,7 @@ R=h["ROOT"]
 OLD_PROVIDER=R/"incident-replay-fit-20261121-v1/tools-homefloor-145-rejoin-v4/post-stop-fit"
 OLD_SEAL="ed0e272c1cf6df09bb19ff6049154cad9e55f21e96089f66e6f9e3d0f89da9cb"
 OLD_IMAGE="176efc76182b210223953c44669ecd3352ff90023c666a38c5edcc8be2fe10a0"
+CURRENT_PROVIDER=OLD_PROVIDER.parent.parent/"tools-homefloor-169-hourly-v2/post-stop-fit"
 
 
 def indexes():
@@ -47,8 +48,31 @@ def indexes():
     return rows
 
 
-def preflight(projection,sha):
-    # Checking input presence before native work avoids a second host census while GCloud is outstanding.
+def native_prestart(fleet, provider_seal):
+    if provider_seal is None:
+        provider, digest = OLD_PROVIDER, OLD_SEAL
+        mode = []
+    else:
+        provider, digest = CURRENT_PROVIDER, provider_seal
+        mode = ["--hourly169=prestart"]
+    reference = dict(path=str(provider.parent/"deployment-seal-receipt.json"),sha256=digest)
+    actor = runpy.run_path(str(HERE/"actor.py"))
+    seal = actor["pinned"](reference)
+    image, = (m for m in seal["members"] if m["name"]=="post-stop-fit" and m["mode"]=="0555")
+    need(seal["destination"]==str(provider.parent) and h["sha"](provider)==image["sha256"] and
+         (provider_seal is not None or image["sha256"]==OLD_IMAGE), "unqualified native price")
+    native=json.loads(subprocess.check_output([provider,*mode,"145",fleet["path"],fleet["sha256"]],timeout=150))
+    need(native["schema"]=="horizon-incident-replay-fit-v1" and native["fits"] and native["candidate"] is None and
+         native["fleet"]==fleet and native["replay_launch_authorized"] is False and
+         native.get("new_resource_measurements") is not False,"receipt-only price cannot admit the hourly actor")
+    if provider_seal is not None:
+        need(native.get("hourly169_provider")==reference and
+             native["phase145"]["stage"]=="v5z-semantic-complete-drained", "unbound V5z handoff or hourly 169 provider")
+    return native
+
+
+def preflight(projection,sha,provider_seal=None):
+    # Check input custody before taking a native sample.
     source=h["sources"]()
     report=h["bound"](dict(path=source["169"]["receipt"],sha256=source["169"]["sha256"]))
     bank=Path(report["destination"])
@@ -56,14 +80,7 @@ def preflight(projection,sha):
     need(source["169"]["verified_ctime_ns"]==meta.st_ctime_ns,"hourly Bank changed after full digest")
     frozen=h["pin"](projection,sha)
     fleet=frozen["latest_fleet"]
-    rr=h["pin"](OLD_PROVIDER.parent/"deployment-seal-receipt.json",OLD_SEAL)
-    need(rr["destination"]==str(OLD_PROVIDER.parent) and h["sha"](OLD_PROVIDER)==OLD_IMAGE and
-         any(m["name"]=="post-stop-fit" and m["sha256"]==OLD_IMAGE for m in rr["members"]), "unqualified native price")
-    # Retain all gates of the five-owner provider including both current native censuses and G4 closure.
-    native=json.loads(subprocess.check_output([OLD_PROVIDER,"145",fleet["path"],fleet["sha256"]],timeout=150))
-    need(native["schema"]=="horizon-incident-replay-fit-v1" and native["fits"] and native["candidate"] is None and
-         native["fleet"]==fleet and native["replay_launch_authorized"] is False and
-         native.get("new_resource_measurements") is not False,"receipt-only price cannot admit the hourly actor")
+    native=native_prestart(fleet,provider_seal)
     screened=h["price"](native,frozen,account_staging=False)
     need(screened["native_admission_eligible"],"fresh native actor price required")
     return dict(snapshot_identity=[meta.st_dev,meta.st_ino,meta.st_size,meta.st_mtime_ns,meta.st_ctime_ns],fleet=fleet,projection=dict(path=str(projection),sha256=sha),sources=source,source_indexes=indexes(),
@@ -75,9 +92,10 @@ if __name__=="__main__":
     cli=argparse.ArgumentParser(__doc__)
     cli.add_argument("projection",type=Path)
     cli.add_argument("sha256")
+    cli.add_argument("--native-provider-seal",metavar="SHA256")
     args=cli.parse_args()
     try:
-        result=preflight(args.projection,args.sha256)
+        result=preflight(args.projection,args.sha256,args.native_provider_seal)
     except (ValueError,FileNotFoundError) as error:
         print(json.dumps({"ready":False,"reason":str(error),"production_starts":0}))
         raise SystemExit(1)
