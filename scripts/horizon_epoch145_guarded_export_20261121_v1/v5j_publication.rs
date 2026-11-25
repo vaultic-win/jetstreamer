@@ -276,7 +276,7 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
     let (_, captured) = publication::frozen_json(&handoff.join("SEMANTIC_COMPLETION.json"))?;
     ensure!(
         result == captured
-            && result["schema"] == "horizon-epoch145-v5w-donor-successor-semantic-completion-v1"
+            && result["schema"] == "horizon-epoch145-v5x-donor-successor-semantic-completion-v1"
             && result["invocation_id"] == export
             && result["publication_authorized"] == false
             && result["r2_mutations"] == false

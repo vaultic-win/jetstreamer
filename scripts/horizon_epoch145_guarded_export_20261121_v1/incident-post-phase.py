@@ -208,7 +208,7 @@ def v5x_completion(s):
     actor = selected["invocation_id"]
     startup = selected["startup_evidence"]
     s.need(selected == captured and s.iid(actor) and actor != "97bd2045ebe449e3ae77330c7e4ec7b4"
-           and selected["schema"] == "horizon-epoch145-v5w-donor-successor-semantic-completion-v1"
+           and selected["schema"] == "horizon-epoch145-v5x-donor-successor-semantic-completion-v1"
            and startup["invocation_id"] == actor and startup["submission_result"] == start_ref
            and startup["worker_build"] == build_ref and startup["worker_seal"] == seal_ref
            and startup["predecessor_terminal"] == build["guard_terminal"]

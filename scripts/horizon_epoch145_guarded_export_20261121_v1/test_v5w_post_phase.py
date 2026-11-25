@@ -71,6 +71,64 @@ class V5wPostPhase(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"different sealed V5w"):
                 route(status)
 
+    def test_v5x_post_uses_the_successor_receipt_schema_and_start(self):
+        root = Path("/private/runtime")
+        family = root / "epoch145-semantic-continuity-20261121-v1"
+        authority = family / "tools-v5x"
+        handoff = family / "v5x-name-handoff"
+        actor = "a" * 32
+        state = root / "state"
+        helper = authority / "v5v_semantic_completion.py"
+        start = handoff / "START_RESULT.json"
+        sealed = authority / "deployment-seal-receipt.json"
+        build = authority / "build-proof.json"
+        done = state / actor / "complete.json"
+        extraction = state / actor / "extraction-complete.json"
+
+        def ref(path):
+            return {"path": str(path), "sha256": expected_hash}
+
+        predecessor = ref(family / "v5w-name-handoff/V5W_TERMINAL_FAILURE_DONOR.json")
+        result = {"schema":"horizon-epoch145-v5x-donor-successor-semantic-completion-v1",
+                  "invocation_id":actor, "completion":ref(done), "extraction":ref(extraction),
+                  "startup_evidence":{"invocation_id":actor,"submission_result":ref(start),
+                                      "worker_build":ref(build),"worker_seal":ref(sealed),
+                                      "predecessor_terminal":predecessor},
+                  "r2_mutations":False, "publication_authorized":False}
+        captured = handoff / "SEMANTIC_COMPLETION.json"
+        extracted = {"archive_bytes":105_610_995_833}
+        records = {
+            sealed:{"schema":"jetstreamer-sealed-deployment-receipt-v1","destination":str(authority),
+                    "members":[{"name":name,"mode":mode,"sha256":expected_hash}
+                               for name,mode in ((helper.name,"0444"),(build.name,"0444"),("export145","0555"))]},
+            build:{"verifier_sha256":expected_hash,"semantic_checker":ref(helper),"guard_terminal":predecessor},
+            start:{}, captured:result, done:{"receipt":ref(extraction)}, extraction:{"extraction":extracted},
+        }
+
+        def need(ok, message):
+            if not ok:
+                raise ValueError(message)
+
+        def bound(binding, path):
+            self.assertEqual(binding, ref(path))
+            return records[path]
+
+        status = SimpleNamespace(read=lambda path:(records[path],ref(path)), need=need, bound=bound,
+                                 iid=lambda value:value == actor)
+        md = SimpleNamespace(st_uid=0,st_gid=0,st_nlink=1,st_mode=stat.S_IFREG|0o444,st_size=1)
+        with patch.dict(scope, ROOT=root,STATE=state), patch.object(Path,"lstat",return_value=md), \
+             patch.object(Path,"resolve",autospec=True,side_effect=lambda p,**_:p), \
+             patch.object(Path,"read_bytes",return_value=b"sealed tool"), \
+             patch.object(hashlib,"sha256",return_value=SimpleNamespace(hexdigest=lambda:expected_hash)), \
+             patch.object(scope["subprocess"],"check_output",return_value=json.dumps(result)) as checked:
+            self.assertEqual(phase["v5x_completion"](status),(ref(done),extracted))
+            self.assertEqual(checked.call_args.args[0][-2:], [str(start),expected_hash])
+            wrong = dict(result,schema="horizon-epoch145-v5w-donor-successor-semantic-completion-v1")
+            records[captured] = wrong
+            checked.return_value = json.dumps(wrong)
+            with self.assertRaisesRegex(ValueError,"foreign V5x semantic completion"):
+                phase["v5x_completion"](status)
+
 
 if __name__=="__main__":
     unittest.main()
