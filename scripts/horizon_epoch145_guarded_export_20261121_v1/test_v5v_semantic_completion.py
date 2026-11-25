@@ -251,7 +251,7 @@ class QualifiedSuccessor(unittest.TestCase):
 
     def test_published_donor_retries_only_the_identical_read_once(self):
         source = DIRECTORY / "build_159_price.py"
-        self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), scope["DONOR_SHA"])
+        self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), scope["V7_DONOR_SHA"])
         command = runpy.run_path(str(source))["command"]
         query = ("/usr/bin/systemctl", "show", "-p",
                  "Id,ActiveState,SubState,InvocationID,MainPID,ControlPID,Job,NRestarts",

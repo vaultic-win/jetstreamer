@@ -62,7 +62,8 @@ REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v
 REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
 REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
-STOPPED168_PRICE = HERE == D / "tools-homefloor-168-stop-v1"
+V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v1"
+STOPPED168_PRICE = V7_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
 V6_POST_PROVIDER = D / "tools-homefloor-145-post-v6-build-v1"
@@ -137,7 +138,7 @@ if CURRENT_HOURLY169:
     fit.binary(HERE / "post-stop-fit", members["post-stop-fit"]["sha256"])
 if HOURLY169:
     hourly169 = runpy.run_path(str(HERE / "hourly169_actor.py"))
-if HOURLY170 or V5V_RECOVERY_145 or V5W_POST_145:
+if HOURLY170 or V7_145 or V5V_RECOVERY_145 or V5W_POST_145:
     adapter = HERE / "hourly170_actor.py"
     seal, _ = s.read(HERE / "deployment-seal-receipt.json")
     member, = [row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444"]
@@ -622,6 +623,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     if focused is not None:
         post_directory = fixture_post_directory(here)
         lease_directory = next(directory for enabled, directory in (
+            (V7_145, "tools-v7-168-stop"),
             (V6_145, "tools-v6-guard-walk"),
             (V5Z_145, "tools-v5z"),
             (V5Y_145, "tools-v5y"),
@@ -684,6 +686,23 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch, fleet=None):
+    if V7_145:
+        members = fit.members(fit.A145)
+        if members:
+            s.need(epoch == 145, "live epoch 145 requires its own capacity probe")
+            profile, adapter, _ = profile145(HERE, focused="lease-semantic")
+            manager = s.show(fit.A145)
+            phase = runpy.run_path(str(adapter))["inspect"](
+                s, fit.overlap.leases, manager, members, epoch, Path(__file__).resolve(), profile)
+            s.need(phase is not None, "different live epoch 145 V7 verifier")
+            return phase
+        stopped = stopped145_phase()
+        proof, terminal = s.read(
+            R / "epoch145-semantic-continuity-20261121-v1/v6-guard-walk-name-handoff/V6_TERMINAL_FAILURE_168_STOP.json",
+            "cec8b4e1c2903ff7b26960df7e1a3910567a01d60c9dc3292b4733243d5e2b53")
+        s.need(proof["native_failure"] == stopped["failure"] and proof["recovery_started"] == stopped["startup"],
+               "different stopped epoch 145 proof")
+        return dict(stopped, InvocationID=stopped["invocation_id"], guard_terminal=terminal)
     if STOPPED168_PRICE:
         return stopped145_phase()
     if PUBLISH168 and not fit.members(fit.A145):
@@ -1474,7 +1493,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         closed_before=closed_bootstrap["settled"](s,fit)
     stopped=proof_stops()
     f,fleet_rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
-    if V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145:
+    if V7_145 or V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145:
         s.need(not f["actual_active_holding_transfers"] and
                not fit.members("horizon-closed185-lanel-park-20261125-v1.service"),
                "V5x requires the completed handback of the 185 serial holding slot")
@@ -1482,7 +1501,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     rows = {e: row for e, row in fleet_rows.items() if not (active170 and e == 170)}
     failed170 = failed170_replay(f, rows) if V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 else None
     failed166 = retry11["failed"](s, fit, f, rows) if RETAIN_FAILED166 else None
-    hourly170_settled = settled_hourly170_for_145(f, ref, rows) if V5V_RECOVERY_145 or V5W_POST_145 else None
+    hourly170_settled = settled_hourly170_for_145(f, ref, rows) if V7_145 or V5V_RECOVERY_145 or V5W_POST_145 else None
     terminal168 = None
     stopped168 = cold168_guard_stop(f, rows) if STOPPED168_PRICE else None
     if PUBLISH168:
@@ -1897,6 +1916,18 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
     s.need(HOURLY170 == (hourly170_mode is not None), "hourly 170 mode requires its own sealed provider")
     s.need(FULL170 == (full170_mode is not None), "full epoch 170 mode requires its own sealed provider")
     s.need(CURRENT_HOURLY169 == (hourly169_mode is not None), "hourly 169 mode requires its own sealed provider")
+    if V7_145:
+        s.need(epoch == 145 and prestart136 is None, "epoch 145 V7 provider has another claimant")
+        seal, _ = s.read(HERE / "deployment-seal-receipt.json")
+        module = HERE / "build_159_price.py"
+        member, = [row for row in seal["members"] if row["name"] == module.name and row["mode"] == "0444"]
+        s.need(seal["destination"] == str(HERE), "unbound V7 donor price")
+        fit.binary(module, member["sha256"])
+        donor = runpy.run_path(str(module))
+        before = donor["snapshot"]()
+        native = capture_native(epoch, ref)
+        native["epoch159_donor_cover"] = donor["cover"](before, native, donor["snapshot"]())
+        return native
     if STOPPED168_PRICE:
         s.need(epoch in (145, 166, 167, 170) and prestart136 is None,
                "stopped epoch 168 pricing cannot fund a new epoch 168 producer")

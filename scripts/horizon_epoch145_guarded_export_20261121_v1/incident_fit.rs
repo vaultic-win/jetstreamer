@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_v5z_guard_recovery145_only)]
+#[cfg(incident_v6_stop_recovery145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v6-stop-recovery-v1/post-stop-fit";
+#[cfg(all(incident_v5z_guard_recovery145_only, not(incident_v6_stop_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5z-guard-walk-recovery-v1/post-stop-fit";
 #[cfg(all(incident_v5y_guard_recovery145_only, not(incident_v5z_guard_recovery145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-v5y-custody-recovery-v1/post-stop-fit";
@@ -926,7 +928,9 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         let observed: Bound = serde_json::from_value(
             complete["phase145"]["window"]["guard_terminal_predecessor"].clone(),
         )?;
-        #[cfg(incident_v5z_guard_recovery145_only)]
+        #[cfg(incident_v6_stop_recovery145_only)]
+        let pinned = incident145::v6_terminal()?;
+        #[cfg(all(incident_v5z_guard_recovery145_only, not(incident_v6_stop_recovery145_only)))]
         let pinned = incident145::v5z_terminal()?;
         #[cfg(all(incident_v5y_guard_recovery145_only, not(incident_v5z_guard_recovery145_only)))]
         let pinned = incident145::v5y_terminal()?;

@@ -11,7 +11,8 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-V5Z_WALK_RECOVERY = VERSION == "tools-v6-guard-walk"
+V6_STOP_RECOVERY = VERSION == "tools-v7-168-stop"
+V5Z_WALK_RECOVERY = VERSION == "tools-v6-guard-walk" or V6_STOP_RECOVERY
 V5Y_CUSTODY_RECOVERY = VERSION == "tools-v5z" or V5Z_WALK_RECOVERY
 V5X_SCHEMA_RECOVERY = VERSION == "tools-v5y" or V5Y_CUSTODY_RECOVERY
 V5W_DONOR_RECOVERY = VERSION == "tools-v5x" or V5X_SCHEMA_RECOVERY
@@ -45,6 +46,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5x": "tools-homefloor-145-v5w-donor-recovery-v1",
                       "tools-v5y": "tools-homefloor-145-v5x-schema-recovery-v1",
                       "tools-v5z": "tools-homefloor-145-v5y-custody-recovery-v1",
+                      "tools-v7-168-stop": "tools-homefloor-145-v6-stop-recovery-v1",
                       "tools-v6-guard-walk": "tools-homefloor-145-v5z-guard-walk-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
@@ -291,7 +293,8 @@ def schema_retry_stopped_phase(s, fit, fleet, package):
 def schema_retry_failed_owner(s, build, successor):
     reader = schema_retry_reader(s, PKG)
     reference = build["guard_terminal"]
-    verify = (reader["guard_walk_failure"] if V5Z_WALK_RECOVERY else
+    verify = (reader["guard_stop_failure"] if V6_STOP_RECOVERY else
+              reader["guard_walk_failure"] if V5Z_WALK_RECOVERY else
               reader["receipt_mode_failure"] if V5Y_CUSTODY_RECOVERY else reader["startup_schema_failure"])
     _terminal, exit_event = verify(reference)
     history = reader["journal"](None, *(reader[key] for key in
@@ -508,16 +511,19 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                    / HOMEFLOOR_PROVIDER / "deployment-seal-receipt.json"), "foreign 145 pre-worker admission")
     if STATUS_OWNER_RECOVERY:
         if V5W_DONOR_RECOVERY:
-            handoff = PKG.parent / ("v6-guard-walk-name-handoff" if V5Z_WALK_RECOVERY else
+            handoff = PKG.parent / ("v7-168-stop-name-handoff" if V6_STOP_RECOVERY else
+                                    "v6-guard-walk-name-handoff" if V5Z_WALK_RECOVERY else
                                     "v5z-name-handoff" if V5Y_CUSTODY_RECOVERY else
                                     "v5y-name-handoff" if V5X_SCHEMA_RECOVERY else "v5x-name-handoff")
             intent, _ = s.read(handoff / "START_INTENT.json")
             quoted = s.bound(intent["capacity"], handoff / "FIT.json")
-            schema = ("horizon-epoch145-v5z-guard-walk-successor-start-intent-v1" if V5Z_WALK_RECOVERY else
+            schema = ("horizon-epoch145-v6-stop-successor-start-intent-v1" if V6_STOP_RECOVERY else
+                      "horizon-epoch145-v5z-guard-walk-successor-start-intent-v1" if V5Z_WALK_RECOVERY else
                       "horizon-epoch145-v5y-custody-successor-start-intent-v1" if V5Y_CUSTODY_RECOVERY else
                       "horizon-epoch145-v5x-schema-successor-start-intent-v1" if V5X_SCHEMA_RECOVERY
                       else "horizon-epoch145-v5v-custody-successor-start-intent-v1")
-            predecessor_stage = ("v5z-drained" if V5Z_WALK_RECOVERY else
+            predecessor_stage = ("v6-failed-168-guard-stop" if V6_STOP_RECOVERY else
+                                 "v5z-drained" if V5Z_WALK_RECOVERY else
                                  "v5y-drained" if V5Y_CUSTODY_RECOVERY else
                                  "v5x-drained" if V5X_SCHEMA_RECOVERY else "v5w-drained")
             s.need(intent["schema"] == schema
@@ -555,7 +561,8 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     if HOMEFLOOR_REJOIN:
         predecessor = "failed_retry1"
     if V5U_QUERY_RECOVERY:
-        predecessor_key = ("failed_v5z" if V5Z_WALK_RECOVERY else
+        predecessor_key = ("failed_v6" if V6_STOP_RECOVERY else
+                           "failed_v5z" if V5Z_WALK_RECOVERY else
                            "failed_v5y" if V5Y_CUSTODY_RECOVERY else "failed_v5x" if V5X_SCHEMA_RECOVERY else "failed_v5w" if V5W_DONOR_RECOVERY
                            else "failed_v5v" if V5V_CUSTODY_RECOVERY else "failed_v5u")
         s.need(started["prior_frozen_recovery"][predecessor_key]["terminal"] == window["guard_terminal_predecessor"],

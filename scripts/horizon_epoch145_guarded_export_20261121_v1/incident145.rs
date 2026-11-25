@@ -28,7 +28,12 @@ compile_error!("the receipt-mode retry requires the V5y verifier guard");
 #[cfg(all(incident_v5z_guard_recovery145_only, not(incident_v5y_guard_recovery145_only)))]
 compile_error!("the allocation-walk hold retry requires the V5z verifier guard");
 
-#[cfg(incident_v5z_guard_recovery145_only)]
+#[cfg(all(incident_v6_stop_recovery145_only, not(incident_v5z_guard_recovery145_only)))]
+compile_error!("the epoch 168 stop recovery requires the complete V6 verifier guard");
+
+#[cfg(incident_v6_stop_recovery145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7-168-stop/export145";
+#[cfg(all(incident_v5z_guard_recovery145_only, not(incident_v6_stop_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v6-guard-walk/export145";
 #[cfg(all(incident_v5y_guard_recovery145_only, not(incident_v5z_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5z/export145";
@@ -415,6 +420,66 @@ pub(super) fn failed_v5z(prior: &Value) -> Result<Value> {
             && proof["archive_publication_authorized"] == false
             && proof["r2_mutations"] == false,
         "V5z guard-walk terminal and paid candidate do not agree"
+    );
+    Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
+}
+
+#[cfg(incident_v6_stop_recovery145_only)]
+pub(super) fn v6_terminal() -> Result<Bound> {
+    let terminal = custody::binding(&Path::new(RUNTIME).join(
+        "epoch145-semantic-continuity-20261121-v1/v6-guard-walk-name-handoff/V6_TERMINAL_FAILURE_168_STOP.json",
+    ))?;
+    ensure!(
+        terminal.sha256 == "cec8b4e1c2903ff7b26960df7e1a3910567a01d60c9dc3292b4733243d5e2b53",
+        "V6 terminal custody changed"
+    );
+    Ok(terminal)
+}
+
+#[cfg(incident_v6_stop_recovery145_only)]
+pub(super) fn failed_v6(prior: &Value) -> Result<Value> {
+    let iid = "a71285e56d674de3bf793692f93dfbb3";
+    let terminal = v6_terminal()?;
+    let proof = custody::evidence(&terminal)?;
+    let state = Path::new(BASE).join("state").join(iid);
+    let startup = custody::binding(&state.join("recovery-started.json"))?;
+    let start = custody::evidence(&startup)?;
+    let native = continuity::failure(iid)?;
+    let prior_terminal: Bound = serde_json::from_value(prior["terminal"].clone())?;
+    let prior_proof = custody::evidence(&prior_terminal)?;
+    let intent: Bound = serde_json::from_value(proof["start_intent"].clone())?;
+    let intent = custody::evidence(&intent)?;
+    let stop: Bound = serde_json::from_value(proof["guard_stop_168"]["terminal"].clone())?;
+    let stop = custody::evidence(&stop)?;
+    ensure!(
+        proof["schema"] == "horizon-epoch145-v6-terminal-168-guard-stop-v1"
+            && proof["invocation_id"] == iid
+            && proof["unit"] == UNIT
+            && proof["manager"]["InvocationID"] == iid
+            && proof["manager"]["MainPID"] == "0"
+            && proof["manager"]["Result"] == "exit-code"
+            && proof["recovery_started"] == json!(startup)
+            && proof["native_failure"] == native["failure"]
+            && proof["native_exit"]["__CURSOR"] == native["native"]["__CURSOR"]
+            && proof["native_exit"]["_BOOT_ID"] == native["native"]["_BOOT_ID"]
+            && proof["candidate"] == prior_proof["candidate"]
+            && intent["terminal"] == json!(prior_terminal)
+            && intent["worker_seal"] == proof["worker_seal"]
+            && intent["provider_seal"] == proof["provider_seal"]
+            && start["iid"] == iid
+            && start["file"] == proof["candidate"]["path"]
+            && start["image"] == intent["worker"]["sha256"]
+            && !state.join("verified-frozen.json").try_exists()?
+            && !state.join("extraction-complete.json").try_exists()?
+            && !state.join("complete.json").try_exists()?
+            && stop["producer_invocation_id"] == proof["guard_stop_168"]["producer_invocation_id"]
+            && stop["scratch_deleted"] == false
+            && proof["guard_stop_168"]["reservation_ending_bytes"] == 0
+            && proof["resource_credit_bytes"] == 0
+            && proof["semantic_completion"] == false
+            && proof["archive_publication_authorized"] == false
+            && proof["r2_mutations"] == false,
+        "V6 guard-stop terminal and paid candidate do not agree"
     );
     Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
 }
