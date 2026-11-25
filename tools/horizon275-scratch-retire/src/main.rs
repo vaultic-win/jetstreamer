@@ -194,6 +194,15 @@ fn terminal_unit(unit: &str) -> Result<()> {
 }
 
 fn scheduled(scope: &Path, target: &Path) -> Result<Value> {
+    let v = scheduled_census(scope, target)?;
+    ensure!(
+        v["remaining"] == json!([]),
+        "scheduled scratch reference appeared: {v}"
+    );
+    Ok(v)
+}
+
+fn scheduled_census(scope: &Path, target: &Path) -> Result<Value> {
     // Invoke the existing scheduled-reader scanner with the original run's
     // path boundary. Keep the literal target out of the caller's argv.
     let code = r#"import hashlib,json,sys
@@ -221,7 +230,7 @@ print(json.dumps(ns['scan']()))"#;
             && v["inspected_command_sources"]
                 .as_u64()
                 .is_some_and(|n| n > 0)
-            && v["remaining"] == json!([])
+            && v["remaining"].is_array()
             && v["unresolved"] == json!([]),
         "scheduled scratch reference appeared: {v}"
     );
@@ -371,11 +380,16 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if matches!(
         args.get(1).map(String::as_str),
-        Some("--check-parked-292" | "--retire-parked-292")
+        Some(
+            "--check-parked-292"
+                | "--retire-parked-292"
+                | "--check-failed-stage-292"
+                | "--retire-failed-stage-292"
+        )
     ) {
         ensure!(
             unsafe { libc::geteuid() } == 0 && args.len() == 5,
-            "usage: horizon275-scratch-retire --check-parked-292|--retire-parked-292 SELF_SHA256 COMPARISON COMPARISON_SHA256"
+            "usage: horizon275-scratch-retire --check-parked-292|--retire-parked-292|--check-failed-stage-292|--retire-failed-stage-292 SELF_SHA256 COMPARISON COMPARISON_SHA256"
         );
         let binary = File::open("/proc/self/exe")?;
         let metadata = binary.metadata()?;
@@ -384,7 +398,8 @@ fn main() -> Result<()> {
             "unsealed retirement image"
         );
         return appendvec292::run(
-            args[1] == "--retire-parked-292",
+            args[1].starts_with("--retire-"),
+            args[1].ends_with("-failed-stage-292"),
             &args[2],
             Binding {
                 path: args[3].clone().into(),
