@@ -8,7 +8,7 @@ scratch=$work
 cfg=epoch166_recovery
 epoch=166
 extra_cfg=()
-if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch166-after168 || $1 == epoch166-after168-retry3 || $1 == epoch166-after168-closed || $1 == epoch166-after168-retry4 || $1 == epoch168-cold-rebook || $1 == epoch168-cold-retry3 || $1 == epoch168-cold-retry4 ) ]]; then
+if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch166-after168 || $1 == epoch166-after168-retry3 || $1 == epoch166-after168-closed || $1 == epoch166-after168-retry4 || $1 == epoch168-cold-rebook || $1 == epoch168-cold-retry3 || $1 == epoch168-cold-retry4 || $1 == epoch168-cold-retry5 ) ]]; then
     if [[ $1 == epoch170-* ]]; then epoch=170; fi
     retry=${1#*-}
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
@@ -29,7 +29,12 @@ if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epo
         extra_cfg=(--cfg epoch166_after170)
     fi
     date=20261122
-    if [[ $retry == cold-retry4 ]]; then
+    if [[ $retry == cold-retry5 ]]; then
+        epoch=168
+        retry=retry5
+        date=20261125
+        extra_cfg=(--cfg epoch168_cold_retry3 --cfg epoch168_cold_retry4 --cfg epoch168_cold_retry5)
+    elif [[ $retry == cold-retry4 ]]; then
         epoch=168
         retry=retry4
         date=20261123
