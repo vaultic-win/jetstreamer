@@ -2,6 +2,7 @@ from copy import deepcopy
 import json
 from pathlib import Path
 import runpy
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -66,6 +67,27 @@ class BoundedEntry(unittest.TestCase):
         self.assertEqual(scope["writer_contract"](self.writer), self.writer)
         with self.assertRaisesRegex(ValueError, "V12 status"):
             scope["writer_contract"](dict(self.writer, consumer_seal=ref("/fixture/v8", "f" * 64)))
+
+    def test_v9_entry_binds_its_provider_and_rejects_old_completion(self):
+        source = Path(__file__).with_name("run-v7-v12-entry.py")
+        with TemporaryDirectory() as temporary:
+            package = Path(temporary) / "tools-post145-v9-v12-sequence-20261125-v1"
+            package.mkdir()
+            operator = package / "run-v9-v12-entry.py"
+            operator.write_bytes(source.read_bytes())
+            successor = runpy.run_path(str(operator))
+        self.assertIn("tools-homefloor-145-post-v9-build-v1", str(successor["PROVIDER"]))
+        completion = {
+            "stage": "v9-semantic-complete-drained",
+            "completed_invocation_id": successor["OWNER145"],
+            "checker_seal": ref(successor["CHECKER145"] / "deployment-seal-receipt.json",
+                                successor["CHECKER145_SHA"]),
+            "completion": ref(successor["COMPLETE145"], "d" * 64),
+            "semantic_receipt": ref(successor["SEMANTIC145"], "e" * 64),
+        }
+        self.assertEqual(successor["completion_contract"](completion), completion)
+        with self.assertRaisesRegex(ValueError, "V9 semantic"):
+            successor["completion_contract"](self.phase)
 
     def test_price_retains_both_replay_rosters_and_delivery_coverage(self):
         self.check_price(self.quote)

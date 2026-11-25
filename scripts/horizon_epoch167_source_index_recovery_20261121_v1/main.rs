@@ -21,7 +21,7 @@ const COLD168_LAUNCHER: &str = "tools-v2/recover168";
 #[cfg(all(epoch168_cold_retry3, not(epoch168_cold_retry5)))]
 const COLD168_LAUNCHER: &str = "tools/recover168";
 #[cfg(epoch168_cold_retry5)]
-const COLD168_LAUNCHER: &str = "fit-launcher-v2/recover168";
+const COLD168_LAUNCHER: &str = "fit-launcher-v3/recover168";
 mod actor;
 #[cfg(epoch166_after168)]
 #[path = "../horizon_epoch166_guard_recovery_20261121_v1/after168.rs"]
