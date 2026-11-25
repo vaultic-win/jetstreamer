@@ -410,11 +410,13 @@ fn main() -> Result<()> {
                 | "--retire-failed-stage-292"
                 | "--check-parked-288"
                 | "--retire-parked-288"
+                | "--check-288-stage-bundle"
+                | "--retire-288-stage-bundle"
         )
     ) {
         ensure!(
             unsafe { libc::geteuid() } == 0 && args.len() == 5,
-            "usage: horizon275-scratch-retire --check-parked-EPOCH|--retire-parked-EPOCH|--check-failed-stage-292|--retire-failed-stage-292 SELF_SHA256 COMPARISON COMPARISON_SHA256"
+            "usage: horizon275-scratch-retire --check-parked-EPOCH|--retire-parked-EPOCH|--check-failed-stage-292|--retire-failed-stage-292|--check-288-stage-bundle|--retire-288-stage-bundle SELF_SHA256 EVIDENCE EVIDENCE_SHA256"
         );
         let binary = File::open("/proc/self/exe")?;
         let metadata = binary.metadata()?;
@@ -427,6 +429,9 @@ fn main() -> Result<()> {
             path: args[3].clone().into(),
             sha256: args[4].clone(),
         };
+        if args[1].ends_with("-288-stage-bundle") {
+            return appendvec288::retire_bundle(apply, &args[2], comparison);
+        }
         if args[1].ends_with("-288") {
             return appendvec288::run(apply, &args[2], comparison);
         }

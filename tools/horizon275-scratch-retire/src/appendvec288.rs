@@ -1,9 +1,11 @@
 //! Retire only the closed epoch 288 AccountsDb proven by authenticated restoration.
 use super::{
     parked_accounts::{self, sealed},
+    selective_accounts::record,
     snapshot288::Stamp,
     *,
 };
+use std::{ffi::CString, os::unix::ffi::OsStrExt};
 
 const CONTROL: &str = "/var/lib/jetstreamer/horizon288-closed-appendvec-study-v1";
 const STATE: &str = "/var/lib/jetstreamer/horizon288-appendvec-retirement-v1";
@@ -85,7 +87,7 @@ fn restore_start(comparison: &Binding, result: &Value) -> Result<Binding> {
     Ok(reference)
 }
 
-pub(super) fn run(apply: bool, self_sha: &str, comparison: Binding) -> Result<()> {
+fn lock_issuer() -> Result<File> {
     let issuer = open_regular(Path::new(ISSUER))?;
     let mode = issuer.metadata()?;
     ensure!(
@@ -95,6 +97,11 @@ pub(super) fn run(apply: bool, self_sha: &str, comparison: Binding) -> Result<()
             && unsafe { libc::flock(issuer.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "epoch 288 issuer lock is unsafe or busy"
     );
+    Ok(issuer)
+}
+
+pub(super) fn run(apply: bool, self_sha: &str, comparison: Binding) -> Result<()> {
+    let _issuer = lock_issuer()?;
     let _cycle = lock(CYCLE_LOCK)?;
     let _local = lock(LOCAL_LOCK)?;
     ensure!(
@@ -243,6 +250,186 @@ pub(super) fn run(apply: bool, self_sha: &str, comparison: Binding) -> Result<()
             Ok(())
         },
     )
+}
+
+pub(super) fn retire_bundle(apply: bool, self_sha: &str, retirement: Binding) -> Result<()> {
+    let _issuer = lock_issuer()?;
+    let _cycle = lock(CYCLE_LOCK)?;
+    let _local = lock(LOCAL_LOCK)?;
+    let state = Path::new(STATE);
+    ensure!(
+        retirement.path == state.join("completion.json")
+            && sealed(&retirement.path, JSON_LIMIT)?.sha256 == retirement.sha256,
+        "require the exact sealed AccountsDb retirement completion"
+    );
+    let completed: Value = value(&serde_json::to_value(&retirement)?)?;
+    let anchors = &completed["authorization"]["anchors"];
+    ensure!(
+        completed["epoch"] == 288
+            && completed["verified_allocated_bytes_removed"] == ALLOCATION
+            && completed["empty_root_retained"] == true
+            && completed["r2_mutations"] == false
+            && completed["publication_authorized"] == false,
+        "AccountsDb retirement has not completed"
+    );
+    let comparison: Binding = serde_json::from_value(anchors["comparison"].clone())?;
+    let verified = value(&anchors["comparison"])?;
+    ensure!(
+        verified["schema"] == "foundation-epoch288-appendvec-stream-comparison-v1"
+            && verified["authenticated_remote_sha256_readback"] == true
+            && verified["complete_sparse_payload_matches"] == true
+            && verified["members"] == FILES,
+        "missing authenticated comparison of the holding bundle"
+    );
+    let start = restore_start(&comparison, &verified)?;
+    ensure!(
+        anchors["restore_start"] == serde_json::to_value(start)?,
+        "retirement and restore invocation disagree"
+    );
+    for unit in [STAGE_UNIT, CUSTODY_UNIT] {
+        terminal_unit(unit)?;
+    }
+    let source = Path::new(
+        verified["source"]
+            .as_str()
+            .context("missing AccountsDb path")?,
+    );
+    let source_metadata = source.symlink_metadata()?;
+    ensure!(
+        anchors["target"] == verified["source"]
+            && source.canonicalize()? == source
+            && source_metadata.dev() == DEVICE
+            && source_metadata.ino() == INODE
+            && source.read_dir()?.next().is_none(),
+        "retired AccountsDb root changed or contains files"
+    );
+    let custody = value(&verified["custody"])?;
+    let archive = Path::new(
+        custody["manifest"]["preserved_archive"]["path"]
+            .as_str()
+            .context("missing retained partial archive path")?,
+    );
+    let preserved: Stamp = serde_json::from_value(anchors["retained_archive"].clone())?;
+    preserved.at(archive)?;
+    let bundle = Path::new(BUNDLE);
+    let mount = bundle.parent().context("missing staging mount")?;
+    ensure!(mount.canonicalize()? == mount, "aliased staging mount");
+    let parent = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(mount)?;
+    let parent_meta = parent.metadata()?;
+    let mut fs: libc::statfs = unsafe { std::mem::zeroed() };
+    ensure!(
+        unsafe { libc::fstatfs(parent.as_raw_fd(), &mut fs) } == 0
+            && fs.f_type == libc::TMPFS_MAGIC
+            && parent_meta.dev() != Path::new("/").metadata()?.dev()
+            && parent_meta.uid() == 0
+            && parent_meta.gid() == 0
+            && parent_meta.mode() & 0o777 == 0o700,
+        "staging mount is not the private tmpfs"
+    );
+    let stamp: Stamp = serde_json::from_value(anchors["local_bundle"].clone())?;
+    let authorization = json!({
+        "source_retirement":retirement, "comparison":comparison, "bundle":bundle,
+        "bundle_stamp":stamp, "self_sha256":self_sha,
+    });
+    let intent_path = state.join("bundle-retirement-intent.json");
+    let completion_path = state.join("bundle-retirement-completion.json");
+    let pending = snapshot288::lookup_receipt(&intent_path)?;
+    if let Some((_, intent)) = &pending {
+        ensure!(
+            intent["authorization"] == authorization,
+            "conflicting bundle retirement"
+        );
+    }
+    let present = bundle.try_exists()?;
+    let entries = mount.read_dir()?.collect::<io::Result<Vec<_>>>()?;
+    ensure!(
+        entries.len() == usize::from(present) && entries.iter().all(|entry| entry.path() == bundle),
+        "unexpected staging mount contents"
+    );
+    if present {
+        let metadata = open_regular(bundle)?.metadata()?;
+        ensure!(
+            Stamp::of(&metadata)? == stamp
+                && metadata.uid() == 0
+                && metadata.gid() == 0
+                && metadata.mode() & 0o777 == 0o400
+                && metadata.dev() == parent_meta.dev()
+                && verified["length"] == metadata.len(),
+            "staged bundle differs from the authenticated retirement anchors"
+        );
+    } else {
+        ensure!(
+            pending.is_some(),
+            "staged bundle absent before retirement intent"
+        );
+    }
+    if let Some((reference, done)) = snapshot288::lookup_receipt(&completion_path)? {
+        ensure!(
+            !present && done["authorization"] == authorization,
+            "completed bundle retirement no longer matches the staging mount"
+        );
+        println!("{}", serde_json::to_string(&reference)?);
+        return Ok(());
+    }
+    let readers = process_references::scan(Path::new("/proc"), bundle)?;
+    ensure!(
+        readers.inspected_processes > 0 && readers.references.is_empty(),
+        "staged bundle has a live consumer"
+    );
+    let before = available(mount)?;
+    if !apply {
+        ensure!(
+            pending.is_none() && present,
+            "bundle retirement already started"
+        );
+        println!(
+            "{}",
+            json!({"authorization":authorization,"readers":readers,"free_before_bytes":before})
+        );
+        return Ok(());
+    }
+    let intent = match pending {
+        Some((reference, _)) => reference,
+        None => record(
+            &intent_path,
+            &json!({
+                "authorization":authorization,"readers":readers,"free_before_bytes":before,
+            }),
+        )?,
+    };
+    if present {
+        stamp.at(bundle)?;
+        let name = CString::new(
+            bundle
+                .file_name()
+                .context("missing bundle name")?
+                .as_bytes(),
+        )?;
+        let result = unsafe { libc::unlinkat(parent.as_raw_fd(), name.as_ptr(), 0) };
+        if result != 0 {
+            return Err(io::Error::last_os_error()).context("retire qualified tmpfs bundle");
+        }
+        parent.sync_all()?;
+    }
+    ensure!(
+        mount.read_dir()?.next().is_none(),
+        "staging mount not empty after retirement"
+    );
+    preserved.at(archive)?;
+    let done = record(
+        &completion_path,
+        &json!({
+            "schema":"foundation-epoch288-local-stage-bundle-retirement-v1","epoch":288,
+            "authorization":authorization,"intent":intent,"verified_tmpfs_bytes_removed":stamp.physical_bytes,
+            "free_at_attempt_start_bytes":before,"free_after_bytes":available(mount)?,
+            "partial_archive_preserved":true,"publication_authorized":false,"r2_mutations":false,
+        }),
+    )?;
+    println!("{}", serde_json::to_string(&done)?);
+    Ok(())
 }
 
 #[cfg(test)]
