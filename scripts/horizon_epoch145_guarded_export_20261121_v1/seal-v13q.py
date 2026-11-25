@@ -82,7 +82,11 @@ stopped = checked(terminal)
 inputs = checked(build["inputs"])
 quote = checked(build["capacity"])["quote"]
 commit = build["source_commit"]
-need(commit == inputs["source_commit"] == "a68223d33f132cc4bf28085b3b9ddfa687248a62"
+reader_revisions = {
+    "a68223d33f132cc4bf28085b3b9ddfa687248a62": "6bc8f25405f86634f484e665a740ecf73845d691",
+    "3072a276dfedcc4b56b7586364572833fa03a647": "e15f71a2a84c9f256c6fc3d5da34e9354430e702",
+}
+need(commit == inputs["source_commit"] and commit in reader_revisions
      and build["actor"]["InvocationID"] == stopped["invocation_id"] and stopped["build"] == qualified_build
      and quote["fits"] is True and quote["resource_credit_bytes"] == 0
      and quote["phase145"]["stage"] == "v5z-semantic-complete-drained"
@@ -95,7 +99,7 @@ source_receipt = stage / "SOURCE_CONTAINMENT.json"
 durable(source_receipt, source_containment(inputs, closure, commit, source_publication))
 reader_bridge = compiled_file(inputs, worker_source / "reader_bridge.py")
 fresh_reader = json.loads(subprocess.check_output(["/usr/bin/python3", "-IB", str(reader_bridge), "--guard-post-preflight"], timeout=45))
-need(fresh_reader["qualified_reader_commit"] == "6bc8f25405f86634f484e665a740ecf73845d691"
+need(fresh_reader["qualified_reader_commit"] == reader_revisions[commit]
    and fresh_reader["fetched_tip"] == source_publication
    and fresh_reader["publication_authorized"] is fresh_reader["r2_mutations"] is False,
    "paired reader equivalence differs from the current branch")
