@@ -1,6 +1,25 @@
 --- a/cycle.py
 +++ b/cycle.py
-@@ -188,7 +188,17 @@
+@@ -80,6 +80,18 @@
+         assert preserved296_cutoff['accepted_predecessor']==ref(previous_completion)
+         assert preserved296_cutoff['previous_fleet']==prevfleet
+ else:prevfleet=audit['previous_fleet']
++verification257 = V / 'horizon257-current-reader-delivery-v1/verification-status-v1/completion.json'
++if 257 in statuses and verification257.is_file():
++    update257 = ref(verification257)
++    forward257 = bound(update257)
++    prior257 = bound(statuses[257])
++    intent257 = bound(forward257['intent'])
++    if prior257 == bound(intent257['previous']):
++        assert forward257['authenticated_exact_byte_readback'] and forward257['key'] == 'epoch-257.epoch-status.json'
++        assert bound(forward257['readback'])['phase'] == 'verification'
++        statuses[257] = update257
++    else:
++        assert bound(prior257['readback'])['sampled_at_utc'] >= bound(forward257['readback'])['sampled_at_utc']
+ correction=D/'horizon257-full-capacity-status-v222-a1/completion.json'
+ if n==223 and correction.is_file():
+     r=ref(correction)
+@@ -188,7 +200,17 @@
          return 'delivery247_pinned_claim' if successor_247 else 'successor247_claim'
      return f'delivery{epoch}_claim'
 
@@ -18,7 +37,7 @@
      if staged_retries:
          return Path(staged_retries[max(staged_retries)][1]['observer']['path'])
      if retry_211:
-@@ -324,6 +334,8 @@
+@@ -324,6 +346,8 @@
      saved = bound(ref(config_path))
      cfg['replays'] = saved['replays']
      cfg['diagnostic_replays'] = saved['diagnostic_replays']
@@ -27,7 +46,7 @@
      for e in closed:
          key = claim_key(e)
          if key not in saved: cfg.pop(key, None)
-@@ -334,6 +346,18 @@
+@@ -334,6 +358,18 @@
          key = claim_key(e)
          cfg.pop(key, None)
          if e == 247: cfg['staged247_resource_only'] = False
@@ -46,7 +65,7 @@
  config=record(config_path,cfg)
  def check_roster():
      for e in failed:
-@@ -359,6 +383,8 @@
+@@ -359,6 +395,8 @@
      rows=sample['delivery_resources']
      check_roster()
      expected = {e for e in all_claims if cfg.get(claim_key(e))}
@@ -55,7 +74,7 @@
      assert {r['range'] for r in rows} == {f'{e}-{e}' for e in expected} and len(rows)==len(expected)
      assert set(roster) <= expected
      for e in expected & set(closed):
-@@ -817,6 +843,8 @@
+@@ -817,6 +855,8 @@
          assert release['resumed_observer'] == ref(obs)
          assert release['fleet']['path'] == str(root / 'jetstreamer-r2')
          fleet_image = Path(publication_handoff.checked_image(release['fleet']))
