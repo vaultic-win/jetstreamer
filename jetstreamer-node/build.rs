@@ -51,6 +51,18 @@ fn hex_prefix(bytes: &[u8], take: usize) -> String {
 }
 
 fn main() {
+    const EPOCH229: &str = "CARGO_FEATURE_EPOCH229_CHECKPOINT_CONTINUATION_DIAGNOSTIC";
+    if env::var_os(EPOCH229).is_some() {
+        assert!(
+            env::vars_os().all(|(key, _)| {
+                let key = key.to_string_lossy();
+                !key.starts_with("CARGO_FEATURE_")
+                    || key == EPOCH229
+                    || key == "CARGO_FEATURE_DEFAULT"
+            }),
+            "epoch 229 continuation requires an exclusive build"
+        );
+    }
     let suffix_recording = env::var_os("CARGO_FEATURE_EPOCH140_SUFFIX_RECORDING").is_some();
     println!("cargo:rustc-check-cfg=cfg(original_entry_replay)");
     println!("cargo:rustc-check-cfg=cfg(called_program_demotion_replay)");

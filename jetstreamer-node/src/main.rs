@@ -66,6 +66,8 @@ mod checkpoint_continuation144;
 mod checkpoint_continuation203;
 #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
 mod checkpoint_continuation226;
+#[cfg(feature = "epoch229-checkpoint-continuation-diagnostic")]
+mod checkpoint_continuation229;
 #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
 mod epoch226_interior;
 #[cfg(all(
@@ -20033,6 +20035,11 @@ async fn main() {
         eprintln!("{error}");
         exit(2);
     }
+    #[cfg(feature = "epoch229-checkpoint-continuation-diagnostic")]
+    if let Err(error) = checkpoint_continuation229::validate_entrypoint(&probe_args) {
+        eprintln!("{error}");
+        exit(2);
+    }
     #[cfg(feature = "epoch140-suffix-recording")]
     let suffix_invocation = epoch140_suffix_recording::parse(&probe_args).unwrap_or_else(|error| {
         eprintln!("{error}");
@@ -20573,7 +20580,8 @@ async fn main() {
         feature = "epoch213-checkpoint-continuation-diagnostic",
         feature = "epoch144-checkpoint-continuation-diagnostic",
         feature = "epoch203-checkpoint-continuation-diagnostic",
-        feature = "epoch226-checkpoint-continuation-diagnostic"
+        feature = "epoch226-checkpoint-continuation-diagnostic",
+        feature = "epoch229-checkpoint-continuation-diagnostic"
     )) || continuation_plan.is_some()
         || continuation_plan_sha256.is_some()
     {
@@ -20616,7 +20624,18 @@ async fn main() {
             explicit_destination,
             forbidden,
         );
-        #[cfg(not(feature = "epoch226-checkpoint-continuation-diagnostic"))]
+        #[cfg(feature = "epoch229-checkpoint-continuation-diagnostic")]
+        let validation = checkpoint_continuation229::validate_cli(
+            (start_epoch, end_epoch),
+            explicit_verify,
+            verify_option_count,
+            explicit_destination,
+            forbidden,
+        );
+        #[cfg(not(any(
+            feature = "epoch226-checkpoint-continuation-diagnostic",
+            feature = "epoch229-checkpoint-continuation-diagnostic"
+        )))]
         let validation = if cfg!(feature = "epoch203-checkpoint-continuation-diagnostic") {
             checkpoint_continuation203::validate_cli(
                 (start_epoch, end_epoch),
@@ -20661,7 +20680,20 @@ async fn main() {
             restart_tracker,
         )
         .await;
-        #[cfg(not(feature = "epoch226-checkpoint-continuation-diagnostic"))]
+        #[cfg(feature = "epoch229-checkpoint-continuation-diagnostic")]
+        let result = checkpoint_continuation229::run(
+            plan,
+            hash,
+            dest_dir,
+            shutdown,
+            cursor,
+            restart_tracker,
+        )
+        .await;
+        #[cfg(not(any(
+            feature = "epoch226-checkpoint-continuation-diagnostic",
+            feature = "epoch229-checkpoint-continuation-diagnostic"
+        )))]
         let result = if cfg!(feature = "epoch203-checkpoint-continuation-diagnostic") {
             checkpoint_continuation203::run(plan, hash, dest_dir, shutdown, cursor, restart_tracker)
                 .await
