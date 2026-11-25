@@ -1,0 +1,13 @@
+--- a/guarded_replays.py
++++ b/guarded_replays.py
+@@ -8,8 +8,9 @@
+ import replay275
+ import rooted288
+ import replay292
++import replay296
+
+-SINGLETONS = {229: replay229, 230: replay230, 252: replay252, 257: replay257, 261: replay261, 271: replay271, 275: replay275, 288: rooted288, 292: replay292}
++SINGLETONS = {229: replay229, 230: replay230, 252: replay252, 257: replay257, 261: replay261, 271: replay271, 275: replay275, 288: rooted288, 292: replay292, 296: replay296}
+
+
+ def epoch(replay):
