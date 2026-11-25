@@ -2558,6 +2558,80 @@ class SourceRecoveryTests(unittest.TestCase):
             )
 
 
+class Standard169LeaseTests(unittest.TestCase):
+    def test_lock_spans_dispatch_and_any_registry_entry_blocks_overlap(self) -> None:
+        overlap = sweep.Cohort(167, 170, "solana-v1.5.8")
+        disjoint = sweep.Cohort(171, 173, "solana-v1.5.8")
+        controller = sweep.STANDARD169_CONTROLLER
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            lock = root / "operation.lock"
+            registry = root / "lease"
+            lock.touch(mode=0o600)
+            native = list(lock.stat())
+            native[4] = 0  # The real lock belongs to root.
+
+            with (
+                mock.patch.object(sweep, "STANDARD169_OPERATION_LOCK", lock),
+                mock.patch.object(sweep, "STANDARD169_LEASE_171", registry),
+                mock.patch.object(sweep.os, "fstat", return_value=os.stat_result(native)),
+            ):
+                with sweep.standard169_launch_admission(controller, overlap) as allowed:
+                    self.assertTrue(allowed)
+                    with sweep.standard169_launch_admission(controller, overlap) as nested:
+                        self.assertFalse(nested)
+
+                registry.mkdir()
+                with sweep.standard169_launch_admission(controller, overlap) as allowed:
+                    self.assertFalse(allowed)
+                registry.rmdir()
+                registry.symlink_to(root / "missing")
+                with sweep.standard169_launch_admission(controller, overlap) as allowed:
+                    self.assertFalse(allowed)
+                with sweep.standard169_launch_admission(controller, disjoint) as allowed:
+                    self.assertTrue(allowed)
+                with sweep.standard169_launch_admission("other", overlap) as allowed:
+                    self.assertTrue(allowed)
+                lock.unlink()
+                with self.assertRaises(FileNotFoundError):
+                    with sweep.standard169_launch_admission(controller, overlap):
+                        self.fail("missing operation lock permitted dispatch")
+
+    def test_blocked_sweep_does_not_consume_a_lane_or_create_a_failed_attempt(self) -> None:
+        overlap = sweep.Cohort(167, 170, "solana-v1.5.8")
+        disjoint = sweep.Cohort(171, 173, "solana-v1.5.8")
+        lane = sweep.Lane("lane-a", Path("/lane-a"))
+        controller = object.__new__(sweep.Controller)
+        controller.args = argparse.Namespace(
+            public_dir=Path("/public"), controller_id=sweep.STANDARD169_CONTROLLER
+        )
+        controller.sol_uid = os.getuid()
+        controller.state = {"assignments": {}, "import_owner": None}
+        controller.lanes = {lane.name: lane}
+        controller.managed_cohorts = (overlap, disjoint)
+        controller.scheduled_bounds = {(167, 170), (171, 173)}
+        controller.desired_capacity = mock.Mock(return_value=1)
+        controller.trusted_public_complete = mock.Mock(return_value=False)
+        controller.launch_producer = mock.Mock(return_value=True)
+
+        with (
+            mock.patch.object(sweep, "public_recovery_marker_present", return_value=False),
+            mock.patch.object(sweep, "public_output_files", return_value=()),
+            mock.patch.object(sweep, "discover_epoch_claims", return_value=()),
+            mock.patch.object(
+                sweep, "standard169_launch_admission",
+                side_effect=lambda _, cohort: contextlib.nullcontext(cohort != overlap),
+            ),
+        ):
+            self.assertEqual(controller._schedule_locked(), 1)
+
+        self.assertEqual(controller.state["assignments"][lane.name]["first_epoch"], 171)
+        controller.launch_producer.assert_called_once_with(
+            lane.name, controller.state["assignments"][lane.name], disjoint,
+            source_recovery=False,
+        )
+
+
 class CrashSafetyTests(unittest.TestCase):
     def staged_import_controller(
         self,
@@ -2607,6 +2681,46 @@ class CrashSafetyTests(unittest.TestCase):
             return_value=contextlib.nullcontext()
         )
         return controller, cohort, assignment
+
+    def test_lease_defers_import_and_source_recovery_without_changing_state(self) -> None:
+        controller, _, assignment = self.staged_import_controller()
+        cohort = sweep.Cohort(167, 170, "solana-v1.5.8")
+        controller.by_bounds = {(167, 170): cohort}
+        controller.args.controller_id = sweep.STANDARD169_CONTROLLER
+        assignment.update(first_epoch=167, last_epoch=170)
+        controller.state["import_owner"] = "lane-a"
+        original = copy.deepcopy(controller.state)
+        controller.launch_producer = mock.Mock()
+
+        with (
+            mock.patch.object(sweep, "public_recovery_marker_present", return_value=False),
+            mock.patch.object(
+                sweep, "standard169_launch_admission",
+                return_value=contextlib.nullcontext(False),
+            ) as gate,
+            mock.patch.object(sweep.subprocess, "run") as launch,
+        ):
+            self.assertFalse(controller.import_one())
+            self.assertEqual(controller.state, original)
+            launch.assert_not_called()
+            gate.assert_called_once_with(sweep.STANDARD169_CONTROLLER, cohort)
+
+        assignment["phase"] = "producer"
+        original = copy.deepcopy(controller.state)
+        controller.reconcile_active_assignment = mock.Mock(return_value=False)
+        with (
+            mock.patch.object(sweep, "public_recovery_marker_present", return_value=True),
+            mock.patch.object(
+                sweep, "standard169_launch_admission",
+                return_value=contextlib.nullcontext(False),
+            ) as gate,
+        ):
+            controller.refresh_assignments()
+            gate.assert_called_once_with(sweep.STANDARD169_CONTROLLER, cohort)
+
+        self.assertEqual(controller.state, original)
+        controller.launch_producer.assert_not_called()
+        controller.save.assert_not_called()
 
     def test_staged_public_cohort_is_finalized_through_bound_attestation(self) -> None:
         controller, cohort, assignment = self.staged_import_controller()

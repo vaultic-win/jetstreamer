@@ -1,8 +1,8 @@
 //! Kernel/PID1 fence for the known historical epoch-171 launch routes.
 //! Runtime masks persist after this writer exits. Release only reconciles the same mask inode.
 use super::*;
+use crate::standard169_cpu_lease::REGISTRY_136 as REG;
 use std::os::unix::fs::{DirBuilderExt, symlink};
-const REG: &str = "/run/horizon-epoch171-exclusive-to136-g1";
 const HIGH: &str = "/run/systemd/system.control";
 const LEGACY: &str = "jetstreamer-epochs159-173-target1-controller-v1-r2.service";
 const RECIPE: &str = "/usr/local/lib/jetstreamer/horizon-local-replacement171-local2-prepare-plan-20261110-v14-r4/plan.json";

@@ -1,5 +1,6 @@
 //! Account for the original standard 169 CPU reservation separately from focused 169.
 use super::*;
+use crate::standard169_cpu_lease::{STANDARD169_CPU as STANDARD_CPU, STANDARD169_PLAN as STANDARD};
 use std::collections::BTreeMap;
 
 const ROOT: &str = "/var/lib/jetstreamer";
@@ -11,10 +12,6 @@ const MEASURE: (&str, &str) = (
 const TEMPLATE: (&str, &str) = (
     "local2-scratch-retirement-source-preparation-20261112-v1/local3/ROOT_CONTROL.SOURCE_TEMPLATE.json",
     "d9c18548f50a1cc7ec742f0d9657d84415ec0b2e84c9a40277611dd0f38d591c",
-);
-const STANDARD: (&str, &str) = (
-    "retry3-peer169-native-operation-20261113-v2/epoch169/epoch169-PREPARE_PLAN.json",
-    "6251beb7e726ce4cc395b4c7034a72d0a2e6311a2ce206de0f6a2c148b8acbd8",
 );
 const NATIVE: (&str, &str) = (
     "retry3-peer169-guarded-launch-20261113-v1/epoch169/ACTUAL_PRODUCER_NATIVE.json",
@@ -34,7 +31,6 @@ const FULL172: (&str, &str) = (
 );
 const FOCUSED_UNIT: &str = "horizon-qualify-169-focused-20261120-v4.service";
 const FOCUSED_GUARD: &str = "horizon-guard-169-focused-20261120-v4";
-const STANDARD_CPU: u64 = 9_000_000;
 const BORROW: u64 = 3_000_000 + 1_000_000 + 250_000;
 const FAMILIES: &[&str] = &[
     "horizon-qualify-169-*",
