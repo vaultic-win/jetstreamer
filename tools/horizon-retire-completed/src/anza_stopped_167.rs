@@ -36,12 +36,27 @@ struct Retirement {
     native_units: BTreeMap<String, BTreeMap<String, String>>,
     definitions: Vec<Bound>,
     screens: Vec<Bound>,
-    direct_archive_references: Vec<Bound>,
+    direct_archive_references: Vec<Reference>,
     guard_evidence: Vec<Bound>,
     other_evidence: Vec<Bound>,
     hashed_bodies: Bound,
     fleet: Bound,
     successor: Value,
+}
+
+#[derive(Deserialize)]
+struct Reference {
+    path: PathBuf,
+    sha256: String,
+    classification: ReferenceKind,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum ReferenceKind {
+    HistoricNativeInventory,
+    HistoricalReclamationDelta,
+    HistoricClosedAccountsTool,
 }
 
 #[derive(Deserialize)]
@@ -337,13 +352,27 @@ pub(super) fn run(bytes: &[u8], sha: &str, image: &str, check_only: bool) -> Res
         hashed["allocated_bytes"] == allocated,
         "different reviewed allocation"
     );
-    for ev in plan
-        .guard_evidence
-        .iter()
-        .chain(&plan.other_evidence)
-        .chain(&plan.direct_archive_references)
-    {
+    for ev in plan.guard_evidence.iter().chain(&plan.other_evidence) {
         checked_hash(ev)?;
+    }
+    for reference in &plan.direct_archive_references {
+        let filename = reference.path.file_name().and_then(|p| p.to_str());
+        ensure!(
+            match reference.classification {
+                ReferenceKind::HistoricNativeInventory => filename == Some("prepared.json"),
+                ReferenceKind::HistoricalReclamationDelta =>
+                    matches!(filename, Some("current.json" | "delta.json")),
+                ReferenceKind::HistoricClosedAccountsTool => matches!(
+                    filename,
+                    Some("profiles.json" | "QUALIFICATION.json" | "CHECK.json")
+                ),
+            },
+            "invalid historical archive reference"
+        );
+        checked_hash(&Bound {
+            path: reference.path.clone(),
+            sha256: reference.sha256.clone(),
+        })?;
     }
     let screen = read_bounded_json(&plan.screens[0])?;
     checked_hash(&plan.screens[1])?;
