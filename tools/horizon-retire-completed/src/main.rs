@@ -352,7 +352,7 @@ fn ready(epoch: u64, receipt: &Value, inventory: &Value) -> Result<()> {
 fn check_target(t: &Target) -> Result<()> {
     let scope = match t.epoch {
         #[cfg(feature = "anza-closed-canaries")]
-        130 | 134 | 191 | 195 | 197 => anza_closed_canaries::is_target(t),
+        119 | 121 | 130 | 134 | 191 | 195 | 197 => anza_closed_canaries::is_target(t),
         #[cfg(feature = "anza-closed-canaries")]
         154 if anza_closed_canaries::is_target(t) => true,
         #[cfg(feature = "anza-closed-154")]
@@ -726,6 +726,10 @@ fn run() -> Result<()> {
         proof_epochs == epochs && p.proofs.len() == epochs.len(),
         "proof/target epoch mismatch"
     );
+    #[cfg(feature = "anza-closed-canaries")]
+    let _first_sweep_lock = (epochs.contains(&119) || epochs.contains(&121))
+        .then(anza_closed_canaries::lock_first_sweep_controller)
+        .transpose()?;
     let receipts = Path::new(HOME_ROOT).join(".jetstreamer-private/r2-receipts");
     #[cfg(feature = "anza-parked-183")]
     let _holding_locks = epochs

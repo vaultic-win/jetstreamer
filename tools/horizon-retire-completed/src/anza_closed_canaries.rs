@@ -2,6 +2,37 @@ use super::*;
 
 const REVIEW: &str = "/home/sol/.jetstreamer-private/epoch145-v5t-stopped-price-20261124.zjcggc_6/RETIREMENT_CANDIDATES_130_195.json";
 const REVIEW_SHA: &str = "6b4563c22f4d586bb8c2fc38c91e4a5c1b8180463b7b27de8de2fa1b115a1291";
+const FIRST_SWEEP_REVIEW: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/closed119121-retirement-20261125-v1/REVIEW.json";
+const FIRST_SWEEP_SHA: &str = "8211fd22d7184f44c418f0602ec251037796b76278d38c966d802df3756a6bd0";
+const FIRST_SWEEP_SCHEMA: &str = "horizon-119-121-obsolete-sweep-output-review-v1";
+const FIRST_SWEEP: &str = "epochs119-147-20260922-v1";
+const FIRST_SWEEP_TARGETS: &[(u64, &str)] = &[
+    (
+        119,
+        "lane-a/private/destination-c5be130f620a62fd07b3a0e691623913d741234fcf5f181878e8e8dc2f646948/work/root-cohort-119-120/run-4191867-1790037445238974158/archives/epoch-119.jet",
+    ),
+    (
+        119,
+        "lane-a/output/compact-indexes/119/epoch-119-bafyreid47uzzln4we2csgomwa2xic7rs3msd77sf2kp3vhlo3qinj2bety-mainnet-cid-to-offset-and-size.index",
+    ),
+    (
+        119,
+        "lane-a/output/compact-indexes/119/epoch-119-bafyreid47uzzln4we2csgomwa2xic7rs3msd77sf2kp3vhlo3qinj2bety-mainnet-slot-to-cid.index",
+    ),
+    (
+        121,
+        "lane-b/private/destination-63c0e82273553ec9d7941677ba71a9a819f878af17a6dc89d21909285635f7cb/work/root-cohort-121-121/run-4191894-1790037445364594405/archives/epoch-121.jet",
+    ),
+    (
+        121,
+        "lane-b/output/compact-indexes/121/epoch-121-bafyreibothqfnoljwaplz5ru6kvuyrvtw24mskfmajvhknh4qkaue32gwa-mainnet-cid-to-offset-and-size.index",
+    ),
+    (
+        121,
+        "lane-b/output/compact-indexes/121/epoch-121-bafyreibothqfnoljwaplz5ru6kvuyrvtw24mskfmajvhknh4qkaue32gwa-mainnet-slot-to-cid.index",
+    ),
+];
 const FOLLOWUP_REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_data/closed-canaries-retirement-134-154-20261124-v1/REVIEW.json";
 const FOLLOWUP_REVIEW_SHA: &str =
     "3e4fb8c99b53cbec9ad8e8d2b0d63862c22a21d191229d539d3124f262710474";
@@ -32,6 +63,9 @@ const BENCHMARK_154: &str = "performance-ab-154-v158-rayon-20261009-v3";
 pub(super) fn is_target(t: &Target) -> bool {
     let root = Path::new(HOME_ROOT).join(".jetstreamer-private");
     match t.epoch {
+        119 | 121 => FIRST_SWEEP_TARGETS.iter().any(|(epoch, relative)| {
+            t.epoch == *epoch && t.path == root.join(FIRST_SWEEP).join(relative)
+        }),
         130 => {
             t.path
                 == root
@@ -93,6 +127,13 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
                 FOLLOWUP_REVIEW_SHA,
                 FOLLOWUP_SCHEMA,
                 [134, 154],
+            )
+        } else if epochs.contains(&119) || epochs.contains(&121) {
+            (
+                FIRST_SWEEP_REVIEW,
+                FIRST_SWEEP_SHA,
+                FIRST_SWEEP_SCHEMA,
+                [119, 121],
             )
         } else if epochs.contains(&191) {
             (
@@ -269,11 +310,43 @@ fn verify_gcs_bootstrap(review: &Value, target: &Target) -> Result<()> {
 
 pub(super) fn check_owners(review: &Value) -> Result<()> {
     let markers: &[&str] = match review["schema"].as_str() {
+        Some(FIRST_SWEEP_SCHEMA) => &[
+            FIRST_SWEEP,
+            "epochs119-147-20260922-v28",
+            "historical-119-147-v28",
+            "run-4191867-1790037445238974158",
+            "run-4191894-1790037445364594405",
+        ],
         Some(FOLLOWUP_SCHEMA) => &[DIAGNOSTIC_134, BENCHMARK_154],
         Some(SNAPSHOT_SCHEMA) => &[SNAPSHOT_DIR],
         Some(BOOTSTRAP_SCHEMA) => &[BOOTSTRAP_DIR],
         _ => &[DIAGNOSTIC, BENCHMARK],
     };
+    if review["schema"] == FIRST_SWEEP_SCHEMA {
+        // The epoch 185 unit mounted the historical batch directory read-only.
+        // Its sealed plan operates on a different run. The loader qualification
+        // names a snapshot in inputs/, which stays alongside the cohort state.
+        for key in ["source_generation", "epoch185_spec", "preserved_snapshot"] {
+            bound(&serde_json::from_value(review[key].clone())?, LIMIT)?;
+        }
+        let screen: Value = serde_json::from_slice(&bound(
+            &serde_json::from_value(review["installed_reference_screen"].clone())?,
+            LIMIT,
+        )?)?;
+        for file in screen["matches"]
+            .as_array()
+            .context("missing swept references")?
+        {
+            let bound_file = Bound {
+                path: PathBuf::from(file["path"].as_str().context("reference path")?),
+                sha256: file["sha256"]
+                    .as_str()
+                    .context("reference digest")?
+                    .to_owned(),
+            };
+            bound(&bound_file, LIMIT)?;
+        }
+    }
     let scan = Command::new("/usr/bin/rg")
         .args(["--files-with-matches", "--fixed-strings"])
         .args(markers.iter().flat_map(|pattern| ["-e", pattern]))
@@ -382,4 +455,58 @@ pub(super) fn verify_delivery(
         }
     }
     Ok(())
+}
+
+pub(super) fn lock_first_sweep_controller() -> Result<File> {
+    let lock = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open("/var/lib/jetstreamer-root-sweep-epochs119-147-20260922-v28/controller.lock")?;
+    let m = lock.metadata()?;
+    ensure!(
+        m.is_file()
+            && (
+                m.dev(),
+                m.ino(),
+                m.uid(),
+                m.gid(),
+                m.nlink(),
+                m.mode() & 0o7777
+            ) == (2304, 3276851, 0, 0, 1, 0o600),
+        "different original sweep lock"
+    );
+    ensure!(
+        unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+        "original sweep controller is occupied"
+    );
+    Ok(lock)
+}
+
+#[cfg(test)]
+mod first_sweep_tests {
+    use super::*;
+
+    #[test]
+    fn first_sweep_selection_binds_both_epoch_and_exact_file() {
+        let root = Path::new(HOME_ROOT)
+            .join(".jetstreamer-private")
+            .join(FIRST_SWEEP);
+        for (epoch, relative) in FIRST_SWEEP_TARGETS {
+            let mut target: Target = serde_json::from_value(json!({
+                "epoch": epoch, "path": root.join(relative), "reason": "test",
+                "identity": {
+                    "dev": 1, "ino": 2, "nlink": 1, "mode": 0o100600, "uid": 1001,
+                    "gid": 1003, "len": 10, "blocks": 1, "mtime": 1, "mtime_ns": 0,
+                    "ctime": 1, "ctime_ns": 0
+                }
+            }))
+            .unwrap();
+            assert!(is_target(&target));
+            target.epoch = if *epoch == 119 { 121 } else { 119 };
+            assert!(!is_target(&target));
+            target.epoch = *epoch;
+            target.path.set_file_name("snapshot-51407922.tar.zst");
+            assert!(!is_target(&target));
+        }
+    }
 }
