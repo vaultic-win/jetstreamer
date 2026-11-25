@@ -40,6 +40,8 @@ TIMER_CORRECTION229 = TERMINAL229.with_name('terminal-timer-correction.json')
 RETIREMENT288 = V / 'horizon288-unpacked-retirement-v328/batch-039-completion.json'
 BANK_DELTA229_UNIT = 'horizon-perf-epoch229-bank-delta@v334.service'
 BANK_DELTA229_GUARDS = V / 'horizon229-bank-delta-v334/guard-receipts'
+DEMOTION229_UNIT = 'horizon-qualify-229-called-program-demotion-v1.service'
+DEMOTION229_GUARDS = V / 'horizon229-called-program-demotion-v1/guard-receipts'
 EXTRACT226_UNIT = 'horizon-qualify-226-checkpoint-continuation-extract-v2.service'
 EXTRACT226_BROKER = 'foundation-226-original225-broker-v2.service'
 EXTRACT226_STATE = V / 'horizon226-extract-v2'
@@ -50,9 +52,13 @@ CONTINUATION230_GUARDS = {
         V / f'horizon230-checkpoint-continuation-fit-v{attempt}/guard-receipts'
     for attempt in (2, 3)
 }
-CONTINUATION230_TMPFS = Path('/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1')
-CONTINUATION230_RAM_CAP = 150_000_000_000
-CONTINUATION230_TMPFS_FLOOR = 2 << 30
+RAM_TMPFS_FLOOR = 2 << 30
+RAM_QUOTES = {
+    229: (Path('/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1'),
+          170_000_000_000, 395_000_000_000, frozenset(range(80, 88))),
+    230: (Path('/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1'),
+          150_000_000_000, MEMORY, frozenset(range(72, 80))),
+}
 GUARDS = {
     226: V / 'horizon226-extract-v2/guard-receipts',
     229: V / 'horizon229-trace-ram-v325/guard-receipts',
@@ -265,8 +271,9 @@ def capacity(kit, candidate_epoch=288):
         affinity, = [line.split('=', 1)[1] for line in template if line.startswith('AllowedCPUs=')]
         candidate_memory = int(memory)
         candidate_cpus = kit.measure.source.helper.cpus(affinity)
-    elif candidate_epoch == 230:
-        candidate_disk, candidate_memory, candidate_cpus = 0, MEMORY, frozenset(range(72, 80))
+    elif candidate_epoch in RAM_QUOTES:
+        _, _, candidate_memory, candidate_cpus = RAM_QUOTES[candidate_epoch]
+        candidate_disk = 0
     else:
         candidate_disk, candidate_memory, candidate_cpus = CAP, MEMORY, CPUS
     completion, fleet_ref, fleet = latest_accepted_fleet(kit)
@@ -291,6 +298,8 @@ def capacity(kit, candidate_epoch=288):
         owners[epoch] = owner
         if producer['Id'] == BANK_DELTA229_UNIT:
             guard_paths[epoch] = BANK_DELTA229_GUARDS
+        elif producer['Id'] == DEMOTION229_UNIT:
+            guard_paths[epoch] = DEMOTION229_GUARDS
         elif producer['Id'] == SUFFIX226_UNIT:
             guard_paths[epoch] = SUFFIX226_STATE / 'guard-receipts'
         elif producer['Id'] in CONTINUATION230_GUARDS:
@@ -343,13 +352,13 @@ def capacity(kit, candidate_epoch=288):
                 disk_shortfall_bytes=max(0, protected + candidate_disk - free),
                 memory_shortfall_bytes=max(0, candidate_memory - memory_room),
                 publication_authorized=False)
-    if candidate_epoch == 230:
-        assert CONTINUATION230_TMPFS.is_mount() and CONTINUATION230_TMPFS.stat().st_dev != root_device
-        mount = os.statvfs(CONTINUATION230_TMPFS)
+    if candidate_epoch in RAM_QUOTES:
+        filesystem, peak, _, _ = RAM_QUOTES[candidate_epoch]
+        assert filesystem.is_mount() and filesystem.stat().st_dev != root_device
+        mount = os.statvfs(filesystem)
         tmpfs_available_bytes = mount.f_bavail * mount.f_frsize
-        result.update(tmpfs_available_bytes=tmpfs_available_bytes, candidate_ram_cap_bytes=CONTINUATION230_RAM_CAP,
-                      tmpfs_shortfall_bytes=max(0, CONTINUATION230_RAM_CAP + CONTINUATION230_TMPFS_FLOOR
-                                                - tmpfs_available_bytes))
+        result.update(tmpfs_available_bytes=tmpfs_available_bytes, candidate_ram_cap_bytes=peak,
+                      tmpfs_shortfall_bytes=max(0, peak + RAM_TMPFS_FLOOR - tmpfs_available_bytes))
     return result
 
 
@@ -611,6 +620,7 @@ def guarded_start(kit, profile_ref, fit, inventory, deployment):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'capacity-continuation230',
+                                          'capacity-demotion229',
                                           'prepare', 'launch'))
     parser.add_argument('reference', nargs='?')
     parser.add_argument('sha256', nargs='?')
@@ -624,6 +634,9 @@ def main():
         return
     if options.action == 'capacity-continuation230':
         print(json.dumps(capacity(load_existing(), candidate_epoch=230)))
+        return
+    if options.action == 'capacity-demotion229':
+        print(json.dumps(capacity(load_existing(), candidate_epoch=229)))
         return
     if options.action in ('prepare', 'launch'):
         kit = load_existing()

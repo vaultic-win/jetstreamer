@@ -36,23 +36,91 @@ def receipt():
     return binding, row
 
 
-def configuration():
-    registration = receipt()
+DEMOTION_UNIT = "horizon-qualify-229-called-program-demotion-v1.service"
+DEMOTION_PACKAGE = V / "horizon229-called-program-demotion-v1"
+DEMOTION_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1/run")
+PARENT_SHA = "060d1807204f66d65854438334847c52a5f3b4c3264fc32fb60243bc42128cfa"
+WORKER_SHA = "e92a4c508ea5e9155f4294cb0e7e8399f3ff81821a356bb0a958da5fa49f2695"
+
+
+def demotion_receipt():
+    path = DEMOTION_PACKAGE / "cadence-registration.json"
+    if not path.exists():
+        return None
+    stamp = path.lstat()
+    assert path.resolve() == path and stamp.st_uid == 0 and not stamp.st_mode & 0o222
+    source = ref(path)
+    row = bound(source)
+    assert row["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+    assert (row["epoch"], row["unit"], row["kind"], row["run_root"]) == (
+        229, DEMOTION_UNIT, "epoch229-called-program-demotion", str(DEMOTION_ROOT))
+    assert (row["bootstrap_slot"], row["first_replay_slot"], row["divergent_bank_slot"],
+            row["terminal_slot"]) == (98927417, 98927418, 98931633, 98939266)
+    assert row["launched"] and row["entry_replay_requested"] and row["worker_sha256"] == WORKER_SHA
+    assert all(row[key] is False for key in ("canonical_epoch_publication_authorized", "remote_mutations", "r2_mutations"))
+    admission = bound(row["admission"])
+    assert admission["parent_qualification"] == dict(path=str(DEMOTION_PACKAGE / "parent-qualification.json"),
+                                                     sha256=PARENT_SHA)
+    assert admission["admitted"] and admission["epoch"] == 229
+    guard = bound(row["active_guard"])
+    assert re.fullmatch("[0-9a-f]{32}", row["invocation_id"]) and row["main_pid"] > 0
+    assert guard["producer_invocation_id"] == row["invocation_id"] and guard["trip_reason"] is None
+    assert guard["producer"]["pid"] == row["main_pid"] and guard["plan_sha256"] == row["guard_plan"]["sha256"]
+    return source, row
+
+
+def register_demotion(plan):
+    registration = demotion_receipt()
+    if registration is None:
+        return None
+    source, row = registration
+    if DEMOTION_UNIT not in plan["tracked_units"]:
+        plan["tracked_units"].append(DEMOTION_UNIT)
+    claim = dict(epoch=229, unit=DEMOTION_UNIT, invocation_id=row["invocation_id"],
+                 scratch_path=str(DEMOTION_ROOT), launch_receipt=source)
+    diagnostics = plan.setdefault("diagnostics", [])
+    previous = [item for item in diagnostics if item["unit"] == DEMOTION_UNIT]
+    assert not previous or previous == [claim]
+    if not previous:
+        diagnostics.append(claim)
+    gate = plan["gates"]["229"]
+    if source not in gate["evidence"]:
+        gate["evidence"].append(source)
+    gate["next_action"] = "Check the signed Bank hash at 98,931,633, then the terminal accounts root and private archive close at 98,939,266."
+    terminal = DEMOTION_PACKAGE / "terminal.json"
+    if terminal.is_file():
+        terminal_ref = ref(terminal)
+        completed = bound(terminal_ref)
+        assert completed["registration"] == source and completed["epoch"] == 229
+        if terminal_ref not in gate["evidence"]:
+            gate["evidence"].append(terminal_ref)
+        gate["next_action"] = completed["next_action"]
+    fleet = bound(bound(row["admission"])["fleet_tool"])
+    assert fleet["schema"] == "foundation-epoch229-called-program-demotion-fleet-tool-v1"
+    return fleet["artifact"]
+
+
+def live_configuration(registration, unit, run_root):
     if registration is None:
         return []
     _, row = registration
-    live = props(UNIT, FIELDS)
+    live = props(unit, FIELDS)
     if live["ActiveState"] in ("inactive", "failed"):
         assert live["MainPID"] == "0" and not live["ControlGroup"]
         return []
-    assert (live["Id"], live["ActiveState"], live["SubState"]) == (UNIT, "active", "running")
+    assert (live["Id"], live["ActiveState"], live["SubState"]) == (unit, "active", "running")
     assert live["InvocationID"] == row["invocation_id"] and int(live["MainPID"]) == row["main_pid"]
-    assert live["ControlGroup"] == "/system.slice/" + UNIT and live["NRestarts"] == "0"
+    assert live["ControlGroup"] == "/system.slice/" + unit and live["NRestarts"] == "0"
     node = Path("/proc") / live["MainPID"] / "exe"
-    assert node.samefile(row["node_path"]) and not node.readlink().is_relative_to(RUN_ROOT)
-    return [dict(range="229-229", controller_unit=UNIT, expected_controller_invocation_id=row["invocation_id"],
-                 producer_unit=UNIT, expected_producer_invocation_id=row["invocation_id"],
-                 scratch_path=str(RUN_ROOT), worker_executable_basename="historical-worker")]
+    assert node.samefile(row["node_path"]) and not node.readlink().is_relative_to(run_root)
+    return [dict(range="229-229", controller_unit=unit, expected_controller_invocation_id=row["invocation_id"],
+                 producer_unit=unit, expected_producer_invocation_id=row["invocation_id"],
+                 scratch_path=str(run_root), worker_executable_basename="historical-worker")]
+
+
+def configuration():
+    return (live_configuration(receipt(), UNIT, RUN_ROOT)
+            + live_configuration(demotion_receipt(), DEMOTION_UNIT, DEMOTION_ROOT))
 
 
 def gate(plan):
@@ -145,11 +213,16 @@ def gate(plan):
 
 def owns(row):
     producer = row.get("producer", {})
-    if producer.get("Id") != UNIT:
+    if producer.get("Id") == DEMOTION_UNIT:
+        _, active = demotion_receipt()
+        root = DEMOTION_ROOT
+    elif producer.get("Id") == UNIT:
+        _, active = receipt()
+        root = RUN_ROOT
+    else:
         return False
-    _, active = receipt()
     assert row["epoch"] == 229 and row["phase"] == "diagnostic-qualification"
     assert producer["InvocationID"] == active["invocation_id"]
     assert row["ordinary_replay_claim"] is False and row["current_sidecar_eta_valid"] is False
-    assert row["scratch_path"] == str(RUN_ROOT)
+    assert row["scratch_path"] == str(root)
     return True

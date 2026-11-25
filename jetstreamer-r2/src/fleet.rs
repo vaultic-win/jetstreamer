@@ -2058,6 +2058,26 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["entry_replay_requested"] == true
             && receipt["source_prefix_retained"] == true
             && receipt["canonical_epoch_publication_authorized"] == false
+    } else if claim.unit == "horizon-qualify-229-called-program-demotion-v1.service"
+        || receipt["kind"] == "epoch229-called-program-demotion"
+    {
+        claim.epoch == 229
+            && claim.unit == "horizon-qualify-229-called-program-demotion-v1.service"
+            && claim.scratch_path == Path::new("/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1/run")
+            && receipt["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+            && receipt["kind"] == "epoch229-called-program-demotion"
+            && receipt["epoch"] == 229
+            && receipt["unit"] == claim.unit
+            && receipt["invocation_id"] == claim.invocation_id
+            && receipt["run_root"].as_str() == claim.scratch_path.to_str()
+            && receipt["bootstrap_slot"] == 98_927_417
+            && receipt["first_replay_slot"] == 98_927_418
+            && receipt["divergent_bank_slot"] == 98_931_633
+            && receipt["terminal_slot"] == 98_939_266
+            && receipt["worker_sha256"]
+                == "e92a4c508ea5e9155f4294cb0e7e8399f3ff81821a356bb0a958da5fa49f2695"
+            && receipt["entry_replay_requested"] == true
+            && receipt["canonical_epoch_publication_authorized"] == false
     } else if matches!(claim.unit.as_str(),
         "horizon-qualify-230-checkpoint-continuation-fit-v2.service"
         | "horizon-qualify-230-checkpoint-continuation-fit-v3.service")
@@ -6165,6 +6185,44 @@ mod tests {
         renamed["unit"] = json!(claim.unit);
         renamed["evidence"]["units"][0]["unit"] = json!(claim.unit);
         assert!(validate_diagnostic_launch(&renamed, &claim).is_err());
+    }
+
+    #[test]
+    fn epoch229_demotion_cannot_extend_its_pinned_scope() {
+        let claim = DiagnosticClaim {
+            epoch: 229,
+            unit: "horizon-qualify-229-called-program-demotion-v1.service".into(),
+            invocation_id: "a".repeat(32),
+            scratch_path: "/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1/run".into(),
+            launch_receipt: BoundFile {
+                path: "/var/lib/jetstreamer/launch.json".into(),
+                sha256: "b".repeat(64),
+            },
+        };
+        let receipt = json!({
+            "schema": "jetstreamer-historical-performance-launch-receipt-v1",
+            "kind": "epoch229-called-program-demotion", "epoch": 229,
+            "unit": claim.unit, "invocation_id": claim.invocation_id, "run_root": claim.scratch_path,
+            "bootstrap_slot": 98_927_417, "first_replay_slot": 98_927_418,
+            "divergent_bank_slot": 98_931_633, "terminal_slot": 98_939_266,
+            "worker_sha256": "e92a4c508ea5e9155f4294cb0e7e8399f3ff81821a356bb0a958da5fa49f2695",
+            "entry_replay_requested": true, "canonical_epoch_publication_authorized": false,
+            "launched": true, "remote_mutations": false, "r2_mutations": false,
+            "evidence": {"units": [{"unit": claim.unit, "invocation_id": claim.invocation_id,
+                "restarts": 0, "load_state": "loaded", "result": "success", "main_pid": 42,
+                "active_state": "active", "sub_state": "running"}]},
+        });
+        validate_diagnostic_launch(&receipt, &claim).unwrap();
+        for (key, replacement) in [
+            ("divergent_bank_slot", json!(98_931_631)),
+            ("terminal_slot", json!(99_359_999)),
+            ("worker_sha256", json!("f".repeat(64))),
+            ("canonical_epoch_publication_authorized", json!(true)),
+        ] {
+            let mut changed = receipt.clone();
+            changed[key] = replacement;
+            assert!(validate_diagnostic_launch(&changed, &claim).is_err(), "{key}");
+        }
     }
 
     #[test]

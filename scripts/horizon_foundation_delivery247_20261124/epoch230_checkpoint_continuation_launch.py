@@ -49,17 +49,17 @@ def helper():
     return module
 
 
-def inventory(kit):
+def inventory(kit, epoch=230, unit="foundation-230-continuation-inventory-v3"):
     image = kit.ops.checked_image(kit.ops.R2)
     command = ['systemd-run', '--quiet', '--wait', '--pipe', '--collect',
-               '--unit=foundation-230-continuation-inventory-v3', '--property=Type=exec',
+               f'--unit={unit}', '--property=Type=exec',
                '--property=EnvironmentFile=/etc/jetstreamer/horizon-r2-upload.env',
                '--setenv=TOKIO_WORKER_THREADS=2', '--', image, 'inventory', '/home/ubuntu/horizon',
-               '--epochs', '230-230', '--receipt-directory', str(kit.measure.PRIVATE / 'r2-receipts')]
+               '--epochs', f'{epoch}-{epoch}', '--receipt-directory', str(kit.measure.PRIVATE / 'r2-receipts')]
     result = json.loads(subprocess.check_output(command, timeout=45))
     row, = result['entries']
     assert result['schema'] == 'jetstreamer-horizon-r2-inventory-v1' and result['anomalies'] == 0
-    assert (row['epoch'], row['state']) == (230, 'missing')
+    assert (row['epoch'], row['state']) == (epoch, 'missing')
     return row
 
 
@@ -128,10 +128,31 @@ def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, de
     checkpoints = cap.checked(source['epoch_hashes'])
     assert f'--snapshot-archive={bootstrap_path}' in argv and f'--epoch-hashes={checkpoints}' in argv
     assert checkpoints.read_text().splitlines() == [bootstrap_path.name, Path(source['terminal_checkpoint']['name']).name]
-    startup.systemd_run(UNIT, [*props, '--property=' + prestart], argv, '--slice=system.slice')
+    unit, plan, token, active_guard = activate_guarded(
+        kit, 230, STATE, TOKENS, UNIT, GUARD, guard, template, launch, props, prestart, argv)
+    iid, pid = unit['invocation_id'], unit['main_pid']
+    work = cap.read(cap.read(inputs)['runtime'])['worker']
+    return ops.funds.put(STATE / 'cadence-registration.json', {
+        'schema': 'jetstreamer-historical-performance-launch-receipt-v1',
+        'kind': 'epoch230-bounded-checkpoint-continuation', 'epoch': 230, 'unit': UNIT, 'invocation_id': iid,
+        'main_pid': pid, 'node_path': argv[0], 'run_root': template['worker_root'], 'worker_sha256': work['sha256'],
+        'bootstrap_slot': 99375855, 'first_slot': 99375856, 'last_slot': 99383572, 'launched': True,
+        'entry_replay_requested': True, 'canonical_epoch_publication_authorized': False,
+        'full_continuation_peak_qualified': False, 'remote_mutations': False, 'r2_mutations': False,
+        'admission': launch, 'guard_plan': plan, 'launch_token': token, 'active_guard': active_guard,
+        'evidence': {'units': [unit]},
+    })
+
+
+def activate_guarded(kit, epoch, state, tokens, producer_unit, guard_unit, guard, template, launch,
+                     props, prestart, argv):
+    ops, runner, startup = kit.ops, kit.replay, kit.startup
+    receipts = state / 'guard-receipts'
+    timer_unit = guard_unit.replace('.service', '.timer')
+    startup.systemd_run(producer_unit, [*props, '--property=' + prestart], argv, '--slice=system.slice')
 
     def held():
-        row = ops.props(UNIT, ['InvocationID', 'ActiveState', 'SubState', 'MainPID', 'ControlPID', 'NRestarts'])
+        row = ops.props(producer_unit, ['InvocationID', 'ActiveState', 'SubState', 'MainPID', 'ControlPID', 'NRestarts'])
         if (row['ActiveState'], row['SubState'], row['MainPID']) == ('activating', 'start-pre', '0'):
             assert int(row['ControlPID']) > 0 and row['NRestarts'] == '0'
             return row
@@ -139,16 +160,16 @@ def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, de
 
     iid = startup.until(held, 12)['InvocationID']
     assert re.fullmatch('[0-9a-f]{32}', iid)
-    plan = ops.funds.put(STATE / 'guard-plan.json', dict(template, invocation_id=iid))
+    plan = ops.funds.put(state / 'guard-plan.json', dict(template, invocation_id=iid))
     guard_props = ['--property=Type=oneshot', '--property=User=root', '--property=UMask=0077',
                    '--property=Restart=no', '--property=MemoryMax=1G', '--property=MemorySwapMax=0',
                    '--property=CPUQuota=100%', '--property=TasksMax=256', '--property=TimeoutStartSec=90',
                    '--property=ProtectSystem=strict', '--property=ProtectHome=read-only', '--property=PrivateNetwork=yes',
                    '--property=NoNewPrivileges=yes', '--property=CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE',
-                   '--property=AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE', f'--property=ReadWritePaths={GUARDS}']
-    runner.PRODUCER, runner.GUARD_UNIT, runner.TIMER, runner.RECEIPTS = UNIT, GUARD, TIMER, GUARDS
+                   '--property=AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE', f'--property=ReadWritePaths={receipts}']
+    runner.PRODUCER, runner.GUARD_UNIT, runner.TIMER, runner.RECEIPTS = producer_unit, guard_unit, timer_unit, receipts
     runner.GUARD_SHA = guard['sha256']
-    startup.systemd_run(GUARD, guard_props, [guard['path'], plan['path'], '--plan-sha256', plan['sha256'],
+    startup.systemd_run(guard_unit, guard_props, [guard['path'], plan['path'], '--plan-sha256', plan['sha256'],
                         '--self-sha256', guard['sha256']], '--on-active=1s', '--on-unit-inactive=60s',
                        '--timer-property=AccuracySec=1s', '--timer-property=RandomizedDelaySec=0')
 
@@ -157,7 +178,7 @@ def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, de
         if reading is None:
             return None
         _, sample = reading
-        result = ops.props(GUARD, ['ActiveState', 'InvocationID', 'Result', 'ExecMainStatus', 'MainPID'])
+        result = ops.props(guard_unit, ['ActiveState', 'InvocationID', 'Result', 'ExecMainStatus', 'MainPID'])
         if result['ActiveState'] != 'inactive':
             return None
         assert result['InvocationID'] == sample['guard_invocation_id'] and result['Result'] == 'success'
@@ -167,23 +188,23 @@ def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, de
     (first, sample), completed = startup.until(guard_completed, 32)
     clock, next_tick = startup.until(runner.timer_ready, 10)
     assert held()['InvocationID'] == iid and sample['root_physical_observation_error'] is None
-    token_dir = TOKENS / iid
+    token_dir = tokens / iid
     token_dir.mkdir(mode=0o755)
     token_dir.chmod(0o755)
     token = ops.funds.put(token_dir / 'guard-admission.json', {
-        'epoch': 230, 'unit': UNIT, 'invocation_id': iid, 'first_guard': first, 'completed_guard': completed,
+        'epoch': epoch, 'unit': producer_unit, 'invocation_id': iid, 'first_guard': first, 'completed_guard': completed,
         'guard_plan': plan, 'guard_timer_invocation': clock['InvocationID'], 'next_guard_monotonic_usec': next_tick,
         'admission': launch, 'publication_authorized': False,
     })
 
     def running():
-        row = ops.props(UNIT, ['InvocationID', 'MainPID', 'ActiveState', 'SubState', 'NRestarts', 'LoadState', 'Result'])
+        row = ops.props(producer_unit, ['InvocationID', 'MainPID', 'ActiveState', 'SubState', 'NRestarts', 'LoadState', 'Result'])
         if (row['ActiveState'], row['SubState']) != ('active', 'running'):
             return None
         pid = int(row['MainPID'])
         assert row['InvocationID'] == iid and row['NRestarts'] == '0' and pid > 0
         assert (Path('/proc') / str(pid) / 'exe').samefile(argv[0])
-        for path in GUARDS.glob('sample-*.json'):
+        for path in receipts.glob('sample-*.json'):
             reference, sample = guard_sample(ops, path)
             assert sample['producer_invocation_id'] == iid and sample['plan_sha256'] == plan['sha256']
             assert sample['guard_sha256'] == guard['sha256'] and sample['trip_reason'] is None
@@ -196,19 +217,9 @@ def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, de
 
     row, pid, active_guard = startup.until(running, 105)
     assert startup.until(runner.timer_ready, 10)[0]['InvocationID'] == clock['InvocationID']
-    unit = dict(unit=UNIT, invocation_id=iid, main_pid=pid, active_state=row['ActiveState'], sub_state=row['SubState'],
+    unit = dict(unit=producer_unit, invocation_id=iid, main_pid=pid, active_state=row['ActiveState'], sub_state=row['SubState'],
                 load_state=row['LoadState'], result=row['Result'], restarts=0)
-    work = cap.read(cap.read(inputs)['runtime'])['worker']
-    return ops.funds.put(STATE / 'cadence-registration.json', {
-        'schema': 'jetstreamer-historical-performance-launch-receipt-v1',
-        'kind': 'epoch230-bounded-checkpoint-continuation', 'epoch': 230, 'unit': UNIT, 'invocation_id': iid,
-        'main_pid': pid, 'node_path': argv[0], 'run_root': template['worker_root'], 'worker_sha256': work['sha256'],
-        'bootstrap_slot': 99375855, 'first_slot': 99375856, 'last_slot': 99383572, 'launched': True,
-        'entry_replay_requested': True, 'canonical_epoch_publication_authorized': False,
-        'full_continuation_peak_qualified': False, 'remote_mutations': False, 'r2_mutations': False,
-        'admission': launch, 'guard_plan': plan, 'launch_token': token, 'active_guard': active_guard,
-        'evidence': {'units': [unit]},
-    })
+    return unit, plan, token, active_guard
 
 
 def main():
