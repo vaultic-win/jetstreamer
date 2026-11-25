@@ -242,6 +242,7 @@ def external_event(epoch,prior,etag,raw):
 def publish(c,store,refs,out,epoch,archive=None):
     key=str(epoch)
     original=refs[key];old=checked(original);intent=out/f'epoch-{epoch}.intent.json';dest=out/f'epoch-{epoch}.receipt.json'
+    commit = getattr(c, 'commits', {}).get(epoch)
     if not intent.exists():
         authenticated(store,epoch,original)
         if utc(old['after_status']['sampled_at_utc'])>=c.now:
@@ -253,22 +254,24 @@ def publish(c,store,refs,out,epoch,archive=None):
             after=full172.forecast(c,prior,archive,previous_remaining,quote['total_millis'])
             extra.update(delivery_forecast=quote,producer_invocation_id=c.full172_row['unit']['InvocationID'],
                          measured_canonical_progress=c.advancing[172],current_repair_owner=None,archive_sample=archive)
-        elif epoch == 170 and epoch in getattr(c,'commits',{}):
-            proof=c.commits[epoch]
-            term=checked(proof['terminal'])
+        elif epoch in (168, 170) and commit:
+            field = f'cold{epoch}_local_commit'
+            term=checked(commit['terminal'])
             committed=term['local_archive']
             size=committed['size']
             age=round((c.now-utc(prior['sampled_at_utc'])).total_seconds()*1000)
-            need(size>0 and age>=0 and prior['phase'] in ('replay','verification'), 'foreign committed 170 status')
+            need(size>0 and age>=0 and prior['phase'] in ('replay','verification'), 'foreign committed status')
             quote=delivery_eta.estimate(c,epoch,size,committed=True)
-            first=old.get('cold170_local_commit') != proof['terminal']
+            first=old.get(field) != commit['terminal']
             remaining=quote['total_millis'] if first else prior['estimated_remaining_millis']-age
-            need(remaining>0,'committed epoch 170 needs a fresh delivery forecast')
+            need(remaining>0, f'committed epoch {epoch} needs a fresh delivery forecast')
             after=dict(prior, sampled_at_utc=c.stamp, elapsed_execution_millis=prior['elapsed_execution_millis']+age,
                        estimated_remaining_millis=remaining, phase='verification', jet_size_bytes=size)
-            extra.update(cold170_local_commit=proof['terminal'], archive_sample=committed,
+            extra.update({field: commit['terminal']}, archive_sample=committed,
                          delivery_forecast=quote, producer_invocation_id=None, measured_canonical_progress=False,
                          current_repair_owner='/root')
+            if epoch == 168:
+                extra['cold168_guard_retirement'] = commit['guard_retirement']
         elif epoch in getattr(c,'new_rows',{}):
             after,archive=cold_workers.reader().forecast(c,epoch,prior,old)
             actor=c.new_rows[epoch]
@@ -313,6 +316,10 @@ def publish(c,store,refs,out,epoch,archive=None):
     etag,raw=store.get(epoch)
     if etag==plan['before_etag'] and raw==status.body(plan['before_status']):
         need(not dest.exists(),'old status replayed after commit')
+        if epoch == 168 and commit and plan.get('cold168_local_commit') != commit['terminal']:
+            # Keep an unapplied pre-terminal intent with its original sample.
+            # The next sample publishes verification using this authenticated predecessor.
+            return
         written=store.put(epoch,etag,status.body(plan['after_status']))
         etag,raw=store.get(epoch);need(written==etag,'updated status ETag lost')
     need(raw==status.body(plan['after_status']) and etag!=plan['before_etag'],'conditional update was superseded')
@@ -813,6 +820,12 @@ def entry():
     if FAILED166_VERSION >= 4:
         need(cold_workers.FAILED166_CADENCE, 'cold worker census omits the drained epoch 166')
         validate_epoch146_modules(seal)
+    if getattr(cold_workers, 'cold168_commit', None):
+        path = CURRENT.with_name('cold168_commit.py')
+        member, = (item for item in seal['members'] if item['name'] == path.name)
+        need(FAILED166_VERSION >= 8 and Path(cold_workers.cold168_commit.__file__) == path
+             and member['mode'] == '0444' and bound(path)['sha256'] == member['sha256'],
+             'unsealed cold168 terminal cadence')
     if METERED_FULL170:
         import full170_status
         need(cold_workers.METERED_FULL and full170_status.PACKAGE == package
