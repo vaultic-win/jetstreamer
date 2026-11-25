@@ -62,7 +62,7 @@ REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v
 REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
 REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
-V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v1"
+V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v2"
 STOPPED168_PRICE = V7_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
@@ -623,7 +623,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     if focused is not None:
         post_directory = fixture_post_directory(here)
         lease_directory = next(directory for enabled, directory in (
-            (V7_145, "tools-v7-168-stop"),
+            (V7_145, "tools-v7-168-stop-v2"),
             (V6_145, "tools-v6-guard-walk"),
             (V5Z_145, "tools-v5z"),
             (V5Y_145, "tools-v5y"),

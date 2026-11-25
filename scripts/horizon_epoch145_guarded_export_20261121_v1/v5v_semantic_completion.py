@@ -13,7 +13,7 @@ import sys
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FAMILY = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
 GENERATION = Path(__file__).resolve().parent.name
-STOP_RETRY = GENERATION in ("tools-v7-168-stop", "tools-homefloor-145-v6-stop-recovery-v1")
+STOP_RETRY = GENERATION in ("tools-v7-168-stop-v2", "tools-homefloor-145-v6-stop-recovery-v2")
 WALK_RETRY = STOP_RETRY or GENERATION in ("tools-v6-guard-walk", "tools-homefloor-145-v5z-guard-walk-build-v2")
 MODE_RETRY = GENERATION in ("tools-v5z", "tools-homefloor-145-v5y-custody-build-v1") or WALK_RETRY
 SCHEMA_RETRY = GENERATION in ("tools-v5y", "tools-homefloor-145-v5x-schema-build-v1") or MODE_RETRY
@@ -30,9 +30,9 @@ V6 = "a71285e56d674de3bf793692f93dfbb3"
 V6_STOP = "cec8b4e1c2903ff7b26960df7e1a3910567a01d60c9dc3292b4733243d5e2b53"
 V7_HANDOFF = FAMILY / "v7-168-stop-name-handoff"
 V7_START_INTENT = "horizon-epoch145-v6-stop-successor-start-intent-v1"
-PACKAGE = (FAMILY / "tools-v7-168-stop" if STOP_RETRY else FAMILY / "tools-v6-guard-walk" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
+PACKAGE = (FAMILY / "tools-v7-168-stop-v2" if STOP_RETRY else FAMILY / "tools-v6-guard-walk" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
            FAMILY / "tools-v5y" if SCHEMA_RETRY else FAMILY / GENERATION if RETRY else V5V_PACKAGE)
-PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v6-stop-recovery-v1") if STOP_RETRY else
+PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v6-stop-recovery-v2") if STOP_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5z-guard-walk-recovery-v1") if WALK_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5y-custody-recovery-v1") if MODE_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5x-schema-recovery-v1") if SCHEMA_RETRY else

@@ -11,7 +11,7 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-V6_STOP_RECOVERY = VERSION == "tools-v7-168-stop"
+V6_STOP_RECOVERY = VERSION == "tools-v7-168-stop-v2"
 V5Z_WALK_RECOVERY = VERSION == "tools-v6-guard-walk" or V6_STOP_RECOVERY
 V5Y_CUSTODY_RECOVERY = VERSION == "tools-v5z" or V5Z_WALK_RECOVERY
 V5X_SCHEMA_RECOVERY = VERSION == "tools-v5y" or V5Y_CUSTODY_RECOVERY
@@ -46,7 +46,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5x": "tools-homefloor-145-v5w-donor-recovery-v1",
                       "tools-v5y": "tools-homefloor-145-v5x-schema-recovery-v1",
                       "tools-v5z": "tools-homefloor-145-v5y-custody-recovery-v1",
-                      "tools-v7-168-stop": "tools-homefloor-145-v6-stop-recovery-v1",
+                      "tools-v7-168-stop-v2": "tools-homefloor-145-v6-stop-recovery-v2",
                       "tools-v6-guard-walk": "tools-homefloor-145-v5z-guard-walk-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")

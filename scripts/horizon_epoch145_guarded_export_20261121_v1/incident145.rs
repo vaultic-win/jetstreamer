@@ -32,7 +32,7 @@ compile_error!("the allocation-walk hold retry requires the V5z verifier guard")
 compile_error!("the epoch 168 stop recovery requires the complete V6 verifier guard");
 
 #[cfg(incident_v6_stop_recovery145_only)]
-pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7-168-stop/export145";
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7-168-stop-v2/export145";
 #[cfg(all(incident_v5z_guard_recovery145_only, not(incident_v6_stop_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v6-guard-walk/export145";
 #[cfg(all(incident_v5y_guard_recovery145_only, not(incident_v5z_guard_recovery145_only)))]
@@ -426,13 +426,13 @@ pub(super) fn failed_v5z(prior: &Value) -> Result<Value> {
 
 #[cfg(incident_v6_stop_recovery145_only)]
 pub(super) fn v6_terminal() -> Result<Bound> {
-    let terminal = custody::binding(&Path::new(RUNTIME).join(
-        "epoch145-semantic-continuity-20261121-v1/v6-guard-walk-name-handoff/V6_TERMINAL_FAILURE_168_STOP.json",
-    ))?;
-    ensure!(
-        terminal.sha256 == "cec8b4e1c2903ff7b26960df7e1a3910567a01d60c9dc3292b4733243d5e2b53",
-        "V6 terminal custody changed"
-    );
+    let terminal = Bound {
+        path: Path::new(RUNTIME).join(
+            "epoch145-semantic-continuity-20261121-v1/v6-guard-walk-name-handoff/V6_TERMINAL_FAILURE_168_STOP.json",
+        ),
+        sha256: "cec8b4e1c2903ff7b26960df7e1a3910567a01d60c9dc3292b4733243d5e2b53".into(),
+    };
+    custody::bytes(&terminal, 1 << 20, true).context("V6 terminal custody changed")?;
     Ok(terminal)
 }
 
