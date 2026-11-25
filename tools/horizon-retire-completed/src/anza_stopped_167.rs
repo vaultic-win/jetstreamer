@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 pub(super) const REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_data/closed167-retry57-prefix-retirement-20261125-v1/REVIEW.json";
 const REVIEW_SHA: &str = "0f6be01db825f091d89295acd2bff1c1d3567349591c026f9c32c90439aaee59";
 const AUDIT: &str = "/var/lib/jetstreamer/horizon_runtime_data/closed167-retry57-prefix-retirement-20261125-v1/retired.jsonl";
-const CAMPAIGN_LOCK: &str = "/run/horizon-epoch171-to136-g1.operation.lock";
 const MUTATION_LOCK: &str = "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock";
 const MANAGER: &str = "/usr/bin/systemctl";
 const PROPERTIES: &str = "Id,FragmentPath,DropInPaths,LoadState,UnitFileState,ActiveState,SubState,ControlPID,MainPID,Job,Triggers,TriggeredBy,NeedDaemonReload,ControlGroup";
@@ -330,7 +329,6 @@ pub(super) fn run(bytes: &[u8], sha: &str, image: &str, check_only: bool) -> Res
         fs::symlink_metadata(audit).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
         "an audit already exists or is inaccessible"
     );
-    let _campaign = lock(Path::new(CAMPAIGN_LOCK), 26, 3453440, 0, 0)?;
     let _historical = plan
         .original_locks
         .iter()
