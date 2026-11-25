@@ -115,7 +115,10 @@ if [[ ${1:-} == epoch166-after168* ]]; then
     rustc "${args[@]}" --cfg epoch166_retry11 --cfg epoch166_after170 --test "$shared/main.rs" -o "$out/tests166-after170"
     "$out/tests166-after170" --test-threads=1
 fi
-if [[ ${1:-} == epoch168-cold-retry4 ]]; then
+if [[ ${1:-} == epoch168-cold-retry5 ]]; then
+    rustc "${args[@]}" --cfg epoch168_cold_rebook --cfg epoch168_cold_retry3 --cfg epoch168_cold_retry4 --test "$shared/main.rs" -o "$out/tests168-prior"
+    "$out/tests168-prior" --test-threads=1
+elif [[ ${1:-} == epoch168-cold-retry4 ]]; then
     rustc "${args[@]}" --cfg epoch168_cold_rebook --cfg epoch168_cold_retry3 --test "$shared/main.rs" -o "$out/tests168-prior"
     "$out/tests168-prior" --test-threads=1
 elif [[ ${1:-} == epoch168-cold-retry3 ]]; then

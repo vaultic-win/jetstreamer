@@ -629,7 +629,7 @@ pub fn files() -> Result<Value> {
     }))
 }
 
-#[cfg(epoch168_cold_retry3)]
+#[cfg(all(epoch168_cold_retry3, not(epoch168_cold_retry5)))]
 fn spent_retry2(root: &Value) -> Result<()> {
     let prior = rt("epoch168-retry2-rebook-20261122-v1");
     let previous_root = bound(&root["previous_root"], &prior.join("SUCCESSOR_ROOT.json"))?;
@@ -737,7 +737,7 @@ fn validate_exdev(failure: &Value, admitted: &Value) -> Result<()> {
     );
     Ok(())
 }
-#[cfg(epoch168_cold_retry4)]
+#[cfg(all(epoch168_cold_retry4, not(epoch168_cold_retry5)))]
 fn spent_retry3(root: &Value) -> Result<()> {
     let prior = rt("epoch168-retry3-rebook-20261123-v1");
     let prev = bound(&root["previous_root"], &prior.join("SUCCESSOR_ROOT.json"))?;
