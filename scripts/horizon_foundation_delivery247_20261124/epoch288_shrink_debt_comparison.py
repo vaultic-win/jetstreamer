@@ -2,6 +2,7 @@
 
 import argparse
 import ast
+from datetime import datetime
 import fcntl
 import hashlib
 import importlib.util
@@ -39,6 +40,11 @@ TIMER_CORRECTION229 = TERMINAL229.with_name('terminal-timer-correction.json')
 RETIREMENT288 = V / 'horizon288-unpacked-retirement-v328/batch-039-completion.json'
 BANK_DELTA229_UNIT = 'horizon-perf-epoch229-bank-delta@v334.service'
 BANK_DELTA229_GUARDS = V / 'horizon229-bank-delta-v334/guard-receipts'
+EXTRACT226_UNIT = 'horizon-qualify-226-checkpoint-continuation-extract-v2.service'
+EXTRACT226_BROKER = 'foundation-226-original225-broker-v2.service'
+EXTRACT226_STATE = V / 'horizon226-extract-v2'
+SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
+SUFFIX226_STATE = V / 'horizon226-suffix-v1'
 GUARDS = {
     226: V / 'horizon226-extract-v2/guard-receipts',
     229: V / 'horizon229-trace-ram-v325/guard-receipts',
@@ -193,10 +199,68 @@ def stopped_diagnostic229(row, ops):
     return dict(terminal=terminal_ref, timer_correction=correction_ref)
 
 
-def capacity(kit):
-    completion, fleet_ref, fleet = kit.measure.source.latest()
-    assert [(r['epoch'], r['state']) for r in fleet['inventory']['entries'] if r['epoch'] == 288] == [(288, 'missing')]
-    assert all(r['epoch'] != 288 for r in fleet['active'])
+def completed_extraction226(ops):
+    path = EXTRACT226_STATE / 'control/success-drain-completion.json'
+    if not path.exists():
+        return None
+    receipt = binding(path)
+    row = read(receipt)
+    assert row['schema'] == 'foundation-epoch226-extraction-success-drain-v1'
+    assert row['epoch'] == 226 and row['prefix_retained'] is True and row['remote_mutations'] is False
+    intent = read(row['intent'])
+    assert intent['schema'] == 'foundation-epoch226-extraction-success-drain-intent-v1'
+    assert row['handoff'] == intent['handoff']
+    launch = read(intent['original_launch'])
+    assert (launch['epoch'], launch['operation'], launch['unit'], launch['broker_unit']) == (
+        226, 'extract', EXTRACT226_UNIT, EXTRACT226_BROKER)
+    assert (row['producer']['Id'], row['after']['broker']['Id']) == (EXTRACT226_UNIT, EXTRACT226_BROKER)
+    for unit in (EXTRACT226_UNIT, EXTRACT226_BROKER):
+        current = ops.props(unit, ['ActiveState', 'MainPID', 'ControlPID', 'ControlGroup', 'Job'])
+        assert current['ActiveState'] in ('inactive', 'failed') and current['MainPID'] == current['ControlPID'] == '0'
+        assert not current['ControlGroup'] and not current['Job']
+        assert not (Path('/sys/fs/cgroup/system.slice') / unit).exists()
+    return dict(completion=receipt, launch=intent['original_launch'], invocation_id=launch['invocation_id'])
+
+
+def latest_accepted_fleet(kit):
+    prefix = 'horizon-foundation-seven-lane-v'
+    completed = (path for path in kit.measure.DIAGNOSTICS.glob(prefix + '*')
+                 if path.name.removeprefix(prefix).isdigit() and (path / 'completion.json').is_file())
+    directory = max(completed, key=lambda path: int(path.name.removeprefix(prefix)))
+    completion = binding(directory / 'completion.json')
+    done = read(completion)
+    fleet_ref = done['fleet']
+    fleet_path = directory / 'fleet.json'
+    assert fleet_ref['path'] == str(fleet_path) and fleet_path.resolve() == fleet_path
+    metadata = fleet_path.stat()
+    assert stat.S_ISREG(metadata.st_mode) and metadata.st_uid == 0 and not metadata.st_mode & 0o022
+    fleet = kit.ops.bound(fleet_ref)
+    assert (fleet['first_epoch'], fleet['last_epoch'], len(fleet['epochs'])) == (201, 300, 100)
+    assert fleet['inventory']['anomalies'] == 0
+    assert (fleet['observer_receipt'], fleet['observer_sha256']) == (done['observer']['path'], done['observer']['sha256'])
+    sampled = datetime.fromisoformat(fleet['sampled_at_utc']).timestamp()
+    assert 0 <= time.time() - sampled < 1800, 'accepted campaign observation is stale'
+    return completion, fleet_ref, fleet
+
+
+def capacity(kit, candidate_epoch=288):
+    terminal226 = completed_extraction226(kit.ops)
+    if candidate_epoch == 226:
+        assert terminal226 is not None, 'epoch 226 extraction and its broker have not drained'
+        profile = read(binding(SUFFIX226_STATE / 'static-prestart-qualification.json'))
+        assert profile['epoch'] == 226 and profile['unit'] == SUFFIX226_UNIT and profile['guard_static_validation']['validated']
+        guard = read(profile['guard_plan_fixture'])
+        assert guard['unit'] == SUFFIX226_UNIT and guard['minimum_free_bytes'] == FLOOR
+        candidate_disk = guard['maximum_root_physical_bytes']
+        template = checked(profile['producer_template']).read_text().splitlines()
+        memory, = [line.split('=', 1)[1] for line in template if line.startswith('MemoryMax=')]
+        affinity, = [line.split('=', 1)[1] for line in template if line.startswith('AllowedCPUs=')]
+        candidate_memory = int(memory)
+        candidate_cpus = kit.measure.source.helper.cpus(affinity)
+    else:
+        candidate_disk, candidate_memory, candidate_cpus = CAP, MEMORY, CPUS
+    completion, fleet_ref, fleet = latest_accepted_fleet(kit)
+    assert [(r['epoch'], r['state']) for r in fleet['inventory']['entries'] if r['epoch'] == candidate_epoch] == [(candidate_epoch, 'missing')]
     helper = kit.measure.source.helper
     owners, growth, guard_paths, reconciled = {}, {}, {}, {}
     for row in fleet['active']:
@@ -205,22 +269,36 @@ def capacity(kit):
         if epoch == 229 and producer['InvocationID'] == '505abb8828c54c138078e97f9277b817':
             reconciled[epoch] = stopped_diagnostic229(row, kit.ops)
             continue
+        if producer['Id'] == EXTRACT226_UNIT and terminal226 is not None:
+            assert epoch == 226 and row['phase'] == 'private-held-extraction'
+            assert producer['InvocationID'] == terminal226['invocation_id']
+            assert row['launch_receipt_sha256'] == terminal226['launch']['sha256']
+            reconciled[epoch] = terminal226
+            continue
+        assert epoch != candidate_epoch, 'comparison candidate already has a live owner'
         owner = helper.active_props(producer['Id'], producer['InvocationID'])
         assert owner['MainPID'] == producer['MainPID']
         owners[epoch] = owner
-        guard_paths[epoch] = BANK_DELTA229_GUARDS if producer['Id'] == BANK_DELTA229_UNIT else GUARDS[epoch]
+        if producer['Id'] == BANK_DELTA229_UNIT:
+            guard_paths[epoch] = BANK_DELTA229_GUARDS
+        elif producer['Id'] == SUFFIX226_UNIT:
+            guard_paths[epoch] = SUFFIX226_STATE / 'guard-receipts'
+        else:
+            guard_paths[epoch] = GUARDS[epoch]
         growth[epoch] = kit.measure.source.growth_for(epoch, owner, guard_paths[epoch])
-    broker_record = kit.ops.bound(kit.ops.ref(V / 'horizon226-extract-v2/held-broker.json'))
-    broker_unit = 'foundation-226-original225-broker-v2.service'
-    broker = kit.ops.props(broker_unit, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID', 'ControlGroup',
-                                          'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
-    assert (broker['ActiveState'], broker['SubState'], int(broker['MainPID'])) == ('active', 'running', broker_record['broker_pid'])
-    live = [*owners.values(), broker]
+    broker = None
+    live = list(owners.values())
+    if terminal226 is None:
+        broker_record = kit.ops.bound(kit.ops.ref(EXTRACT226_STATE / 'held-broker.json'))
+        broker = kit.ops.props(EXTRACT226_BROKER, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
+                                                  'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
+        assert (broker['ActiveState'], broker['SubState'], int(broker['MainPID'])) == ('active', 'running', broker_record['broker_pid'])
+        live.append(broker)
     census = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
         '--no-pager', '--no-legend', '--plain', 'horizon-qualify-*', 'horizon-perf-*', 'horizon-upload-*',
         'horizon-restore-*', 'foundation-*-broker-*'], text=True, timeout=10)
     assert {line.split()[0] for line in census.splitlines() if line.strip()} == {row['Id'] for row in live}, census
-    assert all(r['AllowedCPUs'] and not (CPUS & helper.cpus(r['AllowedCPUs'])) for r in live)
+    assert all(r['AllowedCPUs'] and not (candidate_cpus & helper.cpus(r['AllowedCPUs'])) for r in live)
     mem = {k: int(value.split()[0]) * 1024 for k, value in
            (line.split(':', 1) for line in Path('/proc/meminfo').read_text().splitlines())
            if k in ('MemAvailable', 'MemTotal')}
@@ -238,17 +316,20 @@ def capacity(kit):
     assert RUN.parent.stat().st_dev == root_device
     free = device.f_bavail * device.f_frsize
     protected = floor + sum(row['remaining_growth_bytes'] for row in disk_growth.values()) + helper.PUBLICATION_SCRATCH
-    retirement_ref = fixed(RETIREMENT288, '7867cca9dea1f76def23cae3630941d73ae36241e6637bc6e212458f5b3ee008')
-    retirement = read(retirement_ref)
-    retired = read(retirement['check'])
-    assert retirement['retirement_complete'] and retirement['end'] == retired['matching_files'] == 322833
-    assert retired['matching_allocated_bytes'] == 51_918_905_344 and retired['protected_files'] == 7757
-    return dict(epoch=288, fleet=fleet_ref, completion=completion, sampled_unix_seconds=int(time.time()),
+    retirement_ref = None
+    if candidate_epoch == 288:
+        retirement_ref = fixed(RETIREMENT288, '7867cca9dea1f76def23cae3630941d73ae36241e6637bc6e212458f5b3ee008')
+        retirement = read(retirement_ref)
+        retired = read(retirement['check'])
+        assert retirement['retirement_complete'] and retirement['end'] == retired['matching_files'] == 322833
+        assert retired['matching_allocated_bytes'] == 51_918_905_344 and retired['protected_files'] == 7757
+    return dict(epoch=candidate_epoch, fleet=fleet_ref, completion=completion, sampled_unix_seconds=int(time.time()),
                 live_units=owners, broker=broker, guards=growth, free_bytes=free, protected_disk_bytes=protected,
-                reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref,
-                guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=CAP,
-                candidate_memory_max_bytes=MEMORY, candidate_cpus=sorted(CPUS),
-                disk_shortfall_bytes=max(0, protected + CAP - free), memory_shortfall_bytes=max(0, MEMORY - memory_room),
+                reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref, extraction226_terminal=terminal226,
+                guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=candidate_disk,
+                candidate_memory_max_bytes=candidate_memory, candidate_cpus=sorted(candidate_cpus),
+                disk_shortfall_bytes=max(0, protected + candidate_disk - free),
+                memory_shortfall_bytes=max(0, candidate_memory - memory_room),
                 publication_authorized=False)
 
 
@@ -509,13 +590,16 @@ def guarded_start(kit, profile_ref, fit, inventory, deployment):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('inspect', 'capacity', 'prepare', 'launch'))
+    parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'prepare', 'launch'))
     parser.add_argument('reference', nargs='?')
     parser.add_argument('sha256', nargs='?')
     options = parser.parse_args()
     assert os.geteuid() == 0 and __debug__
     if options.action == 'capacity':
         print(json.dumps(capacity(load_existing())))
+        return
+    if options.action == 'capacity-suffix226':
+        print(json.dumps(capacity(load_existing(), candidate_epoch=226)))
         return
     if options.action in ('prepare', 'launch'):
         kit = load_existing()
