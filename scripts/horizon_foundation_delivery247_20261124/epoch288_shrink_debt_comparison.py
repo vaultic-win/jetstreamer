@@ -106,6 +106,18 @@ def read(reference):
     return json.loads(checked(reference).read_bytes())
 
 
+def read_guard_sample(path):
+    with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW), 'rb') as stream:
+        before = os.fstat(stream.fileno())
+        assert before.st_uid == 0 and stat.S_ISREG(before.st_mode)
+        assert stat.S_IMODE(before.st_mode) in (0o400, 0o600)
+        raw = stream.read()
+        after = os.fstat(stream.fileno())
+    assert len(raw) == before.st_size == after.st_size
+    assert (before.st_mtime_ns, before.st_ctime_ns) == (after.st_mtime_ns, after.st_ctime_ns)
+    return json.loads(raw), dict(path=str(path), sha256=hashlib.sha256(raw).hexdigest())
+
+
 def fixed(path, sha):
     return dict(path=str(path), sha256=sha)
 
@@ -691,8 +703,7 @@ def guarded_start(kit, profile_ref, fit, inventory, deployment):
         pid = int(state['MainPID'])
         assert pid > 0 and (Path('/proc') / str(pid) / 'exe').samefile(argv[0])
         for path in sorted(RECEIPTS.glob('sample-*.json'), key=lambda p: p.stat().st_mtime_ns, reverse=True):
-            ref = binding(path)
-            observation = read(ref)
+            observation, ref = read_guard_sample(path)
             assert observation['producer_invocation_id'] == invocation and observation['plan_sha256'] == plan['sha256']
             assert observation['guard_sha256'] == guard['sha256'] and observation['trip_reason'] is None
             if observation['producer']['active'] == 'active' and observation['workers']:
@@ -702,10 +713,11 @@ def guarded_start(kit, profile_ref, fit, inventory, deployment):
                 assert (process / 'exe').readlink().is_relative_to(RUN)
                 assert f'0::/system.slice/{UNIT}' in (process / 'cgroup').read_text().splitlines()
                 assert binding(process / 'exe')['sha256'] == worker['sha256']
-                return state, pid, worker_pid, ref
+                return state, pid, worker_pid, observation, ref
         return None
 
-    state, pid, worker_pid, active_guard = startup.until(started, 220)
+    state, pid, worker_pid, observation, original_guard = startup.until(started, 220)
+    active_guard = ops.funds.put(PACKAGE / 'active-guard.json', observation)
     identity = dict(unit=UNIT, active_state='active', sub_state='running', main_pid=pid, invocation_id=invocation,
                     restarts=0, load_state=state['LoadState'], result=state['Result'])
     return ops.funds.put(registration, dict(schema='jetstreamer-historical-performance-launch-receipt-v1',
@@ -714,7 +726,7 @@ def guarded_start(kit, profile_ref, fit, inventory, deployment):
         bootstrap_slot=124415782, target_slot=124429562, terminal_slot=124435861,
         launched=True, entry_replay_requested=True, canonical_epoch_publication_authorized=False, remote_mutations=False,
         r2_mutations=False, admission=admission, guard_plan=plan, launch_token=token, active_guard=active_guard,
-        evidence=dict(units=[identity])))
+        evidence=dict(units=[identity], original_guard_sample=original_guard)))
 
 
 def main():
