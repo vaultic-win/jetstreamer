@@ -367,8 +367,10 @@ def drained145(s, fit, root):
 def require_v6(s, status):
     provider = '/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1'
     package = 'tools-cold168-retry4-failed166-v6-entry146'
-    s.need(status['consumer_seal']['path'] == f'{provider}/{package}/deployment-seal-receipt.json',
-           'full epoch 170 requires the registered v6 receiver')
+    holding = f'{provider}/tools-cold168-retry4-failed166-v7-entry146/deployment-seal-receipt.json'
+    s.need(status['consumer_seal']['path'] == f'{provider}/{package}/deployment-seal-receipt.json'
+           or status['consumer_seal'] == dict(path=holding, sha256='c1b777be3164beca0db8afc9777a02bbbd8f7babc09acf063acb00297cd51504'),
+           'full epoch 170 requires the registered v6 receiver or its qualified holding successor')
 
 
 def ownership(s, fit, route, hourly, mode, ref, status, fleet):

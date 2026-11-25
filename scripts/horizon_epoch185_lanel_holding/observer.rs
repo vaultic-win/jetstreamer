@@ -1,4 +1,5 @@
 //! Observe the exact closed lane-l holding transfer. This command only reads host state.
+mod replay_price;
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -436,20 +437,22 @@ fn reconcile(observed: &Value) -> Result<Value> {
         "holding_reservation":reservation,"observation":observed}),
     )
 }
+fn stable_reconciliation() -> Result<Value> {
+    let first = observe()?;
+    let r = reconcile(&first)?;
+    ensure!(
+        observe()? == first && reconcile(&first)? == r,
+        "holding changed during reconciliation"
+    );
+    Ok(r)
+}
 fn main() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "expected root");
     let args: Vec<_> = std::env::args().skip(1).collect();
     let result = match args.as_slice() {
         [op] if op == "observe" => observe()?,
-        [op] if op == "reconcile" => {
-            let first = observe()?;
-            let r = reconcile(&first)?;
-            ensure!(
-                observe()? == first && reconcile(&first)? == r,
-                "holding changed during reconciliation"
-            );
-            r
-        }
+        [op] if op == "reconcile" => stable_reconciliation()?,
+        [op, lane] if op == "replay-price" => replay_price::apply(lane)?,
         [op, path, sha] if op == "cost" => {
             let qr = ref_for(Path::new(path), sha);
             let q = read_bound(&qr)?;
@@ -463,7 +466,7 @@ fn main() -> Result<()> {
             cost["native_price"] = qr;
             cost
         }
-        _ => bail!("expected observe, reconcile, or cost NATIVE_PRICE SHA256"),
+        _ => bail!("expected observe, reconcile, cost NATIVE_PRICE SHA256, or replay-price LANE"),
     };
     println!("{}", serde_json::to_string(&result)?);
     Ok(())

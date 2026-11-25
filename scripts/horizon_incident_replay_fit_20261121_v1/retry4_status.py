@@ -193,13 +193,14 @@ def registered_hourly170_writer(s, prior, *, failed166=False):
 
 def registered_failed166_rejoin(s, prior, version=2):
     old_package, old_seal, old_iid, old = prior
-    s.need(version in (2, 3, 4, 5, 6), 'unknown epoch 166 cadence rejoin')
+    s.need(version in (2, 3, 4, 5, 6, 7), 'unknown epoch 166 cadence rejoin')
     def package_for(generation):
         name = f'tools-cold168-retry4-failed166-v{generation}'
         return STATUS / (name + '-entry146' if generation >= 4 else name)
 
     name = f'FAILED166_CADENCE_V{version}'
-    previous_name = 'FAILED166_CADENCE' if version == 2 else f'FAILED166_CADENCE_V{version - 1}'
+    predecessor = 5 if version == 7 and old_package == package_for(5) else version - 1
+    previous_name = 'FAILED166_CADENCE' if version == 2 else f'FAILED166_CADENCE_V{predecessor}'
     active, _ = s.read(STATUS / f'{name}_ACTIVE.json')
     ready = s.bound(active['ready'], STATUS / f'{name}_READY.json')
     previous = s.bound(ready['old_owner'], STATUS / f'{previous_name}_ACTIVE.json')
@@ -207,7 +208,13 @@ def registered_failed166_rejoin(s, prior, version=2):
     package = package_for(version)
     seal = s.bound(ready['package'], package / 'deployment-seal-receipt.json')
     actor = active['new']
-    s.need(old_package == package_for(version - 1)
+    if version == 7:
+        allowed = {5: '3f36fd3f6f51da689953d091aeafd620a6296d480ff0c0ee8111414d98a3b286',
+                   6: 'dd6011e39810a319f7025ee7887b58aaa000a70209c14ca7ddced49769a15352'}
+        s.need(old_seal['sha256'] == allowed[predecessor]
+               and ready['package']['sha256'] == 'c1b777be3164beca0db8afc9777a02bbbd8f7babc09acf063acb00297cd51504',
+               'different epoch 185 holding cadence deployment')
+    s.need(old_package == package_for(predecessor)
            and old_seal['path'] == str(old_package / 'deployment-seal-receipt.json')
            and active['schema'] == 'horizon-epoch166-cadence-rejoin-active-v1'
            and ready['schema'] == 'horizon-epoch166-cadence-rejoin-ready-v1'

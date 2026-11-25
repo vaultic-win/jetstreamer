@@ -1019,7 +1019,8 @@ def registered_status():
                     failed = writer168v4["registered_failed170_writer"](scope,retry4)
                     if RETAIN_FAILED166:
                         adopted = writer168v4["registered_hourly170_writer"](scope, failed, failed166=True)
-                        for version in (2, 3, 4, 5, 6):
+                        versions = (2, 3, 4, 5, 6, 7) if REPRO166 or FULL170 else (2, 3, 4, 5, 6)
+                        for version in versions:
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():
                                 adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, version)
@@ -1653,12 +1654,24 @@ def capture_native(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=N
                                          final_guard=row["guard"],processes=row["processes"],complete_fit_repeated=True)
     return result
 
+def holding185_program():
+    program = HERE / "holding185-price"
+    deployment, _ = s.read(HERE / "deployment-seal-receipt.json")
+    entry, = (r for r in deployment["members"] if r["name"] == program.name)
+    s.need(deployment["destination"] == str(HERE) and entry["mode"] == "0555", "unbound epoch 185 price")
+    fit.binary(program, entry["sha256"])
+    return program
+
+
 def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None, repro166_mode=None):
     s.need(REPRO166 == (repro166_mode is not None) and (not REPRO166 or
            (epoch == 145 and prestart136 is None and repro166_mode in ("prestart", "held", "post-guard"))),
            "wrong bounded epoch 166 capture route")
     s.need(HOURLY170 == (hourly170_mode is not None), "hourly 170 mode requires its own sealed provider")
     s.need(FULL170 == (full170_mode is not None), "full epoch 170 mode requires its own sealed provider")
+    if REPRO166 or FULL170:
+        holding_program = holding185_program()
+        holding_before = json.loads(subprocess.check_output([holding_program, "reconcile"], timeout=30))
     if FULL170:
         s.need(epoch == 145 and prestart136 is None and full170_mode in ("prestart", "held", "post-guard", "active"),
                "unknown full epoch 170 capacity stage")
@@ -1709,6 +1722,10 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         else:
             options = {"full170": native["active_full170"]} if FULL170 and full170_mode == "active" else {}
             native["epoch159_donor_cover"] = donor["cover"](before,donor_price,donor["snapshot"](), **options)
+        if REPRO166 or FULL170:
+            lane = "166" if REPRO166 else "170"
+            native = json.loads(subprocess.check_output([holding_program, "replay-price", lane],
+                input=json.dumps(dict(before=holding_before, native=native)).encode(), timeout=30))
         if REPRO166:
             s.need(registered_status() == native["status_registration"]
                    and reproduction166_owner(repro166_mode, ref) == native["reproduction166_owner"],
