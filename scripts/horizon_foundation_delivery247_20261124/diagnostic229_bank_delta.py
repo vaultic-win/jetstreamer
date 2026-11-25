@@ -10,6 +10,8 @@ RUN_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch229-bank-delta-tmpfs-v33
 REGISTRATION = PACKAGE / "cadence-registration.json"
 FINALIZED_REWARDS = V / "horizon229-finalized-block-rewards-v1/completion.json"
 FINALIZED_REWARDS_SHA = "a353fd5134d3947788610f9b057442d64cfd2cda7e9835e267169a1eabf34923"
+PREDECESSOR_VOTES = V / "horizon229-predecessor-vote-comparison-v1/completion.json"
+PREDECESSOR_VOTES_SHA = "1f19af6492efbbcae54681b027ce6d922fc2956962c5ae6517ac7f882075a8ce"
 FIELDS = ["Id", "ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup"]
 
 
@@ -94,6 +96,27 @@ def gate(plan):
             gate_row["next_action"] = (
                 "Both block reward lists match finalized RPC. Compare the retained dirty-account hashes "
                 "with independently reconstructed account state at slots 98,931,631 and 98,931,633."
+            )
+        if PREDECESSOR_VOTES.is_file():
+            votes_ref = ref(PREDECESSOR_VOTES)
+            assert votes_ref["sha256"] == PREDECESSOR_VOTES_SHA
+            votes = bound(votes_ref)
+            assert votes["schema"] == "foundation-epoch229-finalized-signed-predecessor-votes-v1"
+            assert votes["epoch"] == 229 and votes["bank_evidence"] == acceptance["evidence"]
+            assert votes["publication_authorized"] is False and votes["remote_mutations"] is False
+            assert votes["request"]["params"][0] == 98931633
+            assert set(votes["slots"]) == {"98931630", "98931631"}
+            for predecessor in votes["slots"].values():
+                assert predecessor["comparison"] == "match"
+                witness, = predecessor["witnesses"]
+                assert witness["all_message_signatures_verified"] is True
+                assert predecessor["finalized_vote_counts"] == {predecessor["replayed_hash"]: witness["count"]}
+                assert witness["vote_hash"] == predecessor["replayed_hash"] and witness["count"] > 0
+            if votes_ref not in gate_row["evidence"]:
+                gate_row["evidence"].append(votes_ref)
+            gate_row["next_action"] = (
+                "Signed votes match the replayed Bank through slot 98,931,631 and diverge at slot 98,931,633. "
+                "Compare the finalized transaction outcomes and retained dirty-account writes in block 98,931,633."
             )
 
 
