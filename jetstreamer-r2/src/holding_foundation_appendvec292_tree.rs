@@ -215,19 +215,20 @@ pub(super) fn run(value: Value, spec: &Bound) -> Result<()> {
         "foreign 292 tree comparison plan"
     );
     let custody = saved(&plan.custody)?;
-    let (key, etag, _) = validate_custody(&custody)?;
+    let validated = validate_custody(&custody)?;
+    let body = &validated.body;
     let restored = saved(&plan.restoration)?;
     let bundle = Path::new(STATE)
         .join("restores")
-        .join(format!("{SHA}.blob"));
+        .join(format!("{}.blob", body.sha256));
     ensure!(
         restored["schema"] == "foundation-epoch292-appendvec-byte-restoration-v1"
             && restored["destination"] == bundle.to_string_lossy().as_ref()
             && restored["custody"] == serde_json::to_value(&plan.custody)?
-            && restored["object_key"] == key
-            && restored["object_etag"] == etag
-            && restored["sha256"] == SHA
-            && restored["length"] == BYTES
+            && restored["object_key"] == validated.object
+            && restored["object_etag"] == validated.etag
+            && restored["sha256"] == body.sha256
+            && restored["length"] == body.length
             && restored["compressed_bundle_restored"] == true
             && restored["remote_sha256_readback"] == true
             && restored["local_retirement_authorized"] == false,
@@ -239,8 +240,8 @@ pub(super) fn run(value: Value, spec: &Bound) -> Result<()> {
     require_read_only(&bundle)?;
     let identity = regular_identity(&bundle)?;
     ensure!(
-        identity.length == BYTES
-            && hash_and_etag(&bundle, identity, DEFAULT_PART_SIZE)?.sha256_hex == SHA,
+        identity.length == body.length
+            && hash_and_etag(&bundle, identity, DEFAULT_PART_SIZE)?.sha256_hex == body.sha256,
         "292 restored bundle no longer matches authenticated custody"
     );
     compare_census(source, expected)?;
@@ -254,7 +255,7 @@ pub(super) fn run(value: Value, spec: &Bound) -> Result<()> {
         &format!("appendvec292-tree-comparison-{}.json", spec.sha256),
         &json!({
             "schema":"foundation-epoch292-appendvec-tree-comparison-v1","spec":spec,"custody":plan.custody,
-            "restoration":plan.restoration,"source":source,"bundle_sha256":SHA,"members":FILES,
+            "restoration":plan.restoration,"source":source,"bundle_sha256":body.sha256,"members":FILES,
             "logical_bytes":LOGICAL_BYTES,"allocated_bytes":PHYSICAL_BYTES,"metadata":expected,
             "tar_sha256":TAR_SHA,"zstd_sha256":ZSTD_SHA,"full_sparse_payload_matches":true,
             "source_census_matches_before_and_after":true,"source_retirement_authorized":false,
