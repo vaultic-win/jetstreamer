@@ -217,8 +217,12 @@ def startup(profile,fit,inventory,namespace,kit,actor_properties):
         cg=Path("/sys/fs/cgroup"+prestart["ControlGroup"])
         limits={key:(cg/key).read_text().strip() for key in ("memory.max","memory.high","memory.swap.max","pids.max","cpu.max","cpuset.cpus.effective")}
         quota,period=map(int,limits["cpu.max"].split())
+        # The cgroup v2 memory controller rounds byte limits down to pages.
+        page_size=os.sysconf("SC_PAGE_SIZE")
+        max_bytes=profile["memory_max_bytes"]//page_size*page_size
+        high_bytes=profile["memory_high_bytes"]//page_size*page_size
         assert [limits[key] for key in ("memory.max","memory.high","memory.swap.max","pids.max","cpuset.cpus.effective")]==[
-            str(profile["memory_max_bytes"]),str(profile["memory_high_bytes"]),"0","512","80-87"]
+            str(max_bytes),str(high_bytes),"0","512","80-87"]
         assert quota==8*period
         record(BASE/"native-prestart.json",dict(owner=prestart,limits=limits))
         plan=record(BASE/"guard-plan.json",dict(bound(profile["static_plan"]),invocation_id=iid))
