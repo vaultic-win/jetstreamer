@@ -66,6 +66,9 @@ if TIMER_SUCCESSOR:
     else:
         ADVANCING_NAME = "V5E_ACTUAL_ADVANCING_WORKER.json"
 
+if VERSION == "tools-v13q":
+    PIPE = Path("/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1/pinned-http500-4bc299e03b21/horizon_pipeline")
+
 
 def argv(pid):
     return [os.fsdecode(x) for x in Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0") if x]

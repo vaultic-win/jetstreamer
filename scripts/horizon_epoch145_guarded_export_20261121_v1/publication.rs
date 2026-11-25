@@ -101,6 +101,13 @@ fn local(full: &Path, iid: &str, archive: &Path) -> Result<(Bound, String)> {
     let argv: Vec<String> = serde_json::from_value(p["argv"].clone())?;
     post::plugin_counts(&custody::evidence(&b)?, &argv)?;
     let body = custody::json(&plan, true)?;
+    #[cfg(incident_v5z_post145_only)]
+    ensure!(
+        body["reader_commit"] == post::GUARD_READER_COMMIT
+            && body["qualification"]["sha256"] == post::GUARD_QUALIFICATION_SHA
+            && p["current_branch_qualification"] == post::GUARD_QUALIFICATION_SHA,
+        "epoch 145 verification did not use the qualified HTTP retry reader"
+    );
     ensure!(
         body["threads"] == 1
             && body["origin_url"] == ORIGIN

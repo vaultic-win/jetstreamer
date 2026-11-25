@@ -66,9 +66,12 @@ pub(super) const VERIFIER: &str =
 #[cfg(not(incident_post145_only))]
 pub(super) const PIPELINE: &str =
     "30251e917ca0eb103aebd586556e235150e396a7354bb670b7bc1a44b83faa51";
-#[cfg(incident_timer_post145_only)]
+#[cfg(all(incident_timer_post145_only, not(incident_v5z_post145_only)))]
 pub(super) const PIPELINE: &str =
     "0f29fd116ef54668698089c01f8cd50ffcf729b430e311bb90b989f4d5ad8e94";
+#[cfg(incident_v5z_post145_only)]
+pub(super) const PIPELINE: &str =
+    "4bc299e03b21ade03a9a89d4112667df84d6a8abda2d45cc42d43ce7f3761859";
 #[cfg(all(incident_timeout_post145_only, not(incident_timer_post145_only)))]
 pub(super) const PIPELINE: &str =
     "56bf2bf0937f1b90de8de0519c0a572b06a8ed62cb9e14bf9e9f0fa8021ed916";
@@ -84,13 +87,17 @@ const READER_COMMIT: &str = "eba5d1b596cd454811c466fde7a25a2ecb4b19ef";
 #[cfg(all(incident_post145_only, not(incident_timeout_post145_only)))]
 const READER_COMMIT: &str = "907c5b3c26837c75c5c62f76bb124ff4fd8fe642";
 #[cfg(incident_guard_v5u_post145_only)]
-const GUARD_READER_COMMIT: &str = if cfg!(incident_v5w_post145_only) {
+pub(super) const GUARD_READER_COMMIT: &str = if cfg!(incident_v5z_post145_only) {
+    "e15f71a2a84c9f256c6fc3d5da34e9354430e702"
+} else if cfg!(incident_v5w_post145_only) {
     "6bc8f25405f86634f484e665a740ecf73845d691"
 } else {
     "80e86a24fba065d17ad97321878cdb9e3ee38dc3"
 };
 #[cfg(incident_guard_v5u_post145_only)]
-const GUARD_QUALIFICATION_SHA: &str = if cfg!(incident_v5w_post145_only) {
+pub(super) const GUARD_QUALIFICATION_SHA: &str = if cfg!(incident_v5z_post145_only) {
+    "e932eb960f91977ee95707793d11c988be923184aec3f76dfbf42d31fdd32ac0"
+} else if cfg!(incident_v5w_post145_only) {
     "5076d6cc1e87bc9c0af0c7192b16e1b062499bc65610edb46b625438b969eaaf"
 } else {
     "a23eaed728ba6195cacfee622188d669dfc78ec7cf380892c1e625d992008553"
@@ -384,6 +391,93 @@ pub(super) fn plugin_counts(report: &Value, argv: &[String]) -> Result<()> {
     );
     Ok(())
 }
+#[cfg(incident_v5z_post145_only)]
+fn native_tools(root: &Path, _state: &Path) -> Result<(Bound, Bound, Bound)> {
+    let directory =
+        Path::new(capacity::RUNTIME).join("ready-audit-http500-candidate-e15f71a2a84c-20261125-v1");
+    let seal = bound(
+        &directory.join("deployment-seal-receipt.json"),
+        "3fa6c503626b68fb91455aa8b2a117c5baedf7c65a08f09a96bc9b09c74fbaca",
+    );
+    let qualified = bound(
+        &directory.join("qualification.json"),
+        GUARD_QUALIFICATION_SHA,
+    );
+    let pairing = bound(
+        &directory.join("ordinary-pair.json"),
+        "55cc1f7e0decc7dd19ef57ec1346112e5d4e13a76674d0667646597379d6d33f",
+    );
+    let comparison = bound(
+        &directory.join("READER_INPUT_COMPARISON.json"),
+        "ee5c719a81408c531f478c6aebc92cc1233f497c61aa6f3e88311321e56f2966",
+    );
+    let evidence = custody::json(&seal, true)?;
+    ensure!(
+        evidence["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && evidence["destination"] == json!(directory)
+            && evidence["publication_authorized"] == false
+            && evidence["remote_mutations"] == false
+            && evidence["members"].as_array().is_some_and(|rows| {
+                [&qualified, &pairing, &comparison].iter().all(|item| {
+                    rows.iter().any(|row| {
+                        row["name"].as_str() == item.path.file_name().and_then(|name| name.to_str())
+                            && row["sha256"] == item.sha256
+                            && row["mode"] == "0444"
+                    })
+                })
+            }),
+        "HTTP retry reader deployment changed"
+    );
+    let q = custody::json(&qualified, true)?;
+    let pair = custody::json(&pairing, true)?;
+    let inputs = custody::json(&comparison, true)?;
+    let full = bound(
+        &root.join("current-reader-tools-v2/verify_archive"),
+        VERIFIER,
+    );
+    let pipe = bound(
+        Path::new(
+            "/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1/pinned-http500-4bc299e03b21/horizon_pipeline",
+        ),
+        PIPELINE,
+    );
+    ensure!(
+        q["schema"] == "horizon-current-reader-main-acceptance-v1"
+            && q["reader_commit"] == GUARD_READER_COMMIT
+            && q["full_verifier"] == json!(full)
+            && q["pipeline"] == json!(pipe)
+            && q["minimum_thread_stack_bytes"] == 67_108_864
+            && q["source_artifact_correspondence_accepted"] == true
+            && q["full_and_plugin_capabilities_accepted"] == true
+            && q["source_build_evidence"]
+                .as_array()
+                .is_some_and(|items| items.contains(&json!(comparison)))
+            && inputs["local_candidate_merge"] == GUARD_READER_COMMIT
+            && inputs["qualified_binary"] == json!(pipe)
+            && inputs["changed_compiler_inputs"] == json!([])
+            && pair["schema"] == "horizon-staged-ordinary-uploader-http-retry-pair-v1"
+            && pair["local_candidate_merge"] == GUARD_READER_COMMIT
+            && pair["qualification"] == json!(qualified)
+            && pair["pipeline"] == json!(pipe)
+            && pair["full_verifier"] == json!(full)
+            && pair["uploader"]
+                == json!(bound(
+                    &root.join("uploader-tools/jetstreamer-r2"),
+                    publication::UPLOADER
+                ))
+            && pair["fixture_threads"] == 1
+            && pair["fixture_slot_count"] == 432_000
+            && pair["wrong_etag_refused"] == true
+            && pair["archive_publication_authorized"] == false
+            && pair["production_r2_mutations"] == false,
+        "HTTP retry source or ordinary publication proof changed"
+    );
+    custody::bytes(&full, 16 << 20, true)?;
+    custody::bytes(&pipe, 256 << 20, true)?;
+    Ok((full, pipe, qualified))
+}
+
+#[cfg(not(incident_v5z_post145_only))]
 fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
     #[cfg(not(incident_post145_only))]
     let (full, seal, built, test, current) = {
@@ -975,6 +1069,9 @@ mod tests {
         let (full, plugin, plan) = native_tools(Path::new(ROOT), dir.path()).unwrap();
         assert_eq!(full.sha256, VERIFIER);
         assert_eq!(plugin.sha256, PIPELINE);
+        #[cfg(incident_v5z_post145_only)]
+        assert_eq!(plan.sha256, GUARD_QUALIFICATION_SHA);
+        #[cfg(not(incident_v5z_post145_only))]
         assert_eq!(
             plan.sha256,
             if cfg!(incident_v5w_post145_only) {
