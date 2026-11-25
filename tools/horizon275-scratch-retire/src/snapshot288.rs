@@ -15,13 +15,23 @@ const TIMER: &str = "horizon-288-full-protective-v303.timer";
 const INVOCATION: &str = "e3823449247b42948e3cf620bffa019d";
 const COPY_BYTES: u64 = 20_078_043_136;
 const SNAPSHOT: &str = "snapshot-124415782-ApsjgCndKc38Wv37guZpxbR7MuTs5WATjVtm3MeGSPM6.tar.zst";
+const UNIT292: &str = "horizon-qualify-292-root-singleton-v322.service";
+pub(super) const RUN292: &str = "/home/ubuntu/.jetstreamer-private/qualification-292-root-v322/state/destination-37f4352dbc01b503f61315df89e21b5b3d475582c178776821f276972e4d0a2e/work/root-cohort-292-292/run-810645-1795554658368379640";
 
 #[derive(Deserialize)]
-struct Asset {
-    path: PathBuf,
+pub(super) struct Asset {
+    pub(super) path: PathBuf,
     sha256: String,
     #[serde(flatten)]
-    stamp: Stamp,
+    pub(super) stamp: Stamp,
+}
+
+pub(super) fn compared(raw: &Value) -> Result<Asset> {
+    Ok(serde_json::from_value(json!({
+        "path":raw["path"], "sha256":raw["sha256"], "device":raw["device"], "inode":raw["inode"],
+        "logical_bytes":raw["bytes"], "physical_bytes":raw["allocated_bytes"], "uid":raw["uid"],
+        "mode":raw["mode"], "links":1, "mtime_ns":raw["modified_ns"], "ctime_ns":raw["changed_ns"],
+    }))?)
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -91,6 +101,14 @@ pub(super) fn lookup_receipt(path: &Path) -> Result<Option<(Binding, Value)>> {
 
 pub(super) fn closed() -> Result<()> {
     closed_units(UNIT, GUARD, TIMER)
+}
+
+pub(super) fn closed292() -> Result<()> {
+    closed_units(
+        UNIT292,
+        "horizon-292-full-protective-v322.service",
+        "horizon-292-full-protective-v322.timer",
+    )
 }
 
 fn closed_units(producer: &str, guard: &str, timer: &str) -> Result<()> {
@@ -440,18 +458,10 @@ pub(super) fn run292(apply: bool, self_sha: &str) -> Result<()> {
     const PACKAGE: &str = "/var/lib/jetstreamer/horizon292-full-v322";
     const STATE292: &str = "/var/lib/jetstreamer/horizon292-bootstrap-retirement-v336";
     const ROOT292: &str = "/home/ubuntu/.jetstreamer-private/qualification-292-root-v322";
-    const UNIT292: &str = "horizon-qualify-292-root-singleton-v322.service";
     const INVOCATION292: &str = "ed9666c18ff34ef3bb1cca59131a323b";
     const PROOF292: &str = "00f87b81869a9254637a10c30cc699990818a879724c849325dfba2adb102a83";
     const SNAPSHOT292: &str =
         "snapshot-126142053-FTKNWkBEjEUiSnw5WiT58GfzsA6xNNs7vN57KGim9Rch.tar.zst";
-    fn stopped() -> Result<()> {
-        closed_units(
-            UNIT292,
-            "horizon-292-full-protective-v322.service",
-            "horizon-292-full-protective-v322.timer",
-        )
-    }
 
     let state = Path::new(STATE292);
     let mode = state.symlink_metadata()?;
@@ -505,16 +515,9 @@ pub(super) fn run292(apply: bool, self_sha: &str) -> Result<()> {
         "epoch 292 proof does not bind a preserved, stopped run"
     );
 
-    fn compared(raw: &Value) -> Result<Asset> {
-        Ok(serde_json::from_value(json!({
-            "path":raw["path"], "sha256":raw["sha256"], "device":raw["device"], "inode":raw["inode"],
-            "logical_bytes":raw["bytes"], "physical_bytes":raw["allocated_bytes"], "uid":raw["uid"],
-            "mode":raw["mode"], "links":1, "mtime_ns":raw["modified_ns"], "ctime_ns":raw["changed_ns"],
-        }))?)
-    }
     let pin = compared(&proof["original"])?;
     let copy = compared(&proof["duplicate"])?;
-    let run = scope.join("state/destination-37f4352dbc01b503f61315df89e21b5b3d475582c178776821f276972e4d0a2e/work/root-cohort-292-292/run-810645-1795554658368379640");
+    let run = PathBuf::from(RUN292);
     let parent = run.join("scratch/.historical-runtime/jetstreamer-historical-parent-fn5lCf");
     let archive = run.join("archives/epoch-292.jet");
     let bank = parent.join("jetstreamer-historical-v1.8.11-LKkCgn/accounts-state");
@@ -576,7 +579,7 @@ pub(super) fn run292(apply: bool, self_sha: &str) -> Result<()> {
             bank: &bank,
             bank_stamp: &bank_stamp,
             parent_inode: 27349434,
-            closed: stopped,
+            closed: closed292,
         },
     )
 }

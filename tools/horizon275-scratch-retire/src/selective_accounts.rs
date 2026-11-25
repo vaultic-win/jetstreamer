@@ -1,22 +1,60 @@
-//! Retire only snapshot-reproducible files from the stopped epoch 288 accounts directory.
+//! Retire only snapshot-reproducible files from a specifically bound stopped accounts directory.
 use super::{snapshot288::Stamp, *};
 use std::{collections::BTreeMap, ffi::CString, os::unix::ffi::OsStrExt as _};
 
-const REPRODUCTION: &str =
-    "/var/lib/jetstreamer/horizon288-full-v303/unpacked-accounts-reproduction-v327.json";
-const REPRODUCTION_SHA: &str = "37442a3c57a4882e719521ac60464ea1b1a47432112c9be493a9db355a29a567";
-const BOOTSTRAP_COMPLETION: &str =
-    "/var/lib/jetstreamer/horizon288-bootstrap-retirement-v327/completion.json";
-const BOOTSTRAP_COMPLETION_SHA: &str =
-    "fee12aff151d187cbd050afc5702ca9ad9de397c2ae7aa9b6a6f30be77958880";
-const STATE: &str = "/var/lib/jetstreamer/horizon288-unpacked-retirement-v328";
-const MATCHING: usize = 322_833;
-const PROTECTED: usize = 7_757;
-const MATCHING_BYTES: u64 = 51_918_905_344;
-const PROTECTED_BYTES: u64 = 1_470_701_568;
 const DEVICE: u64 = 66_305;
-const INODE: u64 = 42_148_866;
 const BATCH_SIZE: usize = 8192;
+
+struct Profile {
+    epoch: u64,
+    reproduction: &'static str,
+    reproduction_sha: &'static str,
+    schema: &'static str,
+    bootstrap_completion: &'static str,
+    bootstrap_completion_sha: &'static str,
+    state: &'static str,
+    matching: usize,
+    protected: usize,
+    matching_bytes: u64,
+    protected_bytes: u64,
+    inode: u64,
+    worker_directory: &'static str,
+    closed: fn() -> Result<()>,
+}
+
+const EPOCH288: Profile = Profile {
+    epoch: 288,
+    reproduction: "/var/lib/jetstreamer/horizon288-full-v303/unpacked-accounts-reproduction-v327.json",
+    reproduction_sha: "37442a3c57a4882e719521ac60464ea1b1a47432112c9be493a9db355a29a567",
+    schema: "foundation-epoch288-unpacked-accounts-reproduction-v327",
+    bootstrap_completion: "/var/lib/jetstreamer/horizon288-bootstrap-retirement-v327/completion.json",
+    bootstrap_completion_sha: "fee12aff151d187cbd050afc5702ca9ad9de397c2ae7aa9b6a6f30be77958880",
+    state: "/var/lib/jetstreamer/horizon288-unpacked-retirement-v328",
+    matching: 322_833,
+    protected: 7_757,
+    matching_bytes: 51_918_905_344,
+    protected_bytes: 1_470_701_568,
+    inode: 42_148_866,
+    worker_directory: "jetstreamer-historical-v1.8.11-y3aKJ1",
+    closed: snapshot288::closed,
+};
+
+const EPOCH292: Profile = Profile {
+    epoch: 292,
+    reproduction: "/var/lib/jetstreamer/horizon292-full-v322/unpacked-accounts-reproduction-v336.json",
+    reproduction_sha: "7942ec5d18a8e16cb2fd1b219f02a7bc305d818f72dfe5da1005f4b3648b7db9",
+    schema: "foundation-epoch292-unpacked-accounts-reproduction-v336",
+    bootstrap_completion: "/var/lib/jetstreamer/horizon292-bootstrap-retirement-v336/completion.json",
+    bootstrap_completion_sha: "92b5e64b94a86e2e35b110060bc2bd25285771555a6f2799c1aec09cb08340c0",
+    state: "/var/lib/jetstreamer/horizon292-unpacked-retirement-v340",
+    matching: 266_990,
+    protected: 8_745,
+    matching_bytes: 42_544_599_040,
+    protected_bytes: 1_784_938_496,
+    inode: 27_349_366,
+    worker_directory: "jetstreamer-historical-v1.8.11-LKkCgn",
+    closed: snapshot288::closed292,
+};
 
 #[derive(Deserialize, Serialize)]
 struct Asset {
@@ -39,6 +77,7 @@ struct Ledger {
 }
 
 struct Scope {
+    profile: &'static Profile,
     run: PathBuf,
     target: PathBuf,
     bootstrap: Asset,
@@ -48,36 +87,59 @@ struct Scope {
 }
 
 impl Scope {
-    fn from_receipts(proof: &Value, self_sha: &str) -> Result<Self> {
+    fn from_receipts(profile: &'static Profile, proof: &Value, self_sha: &str) -> Result<Self> {
         ensure!(
-            proof["schema"] == "foundation-epoch288-unpacked-accounts-reproduction-v327"
-                && proof["epoch"] == 288
-                && proof["checked_files"].as_u64() == Some(MATCHING as u64)
-                && proof["file_count"].as_u64() == Some((MATCHING + PROTECTED) as u64)
-                && proof["allocated_bytes"] == MATCHING_BYTES + PROTECTED_BYTES
+            proof["schema"] == profile.schema
+                && proof["epoch"] == profile.epoch
+                && proof["checked_files"].as_u64() == Some(profile.matching as u64)
+                && proof["file_count"].as_u64()
+                    == Some((profile.matching + profile.protected) as u64)
+                && proof["allocated_bytes"] == profile.matching_bytes + profile.protected_bytes
                 && proof["missing_from_snapshot"] == json!([])
                 && proof["scratch_retired"] == false
                 && proof["target"]["device"] == DEVICE
-                && proof["target"]["inode"] == INODE
+                && proof["target"]["inode"] == profile.inode
                 && proof["target"]["uid"] == 1000,
             "reproduction receipt has the wrong scope"
         );
         let previous: Value = read_bound(
-            Path::new(BOOTSTRAP_COMPLETION),
-            BOOTSTRAP_COMPLETION_SHA,
+            Path::new(profile.bootstrap_completion),
+            profile.bootstrap_completion_sha,
             JSON_LIMIT,
         )?;
+        if profile.epoch == 292 {
+            ensure!(
+                proof["bootstrap_retirement"]
+                    == json!({
+                        "path": profile.bootstrap_completion,
+                        "sha256": profile.bootstrap_completion_sha,
+                    }),
+                "reproduction receipt refers to a different bootstrap retirement"
+            );
+        }
         let intent = value(&previous["intent"])?;
         let prior = &intent["anchors"];
         let copy: PathBuf = serde_json::from_value(prior["copy"].clone())?;
-        let run = snapshot288::run_path(&copy)?.to_owned();
+        let run = if profile.epoch == 288 {
+            snapshot288::run_path(&copy)?.to_owned()
+        } else {
+            PathBuf::from(snapshot288::RUN292)
+        };
         let historical = copy
             .parent()
             .and_then(Path::parent)
             .context("historical root")?
-            .join("jetstreamer-historical-v1.8.11-y3aKJ1");
+            .join(profile.worker_directory);
         let target = historical.join("unpacked/accounts");
-        let bootstrap: Asset = serde_json::from_value(proof["sealed_bootstrap"].clone())?;
+        let bootstrap = if profile.epoch == 288 {
+            serde_json::from_value(proof["sealed_bootstrap"].clone())?
+        } else {
+            let checked = snapshot288::compared(&proof["sealed_bootstrap"])?;
+            Asset {
+                path: checked.path,
+                stamp: checked.stamp,
+            }
+        };
         let archive = Asset {
             path: serde_json::from_value(prior["archive"].clone())?,
             stamp: serde_json::from_value(prior["archive_stamp"].clone())?,
@@ -87,25 +149,27 @@ impl Scope {
             stamp: serde_json::from_value(prior["bank_stamp"].clone())?,
         };
         ensure!(
-            proof["target"]["path"].as_str() == target.to_str()
+            target.starts_with(run.join("scratch/.historical-runtime"))
+                && proof["target"]["path"].as_str() == target.to_str()
                 && prior["snapshot"].as_str() == bootstrap.path.to_str()
                 && prior["qualification_sha256"] == proof["proof"]["sha256"]
-                && archive.path == run.join("archives/epoch-288.jet")
+                && archive.path == run.join(format!("archives/epoch-{}.jet", profile.epoch))
                 && bank.path == historical.join("accounts-state")
-                && previous["epoch"] == 288
+                && previous["epoch"] == profile.epoch
                 && previous["original_snapshot_retained"] == true
                 && previous["partial_archive_retained"] == true
                 && previous["evolved_bank_retained"] == true,
             "reproduction and retired-bootstrap receipts disagree"
         );
         let anchors = json!({
-            "epoch": 288, "self_sha256": self_sha,
-            "reproduction_sha256": REPRODUCTION_SHA,
-            "bootstrap_retirement_completion_sha256": BOOTSTRAP_COMPLETION_SHA,
+            "epoch": profile.epoch, "self_sha256": self_sha,
+            "reproduction_sha256": profile.reproduction_sha,
+            "bootstrap_retirement_completion_sha256": profile.bootstrap_completion_sha,
             "target": proof["target"], "bootstrap": bootstrap, "archive": archive, "bank": bank,
             "batch_size": BATCH_SIZE,
         });
         Ok(Self {
+            profile,
             run,
             target,
             bootstrap,
@@ -124,14 +188,14 @@ impl Scope {
             self.target.canonicalize()? == self.target
                 && current.is_dir()
                 && current.dev() == DEVICE
-                && current.ino() == INODE
+                && current.ino() == self.profile.inode
                 && current.uid() == 1000
                 && current.gid() == 1000
                 && Stamp::of(&current)? == Stamp::of(&root.metadata()?)?,
             "unpacked accounts directory was replaced"
         );
         assert_no_nested_mount(&self.target)?;
-        snapshot288::closed()
+        (self.profile.closed)()
     }
 
     fn readers(&self) -> Result<Value> {
@@ -220,6 +284,7 @@ fn record(path: &Path, data: &impl Serialize) -> Result<Binding> {
 }
 
 fn qualify(state: &Path, scope: &Scope, root: &File, dir: &Path, proof: &Value) -> Result<Binding> {
+    let profile = scope.profile;
     let ledger_path = state.join("ledger.json");
     ensure!(
         ledger_path
@@ -242,14 +307,17 @@ fn qualify(state: &Path, scope: &Scope, root: &File, dir: &Path, proof: &Value) 
             "invalid protected member evidence"
         );
     }
-    ensure!(expected.len() == PROTECTED, "wrong protected member count");
+    ensure!(
+        expected.len() == profile.protected,
+        "wrong protected member count"
+    );
 
     let readers = scope.readers()?;
     let before = Stamp::of(&root.metadata()?)?;
-    let names = names(dir, MATCHING + PROTECTED)?;
+    let names = names(dir, profile.matching + profile.protected)?;
     let mut aggregate = Sha256::new();
-    let mut matching = Vec::with_capacity(MATCHING);
-    let mut protected = Vec::with_capacity(PROTECTED);
+    let mut matching = Vec::with_capacity(profile.matching);
+    let mut protected = Vec::with_capacity(profile.protected);
     for name in names {
         let path = dir.join(&name);
         let stamp = file_stamp(&path.symlink_metadata()?)?;
@@ -285,8 +353,8 @@ fn qualify(state: &Path, scope: &Scope, root: &File, dir: &Path, proof: &Value) 
     ensure!(
         expected.is_empty()
             && proof["file_hash_manifest_sha256"] == format!("{:x}", aggregate.finalize())
-            && count_bytes(&matching, MATCHING)? == MATCHING_BYTES
-            && count_bytes(&protected, PROTECTED)? == PROTECTED_BYTES,
+            && count_bytes(&matching, profile.matching)? == profile.matching_bytes
+            && count_bytes(&protected, profile.protected)? == profile.protected_bytes,
         "current bytes do not reproduce the qualified partition"
     );
     scope.stable(root)?;
@@ -302,9 +370,9 @@ fn qualify(state: &Path, scope: &Scope, root: &File, dir: &Path, proof: &Value) 
     let binding = record(&ledger_path, &ledger)?;
     record(
         &state.join("check.json"),
-        &json!({"anchors": scope.anchors, "ledger": binding, "matching_files": MATCHING,
-            "matching_allocated_bytes": MATCHING_BYTES, "protected_files": PROTECTED,
-            "protected_allocated_bytes": PROTECTED_BYTES, "readers": readers}),
+        &json!({"anchors": scope.anchors, "ledger": binding, "matching_files": profile.matching,
+            "matching_allocated_bytes": profile.matching_bytes, "protected_files": profile.protected,
+            "protected_allocated_bytes": profile.protected_bytes, "readers": readers}),
     )
 }
 
@@ -351,6 +419,7 @@ fn remove_planned(root: &File, dir: &Path, planned: &[FileEntry], resuming: bool
 }
 
 fn apply(state: &Path, scope: &Scope, root: &File, dir: &Path, batch: usize) -> Result<Binding> {
+    let profile = scope.profile;
     let ledger_path = state.join("ledger.json");
     let (check_ref, check) = snapshot288::lookup_receipt(&state.join("check.json"))?
         .context("missing check-only receipt")?;
@@ -362,14 +431,14 @@ fn apply(state: &Path, scope: &Scope, root: &File, dir: &Path, batch: usize) -> 
     let ledger: Ledger = read_bound(&ledger_path, &ledger_ref.sha256, LEDGER_LIMIT)?;
     ensure!(
         ledger.anchors == scope.anchors
-            && count_bytes(&ledger.matching, MATCHING)? == MATCHING_BYTES
-            && count_bytes(&ledger.protected, PROTECTED)? == PROTECTED_BYTES,
+            && count_bytes(&ledger.matching, profile.matching)? == profile.matching_bytes
+            && count_bytes(&ledger.protected, profile.protected)? == profile.protected_bytes,
         "wrong unpacked retirement ledger"
     );
-    let batches = MATCHING.div_ceil(BATCH_SIZE);
+    let batches = profile.matching.div_ceil(BATCH_SIZE);
     ensure!(batch < batches, "batch index out of range");
     let start = batch * BATCH_SIZE;
-    let end = (start + BATCH_SIZE).min(MATCHING);
+    let end = (start + BATCH_SIZE).min(profile.matching);
     let planned = &ledger.matching[start..end];
     let completion_path = |i| state.join(format!("batch-{i:03}-completion.json"));
     let mut basis = json!({"check": check_ref, "batch": batch, "start": start, "end": end,
@@ -434,9 +503,9 @@ fn apply(state: &Path, scope: &Scope, root: &File, dir: &Path, batch: usize) -> 
     for entry in &ledger.protected {
         present(dir, entry, false)?;
     }
-    let final_batch = end == MATCHING;
+    let final_batch = end == profile.matching;
     if final_batch {
-        let current = names(dir, PROTECTED)?;
+        let current = names(dir, profile.protected)?;
         ensure!(
             current
                 .iter()
@@ -453,8 +522,13 @@ fn apply(state: &Path, scope: &Scope, root: &File, dir: &Path, batch: usize) -> 
     )
 }
 
-pub(super) fn run(self_sha: &str, batch: Option<usize>) -> Result<()> {
-    let state = Path::new(STATE);
+pub(super) fn run(epoch: u64, self_sha: &str, batch: Option<usize>) -> Result<()> {
+    let profile = match epoch {
+        288 => &EPOCH288,
+        292 => &EPOCH292,
+        _ => anyhow::bail!("unregistered accounts retirement epoch"),
+    };
+    let state = Path::new(profile.state);
     let mode = state.symlink_metadata()?;
     ensure!(
         state.canonicalize()? == state
@@ -463,9 +537,13 @@ pub(super) fn run(self_sha: &str, batch: Option<usize>) -> Result<()> {
             && mode.mode() & 0o077 == 0,
         "unsafe unpacked retirement state directory"
     );
-    let proof: Value = read_bound(Path::new(REPRODUCTION), REPRODUCTION_SHA, JSON_LIMIT)?;
-    let scope = Scope::from_receipts(&proof, self_sha)?;
-    let root = stopped_tree::open_root(&scope.target, DEVICE, INODE)?;
+    let proof: Value = read_bound(
+        Path::new(profile.reproduction),
+        profile.reproduction_sha,
+        JSON_LIMIT,
+    )?;
+    let scope = Scope::from_receipts(profile, &proof, self_sha)?;
+    let root = stopped_tree::open_root(&scope.target, DEVICE, profile.inode)?;
     let dir = PathBuf::from(format!("/proc/self/fd/{}", root.as_raw_fd()));
     scope.stable(&root)?;
     let receipt = match batch {

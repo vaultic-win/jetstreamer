@@ -1,7 +1,7 @@
 //! Retire individually qualified files and AccountsDb trees from stopped workers.
 #[path = "../../../scripts/horizon_standard_backfill_scratch_retirement_20261110_v1/source/process_references.rs"]
 mod process_references;
-mod selective288;
+mod selective_accounts;
 mod snapshot288;
 mod stopped_bootstrap;
 #[path = "../../../scripts/horizon_standard_backfill_scratch_retirement_20261110_v1/source/stopped_tree.rs"]
@@ -370,21 +370,28 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     ensure!(
         unsafe { libc::geteuid() } == 0
-            && (args.len() == 3 || (args.len() == 4 && args[1] == "--apply-unpacked-288")),
-        "usage: horizon275-scratch-retire MODE SELF_SHA256 [BATCH for --apply-unpacked-288]"
+            && (args.len() == 3
+                || (args.len() == 4
+                    && matches!(
+                        args[1].as_str(),
+                        "--apply-unpacked-288" | "--apply-unpacked-292"
+                    ))),
+        "usage: horizon275-scratch-retire MODE SELF_SHA256 [BATCH for --apply-unpacked-288/292]"
     );
     let apply = match args[1].as_str() {
         "--check-only"
         | "--check-227"
         | "--check-bootstrap-288"
         | "--check-bootstrap-292"
-        | "--check-unpacked-288" => false,
+        | "--check-unpacked-288"
+        | "--check-unpacked-292" => false,
         "--apply"
         | "--retire-bootstrap-copy"
         | "--apply-227"
         | "--retire-bootstrap-288"
         | "--retire-bootstrap-292"
-        | "--apply-unpacked-288" => true,
+        | "--apply-unpacked-288"
+        | "--apply-unpacked-292" => true,
         _ => anyhow::bail!("unknown operation"),
     };
     ensure!(
@@ -403,15 +410,22 @@ fn main() -> Result<()> {
     ) {
         return snapshot288::run292(apply, &args[2]);
     }
-    if args[1] == "--check-unpacked-288" {
-        return selective288::run(&args[2], None);
-    }
-    if args[1] == "--apply-unpacked-288" {
-        let batch = args
-            .get(3)
-            .context("specify a zero-based retirement batch")?
-            .parse()?;
-        return selective288::run(&args[2], Some(batch));
+    let accounts_epoch = match args[1].as_str() {
+        "--check-unpacked-288" | "--apply-unpacked-288" => Some(288),
+        "--check-unpacked-292" | "--apply-unpacked-292" => Some(292),
+        _ => None,
+    };
+    if let Some(epoch) = accounts_epoch {
+        let batch = if apply {
+            Some(
+                args.get(3)
+                    .context("specify a zero-based retirement batch")?
+                    .parse()?,
+            )
+        } else {
+            None
+        };
+        return selective_accounts::run(epoch, &args[2], batch);
     }
     let _cycle = lock(CYCLE_LOCK)?;
     let _mutation = lock(LOCAL_LOCK)?;
