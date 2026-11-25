@@ -80,6 +80,8 @@ BOOTSTRAP230_UNIT = 'foundation-230-capped-bootstrap-v1.service'
 BOOTSTRAP230 = V / 'horizon230-native-restart-v1'
 BOOTSTRAP_CPUS = '118-121'
 BOOTSTRAP_MEMORY = 160 << 30
+TAIL230_BUILD_UNIT = 'foundation-230-final-tail-parent-build-v1.service'
+TAIL230_BUILD = V / 'horizon230-final-tail-parent-build-v1'
 PUBLIC_AUDIT = V / 'horizon-foundation-public-audit-148-156-v1'
 PUBLIC_AUDIT_RELEASE_SHA = 'ea750bf0be9c6742af0ca1503e8cba094594557e1b5225ad8ff93f693f2a344d'
 SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
@@ -459,6 +461,28 @@ def active_bootstrap(ops, unit, state, schema):
     return dict(start=start_ref, owner=owner)
 
 
+def active_230_tail_build(ops):
+    unit = TAIL230_BUILD_UNIT
+    owner = ops.props(unit, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
+                             'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
+    group = Path('/sys/fs/cgroup/system.slice') / unit
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
+        return None
+    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (unit, 'active', 'running')
+    start_ref = binding(TAIL230_BUILD / 'start.json')
+    start = read(start_ref)
+    admission = read(start['admission'])
+    assert all(owner[key] == start['owner'][key] for key in ('MainPID', 'InvocationID', 'ControlGroup'))
+    assert owner['ControlGroup'] == '/system.slice/' + unit and owner['AllowedCPUs'] == '16-17'
+    assert int(owner['MemoryMax']) == admission['memory_reserve_bytes'] == 24 << 30
+    assert admission['epoch'] == 230 and admission['unit'] == unit
+    assert Path('/proc', owner['MainPID'], 'exe').samefile('/usr/bin/bash')
+    assert admission['replay_launch_authorized'] is False and admission['publication_authorized'] is False
+    assert admission['output_reserve_bytes'] == 1 << 30
+    return dict(start=start_ref, owner=owner, remaining_disk_bytes=admission['output_reserve_bytes'])
+
+
 def active_public_audit(helper, census):
     units = [name for name in census if name.startswith('foundation-public-audit-')]
     if not units:
@@ -609,11 +633,14 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
     bootstrap230 = active_bootstrap(kit.ops, BOOTSTRAP230_UNIT, BOOTSTRAP230,
                                     'foundation-epoch230-capped-bootstrap-start-v1')
     live.extend(bootstrap['owner'] for bootstrap in (bootstrap231, bootstrap230) if bootstrap is not None)
+    tail230_build = active_230_tail_build(kit.ops)
+    if tail230_build is not None:
+        live.append(tail230_build['owner'])
     census = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
         '--no-pager', '--no-legend', '--plain', 'horizon-qualify-*', 'horizon-perf-*', 'horizon-upload-*',
         'horizon-restore-*', 'foundation-*-broker-*', 'foundation-public-audit-*',
         'foundation-*-ext4-*', PARK292_UNIT, STAGE228_UNIT, STAGE229_UNIT, 'foundation-288-appendvec-*',
-        'foundation-231-capped-bootstrap-parity-*', BOOTSTRAP230_UNIT],
+        'foundation-231-capped-bootstrap-parity-*', BOOTSTRAP230_UNIT, TAIL230_BUILD_UNIT],
         text=True, timeout=10)
     listed_units = {line.split()[0] for line in census.splitlines() if line.strip()}
     public_audit = active_public_audit(helper, listed_units)
@@ -644,6 +671,8 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
         protected += 64 << 20
     if accounts_stage is not None:
         protected += accounts_stage['remaining_bytes']
+    if tail230_build is not None:
+        protected += tail230_build['remaining_disk_bytes']
     staging = None
     if extract_state == LAYERED226_STATE:
         source = checked(fixed(STAGING292_HELPER, STAGING292_HELPER_SHA))
@@ -667,7 +696,7 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
                 reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref, extraction226_terminal=terminal226,
                 staging292=staging, custody292=custody, staging228=stage228, staging229=accounts_stage,
                 staging288=holding288.get(STAGE288_UNIT), holding288=holding288, bootstrap231=bootstrap231,
-                bootstrap230=bootstrap230,
+                bootstrap230=bootstrap230, tail230_build=tail230_build,
                 public_audit=public_audit,
                 guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=candidate_disk,
                 candidate_memory_max_bytes=candidate_memory, candidate_cpus=sorted(candidate_cpus),
