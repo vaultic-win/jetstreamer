@@ -5,10 +5,10 @@ from pathlib import Path
 
 from ordinary249.delivery248 import V, bound, props, ref
 
-UNIT = "horizon-qualify-230-checkpoint-continuation-fit-v1.service"
-PACKAGE = V / "horizon230-checkpoint-continuation-fit-v1"
+UNIT = "horizon-qualify-230-checkpoint-continuation-fit-v2.service"
+PACKAGE = V / "horizon230-checkpoint-continuation-fit-v2"
 REGISTRATION = PACKAGE / "cadence-registration.json"
-RUN_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1/run")
+RUN_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1/run-v2")
 INPUTS = {
     "path": str(V / "horizon230-checkpoint-continuation-fit-inputs-v1/inputs.json"),
     "sha256": "1737aebe6a78b35cac20aa906145748dff4ec10381c4f296af53a613a82f7971",

@@ -8,30 +8,31 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
 
 BASE = Path('/var/lib/jetstreamer')
-STATE = BASE / 'horizon230-checkpoint-continuation-fit-v1'
+PREVIOUS = BASE / 'horizon230-checkpoint-continuation-fit-v1'
+STATE = BASE / 'horizon230-checkpoint-continuation-fit-v2'
 CONTROL = BASE / 'horizon-seven-publication-controller-v222'
-TOKENS = BASE / 'horizon230-checkpoint-continuation-fit-tokens-v1'
+TOKENS = BASE / 'horizon230-checkpoint-continuation-fit-tokens-v2'
 GUARDS = STATE / 'guard-receipts'
-UNIT = 'horizon-qualify-230-checkpoint-continuation-fit-v1.service'
-GUARD = 'horizon-230-checkpoint-continuation-fit-protective-v1.service'
+UNIT = 'horizon-qualify-230-checkpoint-continuation-fit-v2.service'
+GUARD = 'horizon-230-checkpoint-continuation-fit-protective-v2.service'
 TIMER = GUARD.replace('.service', '.timer')
-CAPACITY = BASE / 'horizon226-suffix-v1/capacity-epoch230-fit-v1.py'
-CAPACITY_SHA = 'a305b724c810c7953bfebde698d9914fc80299f23417ece68e367b74ce0c480a'
+CAPACITY = BASE / 'horizon226-suffix-v1/capacity-epoch230-fit-v2.py'
+CAPACITY_SHA = '4eb296472e2012fb307997f60448dfaed42b819ba0f3961954d69effa8cb4f96'
 REPO = Path('/home/ubuntu/workspace/jetstreamer')
 SOURCE = Path('scripts/horizon_foundation_delivery247_20261124')
 ADAPTER = 'diagnostic230_checkpoint_continuation.py'
-PATCH = 'epoch230-checkpoint-continuation-cadence.patch'
 INPUT = 'horizon230-checkpoint-continuation-fit-inputs-v1/inputs.json'
 INPUT_SHA = '1737aebe6a78b35cac20aa906145748dff4ec10381c4f296af53a613a82f7971'
-TEMPLATE_SHA = 'a24b8d9925ca78492e773a155e5cd2f047ade4be311c2d6cba487e2918967107'
-FLEET_SHA = 'e05883d679b942cf2c41f83577401a42c4d9021b678024cf4884857ade293013'
-STATIC_GUARD = 'horizon230-checkpoint-continuation-fit-guard-static-v1/static-guard-check.json'
-STATIC_GUARD_SHA = '5b5e3192a343f3cfe1aac131a43ee1c801a72e91bda057ffca1fedb9f2e314a1'
+TEMPLATE_SHA = 'ccf5eed9e4cef1d90f3eef3311c83fffcd3fb58c1417205b6c7649ee1feebc81'
+STATIC_GUARD_SHA = '2846297a689a7c49ba53ca1ebd4005f16fb1bbdddd050a65bfb0dd272b52c9e6'
+PREVIOUS_DEPLOYMENT_SHA = '0c296cd8ce4dd227393279a10e5bcf6e2ab8601a9b9059d604456ec299f950de'
+PREVIOUS_TERMINAL_SHA = '2774138f5d7315d7d19f2d309242156cb11f551d39d8dd0a442148f0bd26bba4'
 
 
 def git(*args):
@@ -51,7 +52,7 @@ def helper():
 def inventory(kit):
     image = kit.ops.checked_image(kit.ops.R2)
     command = ['systemd-run', '--quiet', '--wait', '--pipe', '--collect',
-               '--unit=foundation-230-continuation-inventory-v1', '--property=Type=exec',
+               '--unit=foundation-230-continuation-inventory-v2', '--property=Type=exec',
                '--property=EnvironmentFile=/etc/jetstreamer/horizon-r2-upload.env',
                '--setenv=TOKIO_WORKER_THREADS=2', '--', image, 'inventory', '/home/ubuntu/horizon',
                '--epochs', '230-230', '--receipt-directory', str(kit.measure.PRIVATE / 'r2-receipts')]
@@ -63,54 +64,48 @@ def inventory(kit):
 
 
 def deploy_cadence(cap, kit, remote):
-    targets = ('cycle.py', 'native_binding_replays.py')
-    original = {name: (CONTROL / name).read_bytes() for name in targets}
-    assert not (CONTROL / ADAPTER).exists()
-    with tempfile.TemporaryDirectory(prefix='foundation230-cadence-') as temp:
-        temp = Path(temp)
-        for name, data in original.items():
-            (temp / name).write_bytes(data)
-        for name in (ADAPTER, PATCH):
-            data = git('show', f'{remote}:{SOURCE / name}')
-            (temp / name).write_bytes(data)
-        subprocess.run(['patch', '--batch', '--forward', '--fuzz=0', '-p0', '-i', PATCH],
-                       cwd=temp, check=True, stdout=subprocess.DEVNULL)
-        updated = {name: (temp / name).read_bytes() for name in (*targets, ADAPTER)}
-    for name, data in updated.items():
-        ast.parse(data, filename=name)
-    assert (b'diagnostic229_bank_delta, diagnostic226_suffix)' in updated['native_binding_replays.py']
-            and b'diagnostic230_checkpoint_continuation.register(plan)' in updated['cycle.py'])
-    backups = STATE / 'cadence-before'
-    backups.mkdir(mode=0o700)
-    for name, data in original.items():
-        (backups / name).write_bytes(data)
-        (backups / name).chmod(0o400)
+    previous = cap.fixed(PREVIOUS / 'cadence-deployment.json', PREVIOUS_DEPLOYMENT_SHA)
+    old = cap.read(previous)['installed']
+    assert set(old) == {'cycle.py', 'native_binding_replays.py', ADAPTER}
+    assert all(cap.checked(reference) == CONTROL / name for name, reference in old.items())
+    active = CONTROL / ADAPTER
+    original = active.read_bytes()
+    updated = git('show', f'{remote}:{SOURCE / ADAPTER}')
+    ast.parse(updated, filename=ADAPTER)
 
     def put(path, data):
-        with tempfile.NamedTemporaryFile(dir=CONTROL, delete=False) as staged:
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as staged:
             os.fchmod(staged.fileno(), 0o400)
             staged.write(data)
             staged.flush()
             os.fsync(staged.fileno())
         os.replace(staged.name, path)
-
-    try:
-        for name in (ADAPTER, *targets):
-            put(CONTROL / name, updated[name])
-        fd = os.open(CONTROL, os.O_RDONLY | os.O_DIRECTORY)
+        fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
         try:
             os.fsync(fd)
         finally:
             os.close(fd)
+
+    backup = STATE / 'cadence-adapter-before.py'
+    assert not backup.exists()
+    put(backup, original)
+    try:
+        put(active, updated)
         return kit.ops.funds.put(STATE / 'cadence-deployment.json', {
-            'source_commit': remote, 'installed': {name: cap.binding(CONTROL / name) for name in updated},
-            'previous': {name: cap.binding(backups / name) for name in original}, 'publication_authorized': False,
+            'source_commit': remote, 'installed': cap.binding(active), 'previous': previous,
+            'previous_adapter_copy': cap.binding(backup), 'publication_authorized': False,
         })
     except Exception:
-        for name, data in original.items():
-            put(CONTROL / name, data)
-        (CONTROL / ADAPTER).unlink(missing_ok=True)
+        put(active, original)
         raise
+
+
+def guard_sample(ops, path):
+    info = path.lstat()
+    assert path.is_file() and path.resolve() == path and info.st_uid == 0 and info.st_nlink == 1
+    assert not info.st_mode & 0o022, 'guard receipt is writable by another account'
+    reference = ops.ref(path)
+    return reference, ops.bound(reference)
 
 
 def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, deployment):
@@ -182,10 +177,10 @@ def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, de
         assert row['InvocationID'] == iid and row['NRestarts'] == '0' and pid > 0
         assert (Path('/proc') / str(pid) / 'exe').samefile(argv[0])
         for path in GUARDS.glob('sample-*.json'):
-            reference = cap.binding(path)
-            sample = cap.read(reference)
+            reference, sample = guard_sample(ops, path)
             assert sample['producer_invocation_id'] == iid and sample['plan_sha256'] == plan['sha256']
             assert sample['guard_sha256'] == guard['sha256'] and sample['trip_reason'] is None
+            assert sample['producer_stop_enabled'] is True
             if sample['producer']['active'] == 'active':
                 assert sample['producer']['pid'] == pid and sample['worker_observation_error'] is None
                 assert sample['root_physical_observation_error'] is None
@@ -211,6 +206,7 @@ def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, de
 
 def main():
     assert os.geteuid() == 0 and __debug__
+    assert len(sys.argv) == 2 and re.fullmatch('[0-9a-f]{64}', sys.argv[1]), 'provide the sealed fleet-tool receipt hash'
     os.umask(0o077)
     cap = helper()
     kit = cap.load_existing()
@@ -227,9 +223,10 @@ def main():
                 'LoadState': 'not-found', 'ActiveState': 'inactive', 'Job': ''}, name
         assert not list(TOKENS.iterdir()) and not list(GUARDS.iterdir()) and not (STATE / 'admission.json').exists()
         profile = cap.read(cap.fixed(STATE / 'producer-template.json', TEMPLATE_SHA))
+        assert profile['previous_terminal'] == cap.fixed(PREVIOUS / 'controller-stop-completion.json', PREVIOUS_TERMINAL_SHA)
         assert cap.read(profile['namespace'])['result']['namespace_verified']
         producer = cap.checked(profile['producer'])
-        check = cap.read(cap.fixed(BASE / STATIC_GUARD, STATIC_GUARD_SHA))
+        check = cap.read(cap.fixed(STATE / 'static-guard-check.json', STATIC_GUARD_SHA))
         guard = check['guard']
         template = cap.read(check['plan'])
         assert cap.checked(guard) and check['result']['validated'] and template['unit'] == UNIT
@@ -237,7 +234,7 @@ def main():
         inputs = cap.fixed(BASE / INPUT, INPUT_SHA)
         runtime = cap.read(cap.read(inputs)['runtime'])
         assert all(cap.checked(runtime[name]) for name in ('node', 'worker'))
-        assert cap.checked(cap.read(cap.fixed(STATE / 'fleet-tool.json', FLEET_SHA))['artifact'])
+        assert cap.checked(cap.read(cap.fixed(STATE / 'fleet-tool.json', sys.argv[1]))['artifact'])
         remote_inventory = inventory(kit)
         fit = cap.capacity(kit, candidate_epoch=230)
         assert fit['disk_shortfall_bytes'] == fit['memory_shortfall_bytes'] == fit['tmpfs_shortfall_bytes'] == 0
@@ -247,12 +244,13 @@ def main():
         except Exception as error:
             observed = {name: kit.ops.props(name, ['LoadState', 'ActiveState', 'InvocationID', 'Result', 'MainPID'])
                         for name in (UNIT, GUARD, TIMER)}
-            kit.ops.funds.put(STATE / 'launch-failure.json', {'error': str(error), 'observed': observed})
+            kit.ops.funds.put(STATE / 'launch-failure.json', {'error': repr(error), 'observed': observed})
             for name in (UNIT, TIMER, GUARD):
-                if observed[name]['LoadState'] != 'not-found':
-                    current = kit.ops.props(name, ['InvocationID'])
-                    assert current['InvocationID'] == observed[name]['InvocationID']
-                    subprocess.run(['systemctl', 'stop', name], check=True, timeout=200)
+                current = kit.ops.props(name, ['InvocationID', 'LoadState', 'ActiveState'])
+                if current['LoadState'] == 'not-found' and current['ActiveState'] == 'inactive':
+                    continue
+                assert current['InvocationID'] == observed[name]['InvocationID'], name
+                subprocess.run(['systemctl', 'stop', name], check=True, timeout=200)
             raise
 
 

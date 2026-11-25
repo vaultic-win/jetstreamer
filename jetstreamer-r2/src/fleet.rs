@@ -2058,13 +2058,13 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["entry_replay_requested"] == true
             && receipt["source_prefix_retained"] == true
             && receipt["canonical_epoch_publication_authorized"] == false
-    } else if claim.unit == "horizon-qualify-230-checkpoint-continuation-fit-v1.service"
+    } else if claim.unit == "horizon-qualify-230-checkpoint-continuation-fit-v2.service"
         || receipt["kind"] == "epoch230-bounded-checkpoint-continuation"
     {
         claim.epoch == 230
-            && claim.unit == "horizon-qualify-230-checkpoint-continuation-fit-v1.service"
+            && claim.unit == "horizon-qualify-230-checkpoint-continuation-fit-v2.service"
             && claim.scratch_path
-                == Path::new("/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1/run")
+                == Path::new("/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1/run-v2")
             && receipt["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
             && receipt["kind"] == "epoch230-bounded-checkpoint-continuation"
             && receipt["epoch"] == 230
@@ -6167,9 +6167,9 @@ mod tests {
     fn epoch230_checkpoint_continuation_claim_cannot_extend_the_bounded_run() {
         let mut claim = DiagnosticClaim {
             epoch: 230,
-            unit: "horizon-qualify-230-checkpoint-continuation-fit-v1.service".into(),
+            unit: "horizon-qualify-230-checkpoint-continuation-fit-v2.service".into(),
             invocation_id: "a".repeat(32),
-            scratch_path: "/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1/run"
+            scratch_path: "/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1/run-v2"
                 .into(),
             launch_receipt: BoundFile {
                 path: "/var/lib/jetstreamer/launch.json".into(),
