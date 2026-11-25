@@ -87,7 +87,7 @@ pub(super) fn admission_interlock() -> Result<File> {
         .truncate(false)
         .mode(0o600)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open("/run/horizon-epoch171-to136-g1.operation.lock")?;
+        .open(standard169_cpu_lease::OPERATION_LOCK)?;
     let m = f.metadata()?;
     ensure!(
         m.is_file()
@@ -134,12 +134,12 @@ fn check_peer136() -> Result<()> {
 pub(super) fn candidate_state(own: Option<&str>) -> Result<()> {
     check_peer136()?;
     if EPOCH == 171 {
-        ensure!(
-            !Path::new("/run/horizon-epoch171-exclusive-to136-g1").try_exists()?,
-            "active or partial epoch 171 donor fence"
-        );
-    }
-    if EPOCH == 171 {
+        use crate::standard169_cpu_lease::{REGISTRY_136, REGISTRY_171, require_unclaimed};
+        require_unclaimed(Path::new(REGISTRY_136))
+            .context("active or partial epoch 171 donor fence")?;
+        // Only a successor that authenticates the complete loan can consume it.
+        require_unclaimed(Path::new(REGISTRY_171))
+            .context("epoch 171 CPU lease requires a successor controller")?;
         idle("jetstreamer-epochs159-173-target1-controller-v1-r2.service")?;
         let dynamic = run(
             "/usr/bin/systemctl",

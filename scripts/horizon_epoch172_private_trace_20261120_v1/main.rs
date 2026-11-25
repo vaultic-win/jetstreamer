@@ -8,6 +8,8 @@ mod guard_floor;
 mod launch;
 mod peers;
 mod staged;
+#[path = "../horizon_standard169_cpu_lease.rs"]
+pub mod standard169_cpu_lease;
 use anyhow::{Context, Result, bail, ensure};
 use guard172::*;
 use serde_json::{Value, json};

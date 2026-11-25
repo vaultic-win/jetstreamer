@@ -67,6 +67,12 @@ EPOCH199200_INDEX_SUMS_SHA256 = "f5349be495e6448b8ed4607c64482bfceae7d1ea191a544
 LEGACY_UPLOADER_DIRECTORY = Path("/home/sol/horizon")
 PRODUCTION_REAP_ENV = "JETSTREAMER_HISTORICAL_REAP_TIMEOUT_SECS=600"
 ROOT_COHORT_RUN_STATE_SCHEMA = "jetstreamer-root-cohort-run-v1"
+
+# Coordinate only the installed legacy dispatcher for the standard 169 booking.
+# These paths are shared with horizon_standard169_cpu_lease.rs.
+STANDARD169_CONTROLLER = "e159-173-t1-20261016-v1-r2"
+STANDARD169_OPERATION_LOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
+STANDARD169_LEASE_171 = Path("/run/horizon-standard169-cpu-lease-to171-v1")
 DEFAULT_FIRST_EPOCH = 22
 DEFAULT_LAST_EPOCH = 100
 DEFAULT_INITIAL_CONCURRENCY = 2
@@ -3231,6 +3237,49 @@ def assignment_process_alive(raw: Mapping[str, Any]) -> bool:
     return isinstance(pid, int) and isinstance(start_time, int) and process_is_same(pid, start_time)
 
 
+@contextmanager
+def standard169_launch_admission(
+    controller_id: str, cohort: Cohort
+) -> Iterable[bool]:
+    """Hold the shared lock from the lease test through transient dispatch."""
+
+    if (
+        controller_id != STANDARD169_CONTROLLER
+        or not cohort.first_epoch <= 169 <= cohort.last_epoch
+    ):
+        yield True
+        return
+    descriptor = os.open(
+        STANDARD169_OPERATION_LOCK,
+        os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK,
+    )
+    try:
+        opened = os.fstat(descriptor)
+        if not (
+            stat.S_ISREG(opened.st_mode)
+            and opened.st_uid == 0
+            and opened.st_nlink == 1
+            and stat.S_IMODE(opened.st_mode) == 0o600
+        ):
+            raise SweepError("unsafe standard 169 operation lock")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+        if not os.path.samestat(opened, STANDARD169_OPERATION_LOCK.lstat()):
+            raise SweepError("standard 169 operation lock replaced")
+        try:
+            STANDARD169_LEASE_171.lstat()
+        except FileNotFoundError:
+            yield True
+        else:
+            # Even a partial or malformed registry retains the CPU claim.
+            yield False
+    finally:
+        os.close(descriptor)
+
+
 class Controller:
     def __init__(
         self,
@@ -4039,9 +4088,13 @@ class Controller:
                 continue
             lane = self.lanes[lane_name]
             if public_recovery_marker_present(lane.output, self.sol_uid):
-                self.launch_producer(
-                    lane_name, raw, cohort, source_recovery=True
-                )
+                with standard169_launch_admission(
+                    self.args.controller_id, cohort
+                ) as allowed:
+                    if allowed:
+                        self.launch_producer(
+                            lane_name, raw, cohort, source_recovery=True
+                        )
                 continue
             receipts = discover_live_receipts(
                 lane,
@@ -4052,10 +4105,14 @@ class Controller:
             receipt = receipts.get(Cohort(cohort.first_epoch, cohort.last_epoch, ""))
             if receipt is None:
                 if raw.get("source_recovery") is True and not public_output_files(lane):
-                    raw.pop("source_recovery", None)
-                    self.launch_producer(
-                        lane_name, raw, cohort, source_recovery=False
-                    )
+                    with standard169_launch_admission(
+                        self.args.controller_id, cohort
+                    ) as allowed:
+                        if allowed:
+                            raw.pop("source_recovery", None)
+                            self.launch_producer(
+                                lane_name, raw, cohort, source_recovery=False
+                            )
                     continue
                 raw["phase"] = "failed"
                 raw["failure"] = "producer ended without one live v2 receipt"
@@ -4101,11 +4158,20 @@ class Controller:
                 for lane_name, raw in assignments.items()
                 if isinstance(raw, dict) and raw.get("phase") == "staged"
             ]
-        if not candidates:
-            return False
+        for lane_name, raw in candidates:
+            cohort = assignment_cohort(raw, self.by_bounds)
+            with standard169_launch_admission(
+                self.args.controller_id, cohort
+            ) as allowed:
+                if allowed:
+                    return self._import_candidate(
+                        lane_name, raw, cohort, recovery_pending
+                    )
+        return False
 
-        lane_name, raw = candidates[0]
-        cohort = assignment_cohort(raw, self.by_bounds)
+    def _import_candidate(
+        self, lane_name: str, raw: dict[str, Any], cohort: Cohort, recovery_pending: bool
+    ) -> bool:
         claims = discover_epoch_claims(expected_uid=self.sol_uid)
         require_disjoint_epoch_claims(claims)
         if any(
@@ -4343,32 +4409,41 @@ class Controller:
             and all(claim.output != lane.output for claim in claims)
         ]
         started = 0
-        for cohort, lane in zip(pending, free_lanes):
+        lanes = iter(free_lanes)
+        for cohort in pending:
             if active + started >= capacity:
                 break
-            current_claims = discover_epoch_claims(expected_uid=self.sol_uid)
-            require_disjoint_epoch_claims(current_claims)
-            if (
-                len(current_claims) >= capacity
-                or any(
-                    claim.overlaps(cohort) or claim.output == lane.output
-                    for claim in current_claims
-                )
-            ):
-                break
-            raw = {
-                "phase": "failed",
-                "first_epoch": cohort.first_epoch,
-                "last_epoch": cohort.last_epoch,
-                "adopt_only": False,
-            }
-            if (cohort.first_epoch, cohort.last_epoch) not in self.scheduled_bounds:
-                raw["adopt_only"] = True
-            assigned[lane.name] = raw
-            if self.launch_producer(
-                lane.name, raw, cohort, source_recovery=False
-            ):
-                started += 1
+            with standard169_launch_admission(
+                self.args.controller_id, cohort
+            ) as allowed:
+                if not allowed:
+                    continue
+                lane = next(lanes, None)
+                if lane is None:
+                    break
+                current_claims = discover_epoch_claims(expected_uid=self.sol_uid)
+                require_disjoint_epoch_claims(current_claims)
+                if (
+                    len(current_claims) >= capacity
+                    or any(
+                        claim.overlaps(cohort) or claim.output == lane.output
+                        for claim in current_claims
+                    )
+                ):
+                    break
+                raw = {
+                    "phase": "failed",
+                    "first_epoch": cohort.first_epoch,
+                    "last_epoch": cohort.last_epoch,
+                    "adopt_only": False,
+                }
+                if (cohort.first_epoch, cohort.last_epoch) not in self.scheduled_bounds:
+                    raw["adopt_only"] = True
+                assigned[lane.name] = raw
+                if self.launch_producer(
+                    lane.name, raw, cohort, source_recovery=False
+                ):
+                    started += 1
         return started
 
     def all_complete(self) -> bool:

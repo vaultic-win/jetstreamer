@@ -7,6 +7,8 @@ mod fixture_plan;
 mod joint_fit;
 mod session;
 mod standard169;
+#[path = "../horizon_standard169_cpu_lease.rs"]
+pub mod standard169_cpu_lease;
 mod topology;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
@@ -270,7 +272,6 @@ fn file_write(path: &Path, data: &Value) -> Result<Value> {
     Ok(binding(path, &format!("{:x}", Sha256::digest(bytes))))
 }
 const WRITER_UNIT: &str = "horizon-admit-136-actual-20261120-g1.service";
-const IL_PATH: &str = "/run/horizon-epoch171-to136-g1.operation.lock";
 fn generation(plan: &Value) -> Result<()> {
     #[cfg(feature = "fixture-semantic")]
     fixture_plan::validate(plan)?;
@@ -787,7 +788,7 @@ fn run() -> Result<()> {
         .truncate(false)
         .mode(0o600)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(IL_PATH)?;
+        .open(standard169_cpu_lease::OPERATION_LOCK)?;
     let md = lock.metadata()?;
     ensure!(
         md.is_file()
@@ -797,6 +798,7 @@ fn run() -> Result<()> {
             && unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "concurrent or unsafe donor transaction"
     );
+    standard169_cpu_lease::require_unclaimed(Path::new(standard169_cpu_lease::REGISTRY_171))?;
     let base = Path::new(BASE);
     if a == ["qualify-pid1"] {
         return fence::qualify_pid1();
