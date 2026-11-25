@@ -336,7 +336,8 @@ pub(in crate::fleet) fn census_check(
         let recovered = !continuous && !active && p.metadata_event.is_none()
             && p.admission_transition_guard.is_none()
             && (native257::seven_delivery_predecessor(predecessor, previous, &p.observer, observation)?
-                || native257::stopped_292_observer_predecessor(predecessor, previous, &p.observer, observation)?);
+                || native257::stopped_292_observer_predecessor(predecessor, previous, &p.observer, observation)?
+                || native257::failed_296_observer_predecessor(predecessor, previous, &p.observer, observation)?);
         if !continuous && !recovered {
             ensure!(UNIT == native266::UNIT && p.metadata_event.is_none() && p.admission_transition_guard.is_none(),
                 "native bootstrap observation chain interrupted for {UNIT}");

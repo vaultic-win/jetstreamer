@@ -206,6 +206,9 @@ pub(super) fn stopped_292_observer_predecessor(
     Ok(true)
 }
 
+mod interrupted_296;
+pub(super) use interrupted_296::failed_296_observer_predecessor;
+
 #[cfg(test)]
 #[test]
 #[ignore = "reads the recorded Foundation fleet and three routine observations"]
