@@ -56,6 +56,8 @@ STAGING292_HELPER = V / 'horizon292-appendvec-restage-capacity-v308/epoch226_lay
 STAGING292_HELPER_SHA = 'b77c611c5bc628779787dffed0b53f4e19c82179372f1b0154558edffd4e2976'
 PARK292_UNIT = 'foundation-292-appendvec-custody-v308.service'
 PARK292_START = V / 'horizon292-closed-appendvec-staging-v308/custody-start.json'
+STAGE228_UNIT = 'foundation-228-sparse-bundle-v1.service'
+STAGE228 = V / 'horizon228-private-guest-staging-v1'
 SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
 SUFFIX226_STATE = V / 'horizon226-suffix-v1'
 CONTINUATION230_GUARDS = {
@@ -307,6 +309,29 @@ def active_292_custody(ops):
     return dict(start=start_ref, owner=owner, remaining_bytes=booked['booked_nvme_metadata_bytes'])
 
 
+def active_228_staging(ops):
+    owner = ops.props(STAGE228_UNIT, [
+        'Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID', 'ControlGroup',
+        'AllowedCPUs', 'MemoryMax', 'MemoryCurrent', 'IOReadBandwidthMax',
+    ])
+    group = Path('/sys/fs/cgroup/system.slice') / STAGE228_UNIT
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
+        return None
+    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (STAGE228_UNIT, 'active', 'running')
+    assert owner['ControlGroup'] == '/system.slice/' + STAGE228_UNIT and int(owner['MainPID']) > 0
+    start_ref = binding(STAGE228 / 'start.properties')
+    start = dict(line.split('=', 1) for line in checked(start_ref).read_text().splitlines())
+    assert {key: owner[key] for key in start} == start
+    fit_ref = binding(STAGE228 / 'fit.json')
+    fit = read(fit_ref)
+    assert fit['schema'] == 'foundation-epoch228-sparse-staging-fit-v1'
+    assert int(owner['MemoryMax']) == fit['candidate_memory_max_bytes'] == 130 << 30
+    assert owner['AllowedCPUs'] == '58-59' and owner['IOReadBandwidthMax'] == '/dev/nvme0n1p1 150000000'
+    assert fit['candidate_tmpfs_bytes'] == 128 << 30 and not fit['publication_authorized'] and not fit['r2_mutations']
+    return dict(start=start_ref, fit=fit_ref, owner=owner)
+
+
 def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
     assert not demotion_retry or candidate_epoch == 229
     ram_quote = DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch)
@@ -373,9 +398,12 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
     custody = active_292_custody(kit.ops)
     if custody is not None:
         live.append(custody['owner'])
+    stage228 = active_228_staging(kit.ops)
+    if stage228 is not None:
+        live.append(stage228['owner'])
     census = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
         '--no-pager', '--no-legend', '--plain', 'horizon-qualify-*', 'horizon-perf-*', 'horizon-upload-*',
-        'horizon-restore-*', 'foundation-*-broker-*', PARK292_UNIT], text=True, timeout=10)
+        'horizon-restore-*', 'foundation-*-broker-*', PARK292_UNIT, STAGE228_UNIT], text=True, timeout=10)
     assert {line.split()[0] for line in census.splitlines() if line.strip()} == {row['Id'] for row in live}, census
     assert all(r['AllowedCPUs'] and not (candidate_cpus & helper.cpus(r['AllowedCPUs'])) for r in live)
     mem = {k: int(value.split()[0]) * 1024 for k, value in
@@ -418,7 +446,7 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
     result = dict(epoch=candidate_epoch, fleet=fleet_ref, completion=completion, sampled_unix_seconds=int(time.time()),
                 live_units=owners, broker=broker, guards=growth, free_bytes=free, protected_disk_bytes=protected,
                 reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref, extraction226_terminal=terminal226,
-                staging292=staging, custody292=custody,
+                staging292=staging, custody292=custody, staging228=stage228,
                 guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=candidate_disk,
                 candidate_memory_max_bytes=candidate_memory, candidate_cpus=sorted(candidate_cpus),
                 disk_shortfall_bytes=max(0, protected + candidate_disk - free),
