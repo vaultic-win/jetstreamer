@@ -40,8 +40,11 @@ TIMER_CORRECTION229 = TERMINAL229.with_name('terminal-timer-correction.json')
 RETIREMENT288 = V / 'horizon288-unpacked-retirement-v328/batch-039-completion.json'
 BANK_DELTA229_UNIT = 'horizon-perf-epoch229-bank-delta@v334.service'
 BANK_DELTA229_GUARDS = V / 'horizon229-bank-delta-v334/guard-receipts'
-DEMOTION229_UNIT = 'horizon-qualify-229-called-program-demotion-v1.service'
-DEMOTION229_GUARDS = V / 'horizon229-called-program-demotion-v1/guard-receipts'
+DEMOTION229_GUARDS = {
+    f'horizon-qualify-229-called-program-demotion-v{attempt}.service':
+        V / f'horizon229-called-program-demotion-v{attempt}/guard-receipts'
+    for attempt in (1, 2)
+}
 EXTRACT226_UNIT = 'horizon-qualify-226-checkpoint-continuation-extract-v2.service'
 EXTRACT226_BROKER = 'foundation-226-original225-broker-v2.service'
 EXTRACT226_STATE = V / 'horizon226-extract-v2'
@@ -59,6 +62,8 @@ RAM_QUOTES = {
     230: (Path('/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1'),
           150_000_000_000, MEMORY, frozenset(range(72, 80))),
 }
+DEMOTION229_RETRY = (Path('/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v2'),
+                     425_000_000_000, 475_000_000_000, frozenset(range(80, 88)))
 GUARDS = {
     226: V / 'horizon226-extract-v2/guard-receipts',
     229: V / 'horizon229-trace-ram-v325/guard-receipts',
@@ -257,7 +262,9 @@ def latest_accepted_fleet(kit):
     return completion, fleet_ref, fleet
 
 
-def capacity(kit, candidate_epoch=288):
+def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
+    assert not demotion_retry or candidate_epoch == 229
+    ram_quote = DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch)
     terminal226 = completed_extraction226(kit.ops)
     if candidate_epoch == 226:
         assert terminal226 is not None, 'epoch 226 extraction and its broker have not drained'
@@ -271,8 +278,8 @@ def capacity(kit, candidate_epoch=288):
         affinity, = [line.split('=', 1)[1] for line in template if line.startswith('AllowedCPUs=')]
         candidate_memory = int(memory)
         candidate_cpus = kit.measure.source.helper.cpus(affinity)
-    elif candidate_epoch in RAM_QUOTES:
-        _, _, candidate_memory, candidate_cpus = RAM_QUOTES[candidate_epoch]
+    elif ram_quote is not None:
+        _, _, candidate_memory, candidate_cpus = ram_quote
         candidate_disk = 0
     else:
         candidate_disk, candidate_memory, candidate_cpus = CAP, MEMORY, CPUS
@@ -298,8 +305,8 @@ def capacity(kit, candidate_epoch=288):
         owners[epoch] = owner
         if producer['Id'] == BANK_DELTA229_UNIT:
             guard_paths[epoch] = BANK_DELTA229_GUARDS
-        elif producer['Id'] == DEMOTION229_UNIT:
-            guard_paths[epoch] = DEMOTION229_GUARDS
+        elif producer['Id'] in DEMOTION229_GUARDS:
+            guard_paths[epoch] = DEMOTION229_GUARDS[producer['Id']]
         elif producer['Id'] == SUFFIX226_UNIT:
             guard_paths[epoch] = SUFFIX226_STATE / 'guard-receipts'
         elif producer['Id'] in CONTINUATION230_GUARDS:
@@ -352,8 +359,8 @@ def capacity(kit, candidate_epoch=288):
                 disk_shortfall_bytes=max(0, protected + candidate_disk - free),
                 memory_shortfall_bytes=max(0, candidate_memory - memory_room),
                 publication_authorized=False)
-    if candidate_epoch in RAM_QUOTES:
-        filesystem, peak, _, _ = RAM_QUOTES[candidate_epoch]
+    if ram_quote is not None:
+        filesystem, peak, _, _ = ram_quote
         assert filesystem.is_mount() and filesystem.stat().st_dev != root_device
         mount = os.statvfs(filesystem)
         tmpfs_available_bytes = mount.f_bavail * mount.f_frsize
@@ -620,7 +627,7 @@ def guarded_start(kit, profile_ref, fit, inventory, deployment):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'capacity-continuation230',
-                                          'capacity-demotion229',
+                                          'capacity-demotion229', 'capacity-demotion229-retry',
                                           'prepare', 'launch'))
     parser.add_argument('reference', nargs='?')
     parser.add_argument('sha256', nargs='?')
@@ -635,8 +642,9 @@ def main():
     if options.action == 'capacity-continuation230':
         print(json.dumps(capacity(load_existing(), candidate_epoch=230)))
         return
-    if options.action == 'capacity-demotion229':
-        print(json.dumps(capacity(load_existing(), candidate_epoch=229)))
+    if options.action in ('capacity-demotion229', 'capacity-demotion229-retry'):
+        print(json.dumps(capacity(load_existing(), candidate_epoch=229,
+                                  demotion_retry=options.action.endswith('-retry'))))
         return
     if options.action in ('prepare', 'launch'):
         kit = load_existing()

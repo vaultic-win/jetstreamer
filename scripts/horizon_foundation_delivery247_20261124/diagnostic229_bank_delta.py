@@ -39,12 +39,16 @@ def receipt():
 DEMOTION_UNIT = "horizon-qualify-229-called-program-demotion-v1.service"
 DEMOTION_PACKAGE = V / "horizon229-called-program-demotion-v1"
 DEMOTION_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1/run")
+RETRY_UNIT = "horizon-qualify-229-called-program-demotion-v2.service"
+RETRY_PACKAGE = V / "horizon229-called-program-demotion-v2"
+RETRY_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v2/run")
+DEMOTION_RUNS = ((DEMOTION_UNIT, DEMOTION_PACKAGE, DEMOTION_ROOT), (RETRY_UNIT, RETRY_PACKAGE, RETRY_ROOT))
 PARENT_SHA = "060d1807204f66d65854438334847c52a5f3b4c3264fc32fb60243bc42128cfa"
 WORKER_SHA = "e92a4c508ea5e9155f4294cb0e7e8399f3ff81821a356bb0a958da5fa49f2695"
 
 
-def demotion_receipt():
-    path = DEMOTION_PACKAGE / "cadence-registration.json"
+def demotion_receipt(unit, package, root):
+    path = package / "cadence-registration.json"
     if not path.exists():
         return None
     stamp = path.lstat()
@@ -53,14 +57,22 @@ def demotion_receipt():
     row = bound(source)
     assert row["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
     assert (row["epoch"], row["unit"], row["kind"], row["run_root"]) == (
-        229, DEMOTION_UNIT, "epoch229-called-program-demotion", str(DEMOTION_ROOT))
+        229, unit, "epoch229-called-program-demotion", str(root))
     assert (row["bootstrap_slot"], row["first_replay_slot"], row["divergent_bank_slot"],
             row["terminal_slot"]) == (98927417, 98927418, 98931633, 98939266)
     assert row["launched"] and row["entry_replay_requested"] and row["worker_sha256"] == WORKER_SHA
     assert all(row[key] is False for key in ("canonical_epoch_publication_authorized", "remote_mutations", "r2_mutations"))
     admission = bound(row["admission"])
-    assert admission["parent_qualification"] == dict(path=str(DEMOTION_PACKAGE / "parent-qualification.json"),
-                                                     sha256=PARENT_SHA)
+    parent_ref = admission["parent_qualification"]
+    assert parent_ref["path"] == str(package / "parent-qualification.json")
+    if unit == DEMOTION_UNIT:
+        assert parent_ref["sha256"] == PARENT_SHA
+    else:
+        parent = bound(parent_ref)
+        assert parent["capability"]["run_root"] == str(root)
+        assert parent["capability"]["worker_sha256"] == WORKER_SHA
+        assert row["node_path"] == parent["artifact"]["path"]
+        assert bound(admission["predecessor"])["trip_reason"] == "root-physical-budget"
     assert admission["admitted"] and admission["epoch"] == 229
     guard = bound(row["active_guard"])
     assert re.fullmatch("[0-9a-f]{32}", row["invocation_id"]) and row["main_pid"] > 0
@@ -70,16 +82,25 @@ def demotion_receipt():
 
 
 def register_demotion(plan):
-    registration = demotion_receipt()
+    image = None
+    for unit, package, root in DEMOTION_RUNS:
+        selected = register_demotion_run(plan, unit, package, root)
+        if selected is not None:
+            image = selected
+    return image
+
+
+def register_demotion_run(plan, unit, package, root):
+    registration = demotion_receipt(unit, package, root)
     if registration is None:
         return None
     source, row = registration
-    if DEMOTION_UNIT not in plan["tracked_units"]:
-        plan["tracked_units"].append(DEMOTION_UNIT)
-    claim = dict(epoch=229, unit=DEMOTION_UNIT, invocation_id=row["invocation_id"],
-                 scratch_path=str(DEMOTION_ROOT), launch_receipt=source)
+    if unit not in plan["tracked_units"]:
+        plan["tracked_units"].append(unit)
+    claim = dict(epoch=229, unit=unit, invocation_id=row["invocation_id"],
+                 scratch_path=str(root), launch_receipt=source)
     diagnostics = plan.setdefault("diagnostics", [])
-    previous = [item for item in diagnostics if item["unit"] == DEMOTION_UNIT]
+    previous = [item for item in diagnostics if item["unit"] == unit]
     assert not previous or previous == [claim]
     if not previous:
         diagnostics.append(claim)
@@ -87,10 +108,11 @@ def register_demotion(plan):
     if source not in gate["evidence"]:
         gate["evidence"].append(source)
     gate["next_action"] = "Check the signed Bank hash at 98,931,633, then the terminal accounts root and private archive close at 98,939,266."
-    first_checkpoint = DEMOTION_PACKAGE / "signed-transaction-and-bank.json"
+    first_checkpoint = package / "signed-transaction-and-bank.json"
     if first_checkpoint.is_file():
         checkpoint_ref = ref(first_checkpoint)
-        assert checkpoint_ref["sha256"] == "5e8b05e035fd73c2acfd89103c6070ba4989e5feda9f951318683cbef268442d"
+        if unit == DEMOTION_UNIT:
+            assert checkpoint_ref["sha256"] == "5e8b05e035fd73c2acfd89103c6070ba4989e5feda9f951318683cbef268442d"
         checkpoint = bound(checkpoint_ref)
         assert checkpoint["registration"] == source and checkpoint["worker_sha256"] == WORKER_SHA
         assert (checkpoint["epoch"], checkpoint["slot"], checkpoint["transaction_index"]) == (229, 98_931_633, 1764)
@@ -98,7 +120,7 @@ def register_demotion(plan):
         if checkpoint_ref not in gate["evidence"]:
             gate["evidence"].append(checkpoint_ref)
         gate["next_action"] = "The signed transaction and Bank hash matched at slot 98,931,633. Verify the independent accounts root at 98,939,266 and close the private segment."
-    terminal = DEMOTION_PACKAGE / "terminal.json"
+    terminal = package / "terminal.json"
     if terminal.is_file():
         terminal_ref = ref(terminal)
         completed = bound(terminal_ref)
@@ -130,8 +152,10 @@ def live_configuration(registration, unit, run_root):
 
 
 def configuration():
-    return (live_configuration(receipt(), UNIT, RUN_ROOT)
-            + live_configuration(demotion_receipt(), DEMOTION_UNIT, DEMOTION_ROOT))
+    configured = live_configuration(receipt(), UNIT, RUN_ROOT)
+    for unit, package, root in DEMOTION_RUNS:
+        configured.extend(live_configuration(demotion_receipt(unit, package, root), unit, root))
+    return configured
 
 
 def gate(plan):
@@ -224,14 +248,16 @@ def gate(plan):
 
 def owns(row):
     producer = row.get("producer", {})
-    if producer.get("Id") == DEMOTION_UNIT:
-        _, active = demotion_receipt()
-        root = DEMOTION_ROOT
-    elif producer.get("Id") == UNIT:
+    if producer.get("Id") == UNIT:
         _, active = receipt()
         root = RUN_ROOT
     else:
-        return False
+        for unit, package, root in DEMOTION_RUNS:
+            if producer.get("Id") == unit:
+                _, active = demotion_receipt(unit, package, root)
+                break
+        else:
+            return False
     assert row["epoch"] == 229 and row["phase"] == "diagnostic-qualification"
     assert producer["InvocationID"] == active["invocation_id"]
     assert row["ordinary_replay_claim"] is False and row["current_sidecar_eta_valid"] is False
