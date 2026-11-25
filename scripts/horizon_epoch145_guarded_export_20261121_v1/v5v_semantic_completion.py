@@ -13,7 +13,8 @@ import sys
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FAMILY = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
 GENERATION = Path(__file__).resolve().parent.name
-STOP_RETRY = GENERATION in ("tools-v7-168-stop-v2", "tools-homefloor-145-v6-stop-recovery-v2")
+TIMEOUT_RETRY = GENERATION in ("tools-v8-pid1-timeout", "tools-homefloor-145-v7-timeout-build-v1")
+STOP_RETRY = TIMEOUT_RETRY or GENERATION in ("tools-v7-168-stop-v2", "tools-homefloor-145-v6-stop-recovery-v2")
 WALK_RETRY = STOP_RETRY or GENERATION in ("tools-v6-guard-walk", "tools-homefloor-145-v5z-guard-walk-build-v2")
 MODE_RETRY = GENERATION in ("tools-v5z", "tools-homefloor-145-v5y-custody-build-v1") or WALK_RETRY
 SCHEMA_RETRY = GENERATION in ("tools-v5y", "tools-homefloor-145-v5x-schema-build-v1") or MODE_RETRY
@@ -30,9 +31,42 @@ V6 = "a71285e56d674de3bf793692f93dfbb3"
 V6_STOP = "cec8b4e1c2903ff7b26960df7e1a3910567a01d60c9dc3292b4733243d5e2b53"
 V7_HANDOFF = FAMILY / "v7-168-stop-name-handoff"
 V7_START_INTENT = "horizon-epoch145-v6-stop-successor-start-intent-v1"
-PACKAGE = (FAMILY / "tools-v7-168-stop-v2" if STOP_RETRY else FAMILY / "tools-v6-guard-walk" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
+V7 = "f7043fd6595a4151b659d4b098bede11"
+V7_TIMEOUT = "abb572ebbc215821046773de68c3b8ce2afd39113c256f52608ff43296539045"
+V7_START = "ed8a68eb322ffeb2788f3017b14fd7c5dfe256f0e95362ed932457bab7d8e487"
+V7_RESULT = "4c83262f7bb705f30f1850dcc1274a549b2f08b80618bc23c3c9955fae4f4163"
+V7_INTENT = "6340badce38374edd038d7978d29ab60223e6fdea258cef805934866deede7d1"
+V7_NATIVE_START = "924732b30001c550af57ae3bbb1f978abc34c1eeb9677276a3f9c1f4a34aaaa5"
+V7_EVENT_CLOCKS = (
+    ("s=7f76387dd96140468b39dcf01e726fea;i=397938f;b=763ea84ca81f4dddad364b1ea2ba36dd;m=39be973e2c6;t=6611bb6473ffe;x=f5e987fbd627f59c",
+     "3968171500230", "1795621510397950"),
+    ("s=7f76387dd96140468b39dcf01e726fea;i=3979390;b=763ea84ca81f4dddad364b1ea2ba36dd;m=39be974f8dd;t=6611bb6485614;x=fd4906e4c1bf81be",
+     "3968171571421", "1795621510469140"),
+    ("s=7f76387dd96140468b39dcf01e726fea;i=397cb3b;b=763ea84ca81f4dddad364b1ea2ba36dd;m=39eae9cbdf3;t=6611e7b701b2b;x=8f9562b41047605",
+     "3980069223923", "1795633408121643"),
+    ("s=7f76387dd96140468b39dcf01e726fea;i=397cb3c;b=763ea84ca81f4dddad364b1ea2ba36dd;m=39eae9cbe85;t=6611e7b701bbd;x=b3e9ca2dca401fab",
+     "3980069224069", "1795633408121789"),
+)
+V7_SEAL = "589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b"
+V7_STATUS_REGISTRATION = {
+    "registration": {"path": str(RUNTIME / "epoch166-post168-cadence-20261121-v1/METERED168_STATUS_REGISTERED.json"),
+                     "sha256": "02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba"},
+    "consumer_seal": {"path": str(RUNTIME / "survivor172-cadence-20261122-v1/tools-cold168-retry4-failed166-v11-entry146/deployment-seal-receipt.json"),
+                      "sha256": "cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c"},
+    "invocation_id": "048c60372b684a72854aa433c40cbfe8", "pid": 2998320, "start_ticks": 396545999,
+}
+V8_STATUS_REGISTRATION = {
+    "registration": V7_STATUS_REGISTRATION["registration"],
+    "consumer_seal": {"path": str(RUNTIME / "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v12-entry146/deployment-seal-receipt.json"),
+                      "sha256": "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac"},
+    "invocation_id": "fbad8843980d458cb3bfc9b5ba5df16b", "pid": 3156031, "start_ticks": 398133937,
+}
+V8_HANDOFF = FAMILY / "v8-pid1-timeout-name-handoff"
+V8_START_INTENT = "horizon-epoch145-v7-timeout-successor-start-intent-v1"
+PACKAGE = (FAMILY / "tools-v8-pid1-timeout" if TIMEOUT_RETRY else FAMILY / "tools-v7-168-stop-v2" if STOP_RETRY else FAMILY / "tools-v6-guard-walk" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
            FAMILY / "tools-v5y" if SCHEMA_RETRY else FAMILY / GENERATION if RETRY else V5V_PACKAGE)
-PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v6-stop-recovery-v2") if STOP_RETRY else
+PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v7-timeout-recovery-v1") if TIMEOUT_RETRY else
+            V5V_PROVIDER.with_name("tools-homefloor-145-v6-stop-recovery-v2") if STOP_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5z-guard-walk-recovery-v1") if WALK_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5y-custody-recovery-v1") if MODE_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5x-schema-recovery-v1") if SCHEMA_RETRY else
@@ -78,6 +112,7 @@ FAILURE = "d9b373ed55a64feb8242e02dbe79a49c"
 PROCESS_EXIT = "98e322203f7a4ed290d09fe03c09fe15"
 STOPPING = "de5b426a63be47a7b6ac3eaac82e2f6f"
 STOPPED = "9d1aaa27d60140bd96365438aad20286"
+LIFECYCLE = (STARTING, STARTED, PROCESS_EXIT, FAILURE, SUCCESS, STOPPING, STOPPED)
 EVENT_FIELDS = ("_PID", "_BOOT_ID", "UNIT", "INVOCATION_ID", "MESSAGE_ID", "JOB_TYPE",
                 "JOB_RESULT", "COMMAND", "EXIT_CODE", "EXIT_STATUS", "UNIT_RESULT", "MESSAGE")
 SHA256 = re.compile(r"[a-f0-9]{64}")
@@ -100,9 +135,9 @@ def reference(path, digest):
     return {"path": str(path), "sha256": digest}
 
 
-def pinned_json(ref, path):
+def pinned_json(ref, path, *, mode=None):
     require(ref["path"] == str(path), f"unexpected binding for {path.name}")
-    data, actual = read_file(path)
+    data, actual = read_file(path, mode=mode)
     require(ref == actual, f"changed SHA-256 binding for {path}")
     return json.loads(data, object_pairs_hook=unique_object)
 
@@ -439,6 +474,9 @@ def receipt_mode_failure(terminal_ref):
 
 
 def failed_predecessor(terminal_ref):
+    if TIMEOUT_RETRY:
+        terminal, failed = pid1_timeout_failure(terminal_ref)
+        return terminal["candidate"], failed
     if STOP_RETRY:
         terminal, failed = guard_stop_failure(terminal_ref)
         return terminal["candidate"], failed
@@ -547,6 +585,78 @@ def guard_stop_failure(terminal_ref):
     return terminal, events[-1]
 
 
+def v7_timeout_terminal():
+    return reference(STATE / V7 / "failed.json", V7_TIMEOUT)
+
+
+def validate_v7_history(events, anchors):
+    require([row["MESSAGE_ID"] for row in events] == [STARTING, STARTED, PROCESS_EXIT, FAILURE],
+            "different V7 PID1 failure sequence")
+    started, _ = validate_start_events(V7, events[:2], anchors["argv_tail"], anchors["intent_floor"],
+                                        anchors["predecessor_native"])
+    exit_event, failed = events[2:]
+    scope_event(exit_event, V7, PROCESS_EXIT)
+    scope_event(failed, V7, FAILURE)
+    clock_fields = ("__CURSOR", "__MONOTONIC_TIMESTAMP", "__REALTIME_TIMESTAMP")
+    require(tuple(tuple(row[key] for key in clock_fields) for row in events) == V7_EVENT_CLOCKS
+            and exit_event["COMMAND"] == "ExecStart" and exit_event["EXIT_CODE"] == "exited"
+            and exit_event["EXIT_STATUS"] == "1" and failed["UNIT_RESULT"] == "exit-code",
+            "different V7 PID1 exit or failure")
+    return started, failed
+
+
+def pid1_timeout_failure(terminal_ref):
+    require(terminal_ref == v7_timeout_terminal(), "different V7 PID1 timeout terminal")
+    state = STATE / V7
+    failure = pinned_json(terminal_ref, state / "failed.json", mode=0o600)
+    start_ref = reference(state / "recovery-started.json", V7_START)
+    start = pinned_json(start_ref, state / "recovery-started.json", mode=0o600)
+    intent_ref = reference(V7_HANDOFF / "START_INTENT.json", V7_INTENT)
+    intent = pinned_json(intent_ref, V7_HANDOFF / "START_INTENT.json", mode=0o600)
+    result_ref = reference(V7_HANDOFF / "START_RESULT.json", V7_RESULT)
+    result = pinned_json(result_ref, V7_HANDOFF / "START_RESULT.json", mode=0o600)
+    native_ref = reference(V7_HANDOFF / "NATIVE_START_CHECK.json", V7_NATIVE_START)
+    native = pinned_json(native_ref, V7_HANDOFF / "NATIVE_START_CHECK.json", mode=0o600)
+    anchors = native["startup_evidence"]
+    prior, prior_exit = guard_stop_failure(intent["terminal"])
+    fresh = start["fresh_fit"]
+    window = fresh["phase145"]["window"]
+    require(result["intent"] == anchors["submission_intent"] == intent_ref
+            and anchors["submission_result"] == result_ref and anchors["start"] == start_ref
+            and result["status"] == 0 and result["manager"]["InvocationID"] == V7
+            and native["invocation_id"] == anchors["invocation_id"] == start["iid"] == failure["iid"] == V7
+            and result["manager"]["Id"] == intent["unit"] == UNIT
+            and intent["schema"] == V7_START_INTENT and intent["terminal"] == anchors["predecessor_terminal"]
+            == window["guard_terminal_predecessor"]
+            and intent["worker_seal"] == anchors["worker_seal"] == window["continuity_seal"]
+            == reference(FAMILY / "tools-v7-168-stop-v2/deployment-seal-receipt.json", V7_SEAL)
+            and intent["worker"] == anchors["worker"] and start["image"] == intent["worker"]["sha256"]
+            and intent["provider_seal"] == anchors["guard_provider_seal"] == fresh["provider_seal"]
+            and intent["provider"] == anchors["guard_provider"]
+            and anchors["candidate"] == prior["candidate"] and start["file"] == str(PAID)
+            and anchors["argv_tail"] == intent["argv"][-5:]
+            and anchors["intent_floor"] == intent["not_before_monotonic_usec"]
+            and anchors["predecessor_native"] == prior_exit
+            and fresh["status_registration"] == V7_STATUS_REGISTRATION and fresh["fits"] is True
+            and native["native_success"] is None and native["publication_authorized"] is False
+            and start["r2_mutations"] is intent["r2_mutations"] is False
+            and '/session-v4-registered136/status168.py", line 61, in show' in failure["error"]
+            and failure["error"].rstrip().endswith(
+                "'horizon-qualify-172-full-half-core-20261120-v1.service']' timed out after 10 seconds")
+            and {p.name for p in state.iterdir()} == {"recovery-started.json", "failed.json"}
+            and not os.path.lexists(V7_HANDOFF / "SEMANTIC_COMPLETION.json"),
+            "different V7 startup, timeout, or paid candidate")
+    events = journal(V7, *LIFECYCLE)
+    started, failed = validate_v7_history(events, anchors)
+    history = journal(None, *LIFECYCLE, after_cursor=prior_exit["__CURSOR"])
+    cutoff = int(failed["__MONOTONIC_TIMESTAMP"])
+    require(started == native["native_start"]
+            and [row for row in history if int(row["__MONOTONIC_TIMESTAMP"]) <= cutoff] == events,
+            "another native owner intervened before V7 failed")
+    return {"recovery_started": start_ref, "candidate": prior["candidate"],
+            "guard_stop_168": prior["guard_stop_168"]}, failed
+
+
 def manager_properties(properties):
     output = subprocess.check_output(
         ["/usr/bin/systemctl", "show", "--property=" + ",".join(properties), "--", UNIT],
@@ -570,7 +680,15 @@ def predecessor_preflight(fleet_ref):
     expected = dict(Id=UNIT, ActiveState="failed", SubState="failed", InvocationID=V5U,
                     MainPID="0", ControlPID="0", Job="", NRestarts="0", ControlGroup="",
                     ExecMainStatus="1", Result="exit-code")
-    if STOP_RETRY:
+    if TIMEOUT_RETRY:
+        failure_ref = v7_timeout_terminal()
+        terminal, native_failure = pid1_timeout_failure(failure_ref)
+        startup_ref, candidate = terminal["recovery_started"], terminal["candidate"]
+        expected["InvocationID"] = V7
+        require(fleet["cold168_retry4_root_physical_stop"] == terminal["guard_stop_168"]
+                and not journal(None, *LIFECYCLE, after_cursor=native_failure["__CURSOR"]),
+                "retained 168 stop or failed V7 owner changed")
+    elif STOP_RETRY:
         terminal_ref = reference(V6_HANDOFF / "V6_TERMINAL_FAILURE_168_STOP.json", V6_STOP)
         terminal, native_failure = guard_stop_failure(terminal_ref)
         startup_ref, failure_ref, candidate = terminal["recovery_started"], terminal_ref, terminal["candidate"]
@@ -629,7 +747,8 @@ def predecessor_preflight(fleet_ref):
             }.items())
             and file_stamp(m) == file_stamp(PAID.lstat()) and manager_properties(properties) == expected and not group.exists(),
             "paid candidate or failed owner changed during preflight")
-    return {"schema": ("horizon-epoch145-v7-predecessor-preflight-v1" if STOP_RETRY else
+    return {"schema": ("horizon-epoch145-v8-predecessor-preflight-v1" if TIMEOUT_RETRY else
+                       "horizon-epoch145-v7-predecessor-preflight-v1" if STOP_RETRY else
                        "horizon-epoch145-v6-predecessor-preflight-v1" if WALK_RETRY else
                        "horizon-epoch145-v5z-predecessor-preflight-v1" if MODE_RETRY else
                        "horizon-epoch145-v5y-predecessor-preflight-v1" if SCHEMA_RETRY else
@@ -647,7 +766,7 @@ def successor_manager(result, intent, *, retry=None):
     retry = RETRY if retry is None else retry
     manager = result["manager"]
     iid = manager["InvocationID"]
-    schema = V7_START_INTENT if STOP_RETRY else V6_START_INTENT if WALK_RETRY else V5Z_START_INTENT if MODE_RETRY else V5Y_START_INTENT if SCHEMA_RETRY else "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
+    schema = V8_START_INTENT if TIMEOUT_RETRY else V7_START_INTENT if STOP_RETRY else V6_START_INTENT if WALK_RETRY else V5Z_START_INTENT if MODE_RETRY else V5Y_START_INTENT if SCHEMA_RETRY else "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
         "horizon-epoch145-v5u-semantic-successor-start-intent-v1"
     )
     predecessor_invocations = (V5U, V5V, V5W) if retry and DONOR_RETRY else (V5U, V5V) if retry else (V5U,)
@@ -659,6 +778,8 @@ def successor_manager(result, intent, *, retry=None):
         predecessor_invocations += (V5Z,)
     if STOP_RETRY:
         predecessor_invocations += (V6,)
+    if TIMEOUT_RETRY:
+        predecessor_invocations += (V7,)
     require(result["status"] == 0 and manager["Id"] == intent["unit"] == UNIT
             and re.fullmatch(r"[a-f0-9]{32}", iid) and iid not in predecessor_invocations
             and manager["ActiveState"] == "active" and manager["SubState"] == "running"
@@ -670,7 +791,7 @@ def successor_manager(result, intent, *, retry=None):
 
 
 def startup(result_ref):
-    submission = (V7_HANDOFF if STOP_RETRY else V6_HANDOFF if WALK_RETRY else V5Z_HANDOFF if MODE_RETRY else V5Y_HANDOFF if SCHEMA_RETRY
+    submission = (V8_HANDOFF if TIMEOUT_RETRY else V7_HANDOFF if STOP_RETRY else V6_HANDOFF if WALK_RETRY else V5Z_HANDOFF if MODE_RETRY else V5Y_HANDOFF if SCHEMA_RETRY
                   else V5X_HANDOFF if DONOR_RETRY else FAMILY / "v5w-name-handoff" if RETRY else V5V_HANDOFF)
     result = pinned_json(result_ref, submission / "START_RESULT.json")
     intent_ref = result["intent"]
@@ -687,7 +808,7 @@ def startup(result_ref):
     require(launch_quote["fleet"] == bounds and launch_quote["fits"] is True
             and launch_quote["epoch"] == 145 and launch_quote["candidate"] is None
             and launch_quote["phase145"]["InvocationID"] ==
-                (V6 if STOP_RETRY else V5Z if WALK_RETRY else V5Y if MODE_RETRY else V5X if SCHEMA_RETRY else V5W if DONOR_RETRY else V5V if RETRY else V5U)
+                (V7 if TIMEOUT_RETRY else V6 if STOP_RETRY else V5Z if WALK_RETRY else V5Y if MODE_RETRY else V5X if SCHEMA_RETRY else V5W if DONOR_RETRY else V5V if RETRY else V5U)
             and launch_quote["phase145"]["guard_terminal"] == intent["terminal"]
             and launch_quote["resource_credit_bytes"] == 0
             and launch_quote["replay_launch_authorized"] is False,
@@ -708,6 +829,10 @@ def startup(result_ref):
     if DONOR_RETRY:
         require(launch_quote["status_registration"] == fresh["status_registration"],
                 "different V5x startup cadence owner")
+    if TIMEOUT_RETRY:
+        require(launch_quote["phase145"]["stage"] == "v7-drained-pid1-timeout"
+                and fresh["status_registration"] == V8_STATUS_REGISTRATION,
+                "different V8 predecessor price or V12 cadence owner")
     require(donor["sha256"] == DONOR_SHA and intent["worker_seal"] == image_seal
             and intent["provider_seal"] == fresh["provider_seal"]
             and image == actual_image and window["continuity_build"] == actual_proof
@@ -823,7 +948,8 @@ def completion(anchors, started, success):
             "foreign promoted inode")
     require(not (state / "failed.json").exists() and file_stamp(info) == file_stamp(PROMOTED.lstat()),
             "promoted archive or terminal state changed")
-    schema = ("horizon-epoch145-v5z-custody-successor-semantic-completion-v1" if MODE_RETRY else
+    schema = ("horizon-epoch145-v7-timeout-successor-semantic-completion-v1" if TIMEOUT_RETRY else
+              "horizon-epoch145-v5z-custody-successor-semantic-completion-v1" if MODE_RETRY else
               "horizon-epoch145-v5y-schema-successor-semantic-completion-v1" if SCHEMA_RETRY else
               "horizon-epoch145-v5x-donor-successor-semantic-completion-v1" if DONOR_RETRY else
               "horizon-epoch145-v5v-custody-successor-semantic-completion-v1" if RETRY else

@@ -31,7 +31,12 @@ compile_error!("the allocation-walk hold retry requires the V5z verifier guard")
 #[cfg(all(incident_v6_stop_recovery145_only, not(incident_v5z_guard_recovery145_only)))]
 compile_error!("the epoch 168 stop recovery requires the complete V6 verifier guard");
 
-#[cfg(incident_v6_stop_recovery145_only)]
+#[cfg(all(incident_v7_timeout_recovery145_only, not(incident_v6_stop_recovery145_only)))]
+compile_error!("the PID 1 timeout recovery requires the complete V7 verifier guard");
+
+#[cfg(incident_v7_timeout_recovery145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v8-pid1-timeout/export145";
+#[cfg(all(incident_v6_stop_recovery145_only, not(incident_v7_timeout_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7-168-stop-v2/export145";
 #[cfg(all(incident_v5z_guard_recovery145_only, not(incident_v6_stop_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v6-guard-walk/export145";
@@ -480,6 +485,82 @@ pub(super) fn failed_v6(prior: &Value) -> Result<Value> {
             && proof["archive_publication_authorized"] == false
             && proof["r2_mutations"] == false,
         "V6 guard-stop terminal and paid candidate do not agree"
+    );
+    Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
+}
+
+#[cfg(incident_v7_timeout_recovery145_only)]
+const V7: &str = "f7043fd6595a4151b659d4b098bede11";
+
+#[cfg(incident_v7_timeout_recovery145_only)]
+pub(super) fn v7_terminal() -> Result<Bound> {
+    let terminal = Bound {
+        path: Path::new(BASE).join("state").join(V7).join("failed.json"),
+        sha256: "abb572ebbc215821046773de68c3b8ce2afd39113c256f52608ff43296539045".into(),
+    };
+    custody::bytes(&terminal, 1 << 20, false).context("V7 timeout custody changed")?;
+    Ok(terminal)
+}
+
+#[cfg(incident_v7_timeout_recovery145_only)]
+pub(super) fn failed_v7(prior: &Value) -> Result<Value> {
+    let terminal = v7_terminal()?;
+    let state = terminal.path.parent().context("V7 state directory")?;
+    let startup = Bound {
+        path: state.join("recovery-started.json"),
+        sha256: "ed8a68eb322ffeb2788f3017b14fd7c5dfe256f0e95362ed932457bab7d8e487".into(),
+    };
+    let start = custody::evidence(&startup)?;
+    let handoff = Path::new(RUNTIME)
+        .join("epoch145-semantic-continuity-20261121-v1/v7-168-stop-name-handoff");
+    let intent_ref = Bound {
+        path: handoff.join("START_INTENT.json"),
+        sha256: "6340badce38374edd038d7978d29ab60223e6fdea258cef805934866deede7d1".into(),
+    };
+    let intent = custody::evidence(&intent_ref)?;
+    let v7_start = custody::evidence(&Bound {
+        path: handoff.join("NATIVE_START_CHECK.json"),
+        sha256: "924732b30001c550af57ae3bbb1f978abc34c1eeb9677276a3f9c1f4a34aaaa5".into(),
+    })?;
+    let anchors = &v7_start["startup_evidence"];
+    let native = continuity::failure(V7)?;
+    let prior_terminal: Bound = serde_json::from_value(prior["terminal"].clone())?;
+    let prior = custody::evidence(&prior_terminal)?;
+    let candidate = &prior["candidate"];
+    let file = Path::new(OUTPUT).join(".tmp36MvkN");
+    let paid = custody::frozen_identity(&file)?;
+    let names = fs::read_dir(state)?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<std::io::Result<std::collections::BTreeSet<_>>>()?;
+    ensure!(
+        native["failure"] == json!(terminal)
+            && native["native"]["__CURSOR"]
+                == "s=7f76387dd96140468b39dcf01e726fea;i=397cb3b;b=763ea84ca81f4dddad364b1ea2ba36dd;m=39eae9cbdf3;t=6611e7b701b2b;x=8f9562b41047605"
+            && v7_start["invocation_id"] == V7
+            && v7_start["native_success"].is_null()
+            && anchors["submission_intent"] == json!(intent_ref)
+            && anchors["start"] == json!(startup)
+            && intent["schema"] == "horizon-epoch145-v6-stop-successor-start-intent-v1"
+            && intent["unit"] == UNIT
+            && intent["worker"] == anchors["worker"]
+            && intent["worker_seal"] == anchors["worker_seal"]
+            && intent["terminal"] == anchors["predecessor_terminal"]
+            && intent["terminal"] == json!(prior_terminal)
+            && start["iid"] == V7
+            && start["image"] == intent["worker"]["sha256"]
+            && start["file"] == candidate["path"]
+            && start["r2_mutations"] == false
+            && anchors["candidate"] == *candidate
+            && candidate["path"] == json!(file)
+            && candidate["device"] == paid.device
+            && candidate["inode"] == paid.inode
+            && candidate["bytes"] == paid.bytes
+            && candidate["mtime_ns"].as_i64().map(i128::from) == Some(paid.mtime_ns)
+            && candidate["ctime_ns"].as_i64().map(i128::from) == Some(paid.ctime_ns)
+            && paid.mode == 0o100400
+            && !Path::new(OUTPUT).join("epoch-145.jet").try_exists()?
+            && names == ["failed.json", "recovery-started.json"].map(std::ffi::OsString::from).into(),
+        "V7 PID 1 timeout and paid candidate do not agree"
     );
     Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
 }

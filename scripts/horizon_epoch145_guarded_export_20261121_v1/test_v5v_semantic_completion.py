@@ -249,6 +249,41 @@ class QualifiedSuccessor(unittest.TestCase):
                 manager(result(iid),intent,retry=True)
         self.assertEqual(manager(result(),intent,retry=True),(OWNER,42))
 
+    def test_v8_requires_exact_v7_native_failure(self):
+        v7 = scope["V7"]
+        events = [*history(v7)[:2], event(v7, "PROCESS_EXIT", 17), event(v7, "FAILURE", 18)]
+        clock_fields = ("__CURSOR", "__MONOTONIC_TIMESTAMP", "__REALTIME_TIMESTAMP")
+        for row, clocks in zip(events, scope["V7_EVENT_CLOCKS"], strict=True):
+            row.update(zip(clock_fields, clocks, strict=True))
+        events[2].update(COMMAND="ExecStart", EXIT_CODE="exited", EXIT_STATUS="1")
+        events[3]["UNIT_RESULT"] = "exit-code"
+        anchors = {"argv_tail": ARGV, "intent_floor": 3968171412522,
+                   "predecessor_native": event(scope["V6"], "FAILURE", 3964786038661)}
+        verify = scope["validate_v7_history"]
+        self.assertEqual(verify(events, anchors), (events[1], events[3]))
+        for index, field, changed in (
+            (0, "__CURSOR", "another-start"),
+            (2, "EXIT_STATUS", "0"),
+            (2, "__REALTIME_TIMESTAMP", "1795633408121642"),
+            (3, "__CURSOR", "another-failure"),
+        ):
+            with self.subTest(field=field):
+                altered = deepcopy(events)
+                altered[index][field] = changed
+                with self.assertRaisesRegex(ValueError, "different V7 PID1 exit or failure"):
+                    verify(altered, anchors)
+        with self.assertRaisesRegex(ValueError, "different V7 PID1 failure sequence"):
+            verify([*events, event(v7, "STOPPED", 20)], anchors)
+
+    def test_v8_requires_fresh_successor_invocation_and_schema(self):
+        intent = dict(INTENT, schema=scope["V8_START_INTENT"])
+        with patch.dict(common, TIMEOUT_RETRY=True, STOP_RETRY=True, RETRY=True):
+            self.assertEqual(manager(result(), intent), (OWNER, 42))
+            with self.assertRaisesRegex(ValueError, "foreign successful"):
+                manager(result(scope["V7"]), intent)
+            with self.assertRaisesRegex(ValueError, "foreign successful"):
+                manager(result(), dict(intent, schema=scope["V7_START_INTENT"]))
+
     def test_published_donor_retries_only_the_identical_read_once(self):
         source = DIRECTORY / "build_159_price.py"
         self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), scope["V7_DONOR_SHA"])
