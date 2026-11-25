@@ -266,6 +266,18 @@ fn definitions(plan: &Retirement, tokens: &[String]) -> Result<()> {
     Ok(())
 }
 
+fn exited(proc: &Path) -> Result<bool> {
+    match fs::read_to_string(proc.join("status")) {
+        Ok(status) => Ok(status
+            .lines()
+            .find_map(|line| line.strip_prefix("State:"))
+            .and_then(|state| state.split_whitespace().next())
+            .is_some_and(|state| matches!(state, "Z" | "X" | "x"))),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound && !proc.exists() => Ok(true),
+        Err(e) => Err(e).context("cannot establish process exit"),
+    }
+}
+
 fn scan_run_references(strong: &[String]) -> Result<()> {
     let me = std::process::id().to_string();
     for entry in fs::read_dir("/proc")? {
@@ -280,6 +292,14 @@ fn scan_run_references(strong: &[String]) -> Result<()> {
             let bytes = match fs::read(&p) {
                 Ok(bytes) => bytes,
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound && !entry.path().exists() => {
+                    continue;
+                }
+                Err(e) if kind == "mountinfo" && e.raw_os_error() == Some(libc::EINVAL) => {
+                    ensure!(
+                        exited(&entry.path())?,
+                        "cannot inspect live mount namespace: {}",
+                        p.display()
+                    );
                     continue;
                 }
                 Err(e) => return Err(e).with_context(|| format!("cannot scan {}", p.display())),
