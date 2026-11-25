@@ -46,11 +46,11 @@ class Retry5Completion(unittest.TestCase):
         return proof, status
 
     def test_requires_both_startup_receipts_for_each_generation(self):
-        for v8, owner in ((False, retry5_fit.V7), (True, retry5_fit.V8)):
-            with self.subTest(v8=v8), patch.object(Path, "exists", return_value=False):
+        for owner in (retry5_fit.V7, retry5_fit.V8, retry5_fit.V9):
+            with self.subTest(generation=owner["generation"]), patch.object(Path, "exists", return_value=False):
                 proof, status = self.fixture(owner)
                 with patch.object(retry5_fit.subprocess, "check_output", return_value=json.dumps(proof)) as check:
-                    phase = retry5_fit.drained145(status, self.fit, self.load, v8=v8)
+                    phase = retry5_fit.drained145(status, self.fit, self.load, owner=owner)
                     self.assertEqual(phase["stage"], f"{owner['generation']}-semantic-complete-drained")
                     self.assertEqual(phase["completed_invocation_id"], owner["invocation"])
                     self.load.assert_called_with(owner["checker"], owner["checker_sha"])
@@ -68,15 +68,15 @@ class Retry5Completion(unittest.TestCase):
                         status.read.return_value = (invalid, phase["completion"])
                         check.return_value = json.dumps(invalid)
                         with self.assertRaisesRegex(ValueError, "terminal or native owner"):
-                            retry5_fit.drained145(status, self.fit, self.load, v8=v8)
+                            retry5_fit.drained145(status, self.fit, self.load, owner=owner)
 
-    def test_rejects_live_and_failed_v8_manager_before_reading_completion(self):
-        _, status = self.fixture(retry5_fit.V8)
+    def test_rejects_live_and_failed_v9_manager_before_reading_completion(self):
+        _, status = self.fixture(retry5_fit.V9)
         for active, substate in (("active", "running"), ("failed", "failed")):
             with self.subTest(active=active):
                 status.show.return_value.update(ActiveState=active, SubState=substate)
-                with self.assertRaisesRegex(ValueError, "v8 verifier has not drained"):
-                    retry5_fit.drained145(status, self.fit, self.load, v8=True)
+                with self.assertRaisesRegex(ValueError, "v9 verifier has not drained"):
+                    retry5_fit.drained145(status, self.fit, self.load, owner=retry5_fit.V9)
         self.load.assert_not_called()
         status.read.assert_not_called()
 

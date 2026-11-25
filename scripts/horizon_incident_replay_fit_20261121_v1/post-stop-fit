@@ -71,11 +71,14 @@ V9_145 = V9_RUNTIME_145 or V9_BUILD_145
 V8_145 = V8_RUNTIME_145 or V8_BUILD_145
 V12_RECOVERY_145 = V8_145 or V9_145
 STOP_RECOVERY_145 = V7_145 or V12_RECOVERY_145
+V9_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v4"
 V8_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v3"
-RETRY5_FIT_ROUTE = V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
+RETRY5_FIT_ROUTE = V9_RETRY5_FIT or V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
 V7_POST_145 = HERE == D / "tools-homefloor-145-post-v7-current-v1"
 V7_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v7-build-v1"
-RETRY5_168 = RETRY5_FIT_ROUTE or V7_POST_145 or V7_POST_BUILD_145
+V9_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v9-build-v1"
+RETRY5_POST_BUILD_145 = V7_POST_BUILD_145 or V9_POST_BUILD_145
+RETRY5_168 = RETRY5_FIT_ROUTE or V7_POST_145 or RETRY5_POST_BUILD_145
 STOPPED168_PRICE = RETRY5_168 or STOP_RECOVERY_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
@@ -743,9 +746,10 @@ def v12_stopped145(fleet):
 
 
 def phase145(epoch, fleet=None):
-    if RETRY5_FIT_ROUTE or V7_POST_BUILD_145:
-        phase = retry5_fit["drained145"](s, fit, loader["load_package"], v8=V8_RETRY5_FIT)
-        if V7_POST_BUILD_145:
+    if RETRY5_FIT_ROUTE or RETRY5_POST_BUILD_145:
+        generation = "V9" if V9_RETRY5_FIT or V9_POST_BUILD_145 else "V8" if V8_RETRY5_FIT else "V7"
+        phase = retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit[generation])
+        if RETRY5_POST_BUILD_145:
             proof = bound(phase["completion"])
             phase["semantic_receipt"] = phase["completion"]
             phase["completion"] = proof["completion"]

@@ -27,9 +27,19 @@ V8 = {
     'schema': 'horizon-epoch145-v7-timeout-successor-semantic-completion-v1',
 }
 
+V9 = {
+    'generation': 'v9',
+    'handoff': FAMILY / 'v9-census-name-handoff',
+    'checker': FAMILY / 'tools-v9-census-recovery',
+    'checker_sha': '8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd',
+    'submission_sha': '33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973',
+    'start_sha': 'eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4',
+    'invocation': 'ebdfc34db47c4e7699ea5ccbada5d604',
+    'schema': 'horizon-epoch145-v8-census-successor-semantic-completion-v1',
+}
 
-def drained145(s, fit, load, *, v8=False):
-    owner = V8 if v8 else V7
+
+def drained145(s, fit, load, *, owner=V7):
     generation = owner['generation']
     invocation = owner['invocation']
     manager = s.show(fit.A145)
@@ -105,7 +115,7 @@ def donor_cover(s, donor, before, native, fleet):
                booking['measurement'] == 'two complete stopped-tree walks', 'changed retained ' + epoch)
 
     fit168 = native['epoch'] == 168
-    phases = {'v7-semantic-complete-drained', 'v8-semantic-complete-drained'}
+    phases = {'v7-semantic-complete-drained', 'v8-semantic-complete-drained', 'v9-semantic-complete-drained'}
     if native['epoch'] == 145:
         phases |= {'v5j-semantic-complete', 'post-full', 'publish'}
     peers = native['replacements']
