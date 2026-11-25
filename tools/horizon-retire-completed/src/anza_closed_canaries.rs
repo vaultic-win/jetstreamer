@@ -1,5 +1,8 @@
 use super::*;
 
+mod closed_indexes;
+pub(super) use closed_indexes::{is_index, lock_index_controllers};
+
 const REVIEW: &str = "/home/sol/.jetstreamer-private/epoch145-v5t-stopped-price-20261124.zjcggc_6/RETIREMENT_CANDIDATES_130_195.json";
 const REVIEW_SHA: &str = "6b4563c22f4d586bb8c2fc38c91e4a5c1b8180463b7b27de8de2fa1b115a1291";
 const FIRST_SWEEP_REVIEW: &str =
@@ -85,6 +88,7 @@ pub(super) fn is_target(t: &Target) -> bool {
                     .join(case)
                     .join("output/epoch-154-through-66958784.jet")
         }),
+        191..=194 if is_index(t) => true,
         191 => t.path == root.join(SNAPSHOT_DIR).join("inputs").join(SNAPSHOT_NAME),
         195 => ["control32", "candidate8"].iter().any(|case| {
             t.path
@@ -109,13 +113,13 @@ fn identity(t: &Target) -> Value {
 }
 
 pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Result<Option<Value>> {
-    let (path, sha256, schema, expected_epochs) =
+    let (path, sha256, schema, expected_epochs): (&str, &str, &str, &[u64]) =
         if epochs.iter().any(|&epoch| matches!(epoch, 130 | 195)) {
             (
                 REVIEW,
                 REVIEW_SHA,
                 "horizon-epoch145-disk-recovery-candidates-v1",
-                [130, 195],
+                &[130, 195],
             )
         } else if p
             .targets
@@ -126,28 +130,39 @@ pub(super) fn verify_scope(p: &Plan, epochs: &BTreeSet<u64>, lock: &File) -> Res
                 FOLLOWUP_REVIEW,
                 FOLLOWUP_REVIEW_SHA,
                 FOLLOWUP_SCHEMA,
-                [134, 154],
+                &[134, 154],
             )
         } else if epochs.contains(&119) || epochs.contains(&121) {
             (
                 FIRST_SWEEP_REVIEW,
                 FIRST_SWEEP_SHA,
                 FIRST_SWEEP_SCHEMA,
-                [119, 121],
+                &[119, 121],
+            )
+        } else if p.targets.iter().any(is_index) {
+            ensure!(
+                closed_indexes::complete_selection(&p.targets),
+                "incomplete index retirement selection"
+            );
+            (
+                closed_indexes::REVIEW,
+                closed_indexes::SHA,
+                closed_indexes::SCHEMA,
+                &[191, 192, 193, 194],
             )
         } else if epochs.contains(&191) {
             (
                 SNAPSHOT_REVIEW,
                 SNAPSHOT_REVIEW_SHA,
                 SNAPSHOT_SCHEMA,
-                [191, 191],
+                &[191],
             )
         } else if epochs.contains(&197) {
             (
                 BOOTSTRAP_REVIEW,
                 BOOTSTRAP_REVIEW_SHA,
                 BOOTSTRAP_SCHEMA,
-                [197, 197],
+                &[197],
             )
         } else {
             return Ok(None);
@@ -347,6 +362,9 @@ pub(super) fn check_owners(review: &Value) -> Result<()> {
             bound(&bound_file, LIMIT)?;
         }
     }
+    if review["schema"] == closed_indexes::SCHEMA {
+        return closed_indexes::check_owners(review);
+    }
     let scan = Command::new("/usr/bin/rg")
         .args(["--files-with-matches", "--fixed-strings"])
         .args(markers.iter().flat_map(|pattern| ["-e", pattern]))
@@ -458,10 +476,17 @@ pub(super) fn verify_delivery(
 }
 
 pub(super) fn lock_first_sweep_controller() -> Result<File> {
+    controller_lock(
+        "/var/lib/jetstreamer-root-sweep-epochs119-147-20260922-v28/controller.lock",
+        3276851,
+    )
+}
+
+fn controller_lock(path: &str, inode: u64) -> Result<File> {
     let lock = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open("/var/lib/jetstreamer-root-sweep-epochs119-147-20260922-v28/controller.lock")?;
+        .open(path)?;
     let m = lock.metadata()?;
     ensure!(
         m.is_file()
@@ -472,7 +497,7 @@ pub(super) fn lock_first_sweep_controller() -> Result<File> {
                 m.gid(),
                 m.nlink(),
                 m.mode() & 0o7777
-            ) == (2304, 3276851, 0, 0, 1, 0o600),
+            ) == (2304, inode, 0, 0, 1, 0o600),
         "different original sweep lock"
     );
     ensure!(
