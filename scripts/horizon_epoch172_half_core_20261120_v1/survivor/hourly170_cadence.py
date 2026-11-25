@@ -19,7 +19,7 @@ if Path(__file__).resolve().parent.name == "tools-cold168-retry4-failed166-v2":
     PROVIDER_SEAL = "91a9c718e062c1dafe8516023c10bc4bec054b1ccb7c59eebc2ad6cba71fba16"
 if Path(__file__).resolve().parent.name in (
     "tools-cold168-retry4-failed166-v3", "tools-cold168-retry4-failed166-v4-entry146",
-    "tools-cold168-retry4-failed166-v5-entry146",
+    "tools-cold168-retry4-failed166-v5-entry146", "tools-cold168-retry4-failed166-v8-entry146",
 ):
     PROVIDER = PROVIDER.with_name("tools-homefloor-170-metered-hourly-v8")
     PROVIDER_SEAL = "e927fbd7c9bd096933e7fea73bbbb82ed5105443afdf3f0c27077398059dcaaf"
@@ -37,6 +37,16 @@ def previous_row(fleet):
     return rows[0] if rows else None
 
 
+def terminal_predecessor(fleet_ref):
+    path = Path(fleet_ref["path"])
+    need(path.parent.parent == BASE and path.name == "ROOT_COMPLETE_OPERATIONAL_FLEET.json",
+         "foreign epoch 170 terminal predecessor")
+    fleet = checked(fleet_ref)
+    need(fleet["schema"] == "horizon-Root-complete-fleet-operational-review-v1"
+         and fleet["owner"] == "/root", "unaccepted epoch 170 terminal predecessor")
+    return fleet
+
+
 def projection(fleet_ref):
     """Use the existing sealed actor and guard checks in a separate process."""
     seal_ref = bound(PROVIDER / "deployment-seal-receipt.json")
@@ -48,10 +58,15 @@ def projection(fleet_ref):
     need(bound(image)["sha256"] == member["sha256"], "changed epoch 170 capacity driver")
     provider = runpy.run_path(str(image), run_name="hourly170_cadence_provider")
     route, s, fit = (provider[key] for key in ("hourly170", "s", "fit"))
-    fleet, _ = provider["fleet_head"](fleet_ref)
-    prior = previous_row(fleet)
     iid = route["properties"](route["UNIT"], "InvocationID", "MainPID", "ControlPID",
                               "ControlGroup", "ActiveState", "Job")
+    if iid["ActiveState"] == "active":
+        fleet, _ = provider["fleet_head"](fleet_ref)
+    else:
+        # A drained diagnostic is reauthenticated from its release and PID 1
+        # terminal record, even when a missed observer aged the predecessor.
+        fleet = terminal_predecessor(fleet_ref)
+    prior = previous_row(fleet)
     if not RELEASE.exists():
         need(prior is None, "epoch 170 released diagnostic lost its grant")
         return None

@@ -6,7 +6,7 @@ import runpy
 import sys
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 def need(condition, message):
@@ -55,6 +55,41 @@ def context(active=False):
 
 
 class Hourly170Cadence(unittest.TestCase):
+    def test_drained_diagnostic_can_read_stale_predecessor(self):
+        project = route["projection"]
+        provider_path = route["PROVIDER"]
+        seal = {"destination": str(provider_path), "members": [
+            {"name": "post-stop-fit", "sha256": "b" * 64},
+        ]}
+        predecessor = dict(fleet(), owner="/root", schema="horizon-Root-complete-fleet-operational-review-v1")
+        manager = {"ActiveState": "inactive"}
+        actor = {"UNIT": "private.service", "properties": Mock(return_value=manager),
+                 "ready_contract": Mock(return_value={"qualified": True})}
+        fresh_head = Mock(side_effect=ValueError("stale or incomplete root fleet"))
+        provider = {"hourly170": actor, "s": object(), "fit": object(), "fleet_head": fresh_head}
+        terminal = {"successful_exit": True}
+        ref = {"path": "/runtime/root-before-gap/ROOT_COMPLETE_OPERATIONAL_FLEET.json", "sha256": "c" * 64}
+
+        def reference(path):
+            digest = route["PROVIDER_SEAL"] if path.name == "deployment-seal-receipt.json" else "b" * 64
+            return {"path": str(path), "sha256": digest}
+
+        def checked_reference(value):
+            return predecessor if value == ref else seal
+
+        read_terminal = Mock(return_value=terminal)
+        with patch.dict(project.__globals__, {"bound": reference, "checked": checked_reference,
+                                             "RELEASE": SimpleNamespace(exists=lambda: True),
+                                             "terminal": read_terminal}), \
+                patch.object(runpy, "run_path", return_value=provider):
+            self.assertEqual(project(ref), {"terminal": terminal})
+            fresh_head.assert_not_called()
+            read_terminal.assert_called_once_with(actor, provider["fit"], {"qualified": True}, None, manager)
+            actor["properties"].return_value = {"ActiveState": "active"}
+            with self.assertRaisesRegex(ValueError, "stale or incomplete root fleet"):
+                project(ref)
+            fresh_head.assert_called_once_with(ref)
+
     def test_enrollment_keeps_current_replay_count_and_verification_phase(self):
         view, c, observed = fleet(), context(), observation()
         route["interpret"](c, observed, lambda *_a, **_k:self.fail("needs a scheduled sample"))

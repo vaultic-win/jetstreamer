@@ -29,7 +29,7 @@ def failed166_package(version):
     return name + '-entry146' if version >= 4 else name
 
 
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8)
                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
 FAILED166 = bool(FAILED166_VERSION)
 METERED_FULL170 = FAILED166_VERSION in (6, 7)
@@ -995,7 +995,7 @@ def rejoin_failed166_cadence(state, receipt, fd):
     ready_ref = bound(ROOT/f'{name}_READY.json')
     ready = checked(ready_ref)
     previous = 'FAILED166_CADENCE' if FAILED166_VERSION == 2 else f'FAILED166_CADENCE_V{FAILED166_VERSION - 1}'
-    if HOLDING185 and ready['old_owner']['path'] == str(ROOT/'FAILED166_CADENCE_V5_ACTIVE.json'):
+    if FAILED166_VERSION == 8 or (HOLDING185 and ready['old_owner']['path'] == str(ROOT/'FAILED166_CADENCE_V5_ACTIVE.json')):
         previous = 'FAILED166_CADENCE_V5'
     incumbent_ref = bound(ROOT/f'{previous}_ACTIVE.json')
     need(ready['schema'] == 'horizon-epoch166-cadence-rejoin-ready-v1'
@@ -1026,6 +1026,8 @@ def rejoin_failed166_cadence(state, receipt, fd):
          and (timer_names() == [ready['timer']] or
               (not timer_names() and Path(cfg['output']).is_file())),
          'epoch 166 cadence rejoin lost its latest fleet or observer clock')
+    if FAILED166_VERSION == 8:
+        check_v8_recovery_sample(ready, fleet)
     pid = os.getpid()
     actor = dict(unit=CONTROLLER, program=str(CURRENT), invocation_id=state['InvocationID'],
                  pid=pid, start_ticks=owners.ticks(pid), lock=dict(old['lock'], fd=fd))
@@ -1035,6 +1037,23 @@ def rejoin_failed166_cadence(state, receipt, fd):
     return ready
 
 
+def check_v8_recovery_sample(ready, fleet):
+    original = fleet['sole_next_observer']
+    path = ROOT/('recover-'+original['sha256'][:20])/'REGISTERED.json'
+    registration = checked(bound(path))
+    failure = checked(registration['terminal'])
+    need(failure['fleet'] == ready['fleet'] and failure['prior_config'] == original
+         and failure['error'] == 'native HOST RSS unavailable',
+         'replacement is not bound to the missed fleet sample')
+    cfg = sealed(registration['config'])
+    expected = names(cfg['not_before_utc'])
+    sample = bound(expected['sample'])
+    need(cfg['output'] == sample['path'] and ready['recovery_sample'] == sample
+         and ready['recovery_registration'] == bound(path) and not timer_names(),
+         'different completed replacement sample')
+    return check_sample(fleet, checked(sample), cfg)
+
+
 def main():
     receipt=entry()
     if sys.argv[1:]==['--check-entry']:
@@ -1042,6 +1061,11 @@ def main():
         return
     if FAILED166 and sys.argv[1:] == ['--check-failed166']:
         print(json.dumps(check_failed166_ready(read_ref(ROOT/'FAILED166_CADENCE_READY.json'), receipt)))
+        return
+    if FAILED166_VERSION == 8 and sys.argv[1:] == ['--check-recovery-sample']:
+        ready = read_ref(ROOT/'FAILED166_CADENCE_V8_READY.json')
+        need(ready['package'] == receipt, 'different recovery package')
+        print(check_v8_recovery_sample(ready, checked(ready['fleet'])))
         return
     if RESUMING:
         member, = (row for row in checked(receipt)['members'] if row['name']=='status_resume.py')
