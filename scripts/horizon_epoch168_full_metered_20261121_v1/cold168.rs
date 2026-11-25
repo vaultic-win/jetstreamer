@@ -113,7 +113,7 @@ mod route {
     pub const WITNESS: &str = "fa3ba73fbc164507e40b76f6653c1394df223b2bea0aa940b815baae16d868fc";
     pub const GUARD_BASE: &str = "epoch168-cold-guard-20261125-v5";
     pub const FIT: &str =
-        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-v2/post-stop-fit";
+        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-v3/post-stop-fit";
     pub const ROOT: &str = "4cd544fddda40cd81c94358b8c455feac24247b14f56e8fdb8ede2727c54af25";
     pub const ALIAS: &str = "/run/horizon-full168-cold-v5";
     pub const STATUS_QUALIFIED: &str = "FAILED166_CADENCE_V12_READY.json";

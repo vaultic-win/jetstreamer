@@ -67,7 +67,8 @@ V8_RUNTIME_145 = HERE == D / "tools-homefloor-145-v7-timeout-recovery-v1"
 V8_BUILD_145 = HERE == D / "tools-homefloor-145-v7-timeout-build-v2"
 V8_145 = V8_RUNTIME_145 or V8_BUILD_145
 STOP_RECOVERY_145 = V7_145 or V8_145
-RETRY5_FIT_ROUTE = HERE == D / "tools-homefloor-cold168-retry5-v2"
+V8_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v3"
+RETRY5_FIT_ROUTE = V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
 V7_POST_145 = HERE == D / "tools-homefloor-145-post-v7-current-v1"
 V7_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v7-build-v1"
 RETRY5_168 = RETRY5_FIT_ROUTE or V7_POST_145 or V7_POST_BUILD_145
@@ -734,7 +735,7 @@ def v8_stopped145(fleet):
 
 def phase145(epoch, fleet=None):
     if RETRY5_FIT_ROUTE or V7_POST_BUILD_145:
-        phase = retry5_fit["drained145"](s, fit, loader["load_package"])
+        phase = retry5_fit["drained145"](s, fit, loader["load_package"], v8=V8_RETRY5_FIT)
         if V7_POST_BUILD_145:
             proof = bound(phase["completion"])
             phase["semantic_receipt"] = phase["completion"]

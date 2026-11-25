@@ -6,34 +6,57 @@ import subprocess
 
 R = Path('/var/lib/jetstreamer/horizon_runtime_data')
 FAMILY = R / 'epoch145-semantic-continuity-20261121-v1'
-V7_HANDOFF = FAMILY / 'v7-168-stop-name-handoff'
-CHECKER = FAMILY / 'tools-v7-168-stop-v2'
-CHECKER_SHA = '589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b'
-START_SHA = '4c83262f7bb705f30f1850dcc1274a549b2f08b80618bc23c3c9955fae4f4163'
-I145 = 'f7043fd6595a4151b659d4b098bede11'
+V7 = {
+    'generation': 'v7',
+    'handoff': FAMILY / 'v7-168-stop-name-handoff',
+    'checker': FAMILY / 'tools-v7-168-stop-v2',
+    'checker_sha': '589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b',
+    'submission_sha': '4c83262f7bb705f30f1850dcc1274a549b2f08b80618bc23c3c9955fae4f4163',
+    'start_sha': 'ed8a68eb322ffeb2788f3017b14fd7c5dfe256f0e95362ed932457bab7d8e487',
+    'invocation': 'f7043fd6595a4151b659d4b098bede11',
+    'schema': 'horizon-epoch145-v5z-custody-successor-semantic-completion-v1',
+}
+V8 = {
+    'generation': 'v8',
+    'handoff': FAMILY / 'v8-pid1-timeout-name-handoff',
+    'checker': FAMILY / 'tools-v8-pid1-timeout',
+    'checker_sha': '970f9aa956611e499ce1582d37dc845c5e7bfacd639c6002a6c72ccb1a3d718c',
+    'submission_sha': '6209b4b6a1c8a95803b82dc4d7e385e67ce59519e53b608ce146032eedf915b6',
+    'start_sha': 'e3fedd1fb256f88f0a98175f122a0d140c291b109f6abc88e3a1b906de1c64ab',
+    'invocation': 'e0aa2fa7d85e41578b8489eddd8695b5',
+    'schema': 'horizon-epoch145-v7-timeout-successor-semantic-completion-v1',
+}
 
 
-def drained145(s, fit, load):
+def drained145(s, fit, load, *, v8=False):
+    owner = V8 if v8 else V7
+    generation = owner['generation']
+    invocation = owner['invocation']
     manager = s.show(fit.A145)
     group = Path('/sys/fs/cgroup/system.slice') / fit.A145
     s.need(manager['ActiveState'] == 'inactive' and manager['SubState'] == 'dead' and
            manager['MainPID'] == manager['ControlPID'] == '0' and
-           manager['InvocationID'] in ('', I145) and not manager['ControlGroup'] and
+           manager['InvocationID'] in ('', invocation) and not manager['ControlGroup'] and
            not manager['Job'] and not fit.members(fit.A145) and not group.exists(),
-           'epoch 145 V7 verifier has not drained')
-    load(CHECKER, CHECKER_SHA)
-    saved, completion = s.read(V7_HANDOFF / 'SEMANTIC_COMPLETION.json')
-    start = V7_HANDOFF / 'START_RESULT.json'
+           f'epoch 145 {generation} verifier has not drained')
+    checker, checker_sha = owner['checker'], owner['checker_sha']
+    load(checker, checker_sha)
+    saved, completion = s.read(owner['handoff'] / 'SEMANTIC_COMPLETION.json')
+    submission = owner['handoff'] / 'START_RESULT.json'
+    start = R / 'epoch145-guarded-export-20261121-v1/state' / invocation / 'recovery-started.json'
+    start_ref = s.ref(start, owner['start_sha'])
     proof = json.loads(subprocess.check_output(
-        ['/usr/bin/python3', '-IB', CHECKER / 'v5v_semantic_completion.py', start, START_SHA],
+        ['/usr/bin/python3', '-IB', checker / 'v5v_semantic_completion.py', submission, owner['submission_sha']],
         timeout=20))
-    s.need(proof == saved and proof['invocation_id'] == I145 and
-           proof['start'] == s.ref(start, START_SHA) and proof['publication_authorized'] is False and
+    s.need(proof == saved and proof['schema'] == owner['schema'] and proof['invocation_id'] == invocation and
+           proof['start'] == proof['startup_evidence']['start'] == start_ref and
+           proof['startup_evidence']['submission_result'] == s.ref(submission, owner['submission_sha']) and
+           proof['publication_authorized'] is False and proof['r2_mutations'] is False and
            s.show(fit.A145) == manager and not fit.members(fit.A145) and not group.exists(),
-           'changed epoch 145 V7 terminal or native owner')
-    return dict(Id=fit.A145, MainPID='0', stage='v7-semantic-complete-drained',
-                completed_invocation_id=I145, completion=completion,
-                checker_seal=s.ref(CHECKER / 'deployment-seal-receipt.json', CHECKER_SHA))
+           f'changed epoch 145 {generation} terminal or native owner')
+    return dict(Id=fit.A145, MainPID='0', stage=f'{generation}-semantic-complete-drained',
+                completed_invocation_id=invocation, completion=completion,
+                checker_seal=s.ref(checker / 'deployment-seal-receipt.json', checker_sha))
 
 
 def retained(s, fit, fleet, cold168):
@@ -82,7 +105,7 @@ def donor_cover(s, donor, before, native, fleet):
                booking['measurement'] == 'two complete stopped-tree walks', 'changed retained ' + epoch)
 
     fit168 = native['epoch'] == 168
-    phases = {'v7-semantic-complete-drained'}
+    phases = {'v7-semantic-complete-drained', 'v8-semantic-complete-drained'}
     if native['epoch'] == 145:
         phases |= {'v5j-semantic-complete', 'post-full', 'publish'}
     peers = native['replacements']
