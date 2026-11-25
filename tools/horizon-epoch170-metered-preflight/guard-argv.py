@@ -1,6 +1,7 @@
 """Prepare epoch 170 guard records from the sealed review and PID 1 evidence."""
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -107,7 +108,7 @@ def guard_argv(route, plan_ref, qualification):
     ]
 
 
-def first_proof(route, native, actor, plan_ref, sample_path):
+def guard_proof(route, native, actor, plan_ref, sample_path):
     sample_ref = bound(sample_path)
     sample = checked(sample_ref)
     iid = sample["guard_invocation_id"]
@@ -123,15 +124,19 @@ def first_proof(route, native, actor, plan_ref, sample_path):
          "epoch 170 guard timer is outside its producer scope")
     proof = dict(guard_invocation=iid, receipt=sample_ref, timer=timer)
     validated = route["actual_guard"](actor, proof, plan_ref)
-    need(not validated["workers"] and 0 <= time.time() - validated["recorded_unix_seconds"] <= 120,
-         "epoch 170 first guard is stale or has a worker")
+    need(0 <= time.time() - validated["recorded_unix_seconds"] <= 120, "epoch 170 guard sample is stale")
     boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
     events = native["pid1"](service, iid, boot, (native["SUCCESS"], native["FAILURE"], native["EXIT"]))
     need(len(events) == 1 and events[0]["MESSAGE_ID"] == native["SUCCESS"]
          and int(events[0]["__REALTIME_TIMESTAMP"]) // 1_000_000 >= validated["recorded_unix_seconds"],
-         "first epoch 170 guard lacks exact PID 1 success")
-    need(held_owner(route) == actor and native["properties"](route["TIMER"], *TIMER_FIELDS) == timer,
-         "epoch 170 hold or guard timer changed")
+         "epoch 170 guard lacks exact PID 1 success")
+    need(native["properties"](route["TIMER"], *TIMER_FIELDS) == timer, "epoch 170 guard timer changed")
+    return proof, validated
+
+
+def first_proof(route, native, actor, plan_ref, sample_path):
+    proof, sample = guard_proof(route, native, actor, plan_ref, sample_path)
+    need(not sample["workers"] and held_owner(route) == actor, "first epoch 170 guard is outside the hold")
     return proof
 
 
@@ -165,6 +170,65 @@ def release_record(route, actor, intent, plan_ref, first_ref, post_ref, boot, no
                 post_guard_capacity=post_ref, transaction_replay_claimed=False)
 
 
+def released_owner(route):
+    state = route["native"](OWNER_FIELDS)
+    need(state is not None and not route["held"]({"actor": state[1]}), "epoch 170 has no released producer")
+    return state
+
+
+def admission_record(route, native, actor):
+    intent, _, _ = route["intent"]()
+    authorization = checked(bound(ROOT / "AUTHORIZED_GATED_PAYLOAD.json"))
+    first = checked(authorization["first_guard"])
+    timer = native["properties"](route["TIMER"], "Id", "ActiveState", "InvocationID", "Triggers", "Job")
+    need(all(authorization[key] == value for key, value in actor.items())
+         and timer["Id"] == route["TIMER"] and timer["ActiveState"] == "active" and not timer["Job"]
+         and timer["InvocationID"] == first["timer"]["InvocationID"]
+         and timer["Triggers"] == route["TIMER"].removesuffix(".timer") + ".service",
+         "epoch 170 admission lost the authorized producer or guard timer")
+    return dict(authorization, schema="horizon-170-full-metered-admission-v1", epoch=170,
+                stage="node", bootstrap_only=True, fleet=intent["fleet"], stable_root=intent["stable_root"],
+                predecessor_stop=intent["predecessor_stop"], source=intent["prepared"],
+                timer_unit=route["TIMER"], timer_invocation_id=first["timer"]["InvocationID"], resource_credit_bytes=0)
+
+
+def worker_record(route, native, state, sample_path):
+    _, actor = state
+    admission = bound(ROOT / "ACTUAL_ADMISSION_AND_PROTECTION.json")
+    expected = admission_record(route, native, actor)
+    need(checked(admission) == expected, "different epoch 170 admission")
+    proof, sample = guard_proof(route, native, actor, expected["actual_guard_plan"], sample_path)
+    need(len(sample["workers"]) == 1 and proof["timer"]["InvocationID"] == expected["timer_invocation_id"],
+         "guard has no single protected epoch 170 worker under the admitted timer")
+    pid, _ = sample["workers"][0]
+    proc = Path("/proc") / str(pid)
+    ticks = proc.joinpath("stat").read_text().rsplit(")", 1)[1].split()
+    ancestry = proc.joinpath("cgroup").read_text().strip()
+    handle = proc / "exe"
+    worker = handle.readlink()
+    scratch, = (parent.parent for parent in worker.parents if parent.name == ".historical-runtime")
+    need(ancestry == "0::" + route["GROUP"] and int(ticks[1]) == actor["producer_pid"]
+         and int(ticks[19]) > actor["start_ticks"] and worker.name == "historical-worker"
+         and scratch.name == "scratch" and scratch.is_relative_to(route["RUN"] / "private"),
+         "epoch 170 worker is outside the admitted replay tree")
+    with handle.open("rb") as image:
+        identity = os.fstat(image.fileno())
+        digest = hashlib.file_digest(image, "sha256").hexdigest()
+    need(digest == route["WORKER_SHA"] and os.path.samestat(identity, handle.stat())
+         and handle.samefile(worker) and proc.joinpath("stat").read_text().rsplit(")", 1)[1].split()[19] == ticks[19]
+         and released_owner(route) == state, "protected epoch 170 worker changed")
+    _, _, candidate = route["intent"]()
+    row = dict(range="170", controller_unit=route["UNIT"], producer_unit=route["UNIT"],
+               expected_controller_invocation_id=actor["producer_invocation_id"],
+               expected_producer_invocation_id=actor["producer_invocation_id"], scratch_path=str(scratch),
+               append_log=route["append_identity"](candidate, Path("/proc") / str(actor["producer_pid"])),
+               worker_executable_basename=worker.name)
+    return dict(actor, schema="horizon-170-full-metered-first-protected-worker-v1", epoch=170, stage="worker",
+                admission=admission, worker_guard=proof, worker_pid=pid, worker_start_ticks=int(ticks[19]),
+                worker_exe_device=identity.st_dev, worker_exe_inode=identity.st_ino,
+                worker_sha256=digest, observer_row=row, measured_transaction_replay=False)
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     sub = cli.add_subparsers(dest="operation", required=True)
@@ -177,12 +241,23 @@ def main():
     first.add_argument("sample", type=Path)
     sub.add_parser("release-record")
     sub.add_parser("permit")
+    sub.add_parser("admission")
+    worker = sub.add_parser("worker")
+    worker.add_argument("sample", type=Path)
     args = cli.parse_args()
     try:
         need(os.geteuid() == 0 and sys.flags.isolated and sys.dont_write_bytecode, "run as root with python3 -IB")
         route = sealed_module(RECEIVER, "c1b777be3164beca0db8afc9777a02bbbd8f7babc09acf063acb00297cd51504", "full170_status.py")
         if args.operation == "start-intent":
             result = start_intent(route, reference(args.review, args.review_sha256))
+        elif args.operation in ("admission", "worker"):
+            native = sealed_module(POST_BUILD, "8e48c19a738a9ff4586c10fd4c7581b5c2a01133b5de5edbae8b7e26e241d4ea",
+                                   "hourly170_actor.py")
+            state = released_owner(route)
+            if args.operation == "admission":
+                result = admission_record(route, native, state[1])
+            else:
+                result = worker_record(route, native, state, args.sample)
         else:
             actor = held_owner(route)
             intent, _, _ = route["intent"]()
