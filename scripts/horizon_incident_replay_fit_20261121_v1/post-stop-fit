@@ -56,7 +56,7 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v2",
     D / "tools-homefloor-170-metered-hourly-v3",
 )
-FULL170_V13 = HERE == D / "tools-homefloor-170-full-metered-v4"
+FULL170_V13 = HERE == D / "tools-homefloor-170-full-metered-v5"
 FULL170_V9 = FULL170_V13 or HERE == D / "tools-homefloor-170-full-metered-v3"
 FULL170 = FULL170_V9 or HERE == D / "tools-homefloor-170-full-metered-v1"
 REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
@@ -212,6 +212,9 @@ if RETRY5_168:
 if FIFTH168:
     cold168 = runpy.run_path(str(HERE / "cold168_actor.py"),
                             init_globals={"RETRY3": RETRY3_168, "RETRY4": RETRY4_168, "RETRY5": RETRY5_168})
+    if FULL170_V13:
+        s.need(all(name in cold168 for name in ("RETRY4_PREPARED_SHA", "RETRY4_GUARD_SHA")),
+               "full epoch 170 provider lacks the retained retry4 cadence bindings")
 if RETRY4_168:
     writer168v4=runpy.run_path(str(HERE / "retry4_status.py"))
 if CLOSED_RETRY3:
