@@ -20,6 +20,13 @@ SUCCESSOR = V / "horizon231-232-input-readmission-v300"
 REPLAY231 = V / "horizon231-capped-replay-v1"
 UNIT231 = "horizon-perf-epoch231-capped-replay@v1.service"
 ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-capped-replay-tmpfs-v1/run")
+TAIL_UNIT = "horizon-qualify-230-final-tail-v1.service"
+TAIL_PACKAGE = V / "horizon230-final-tail-v1"
+TAIL_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch230-final-tail-tmpfs-v1/run")
+TAIL_INPUTS = {
+    "path": str(V / "horizon230-final-tail-static-v1/inputs.json"),
+    "sha256": "91faca00759d243930050e2fa824e890953f9b329606675cba573d0f103fefc3",
+}
 STOCK231 = V / "horizon231-stock-warmup-v1"
 STOCK_UNIT231 = "horizon-perf-epoch231-stock-warmup@v1.service"
 STOCK_ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-stock-warmup-tmpfs-v1/run")
@@ -63,22 +70,56 @@ def receipt():
     return binding, row
 
 
-def configuration230():
-    registered = receipt()
+def tail_receipt():
+    path = TAIL_PACKAGE / "cadence-registration.json"
+    if not path.is_file():
+        return None
+    metadata = path.lstat()
+    assert path.resolve() == path and metadata.st_uid == 0 and metadata.st_nlink == 1
+    assert not metadata.st_mode & 0o222
+    source = ref(path)
+    row = bound(source)
+    assert row["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+    assert (row["epoch"], row["unit"], row["kind"], row["run_root"]) == (
+        230, TAIL_UNIT, "epoch230-final-tail", str(TAIL_ROOT))
+    assert (row["bootstrap_slot"], row["first_slot"], row["last_slot"]) == (99_791_404, 99_791_405, 99_803_089)
+    assert re.fullmatch("[0-9a-f]{32}", row["invocation_id"]) and row["main_pid"] > 0
+    assert row["launched"] and row["entry_replay_requested"]
+    assert all(row[key] is False for key in ("canonical_epoch_publication_authorized", "remote_mutations",
+                                            "r2_mutations", "full_continuation_peak_qualified"))
+    admission = bound(row["admission"])
+    assert admission["epoch"] == 230 and admission["inputs"] == TAIL_INPUTS and admission["admitted"]
+    inputs = bound(TAIL_INPUTS)
+    assert row["worker_sha256"] == inputs["worker"]["sha256"]
+    assert admission["node"]["path"] == row["node_path"]
+    guard = bound(row["active_guard"])
+    assert guard["producer_invocation_id"] == row["invocation_id"]
+    assert guard["producer"]["pid"] == row["main_pid"] and guard["trip_reason"] is None
+    assert guard["producer_stop_enabled"] and guard["plan_sha256"] == row["guard_plan"]["sha256"]
+    return source, row
+
+
+def live230(unit, root, registered):
     if registered is None:
         return []
     _, row = registered
-    live = props(UNIT, FIELDS)
+    live = props(unit, FIELDS)
     if live["ActiveState"] in ("inactive", "failed"):
         assert live["MainPID"] == "0" and not live["ControlGroup"]
         return []
-    assert (live["Id"], live["ActiveState"], live["SubState"]) == (UNIT, "active", "running")
+    assert (live["Id"], live["ActiveState"], live["SubState"]) == (unit, "active", "running")
     assert (live["InvocationID"], int(live["MainPID"])) == (row["invocation_id"], row["main_pid"])
-    assert live["ControlGroup"] == "/system.slice/" + UNIT and live["NRestarts"] == "0"
+    assert live["ControlGroup"] == "/system.slice/" + unit and live["NRestarts"] == "0"
     assert (Path("/proc") / live["MainPID"] / "exe").samefile(row["node_path"])
-    return [dict(range="230-230", controller_unit=UNIT, expected_controller_invocation_id=row["invocation_id"],
-                 producer_unit=UNIT, expected_producer_invocation_id=row["invocation_id"],
-                 scratch_path=str(RUN_ROOT), worker_executable_basename="historical-worker")]
+    return [dict(range="230-230", controller_unit=unit, expected_controller_invocation_id=row["invocation_id"],
+                 producer_unit=unit, expected_producer_invocation_id=row["invocation_id"],
+                 scratch_path=str(root), worker_executable_basename="historical-worker")]
+
+
+def configuration230():
+    rows = live230(UNIT, RUN_ROOT, receipt()) + live230(TAIL_UNIT, TAIL_ROOT, tail_receipt())
+    assert len(rows) <= 1
+    return rows
 
 
 def receipt231(unit):
@@ -144,6 +185,7 @@ def configuration():
 def register(plan):
     registered = receipt()
     if registered is None:
+        register_tail(plan)
         return None
     source, row = registered
     if UNIT not in plan["tracked_units"]:
@@ -181,7 +223,41 @@ def register(plan):
         )
     deployment = bound(ref(PACKAGE / "fleet-tool.json"))
     assert deployment["schema"] == "foundation-epoch230-checkpoint-continuation-fleet-tool-v1"
+    register_tail(plan)
     return deployment["artifact"]
+
+
+def register_tail(plan):
+    registered = tail_receipt()
+    if registered is None:
+        return
+    source, row = registered
+    if TAIL_UNIT not in plan["tracked_units"]:
+        plan["tracked_units"].append(TAIL_UNIT)
+    diagnostics = plan.setdefault("diagnostics", [])
+    claim = dict(epoch=230, unit=TAIL_UNIT, invocation_id=row["invocation_id"],
+                 scratch_path=str(TAIL_ROOT), launch_receipt=source)
+    previous = [owner for owner in diagnostics if owner["unit"] == TAIL_UNIT]
+    assert not previous or previous == [claim]
+    gate = plan["gates"]["230"]
+    for evidence in (TAIL_INPUTS, source):
+        if evidence not in gate["evidence"]:
+            gate["evidence"].append(evidence)
+    terminal = TAIL_PACKAGE / "terminal.json"
+    if terminal.is_file():
+        terminal_ref = ref(terminal)
+        result = bound(terminal_ref)
+        assert result["registration"] == source and result["epoch"] == 230
+        assert result["publication_authorized"] is False
+        assert not live230(TAIL_UNIT, TAIL_ROOT, registered)
+        if terminal_ref not in gate["evidence"]:
+            gate["evidence"].append(terminal_ref)
+        gate["next_action"] = result["next_action"]
+        diagnostics[:] = [owner for owner in diagnostics if owner["unit"] != TAIL_UNIT]
+    else:
+        if not previous:
+            diagnostics.append(claim)
+        gate["next_action"] = "Verify the final 595 canonical slots and both downstream checkpoints for the epoch 230 tail."
 
 
 def register_successor_inputs(plan):
@@ -264,11 +340,11 @@ def owns(row):
         assert producer["InvocationID"] == registration["invocation_id"] and row["scratch_path"] == registration["run_root"]
         assert row["ordinary_replay_claim"] is False and row["current_sidecar_eta_valid"] is False
         return True
-    if producer.get("Id") != UNIT:
+    if unit not in (UNIT, TAIL_UNIT):
         return False
-    _, registration = receipt()
+    _, registration = tail_receipt() if unit == TAIL_UNIT else receipt()
     assert row["epoch"] == 230 and row["phase"] == "diagnostic-qualification"
     assert producer["InvocationID"] == registration["invocation_id"]
     assert row["ordinary_replay_claim"] is False and row["current_sidecar_eta_valid"] is False
-    assert row["scratch_path"] == str(RUN_ROOT)
+    assert row["scratch_path"] == registration["run_root"]
     return True

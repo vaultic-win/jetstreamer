@@ -82,6 +82,10 @@ BOOTSTRAP_CPUS = '118-121'
 BOOTSTRAP_MEMORY = 160 << 30
 TAIL230_BUILD_UNIT = 'foundation-230-final-tail-parent-build-v1.service'
 TAIL230_BUILD = V / 'horizon230-final-tail-parent-build-v1'
+TAIL230_UNIT = 'horizon-qualify-230-final-tail-v1.service'
+TAIL230_STATE = V / 'horizon230-final-tail-v1'
+TAIL230_MOUNT = Path('/home/ubuntu/.jetstreamer-private/epoch230-final-tail-tmpfs-v1')
+TAIL230_HANDOFF_BYTES = 150_000_000_000
 PUBLIC_AUDIT = V / 'horizon-foundation-public-audit-148-156-v1'
 PUBLIC_AUDIT_RELEASE_SHA = 'ea750bf0be9c6742af0ca1503e8cba094594557e1b5225ad8ff93f693f2a344d'
 SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
@@ -91,6 +95,7 @@ CONTINUATION230_GUARDS = {
         V / f'horizon230-checkpoint-continuation-fit-v{attempt}/guard-receipts'
     for attempt in (2, 3)
 }
+CONTINUATION230_GUARDS[TAIL230_UNIT] = TAIL230_STATE / 'guard-receipts'
 RAM_TMPFS_FLOOR = 2 << 30
 REPLAY231 = V / 'horizon231-capped-replay-v1'
 REPLAY231_UNIT = 'horizon-perf-epoch231-capped-replay@v1.service'
@@ -510,15 +515,19 @@ def active_public_audit(helper, census):
     return dict(launch=launch_ref, owner=owner)
 
 
-def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='capped', stage229=False, probe230=False):
+def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='capped', stage229=False,
+             probe230=False, tail230=False):
     assert not demotion_retry or candidate_epoch == 229
     assert replay231 == 'capped' or candidate_epoch == 231
     assert not stage229 or (candidate_epoch == 229 and not demotion_retry)
     assert not probe230 or candidate_epoch == 230
+    assert not tail230 or (candidate_epoch == 230 and not probe230)
     ram_quote = None if stage229 or probe230 else (DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch))
     if candidate_epoch == 231:
         mount = {'capped': RAM_QUOTES[231][0], 'stock': STOCK231_MOUNT, 'demotion': DEMOTION231_MOUNT}[replay231]
         ram_quote = (mount, *RAM_QUOTES[231][1:])
+    if tail230:
+        ram_quote = (TAIL230_MOUNT, *RAM_QUOTES[230][1:])
     extract_state, extract_unit, extract_broker = extraction226_scope()
     terminal226 = completed_extraction226(kit.ops, extract_state, extract_unit, extract_broker)
     if candidate_epoch == 226:
@@ -540,7 +549,9 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
         candidate_cpus = kit.measure.source.helper.cpus(BOOTSTRAP_CPUS)
     elif ram_quote is not None:
         _, _, candidate_memory, candidate_cpus = ram_quote
-        candidate_disk = 0
+        candidate_disk = TAIL230_HANDOFF_BYTES if tail230 else 0
+        if tail230:
+            candidate_memory += 1 << 30
     else:
         candidate_disk, candidate_memory, candidate_cpus = CAP, MEMORY, CPUS
     completion, fleet_ref, fleet = latest_accepted_fleet(kit)
@@ -653,6 +664,9 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
            if k in ('MemAvailable', 'MemTotal')}
     memory_commitments = sum(max(0, int(row['MemoryMax']) - int(row['MemoryCurrent'])) for row in live)
     memory_room = mem['MemAvailable'] - mem['MemTotal'] // 10 - memory_commitments
+    tail230_running = 230 in owners and owners[230]['Id'] == TAIL230_UNIT
+    if tail230_running:
+        memory_room -= 1 << 30
     root_device = Path('/').stat().st_dev
     for epoch in RAM_QUOTES:
         if epoch in growth:
@@ -673,6 +687,8 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
         protected += accounts_stage['remaining_bytes']
     if tail230_build is not None:
         protected += tail230_build['remaining_disk_bytes']
+    if tail230_running:
+        protected += TAIL230_HANDOFF_BYTES
     staging = None
     if extract_state == LAYERED226_STATE:
         source = checked(fixed(STAGING292_HELPER, STAGING292_HELPER_SHA))
