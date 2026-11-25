@@ -45,8 +45,19 @@ const RETRY: Profile = Profile {
     node_sha: "7a4ebbc1ad665efdb8ab201ceb6618074193012e7651a509ca0ef54008ff5132",
 };
 
+const LAYERED_RETRY: Profile = Profile {
+    unit: "horizon-qualify-226-checkpoint-continuation-extract-v3.service",
+    broker: "foundation-226-original225-broker-v3.service",
+    root: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-226-extract-v3",
+    state: "/var/lib/jetstreamer/horizon226-extract-v3",
+    node: "/var/lib/jetstreamer/horizon226-layered-range-release-726c38e5-v1/jetstreamer-node",
+    node_sha: "b48a4eeaddd17288a6b0f226ffdaecf8141fbe5de02dc7d7f84b1f19afdd80d6",
+};
+
+const PROFILES: [&Profile; 3] = [&ORIGINAL, &RETRY, &LAYERED_RETRY];
+
 fn profile(unit: &str) -> Result<&'static Profile> {
-    [&ORIGINAL, &RETRY]
+    PROFILES
         .into_iter()
         .find(|profile| profile.unit == unit)
         .context("unknown epoch 226 extraction owner")
@@ -57,7 +68,7 @@ pub(super) fn broker_for(claim: &DiagnosticClaim) -> Result<&'static str> {
 }
 
 pub(super) fn broker_unit(unit: &str) -> bool {
-    unit == ORIGINAL.broker || unit == RETRY.broker
+    PROFILES.iter().any(|profile| unit == profile.broker)
 }
 
 pub(super) fn namespace(claim: &DiagnosticClaim) -> bool {
