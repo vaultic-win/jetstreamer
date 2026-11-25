@@ -21,7 +21,7 @@ struct Plan {
     restoration: Bound,
 }
 
-fn require_read_only(path: &Path) -> Result<()> {
+pub(super) fn require_read_only(path: &Path) -> Result<()> {
     ensure!(path.canonicalize()? == path, "aliased tree or bundle");
     let path = CString::new(path.as_os_str().as_encoded_bytes())?;
     let mut value = std::mem::MaybeUninit::<libc::statvfs>::uninit();
@@ -234,29 +234,13 @@ pub(super) fn run(value: Value, spec: &Bound) -> Result<()> {
             && restored["local_retirement_authorized"] == false,
         "292 comparison requires exact authenticated local restoration"
     );
-    let expected = &custody["manifest"]["restore_metadata"];
-    let source = Path::new(expected["source"].as_str().context("292 source tree")?);
-    require_read_only(source)?;
-    require_read_only(&bundle)?;
-    let identity = regular_identity(&bundle)?;
-    ensure!(
-        identity.length == body.length
-            && hash_and_etag(&bundle, identity, DEFAULT_PART_SIZE)?.sha256_hex == body.sha256,
-        "292 restored bundle no longer matches authenticated custody"
-    );
-    compare_census(source, expected)?;
-    compare_payload(&bundle, source, identity)?;
-    compare_census(source, expected)?;
-    ensure!(
-        regular_identity(&bundle)? == identity,
-        "292 restored bundle changed during comparison"
-    );
+    let (proof, _) = compare(&bundle, body, &custody["manifest"]["restore_metadata"])?;
     let output = receipt(
         &format!("appendvec292-tree-comparison-{}.json", spec.sha256),
         &json!({
             "schema":"foundation-epoch292-appendvec-tree-comparison-v1","spec":spec,"custody":plan.custody,
-            "restoration":plan.restoration,"source":source,"bundle_sha256":body.sha256,"members":FILES,
-            "logical_bytes":LOGICAL_BYTES,"allocated_bytes":PHYSICAL_BYTES,"metadata":expected,
+            "restoration":plan.restoration,"source":proof["source"],"bundle_sha256":body.sha256,"members":FILES,
+            "logical_bytes":LOGICAL_BYTES,"allocated_bytes":PHYSICAL_BYTES,"metadata":proof["metadata"],
             "tar_sha256":TAR_SHA,"zstd_sha256":ZSTD_SHA,"full_sparse_payload_matches":true,
             "source_census_matches_before_and_after":true,"source_retirement_authorized":false,
             "publication_authorized":false
@@ -264,4 +248,35 @@ pub(super) fn run(value: Value, spec: &Bound) -> Result<()> {
     )?;
     println!("{}", output.display());
     Ok(())
+}
+
+pub(super) fn compare(bundle: &Path, body: &Body, expected: &Value) -> Result<(Value, LocalProof)> {
+    let source = Path::new(expected["source"].as_str().context("292 source tree")?);
+    require_read_only(source)?;
+    require_read_only(bundle)?;
+    let identity = regular_identity(bundle)?;
+    ensure!(
+        identity.length == body.length,
+        "292 restored bundle length differs"
+    );
+    let proof = hash_and_etag(bundle, identity, DEFAULT_PART_SIZE)?;
+    ensure!(
+        proof.sha256_hex == body.sha256,
+        "292 restored bundle no longer matches authenticated custody"
+    );
+    compare_census(source, expected)?;
+    compare_payload(bundle, source, identity)?;
+    compare_census(source, expected)?;
+    ensure!(
+        regular_identity(bundle)? == identity,
+        "292 restored bundle changed during comparison"
+    );
+    Ok((
+        json!({
+            "source":source,"metadata":expected,"members":FILES,"logical_bytes":LOGICAL_BYTES,
+            "allocated_bytes":PHYSICAL_BYTES,"tar_sha256":TAR_SHA,"zstd_sha256":ZSTD_SHA,
+            "full_sparse_payload_matches":true,"source_census_matches_before_and_after":true
+        }),
+        proof,
+    ))
 }

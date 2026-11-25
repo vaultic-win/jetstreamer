@@ -2,6 +2,8 @@
 //! Archive publication and original-tree retirement have separate gates.
 use super::*;
 use horizon_singleton211_launch::foundation_holding_capacity as capacity;
+#[path = "holding_foundation_appendvec292_ram.rs"]
+mod ram;
 #[path = "holding_foundation_appendvec292_tree.rs"]
 mod tree;
 
@@ -66,7 +68,7 @@ struct Custody<'a> {
 }
 
 pub(super) fn command(action: &str) -> bool {
-    matches!(action, PARK | ADMIT | RESTORE | CHECK_TREE)
+    matches!(action, PARK | ADMIT | RESTORE | CHECK_TREE | ram::ACTION)
 }
 
 pub(super) fn check_tree(value: Value, spec: &Bound) -> Result<()> {
@@ -463,6 +465,7 @@ pub(super) async fn run(action: &str, value: Value, spec: &Bound) -> Result<()> 
     match action {
         PARK => park(&client, serde_json::from_value(value)?, spec).await,
         RESTORE => restore(&client, serde_json::from_value(value)?, spec).await,
+        ram::ACTION => ram::restore_and_compare(&client, value, spec).await,
         _ => bail!("unknown 292 holding action"),
     }
 }
