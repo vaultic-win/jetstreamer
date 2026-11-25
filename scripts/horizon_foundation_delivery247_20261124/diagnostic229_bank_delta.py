@@ -111,9 +111,18 @@ def register_demotion_run(plan, unit, package, root):
     first_checkpoint = package / "signed-transaction-and-bank.json"
     if first_checkpoint.is_file():
         checkpoint_ref = ref(first_checkpoint)
+        checkpoint = bound(checkpoint_ref)
         if unit == DEMOTION_UNIT:
             assert checkpoint_ref["sha256"] == "5e8b05e035fd73c2acfd89103c6070ba4989e5feda9f951318683cbef268442d"
-        checkpoint = bound(checkpoint_ref)
+        elif "worker_sha256" not in checkpoint:
+            original = checkpoint_ref
+            checkpoint_ref = ref(package / "signed-transaction-and-bank-worker-bound.json")
+            corrected = bound(checkpoint_ref)
+            assert corrected["original_checkpoint"] == original
+            assert all(corrected[key] == value for key, value in checkpoint.items())
+            if original not in gate["evidence"]:
+                gate["evidence"].append(original)
+            checkpoint = corrected
         assert checkpoint["registration"] == source and checkpoint["worker_sha256"] == WORKER_SHA
         assert (checkpoint["epoch"], checkpoint["slot"], checkpoint["transaction_index"]) == (229, 98_931_633, 1764)
         assert checkpoint["bank_hash"] == "7eZpcd8gDPTZ7cGasN6K6YpFiQGbGPJvGeovtAbBrorU"
