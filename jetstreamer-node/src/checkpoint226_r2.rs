@@ -19,7 +19,7 @@ const SOCKET: &str = "/run/jetstreamer-horizon-epoch226-holding-v1/source.sock";
 const ETAG: &str = "\"4cd6d98c0ad728ddd15a128b17300724-3958\"";
 const CHUNK: u64 = 4 << 20;
 const CONTEXT_BYTES: &[u8] = b"original225/pinned-range-v1";
-const RANGE_ATTEMPTS: usize = 3;
+const RANGE_ATTEMPTS: usize = 8;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -184,11 +184,18 @@ impl<F: Fn() -> io::Result<UnixStream>> PinnedReader<F> {
                 Err(error) => {
                     let _ = self.stream.shutdown(std::net::Shutdown::Both);
                     if attempt == RANGE_ATTEMPTS || !interrupted(&error) {
-                        return Err(error);
+                        return Err(io::Error::new(
+                            error.kind(),
+                            format!(
+                                "Original225 transport failed at byte {start} for {length} bytes on attempt {attempt}: {error}"
+                            ),
+                        ));
                     }
+                    let delay = Duration::from_secs(1 << (attempt - 1).min(4));
                     log::warn!(
-                        "Original225 range at byte {start} interrupted on attempt {attempt}: {error}"
+                        "Original225 range at byte {start} interrupted on attempt {attempt}, retrying in {delay:?}: {error}"
                     );
+                    std::thread::sleep(delay);
                 }
             }
         }
@@ -290,6 +297,10 @@ mod tests {
         let mut output = [0; 3];
         let err = reader.read_exact(&mut output).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            err.to_string(),
+            "Original225 transport failed at byte 0 for 3 bytes on attempt 2: broker identity changed"
+        );
         assert_eq!(reader.stream_position().unwrap(), 0);
         assert_eq!(output, [0; 3]);
     }

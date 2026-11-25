@@ -260,6 +260,17 @@ pub enum SegmentManifestError {
     Invalid(String),
     #[error("Horizon source archive is invalid: {0}")]
     Archive(#[source] ArchiveFormatError),
+    #[error(
+        "Horizon source bucket {index} at slot {first_slot} (byte {offset}, length {length}) could not be decoded: {source}"
+    )]
+    BucketDecode {
+        index: usize,
+        first_slot: u64,
+        offset: u64,
+        length: u64,
+        #[source]
+        source: ArchiveFormatError,
+    },
     #[error("Horizon source provenance is invalid: {0}")]
     Provenance(#[source] ArchiveProvenanceError),
     #[error("Horizon source has no runtime provenance")]
@@ -849,11 +860,22 @@ fn validate_horizon_bucket_range<R: Read + Seek>(
     let mut visitor = SegmentBucketVisitor::new(expected_writes);
     let mut visited_slots = 0u64;
     for bucket in first_bucket..end_bucket {
+        let entry = reader.bucket_index()[bucket];
         let visited = reader
             .read_bucket_with_header(bucket, &mut visitor, |header, visitor| {
                 visitor.on_bucket_header(header)
             })
-            .map_err(SegmentManifestError::Archive)?;
+            .map_err(|source| {
+                let error = SegmentManifestError::BucketDecode {
+                    index: bucket,
+                    first_slot: entry.first_slot,
+                    offset: entry.offset,
+                    length: entry.len,
+                    source,
+                };
+                log::warn!("{error}");
+                error
+            })?;
         visited_slots = visited_slots
             .checked_add(visited)
             .ok_or_else(|| invalid("decoded slot count overflows u64"))?;
