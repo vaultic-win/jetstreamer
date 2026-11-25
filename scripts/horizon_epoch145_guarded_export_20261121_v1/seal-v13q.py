@@ -13,21 +13,27 @@ sys.path.insert(0, str(runtime / "prefix140-status-cadence-20261122-v1/cadence-t
 from evidence import SEALER, bound, checked, durable, need, raw, syncdir
 
 sealer = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment"
-need(os.geteuid() == 0 and sys.flags.isolated and sys.dont_write_bytecode and len(sys.argv) == 2,
-     "run as root with python3 -IB seal-v13q.py STAGE")
+need(os.geteuid() == 0 and sys.flags.isolated and sys.dont_write_bytecode
+     and (len(sys.argv) == 2 or sys.argv[2:] == ["--v7"]),
+     "run as root with python3 -IB seal-v13q.py STAGE [--v7]")
+v7 = len(sys.argv) == 3
 stage = Path(sys.argv[1])
 need(stage.is_absolute() and stage.resolve(strict=True) == stage and stage.is_dir(), "invalid V13q build stage")
 checkout = stage.parent / "source"
 continuity = runtime / "epoch145-semantic-continuity-20261121-v1"
-worker = continuity / "tools-v13q"
+worker = continuity / ("tools-v13r" if v7 else "tools-v13q")
 fit = runtime / "incident-replay-fit-20261121-v1"
-provider = fit / "tools-homefloor-145-post-v6-current-v1"
-original_provider = fit / "tools-homefloor-145-post-v6-build-v1"
+generation = "v7" if v7 else "v6"
+provider = fit / f"tools-homefloor-145-post-{generation}-current-v1"
+original_provider = fit / f"tools-homefloor-145-post-{generation}-build-v1"
 evidence = stage / "evidence"
 source = stage / "source"
 worker_source = Path("scripts/horizon_epoch145_guarded_export_20261121_v1")
 fit_source = Path("scripts/horizon_incident_replay_fit_20261121_v1")
-semantic_owner = "a71285e56d674de3bf793692f93dfbb3"
+semantic_owner = "f7043fd6595a4151b659d4b098bede11" if v7 else "a71285e56d674de3bf793692f93dfbb3"
+semantic_package = continuity / ("tools-v7-168-stop-v2" if v7 else "tools-v6-guard-walk")
+semantic_handoff = continuity / ("v7-168-stop-name-handoff" if v7 else "v6-guard-walk-name-handoff")
+semantic_seal = "589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b"
 reader_commit = "e15f71a2a84c9f256c6fc3d5da34e9354430e702"
 
 def git(*args):
@@ -84,22 +90,31 @@ stopped = checked(terminal)
 inputs = checked(build["inputs"])
 quote = checked(build["capacity"])["quote"]
 commit = build["source_commit"]
-completion_ref = bound(continuity / "v6-guard-walk-name-handoff/SEMANTIC_COMPLETION.json")
+completion_ref = bound(semantic_handoff / "SEMANTIC_COMPLETION.json")
 completion = checked(completion_ref)
+checker_seal = bound(semantic_package / "deployment-seal-receipt.json") if v7 else inputs["quote_program_seal"]
 need(commit == inputs["source_commit"]
      and build["schema"] == "horizon-epoch145-v13q-guarded-build-v1"
      and build["actor"]["InvocationID"] == stopped["invocation_id"] and stopped["build"] == qualified_build
      and quote["fits"] is True and quote["resource_credit_bytes"] == 0 and not quote["replay_launch_authorized"]
-     and quote["phase145"]["stage"] == "v6-semantic-complete-drained"
+     and quote["phase145"]["stage"] == f"{generation}-semantic-complete-drained"
      and quote["phase145"]["completed_invocation_id"] == completion["invocation_id"] == semantic_owner
      and quote["phase145"]["completion"] == completion["completion"]
-     and quote["phase145"]["checker_seal"] == inputs["quote_program_seal"]
+     and quote["phase145"]["checker_seal"] == checker_seal
+     and (not v7 or (
+          checker_seal["sha256"] == semantic_seal
+          and quote["phase145"]["semantic_receipt"] == completion_ref
+          and completion["native_success"]["INVOCATION_ID"] == semantic_owner
+          and completion["native_success"]["_PID"] == "1"))
      and completion["schema"] == "horizon-epoch145-v5z-custody-successor-semantic-completion-v1"
      and completion["publication_authorized"] is completion["r2_mutations"] is False,
      "different native build provenance")
 tracked = [worker_source / name for name in (
     "incident-post-phase.py", "run-incident-post.sh", "reader_bridge.py", "seal-v13q.py")]
 tracked += [fit_source / name for name in ("post-stop-fit", "retry4_status.py")]
+if v7:
+    tracked += [fit_source / name for name in ("retry5_fit.py", "cold168_actor.py")]
+    tracked.append(worker_source / "build_159_price.py")
 closure = sorted(set(map(Path, build["merged_source_closure"])) | set(tracked))
 source_receipt = stage / "SOURCE_CONTAINMENT.json"
 durable(source_receipt, source_containment(inputs, closure, commit, source_publication))
@@ -117,7 +132,9 @@ image = evidence / "export145"
 need(build["worker"] == bound(image) and build["tests"] == bound(tests)
      and build["phase_tests"] == bound(phase_tests)
      and "test result: ok." in tests.read_text() and "0 failed;" in tests.read_text()
-     and "Ran 4 tests" in phase_tests.read_text() and phase_tests.read_text().endswith("OK\n"),
+     and ("Ran 5 tests" in phase_tests.read_text() or
+          not v7 and "Ran 4 tests" in phase_tests.read_text())
+     and phase_tests.read_text().endswith("OK\n"),
      "native or phase test results differ")
 reader_test = evidence / "native-reader-test.log"
 result = reader_test.read_text()
@@ -131,12 +148,21 @@ post_fit = compiled_file(inputs, fit_source / "post-stop-fit")
 status_adapter = compiled_file(inputs, fit_source / "retry4_status.py")
 worker_proof = stage / "worker-build-proof.json"
 image_hash = build["worker"]["sha256"]
-helper = bound(continuity / "tools-v6-guard-walk/v5v_semantic_completion.py")
-runtime_seal = bound(continuity / "tools-v6-guard-walk/deployment-seal-receipt.json")
-qualified = checked(bound(stage.parent / "v6-worker-seal-evidence/QUALIFIED_V6.json"))
-need(runtime_seal == qualified["worker"] == completion["startup_evidence"]["worker_seal"]
-     and completion["startup_evidence"]["predecessor_terminal"] == qualified["predecessor"],
-     "the V6 semantic deployment changed")
+helper = bound(semantic_package / "v5v_semantic_completion.py")
+runtime_seal = bound(semantic_package / "deployment-seal-receipt.json")
+if v7:
+    startup = completion["startup_evidence"]
+    original = bound(semantic_package / "build-proof.json")
+    proof = checked(original)
+    need(runtime_seal == checker_seal == startup["worker_seal"]
+         and startup["worker_build"] == original and proof["semantic_checker"] == helper
+         and startup["predecessor_terminal"] == proof["guard_terminal"],
+         "the V7 semantic deployment changed")
+else:
+    qualified = checked(bound(stage.parent / "v6-worker-seal-evidence/QUALIFIED_V6.json"))
+    need(runtime_seal == qualified["worker"] == completion["startup_evidence"]["worker_seal"]
+         and completion["startup_evidence"]["predecessor_terminal"] == qualified["predecessor"],
+         "the V6 semantic deployment changed")
 semantic_member, = (row for row in checked(runtime_seal)["members"]
                     if row["name"] == "v5v_semantic_completion.py" and row["mode"] == "0444")
 need(helper["sha256"] == semantic_member["sha256"], "V6 semantic checker changed")
@@ -182,7 +208,7 @@ for row in prior["members"]:
 members.extend([member(profile.name, profile, 0o444), member(post_fit.name, post_fit, 0o555),
                 member(status_adapter.name, status_adapter, 0o444)])
 provider_ref = seal("provider", provider, members)
-result = stage / "SEALED_V13Q.json"
+result = stage / ("SEALED_V13R.json" if v7 else "SEALED_V13Q.json")
 durable(result, {"source_commit":commit, "native_qualification":qualified_build, "native_terminal":terminal,
                  "seal_operator":bound(Path(__file__).resolve()),
                  "source_containment":bound(source_receipt), "reader_preflight":bound(reader_preflight),

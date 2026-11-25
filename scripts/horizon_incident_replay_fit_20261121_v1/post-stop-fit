@@ -63,7 +63,10 @@ REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
 REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
 V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v2"
-RETRY5_168 = HERE == D / "tools-homefloor-cold168-retry5-v2"
+RETRY5_FIT_ROUTE = HERE == D / "tools-homefloor-cold168-retry5-v2"
+V7_POST_145 = HERE == D / "tools-homefloor-145-post-v7-current-v1"
+V7_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v7-build-v1"
+RETRY5_168 = RETRY5_FIT_ROUTE or V7_POST_145 or V7_POST_BUILD_145
 STOPPED168_PRICE = RETRY5_168 or V7_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
@@ -79,7 +82,7 @@ V5Y_BUILD_145 = HERE == D / "tools-homefloor-145-v5x-schema-build-v1"
 V5X_145 = HERE == D / "tools-homefloor-145-v5w-donor-recovery-v1"
 V5X_BUILD_145 = HERE == D / "tools-homefloor-145-v5w-donor-build-v1"
 V5W_RECOVERY_145 = V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or REPRO166_LIVE or FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
-V5Z_POST_145 = HERE in (D / "tools-homefloor-145-post-v5z-current-v1", D / "tools-homefloor-145-post-v6-current-v1")
+V5Z_POST_145 = V7_POST_145 or HERE in (D / "tools-homefloor-145-post-v5z-current-v1", D / "tools-homefloor-145-post-v6-current-v1")
 CURRENT_HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v2"
 V6_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v6-build-v1"
 V5Z_POST_BUILD_145 = CURRENT_HOURLY169 or V6_POST_BUILD_145 or HERE == D / "tools-homefloor-145-post-v5z-build-v1"
@@ -661,7 +664,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
             (MISSED_RUNTIME_145, "tools-v5m"),
             (True, "tools-v5k"),
         ) if enabled)
-        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13q" if V5Z_POST_145 else "tools-v13p" if V5X_POST_145 else "tools-v13o" if V5W_POST_145 else "tools-v13n" if V5U_GUARD_POST_145 else "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
+        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13r" if V7_POST_145 else "tools-v13q" if V5Z_POST_145 else "tools-v13p" if V5X_POST_145 else "tools-v13o" if V5W_POST_145 else "tools-v13n" if V5U_GUARD_POST_145 else "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
                     "lease-semantic": ("profile145-lease-semantic.json", lease_directory),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
@@ -706,8 +709,13 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch, fleet=None):
-    if RETRY5_168:
-        return retry5_fit["drained145"](s, fit, loader["load_package"])
+    if RETRY5_FIT_ROUTE or V7_POST_BUILD_145:
+        phase = retry5_fit["drained145"](s, fit, loader["load_package"])
+        if V7_POST_BUILD_145:
+            proof = bound(phase["completion"])
+            phase["semantic_receipt"] = phase["completion"]
+            phase["completion"] = proof["completion"]
+        return phase
     if V7_145:
         members = fit.members(fit.A145)
         if members:
@@ -725,7 +733,7 @@ def phase145(epoch, fleet=None):
         s.need(proof["native_failure"] == stopped["failure"] and proof["recovery_started"] == stopped["startup"],
                "different stopped epoch 145 proof")
         return dict(stopped, InvocationID=stopped["invocation_id"], guard_terminal=terminal)
-    if STOPPED168_PRICE:
+    if STOPPED168_PRICE and not V7_POST_145:
         return stopped145_phase()
     if PUBLISH168 and not fit.members(fit.A145):
         loader["load_package"](V6_POST_PROVIDER, "197ba4e755875f01097446ab1a8958c604478e8e183769d451d968b269d7f349")
@@ -821,7 +829,9 @@ def phase145(epoch, fleet=None):
         return runpy.run_path(str(adapter))["v5v_stopped_phase"](s, fit, fleet, profile)
     if HOURLY170 and not fit.members(fit.A145):
         return hourly170["drained145"](s, fit)
-    guard_terminal = STOPPED_GUARD_145 or (GUARD_TERMINAL_RECOVERY_145 and not fit.members(fit.A145))
+    guard_terminal = STOPPED_GUARD_145 or (
+        GUARD_TERMINAL_RECOVERY_145 and not V7_POST_145 and not fit.members(fit.A145)
+    )
     for active, name in ((guard_terminal, "v5r_stopped.py"), (STOPPED_V5P, "v5p_stopped.py"), (STOPPED_V5O, "v5o_stopped.py"),
                          (STOPPED_V5N, "v5n_stopped.py"), (STOPPED_V5M, "v5m_stopped.py"),
                          (STOPPED_V5K, "v5k_stopped.py")):
@@ -1764,10 +1774,16 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         raw += unreconciled
         books["168"]["unreconciled_stop_bytes"] = unreconciled
     budget_rep = dict(rep)
+    budget_floor168 = floor168
+    if RETRY5_168:
+        # The retry5 floor already includes the donor and previous guard claims.
+        # Apply it with its live growth once, after computing the legacy liabilities.
+        budget_rep.pop("168", None)
+        budget_floor168 = 0
     if active170:
         budget_rep["170"] = dict(prestart_remaining=full170["CAP"] - hourly170_owner["prestart_physical_bytes"],
                                  floor=0)
-    need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,budget_rep,floor168,closed_prepaid)
+    need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,budget_rep,budget_floor168,closed_prepaid)
     resident={e:joined_resident(v) for e,v in rep.items()}
     if active170 and hourly170_owner["admission"]:
         resident["170"] = joined_resident(hourly170_owner)
@@ -1797,7 +1813,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
                prefix_before["child"]["InvocationID"] == prefix_after["child"]["InvocationID"],
                "prefix140 generation changed during 145 capture")
         growth = max(p["remaining_DATA_growth_bytes"] for p in (prefix_before, prefix_after))
-        zero, _, _ = disk_budget(raw, dict(remaining=0), books, epoch, peers, budget_rep, floor168, closed_prepaid)
+        zero, _, _ = disk_budget(raw, dict(remaining=0), books, epoch, peers, budget_rep, budget_floor168, closed_prepaid)
         old_need = need
         need = post145_floor(old_need, zero, c136, growth)
         protected += need - old_need
@@ -1823,7 +1839,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         # same promises on top of its own protected floor.
         other_floors = {k: (dict(v, floor=0) if int(k) == epoch else v) for k, v in budget_rep.items()}
         zero, _, _ = disk_budget(raw, dict(remaining=0), books, 145, peers, other_floors,
-                                 0 if epoch == 168 else floor168, closed_prepaid)
+                                 0 if epoch == 168 else budget_floor168, closed_prepaid)
         required = max(need + (0 if post_price else prefix_growth),
                        post145_floor(0, zero, c136, prefix_growth)) + after["missing_mirror_bytes"]
         protected += required - need
@@ -1882,8 +1898,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,**recovered_price,active168_guard_floor=floor168,
         population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
     if RETRY5_168:
-        donor = retry5_donor["cover"](retry5_donor_before, native, retry5_donor["snapshot"](),
-                                      cold168_retry5=True)
+        donor = retry5_fit["donor_cover"](s, retry5_donor, retry5_donor_before, native, f)
         return retry5_fit["price"](s, native, retry5_current, books["168"], donor, cold168)
     if FULL170 or REPRO166:
         # At zero remaining growth, the same paid tree has realized its full
@@ -2001,7 +2016,8 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         native["epoch159_donor_cover"] = donor["cover"](before, native, donor["snapshot"]())
         return native
     if RETRY5_168:
-        s.need(epoch == 168 and prestart136 is None, "retry5 provider only prices epoch 168")
+        s.need(epoch == (168 if RETRY5_FIT_ROUTE else 145) and prestart136 is None,
+               "wrong epoch for the sealed retry5 or V7 post provider")
         return capture_native(epoch, ref)
     if STOPPED168_PRICE:
         s.need(epoch in (145, 166, 167, 170) and prestart136 is None,

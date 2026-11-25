@@ -145,8 +145,7 @@ def snapshot(exclusive136=None):
     return proof
 
 
-def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=None, full170=None,
-          cold168_retry5=False):
+def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=None, full170=None):
     need(before == after and before["invocation_id"] == IID and before["grant_sha256"] == GRANT and
          before["driver_exit"] == EXIT and 0 <= build_bytes <= 104 * MIB and 0 <= build_ram <= 768 * MIB,
          "transition during pricing or unqualified build bound")
@@ -182,10 +181,7 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
                  and book["measurement"] == "two complete stopped-tree walks"
                  and book["unreconciled_stop_bytes"] ==
                  max(0, stopped168["measured_physical_bytes"] - max(book["cap_bytes"], book["physical_bytes"]))
-                 and writer["sha256"] == (
-                     "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac"
-                     if cold168_retry5 else
-                     "cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c"),
+                 and writer["sha256"] == "cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c",
                  "changed retained epoch 168 booking or cadence")
             running.remove(168)
         if failed166:
@@ -209,22 +205,6 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
                         and diagnostic["receipt"] is not None and diagnostic["intent"] is not None)
         active_count = 0
         replay_rows = fleet["actual_executing_replays"]
-        replacements = set(native["replacements"])
-        if cold168_retry5:
-            own = native["candidate"]
-            scoped = [row for row in replay_rows if row["epoch"] == 168]
-            active_count = len(scoped)
-            need(native["epoch"] == 168 and native["phase145"]["stage"] == "v7-semantic-complete-drained"
-                 and native["retry5_retained_source"]["sha256"] ==
-                 "488dbd9e630511b97a0ad0704241a0a1fdec71a614caf17c6cd1d3a63b3dc0b2"
-                 and stopped168 and full170 is None and active_count <= 1
-                 and ("168" not in replacements or own == native["replacements"]["168"])
-                 and all(own and row["unit"]["Id"] == own["producer_unit"]
-                         and row["unit"]["InvocationID"] == own["producer_invocation_id"]
-                         and row["admission"] == own["admission"] for row in scoped),
-                 "foreign retry5 candidate in the donor census")
-            replay_rows = [row for row in replay_rows if row["epoch"] != 168]
-            replacements.discard("168")
         if full170 is not None:
             rows = [row for key in ("actual_executing_replays", "actual_active_bootstraps")
                     for row in fleet[key] if row["epoch"] == 170]
@@ -242,7 +222,7 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
              and failed170["reservation_ending_bytes"] == 0
              and fleet["canonical_producer_count"] == len(replay_rows) + active_count == len(running) + active_count
              and {row["epoch"] for row in replay_rows} == running
-             and replacements == {str(epoch) for epoch in running - {172}}
+             and set(native["replacements"]) == {str(epoch) for epoch in running - {172}}
              and set(native["survivors"]) == {"172"}
              and booking["cap_bytes"] == 384 * GIB
              and booking["cap_bytes"] == booking["physical_bytes"] + booking["remaining_bytes"]
