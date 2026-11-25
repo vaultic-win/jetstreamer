@@ -25,7 +25,8 @@ METERED_FULL = LOCAL.name in ('tools-cold168-retry4-failed166-v6-entry146',
 if METERED_FULL:
     import full170_status as full170
 
-FAILED166_CADENCE = METERED_FULL or LOCAL.name in (
+RETRY5_168 = LOCAL.name == 'tools-cold168-retry5-failed166-v12-entry146'
+FAILED166_CADENCE = RETRY5_168 or METERED_FULL or LOCAL.name in (
     'tools-cold168-retry4-failed166-v1', 'tools-cold168-retry4-failed166-v2',
     'tools-cold168-retry4-failed166-v3', 'tools-cold168-retry4-failed166-v4-entry146',
     'tools-cold168-retry4-failed166-v5-entry146', 'tools-cold168-retry4-failed166-v8-entry146',
@@ -86,13 +87,14 @@ def generation():
 # Earlier sealed packages continue to follow their original lane populations.
 cold168 = None
 cold168_commit = None
-generation168 = [n for n in (2, 3, 4) if (LOCAL/f'retry{n}-168-generation.json').is_file()]
-need(len(generation168)<=1, 'overlapping 168 receiver generations')
+generation168 = [n for n in (2, 3, 4, 5) if (LOCAL/f'retry{n}-168-generation.json').is_file()]
+need(len(generation168)<=1 and RETRY5_168 == (generation168 == [5]),
+     'different or overlapping 168 receiver generations')
 if generation168:
     need(ATTEMPT == 'retry13' and (LOCAL/'cold170_commit.py').is_file(), 'wrong 170 generation for 168')
     import cold168_status as cold168
     if (LOCAL/'cold168_commit.py').is_file():
-        need(cold168.ATTEMPT == 4, 'cold168 terminal support requires retry4')
+        need(cold168.ATTEMPT in (4, 5), 'cold168 terminal support requires retry4 custody')
         import cold168_commit
 
 
@@ -260,7 +262,10 @@ def reconcile(c, observed_lane):
     terminal = terminal_route(c.fleet) if not METERED_FULL else None
     stopped168 = LOCAL.name == 'tools-cold168-retry4-failed166-v11-entry146'
     c.failed168 = cold168_commit.guard_stop(c.fleet, c.cfg) if stopped168 else None
-    terminal168 = cold168_commit.current(c.fleet, c.cfg) if cold168_commit and not stopped168 else None
+    c.retained168 = (cold168_commit.guard_stop(c.fleet, c.cfg, successor=cold168) if RETRY5_168
+                     else c.failed168)
+    terminal168 = (cold168_commit.current(c.fleet, c.cfg)
+                   if cold168_commit and not (stopped168 or RETRY5_168) else None)
     c.failed170 = failed_route(c.fleet)
     c.failed166 = retry166.failed_route(c.fleet) if FAILED166_CADENCE else None
     need(not (terminal and c.failed170), 'conflicting epoch 170 commit and failure')
@@ -394,6 +399,8 @@ def install(c, fleet):
         cold168_commit.install(c.fleet, fleet, c.commits[168])
     if c.failed168:
         cold168_commit.install_guard_stop(c.fleet, fleet, c.failed168)
+    if RETRY5_168:
+        install_retry5(c, fleet)
     if c.failed170:
         fleet[FAILED_STATUS] = c.failed170
     if c.failed170 and '170' not in c.recovered_owners:
@@ -426,3 +433,25 @@ def install(c, fleet):
         need(original['completion']['sha256'] == stops[epoch], 'original cold guard stop lost')
         row['original_home_floor_stop'] = original
         row['next_action'] = 'Maintain the admitted worker and verify its resulting archive.'
+
+
+
+def install_retry5(c, fleet):
+    historical = cold168_commit.check_owner(c.fleet.get(cold168_commit.HISTORY))
+    need(c.retained168 == c.fleet[cold168_commit.FAILED_FIELD],
+         'retry5 changed the retained retry4 booking')
+    fleet[cold168_commit.HISTORY] = historical
+    fleet[cold168_commit.FAILED_FIELD] = c.retained168
+    fleet['retained_cold168_retry4_reservation'] = c.retained168
+    row = next(item for item in fleet['epochs'] if item['epoch'] == 168)
+    row[cold168_commit.FAILED_FIELD] = c.retained168
+    owner = c.recovered_owners.get('168')
+    if owner and 168 not in c.new_rows:
+        row.update(no_live_producer_claimed=False, state='bootstrap',
+                   current_status_scope='Epoch 168 retry5 is held for first-guard funding.',
+                   next_action='Bind the guarded retry5 admission before releasing replay.',
+                   current_cold168_retry5_held=owner)
+    else:
+        row.pop('current_cold168_retry5_held', None)
+    if 168 in c.new_rows:
+        row['current_status_scope'] = 'Epoch 168 retry5 is running under its admitted guard.'

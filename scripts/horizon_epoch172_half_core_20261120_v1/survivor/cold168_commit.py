@@ -147,7 +147,7 @@ def retained_booking(proof):
                 retained_cap_bytes=CAP, resource_credit_bytes=0, reservation_ending_bytes=0)
 
 
-def guard_stop(fleet, config):
+def guard_stop(fleet, config, *, successor=None):
     from owners import show
 
     intent, stopped = checked(FAILED_INTENT), checked(FAILED_COMPLETION)
@@ -193,9 +193,13 @@ def guard_stop(fleet, config):
     owner = fleet.get(OWNERS, {}).get('168')
     if FAILED_FIELD in fleet:
         check_owner(fleet.get(HISTORY))
-        need(fleet[FAILED_FIELD] == result and not owner and not live and not scheduled,
-             'changed adopted epoch 168 guard stop')
+        need(fleet[FAILED_FIELD] == result, 'changed adopted epoch 168 guard stop')
+        if successor is None:
+            need(not owner and not live and not scheduled, 'stopped epoch 168 still has a live row')
+        else:
+            successor.verify_retained_population(result, owner, live, scheduled)
     else:
+        need(successor is None, 'retry5 requires the previously adopted retry4 stop')
         check_owner(owner)
         need(len(live) == 1 and live[0]['admission'] == ADMISSION and live[0]['unit']['Id'] == UNIT
              and live[0]['unit']['InvocationID'] == IID
