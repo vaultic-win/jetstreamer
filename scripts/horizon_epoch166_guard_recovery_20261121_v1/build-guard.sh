@@ -26,6 +26,11 @@ elif [[ ${1:-} == epoch168-cold-v4 && $# == 1 ]]; then
     base=/var/lib/jetstreamer/horizon_runtime_data/epoch168-cold-guard-20261123-v4
     group=/sys/fs/cgroup/system.slice/horizon-168-cold-guard-v4-build.service
     features+=(--cfg 'feature="epoch168-cold-v4"')
+elif [[ ${1:-} == epoch168-cold-v5 && $# == 1 ]]; then
+    src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
+    base=/var/lib/jetstreamer/horizon_runtime_data/epoch168-cold-guard-20261125-v5
+    group=/sys/fs/cgroup/system.slice/horizon-168-cold-guard-v5-build.service
+    features+=(--cfg 'feature="epoch168-cold-v5"')
 elif [[ ${1:-} == epoch166-retry11 && $# == 1 ]]; then
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
     base=/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry11-guard-20261122-v1
@@ -60,7 +65,7 @@ test "$(cat "$group/cpu.max")" = '100000 100000'
 test "$(cat "$group/memory.max")" = '1073741824'
 test "$(cat "$group/memory.swap.max")" = '0'
 test "$(findmnt -n -T "$work" -o SOURCE)" = /dev/loop4
-if [[ ${1:-} == epoch168-cold-v4 || ${1:-} == epoch168-cold-v3 || ${1:-} == epoch168-cold-v2 || ${1:-} == epoch167-cold-v3 || ${1:-} == epoch166-retry11 || ${1:-} == epoch170-retry11 || ${1:-} == epoch170-retry12 || ${1:-} == epoch170-retry13 ]]; then
+if [[ ${1:-} == epoch168-cold-v5 || ${1:-} == epoch168-cold-v4 || ${1:-} == epoch168-cold-v3 || ${1:-} == epoch168-cold-v2 || ${1:-} == epoch167-cold-v3 || ${1:-} == epoch166-retry11 || ${1:-} == epoch170-retry11 || ${1:-} == epoch170-retry12 || ${1:-} == epoch170-retry13 ]]; then
     # Reuse the already allocated compiler filesystem for intermediates. Leave the
     # older read-only dependency filesystem and its remaining free space alone.
     scratch=/home/sol/.jetstreamer-private/epoch168-extractor-build-20261120-v1/work
