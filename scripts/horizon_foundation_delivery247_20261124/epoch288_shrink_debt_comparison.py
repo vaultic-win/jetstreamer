@@ -2,7 +2,7 @@
 
 import argparse
 import ast
-from datetime import datetime
+from datetime import datetime, timezone
 import fcntl
 import hashlib
 import importlib.util
@@ -25,6 +25,8 @@ ORIGINAL = V / 'horizon288-full-v303'
 ORIGINAL_ROOT = Path('/home/ubuntu/.jetstreamer-private/qualification-288-root-v303')
 PREPARATION = V / 'horizon288-worker-shrink-debt-v327'
 PACKAGE = V / 'horizon288-shrink-debt-comparison-v327'
+FULL_PACKAGE = V / 'horizon288-full-shrink-debt-v1'
+FULL_UNIT = 'horizon-qualify-288-root-shrink-debt-v1.service'
 RECEIPTS = PACKAGE / 'guard-receipts'
 TOKENS = V / 'horizon288-shrink-debt-comparison-tokens-v327'
 RUN = Path('/home/ubuntu/.jetstreamer-private/qualification-288-shrink-debt-compare-v327')
@@ -473,14 +475,20 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
         assert owner['MainPID'] == producer['MainPID']
         owners[epoch] = owner
         if epoch == 288:
-            registration = binding(PACKAGE / 'cadence-registration.json')
+            full = producer['Id'] == FULL_UNIT
+            root = FULL_PACKAGE if full else PACKAGE
+            registration = binding(root / 'cadence-registration.json')
             launched = read(registration)
-            assert row['phase'] == 'diagnostic-qualification' and row['scratch_path'] == str(RUN)
-            assert launched['epoch'] == 288 and launched['unit'] == producer['Id'] == UNIT
+            if full:
+                assert row['phase'] == 'replay' and Path(row['scratch_path']).is_relative_to(launched['run_root'])
+                assert launched['kind'] == 'epoch288-full-shrink-debt-replay'
+            else:
+                assert row['phase'] == 'diagnostic-qualification' and row['scratch_path'] == str(RUN)
+            assert launched['epoch'] == 288 and launched['unit'] == producer['Id'] == (FULL_UNIT if full else UNIT)
             assert launched['invocation_id'] == owner['InvocationID']
             assert launched['main_pid'] == int(owner['MainPID'])
             assert launched['canonical_epoch_publication_authorized'] is False
-            assert launched['guard_plan'] == binding(PACKAGE / 'guard-plan.json')
+            assert launched['guard_plan'] == binding(root / 'guard-plan.json')
         if producer['Id'] == BANK_DELTA229_UNIT:
             guard_paths[epoch] = BANK_DELTA229_GUARDS
         elif producer['Id'] in DEMOTION229_GUARDS:
@@ -491,6 +499,8 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
             guard_paths[epoch] = extract_state / 'guard-receipts'
         elif producer['Id'] in CONTINUATION230_GUARDS:
             guard_paths[epoch] = CONTINUATION230_GUARDS[producer['Id']]
+        elif producer['Id'] == FULL_UNIT:
+            guard_paths[epoch] = FULL_PACKAGE / 'guard-receipts'
         else:
             guard_paths[epoch] = GUARDS[epoch]
         growth[epoch] = kit.measure.source.growth_for(epoch, owner, guard_paths[epoch])
@@ -616,7 +626,7 @@ def cadence_changes():
     return changes
 
 
-def remote_source(guard_source):
+def remote_source(guard_source, *, full=False):
     prefix = ['runuser', '-u', 'ubuntu', '--', 'git', '-C', str(SOURCE)]
 
     def git(*args):
@@ -629,10 +639,11 @@ def remote_source(guard_source):
     adapter = launcher.with_name(ADAPTER + '.py')
     parent = launcher.parent.stat()
     assert parent.st_uid == 0 and not parent.st_mode & 0o222
-    for file in (launcher, adapter):
-        relative = SOURCE_DIRECTORY / file.name
-        committed = git('show', f'{branch}:{relative}')
-        checked(fixed(file, hashlib.sha256(committed).hexdigest()))
+    if not full:
+        for file in (launcher, adapter):
+            relative = SOURCE_DIRECTORY / file.name
+            committed = git('show', f'{branch}:{relative}')
+            checked(fixed(file, hashlib.sha256(committed).hexdigest()))
     sources = guard_source['compiled_source_sha256']
     expected = {f'jetstreamer-utils/src/horizon_standalone_guard_{part}.rs' for part in ('bin', 'handoff', 'native227', 'root')}
     assert set(sources) == expected
@@ -755,6 +766,92 @@ def deploy_cadence(kit):
     return kit.ops.funds.put(PACKAGE / 'cadence-deployment.json', dict(previous=old, installed=installed))
 
 
+def deploy_full_cadence(kit):
+    launcher = Path(__file__)
+    adapter = launcher.with_name('rooted288.py')
+    seal_ref = binding(launcher.with_name('deployment-seal-receipt.json'))
+    seal = read(seal_ref)
+    assert seal['schema'] == 'jetstreamer-sealed-deployment-receipt-v1'
+    assert seal['destination'] == str(launcher.parent) and not seal['replay_launch_authorized']
+    members = {member['name']: member['sha256'] for member in seal['members']}
+    for path in (launcher, adapter):
+        checked(fixed(path, members[path.name]))
+
+    target = CONTROL / adapter.name
+    expected = subprocess.check_output(['runuser', '-u', 'ubuntu', '--', 'git', '-C', str(SOURCE),
+        'show', f'origin/account-updates:{SOURCE_DIRECTORY / adapter.name}'], timeout=15)
+    old = target.read_bytes()
+    assert old == expected
+    candidate = adapter.read_bytes()
+    ast.parse(candidate, filename=adapter.name)
+    backup = sealed_file(FULL_PACKAGE / 'rooted288.py.previous', old)
+    with tempfile.NamedTemporaryFile(dir=CONTROL, delete=False) as out:
+        os.fchmod(out.fileno(), 0o400)
+        out.write(candidate)
+        out.flush()
+        os.fsync(out.fileno())
+    os.replace(out.name, target)
+    descriptor = os.open(CONTROL, os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    return kit.ops.funds.put(FULL_PACKAGE / 'cadence-deployment.json',
+        dict(previous=backup, installed=binding(target), seal=seal_ref, publication_authorized=False))
+
+
+def launch_full(kit, profile_ref):
+    assert profile_ref['path'] == str(FULL_PACKAGE / 'profile.json')
+    profile = read(profile_ref)
+    assert profile['schema'] == 'foundation-epoch288-full-shrink-debt-profile-v1'
+    assert profile['epoch'] == 288 and profile['unit'] == FULL_UNIT
+    assert profile['replay_started'] is False and profile['publication_authorized'] is False
+    assert profile['cpu_affinity'] == sorted(CPUS)
+    assert (profile['disk_cap_bytes'], profile['memory_max_bytes']) == (CAP, MEMORY)
+    namespace = read(profile['namespace'])
+    assert namespace['result'] == dict(namespace_verified=True, replay_started=False, mounts=9)
+    assert namespace['argv'] == profile['argv'] and namespace['verification_terminal'] == 124846819
+    run_root = Path(profile['run_root'])
+    assert run_root == Path('/home/ubuntu/.jetstreamer-private/qualification-288-full-shrink-debt-v1')
+    assert profile['argv'][:5] == [profile['node']['path'], '288', str(run_root / 'output'),
+                                   '--verify', '--root-checkpoint-cohort']
+    guard_unit = profile['guard_unit']
+    assert guard_unit == 'horizon-288-full-shrink-debt-protective-v1.service'
+    guard_plan = read(profile['guard_template'])
+    assert (guard_plan['unit'], guard_plan['worker_root']) == (FULL_UNIT, str(run_root))
+    assert (guard_plan['minimum_free_bytes'], guard_plan['maximum_root_physical_bytes']) == (FLOOR, CAP)
+    assert guard_plan['receipt_directory'] == profile['guard_receipts'] == str(FULL_PACKAGE / 'guard-receipts')
+    assert profile['tokens'] == str(V / 'horizon288-full-shrink-debt-tokens-v1')
+    assert profile['static_guard_validation']['validated']
+    assert not any(Path(profile['guard_receipts']).iterdir())
+    assert list(Path(profile['tokens']).iterdir()) == [Path(profile['token']['path'])]
+    for key in ('node', 'worker', 'producer', 'guard', 'token'):
+        checked(profile[key])
+    _, bounded, source = plan_inputs()
+    assert profile['worker'] == bounded['worker'] and profile['node'] == source['node']
+    assert profile['snapshot'] == source['snapshot']
+    assert namespace['mounts'] == {path.replace(str(ORIGINAL_ROOT), str(run_root)): row
+                                   for path, row in source['bindings'].items()}
+    comparison = read(profile['comparison'])
+    assert comparison['registration'] == binding(PACKAGE / 'cadence-registration.json')
+    assert comparison['candidate_terminal_checkpoint_passed'] and comparison['full_epoch_resource_qualified'] is False
+    assert comparison['candidate_archive']['last_slot'] == 124435861
+    prior = read(binding(PACKAGE / 'profile.json'))
+    guard_provenance = read(prior['guard_provenance'])
+    assert guard_provenance['guard'] == profile['guard']
+    remote_source(guard_provenance, full=True)
+    for unit in (FULL_UNIT, guard_unit, guard_unit.replace('.service', '.timer')):
+        assert kit.ops.props(unit, ['LoadState', 'ActiveState', 'Job']) == {
+            'LoadState': 'not-found', 'ActiveState': 'inactive', 'Job': ''}, unit
+    assert not (FULL_PACKAGE / 'admission.json').exists()
+    inventory = exact_inventory(kit)
+    fit = capacity(kit)
+    assert fit['disk_shortfall_bytes'] == fit['memory_shortfall_bytes'] == 0, fit
+    deployment = deploy_full_cadence(kit)
+    fit = capacity(kit)
+    return guarded_start(kit, profile_ref, fit, inventory, deployment, full=True)
+
+
 def exact_inventory(kit):
     image = kit.ops.checked_image(kit.ops.R2)
     command = ['systemd-run', '--quiet', '--wait', '--pipe', '--collect', '--unit=foundation-288-shrink-debt-inventory-v327',
@@ -768,58 +865,68 @@ def exact_inventory(kit):
     return row
 
 
-def guarded_start(kit, profile_ref, fit, inventory, deployment):
+def guarded_start(kit, profile_ref, fit, inventory, deployment, *, full=False):
     profile = read(profile_ref)
-    worker = read(profile['proposal'])['worker']
+    if full:
+        unit = FULL_UNIT
+        package = FULL_PACKAGE
+        guard_unit = profile['guard_unit']
+        receipts = Path(profile['guard_receipts'])
+        tokens = Path(profile['tokens'])
+        run_root = Path(profile['run_root'])
+        worker = profile['worker']
+    else:
+        unit, package, guard_unit, receipts, tokens, run_root = UNIT, PACKAGE, GUARD_UNIT, RECEIPTS, TOKENS, RUN
+        worker = read(profile['proposal'])['worker']
     assert time.time() - fit['sampled_unix_seconds'] < 20
     assert fit['disk_shortfall_bytes'] == fit['memory_shortfall_bytes'] == 0
-    registration = PACKAGE / 'cadence-registration.json'
+    registration = package / 'cadence-registration.json'
     ops, runner, startup = kit.ops, kit.replay, kit.startup
-    timer = GUARD_UNIT.replace('.service', '.timer')
-    admission = ops.funds.put(PACKAGE / 'admission.json', dict(epoch=288, profile=profile_ref, fit=fit, inventory=inventory,
+    timer = guard_unit.replace('.service', '.timer')
+    admission = ops.funds.put(package / 'admission.json', dict(epoch=288, profile=profile_ref, fit=fit, inventory=inventory,
         deployment=deployment, admitted=True, publication_authorized=False))
-    properties, argv = startup.start_props(UNIT, checked(profile['producer']))
+    properties, argv = startup.start_props(unit, checked(profile['producer']))
     assert argv == profile['argv']
-    properties.append(f'--property=ExecStartPre=/usr/bin/bash {checked(profile["token"])} 60 {TOKENS}')
-    startup.systemd_run(UNIT, properties, argv, '--slice=system.slice')
+    properties.append(f'--property=ExecStartPre=/usr/bin/bash {checked(profile["token"])} 60 {tokens}')
+    startup.systemd_run(unit, properties, argv, '--slice=system.slice')
 
     def held():
-        state = ops.props(UNIT, ['InvocationID', 'ActiveState', 'SubState', 'MainPID', 'ControlPID'])
+        state = ops.props(unit, ['InvocationID', 'ActiveState', 'SubState', 'MainPID', 'ControlPID'])
         return state if (state['ActiveState'], state['SubState'], state['MainPID']) == ('activating', 'start-pre', '0') and int(state['ControlPID']) > 0 else None
 
     invocation = startup.until(held, 12)['InvocationID']
     guard = profile['guard']
     template = read(profile['guard_template'])
-    plan = ops.funds.put(PACKAGE / 'guard-plan.json', dict(template, invocation_id=invocation))
+    plan = ops.funds.put(package / 'guard-plan.json', dict(template, invocation_id=invocation))
     guard_properties = ['--property=Type=oneshot', '--property=User=root', '--property=UMask=0077',
         '--property=Restart=no', '--property=MemoryMax=1G', '--property=MemorySwapMax=0', '--property=CPUQuota=100%',
         '--property=TasksMax=256', '--property=TimeoutStartSec=90', '--property=ProtectSystem=strict',
         '--property=ProtectHome=read-only', '--property=PrivateNetwork=yes', '--property=NoNewPrivileges=yes',
         '--property=CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE',
-        '--property=AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE', f'--property=ReadWritePaths={RECEIPTS}']
-    runner.PRODUCER, runner.GUARD_UNIT, runner.TIMER, runner.RECEIPTS = UNIT, GUARD_UNIT, timer, RECEIPTS
+        '--property=AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE', f'--property=ReadWritePaths={receipts}']
+    runner.PRODUCER, runner.GUARD_UNIT, runner.TIMER, runner.RECEIPTS = unit, guard_unit, timer, receipts
     runner.GUARD_SHA = guard['sha256']
-    startup.systemd_run(GUARD_UNIT, guard_properties, [guard['path'], plan['path'], '--plan-sha256', plan['sha256'],
+    startup.systemd_run(guard_unit, guard_properties, [guard['path'], plan['path'], '--plan-sha256', plan['sha256'],
         '--self-sha256', guard['sha256']], '--on-active=1s', '--on-unit-inactive=60s', '--timer-property=AccuracySec=1s',
         '--timer-property=RandomizedDelaySec=0')
     first, sample = startup.until(lambda: runner.first_guard(invocation, plan), 35)
     clock, next_guard = startup.until(runner.timer_ready, 12)
     assert held()['InvocationID'] == invocation and sample['root_physical_observation_error'] is None
-    token_dir = TOKENS / invocation
+    token_dir = tokens / invocation
     token_dir.mkdir(mode=0o755)
     token_dir.chmod(0o755)
-    token = ops.funds.put(token_dir / 'guard-admission.json', dict(epoch=288, unit=UNIT, invocation_id=invocation,
+    token = ops.funds.put(token_dir / 'guard-admission.json', dict(epoch=288, unit=unit, invocation_id=invocation,
         first_guard=first, guard_plan=plan, guard_timer_invocation=clock['InvocationID'],
         next_guard_monotonic_usec=next_guard, admission=admission, publication_authorized=False))
 
     def started():
-        state = ops.props(UNIT, ['Id', 'InvocationID', 'MainPID', 'ActiveState', 'SubState', 'NRestarts', 'LoadState', 'Result'])
+        state = ops.props(unit, ['Id', 'InvocationID', 'MainPID', 'ActiveState', 'SubState', 'NRestarts', 'LoadState', 'Result'])
         if (state['ActiveState'], state['SubState']) != ('active', 'running'):
             return None
         assert state['InvocationID'] == invocation and state['NRestarts'] == '0'
         pid = int(state['MainPID'])
         assert pid > 0 and (Path('/proc') / str(pid) / 'exe').samefile(argv[0])
-        for path in sorted(RECEIPTS.glob('sample-*.json'), key=lambda p: p.stat().st_mtime_ns, reverse=True):
+        for path in sorted(receipts.glob('sample-*.json'), key=lambda p: p.stat().st_mtime_ns, reverse=True):
             observation, ref = read_guard_sample(path)
             assert observation['producer_invocation_id'] == invocation and observation['plan_sha256'] == plan['sha256']
             assert observation['guard_sha256'] == guard['sha256'] and observation['trip_reason'] is None
@@ -827,20 +934,27 @@ def guarded_start(kit, profile_ref, fit, inventory, deployment):
                 assert observation['producer']['pid'] == pid and observation['worker_observation_error'] is None
                 (worker_pid, _), = observation['workers']
                 process = Path('/proc') / str(worker_pid)
-                assert (process / 'exe').readlink().is_relative_to(RUN)
-                assert f'0::/system.slice/{UNIT}' in (process / 'cgroup').read_text().splitlines()
+                assert (process / 'exe').readlink().is_relative_to(run_root)
+                assert f'0::/system.slice/{unit}' in (process / 'cgroup').read_text().splitlines()
                 assert binding(process / 'exe')['sha256'] == worker['sha256']
                 return state, pid, worker_pid, observation, ref
         return None
 
     state, pid, worker_pid, observation, original_guard = startup.until(started, 220)
-    active_guard = ops.funds.put(PACKAGE / 'active-guard.json', observation)
-    identity = dict(unit=UNIT, active_state='active', sub_state='running', main_pid=pid, invocation_id=invocation,
+    active_guard = ops.funds.put(package / 'active-guard.json', observation)
+    identity = dict(unit=unit, active_state='active', sub_state='running', main_pid=pid, invocation_id=invocation,
                     restarts=0, load_state=state['LoadState'], result=state['Result'])
+    scope = dict(kind='epoch288-bounded-shrink-debt-storage-comparison', target_slot=124429562, terminal_slot=124435861)
+    if full:
+        manager = ops.props(unit, ['InvocationID', 'ExecStart', 'ExecMainStartTimestamp'])
+        assert manager['InvocationID'] == invocation
+        started_at = datetime.strptime(manager['ExecMainStartTimestamp'], '%a %Y-%m-%d %H:%M:%S UTC').replace(tzinfo=timezone.utc)
+        scope = dict(kind='epoch288-full-shrink-debt-replay', terminal_slot=124846819,
+                     started_unix_seconds=int(started_at.timestamp()), expected_exec_start=manager['ExecStart'])
     return ops.funds.put(registration, dict(schema='jetstreamer-historical-performance-launch-receipt-v1',
-        kind='epoch288-bounded-shrink-debt-storage-comparison', epoch=288, unit=UNIT, invocation_id=invocation, main_pid=pid,
-        node_path=argv[0], worker=worker, worker_pid=worker_pid, run_root=str(RUN),
-        bootstrap_slot=124415782, target_slot=124429562, terminal_slot=124435861,
+        epoch=288, unit=unit, invocation_id=invocation, main_pid=pid,
+        node_path=argv[0], worker=worker, worker_pid=worker_pid, run_root=str(run_root),
+        bootstrap_slot=124415782, **scope,
         launched=True, entry_replay_requested=True, canonical_epoch_publication_authorized=False, remote_mutations=False,
         r2_mutations=False, admission=admission, guard_plan=plan, launch_token=token, active_guard=active_guard,
         evidence=dict(units=[identity], original_guard_sample=original_guard)))
@@ -850,7 +964,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'capacity-continuation230',
                                           'capacity-demotion229', 'capacity-demotion229-retry',
-                                          'prepare', 'launch'))
+                                          'prepare', 'launch', 'launch-full'))
     parser.add_argument('reference', nargs='?')
     parser.add_argument('sha256', nargs='?')
     options = parser.parse_args()
@@ -868,7 +982,7 @@ def main():
         print(json.dumps(capacity(load_existing(), candidate_epoch=229,
                                   demotion_retry=options.action.endswith('-retry'))))
         return
-    if options.action in ('prepare', 'launch'):
+    if options.action in ('prepare', 'launch', 'launch-full'):
         kit = load_existing()
         assert os.environ['CODEX_THREAD_ID'] == kit.replay.THREAD
         os.umask(0o077)
@@ -881,6 +995,9 @@ def main():
                 'ActiveState': 'inactive', 'Job': ''}
             if options.action == 'prepare':
                 print(json.dumps(prepare(kit, ref)))
+                return
+            if options.action == 'launch-full':
+                print(json.dumps(launch_full(kit, ref)))
                 return
             assert ref['path'] == str(PACKAGE / 'profile.json')
             profile = read(ref)

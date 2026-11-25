@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -17,10 +18,15 @@ V = Path('/var/lib/jetstreamer')
 CONTROL = V / 'horizon-seven-publication-controller-v222'
 ROOT = V / 'horizon288-full-v303'
 SCRATCH = Path('/home/ubuntu/.jetstreamer-private/qualification-288-root-v303')
-UNIT = 'horizon-qualify-288-root-singleton-v303.service'
+PREDECESSOR_UNIT = 'horizon-qualify-288-root-singleton-v303.service'
 TOKENS = V / 'horizon288-full-tokens-v303'
 GUARD_RECEIPTS = V / 'horizon288-full-guard-receipts-v303'
 PROOF = ROOT / 'cadence-registration.json'
+REPAIR = V / 'horizon288-full-shrink-debt-v1'
+REPAIR_UNIT = 'horizon-qualify-288-root-shrink-debt-v1.service'
+REPAIR_ROOT = Path('/home/ubuntu/.jetstreamer-private/qualification-288-full-shrink-debt-v1')
+REPAIR_PROOF = REPAIR / 'cadence-registration.json'
+UNIT = REPAIR_UNIT if REPAIR_PROOF.is_file() else PREDECESSOR_UNIT
 PREPARED = ROOT / 'producer-prepared.json'
 OLD = V / 'horizon275-full-v301-a2'
 CAP = 501_073_741_824
@@ -145,8 +151,60 @@ def specialized(filename, checksum):
 
 def adapter():
     value = specialized('replay275.py', '54f6c3d63fa51312afb7eea75f8c9dd4cdeae1acdd57161806dec3e511d51944')
-    assert value.UNIT == UNIT and value.CAP == CAP and value.PROOF == PROOF
+    assert value.UNIT == PREDECESSOR_UNIT and value.CAP == CAP and value.PROOF == PROOF
+    if REPAIR_PROOF.is_file():
+        value.UNIT, value.ROOT, value.PROOF = REPAIR_UNIT, REPAIR_ROOT, REPAIR_PROOF
+        value.PROFILE = REPAIR / 'profile.json'
+        value.evidence = lambda: repair_evidence(value)
     return value
+
+
+def repair_evidence(value):
+    proof = value.sealed(REPAIR_PROOF)
+    registration = bound(proof)
+    iid = registration['invocation_id']
+    assert re.fullmatch('[0-9a-f]{32}', iid)
+    assert registration['kind'] == 'epoch288-full-shrink-debt-replay'
+    assert (registration['epoch'], registration['unit'], registration['run_root']) == (288, REPAIR_UNIT, str(REPAIR_ROOT))
+    assert registration['terminal_slot'] == 124846819 and registration['launched']
+    assert registration['canonical_epoch_publication_authorized'] is False
+    assert type(registration['started_unix_seconds']) is int and registration['started_unix_seconds'] > 0
+    admission = bound(registration['admission'])
+    assert admission['admitted'] and admission['publication_authorized'] is False
+    profile_ref = value.sealed(REPAIR / 'profile.json', admission['profile']['sha256'])
+    assert profile_ref == admission['profile']
+    profile = bound(profile_ref)
+    namespace = bound(profile['namespace'])
+    assert namespace['result']['namespace_verified'] and not namespace['result']['replay_started']
+    assert profile['worker'] == namespace['worker'] == registration['worker']
+    assert profile['node'] == namespace['node']
+    for key in ('node', 'worker', 'guard', 'producer'):
+        assert value.sealed(profile[key]['path'], profile[key]['sha256']) == profile[key]
+    token = bound(registration['launch_token'])
+    assert (token['epoch'], token['unit'], token['invocation_id']) == (288, REPAIR_UNIT, iid)
+    assert token['admission'] == registration['admission'] and token['guard_plan'] == registration['guard_plan']
+    assert token['publication_authorized'] is False
+    first = value.sealed(token['first_guard']['path'], token['first_guard']['sha256'], native_receipt=True)
+    plan = bound(registration['guard_plan'])
+    assert (plan['unit'], plan['invocation_id'], plan['worker_root']) == (REPAIR_UNIT, iid, str(REPAIR_ROOT))
+    assert plan['maximum_root_physical_bytes'] == CAP
+    for sample in (bound(first), bound(registration['active_guard'])):
+        assert sample['producer_invocation_id'] == iid
+        assert sample['producer_stop_enabled'] and sample['trip_reason'] is None
+        assert sample['plan_sha256'] == registration['guard_plan']['sha256']
+        assert sample['guard_sha256'] == profile['guard']['sha256']
+    active = bound(registration['active_guard'])
+    assert active['producer']['pid'] == registration['main_pid']
+    assert active['producer']['active'] == 'active' and active['worker_observation_error'] is None
+    assert active['workers'][0][0] == registration['worker_pid']
+    command, = (line.removeprefix('ExecStart=') for line in Path(profile['producer']['path']).read_text().splitlines()
+                if line.startswith('ExecStart='))
+    argv = shlex.split(command)
+    assert argv == profile['argv'] == namespace['argv'] and argv[:3] == [str(value.NODE), '288', str(REPAIR_ROOT / 'output')]
+    assert registration['expected_exec_start'].startswith(f'{{ path={value.NODE} ; argv[]={command} ;')
+    sources = (proof, profile_ref, registration['admission'], registration['launch_token'], first,
+               registration['active_guard'], registration['guard_plan'], profile['comparison'], profile['namespace'])
+    return registration, sources, argv, profile['worker']['sha256']
 
 
 def config():
