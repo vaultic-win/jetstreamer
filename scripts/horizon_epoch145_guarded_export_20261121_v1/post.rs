@@ -7,7 +7,11 @@ use std::os::unix::fs::PermissionsExt;
 #[cfg(not(incident_timeout_post145_only))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7/export145";
 #[cfg(incident_fixture_post145_only)]
-pub(super) const INCIDENT_POST_IMAGE: &str = if cfg!(incident_v5u_post145_only) {
+pub(super) const INCIDENT_POST_IMAGE: &str = if cfg!(incident_v5w_post145_only) {
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13o/export145"
+} else if cfg!(incident_guard_v5u_post145_only) {
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13n/export145"
+} else if cfg!(incident_v5u_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13m/export145"
 } else if cfg!(incident_v5r_136_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13l/export145"
@@ -75,6 +79,18 @@ const READER_COMMIT: &str = "58709604dfa4c97336c2e1f6fac53b862ed6f17f";
 const READER_COMMIT: &str = "eba5d1b596cd454811c466fde7a25a2ecb4b19ef";
 #[cfg(all(incident_post145_only, not(incident_timeout_post145_only)))]
 const READER_COMMIT: &str = "907c5b3c26837c75c5c62f76bb124ff4fd8fe642";
+#[cfg(incident_guard_v5u_post145_only)]
+const GUARD_READER_COMMIT: &str = if cfg!(incident_v5w_post145_only) {
+    "6bc8f25405f86634f484e665a740ecf73845d691"
+} else {
+    "80e86a24fba065d17ad97321878cdb9e3ee38dc3"
+};
+#[cfg(incident_guard_v5u_post145_only)]
+const GUARD_QUALIFICATION_SHA: &str = if cfg!(incident_v5w_post145_only) {
+    "5076d6cc1e87bc9c0af0c7192b16e1b062499bc65610edb46b625438b969eaaf"
+} else {
+    "a23eaed728ba6195cacfee622188d669dfc78ec7cf380892c1e625d992008553"
+};
 const ANCHORS: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch145-independent-boundary-metadata-20261106-v1";
 const PARENT: &str = "Fnoa95TKZ1U419CubZrxYDtFnqadRmvM554FFi2xSizB";
@@ -572,6 +588,86 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
         )?;
         qualified
     };
+    #[cfg(incident_guard_v5u_post145_only)]
+    let qualified = {
+        let directory =
+            Path::new(capacity::RUNTIME).join("archive-reader-epoch145-guard-80e86a24-v1");
+        let pair = bound(
+            &directory.join("ordinary/QUALIFIED.json"),
+            "2dd2912c5c82c976233015a6bea69883eaff27a3999128e9ace9d02413491839",
+        );
+        let item = bound(
+            &directory.join("qualification.json"),
+            "a23eaed728ba6195cacfee622188d669dfc78ec7cf380892c1e625d992008553",
+        );
+        let paired = custody::json(&pair, true)?;
+        let accepted = custody::json(&item, true)?;
+        let previous = custody::json(&qualified, true)?;
+        let sources = accepted["source_build_evidence"]
+            .as_array()
+            .context("reader build evidence")?;
+        ensure!(
+            paired["schema"]
+                == "horizon-ordinary-uploader-and-current-reader-loopback-qualification-v1"
+                && paired["reader"] == json!(item)
+                && paired["uploader"]
+                    == json!({"path":root.join("uploader-tools/jetstreamer-r2"),"sha256":super::publication::UPLOADER})
+                && paired["threads"] == 1
+                && paired["slot_count"] == 432000
+                && paired["production_r2_mutations"] == 0
+                && paired["wrong_etag_rejected_before_sidecar"] == true
+                && accepted["schema"] == "horizon-current-reader-main-acceptance-v1"
+                && accepted["reader_commit"] == "80e86a24fba065d17ad97321878cdb9e3ee38dc3"
+                && accepted["full_verifier"] == json!(full)
+                && accepted["pipeline"] == json!(pipe)
+                && [
+                    "cargo_features",
+                    "rustc_flags",
+                    "minimum_thread_stack_bytes",
+                    "source_artifact_correspondence_accepted",
+                    "full_and_plugin_capabilities_accepted"
+                ]
+                .iter()
+                .all(|key| accepted[*key] == previous[*key])
+                && sources.contains(&json!(qualified))
+                && sources.contains(&paired["compiled_equivalence"]),
+            "different requalified epoch 145 reader and uploader"
+        );
+        #[cfg(incident_v5w_post145_only)]
+        {
+            let new = Path::new(capacity::RUNTIME).join("archive-reader-epoch145-guard-6bc8f254-v1");
+            let successor = bound(&new.join("qualification.json"), GUARD_QUALIFICATION_SHA);
+            let equivalence = bound(&new.join("compiled-equivalence.json"),
+                "b1d0114cd8fcf31ea0a7398f1dc93efa0e61bd608c040ef8f9fdbd45d2e5f078");
+            let pairing = bound(&new.join("pair-equivalence.json"),
+                "cadb6b28959ffb60ed496be3db3813afad6a05554ab3ebcd05e5beefabe354e8");
+            let c = custody::json(&equivalence, true)?;
+            let q = custody::json(&successor, true)?;
+            let p = custody::json(&pairing, true)?;
+            ensure!(
+                q["schema"] == accepted["schema"] && q["reader_commit"] == GUARD_READER_COMMIT
+                    && ["pipeline","full_verifier","cargo_features","rustc_flags","minimum_thread_stack_bytes",
+                       "source_artifact_correspondence_accepted","full_and_plugin_capabilities_accepted"]
+                        .iter().all(|key| q[*key] == accepted[*key])
+                    && q["source_build_evidence"].as_array().is_some_and(|sources|
+                        sources.contains(&json!(item)) && sources.contains(&json!(pair))
+                            && sources.contains(&json!(equivalence)))
+                    && c["reader_commit"] == GUARD_READER_COMMIT && c["pipeline"] == json!(pipe)
+                    && c["full_verifier"] == json!(full)
+                    && p["schema"] == "horizon-ordinary-uploader-reader-equivalence-v1"
+                    && p["reader"] == json!(successor) && p["predecessor_pair"] == json!(pair)
+                    && p["predecessor_reader"] == json!(item) && p["compiled_equivalence"] == json!(equivalence)
+                    && p["pipeline"] == json!(pipe) && p["full_verifier"] == json!(full)
+                    && p["uploader"] == paired["uploader"] && p["uploader_seal"] == paired["uploader_seal"]
+                    && p["fixture_threads"] == 1 && p["fixture_slot_count"] == 432000
+                    && p["fixture_wrong_etag_rejected"] == true && p["production_r2_mutations"] == 0,
+                "successor reader qualification or carried fixture differs"
+            );
+            successor
+        }
+        #[cfg(not(incident_v5w_post145_only))]
+        item
+    };
     Ok((full, pipe, qualified))
 }
 
@@ -755,10 +851,14 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
         &serde_json::to_vec_pretty(&expectation)?,
     )?;
     let (reader, pipeline, qualified) = native_tools(Path::new(ROOT), &state)?;
+    #[cfg(incident_guard_v5u_post145_only)]
+    let delivery_commit = GUARD_READER_COMMIT;
+    #[cfg(not(incident_guard_v5u_post145_only))]
+    let delivery_commit = READER_COMMIT;
     let scratch = state.join("delivery");
     fs::DirBuilder::new().mode(0o700).create(&scratch)?;
     let plan = json!({"schema":"horizon-current-reader-plan-v1","repository":"/home/sol/workspace/jetstreamer",
-      "origin_url":"git@github-matt-vaultic:vaultic-win/jetstreamer.git","reader_commit":READER_COMMIT,
+      "origin_url":"git@github-matt-vaultic:vaultic-win/jetstreamer.git","reader_commit":delivery_commit,
       "pipeline":pipeline,"full_verifier":reader,"qualification":qualified,"scratch_directory":scratch,"threads":1,
       "maximum_archive_bytes":BYTES,"minimum_free_bytes":first["protected_bytes"],"epoch_expectations":{"145":eb}});
     let plan_binding = immutable_copy(
@@ -873,7 +973,11 @@ mod tests {
         assert_eq!(plugin.sha256, PIPELINE);
         assert_eq!(
             plan.sha256,
-            if cfg!(incident_timer_post145_only) {
+            if cfg!(incident_v5w_post145_only) {
+                "5076d6cc1e87bc9c0af0c7192b16e1b062499bc65610edb46b625438b969eaaf"
+            } else if cfg!(incident_guard_v5u_post145_only) {
+                "a23eaed728ba6195cacfee622188d669dfc78ec7cf380892c1e625d992008553"
+            } else if cfg!(incident_timer_post145_only) {
                 "c715952c42ac45b2ebce0a104fee239ff0e5374e18ca2613a569a8f4e91bc36a"
             } else if cfg!(incident_timeout_post145_only) {
                 "432f57f077e6b82632d3bae94b000bd9a42751c9a3bab7ee20cb69c3b73fd471"

@@ -9,6 +9,7 @@ import sys
 BASE = "58709604dfa4c97336c2e1f6fac53b862ed6f17f"
 BRIDGE = "06607089e5762e61a82e0f6b2da0ae1adbf16634"
 GUARD_BRIDGE = "80e86a24fba065d17ad97321878cdb9e3ee38dc3"
+GUARD_SUCCESSOR = "6bc8f25405f86634f484e665a740ecf73845d691"
 HOME = Path("/home/sol")
 REPO = HOME / "workspace/jetstreamer"
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
@@ -18,6 +19,9 @@ ORIGINAL = FAST / "production-reader-v1/qualification.json"
 ORIGINAL_SHA = "c715952c42ac45b2ebce0a104fee239ff0e5374e18ca2613a569a8f4e91bc36a"
 EVIDENCE = RT / "archive-reader-epoch145-bridge-06607089-v1"
 GUARD_EVIDENCE = RT / "archive-reader-epoch145-guard-80e86a24-v1"
+GUARD_SUCCESSOR_EVIDENCE = RT / "archive-reader-epoch145-guard-6bc8f254-v1"
+GUARD_QUALIFICATION_SHA = "a23eaed728ba6195cacfee622188d669dfc78ec7cf380892c1e625d992008553"
+GUARD_PAIR_SHA = "2dd2912c5c82c976233015a6bea69883eaff27a3999128e9ace9d02413491839"
 BINARY = "jetstreamer-utils/src/horizon_boundary_bridge_bin.rs"
 MODULE = "jetstreamer-utils/src/horizon_boundary_bridge/native_full.rs"
 GUARD = "jetstreamer-utils/src/horizon_standalone_guard_bin.rs"
@@ -81,10 +85,12 @@ def checked_transition(candidate):
             BINARY: ":100644 100644 4335f85511ed25a205b1d71235e91dff282bb894 11d41120919f99f8b2e7d08d5845dde85a675c1c M",
         }
     else:
-        check(candidate == GUARD_BRIDGE, "unknown reader equivalence target")
-        expected = {
-            GUARD: ":100644 100644 586ff69471846a477db4373912646abecc75299d 826129fa61932fd05c4c3b81d7e2fc86a1666023 M",
+        new = {
+            GUARD_BRIDGE: "826129fa61932fd05c4c3b81d7e2fc86a1666023",
+            GUARD_SUCCESSOR: "b31f8783f3e1a494d9b57f40d202f8dca3769c9b",
         }
+        check(candidate in new, "unknown reader equivalence target")
+        expected = {GUARD: ":100644 100644 586ff69471846a477db4373912646abecc75299d " + new[candidate] + " M"}
     git("merge-base", "--is-ancestor", BASE, candidate)
     changed = git("diff", "--no-renames", "--raw", "--no-abbrev", BASE, candidate,
                   "--", *SCOPES, POH).decode().splitlines()
@@ -96,7 +102,7 @@ def checked_transition(candidate):
 def compatible_branch():
     tip = git("rev-parse", "origin/account-updates").decode().strip()
     git("merge-base", "--is-ancestor", BASE, tip)
-    for candidate in (BASE, BRIDGE, GUARD_BRIDGE):
+    for candidate in (BASE, BRIDGE, GUARD_BRIDGE, GUARD_SUCCESSOR):
         if not git("diff", "--name-only", candidate, tip, "--", *SCOPES, POH):
             git("merge-base", "--is-ancestor", candidate, tip)
             return candidate, tip
@@ -141,7 +147,7 @@ def evidence(candidate, old):
     check(full["equivalent_at"] == BASE and full["external_module"] == POH, "different full-verifier origin")
     for path, obj in full["trees"].items():
         check(git("rev-parse", candidate + ":" + path).decode().strip() == obj, "full verifier input changed: " + path)
-    schema = "horizon-reader-standalone-guard-equivalence-v1" if candidate == GUARD_BRIDGE else "horizon-reader-boundary-tool-equivalence-v1"
+    schema = "horizon-reader-standalone-guard-equivalence-v1" if candidate in (GUARD_BRIDGE, GUARD_SUCCESSOR) else "horizon-reader-boundary-tool-equivalence-v1"
     obj = dict(schema=schema, original=ref(ORIGINAL, ORIGINAL_SHA),
                reader_commit=candidate, predecessor_commit=BASE, original_cargo_artifacts=ref(RUN / "artifacts.jsonl", artsha),
                depinfo=ref(RUN / "horizon_pipeline.d", depsha), paths=paths, changed_git_blobs=transition,
@@ -172,9 +178,126 @@ def store(path, value):
     return ref(path, sha(raw))
 
 
-if __name__ == "__main__":
-    check(os.geteuid() == 0 and sys.flags.isolated and len(sys.argv) == 1, "requires root isolated execution")
+def successor_post_preflight(tip):
+    directory = GUARD_SUCCESSOR_EVIDENCE
+    qualification = ref(directory / "qualification.json",
+                        "5076d6cc1e87bc9c0af0c7192b16e1b062499bc65610edb46b625438b969eaaf")
+    proof = ref(directory / "compiled-equivalence.json",
+                "b1d0114cd8fcf31ea0a7398f1dc93efa0e61bd608c040ef8f9fdbd45d2e5f078")
+    paired = ref(directory / "pair-equivalence.json",
+                 "cadb6b28959ffb60ed496be3db3813afad6a05554ab3ebcd05e5beefabe354e8")
+    q = json.loads(read(qualification["path"], qualification["sha256"]))
+    comparison = json.loads(read(proof["path"], proof["sha256"]))
+    p = json.loads(read(paired["path"], paired["sha256"]))
+    sha_seal = sha((directory / "deployment-seal-receipt.json").read_bytes())
+    seal_ref = ref(directory / "deployment-seal-receipt.json", sha_seal)
+    seal = json.loads(read(seal_ref["path"], seal_ref["sha256"]))
+    check(seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+          and seal["destination"] == str(directory) and seal["remote_mutations"] is False
+          and seal["sealer_sha256"] == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+          and {m["name"]: m["sha256"] for m in seal["members"]} == {
+              Path(item["path"]).name: item["sha256"] for item in (qualification, proof, paired)},
+          "the current reader proof deployment differs")
+    check(q["reader_commit"] == comparison["reader_commit"] == GUARD_SUCCESSOR
+          and p["reader"] == qualification and p["compiled_equivalence"] == proof
+          and q["pipeline"] == comparison["pipeline"] == p["pipeline"]
+          and q["full_verifier"] == comparison["full_verifier"] == p["full_verifier"]
+          and p["fixture_threads"] == 1 and p["fixture_slot_count"] == 432000
+          and p["fixture_wrong_etag_rejected"] is True and p["production_r2_mutations"] == 0,
+          "the current reader proof or fixture differs")
+    for item in (q["pipeline"], q["full_verifier"], p["uploader"], p["uploader_seal"],
+                 p["predecessor_pair"], p["predecessor_reader"]):
+        read(item["path"], item["sha256"])
+    check(compatible_branch() == (GUARD_SUCCESSOR, tip), "current reader inputs changed during preflight")
+    return dict(schema="horizon-epoch145-v5w-ordinary-reader-preflight-v1", fetched_tip=tip,
+                qualified_reader_commit=GUARD_SUCCESSOR, qualification=qualification, deployment=seal_ref,
+                compiled_equivalence=proof, ordinary_pair=paired, full=q["full_verifier"], pipeline=q["pipeline"],
+                uploader=p["uploader"], uploader_seal=p["uploader_seal"],
+                publication_authorized=False, r2_mutations=False)
+
+
+def guard_post_preflight():
     baseline, tip = compatible_branch()
+    if baseline == GUARD_SUCCESSOR:
+        return successor_post_preflight(tip)
+    check(baseline == GUARD_BRIDGE, "current branch does not match the guard-qualified post route")
+    qref = ref(GUARD_EVIDENCE / "qualification.json", GUARD_QUALIFICATION_SHA)
+    pair_ref = ref(GUARD_EVIDENCE / "ordinary/QUALIFIED.json", GUARD_PAIR_SHA)
+    q = json.loads(read(qref["path"], qref["sha256"]))
+    pair = json.loads(read(pair_ref["path"], pair_ref["sha256"]))
+    compiled = pair["compiled_equivalence"]
+    checked = json.loads(read(compiled["path"], compiled["sha256"]))
+    check(q["reader_commit"] == baseline == checked["reader_commit"]
+          and pair["reader"] == qref and compiled in q["source_build_evidence"]
+          and q["pipeline"] == checked["pipeline"] and q["full_verifier"] == checked["full_verifier"]
+          and pair["production_r2_mutations"] == 0 and pair["wrong_etag_rejected_before_sidecar"] is True,
+          "different archived qualification or ordinary uploader pairing")
+    for item in [q["pipeline"], q["full_verifier"], pair["uploader"], pair["uploader_seal"]]:
+        read(item["path"], item["sha256"])
+    check(compatible_branch() == (baseline, tip), "branch tracker changed during qualification")
+    return dict(schema="horizon-epoch145-v5u-ordinary-reader-preflight-v1", fetched_tip=tip,
+                qualified_reader_commit=baseline, compared_reader_scopes=[*SCOPES, POH],
+                ordinary_pair=pair_ref, qualification=qref, full=q["full_verifier"], pipeline=q["pipeline"],
+                uploader=pair["uploader"], uploader_seal=pair["uploader_seal"],
+                publication_authorized=False, r2_mutations=False)
+
+
+def stage_guard_successor(directory):
+    baseline, tip = compatible_branch()
+    check(baseline == GUARD_SUCCESSOR and directory.resolve(strict=True) == directory
+          and directory.stat().st_uid == 0 and directory.stat().st_mode & 0o777 == 0o700
+          and not any(directory.iterdir()), "a fresh private stage and the reviewed guard successor are required")
+    previous_q = ref(GUARD_EVIDENCE / "qualification.json", GUARD_QUALIFICATION_SHA)
+    previous_pair = ref(GUARD_EVIDENCE / "ordinary/QUALIFIED.json", GUARD_PAIR_SHA)
+    old = original_reader()
+    q = json.loads(read(previous_q["path"], previous_q["sha256"]))
+    pair = json.loads(read(previous_pair["path"], previous_pair["sha256"]))
+    check(q["reader_commit"] == GUARD_BRIDGE and pair["reader"] == previous_q
+          and pair["schema"] == "horizon-ordinary-uploader-and-current-reader-loopback-qualification-v1"
+          and pair["threads"] == 1 and pair["slot_count"] == 432000
+          and pair["production_r2_mutations"] == 0 and pair["wrong_etag_rejected_before_sidecar"] is True
+          and all(old[k] == q[k] for k in ("pipeline", "full_verifier", "rustc_flags",
+                                        "cargo_features", "minimum_thread_stack_bytes")),
+          "the previous qualified reader and uploader pair differs")
+    for item in (q["pipeline"], q["full_verifier"], pair["uploader"], pair["uploader_seal"],
+                 pair["compiled_equivalence"]):
+        read(item["path"], item["sha256"])
+    comparison = evidence(baseline, old)
+    check(compatible_branch() == (baseline, tip), "branch tracker moved across compiled-input comparison")
+    comparison_ref = ref(GUARD_SUCCESSOR_EVIDENCE / "compiled-equivalence.json", sha(encode(comparison)))
+    accepted = dict(old, reader_commit=baseline, source_build_evidence=[
+        *old["source_build_evidence"], ref(ORIGINAL, ORIGINAL_SHA), previous_q,
+        previous_pair, comparison_ref])
+    accepted_ref = ref(GUARD_SUCCESSOR_EVIDENCE / "qualification.json", sha(encode(accepted)))
+    pairing = dict(schema="horizon-ordinary-uploader-reader-equivalence-v1",
+                   reader=accepted_ref, predecessor_pair=previous_pair,
+                   predecessor_reader=previous_q, compiled_equivalence=comparison_ref,
+                   pipeline=q["pipeline"], full_verifier=q["full_verifier"],
+                   uploader=pair["uploader"], uploader_seal=pair["uploader_seal"],
+                   fixture_threads=pair["threads"], fixture_slot_count=pair["slot_count"],
+                   fixture_wrong_etag_rejected=pair["wrong_etag_rejected_before_sidecar"],
+                   new_native_playback=False, production_r2_mutations=0)
+    files = [store(directory / name, payload) for name, payload in (
+        ("compiled-equivalence.json", comparison), ("qualification.json", accepted),
+        ("pair-equivalence.json", pairing))]
+    return dict(schema="horizon-epoch145-guard-successor-reader-stage-v1", reader_commit=baseline,
+                fetched_tip=tip, destination=str(GUARD_SUCCESSOR_EVIDENCE), members=files,
+                archive_publication_authorized=False)
+
+
+def main():
+    check(os.geteuid() == 0 and sys.flags.isolated, "requires root isolated execution")
+    if len(sys.argv) == 3 and sys.argv[1] == "--stage-guard-successor":
+        print(json.dumps(stage_guard_successor(Path(sys.argv[2]))))
+        return
+    if sys.argv[1:] == ["--guard-post-preflight"]:
+        print(json.dumps(guard_post_preflight()))
+        return
+    check(len(sys.argv) == 1, "unexpected reader bridge arguments")
+    baseline, tip = compatible_branch()
+    if baseline == GUARD_SUCCESSOR:
+        print(json.dumps(successor_post_preflight(tip)))
+        return
     old = original_reader()
     if baseline == BASE:
         qualification = ref(ORIGINAL, ORIGINAL_SHA)
@@ -187,3 +310,7 @@ if __name__ == "__main__":
                          source_build_evidence=[*old["source_build_evidence"], ref(ORIGINAL, ORIGINAL_SHA), source_ref])
         qualification = store(directory / "qualification.json", qualified)
     print(json.dumps(dict(reader_commit=baseline, qualified_branch=tip, qualification=qualification)))
+
+
+if __name__ == "__main__":
+    main()

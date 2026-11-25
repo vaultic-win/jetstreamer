@@ -57,9 +57,10 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v3",
 )
 V5W_RECOVERY_145 = HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
+V5W_POST_145 = HERE == D / "tools-homefloor-145-post-v5w-current-v1"
 V5V_RECOVERY_145 = V5W_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
 FRESH_CENSUS_RECOVERY_145 = V5V_RECOVERY_145 or HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
-RETAIN_FAILED166 = FAILED166_CADENCE or V5V_RECOVERY_145
+RETAIN_FAILED166 = FAILED166_CADENCE or V5V_RECOVERY_145 or V5W_POST_145
 GUARD_WALK_RECOVERY_145 = FRESH_CENSUS_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5s-guard-recovery-v1"
 GUARD_TERMINAL_RECOVERY_145 = (
     GUARD_WALK_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5r-guard-recovery-v1"
@@ -93,7 +94,8 @@ V5N_136 = HERE == D / "tools-homefloor-145-post-v5n-136-v1"
 V5O_136 = HERE == D / "tools-homefloor-145-post-v5o-136-v1"
 V5Q_136 = HERE == D / "tools-homefloor-145-post-v5q-136-v1"
 V5R_136 = HERE == D / "tools-homefloor-145-post-v5r-136-v1"
-V5U_POST_145 = HERE == D / "tools-homefloor-145-post-v5u-v1"
+V5U_GUARD_POST_145 = HERE == D / "tools-homefloor-145-post-v5u-guard-v1"
+V5U_POST_145 = V5W_POST_145 or V5U_GUARD_POST_145 or HERE == D / "tools-homefloor-145-post-v5u-v1"
 POST_136 = V5N_136 or V5O_136 or V5Q_136 or V5R_136
 V5N_POST = V5U_POST_145 or POST_136 or HERE == D / "tools-homefloor-145-post-v5n-v1"
 V5M_POST = V5N_POST or HERE == D / "tools-homefloor-145-post-v5m-v1"
@@ -103,7 +105,7 @@ V5J_POST = V5J_RETRY_POST or HERE == D / "tools-homefloor-145-post-v5j-v1"
 HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v1"
 if HOURLY169:
     hourly169 = runpy.run_path(str(HERE / "hourly169_actor.py"))
-if HOURLY170 or V5V_RECOVERY_145:
+if HOURLY170 or V5V_RECOVERY_145 or V5W_POST_145:
     adapter = HERE / "hourly170_actor.py"
     seal, _ = s.read(HERE / "deployment-seal-receipt.json")
     member, = [row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444"]
@@ -584,7 +586,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
             (MISSED_RUNTIME_145, "tools-v5m"),
             (True, "tools-v5k"),
         ) if enabled)
-        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
+        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13o" if V5W_POST_145 else "tools-v13n" if V5U_GUARD_POST_145 else "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
                     "lease-semantic": ("profile145-lease-semantic.json", lease_directory),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
@@ -1245,7 +1247,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
     failed170 = failed170_replay(f, rows) if V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 else None
     failed166 = retry11["failed"](s, fit, f, rows) if RETAIN_FAILED166 else None
-    hourly170_settled = settled_hourly170_for_145(f, ref, rows) if V5V_RECOVERY_145 else None
+    hourly170_settled = settled_hourly170_for_145(f, ref, rows) if V5V_RECOVERY_145 or V5W_POST_145 else None
     terminal170 = None
     if PUBLISH170:
         s.need(epoch == 145 and prestart136 is None, "cold170 provider only prices terminal publication")
@@ -1556,7 +1558,7 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None):
         module = HERE / "build_159_price.py"
         member, = [v for v in seal["members"] if v["name"] == module.name]
         s.need(seal["destination"] == str(HERE) and member["mode"] == "0444", "unbound donor price")
-        if V5V_RECOVERY_145:
+        if V5V_RECOVERY_145 or V5W_POST_145:
             s.need(member["sha256"] == "db0b9de9d848a525c0f2daf7810ac8dba85515253e99f8c358eb34e4ba2e5d7c",
                    "V5v requires the published epoch 159 donor retry")
         fit.binary(module,member["sha256"])

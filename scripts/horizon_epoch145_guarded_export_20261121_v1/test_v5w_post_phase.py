@@ -1,0 +1,76 @@
+"""Verify that ordinary epoch 145 checks consume only authenticated V5w completion."""
+import hashlib
+import json
+from pathlib import Path
+import runpy
+import stat
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+phase = runpy.run_path(str(Path(__file__).with_name("incident-post-phase.py")))
+route = phase["v5w_completion"]
+scope = route.__globals__
+iid = "97bd2045ebe449e3ae77330c7e4ec7b4"
+expected_hash = "42118f1624e540ed5973d37e358ad4a9f0ba68e3c8c2100c9f777e01c0f2a9bf"
+
+
+class V5wPostPhase(unittest.TestCase):
+    def test_reopen_captured_receipts_only_after_matching_sealed_checker(self):
+        parent = Path("/private/epoch145")
+        pkg = parent / "tools-v13o"
+        original = parent / "tools-v5w"
+        helper = original / "v5v_semantic_completion.py"
+        handoff = parent / "v5w-name-handoff"
+        state = parent / "state"
+        completed = {"path":str(state/iid/"complete.json"),"sha256":"5"*64}
+        extracted = {"path":str(state/iid/"extraction-complete.json"),"sha256":"6"*64}
+        invocation = {"schema":"horizon-epoch145-v5v-custody-successor-semantic-completion-v1",
+                      "invocation_id":iid,"completion":completed,"extraction":extracted,
+                      "publication_authorized":False,"r2_mutations":False}
+        primary = {"archive_bytes":105_610_995_833}
+        records = {
+            original/"deployment-seal-receipt.json":
+                {"destination":str(original),"members":[{"name":helper.name,"mode":"0444","sha256":expected_hash}]},
+            handoff/"SEMANTIC_COMPLETION.json":invocation,
+            state/iid/"complete.json":{"receipt":extracted},
+            state/iid/"extraction-complete.json":{"extraction":primary},
+        }
+
+        def need(ok,message):
+            if not ok:
+                raise ValueError(message)
+
+        def read(path,*_digest):
+            return records[path],{}
+
+        def bound(receipt,path):
+            self.assertEqual(receipt["path"],str(path))
+            return records[path]
+
+        status = SimpleNamespace(read=read,need=need,bound=bound)
+        md = SimpleNamespace(st_uid=0,st_gid=0,st_nlink=1,st_mode=stat.S_IFREG|0o444)
+        with patch.dict(scope, PKG=pkg, STATE=state), patch.object(Path,"lstat",return_value=md), \
+             patch.object(Path,"resolve",autospec=True,side_effect=lambda p,**_:p), \
+             patch.object(Path,"read_bytes",return_value=b"sealed tool"), \
+             patch.object(hashlib,"sha256",return_value=SimpleNamespace(hexdigest=lambda:expected_hash)), \
+             patch.object(scope["subprocess"],"check_output",return_value=json.dumps(invocation)) as checked:
+            self.assertEqual(route(status),(completed,primary))
+            command=checked.call_args.args[0]
+            self.assertEqual(command[:4],["/usr/bin/python3","-IB",helper,handoff/"START_RESULT.json"])
+            changed = dict(invocation,invocation_id="f"*32)
+            checked.return_value=json.dumps(changed)
+            with self.assertRaisesRegex(ValueError,"foreign V5w semantic"):
+                route(status)
+            records[handoff/"SEMANTIC_COMPLETION.json"]=changed
+            with self.assertRaisesRegex(ValueError,"foreign V5w semantic"):
+                route(status)
+            records[handoff/"SEMANTIC_COMPLETION.json"]=invocation
+            checked.return_value=json.dumps(invocation)
+            records[original/"deployment-seal-receipt.json"]["members"][0]["sha256"]="0"*64
+            with self.assertRaisesRegex(ValueError,"different sealed V5w"):
+                route(status)
+
+
+if __name__=="__main__":
+    unittest.main()

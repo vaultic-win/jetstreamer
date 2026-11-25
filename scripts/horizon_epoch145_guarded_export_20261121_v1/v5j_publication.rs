@@ -183,11 +183,50 @@ fn v5u_semantic_owner(export: &str) -> Result<()> {
     terminal(export)
 }
 
+#[cfg(incident_v5w_post145_only)]
+fn v5w_semantic_owner(export: &str) -> Result<()> {
+    ensure!(export == "97bd2045ebe449e3ae77330c7e4ec7b4", "foreign V5w semantic export");
+    let family = Path::new(RUNTIME).join("epoch145-semantic-continuity-20261121-v1");
+    let authority = family.join("tools-v5w");
+    let helper = authority.join("v5v_semantic_completion.py");
+    let helper_hash = "42118f1624e540ed5973d37e358ad4a9f0ba68e3c8c2100c9f777e01c0f2a9bf";
+    let (seal, seal_ref) = publication::frozen_json(&authority.join("deployment-seal-receipt.json"))?;
+    ensure!(
+        seal_ref.sha256 == "8768935daed0a99dd01d467da957dabdb218c3741c04f6597cf663dbcf36314e"
+            && seal["destination"] == json!(authority)
+            && seal["remote_mutations"] == false
+            && seal["members"].as_array().is_some_and(|entries| entries.iter().any(|member|
+                member["name"] == "v5v_semantic_completion.py"
+                    && member["sha256"] == helper_hash && member["mode"] == "0444")),
+        "V5w checker differs from the accepted seal"
+    );
+    custody::bytes(&Bound{path:helper.clone(),sha256:helper_hash.into()}, 128 << 10, true)?;
+    let handoff = family.join("v5w-name-handoff");
+    let start = handoff.join("START_RESULT.json");
+    let report = capacity::run("/usr/bin/python3",
+        &["-IB", helper.to_str().context("V5w semantic checker")?,
+          start.to_str().context("V5w start result")?,
+          "5671b19df2e673656d4ddca27c6218b60a7f5b60f4e9bea72f69792a0af5c379"], "45")?;
+    let result: Value = serde_json::from_str(&report)?;
+    let (captured, _) = publication::frozen_json(&handoff.join("SEMANTIC_COMPLETION.json"))?;
+    ensure!(
+        result == captured
+            && result["schema"] == "horizon-epoch145-v5v-custody-successor-semantic-completion-v1"
+            && result["invocation_id"] == export && result["publication_authorized"] == false
+            && result["r2_mutations"] == false,
+        "different accepted V5w semantic completion"
+    );
+    terminal(export)
+}
+
 pub(crate) fn semantic_owner(export: &str) -> Result<()> {
-    #[cfg(incident_v5u_post145_only)]
+    #[cfg(incident_v5w_post145_only)]
+    return v5w_semantic_owner(export);
+
+    #[cfg(all(incident_v5u_post145_only, not(incident_v5w_post145_only)))]
     return v5u_semantic_owner(export);
 
-    #[cfg(not(incident_v5u_post145_only))]
+    #[cfg(not(any(incident_v5u_post145_only, incident_v5w_post145_only)))]
     legacy_semantic_owner(export)
 }
 
