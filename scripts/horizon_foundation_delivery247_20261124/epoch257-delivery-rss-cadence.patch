@@ -1,0 +1,66 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -188,7 +188,17 @@
+         return 'delivery247_pinned_claim' if successor_247 else 'successor247_claim'
+     return f'delivery{epoch}_claim'
+
++def delivery257_rss_image(kind, name):
++    root = V / 'horizon257-delivery-rss-v1'
++    release = bound(sealed_226_file(root / 'acceptance.json'))
++    assert release['schema'] == 'foundation-epoch257-delivery-rss-release-v1'
++    assert release[kind]['path'] == str(root / name)
++    assert release['claim'] == ref(V / 'horizon257-current-reader-delivery-v1/pipeline-claim.json')
++    return Path(publication_handoff.checked_image(release[kind]))
++
+ def observe_image():
++    if cfg.get('delivery257_claim'):
++        return delivery257_rss_image('observer', 'jetstreamer-horizon-observe')
+     if staged_retries:
+         return Path(staged_retries[max(staged_retries)][1]['observer']['path'])
+     if retry_211:
+@@ -324,6 +334,8 @@
+     saved = bound(ref(config_path))
+     cfg['replays'] = saved['replays']
+     cfg['diagnostic_replays'] = saved['diagnostic_replays']
++    if 'delivery257_claim' in saved:
++        cfg['delivery257_claim'] = saved['delivery257_claim']
+     for e in closed:
+         key = claim_key(e)
+         if key not in saved: cfg.pop(key, None)
+@@ -334,6 +346,18 @@
+         key = claim_key(e)
+         cfg.pop(key, None)
+         if e == 247: cfg['staged247_resource_only'] = False
++    path257 = V / 'horizon257-current-reader-delivery-v1/pipeline-claim.json'
++    if path257.is_file():
++        reference257 = ref(path257)
++        claim257 = bound(reference257)
++        current257 = props(claim257['unit'], ['ActiveState', 'SubState', 'InvocationID', 'MainPID'])
++        if (current257['ActiveState'], current257['SubState']) == ('active', 'running'):
++            assert current257['InvocationID'] == claim257['invocation_id']
++            launch257 = bound(claim257['evidence'][1])['owner']
++            assert launch257['Id'] == claim257['unit'] and launch257['InvocationID'] == current257['InvocationID']
++            assert launch257['MainPID'] == current257['MainPID'] and int(current257['MainPID']) > 1
++            cfg['delivery257_claim'] = dict(invocation_id=current257['InvocationID'],
++                                           pid=int(current257['MainPID']), claim_sha256=reference257['sha256'])
+ config=record(config_path,cfg)
+ def check_roster():
+     for e in failed:
+@@ -359,6 +383,8 @@
+     rows=sample['delivery_resources']
+     check_roster()
+     expected = {e for e in all_claims if cfg.get(claim_key(e))}
++    if cfg.get('delivery257_claim'):
++        expected.add(257)
+     assert {r['range'] for r in rows} == {f'{e}-{e}' for e in expected} and len(rows)==len(expected)
+     assert set(roster) <= expected
+     for e in expected & set(closed):
+@@ -817,6 +843,8 @@
+         assert release['resumed_observer'] == ref(obs)
+         assert release['fleet']['path'] == str(root / 'jetstreamer-r2')
+         fleet_image = Path(publication_handoff.checked_image(release['fleet']))
++    if cfg.get('delivery257_claim'):
++        fleet_image = delivery257_rss_image('fleet', 'jetstreamer-r2')
+     binding=record(out/f'seven-owner-plan-{cohort}.json',plan)
+     target=Path(plan['output'])
+     if not target.exists():

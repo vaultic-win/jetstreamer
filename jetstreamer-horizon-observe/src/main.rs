@@ -139,6 +139,8 @@ struct Config {
     #[serde(default)]
     delivery251_claim: Option<delivery247_resource::DeliveryClaim>,
     #[serde(default)]
+    delivery257_claim: Option<delivery247_resource::DeliveryClaim>,
+    #[serde(default)]
     delivery265_claim: Option<delivery247_resource::DeliveryClaim>,
     #[serde(default)]
     singleton_finalization_epochs: Vec<u64>,
@@ -363,6 +365,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
             || config.delivery249_claim.is_some()
             || config.delivery250_claim.is_some()
             || config.delivery251_claim.is_some()
+            || config.delivery257_claim.is_some()
             || config.delivery265_claim.is_some()
             || config.delivery247_resource_only
             || config.singleton247_finalization
@@ -417,6 +420,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "delivery249_claim":config.delivery249_claim,
             "delivery250_claim":config.delivery250_claim,
             "delivery251_claim":config.delivery251_claim,
+            "delivery257_claim":config.delivery257_claim,
             "delivery265_claim":config.delivery265_claim,
             "singleton_finalization_epochs":singleton247_finalization::epochs(&config)?,
             "configuration_validated": true,
@@ -2022,6 +2026,7 @@ fn run(config: Config) -> Result<()> {
         (Epoch249, &config.delivery249_claim),
         (Epoch250, &config.delivery250_claim),
         (Epoch251, &config.delivery251_claim),
+        (Current257, &config.delivery257_claim),
         (Epoch265, &config.delivery265_claim),
     ] {
         if let Some(claim) = claim {
@@ -2560,6 +2565,7 @@ mod tests {
             delivery249_claim: None,
             delivery250_claim: None,
             delivery251_claim: None,
+            delivery257_claim: None,
             delivery265_claim: None,
             singleton_finalization_epochs: vec![],
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {

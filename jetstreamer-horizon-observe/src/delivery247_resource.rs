@@ -138,6 +138,7 @@ pub(super) fn validate(c: &Config) -> Result<()> {
         (Epoch249, &c.delivery249_claim),
         (Epoch250, &c.delivery250_claim),
         (Epoch251, &c.delivery251_claim),
+        (Current257, &c.delivery257_claim),
         (Epoch265, &c.delivery265_claim),
     ] {
         let Some(claim) = claim else { continue };
@@ -496,6 +497,7 @@ pub(super) enum OrdinaryEpoch {
     Epoch250,
     Staged250,
     Epoch251,
+    Current257,
     Epoch265,
     Retry265,
     Staged265,
@@ -509,6 +511,7 @@ impl OrdinaryEpoch {
             Self::Epoch249 => 249,
             Self::Epoch250 | Self::Staged250 => 250,
             Self::Epoch251 => 251,
+            Self::Current257 => 257,
             Self::Epoch265 | Self::Retry265 | Self::Staged265 => 265,
         }
     }
@@ -524,6 +527,7 @@ impl OrdinaryEpoch {
             Self::Epoch250 => UNIT250,
             Self::Staged250 => STAGED250,
             Self::Epoch251 => UNIT251,
+            Self::Current257 => staged::CURRENT257_UNIT,
             Self::Epoch265 => UNIT265,
             Self::Retry265 => RETRY265,
             Self::Staged265 => STAGED265,
@@ -531,6 +535,7 @@ impl OrdinaryEpoch {
     }
     fn image(self) -> (&'static str, &'static str) {
         match self {
+            Self::Current257 => (staged::CURRENT257_IMAGE, staged::CURRENT257_IMAGE_SHA),
             Self::Staged211
             | Self::Staged211Retry
             | Self::Pinned247
@@ -551,6 +556,7 @@ impl OrdinaryEpoch {
             Self::Epoch250 => "12e68ddf9b6d2505b6090688b5a3cfa4e720242b264cf2a6e7993b9b02f910c2",
             Self::Staged250 => "e96999d456f560fcdc1e1c2c29d11bb4fac9adde7d127542112fe77451c49aa0",
             Self::Epoch251 => "1c815780661e8b502634caff4a2b0d783e831fccc27c612d6a94c3480d00e318",
+            Self::Current257 => "a4a86f9d1a571c15f89e76be632c5dd69509d412cd0d46414699e82ba64abf07",
             Self::Epoch265 | Self::Retry265 => {
                 "801acbb79784fb29fda64a572b6b0a1ed1396cdad4216b6d39b36b1dad86a544"
             }
@@ -571,6 +577,9 @@ impl OrdinaryEpoch {
         }
     }
     fn claim_path(self) -> PathBuf {
+        if matches!(self, Self::Current257) {
+            return Path::new(staged::CURRENT257_DIRECTORY).join("pipeline-claim.json");
+        }
         Path::new("/home/ubuntu/.codex/diagnostics")
             .join(self.unit().trim_end_matches(".service"))
             .join("pipeline-claim.json")
@@ -578,6 +587,26 @@ impl OrdinaryEpoch {
     fn argv(self) -> Vec<String> {
         let epoch = self.number();
         let (source, receipts, plan) = match self {
+            Self::Current257 => {
+                return [
+                    staged::CURRENT257_IMAGE,
+                    "sync",
+                    "/home/ubuntu/.jetstreamer-private/qualification-257-singleton-v1/output",
+                    "--epochs",
+                    "257-257",
+                    "--concurrency",
+                    "1",
+                    "--receipt-directory",
+                    "/var/lib/jetstreamer/horizon257-current-reader-delivery-v1/receipts",
+                    "--current-reader-plan",
+                    "/var/lib/jetstreamer/horizon257-paired-reader-88315624-v1/epoch-257-plan.json",
+                    "--current-reader-plan-sha256",
+                    self.digest(),
+                ]
+                .into_iter()
+                .map(str::to_owned)
+                .collect();
+            }
             Self::Epoch265 | Self::Retry265 => (
                 "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v3/output".to_owned(),
                 "/home/ubuntu/.jetstreamer-private/current-reader-delivery-265-v215/receipts".to_owned(),
@@ -717,6 +746,7 @@ impl DeliveryClaim {
                         | OrdinaryEpoch::Pinned247
                         | OrdinaryEpoch::Staged248
                         | OrdinaryEpoch::Staged250
+                        | OrdinaryEpoch::Current257
                         | OrdinaryEpoch::Staged265
                 ) || (command.ends_with(" }") && command.matches("{ path=").count() == 1)),
             "ordinary delivery unexpected uploader command"
@@ -788,10 +818,10 @@ pub(super) fn sample_ordinary(epoch: OrdinaryEpoch, claim: &DeliveryClaim, clock
         pid: claim.pid,
         image,
         sha,
-        cap: if matches!(epoch, OrdinaryEpoch::Pinned247) {
-            24 << 30
-        } else {
-            10 << 30
+        cap: match epoch {
+            OrdinaryEpoch::Pinned247 => 24 << 30,
+            OrdinaryEpoch::Current257 => staged::CURRENT257_MEMORY_CAP,
+            _ => 10 << 30,
         },
     };
     let result = (|| {
@@ -807,6 +837,33 @@ pub(super) fn sample_ordinary(epoch: OrdinaryEpoch, claim: &DeliveryClaim, clock
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn current_257_telemetry_requires_the_exact_uploader_command() {
+        let epoch = OrdinaryEpoch::Current257;
+        let args = epoch.argv();
+        let expected = format!(
+            "{{ path={} ; argv[]={} ; ignore_errors=no ; start_time=test ; pid=17 ; code=(null) ; status=0/0 }}",
+            epoch.image().0,
+            args.join(" "),
+        );
+        let binding = DeliveryClaim {
+            retry_unit: None,
+            invocation_id: "a".repeat(32),
+            pid: 17,
+            claim_sha256: "b".repeat(64),
+        };
+        let claim = json!({
+            "epoch":257, "phase":"upload-readback", "unit":epoch.unit(),
+            "invocation_id":binding.invocation_id, "evidence":[{}], "expected_exec_start":expected,
+        });
+        let actual = args.join("\0") + "\0";
+        assert!(binding.checked_process_command(epoch, &claim, actual.as_bytes()).is_ok());
+        let mut wrong = args;
+        wrong[6] = "2".into();
+        assert!(binding.checked_process_command(epoch, &claim, (wrong.join("\0") + "\0").as_bytes()).is_err());
+    }
+
     #[test]
     #[ignore = "reads only the registered manager, PID and historical drains on the original host"]
     fn v221_registered_commands_match_all_native_identities() -> Result<()> {

@@ -2,6 +2,15 @@
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 
+pub const CURRENT257_UNIT: &str = "horizon-upload-257-current-reader-v1.service";
+pub const CURRENT257_DIRECTORY: &str = "/var/lib/jetstreamer/horizon257-current-reader-delivery-v1";
+pub const CURRENT257_IMAGE: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-88315624-v1/jetstreamer-r2";
+pub const CURRENT257_IMAGE_SHA: &str =
+    "206cd7c558fff3992a14607c18363522a4f54b9840d6bd96ad0dfc86e22344ff";
+pub const CURRENT257_MEMORY_CAP: u64 = 32 << 30;
+pub const CURRENT257_START_TICKS: u64 = 78_209_038;
+
 pub const UNIT: &str = "horizon-upload-247-staged-680e1173-v1.service";
 pub const IID: &str = "3e08307874db424886cd8c46b3ecfba6";
 pub const PID: u32 = 2149076;

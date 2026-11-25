@@ -4,6 +4,10 @@
 #[path = "../../tools/horizon247_recovery_delivery.rs"]
 mod fourth;
 use anyhow::{Context, Result, ensure};
+use jetstreamer_horizon_observe::staged247_rss::{
+    CURRENT257_DIRECTORY, CURRENT257_IMAGE, CURRENT257_IMAGE_SHA, CURRENT257_MEMORY_CAP,
+    CURRENT257_START_TICKS, CURRENT257_UNIT,
+};
 use jetstreamer_horizon_observe::successor247 as successor;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -128,6 +132,7 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
         (247, PINNED_247_UNIT) => Some(PINNED_247_MEMORY_CAP),
         (248, STAGED_248_UNIT) => Some(10 << 30),
         (250, STAGED_250_UNIT) => Some(STAGED_250_MEMORY_CAP),
+        (257, CURRENT257_UNIT) => Some(CURRENT257_MEMORY_CAP),
         (265, STAGED_265_UNIT) => Some(10 << 30),
         _ => None,
     };
@@ -136,7 +141,12 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
             && stem.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-'),
         "ordinary delivery epoch or unit changed"
     );
-    let root = Path::new("/home/ubuntu/.codex/diagnostics").join(stem);
+    let current257 = name == CURRENT257_UNIT;
+    let root = if current257 {
+        Path::new(CURRENT257_DIRECTORY).to_owned()
+    } else {
+        Path::new("/home/ubuntu/.codex/diagnostics").join(stem)
+    };
     let claim = fourth::read(&row["delivery_claim"], &root.join("pipeline-claim.json"))?;
     let records = claim["evidence"].as_array().context("delivery evidence")?;
     let launch_ref = records
@@ -152,15 +162,20 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
         .as_str()
         .context("ordinary PID")?
         .parse::<u32>()?;
-    let micros = launch["unit"]["ExecMainStartTimestampMonotonic"]
-        .as_str()
-        .context("ordinary launch time")?
-        .parse::<u64>()?;
+    let (launch_unit, ticks) = if current257 {
+        (&launch["owner"], CURRENT257_START_TICKS)
+    } else {
+        let micros = launch["unit"]["ExecMainStartTimestampMonotonic"]
+            .as_str()
+            .context("ordinary launch time")?
+            .parse::<u64>()?;
+        (&launch["unit"], micros / 10_000)
+    };
     let range = format!("{epoch}-{epoch}");
     ensure!(
         entries.next().is_none()
             && pid > 1
-            && micros >= 10_000
+            && ticks > 0
             && entry["live"] == true
             && entry["phase"] == "upload-readback"
             && entry["sampled_at_utc"] == fleet["sampled_at_utc"]
@@ -177,10 +192,10 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
             && claim["epoch"] == epoch
             && claim["phase"] == "upload-readback"
             && claim["evidence"] == entry["evidence"]
-            && launch["unit"]["Id"] == name
-            && launch["unit"]["InvocationID"] == iid
-            && launch["unit"]["MainPID"] == unit["MainPID"]
-            && launch["unit"]["ExecStart"] == claim["expected_exec_start"]
+            && launch_unit["Id"] == name
+            && launch_unit["InvocationID"] == iid
+            && launch_unit["MainPID"] == unit["MainPID"]
+            && launch_unit["ExecStart"] == claim["expected_exec_start"]
             && row["sampled_unix_seconds"]
                 == super::fleet::utc_seconds(
                     o["recorded_at_utc"].as_str().context("sample clock")?
@@ -201,7 +216,9 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
                 == 1,
         "ordinary delivery claim, endpoints or sample clock changed"
     );
-    let (image, image_sha, cap) = if let Some(cap) = pinned_cap {
+    let (image, image_sha, cap) = if current257 {
+        (CURRENT257_IMAGE, CURRENT257_IMAGE_SHA, CURRENT257_MEMORY_CAP)
+    } else if let Some(cap) = pinned_cap {
         (PINNED_247_IMAGE, PINNED_247_IMAGE_SHA, cap)
     } else {
         (fourth::IMAGE, fourth::IMAGE_SHA, successor::HARD)
@@ -212,7 +229,7 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
             unit: name,
             iid,
             pid,
-            ticks: micros / 10_000,
+            ticks,
             image,
             image_sha,
             cap,
@@ -333,6 +350,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                 | STAGED_211_RETRY_UNIT
                 | STAGED_248_UNIT
                 | STAGED_250_UNIT
+                | CURRENT257_UNIT
                 | STAGED_265_UNIT
         ) || (owners.contains_key(fourth::V221_UNIT)
             && name.starts_with("horizon-upload-")
