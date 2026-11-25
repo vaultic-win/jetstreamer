@@ -151,7 +151,7 @@ pub(super) fn stopped_292_observer_predecessor(
     };
     let accepted = reference(
         "horizon-foundation-seven-lane-v290/fleet.json",
-        "013e9cd9792671f29e969cca8bc53657caaf27c979525abce5293a423cb3ea5",
+        "013e9cd9792671f29e969cca8cbc53657caaf27c979525abce5293a423cb3ea5",
     );
     let resumed = reference(
         "horizon-resume-observer-20261120-v292.json",

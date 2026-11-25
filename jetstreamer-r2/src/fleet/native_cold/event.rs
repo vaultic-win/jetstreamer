@@ -333,14 +333,13 @@ pub(in crate::fleet) fn census_check(
         let continuous = observation["cadence"]["previous_sample"] == previous["observer_receipt"]
             && observation["cadence"]["previous_sample_sha256"] == previous["observer_sha256"]
             && observation["cadence"]["previous_sample_recorded_at_utc"] == previous["sampled_at_utc"];
-        let recovered = !continuous && p.metadata_event.is_none()
+        let recovered = !continuous && !active && p.metadata_event.is_none()
             && p.admission_transition_guard.is_none()
-            && ((!active && native257::seven_delivery_predecessor(predecessor, previous, &p.observer, observation)?)
-                // The exact v292 sample still goes through the live owner telemetry check below.
+            && (native257::seven_delivery_predecessor(predecessor, previous, &p.observer, observation)?
                 || native257::stopped_292_observer_predecessor(predecessor, previous, &p.observer, observation)?);
         if !continuous && !recovered {
             ensure!(UNIT == native266::UNIT && p.metadata_event.is_none() && p.admission_transition_guard.is_none(),
-                "native bootstrap observation chain interrupted");
+                "native bootstrap observation chain interrupted for {UNIT}");
             horizon_singleton211_launch::native266::validate_observer_predecessor(
                 &predecessor.path, &predecessor.sha256, &p.observer.path, observation,
             )?;
