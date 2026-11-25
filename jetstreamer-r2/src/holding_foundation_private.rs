@@ -3,6 +3,8 @@
 use super::*;
 use jetstreamer_horizon_observe::foundation_holding213_review as host;
 use std::os::fd::AsRawFd;
+#[path = "holding_foundation_appendvec292.rs"]
+mod appendvec292;
 #[path = "holding_foundation_private_checkpoint203.rs"]
 mod checkpoint203;
 #[path = "holding_foundation_private_closure.rs"]
@@ -732,7 +734,7 @@ fn admit(p: AdmitSpec, spec: &Bound) -> Result<()> {
     mapping(&p.mapping)?;
     let c = saved(&p.custody)?;
     let (a, sha) = custody(&c)?;
-    let additional = restore_remaining(a, &sha)?
+    let additional = restore_remaining(a.expected().length, &sha)?
         .checked_add(METADATA_RESERVE)
         .context("restore reserve overflow")?;
     let capacity = horizon_singleton211_launch::foundation_holding_capacity::check(&p.resource_basis, additional)?;
@@ -745,7 +747,7 @@ fn admit(p: AdmitSpec, spec: &Bound) -> Result<()> {
     );
     Ok(())
 }
-fn restore_remaining(a: Artifact, sha: &str) -> Result<u64> {
+fn restore_remaining(length: u64, sha: &str) -> Result<u64> {
     let directory = Path::new(STATE).join("restores");
     for name in [format!("{sha}.blob"), format!(".{sha}.partial")] {
         let path = directory.join(name);
@@ -756,7 +758,7 @@ fn restore_remaining(a: Artifact, sha: &str) -> Result<u64> {
                         && m.is_file()
                         && m.uid() == 0
                         && m.nlink() == 1
-                        && m.len() <= a.expected().length
+                        && m.len() <= length
                         && matches!(m.mode() & 0o777, 0o400 | 0o600),
                     "unsafe existing private restore allocation"
                 );
@@ -764,13 +766,13 @@ fn restore_remaining(a: Artifact, sha: &str) -> Result<u64> {
                     .blocks()
                     .checked_mul(512)
                     .context("restore block overflow")?;
-                return remaining_allocation(a.expected().length, m.len(), physical);
+                return remaining_allocation(length, m.len(), physical);
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(e.into()),
         }
     }
-    Ok(a.expected().length)
+    Ok(length)
 }
 fn remaining_allocation(length: u64, logical: u64, physical: u64) -> Result<u64> {
     ensure!(
@@ -845,7 +847,7 @@ struct PreparedRestore {
 impl PreparedRestore {
     fn checkpoint(&self, force: bool) -> Result<()> {
         let remaining = || {
-            restore_remaining(self.artifact, &self.sha)?
+            restore_remaining(self.artifact.expected().length, &self.sha)?
                 .checked_add(METADATA_RESERVE)
                 .context("restore reserve overflow")
         };
@@ -889,7 +891,7 @@ impl runner::RestoreOperations for NativeRestore<'_> {
                 let admission = saved(&self.p.admission)?;
                 let entry = clock()?;
                 let original_floor = admission_floor(&admission, &self.p.custody, artifact, entry)?;
-                let remaining = restore_remaining(artifact, &sha)?
+                let remaining = restore_remaining(artifact.expected().length, &sha)?
                     .checked_add(METADATA_RESERVE)
                     .context("restore reserve overflow")?;
                 let lease =
@@ -1004,7 +1006,7 @@ async fn restore(client: &Client, p: RestoreSpec, spec: &Bound) -> Result<()> {
 }
 
 pub(super) fn command(s: &str) -> bool {
-    matches!(
+    appendvec292::command(s) || matches!(
         s,
         "holding-foundation-private-inspect"
             | "holding-foundation-private-inspect-old-v2-237"
@@ -1022,6 +1024,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     host::validate_host_mapping()?;
     let supplied_mapping: Bound = serde_json::from_value(v["mapping"].clone())?;
     mapping(&supplied_mapping)?;
+    if action == appendvec292::CHECK_TREE {
+        return appendvec292::check_tree(v, spec);
+    }
     for p in [
         PathBuf::from(STATE),
         Path::new(STATE).join("receipts"),
@@ -1046,6 +1051,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
             && unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "unsafe/owned private holding transition lock"
     );
+    if appendvec292::command(action) {
+        return appendvec292::run(action, v, spec).await;
+    }
     if action == "holding-foundation-private-inspect-partial223" {
         return partial223::inspect(v, spec);
     }
