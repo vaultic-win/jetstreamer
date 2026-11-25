@@ -20,6 +20,7 @@ EXTRACT = PRIVATE / 'checkpoint-continuation-226-extract-v2'
 SUFFIX = PRIVATE / 'checkpoint-continuation-226-suffix-v1'
 SUFFIX_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
 SEALED = V / 'horizon226-suffix-stage-evidence-v1'
+HANDOFF = V / 'horizon226-suffix-v1/source-handoff.json'
 PLAN_SCHEMA = 'jetstreamer-private-epoch226-scoped-repair-plan-v1'
 ADMISSION_SCHEMA = 'jetstreamer-epoch226-scoped-repair-admission-v1'
 SUCCESS = '7ad2d189f7e94e70a38c781354912448'
@@ -250,16 +251,17 @@ def validate_outputs(owner, extraction, manifest, launch, extract_plan, receipt_
 
 def durable_seal(path, payload):
     # Publish one immutable file atomically, without replacing prior custody.
-    require(path.parent == SEALED and path.parent.resolve(strict=True) == path.parent,
+    require((path.parent == SEALED or path == HANDOFF) and path.parent.resolve(strict=True) == path.parent,
             'sealed destination is not the exact stage custody path')
     parent = path.parent.stat()
     require(parent.st_uid == 0 and stat.S_IMODE(parent.st_mode) == 0o755, 'unsafe custody directory')
+    mode = 0o400 if path == HANDOFF else 0o444
     if not path.exists():
         fd, name = tempfile.mkstemp(prefix='.stage-', dir=path.parent)
         temporary = Path(name)
         try:
             with os.fdopen(fd, 'wb') as out:
-                os.fchmod(out.fileno(), 0o444)
+                os.fchmod(out.fileno(), mode)
                 out.write(payload)
                 out.flush()
                 os.fsync(out.fileno())
@@ -271,7 +273,8 @@ def durable_seal(path, payload):
             os.fsync(directory)
         finally:
             os.close(directory)
-    require(read_bytes(path) == payload, f'existing sealed bytes differ: {path}')
+    require(stat.S_IMODE(path.lstat().st_mode) == mode and read_bytes(path) == payload,
+            f'existing sealed bytes or mode differ: {path}')
     return {'path': str(path), 'sha256': digest(payload)}
 
 
@@ -337,13 +340,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('operation', choices=('verify-static', 'bind', 'emit-plan'))
     parser.add_argument('--admission', nargs=2, metavar=('PATH', 'SHA256'))
+    parser.add_argument('--seal-handoff', action='store_true')
     args = parser.parse_args()
     require(os.geteuid() == 0, 'run with root read and sealed-custody permissions')
     require((args.operation == 'emit-plan') == bool(args.admission), 'only emit-plan accepts external admission evidence')
+    require(not args.seal_handoff or args.operation == 'bind', 'only bind can seal the successful handoff')
     prep, launch, extract_plan, static = static_inputs(full=args.operation == 'verify-static')
     result = static
     if args.operation != 'verify-static':
         result = bind_static_to_output(prep, launch, extract_plan, static)
+    if args.seal_handoff:
+        # Outside the native node's writable generation; consumed by the scoped Rust drain.
+        payload = (json.dumps(result, indent=2, sort_keys=True) + '\n').encode()
+        result = durable_seal(HANDOFF, payload)
     if args.operation == 'emit-plan':
         path, sha = args.admission
         ref = {'path': path, 'sha256': sha}
