@@ -6,7 +6,7 @@
                  and not diagnostic226_suffix.owns(r) and not diagnostic230_checkpoint_continuation.owns(r)]
 +    ordinary = [row for row in ordinary
 +                if not (row['epoch'] == 257 and row['phase'] == 'upload-readback'
-+                        and row['producer']['Id'] == 'horizon-upload-257-current-reader-v1.service')]
++                        and row['unit']['Id'] == 'horizon-upload-257-current-reader-v1.service')]
      assert sorted(r['epoch'] for r in ordinary) == sorted([*roster,*guarded_replays.by_epoch(cfg['replays'])])
      guarded_replays.validate_fleet([r for r in ordinary if r['epoch'] not in roster], bound(ref(obs))['replays'])
      reported={r['epoch']:r['status'] for r in f['epochs'] if r['status']}
@@ -29,7 +29,7 @@
  diagnostic_handlers = (diagnostic229, diagnostic229_bounded, diagnostic229_bounded_retry, diagnostic271_trace, diagnostic271_europe, diagnostic271_boundary, diagnostic271_reward_tuples, diagnostic271_stake_inputs, diagnostic230_slot_hashes, diagnostic230_bank_trace, diagnostic288_shrink_debt, diagnostic229_slot_hash_ram, diagnostic230_program_demotion_ram, diagnostic230_checkpoint_continuation, diagnostic229_bank_delta, diagnostic226_suffix)
  ordinary = [r for r in f['active'] if r not in sample_publishers and r not in extract226
 +            and not (r['epoch'] == 257 and r['phase'] == 'upload-readback'
-+                     and r['producer']['Id'] == 'horizon-upload-257-current-reader-v1.service')
++                     and r['unit']['Id'] == 'horizon-upload-257-current-reader-v1.service')
              and not any(handler.owns(r) for handler in diagnostic_handlers)]
  guarded_replays.validate_fleet(ordinary, bound(obs)['replays'])
  live = {int(k): v for k, v in states['active_claims'].items()}
