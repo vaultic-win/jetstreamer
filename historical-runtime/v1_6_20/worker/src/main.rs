@@ -27,6 +27,7 @@ compile_error!("epoch 228 capped requires an exclusive qualification build");
 #[cfg(all(
     feature = "epoch229-called-program-demotion",
     any(
+        feature = "capped-shrink-candidate",
         feature = "diagnostic-singleton",
         feature = "epoch223-prefix-qualification",
         feature = "epoch227-capped-qualification",
@@ -42,6 +43,7 @@ compile_error!("epoch 229 called-program demotion requires an exclusive qualific
 #[cfg(all(
     feature = "epoch230-called-program-demotion",
     any(
+        feature = "capped-shrink-candidate",
         feature = "diagnostic-singleton",
         feature = "epoch223-prefix-qualification",
         feature = "epoch227-capped-qualification",

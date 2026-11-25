@@ -20,6 +20,8 @@ diagnostic-singleton = []
 snapshot-hard-fork-metadata = ["solana-runtime/snapshot-hard-fork-metadata"]
 # Capture bank hash inputs and dirty account hashes at the epoch 230 mismatch.
 epoch230-bank-trace = ["solana-runtime/epoch230-bank-trace"]
+# Opt in to the validator's storage-only shrink-debt cap for cohort replay.
+capped-shrink-candidate = []
 # Private epoch 223 prefix using the original runtime and capped storage shrink
 # debt. No native transaction, fee, hash or account-loading semantics change.
 epoch223-prefix-qualification = []

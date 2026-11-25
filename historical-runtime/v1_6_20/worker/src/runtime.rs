@@ -788,10 +788,12 @@ impl RuntimeState {
             self.accounts_shrink_consumed_budget,
             ACCOUNTS_SHRINK_RECOVERY_PER_ROOT,
         );
-        if cfg!(feature = "epoch223-prefix-qualification")
-            || cfg!(feature = "epoch227-capped-qualification")
-            || cfg!(feature = "epoch228-capped-qualification")
-        {
+        if cfg!(any(
+            feature = "capped-shrink-candidate",
+            feature = "epoch223-prefix-qualification",
+            feature = "epoch227-capped-qualification",
+            feature = "epoch228-capped-qualification"
+        )) {
             // Match the pinned validator background-service debt cap. This
             // reclaims storage without generating account writes or Bank state.
             self.accounts_shrink_consumed_budget = self
@@ -2040,6 +2042,7 @@ mod tests {
     }
 
     #[cfg(any(
+        feature = "capped-shrink-candidate",
         feature = "epoch223-prefix-qualification",
         feature = "epoch227-capped-qualification",
         feature = "epoch228-capped-qualification"
