@@ -193,9 +193,10 @@ def registered_hourly170_writer(s, prior, *, failed166=False):
 
 def registered_failed166_rejoin(s, prior, version=2):
     old_package, old_seal, old_iid, old = prior
-    s.need(version in (2, 3, 4, 5, 6, 7, 8, 11), 'unknown epoch 166 cadence rejoin')
+    s.need(version in (2, 3, 4, 5, 6, 7, 8, 11, 12), 'unknown epoch 166 cadence rejoin')
     def package_for(generation):
-        name = f'tools-cold168-retry4-failed166-v{generation}'
+        attempt = 5 if generation == 12 else 4
+        name = f'tools-cold168-retry{attempt}-failed166-v{generation}'
         return STATUS / (name + '-entry146' if generation >= 4 else name)
 
     name = f'FAILED166_CADENCE_V{version}'
@@ -249,6 +250,31 @@ def registered_failed166_rejoin(s, prior, version=2):
                and preflight['stopped_168']['resource_credit_bytes'] == 0
                and preflight['stopped_168']['reservation_ending_bytes'] == 0,
                'guard-stop cadence does not bind the failed writer and accepted sample')
+    if version == 12:
+        s.need(old_seal['sha256'] == 'cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c'
+               and ready['package']['sha256'] == '6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac',
+               'different retry5 cadence pair')
+        binding = package / 'retry5-168-generation.json'
+        member, = [m for m in seal['members'] if m['name'] == binding.name and m['mode'] == '0444']
+        s.need(ready['retry5_generation'] == s.ref(binding, member['sha256']),
+               'unsealed retry5 cadence generation')
+        generation = s.bound(ready['retry5_generation'], binding)
+        root = R / 'epoch168-retry5-rebook-20261125-v1'
+        prepared = s.bound(generation['prepared'], root / 'PREPARED.json')
+        successor = s.bound(generation['successor_root'], root / 'SUCCESSOR_ROOT.json')
+        guard = s.bound(generation['guard_qualification'], R / 'epoch168-cold-guard-20261125-v5/GUARD_QUALIFIED.json')
+        retained = s.bound(generation['retained_source'], R / 'incident-replay-fit-20261121-v1/STOPPED168_RETRY5_RETAINED_SOURCE_CONTROL_20261125.json')
+        terminal = s.bound(ready['retained_retry4_stop'], ROOT / 'guard-receipts/stop-completion.json')
+        stop = fleet['cold168_retry4_root_physical_stop']
+        s.need(retained['stop'] == stop == prepared['baseline']['retry4_root_physical_stop']
+               and stop['terminal'] == ready['retained_retry4_stop']
+               and stop['producer_invocation_id'] == terminal['producer_invocation_id']
+               and stop['resource_credit_bytes'] == stop['reservation_ending_bytes'] == 0
+               and successor['source_control_sha256'] == generation['retained_source']['sha256']
+               and prepared['baseline']['stable_roots'] == generation['successor_root']
+               and prepared['profile']['guard_binary_sha256'] == guard['guard']['sha256']
+               and successor['whole_tree_cap_bytes'] == prepared['profile']['payload']['whole_root_cap'] == 512 << 30,
+               'different retry5 namespace, guard or retained retry4 charge')
     s.need(old_package == package_for(predecessor)
            and old_seal['path'] == str(old_package / 'deployment-seal-receipt.json')
            and active['schema'] == 'horizon-epoch166-cadence-rejoin-active-v1'
