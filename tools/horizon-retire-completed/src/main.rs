@@ -27,6 +27,9 @@ mod anza_closed_canaries;
 #[cfg(feature = "anza-parked-183")]
 mod anza_parked_183;
 
+#[cfg(feature = "anza-closed-canaries")]
+mod anza_stopped_167;
+
 const HOME_ROOT: &str = if cfg!(any(
     feature = "anza-parked-183",
     feature = "anza-closed-154",
@@ -690,11 +693,15 @@ fn run() -> Result<()> {
     );
     let bytes = bound(
         &Bound {
-            path: plan_path,
+            path: plan_path.clone(),
             sha256: args[2].clone(),
         },
         LIMIT,
     )?;
+    #[cfg(feature = "anza-closed-canaries")]
+    if plan_path == Path::new(anza_stopped_167::REVIEW) {
+        return anza_stopped_167::run(&bytes, &args[2], &args[3], check_only);
+    }
     let p: Plan = serde_json::from_slice(&bytes)?;
     ensure!(
         p.schema == "horizon-retire-completed-v1"
