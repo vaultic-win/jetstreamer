@@ -305,6 +305,28 @@ fn promote(source: &Path, target: &Path) -> Result<()> {
     File::open(target.parent().context("publication directory")?)?.sync_all()?;
     Ok(())
 }
+#[cfg(incident_v5y_guard_recovery145_only)]
+pub(super) fn check_recovery_custody(sha: &str) -> Result<()> {
+    check_image(sha, Path::new(IMAGE))?;
+    let _lock = lock()?;
+    pending()?;
+    let prior = pred().context("materialized predecessor custody")?;
+    let recovery = continuity::predecessor().context("frozen predecessor custody")?;
+    source_identity().context("frozen source identity")?;
+    let candidate = leaf().context("paid candidate custody")?;
+    prove_view(&candidate).context("read-only paid candidate view")?;
+    ensure!(accepted_owner()?.is_none(), "a successful export already owns the paid archive");
+    println!("{}", json!({
+        "schema":"horizon-epoch145-v5z-native-custody-preflight-v1",
+        "predecessor":prior,
+        "frozen_recovery":recovery,
+        "candidate":candidate,
+        "archive_publication_authorized":false,
+        "r2_mutations":false
+    }));
+    Ok(())
+}
+
 pub fn run(fleet: Bound, sha: &str) -> Result<()> {
     check_image(sha, Path::new(IMAGE))?;
     let iid = verify_cgroup()?;

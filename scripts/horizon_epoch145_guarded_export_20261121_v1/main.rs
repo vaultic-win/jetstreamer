@@ -668,6 +668,8 @@ fn run() -> Result<()> {
 fn run() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
     match a.as_slice() {
+        #[cfg(incident_v5y_guard_recovery145_only)]
+        [_, mode, sha] if mode == "check-recovery-custody" => materialized::check_recovery_custody(sha),
         #[cfg(incident_five_lane145_only)]
         [_, mode, fleet, digest, sha] if mode == "check-serial-handback" => {
             incident_fit::preflight(

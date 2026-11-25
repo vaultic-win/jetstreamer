@@ -60,11 +60,13 @@ FULL170 = HERE == D / "tools-homefloor-170-full-metered-v1"
 REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
 REPRO166_POST = HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
+V5Z_145 = HERE == D / "tools-homefloor-145-v5y-custody-recovery-v1"
+V5Z_BUILD_145 = HERE == D / "tools-homefloor-145-v5y-custody-build-v1"
 V5Y_145 = HERE == D / "tools-homefloor-145-v5x-schema-recovery-v1"
 V5Y_BUILD_145 = HERE == D / "tools-homefloor-145-v5x-schema-build-v1"
 V5X_145 = HERE == D / "tools-homefloor-145-v5w-donor-recovery-v1"
 V5X_BUILD_145 = HERE == D / "tools-homefloor-145-v5w-donor-build-v1"
-V5W_RECOVERY_145 = V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or REPRO166_LIVE or FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
+V5W_RECOVERY_145 = V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or REPRO166_LIVE or FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
 V5X_POST_145 = HERE == D / "tools-homefloor-145-post-v5x-current-v1"
 V5W_POST_145 = V5X_POST_145 or REPRO166_POST or HERE == D / "tools-homefloor-145-post-v5w-current-v1"
 V5V_RECOVERY_145 = V5W_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
@@ -595,6 +597,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     if focused is not None:
         post_directory = fixture_post_directory(here)
         lease_directory = next(directory for enabled, directory in (
+            (V5Z_145, "tools-v5z"),
             (V5Y_145, "tools-v5y"),
             (V5X_145, "tools-v5x"),
             (V5W_RECOVERY_145, "tools-v5w"),
@@ -655,7 +658,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch, fleet=None):
-    if V5Y_BUILD_145:
+    if V5Z_BUILD_145 or V5Y_BUILD_145:
         s.need(epoch == 145 and fleet is not None and not fit.members(fit.A145),
                "V5y build cannot price an occupied verifier")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
@@ -663,7 +666,7 @@ def phase145(epoch, fleet=None):
         member, = (row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444")
         s.need(seal["destination"] == str(HERE), "foreign V5y build provider")
         fit.binary(adapter, member["sha256"])
-        return runpy.run_path(str(adapter))["v5x_stopped_phase"](s, fit, fleet, HERE)
+        return runpy.run_path(str(adapter))["schema_retry_stopped_phase"](s, fit, fleet, HERE)
     if V5X_BUILD_145:
         s.need(epoch == 145 and fleet is not None and not fit.members(fit.A145),
                "V5x build cannot price an occupied verifier")
@@ -683,8 +686,8 @@ def phase145(epoch, fleet=None):
     if V5V_RECOVERY_145 and not fit.members(fit.A145):
         s.need(epoch == 145 and fleet is not None, "V5v requires the accepted fleet and paid predecessor")
         profile, adapter, _ = profile145(HERE, focused="lease-semantic")
-        if V5Y_145:
-            return runpy.run_path(str(adapter))["v5x_stopped_phase"](s, fit, fleet, adapter.parent)
+        if V5Z_145 or V5Y_145:
+            return runpy.run_path(str(adapter))["schema_retry_stopped_phase"](s, fit, fleet, adapter.parent)
         if V5X_145:
             build, _ = s.read(adapter.parent / "build-proof.json", profile["build_sha256"])
             return runpy.run_path(str(adapter))["v5w_stopped_phase"](s, fit, build)
@@ -1052,7 +1055,7 @@ def registered_status():
                     failed = writer168v4["registered_failed170_writer"](scope,retry4)
                     if RETAIN_FAILED166:
                         adopted = writer168v4["registered_hourly170_writer"](scope, failed, failed166=True)
-                        versions = (2, 3, 4, 5, 6, 7) if REPRO166 or FULL170 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or V5X_POST_145 else (2, 3, 4, 5, 6)
+                        versions = (2, 3, 4, 5, 6, 7) if REPRO166 or FULL170 or V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or V5X_POST_145 else (2, 3, 4, 5, 6)
                         for version in versions:
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():
@@ -1329,7 +1332,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         closed_before=closed_bootstrap["settled"](s,fit)
     stopped=proof_stops()
     f,fleet_rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
-    if V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145:
+    if V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145:
         s.need(not f["actual_active_holding_transfers"] and
                not fit.members("horizon-closed185-lanel-park-20261125-v1.service"),
                "V5x requires the completed handback of the 185 serial holding slot")

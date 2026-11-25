@@ -22,7 +22,12 @@ compile_error!("the donor-lock retry requires the V5w verifier guard");
 #[cfg(all(incident_v5x_guard_recovery145_only, not(incident_v5w_guard_recovery145_only)))]
 compile_error!("the startup-schema retry requires the V5x verifier guard");
 
-#[cfg(incident_v5x_guard_recovery145_only)]
+#[cfg(all(incident_v5y_guard_recovery145_only, not(incident_v5x_guard_recovery145_only)))]
+compile_error!("the receipt-mode retry requires the V5y verifier guard");
+
+#[cfg(incident_v5y_guard_recovery145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5z/export145";
+#[cfg(all(incident_v5x_guard_recovery145_only, not(incident_v5y_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5y/export145";
 #[cfg(all(incident_v5w_guard_recovery145_only, not(incident_v5x_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5x/export145";
@@ -265,7 +270,7 @@ pub(super) fn v5x_terminal() -> Result<Bound> {
         ),
         sha256: "b790f288c0b6f2d05a566c2a7e84fe675bcb9e63ae7c07694c53e10b0b5a84dd".into(),
     };
-    ensure!(custody::binding(&pin.path)? == pin, "V5x terminal custody changed");
+    ensure!(custody::binding(&pin.path).context("V5x terminal receipt custody")? == pin, "V5x terminal custody changed");
     Ok(pin)
 }
 
@@ -305,6 +310,54 @@ pub(super) fn failed_v5x(prior: &Value) -> Result<Value> {
         "V5x startup failure and the unchanged paid candidate do not agree"
     );
     Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
+}
+
+#[cfg(incident_v5y_guard_recovery145_only)]
+pub(super) fn v5y_terminal() -> Result<Bound> {
+    let pin = Bound {
+        path: Path::new(RUNTIME).join(
+            "epoch145-semantic-continuity-20261121-v1/v5y-name-handoff/V5Y_TERMINAL_FAILURE_RECEIPT_MODE.json",
+        ),
+        sha256: "6e4e62c15adea128211437bc57f9b768ad8f91ac75b720e41e6b267dfc30620d".into(),
+    };
+    ensure!(
+        custody::binding(&pin.path).context("V5y terminal receipt custody")? == pin,
+        "V5y terminal custody changed"
+    );
+    Ok(pin)
+}
+
+#[cfg(incident_v5y_guard_recovery145_only)]
+pub(super) fn failed_v5y(prior: &Value) -> Result<Value> {
+    let iid = "39e0be627a994249915dc8f7a185b438";
+    let terminal = v5y_terminal()?;
+    let proof = custody::evidence(&terminal)?;
+    let prior_terminal: Bound = serde_json::from_value(prior["terminal"].clone())?;
+    let prior_proof = custody::evidence(&prior_terminal)?;
+    ensure!(
+        proof["schema"] == "horizon-epoch145-v5y-terminal-receipt-mode-failure-v1"
+            && proof["unit"] == UNIT
+            && proof["invocation_id"] == iid
+            && proof["predecessor"] == json!(prior_terminal)
+            && proof["candidate"] == prior_proof["candidate"]
+            && proof["manager"]["InvocationID"] == iid
+            && proof["manager"]["MainPID"] == "0"
+            && proof["manager"]["Result"] == "exit-code"
+            && proof["native_events"][2]["EXIT_CODE"] == "exited"
+            && proof["native_events"][2]["EXIT_STATUS"] == "1"
+            && proof["native_events"][3]["UNIT_RESULT"] == "exit-code"
+            && proof["terminal_output"] == "epoch145: private binding custody"
+            && proof["prior_receipt_original_mode"] == "0400"
+            && proof["prior_receipt_corrected_mode"] == "0600"
+            && proof["pre_read_state_absent"] == true
+            && !Path::new(BASE).join("state").join(iid).try_exists()?
+            && proof["semantic_completion"] == false
+            && proof["resource_credit_bytes"] == 0
+            && proof["archive_publication_authorized"] == false
+            && proof["r2_mutations"] == false,
+        "V5y failed before the paid verifier read"
+    );
+    Ok(json!({"terminal":terminal,"predecessor":prior_terminal}))
 }
 
 pub fn predecessor() -> Result<Value> {
