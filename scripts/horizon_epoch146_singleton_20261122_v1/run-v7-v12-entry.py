@@ -1,4 +1,4 @@
-"""Release the existing 146 bounded entry after epoch 145 V7 under V12."""
+"""Release the existing 146 bounded entry after the sealed epoch 145 verifier."""
 
 import argparse
 import json
@@ -13,20 +13,25 @@ import time
 
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 EPOCH = ROOT / "epoch146-singleton-20261122-v1"
-DEPLOYMENT = EPOCH / "tools-post145-v7-v12-sequence-20261125-v1"
+V9_DEPLOYMENT = EPOCH / "tools-post145-v9-v12-sequence-20261125-v1"
+V9_ENTRY = Path(__file__).resolve().parent.name == V9_DEPLOYMENT.name
+GENERATION = "v9" if V9_ENTRY else "v7"
+DEPLOYMENT = V9_DEPLOYMENT if V9_ENTRY else EPOCH / "tools-post145-v7-v12-sequence-20261125-v1"
 LEGACY = EPOCH / "tools-post145-v6-v8-sequence-20261125-v1"
 LEGACY_SHA = "13c45accc31c3c3db84f43701a310eb4aae3cd3ec4bc1c92cd8f7845ef046365"
 WATCH = EPOCH / "tools-post145-v6-v8-operator-20261125-v1"
 WATCH_SHA = "d60fc69ba8330a2dd246f83f6f1347ad93966d7865a3d8694284dc02332ec096"
-PROVIDER = ROOT / "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v7-build-v1/post-stop-fit"
-PROVIDER_SHA = "db8beab61152a7852b890b1c8b1d985c83c4d9ae9bd4c0db6138887367b950cc"
+PROVIDER = ROOT / "incident-replay-fit-20261121-v1" / f"tools-homefloor-145-post-{GENERATION}-build-v1/post-stop-fit"
+PROVIDER_SHA = ("f650a4acb3f901ba82fe36e6014d6b48176c9365d4750ba80d71debeaa3942c6" if V9_ENTRY else
+                "db8beab61152a7852b890b1c8b1d985c83c4d9ae9bd4c0db6138887367b950cc")
 CADENCE = ROOT / "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v12-entry146"
 CADENCE_SHA = "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac"
 FAMILY145 = ROOT / "epoch145-semantic-continuity-20261121-v1"
-CHECKER145 = FAMILY145 / "tools-v7-168-stop-v2"
-CHECKER145_SHA = "589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b"
-SEMANTIC145 = FAMILY145 / "v7-168-stop-name-handoff/SEMANTIC_COMPLETION.json"
-OWNER145 = "f7043fd6595a4151b659d4b098bede11"
+CHECKER145 = FAMILY145 / ("tools-v9-census-recovery" if V9_ENTRY else "tools-v7-168-stop-v2")
+CHECKER145_SHA = ("8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd" if V9_ENTRY else
+                  "589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b")
+SEMANTIC145 = FAMILY145 / ("v9-census-name-handoff" if V9_ENTRY else "v7-168-stop-name-handoff") / "SEMANTIC_COMPLETION.json"
+OWNER145 = "ebdfc34db47c4e7699ea5ccbada5d604" if V9_ENTRY else "f7043fd6595a4151b659d4b098bede11"
 COMPLETE145 = ROOT / "epoch145-guarded-export-20261121-v1/state" / OWNER145 / "complete.json"
 LEASE_FIELD = "epoch146_bounded_entry_lease"
 HOLD_SECONDS = 320
@@ -62,12 +67,12 @@ def sealed_package(evidence, package, digest=None):
 
 
 def completion_contract(phase):
-    require(phase["stage"] == "v7-semantic-complete-drained"
+    require(phase["stage"] == f"{GENERATION}-semantic-complete-drained"
             and phase["completed_invocation_id"] == OWNER145
             and phase["checker_seal"] == ref(CHECKER145 / "deployment-seal-receipt.json", CHECKER145_SHA)
             and phase["completion"]["path"] == str(COMPLETE145)
             and phase["semantic_receipt"]["path"] == str(SEMANTIC145),
-            "epoch 146 requires the exact drained V7 semantic owner")
+            f"epoch 146 requires the exact drained {GENERATION.upper()} semantic owner")
     return phase
 
 
@@ -263,7 +268,7 @@ def main():
     evidence = runpy.run_path(str(ROOT / "prefix140-status-cadence-20261122-v1/cadence-tools/evidence.py"))
     if opts.run:
         require(Path(__file__).resolve() == DEPLOYMENT / Path(__file__).name
-                and Path(__file__).name in sealed_package(evidence, DEPLOYMENT), "unsealed V7/V12 operator")
+                and Path(__file__).name in sealed_package(evidence, DEPLOYMENT), "unsealed epoch 146 entry operator")
     sealed_package(evidence, LEGACY, LEGACY_SHA)
     legacy = runpy.run_path(str(LEGACY / "run_sequence.py"))
     draft = original_inputs(legacy)
