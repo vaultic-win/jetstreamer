@@ -10,6 +10,7 @@ BASE = "58709604dfa4c97336c2e1f6fac53b862ed6f17f"
 BRIDGE = "06607089e5762e61a82e0f6b2da0ae1adbf16634"
 GUARD_BRIDGE = "80e86a24fba065d17ad97321878cdb9e3ee38dc3"
 GUARD_SUCCESSOR = "6bc8f25405f86634f484e665a740ecf73845d691"
+HTTP_RETRY = "e15f71a2a84c9f256c6fc3d5da34e9354430e702"
 HOME = Path("/home/sol")
 REPO = HOME / "workspace/jetstreamer"
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
@@ -20,6 +21,8 @@ ORIGINAL_SHA = "c715952c42ac45b2ebce0a104fee239ff0e5374e18ca2613a569a8f4e91bc36a
 EVIDENCE = RT / "archive-reader-epoch145-bridge-06607089-v1"
 GUARD_EVIDENCE = RT / "archive-reader-epoch145-guard-80e86a24-v1"
 GUARD_SUCCESSOR_EVIDENCE = RT / "archive-reader-epoch145-guard-6bc8f254-v1"
+HTTP_RETRY_EVIDENCE = RT / "ready-audit-http500-candidate-e15f71a2a84c-20261125-v1"
+HTTP_RETRY_SEAL = "3fa6c503626b68fb91455aa8b2a117c5baedf7c65a08f09a96bc9b09c74fbaca"
 GUARD_QUALIFICATION_SHA = "a23eaed728ba6195cacfee622188d669dfc78ec7cf380892c1e625d992008553"
 GUARD_PAIR_SHA = "2dd2912c5c82c976233015a6bea69883eaff27a3999128e9ace9d02413491839"
 BINARY = "jetstreamer-utils/src/horizon_boundary_bridge_bin.rs"
@@ -102,7 +105,7 @@ def checked_transition(candidate):
 def compatible_branch():
     tip = git("rev-parse", "origin/account-updates").decode().strip()
     git("merge-base", "--is-ancestor", BASE, tip)
-    for candidate in (BASE, BRIDGE, GUARD_BRIDGE, GUARD_SUCCESSOR):
+    for candidate in (BASE, BRIDGE, GUARD_BRIDGE, GUARD_SUCCESSOR, HTTP_RETRY):
         if not git("diff", "--name-only", candidate, tip, "--", *SCOPES, POH):
             git("merge-base", "--is-ancestor", candidate, tip)
             return candidate, tip
@@ -216,8 +219,52 @@ def successor_post_preflight(tip):
                 publication_authorized=False, r2_mutations=False)
 
 
+def retry_post_preflight(tip):
+    directory = HTTP_RETRY_EVIDENCE
+    seal_ref = ref(directory / "deployment-seal-receipt.json", HTTP_RETRY_SEAL)
+    seal = json.loads(read(seal_ref["path"], seal_ref["sha256"]))
+    members = {m["name"]: m["sha256"] for m in seal["members"]}
+    check(seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+          and seal["destination"] == str(directory) and seal["remote_mutations"] is False
+          and seal["publication_authorized"] is False and seal["r2_mutations"] is False,
+          "different HTTP retry reader deployment")
+    check(set(members) == {"qualification.json", "ordinary-pair.json",
+                           "READER_INPUT_COMPARISON.json", "HTTP500_ROLLOUT_EVIDENCE.json"}
+          and len(members) == len(seal["members"])
+          and all(m["mode"] == "0444" for m in seal["members"]),
+          "incomplete HTTP retry reader deployment")
+    qualification = ref(directory / "qualification.json", members["qualification.json"])
+    pairing = ref(directory / "ordinary-pair.json", members["ordinary-pair.json"])
+    comparison = ref(directory / "READER_INPUT_COMPARISON.json", members["READER_INPUT_COMPARISON.json"])
+    q = json.loads(read(qualification["path"], qualification["sha256"]))
+    pair = json.loads(read(pairing["path"], pairing["sha256"]))
+    inputs = json.loads(read(comparison["path"], comparison["sha256"]))
+    check(q["schema"] == "horizon-current-reader-main-acceptance-v1"
+          and q["reader_commit"] == pair["local_candidate_merge"] == inputs["local_candidate_merge"] == HTTP_RETRY
+          and q["pipeline"] == pair["pipeline"] == inputs["qualified_binary"]
+          and q["full_verifier"] == pair["full_verifier"] and pair["qualification"] == qualification
+          and comparison in q["source_build_evidence"] and inputs["changed_compiler_inputs"] == []
+          and q["full_and_plugin_capabilities_accepted"] is True
+          and q["source_artifact_correspondence_accepted"] is True
+          and q["minimum_thread_stack_bytes"] == 67108864
+          and pair["schema"] == "horizon-staged-ordinary-uploader-http-retry-pair-v1"
+          and pair["fixture_threads"] == 1 and pair["fixture_slot_count"] == 432000
+          and pair["wrong_etag_refused"] is True and pair["production_r2_mutations"] is False,
+          "HTTP retry compiled input or ordinary uploader qualification differs")
+    for item in (q["pipeline"], q["full_verifier"], pair["uploader"], pair["uploader_seal"]):
+        read(item["path"], item["sha256"])
+    check(compatible_branch() == (HTTP_RETRY, tip), "current reader inputs changed during preflight")
+    return dict(schema="horizon-epoch145-http-retry-ordinary-reader-preflight-v1", fetched_tip=tip,
+                qualified_reader_commit=HTTP_RETRY, qualification=qualification, deployment=seal_ref,
+                compiled_equivalence=comparison, ordinary_pair=pairing, full=q["full_verifier"],
+                pipeline=q["pipeline"], uploader=pair["uploader"], uploader_seal=pair["uploader_seal"],
+                publication_authorized=False, r2_mutations=False)
+
+
 def guard_post_preflight():
     baseline, tip = compatible_branch()
+    if baseline == HTTP_RETRY:
+        return retry_post_preflight(tip)
     if baseline == GUARD_SUCCESSOR:
         return successor_post_preflight(tip)
     check(baseline == GUARD_BRIDGE, "current branch does not match the guard-qualified post route")
@@ -297,6 +344,9 @@ def main():
     baseline, tip = compatible_branch()
     if baseline == GUARD_SUCCESSOR:
         print(json.dumps(successor_post_preflight(tip)))
+        return
+    if baseline == HTTP_RETRY:
+        print(json.dumps(retry_post_preflight(tip)))
         return
     old = original_reader()
     if baseline == BASE:
