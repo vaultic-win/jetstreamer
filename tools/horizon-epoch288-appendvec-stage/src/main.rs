@@ -1,4 +1,6 @@
-//! Prepare local, bounded custody staging for the closed 288 AccountsDb.
+//! Prepare bounded custody staging for closed AccountsDb files.
+mod epoch229;
+
 use {
     anyhow::{Context, Result, ensure},
     serde_json::json,
@@ -47,8 +49,8 @@ fn hash_file(path: &Path) -> Result<String> {
     Ok(format!("{:x}", hash.finalize()))
 }
 
-fn closed() -> Result<process_references::Scan> {
-    for unit in [PRODUCER, TIMER] {
+fn closed(root: &Path, producer: &str, clock: &str) -> Result<process_references::Scan> {
+    for unit in [producer, clock] {
         let state = Command::new("/usr/bin/systemctl")
             .args(["show", "-p", "ActiveState", "--value", unit])
             .output()?;
@@ -59,11 +61,11 @@ fn closed() -> Result<process_references::Scan> {
     }
     ensure!(
         !Path::new("/sys/fs/cgroup/system.slice")
-            .join(PRODUCER)
+            .join(producer)
             .try_exists()?,
         "predecessor control group still exists"
     );
-    let scan = process_references::scan(Path::new("/proc"), Path::new(ROOT))?;
+    let scan = process_references::scan(Path::new("/proc"), root)?;
     ensure!(
         scan.references.is_empty(),
         "live predecessor references: {:?}",
@@ -86,7 +88,7 @@ fn no_xattrs(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn census(source: &Path, members: &mut impl Write) -> Result<String> {
+fn census(source: &Path, members: &mut impl Write, member_count: usize) -> Result<String> {
     ensure!(source.canonicalize()? == source, "aliased AccountsDb");
     let mut shards = fs::read_dir(source)?
         .map(|entry| entry.map(|entry| entry.file_name()))
@@ -129,7 +131,10 @@ fn census(source: &Path, members: &mut impl Write) -> Result<String> {
         .stdout
         .split_inclusive(|byte| *byte == b'\n')
         .collect();
-    ensure!(rows.len() == MEMBERS, "AccountsDb member count differs");
+    ensure!(
+        rows.len() == member_count,
+        "AccountsDb member count differs"
+    );
     rows.sort_unstable();
     let mut digest = Sha256::new();
     for row in rows {
@@ -145,9 +150,7 @@ fn census(source: &Path, members: &mut impl Write) -> Result<String> {
         members.write_all(name)?;
         members.write_all(b"\0")?;
     }
-    let hash = format!("{:x}", digest.finalize());
-    ensure!(hash == CENSUS_SHA, "AccountsDb census differs: {hash}");
-    Ok(hash)
+    Ok(format!("{:x}", digest.finalize()))
 }
 
 fn check_mount(directory: &Path, source: &Path) -> Result<()> {
@@ -209,7 +212,7 @@ fn guarded_invocation() -> Result<String> {
     Ok(invocation)
 }
 
-fn compress(source: &Path, members: &Path, output: &mut File) -> Result<(u64, String)> {
+fn compress(source: &Path, members: &Path, output: &mut File, limit: u64) -> Result<(u64, String)> {
     let mut tar = Command::new(TAR)
         .current_dir(source)
         .env("LC_ALL", "C")
@@ -252,8 +255,8 @@ fn compress(source: &Path, members: &Path, output: &mut File) -> Result<(u64, St
             }
             length += bytes as u64;
             ensure!(
-                length < CAP,
-                "compressed output exceeded admitted tmpfs size"
+                length < limit,
+                "compressed output exceeded the admitted size"
             );
             output.write_all(&buffer[..bytes])?;
             digest.update(&buffer[..bytes]);
@@ -277,6 +280,10 @@ fn compress(source: &Path, members: &Path, output: &mut File) -> Result<(u64, St
 
 fn run() -> Result<()> {
     let action = std::env::args().nth(1).context("use check or stage")?;
+    if matches!(action.as_str(), "check-229" | "stage-229") {
+        ensure!(std::env::args().len() == 2, "use check-229 or stage-229");
+        return epoch229::run(action == "stage-229");
+    }
     ensure!(
         matches!(action.as_str(), "check" | "stage") && std::env::args().len() == 2,
         "use check or stage"
@@ -301,9 +308,13 @@ fn run() -> Result<()> {
             "staging tool changed: {path}"
         );
     }
-    let before = closed()?;
+    let before = closed(Path::new(ROOT), PRODUCER, TIMER)?;
     let mut members = tempfile::NamedTempFile::new()?;
-    let census_sha = census(&source, &mut members)?;
+    let census_sha = census(&source, &mut members, MEMBERS)?;
+    ensure!(
+        census_sha == CENSUS_SHA,
+        "AccountsDb census differs: {census_sha}"
+    );
     if action == "check" {
         println!(
             "{}",
@@ -327,14 +338,17 @@ fn run() -> Result<()> {
         .create_new(true)
         .mode(0o600)
         .open(&part)?;
-    let (length, sha256) = compress(&source, members.path(), &mut file)?;
+    let (length, sha256) = compress(&source, members.path(), &mut file, CAP)?;
     file.sync_all()?;
     ensure!(
         file.metadata()?.len() == length && hash_file(&part)? == sha256,
         "bundle readback differs"
     );
-    census(&source, &mut std::io::sink())?;
-    let after = closed()?;
+    ensure!(
+        census(&source, &mut std::io::sink(), MEMBERS)? == census_sha,
+        "AccountsDb census changed during staging"
+    );
+    let after = closed(Path::new(ROOT), PRODUCER, TIMER)?;
     file.set_permissions(fs::Permissions::from_mode(0o400))?;
     file.sync_all()?;
     fs::hard_link(&part, &bundle)?;

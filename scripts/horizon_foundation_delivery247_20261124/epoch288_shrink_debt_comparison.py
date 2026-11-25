@@ -61,6 +61,11 @@ PARK292_UNIT = 'foundation-292-appendvec-custody-v308.service'
 PARK292_START = V / 'horizon292-closed-appendvec-staging-v308/custody-start.json'
 STAGE228_UNIT = 'foundation-228-sparse-bundle-v1.service'
 STAGE228 = V / 'horizon228-private-guest-staging-v1'
+STAGE229_UNIT = 'foundation-229-closed-accounts-stage-v1.service'
+STAGE229 = V / 'horizon229-v1-accounts-custody-v1'
+STAGE229_BUNDLE = STAGE229 / 'epoch-229-closed-accounts.pax.zst'
+STAGE229_CAP = 96 << 30
+STAGE229_METADATA = 64 << 20
 STAGE288_UNIT = 'foundation-288-appendvec-stage-v2.service'
 STAGE288 = V / 'horizon288-closed-appendvec-study-v1'
 HOLDING288_UNITS = {
@@ -397,6 +402,39 @@ def active_288_holding(ops, unit):
     return dict(start=start_ref, owner=owner)
 
 
+def active_229_staging(ops):
+    owner = ops.props(STAGE229_UNIT, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
+                                     'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
+    group = Path('/sys/fs/cgroup/system.slice') / STAGE229_UNIT
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
+        return None
+    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (STAGE229_UNIT, 'active', 'running')
+    assert owner['ControlGroup'] == '/system.slice/' + STAGE229_UNIT
+    start_ref = binding(STAGE229 / 'start.json')
+    start = read(start_ref)
+    assert start['schema'] == 'foundation-epoch229-local-accounts-stage-start-v1'
+    assert all(owner[key] == start['owner'][key] for key in ('InvocationID', 'MainPID', 'ControlGroup'))
+    assert Path('/proc', owner['MainPID'], 'exe').samefile(checked(start['binary']))
+    admission = read(start['admission'])
+    assert admission['schema'] == 'foundation-epoch229-local-accounts-stage-admission-v1'
+    assert admission['unit'] == STAGE229_UNIT and admission['admitted'] is True
+    assert admission['maximum_bundle_bytes'] == STAGE229_CAP
+    assert int(owner['MemoryMax']) == 2 << 30 and owner['AllowedCPUs'] == '78-79'
+    assert start['retirement_authorized'] is False and start['remote_mutations'] is False
+    allocated = 0
+    for path in (STAGE229_BUNDLE, STAGE229_BUNDLE.with_suffix('.zst.part')):
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            continue
+        assert stat.S_ISREG(metadata.st_mode) and metadata.st_dev == STAGE229.stat().st_dev
+        assert metadata.st_uid == 0 and metadata.st_nlink in (1, 2) and metadata.st_size <= STAGE229_CAP
+        allocated = max(allocated, metadata.st_blocks * 512)
+    remaining = max(0, STAGE229_CAP - allocated) + STAGE229_METADATA
+    return dict(start=start_ref, owner=owner, remaining_bytes=remaining)
+
+
 def active_231_bootstrap_parity(ops):
     owner = ops.props(BOOTSTRAP231_UNIT, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
                                         'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
@@ -444,10 +482,11 @@ def active_public_audit(helper, census):
     return dict(launch=launch_ref, owner=owner)
 
 
-def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='capped'):
+def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='capped', stage229=False):
     assert not demotion_retry or candidate_epoch == 229
     assert replay231 == 'capped' or candidate_epoch == 231
-    ram_quote = DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch)
+    assert not stage229 or (candidate_epoch == 229 and not demotion_retry)
+    ram_quote = None if stage229 else (DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch))
     if candidate_epoch == 231:
         mount = {'capped': RAM_QUOTES[231][0], 'stock': STOCK231_MOUNT, 'demotion': DEMOTION231_MOUNT}[replay231]
         ram_quote = (mount, *RAM_QUOTES[231][1:])
@@ -465,6 +504,8 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
         affinity, = [line.split('=', 1)[1] for line in template if line.startswith('AllowedCPUs=')]
         candidate_memory = int(memory)
         candidate_cpus = kit.measure.source.helper.cpus(affinity)
+    elif stage229:
+        candidate_disk, candidate_memory, candidate_cpus = STAGE229_CAP + STAGE229_METADATA, 2 << 30, {78, 79}
     elif ram_quote is not None:
         _, _, candidate_memory, candidate_cpus = ram_quote
         candidate_disk = 0
@@ -548,6 +589,9 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
     stage228 = active_228_staging(kit.ops)
     if stage228 is not None:
         live.append(stage228['owner'])
+    accounts_stage = active_229_staging(kit.ops)
+    if accounts_stage is not None:
+        live.append(accounts_stage['owner'])
     holding288 = {unit: item for unit in HOLDING288_UNITS
                   if (item := active_288_holding(kit.ops, unit)) is not None}
     assert len(holding288) <= 1, 'epoch 288 holding phases overlap'
@@ -558,7 +602,7 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
     census = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
         '--no-pager', '--no-legend', '--plain', 'horizon-qualify-*', 'horizon-perf-*', 'horizon-upload-*',
         'horizon-restore-*', 'foundation-*-broker-*', 'foundation-public-audit-*',
-        'foundation-*-ext4-*', PARK292_UNIT, STAGE228_UNIT, 'foundation-288-appendvec-*',
+        'foundation-*-ext4-*', PARK292_UNIT, STAGE228_UNIT, STAGE229_UNIT, 'foundation-288-appendvec-*',
         'foundation-231-capped-bootstrap-parity-*'],
         text=True, timeout=10)
     listed_units = {line.split()[0] for line in census.splitlines() if line.strip()}
@@ -588,6 +632,8 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
         protected += custody['remaining_bytes']
     if holding288:
         protected += 64 << 20
+    if accounts_stage is not None:
+        protected += accounts_stage['remaining_bytes']
     staging = None
     if extract_state == LAYERED226_STATE:
         source = checked(fixed(STAGING292_HELPER, STAGING292_HELPER_SHA))
@@ -609,7 +655,7 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='cappe
     result = dict(epoch=candidate_epoch, fleet=fleet_ref, completion=completion, sampled_unix_seconds=int(time.time()),
                 live_units=owners, broker=broker, guards=growth, free_bytes=free, protected_disk_bytes=protected,
                 reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref, extraction226_terminal=terminal226,
-                staging292=staging, custody292=custody, staging228=stage228,
+                staging292=staging, custody292=custody, staging228=stage228, staging229=accounts_stage,
                 staging288=holding288.get(STAGE288_UNIT), holding288=holding288, bootstrap231=bootstrap231,
                 public_audit=public_audit,
                 guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=candidate_disk,
@@ -990,6 +1036,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'capacity-continuation230',
                                           'capacity-demotion229', 'capacity-demotion229-retry',
+                                          'capacity-stage229',
                                           'capacity-replay231', 'capacity-stock231', 'capacity-demotion231',
                                           'prepare', 'launch', 'launch-full'))
     parser.add_argument('reference', nargs='?')
@@ -1004,6 +1051,9 @@ def main():
         return
     if options.action == 'capacity-continuation230':
         print(json.dumps(capacity(load_existing(), candidate_epoch=230)))
+        return
+    if options.action == 'capacity-stage229':
+        print(json.dumps(capacity(load_existing(), candidate_epoch=229, stage229=True)))
         return
     if options.action in ('capacity-replay231', 'capacity-stock231', 'capacity-demotion231'):
         variant = options.action.removeprefix('capacity-').removesuffix('231')
