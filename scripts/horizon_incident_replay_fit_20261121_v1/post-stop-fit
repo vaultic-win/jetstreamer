@@ -56,7 +56,8 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v2",
     D / "tools-homefloor-170-metered-hourly-v3",
 )
-V5W_RECOVERY_145 = HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
+FULL170 = HERE == D / "tools-homefloor-170-full-metered-v1"
+V5W_RECOVERY_145 = FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
 V5W_POST_145 = HERE == D / "tools-homefloor-145-post-v5w-current-v1"
 V5V_RECOVERY_145 = V5W_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
 FRESH_CENSUS_RECOVERY_145 = V5V_RECOVERY_145 or HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
@@ -112,6 +113,13 @@ if HOURLY170 or V5V_RECOVERY_145 or V5W_POST_145:
     s.need(seal["destination"] == str(HERE), "unbound hourly 170 capacity adapter")
     fit.binary(adapter, member["sha256"])
     hourly170 = runpy.run_path(str(adapter))
+if FULL170:
+    loader["load_package"](HERE, s.read(HERE / "deployment-seal-receipt.json")[1]["sha256"])
+    observation = R / "prefix140-status-cadence-20261122-v1/cadence-tools"
+    loader["load_package"](observation,"7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e")
+    sys.path.insert(0, str(observation))
+    full170 = runpy.run_path(str(HERE / "full170_status.py"))
+    full170_capacity = runpy.run_path(str(HERE / "full170_capacity.py"))
 RETRY4_145 = LEASE_RUNTIME_145 or LEASE_BUILD_145 or HOURLY169 or V5J_POST or DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
 RETRY4_168 = RETRY4_145 or HERE.name == "tools-homefloor-cold168-retry4-v1"
 CLOSED_RETRY3 = HERE.name == "tools-homefloor-closed168-retry3-v1"
@@ -700,7 +708,10 @@ def phase145(epoch, fleet=None):
                        "five-lane-semantic" if FIVE_LANE_145 else "homefloor-semantic")
             cfg, adapter, _ = profile145(here.parent, focused=focused)
             reader = runpy.run_path(str(adapter))
-            members = hourly170["epoch145_members"](s, fit) if HOURLY170 else fit.members(fit.A145)
+            if FULL170:
+                members = full170_capacity["epoch145_members"](s, fit)
+            else:
+                members = hourly170["epoch145_members"](s, fit) if HOURLY170 else fit.members(fit.A145)
             phase = reader["inspect"](s, fit.overlap.leases, s.show(fit.A145), members, epoch, here, cfg)
             s.need(phase is not None, "unexpected HOME verifier image")
             return phase
@@ -873,8 +884,8 @@ def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None,
                "different focused 169 actor or donor")
         expect[hourly["unit"]] = hourly["processes"]
     if hourly170_owner is not None:
-        s.need(HOURLY170 and own == 145 and hourly170_owner["unit"] not in expect and not c136["occupied"],
-               "conflicting native hourly 170 capacity claimant")
+        s.need((HOURLY170 or FULL170) and own == 145 and hourly170_owner["unit"] not in expect and not c136["occupied"],
+               "conflicting native epoch 170 capacity claimant")
         expect[hourly170_owner["unit"]] = hourly170_owner["processes"]
     s.need(fit.units()==set(expect),"foreign qualifier unit")
     for u,prs in expect.items():
@@ -1207,10 +1218,17 @@ def settled_hourly170_for_145(fleet, fleet_ref, rows):
     s.need(170 not in rows and not any(row["epoch"] == 170 for row in fleet["actual_active_private_diagnostics"]),
            "V5v requires the drained private epoch 170 diagnostic")
     observation = Path(fleet_ref["path"]).parent / "PRIVATE170_OBSERVATION.json"
-    observed, receipt = s.read(observation)
+    if FULL170:
+        stored = next(row for row in fleet["epochs"] if row["epoch"] == 170)["private170_observation"]
+        observed, receipt = s.read(Path(stored["path"]), stored["sha256"])
+        s.need(Path(stored["path"]).parent.parent == R
+               and Path(stored["path"]).name == observation.name, "foreign retained private epoch 170 evidence")
+    else:
+        observed, receipt = s.read(observation)
+        s.need(observed["fleet"] == fleet["previous_Root_operational_review"]
+               and observed["sample"] == fleet["observer"], "stale private epoch 170 observation")
     s.need(observed["schema"] == "horizon-170-private-cycle-observation-v1"
-           and observed["fleet"] == fleet["previous_Root_operational_review"]
-           and observed["sample"] == fleet["observer"] and set(observed["observed"]) == {"terminal"},
+           and set(observed["observed"]) == {"terminal"},
            "different coordinated private epoch 170 terminal")
     package = R / "survivor172-cadence-20261122-v1/tools-cold168-retry4-failed166-v4"
     loader["load_package"](package, "b01cbf68251c60a2a836ebefa1fae70bdfa651cceab5d77ce7e340db55f76832")
@@ -1237,7 +1255,7 @@ def settled_hourly170_for_145(fleet, fleet_ref, rows):
     return {"observation": receipt, "terminal": terminal}
 
 
-def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
+def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
     closed_before=None
     if CLOSED_RETRY3:
@@ -1260,6 +1278,12 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
     peers=survivors(rows,ledger);status=registered_status()
     phase=phase145(epoch, ref)
     hourly170_owner = hourly170_guard = hourly170_contract = hourly170_row = None
+    full170_guard = None
+    if FULL170:
+        s.need(epoch == 145 and prestart136 is None and failed170,
+               "full epoch 170 requires the exact retained retry13 terminal")
+        hourly170_owner, full170_guard = full170_capacity["ownership"](s, fit, full170, hourly170,
+                                                                       full170_mode, ref, status)
     if HOURLY170:
         s.need(epoch == 145 and prestart136 is None and hourly170_mode in ("prestart", "post-guard", "active")
                and failed170, "hourly 170 requires the positive retry 13 terminal")
@@ -1517,6 +1541,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
         complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=needmem,available_memory_bytes=mem["MemAvailable:"],
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,**recovered_price,active168_guard_floor=floor168,
         population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
+    if FULL170:
+        s.need(full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status)
+               == (hourly170_owner, full170_guard), "full epoch 170 hold or first guard changed during price")
     if not HOURLY170:
         return native
     s.need(hourly170["ready_contract"]() == hourly170_contract, "sealed diagnostic changed during native price")
@@ -1531,9 +1558,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None):
     return hourly170["price"](native, hourly170_contract, hourly170_owner, hourly170_guard, hourly170_mode)
 
 
-def capture_native(epoch,ref,prestart136=None,hourly170_mode=None):
+def capture_native(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None):
     try:
-        return capture_once(epoch,ref,prestart136,hourly170_mode)
+        return capture_once(epoch,ref,prestart136,hourly170_mode,full170_mode)
     except WorkerFork as fork:
         e,before=fork.epoch,fork.anchor
         after=confirm_fork(e,epoch,before,{} if FIFTH168 and e==168 else proof_stops()[str(e)])
@@ -1541,7 +1568,7 @@ def capture_native(epoch,ref,prestart136=None,hourly170_mode=None):
         e,before,after=confirmed.epoch,confirmed.before,confirmed.after
     # Discard every earlier resource measurement. A second fork or a change of child
     # fails the capture instead of chaining unbounded retries.
-    result=capture_once(epoch,ref,prestart136,hourly170_mode)
+    result=capture_once(epoch,ref,prestart136,hourly170_mode,full170_mode)
     row=result["candidate"] if e==epoch else result["replacements"].get(str(e))
     s.need(row is not None,"replacement disappeared during complete reprice")
     same_fork(after,row,False)
@@ -1550,8 +1577,15 @@ def capture_native(epoch,ref,prestart136=None,hourly170_mode=None):
                                          final_guard=row["guard"],processes=row["processes"],complete_fit_repeated=True)
     return result
 
-def capture(epoch, ref, prestart136=None, hourly170_mode=None):
+def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None):
     s.need(HOURLY170 == (hourly170_mode is not None), "hourly 170 mode requires its own sealed provider")
+    s.need(FULL170 == (full170_mode is not None), "full epoch 170 mode requires its own sealed provider")
+    if FULL170:
+        s.need(epoch == 145 and prestart136 is None and full170_mode in ("prestart", "held", "post-guard"),
+               "unknown full epoch 170 capacity stage")
+        fleet, _ = fleet_head(ref)
+        status = registered_status()
+        actor, guard = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status)
     if STOPPED_GUARD_145 or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or LATE_HANDOFF_145:
         s.need(epoch == 145 and (prestart136 is None or POST_136), "unexpected missed-census pricing scope")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
@@ -1577,7 +1611,8 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None):
             quotes.append(donor["snapshot"](candidate))
             return candidate
 
-        native = capture_native(epoch,ref,verified_prestart if prestart136 is not None else None,hourly170_mode)
+        native = capture_native(epoch,ref,verified_prestart if prestart136 is not None else None,
+                                hourly170_mode,full170_mode)
         if guarded:
             s.need(feature_before == snapshot(donor), "corrected epoch 159 grant changed during census")
             native["corrected_159_donor"] = feature_before
@@ -1594,6 +1629,12 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None):
             native["epoch159_donor_cover"] = donor["cover"](left,native,right,exclusive136=native["candidate136"])
         else:
             native["epoch159_donor_cover"] = donor["cover"](before,donor_price,donor["snapshot"]())
+        if FULL170:
+            s.need(registered_status() == status and fleet_head(ref)[0] == fleet
+                   and full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status)
+                       == (actor, guard), "full epoch 170 ownership changed after donor proof")
+            return full170_capacity["price"](s, full170, native, full170_mode, actor, guard,
+                                              fleet["complete_cycle_conservative_available_DATA_bytes"])
         return native
     if HOURLY169:
         s.need(epoch == 145 and prestart136 is None, "hourly actor registration requires its dedicated complete quote")
@@ -1677,9 +1718,12 @@ if __name__=="__main__":
     s.need(HOURLY170 == (hourly170_mode is not None) and
            (not HOURLY170 or hourly170_mode in ("prestart", "post-guard", "active")),
            "hourly 170 requires --hourly170=prestart|post-guard|active with its exact provider")
+    full170_mode = None
+    if args and args[0].startswith("--full170="):
+        full170_mode = args.pop(0).split("=", 1)[1]
     review=args[:1]==["--next-admission"]
     if review:
-        s.need(not (HOURLY169 or HOURLY170), "use the dedicated hourly actor complete quote directly")
+        s.need(not (HOURLY169 or HOURLY170 or FULL170), "use the dedicated actor complete quote directly")
         args=args[1:]
     s.need(len(args)==3,"usage: post-stop-fit [--next-admission] EPOCH FLEET_ABSOLUTE_PATH FLEET_SHA256")
     signal.alarm(142)
@@ -1691,7 +1735,7 @@ if __name__=="__main__":
         runpy.run_path(str(HERE / "run-recovery"))["check_quote_parent"](ref)
     handback = semantic136_post_window() if launching_post else None
     try:
-        result=capture(int(args[0]),ref,hourly170_mode=hourly170_mode)
+        result=capture(int(args[0]),ref,hourly170_mode=hourly170_mode,full170_mode=full170_mode)
     except PublicReaderTurnover as error:
         print(error, file=sys.stderr)
         sys.exit(os.EX_TEMPFAIL)

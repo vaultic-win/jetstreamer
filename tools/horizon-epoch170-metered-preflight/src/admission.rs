@@ -6,6 +6,7 @@ const V10: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-metered-h
 const V10_PROVIDER_SHA: &str = "07c9d8a9fa3dda492348eff10e6eac13e9f496abb5d380f076b436e52e498e90";
 const V10_SEAL_SHA: &str = "dd7b7dea1f90c170e6942b329980964b238fc5e539194e66519a55b940d253a6";
 const V5W: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-v5v-custody-recovery-v1";
+const FULL170: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v1";
 
 const HOST_MEMORY_WITH_RESERVE: u64 = 810_658_050_048;
 const HOST_CPU_MICROS: u64 = 64_000_000;
@@ -231,6 +232,7 @@ pub(super) fn quote(
             rt(V10)
         }
         "v5w" => rt(V5W),
+        "full170" => rt(FULL170),
         _ => bail!("unknown epoch 170 capacity provider deployment"),
     };
     let sealed = reference(
@@ -258,8 +260,14 @@ pub(super) fn quote(
     image(&program)?;
     let mut command = Command::new("/usr/bin/timeout");
     command.args(["150", "/usr/bin/python3", "-IB", string(&program, "path")?]);
-    if route == "v10" {
-        command.arg("--hourly170=prestart");
+    match route {
+        "v10" => {
+            command.arg("--hourly170=prestart");
+        }
+        "full170" => {
+            command.arg("--full170=prestart");
+        }
+        _ => {}
     }
     let output = command
         .args(["145", string(fleet, "path")?, string(fleet, "sha256")?])
