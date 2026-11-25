@@ -14,9 +14,9 @@ use sha2::{Digest, Sha256};
 use solana_hash::Hash;
 use std::{fs, io::Read, os::unix::fs::MetadataExt, path::Path, time::Instant};
 
-const UNIT: &str = "foundation-231-capped-bootstrap-parity-v1.service";
+const UNIT: &str = "foundation-231-capped-bootstrap-parity-v2.service";
 const SCRATCH: &str = "/tmp/foundation-231-bootstrap";
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon231-capped-bootstrap-parity-v1";
+const PACKAGE: &str = "/var/lib/jetstreamer/horizon231-capped-bootstrap-parity-v2";
 const SLOT: u64 = 99_791_404;
 const ACCOUNTS: &str = "Hn6PFpfb4b63XELLfqGYLbFk8c8hJtujeQbFR1WmNW84";
 const SNAPSHOT: &str = "/var/lib/jetstreamer/horizon-contiguous-231-232-current-46b4b4a-v1/snapshot-99791404-Hn6PFpfb4b63XELLfqGYLbFk8c8hJtujeQbFR1WmNW84.tar.zst";
@@ -138,19 +138,23 @@ fn main() -> Result<()> {
     let root = Path::new(SCRATCH);
     let mounts = fs::read_to_string("/proc/self/mountinfo")?;
     ensure!(
-        mounts.lines().any(
-            |row| row.split_once(" - ").is_some_and(|(front, back)| front
-                .split_whitespace()
-                .nth(4)
-                == Some(SCRATCH)
-                && back.starts_with("tmpfs ")
-                && back
-                    .split_whitespace()
-                    .nth(2)
-                    .is_some_and(|options| options.split(',').any(|value| value == "noswap")))
-        ) && root.metadata()?.uid() == 1000
+        mounts
+            .lines()
+            .any(|row| row.split_once(" - ").is_some_and(|(front, back)| {
+                let mut fields = front.split_whitespace().skip(4);
+                fields.next() == Some(SCRATCH)
+                    && fields
+                        .next()
+                        .is_some_and(|options| !options.split(',').any(|value| value == "noexec"))
+                    && back.starts_with("tmpfs ")
+                    && back
+                        .split_whitespace()
+                        .nth(2)
+                        .is_some_and(|options| options.split(',').any(|value| value == "noswap"))
+            }))
+            && root.metadata()?.uid() == 1000
             && fs::read_dir(root)?.next().is_none(),
-        "probe requires fresh private no-swap tmpfs"
+        "probe requires fresh private no-swap tmpfs that permits the bound worker to execute"
     );
     let ledger = Path::new(PACKAGE).join("ledger");
     ensure!(
