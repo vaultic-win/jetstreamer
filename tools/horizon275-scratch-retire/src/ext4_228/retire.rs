@@ -13,15 +13,19 @@ const PRODUCER_FILE: &str =
 const PRODUCER_SHA: &str = "9c208b277b1d9f1b37f1e4387e5c42c60905bacaf9a721e06bf664a7cd9ae3bf";
 const SPEC: &str = "/var/lib/jetstreamer/horizon228-native-root-tail-v166-a1/pilot/spec.json";
 const SPEC_SHA: &str = "1fec8637c4dade8953caf503eaecb8230db84bb27971ac4772ff548766b40363";
+const IMAGE_SCOPE: &str = "/var/lib/jetstreamer/horizon228-native-root-tail-v166-a1";
+const ROUND_TRIP_UNIT: &str = "foundation-228-sparse-round-trip-v329.service";
+const ROUND_TRIP_FILE: &str =
+    "/run/systemd/transient/foundation-228-sparse-round-trip-v329.service";
+const ROUND_TRIP_SHA: &str = "74f47b6ba10b5e79c45b6ab4e2797ee7e6d7a803a8722229e704c4da03ead4b9";
 
-fn no_readers() -> Result<Value> {
-    closed()?;
+fn drained(unit: &str, required: &[&str]) -> Result<()> {
     let result = Command::new("/usr/bin/systemctl")
         .args([
             "show",
-            UNIT,
+            unit,
             "-p",
-            "Job,Restart,NRestarts,Triggers,TriggeredBy,RequiredBy,WantedBy,PartOf,BoundBy",
+            "ActiveState,MainPID,ControlPID,ControlGroup,InvocationID,Result,Job,Restart,NRestarts,Triggers,TriggeredBy,RequiredBy,WantedBy,PartOf,BoundBy",
         ])
         .output()?;
     let stdout = std::str::from_utf8(&result.stdout)?;
@@ -31,6 +35,9 @@ fn no_readers() -> Result<Value> {
                 "Job=",
                 "Restart=no",
                 "NRestarts=0",
+                "MainPID=0",
+                "ControlPID=0",
+                "ControlGroup=",
                 "Triggers=",
                 "TriggeredBy=",
                 "RequiredBy=",
@@ -39,22 +46,39 @@ fn no_readers() -> Result<Value> {
                 "BoundBy="
             ]
             .iter()
+            .chain(required)
             .all(|field| stdout.lines().any(|line| line == *field)),
-        "retired producer can still be triggered"
+        "{unit} is active, changed identity, or can be triggered"
     );
+    Ok(())
+}
+
+fn no_readers() -> Result<Value> {
+    closed()?;
+    drained(UNIT, &["ActiveState=inactive"])?;
     let mut schedules = BTreeMap::new();
-    for path in [TARGET, IMAGE, LOOP] {
-        let target = Path::new(path);
-        let scope = if path == TARGET {
-            target
-        } else {
-            target.parent().context("candidate parent")?
-        };
-        let schedule = scheduled_census(scope, target)?;
+    for (scope, path) in [(TARGET, TARGET), (IMAGE_SCOPE, IMAGE), (LOOP, LOOP)] {
+        let schedule = scheduled_census(Path::new(scope), Path::new(path))?;
         for entry in schedule["remaining"]
             .as_array()
             .context("invalid scheduled reference report")?
         {
+            if path == IMAGE
+                && entry["origin"] == ROUND_TRIP_FILE
+                && entry["chain"] == json!([])
+                && entry["sha256"] == ROUND_TRIP_SHA
+                && entry["targets"] == json!([IMAGE])
+            {
+                drained(
+                    ROUND_TRIP_UNIT,
+                    &[
+                        "ActiveState=failed",
+                        "InvocationID=07fe215075a44c94884a4030e9911462",
+                        "Result=exit-code",
+                    ],
+                )?;
+                continue;
+            }
             ensure!(
                 entry["origin"] == PRODUCER_FILE
                     && entry["targets"] == json!([path])
