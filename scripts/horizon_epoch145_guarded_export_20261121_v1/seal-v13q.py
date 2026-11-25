@@ -113,6 +113,13 @@ need(build["worker"] == bound(image) and build["tests"] == bound(tests)
      and "test result: ok." in tests.read_text() and "0 failed;" in tests.read_text()
      and "Ran 3 tests" in phase_tests.read_text() and phase_tests.read_text().endswith("OK\n"),
      "native or phase test results differ")
+if reader_revisions[commit] == "e15f71a2a84c9f256c6fc3d5da34e9354430e702":
+    reader_test = evidence / "native-reader-test.log"
+    result = reader_test.read_text()
+    need(build["reader_test"] == bound(reader_test)
+         and "post::tests::current_full_and_plugin_use_the_same_qualified_plan_as_delivery ... ok" in result
+         and "test result: ok. 1 passed; 0 failed;" in result,
+         "the linked verifier did not prove the qualified HTTP retry reader")
 adapter = compiled_file(inputs, worker_source / "incident-post-phase.py")
 wrapper = compiled_file(inputs, worker_source / "run-incident-post.sh")
 post_fit = compiled_file(inputs, fit_source / "post-stop-fit")
