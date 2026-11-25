@@ -29,7 +29,7 @@ def failed166_package(version):
     return name + '-entry146' if version >= 4 else name
 
 
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10)
                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
 FAILED166 = bool(FAILED166_VERSION)
 METERED_FULL170 = FAILED166_VERSION in (6, 7)
@@ -820,10 +820,11 @@ def entry():
     if FAILED166_VERSION >= 4:
         need(cold_workers.FAILED166_CADENCE, 'cold worker census omits the drained epoch 166')
         validate_epoch146_modules(seal)
-    if getattr(cold_workers, 'cold168_commit', None):
+    if FAILED166_VERSION == 10:
+        need(getattr(cold_workers, 'cold168_commit', None), 'missing cold168 terminal cadence')
         path = CURRENT.with_name('cold168_commit.py')
         member, = (item for item in seal['members'] if item['name'] == path.name)
-        need(FAILED166_VERSION >= 8 and Path(cold_workers.cold168_commit.__file__) == path
+        need(Path(cold_workers.cold168_commit.__file__) == path
              and member['mode'] == '0444' and bound(path)['sha256'] == member['sha256'],
              'unsealed cold168 terminal cadence')
     if METERED_FULL170:
@@ -1010,6 +1011,8 @@ def rejoin_failed166_cadence(state, receipt, fd):
     previous = 'FAILED166_CADENCE' if FAILED166_VERSION == 2 else f'FAILED166_CADENCE_V{FAILED166_VERSION - 1}'
     if FAILED166_VERSION == 8 or (HOLDING185 and ready['old_owner']['path'] == str(ROOT/'FAILED166_CADENCE_V5_ACTIVE.json')):
         previous = 'FAILED166_CADENCE_V5'
+    if FAILED166_VERSION == 10:
+        previous = 'FAILED166_CADENCE_V8'
     incumbent_ref = bound(ROOT/f'{previous}_ACTIVE.json')
     need(ready['schema'] == 'horizon-epoch166-cadence-rejoin-ready-v1'
          and ready['package'] == receipt and ready['old_owner'] == incumbent_ref,

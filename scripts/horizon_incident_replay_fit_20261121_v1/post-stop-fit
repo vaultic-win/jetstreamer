@@ -62,7 +62,10 @@ REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v
 REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
 REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
-V6_145 = HERE == D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
+PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
+V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
+V6_POST_PROVIDER = D / "tools-homefloor-145-post-v6-build-v1"
+V6_145 = HERE == V6_LIVE_PROVIDER or PUBLISH168
 V5Z_145 = HERE == D / "tools-homefloor-145-v5y-custody-recovery-v1" or V6_145
 V5Z_BUILD_145 = HERE in (
     D / "tools-homefloor-145-v5y-custody-build-v1",
@@ -184,6 +187,8 @@ if CLOSED_RETRY3:
     closed_bootstrap = runpy.run_path(str(HERE / "closed_retry3.py"))
 if RETRY3_168:
     writer168 = runpy.run_path(str(HERE / "retry3_status.py"))
+if PUBLISH168:
+    publication168 = runpy.run_path(str(HERE / "cold168_publication.py"))
 if PUBLISH170:
     publication170 = runpy.run_path(str(HERE / "cold170_commit.py"))
 if COLD170:
@@ -678,6 +683,12 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch, fleet=None):
+    if PUBLISH168 and not fit.members(fit.A145):
+        loader["load_package"](V6_POST_PROVIDER, "197ba4e755875f01097446ab1a8958c604478e8e183769d451d968b269d7f349")
+        phase = runpy.run_path(str(V6_POST_PROVIDER / "post-stop-fit"))["phase145"](epoch, fleet)
+        s.need(phase["completed_invocation_id"] == "a71285e56d674de3bf793692f93dfbb3",
+               "different drained epoch 145 verifier")
+        return phase
     if REPRO166_POST_V6:
         s.need(epoch == 145 and fleet is not None, "epoch 166 requires an accepted fleet")
         phase = full170_capacity["drained145"](s, fit, R)
@@ -833,7 +844,14 @@ def phase145(epoch, fleet=None):
                 members = full170_capacity["epoch145_members"](s, fit)
             else:
                 members = hourly170["epoch145_members"](s, fit) if HOURLY170 else fit.members(fit.A145)
-            phase = reader["inspect"](s, fit.overlap.leases, s.show(fit.A145), members, epoch, here, cfg)
+            probe = here
+            manager = s.show(fit.A145)
+            if PUBLISH168:
+                s.need(manager["InvocationID"] == "a71285e56d674de3bf793692f93dfbb3",
+                       "different live epoch 145 verifier")
+                probe = V6_LIVE_PROVIDER / "post-stop-fit"
+                fit.binary(probe, "8a57387bf3aba4c2346233177e75f4d07085ab9cbadac871a47e2667bbb5b535")
+            phase = reader["inspect"](s, fit.overlap.leases, manager, members, epoch, probe, cfg)
             s.need(phase is not None, "unexpected HOME verifier image")
             return phase
         return registrations["phase145"](s, fit, epoch)
@@ -1134,7 +1152,7 @@ def registered_status():
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():
                                 adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, version)
-                        return adopted
+                        return publication168["registered_writer"](scope, adopted) if PUBLISH168 else adopted
                     if HOURLY170_CADENCE and (
                         R / "survivor172-cadence-20261122-v1/HOURLY170_CADENCE_ACTIVE.json"
                     ).exists():
@@ -1415,6 +1433,10 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     failed170 = failed170_replay(f, rows) if V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 else None
     failed166 = retry11["failed"](s, fit, f, rows) if RETAIN_FAILED166 else None
     hourly170_settled = settled_hourly170_for_145(f, ref, rows) if V5V_RECOVERY_145 or V5W_POST_145 else None
+    terminal168 = None
+    if PUBLISH168:
+        s.need(epoch == 145 and prestart136 is None, "cold168 provider only prices terminal publication")
+        terminal168 = publication168["current"](s, loader["load_package"], f)
     terminal170 = None
     if PUBLISH170:
         s.need(epoch == 145 and prestart136 is None, "cold170 provider only prices terminal publication")
@@ -1538,7 +1560,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     tree_measurement="two complete stopped-tree walks"
     if FIFTH168:
         s.need(closed168 is None and 168 in interrupted and extra is None, "unexpected original 168 settlement")
-        a = observe_actor(168,epoch,s.TREE,cold168["RUN"],interrupted[168])
+        a = None if terminal168 else observe_actor(168,epoch,s.TREE,cold168["RUN"],interrupted[168])
         if a:
             rep["168"] = a
             if a["physical"] is not None:
@@ -1671,6 +1693,10 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if CLOSED_RETRY3:
         s.need(closed_bootstrap["settled"](s,fit)==closed_before and "168" not in rep, "closed 168 changed")
         recovered_price["closed_retry3_bootstrap"]=closed_before
+    if terminal168:
+        s.need(publication168["current"](s, loader["load_package"], f) == terminal168,
+               "cold168 terminal changed during price")
+        recovered_price["closed_cold168"] = terminal168
     if PUBLISH170:
         s.need(publication170["current"](f) == terminal170, "cold170 terminal changed during price")
         recovered_price["closed_cold170"] = terminal170

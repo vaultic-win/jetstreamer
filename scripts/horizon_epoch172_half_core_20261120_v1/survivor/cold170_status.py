@@ -29,6 +29,7 @@ FAILED166_CADENCE = METERED_FULL or LOCAL.name in (
     'tools-cold168-retry4-failed166-v1', 'tools-cold168-retry4-failed166-v2',
     'tools-cold168-retry4-failed166-v3', 'tools-cold168-retry4-failed166-v4-entry146',
     'tools-cold168-retry4-failed166-v5-entry146', 'tools-cold168-retry4-failed166-v8-entry146',
+    'tools-cold168-retry4-failed166-v10-entry146',
 )
 FAILED_CADENCE = FAILED166_CADENCE or LOCAL.name == 'tools-cold168-retry4-failed170-v1'
 FAILED_STATUS = 'cold170_retry13_execution_failure'
