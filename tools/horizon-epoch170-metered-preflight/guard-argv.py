@@ -15,6 +15,11 @@ RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT = RUNTIME / "epoch170-full-metered-rebook-20261124-v1"
 EVIDENCE = RUNTIME / "prefix140-status-cadence-20261122-v1/cadence-tools"
 RECEIVER = RUNTIME / "survivor172-cadence-20261122-v1/tools-cold168-retry4-failed166-v7-entry146"
+CADENCE = RECEIVER.parent
+V13 = CADENCE / "tools-cold168-retry5-failed166-v13-entry146"
+V12_OWNER_SHA = "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54"
+V13_RECEIVER_SHA = "4ec9ca4476a6e8ed21090e9dfeb58582916b00610f5145a9181a8cadc0dbb695"
+V13_WRITER_SHA = "3d2401bb1bfe9a65f68503c2feca30c0630ea876ad04fa01d1a6a5eda374e8ab"
 POST_BUILD = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5z-build-v1"
 PREDECESSOR = RUNTIME / "epoch170-retry10-recovery-20261121-v1/guard-receipts/stop-completion.json"
 PREDECESSOR_SHA = "d670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a"
@@ -40,6 +45,46 @@ def sealed_module(package, seal_digest, name):
     return runpy.run_path(str(path))
 
 
+def v13_writer(price, enrollment):
+    from owners import show, ticks
+
+    status = price["status_registration"]
+    incumbent = enrollment["incumbent"]
+    active_ref = enrollment["incumbent_registration"]
+    need(active_ref["path"] == str(CADENCE / "FAILED166_CADENCE_V13_ACTIVE.json")
+         and status["consumer_seal"]["path"] == str(V13 / "deployment-seal-receipt.json"),
+         "current cadence cannot adopt the held full epoch 170 worker")
+    active = checked(active_ref)
+    ready = checked(active["ready"])
+    seal = checked(status["consumer_seal"])
+    actor = active["new"]
+    previous_ref = reference(CADENCE / "FAILED166_CADENCE_V12_ACTIVE.json", V12_OWNER_SHA)
+    previous = checked(previous_ref)["new"]
+    receiver = reference(V13 / "full170_status.py", V13_RECEIVER_SHA)
+    program = reference(V13 / "status_cycle.py", V13_WRITER_SHA)
+    member, = (row for row in seal["members"] if row["name"] == "full170_status.py")
+    need(active["schema"] == "horizon-epoch166-cadence-rejoin-active-v1"
+         and active["producer_mutations"] is False
+         and active["ready"]["path"] == str(CADENCE / "FAILED166_CADENCE_V13_READY.json")
+         and ready["package"] == status["consumer_seal"]
+         and ready["old_owner"] == previous_ref and active["old"] == previous
+         and actor["invocation_id"] != previous["invocation_id"] and actor["start_ticks"] > previous["start_ticks"]
+         and all(actor["lock"][key] == previous["lock"][key] for key in ("path", "device", "inode"))
+         and ready["full170_receiver"] == bound(V13 / "full170_status.py") == receiver
+         and seal["destination"] == str(V13)
+         and member["mode"] == "0444" and member["sha256"] == V13_RECEIVER_SHA
+         and incumbent["program"] == bound(V13 / "status_cycle.py") == program
+         and actor["program"] == program["path"]
+         and all(status[key] == incumbent[key] == actor[key] for key in ("invocation_id", "pid", "start_ticks")),
+         "different V13 receiver or enrolled writer")
+    unit = "horizon-archive-status-cadence-after172-20261120-v1.service"
+    manager = show(unit, ("Id", "InvocationID", "MainPID", "ActiveState", "NRestarts", "Job"))
+    need(actor["unit"] == unit and manager == dict(
+        Id=unit, InvocationID=actor["invocation_id"], MainPID=str(actor["pid"]),
+        ActiveState="active", NRestarts="0", Job="") and ticks(actor["pid"]) == actor["start_ticks"],
+         "V13 writer changed before the epoch 170 transition")
+
+
 def start_intent(route, review_ref):
     review = checked(review_ref)
     profile = review["profile"]
@@ -59,13 +104,7 @@ def start_intent(route, review_ref):
          and profile["actor"]["unit"] == route["UNIT"]
          and not os.path.lexists(route["PERMIT"]), "epoch 170 start basis differs")
     if price.get("phase145", {}).get("stage") == "v9-semantic-complete-drained":
-        status = price["status_registration"]
-        receiver = checked(status["consumer_seal"])
-        need(status["invocation_id"] == enrollment["incumbent"]["invocation_id"]
-             and str(Path(enrollment["incumbent"]["program"]).parent) == receiver["destination"]
-             and any(member["name"] == "full170_status.py" and member["mode"] == "0444"
-                     for member in receiver["members"]),
-             "current cadence cannot adopt the held full epoch 170 worker")
+        v13_writer(price, enrollment)
     predecessor = bound(PREDECESSOR)
     need(predecessor["sha256"] == PREDECESSOR_SHA, "original epoch 170 stop proof changed")
     return dict(schema="horizon-170-full-metered-start-intent-v1", epoch=170, fleet=fleet_ref,
@@ -174,6 +213,12 @@ def release_record(route, actor, intent, plan_ref, first_ref, post_ref, boot, no
          and post["available_HOME_bytes"] >= post["complete_required_HOME_bytes"] == floor + book["remaining_bytes"]
          and post["available_memory_bytes"] >= post["required_available_memory_bytes"],
          "epoch 170 release lacks a fresh positive post-guard quote for this hold")
+    if pre["phase145"].get("stage") == "v9-semantic-complete-drained":
+        enrollment_ref = pre["epoch170_metered_full"]["observer_enrollment"]
+        need(post["status_registration"] == pre["status_registration"]
+             and stage["observer_enrollment"] == enrollment_ref,
+             "epoch 170 post-guard quote changed the enrolled V13 writer")
+        v13_writer(post, checked(enrollment_ref))
     return dict(actor, intent=intent_ref, actual_guard_plan=plan_ref, first_guard=first_ref,
                 post_guard_capacity=post_ref, transaction_replay_claimed=False)
 

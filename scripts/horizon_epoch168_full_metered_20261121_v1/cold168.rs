@@ -112,12 +112,23 @@ mod route {
     pub const CSEAL: &str = "bfcdef46e5c2ff3ea39b8293f8f82edd53643f6a6363e2069ec4eb58ef04f2c6";
     pub const WITNESS: &str = "fa3ba73fbc164507e40b76f6653c1394df223b2bea0aa940b815baae16d868fc";
     pub const GUARD_BASE: &str = "epoch168-cold-guard-20261125-v5";
-    pub const FIT: &str =
-        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-v4/post-stop-fit";
+    pub const FIT: &str = if cfg!(epoch168_cold_retry5_v13) {
+        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-v5/post-stop-fit"
+    } else {
+        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-v4/post-stop-fit"
+    };
     pub const ROOT: &str = "4cd544fddda40cd81c94358b8c455feac24247b14f56e8fdb8ede2727c54af25";
     pub const ALIAS: &str = "/run/horizon-full168-cold-v5";
-    pub const STATUS_QUALIFIED: &str = "FAILED166_CADENCE_V12_READY.json";
-    pub const STATUS_ACTIVE: &str = "FAILED166_CADENCE_V12_ACTIVE.json";
+    pub const STATUS_QUALIFIED: &str = if cfg!(epoch168_cold_retry5_v13) {
+        "FAILED166_CADENCE_V13_READY.json"
+    } else {
+        "FAILED166_CADENCE_V12_READY.json"
+    };
+    pub const STATUS_ACTIVE: &str = if cfg!(epoch168_cold_retry5_v13) {
+        "FAILED166_CADENCE_V13_ACTIVE.json"
+    } else {
+        "FAILED166_CADENCE_V12_ACTIVE.json"
+    };
     pub const STATUS_SCHEMA: &str = "horizon-epoch166-cadence-rejoin-ready-v1";
     pub const GUARD_QUALIFIED: &str =
         "e237ca579a8921adaae0081ef71a82b35377e4ff80acaf8539c03cd68e3aa696";
@@ -1647,30 +1658,60 @@ pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
 
 #[cfg(epoch168_cold_retry5)]
 pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
-    const SEAL: &str = "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac";
+    const V12_SEAL: &str = "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac";
+    const V12_ACTIVE: &str = "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54";
+    const V13_RECEIVER: &str = "4ec9ca4476a6e8ed21090e9dfeb58582916b00610f5145a9181a8cadc0dbb695";
+    const V13_WRITER: &str = "3d2401bb1bfe9a65f68503c2feca30c0630ea876ad04fa01d1a6a5eda374e8ab";
+    const RETRY5_BINDING: &str = "906eabc8de4ead288fcae3b514daff4a18786fd9e7200ff8fbbac6a96e933716";
+    let successor = cfg!(epoch168_cold_retry5_v13);
     let status = rt("survivor172-cadence-20261122-v1");
-    let package = status.join("tools-cold168-retry5-failed166-v12-entry146");
+    let registration = &price["status_registration"];
+    let (package, seal_digest, previous_name) = if successor {
+        (
+            status.join("tools-cold168-retry5-failed166-v13-entry146"),
+            st(&registration["consumer_seal"], "sha256")?,
+            "FAILED166_CADENCE_V12_ACTIVE.json",
+        )
+    } else {
+        (
+            status.join("tools-cold168-retry5-failed166-v12-entry146"),
+            V12_SEAL,
+            "FAILED166_CADENCE_V11_ACTIVE.json",
+        )
+    };
     let entry = package.join("status_cycle.py");
-    let seal = member(&entry, SEAL)?;
+    let seal = member(&entry, seal_digest)?;
     let marker = package.join("retry5-168-generation.json");
     ensure!(
-        member(&marker, SEAL)? == seal,
+        member(&marker, seal_digest)? == seal,
         "different retry5 generation seal"
     );
     let (generation, generation_ref) = doc(&marker, None)?;
     let (ready, ready_ref) = doc(&status.join(STATUS_QUALIFIED), None)?;
     let (active, active_ref) = doc(&status.join(STATUS_ACTIVE), None)?;
-    let previous = bound(
-        &ready["old_owner"],
-        &status.join("FAILED166_CADENCE_V11_ACTIVE.json"),
-    )?;
+    let previous = if successor {
+        let (previous, previous_ref) = doc(&status.join(previous_name), Some(V12_ACTIVE))?;
+        let receiver = package.join("full170_status.py");
+        ensure!(
+            ready["old_owner"] == previous_ref
+                && ready["full170_receiver"]["path"] == json!(receiver)
+                && ready["full170_receiver"]["sha256"] == V13_RECEIVER
+                && member(&receiver, seal_digest)? == seal
+                && file_digest(&receiver)? == V13_RECEIVER
+                && file_digest(&entry)? == V13_WRITER
+                && generation_ref["sha256"] == RETRY5_BINDING,
+            "different V13 receiver or V12 cadence predecessor"
+        );
+        previous
+    } else {
+        bound(&ready["old_owner"], &status.join(previous_name))?
+    };
     let fleet = bound(&ready["fleet"], Path::new(st(&ready["fleet"], "path")?))?;
     let (_, root_ref) = doc(&base().join("SUCCESSOR_ROOT.json"), Some(ROOT))?;
     let (_, guard_ref) = doc(
         &rt(GUARD_BASE).join("GUARD_QUALIFIED.json"),
         Some(GUARD_QUALIFIED),
     )?;
-    let registration = &price["status_registration"];
     let actor = &active["new"];
     let lock = &actor["lock"];
     let old = &previous["new"];

@@ -19,6 +19,16 @@ FAILED_RESUME = 'd3c726dc3143441b80687e0c9504221b'
 RESUME_FLEET = '7e45aafe0709ddd977f622a8a3ad1041678852bce5755d7268245cf07c90c037'
 RESUME_SAMPLE = '8ea7d08de19c26038d88f69a4f7df04e90df4b6cc45c3a7a4b65ebba8e05094c'
 EXIT = '98e322203f7a4ed290d09fe03c09fe15'
+V12_ACTIVE_SHA = 'b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54'
+V12_SEAL_SHA = '6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac'
+V13_PACKAGE = STATUS/'tools-cold168-retry5-failed166-v13-entry146'
+# These four members are the source-only cadence change in b643fe4b.
+V13_MEMBERS = {
+    'status_cycle.py': '3d2401bb1bfe9a65f68503c2feca30c0630ea876ad04fa01d1a6a5eda374e8ab',
+    'cold170_status.py': 'b28adb8a1a9bab4b1d04b26138310d92e4ae99ea98369456255f7809afd06bbf',
+    'hourly170_cadence.py': 'e42848fba26c371b2673d1495b5ea928b8f9519cfaa4027516990e95e6b1890e',
+    'full170_status.py': '4ec9ca4476a6e8ed21090e9dfeb58582916b00610f5145a9181a8cadc0dbb695',
+}
 
 
 def registered_writer(s, prior, prepared_sha, guard_sha):
@@ -191,11 +201,39 @@ def registered_hourly170_writer(s, prior, *, failed166=False):
     return package, ready['package'], actor['invocation_id'], actor
 
 
-def registered_failed166_rejoin(s, prior, version=2):
+def check_v13_receiver(s, binary, old_package, old_seal, previous, ready, package, seal):
+    s.need(binary is not None and package == V13_PACKAGE
+           and old_seal == s.ref(old_package/'deployment-seal-receipt.json', V12_SEAL_SHA)
+           and ready['old_owner'] == s.ref(STATUS/'FAILED166_CADENCE_V12_ACTIVE.json', V12_ACTIVE_SHA),
+           'different immutable V12 cadence predecessor')
+    previous_ready = s.bound(previous['ready'], STATUS/'FAILED166_CADENCE_V12_READY.json')
+    old_members = s.bound(old_seal, old_package/'deployment-seal-receipt.json')
+    expected = {m['name']: (m['mode'], m['sha256']) for m in old_members['members']}
+    expected.update({name: ('0444', sha) for name, sha in V13_MEMBERS.items()})
+    members = {m['name']: (m['mode'], m['sha256']) for m in seal['members']}
+    s.need(seal['schema'] == old_members['schema'] == 'jetstreamer-sealed-deployment-receipt-v1'
+           and seal['sealer_sha256'] == old_members['sealer_sha256']
+           and all(seal[key] is False for key in ('remote_mutations', 'r2_mutations',
+                                                'publication_authorized', 'replay_launch_authorized'))
+           and len(seal['members']) == len(members) and members == expected
+           and ready['full170_receiver'] == s.ref(package/'full170_status.py', V13_MEMBERS['full170_status.py']),
+           'different V13 receiver or sealed member set')
+    binding = 'retry5-168-generation.json'
+    digest = expected[binding][1]
+    s.need(previous_ready['package'] == old_seal
+           and previous_ready['retry5_generation'] == s.ref(old_package/binding, digest)
+           and ready['retry5_generation'] == s.ref(package/binding, digest)
+           and previous_ready['retained_retry4_stop'] == ready['retained_retry4_stop'],
+           'V13 changed the registered retry5 generation or retained stop')
+    for name, (_, digest) in members.items():
+        binary(package/name, digest)
+
+
+def registered_failed166_rejoin(s, prior, version=2, *, binary=None):
     old_package, old_seal, old_iid, old = prior
-    s.need(version in (2, 3, 4, 5, 6, 7, 8, 11, 12), 'unknown epoch 166 cadence rejoin')
+    s.need(version in (2, 3, 4, 5, 6, 7, 8, 11, 12, 13), 'unknown epoch 166 cadence rejoin')
     def package_for(generation):
-        attempt = 5 if generation == 12 else 4
+        attempt = 5 if generation in (12, 13) else 4
         name = f'tools-cold168-retry{attempt}-failed166-v{generation}'
         return STATUS / (name + '-entry146' if generation >= 4 else name)
 
@@ -252,8 +290,11 @@ def registered_failed166_rejoin(s, prior, version=2):
                'guard-stop cadence does not bind the failed writer and accepted sample')
     if version == 12:
         s.need(old_seal['sha256'] == 'cfcb2a66ab626bb5a0066377f22c65ca424e9e42f4a87f866f6d53be56583a5c'
-               and ready['package']['sha256'] == '6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac',
+               and ready['package']['sha256'] == V12_SEAL_SHA,
                'different retry5 cadence pair')
+    if version == 13:
+        check_v13_receiver(s, binary, old_package, old_seal, previous, ready, package, seal)
+    if version in (12, 13):
         binding = package / 'retry5-168-generation.json'
         member, = [m for m in seal['members'] if m['name'] == binding.name and m['mode'] == '0444']
         s.need(ready['retry5_generation'] == s.ref(binding, member['sha256']),
