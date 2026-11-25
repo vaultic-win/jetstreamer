@@ -14,25 +14,25 @@ import time
 from pathlib import Path
 
 BASE = Path('/var/lib/jetstreamer')
-PREVIOUS = BASE / 'horizon230-checkpoint-continuation-fit-v1'
-STATE = BASE / 'horizon230-checkpoint-continuation-fit-v2'
+PREVIOUS = BASE / 'horizon230-checkpoint-continuation-fit-v2'
+STATE = BASE / 'horizon230-checkpoint-continuation-fit-v3'
 CONTROL = BASE / 'horizon-seven-publication-controller-v222'
-TOKENS = BASE / 'horizon230-checkpoint-continuation-fit-tokens-v2'
+TOKENS = BASE / 'horizon230-checkpoint-continuation-fit-tokens-v3'
 GUARDS = STATE / 'guard-receipts'
-UNIT = 'horizon-qualify-230-checkpoint-continuation-fit-v2.service'
-GUARD = 'horizon-230-checkpoint-continuation-fit-protective-v2.service'
+UNIT = 'horizon-qualify-230-checkpoint-continuation-fit-v3.service'
+GUARD = 'horizon-230-checkpoint-continuation-fit-protective-v3.service'
 TIMER = GUARD.replace('.service', '.timer')
-CAPACITY = BASE / 'horizon226-suffix-v1/capacity-epoch230-fit-v2.py'
-CAPACITY_SHA = '4eb296472e2012fb307997f60448dfaed42b819ba0f3961954d69effa8cb4f96'
+CAPACITY = BASE / 'horizon226-suffix-v1/capacity-epoch230-fit-v3.py'
+CAPACITY_SHA = 'ad829e77cb25c5e77ca65516541d7a7c57df375355beab371ea0a87b7295265f'
 REPO = Path('/home/ubuntu/workspace/jetstreamer')
 SOURCE = Path('scripts/horizon_foundation_delivery247_20261124')
 ADAPTER = 'diagnostic230_checkpoint_continuation.py'
-INPUT = 'horizon230-checkpoint-continuation-fit-inputs-v1/inputs.json'
-INPUT_SHA = '1737aebe6a78b35cac20aa906145748dff4ec10381c4f296af53a613a82f7971'
-TEMPLATE_SHA = 'ccf5eed9e4cef1d90f3eef3311c83fffcd3fb58c1417205b6c7649ee1feebc81'
-STATIC_GUARD_SHA = '2846297a689a7c49ba53ca1ebd4005f16fb1bbdddd050a65bfb0dd272b52c9e6'
-PREVIOUS_DEPLOYMENT_SHA = '0c296cd8ce4dd227393279a10e5bcf6e2ab8601a9b9059d604456ec299f950de'
-PREVIOUS_TERMINAL_SHA = '2774138f5d7315d7d19f2d309242156cb11f551d39d8dd0a442148f0bd26bba4'
+INPUT = 'horizon230-checkpoint-continuation-fit-inputs-v3/inputs.json'
+INPUT_SHA = '8aa61a6982e597daf9c0c97a93f39c00d536740939a6e6aebf398d958c583739'
+TEMPLATE_SHA = 'd85676f4d8ff5292aa2c927985cdae736fa3f6fa0282e26f1c8d0252233d603b'
+STATIC_GUARD_SHA = 'f9265269f87cf0535a3bfba7b9730cdecf5da8b4341f77464c55c5e2270ad4c8'
+PREVIOUS_DEPLOYMENT_SHA = 'd335e212a119ed40a398d5c6e361ef829ac318ac767c9a7816bcc09af7218aa0'
+PREVIOUS_TERMINAL_SHA = '86f8c6dadfc0519b21baac0767a99675c74a2a3be5d2555127eb2df7a6b92cff'
 
 
 def git(*args):
@@ -52,7 +52,7 @@ def helper():
 def inventory(kit):
     image = kit.ops.checked_image(kit.ops.R2)
     command = ['systemd-run', '--quiet', '--wait', '--pipe', '--collect',
-               '--unit=foundation-230-continuation-inventory-v2', '--property=Type=exec',
+               '--unit=foundation-230-continuation-inventory-v3', '--property=Type=exec',
                '--property=EnvironmentFile=/etc/jetstreamer/horizon-r2-upload.env',
                '--setenv=TOKIO_WORKER_THREADS=2', '--', image, 'inventory', '/home/ubuntu/horizon',
                '--epochs', '230-230', '--receipt-directory', str(kit.measure.PRIVATE / 'r2-receipts')]
@@ -65,10 +65,12 @@ def inventory(kit):
 
 def deploy_cadence(cap, kit, remote):
     previous = cap.fixed(PREVIOUS / 'cadence-deployment.json', PREVIOUS_DEPLOYMENT_SHA)
-    old = cap.read(previous)['installed']
-    assert set(old) == {'cycle.py', 'native_binding_replays.py', ADAPTER}
-    assert all(cap.checked(reference) == CONTROL / name for name, reference in old.items())
-    active = CONTROL / ADAPTER
+    last_deployment = cap.read(previous)
+    active = cap.checked(last_deployment['installed'])
+    assert active == CONTROL / ADAPTER
+    initial = cap.read(last_deployment['previous'])['installed']
+    for name in ('cycle.py', 'native_binding_replays.py'):
+        assert cap.checked(initial[name]) == CONTROL / name
     original = active.read_bytes()
     updated = git('show', f'{remote}:{SOURCE / ADAPTER}')
     ast.parse(updated, filename=ADAPTER)
@@ -121,6 +123,11 @@ def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, de
     prestart, = [row for row in producer.read_text().splitlines() if row.startswith('ExecStartPre=')]
     assert '--setenv=JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1' in props
     assert argv[1] == '230' and '--qualification-end-slot=99383572' in argv
+    source = cap.read(inputs)
+    bootstrap_path = Path(cap.read(source['bootstrap_receipt'])['snapshot']['path'])
+    checkpoints = cap.checked(source['epoch_hashes'])
+    assert f'--snapshot-archive={bootstrap_path}' in argv and f'--epoch-hashes={checkpoints}' in argv
+    assert checkpoints.read_text().splitlines() == [bootstrap_path.name, Path(source['terminal_checkpoint']['name']).name]
     startup.systemd_run(UNIT, [*props, '--property=' + prestart], argv, '--slice=system.slice')
 
     def held():
@@ -223,8 +230,9 @@ def main():
                 'LoadState': 'not-found', 'ActiveState': 'inactive', 'Job': ''}, name
         assert not list(TOKENS.iterdir()) and not list(GUARDS.iterdir()) and not (STATE / 'admission.json').exists()
         profile = cap.read(cap.fixed(STATE / 'producer-template.json', TEMPLATE_SHA))
-        assert profile['previous_terminal'] == cap.fixed(PREVIOUS / 'controller-stop-completion.json', PREVIOUS_TERMINAL_SHA)
-        assert cap.read(profile['namespace'])['result']['namespace_verified']
+        assert profile['previous_terminal'] == cap.fixed(PREVIOUS / 'terminal.json', PREVIOUS_TERMINAL_SHA)
+        namespace = cap.read(profile['namespace'])['result']
+        assert namespace['namespace_verified'] and namespace['checkpoint_entries'] == 2
         producer = cap.checked(profile['producer'])
         check = cap.read(cap.fixed(STATE / 'static-guard-check.json', STATIC_GUARD_SHA))
         guard = check['guard']
@@ -232,6 +240,7 @@ def main():
         assert cap.checked(guard) and check['result']['validated'] and template['unit'] == UNIT
         assert template['receipt_directory'] == str(GUARDS) and template['maximum_root_physical_bytes'] == 150_000_000_000
         inputs = cap.fixed(BASE / INPUT, INPUT_SHA)
+        assert profile['inputs'] == inputs
         runtime = cap.read(cap.read(inputs)['runtime'])
         assert all(cap.checked(runtime[name]) for name in ('node', 'worker'))
         assert cap.checked(cap.read(cap.fixed(STATE / 'fleet-tool.json', sys.argv[1]))['artifact'])

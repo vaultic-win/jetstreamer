@@ -21,8 +21,8 @@ const CADENCE_SHA: &str = "a2c236119326ba07abb8ec3d00dff5a6f9389c586f82374224b92
 const NODE: &str = "/run/foundation-epoch226-release.y35rokj7/jetstreamer-node";
 const NODE_SHA: &str = "7e17105ad9429fccbeb53dcd38650adb3f469bc1d3fe797360afff2cc7379ded";
 const WORKER_SHA: &str = "7a831420bb1498ddb0268309ce69f615c7f0c6d90cfab940896a03dc38b5336a";
-const QUOTE: &str = "/var/lib/jetstreamer/horizon226-suffix-v1/capacity-epoch230-fit-v2.py";
-const QUOTE_SHA: &str = "4eb296472e2012fb307997f60448dfaed42b819ba0f3961954d69effa8cb4f96";
+const QUOTE: &str = "/var/lib/jetstreamer/horizon226-suffix-v1/capacity-epoch230-fit-v3.py";
+const QUOTE_SHA: &str = "ad829e77cb25c5e77ca65516541d7a7c57df375355beab371ea0a87b7295265f";
 const THREAD: &str = "01a1f8f4-293b-7a91-a36e-2e7658bba721";
 
 fn path(name: &str) -> PathBuf {

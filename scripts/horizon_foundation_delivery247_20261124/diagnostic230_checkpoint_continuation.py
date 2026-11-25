@@ -5,13 +5,13 @@ from pathlib import Path
 
 from ordinary249.delivery248 import V, bound, props, ref
 
-UNIT = "horizon-qualify-230-checkpoint-continuation-fit-v2.service"
-PACKAGE = V / "horizon230-checkpoint-continuation-fit-v2"
+UNIT = "horizon-qualify-230-checkpoint-continuation-fit-v3.service"
+PACKAGE = V / "horizon230-checkpoint-continuation-fit-v3"
 REGISTRATION = PACKAGE / "cadence-registration.json"
-RUN_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1/run-v2")
+RUN_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1/run-v3")
 INPUTS = {
-    "path": str(V / "horizon230-checkpoint-continuation-fit-inputs-v1/inputs.json"),
-    "sha256": "1737aebe6a78b35cac20aa906145748dff4ec10381c4f296af53a613a82f7971",
+    "path": str(V / "horizon230-checkpoint-continuation-fit-inputs-v3/inputs.json"),
+    "sha256": "8aa61a6982e597daf9c0c97a93f39c00d536740939a6e6aebf398d958c583739",
 }
 WORKER_SHA = "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c"
 FIELDS = ["Id", "ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup"]

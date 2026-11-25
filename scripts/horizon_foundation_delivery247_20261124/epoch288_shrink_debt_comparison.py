@@ -45,8 +45,11 @@ EXTRACT226_BROKER = 'foundation-226-original225-broker-v2.service'
 EXTRACT226_STATE = V / 'horizon226-extract-v2'
 SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
 SUFFIX226_STATE = V / 'horizon226-suffix-v1'
-CONTINUATION230_UNIT = 'horizon-qualify-230-checkpoint-continuation-fit-v2.service'
-CONTINUATION230_STATE = V / 'horizon230-checkpoint-continuation-fit-v2'
+CONTINUATION230_GUARDS = {
+    f'horizon-qualify-230-checkpoint-continuation-fit-v{attempt}.service':
+        V / f'horizon230-checkpoint-continuation-fit-v{attempt}/guard-receipts'
+    for attempt in (2, 3)
+}
 CONTINUATION230_TMPFS = Path('/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1')
 CONTINUATION230_RAM_CAP = 150_000_000_000
 CONTINUATION230_TMPFS_FLOOR = 2 << 30
@@ -290,8 +293,8 @@ def capacity(kit, candidate_epoch=288):
             guard_paths[epoch] = BANK_DELTA229_GUARDS
         elif producer['Id'] == SUFFIX226_UNIT:
             guard_paths[epoch] = SUFFIX226_STATE / 'guard-receipts'
-        elif producer['Id'] == CONTINUATION230_UNIT:
-            guard_paths[epoch] = CONTINUATION230_STATE / 'guard-receipts'
+        elif producer['Id'] in CONTINUATION230_GUARDS:
+            guard_paths[epoch] = CONTINUATION230_GUARDS[producer['Id']]
         else:
             guard_paths[epoch] = GUARDS[epoch]
         growth[epoch] = kit.measure.source.growth_for(epoch, owner, guard_paths[epoch])
