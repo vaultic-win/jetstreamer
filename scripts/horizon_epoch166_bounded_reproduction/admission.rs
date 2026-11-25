@@ -655,7 +655,7 @@ fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Re
     let evidence = generation()?;
     let before = owner(mode, fleet, &evidence)?;
     ensure!(
-        matches!(generation_name, "v5w" | "post145"),
+        matches!(generation_name, "v5w" | "post145" | "post145-v5z"),
         "unknown epoch 145 provider generation"
     );
     let deployment = Path::new(RT).join(format!(

@@ -58,7 +58,8 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
 )
 FULL170 = HERE == D / "tools-homefloor-170-full-metered-v1"
 REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
-REPRO166_POST = HERE == D / "tools-homefloor-166-write-version-post145-v1"
+REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v1"
+REPRO166_POST = REPRO166_POST_V5Z or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
 V5Z_145 = HERE == D / "tools-homefloor-145-v5y-custody-recovery-v1"
 V5Z_BUILD_145 = HERE == D / "tools-homefloor-145-v5y-custody-build-v1"
@@ -139,7 +140,7 @@ if FULL170:
     loader["load_package"](observation,"7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e")
     sys.path.insert(0, str(observation))
     full170 = runpy.run_path(str(HERE / "full170_status.py"))
-if FULL170 or REPRO166_LIVE:
+if FULL170 or REPRO166_LIVE or REPRO166_POST_V5Z:
     adapter = HERE / "full170_capacity.py"
     seal, _ = s.read(HERE / "deployment-seal-receipt.json")
     member, = [row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444"]
@@ -670,6 +671,14 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch, fleet=None):
+    if REPRO166_POST_V5Z:
+        s.need(epoch == 145 and fleet is not None, "epoch 166 requires an accepted fleet")
+        phase = full170_capacity["drained145"](s, fit, R)
+        s.need(phase["stage"] == "v5z-semantic-complete-drained"
+               and phase["completed_invocation_id"] == "4b6a40fe7a4441c28c229ad2b59e2503"
+               and phase["checker_seal"]["sha256"] == "8e48c19a738a9ff4586c10fd4c7581b5c2a01133b5de5edbae8b7e26e241d4ea",
+               "epoch 166 requires the exact drained V5z verifier and sealed completion reader")
+        return phase
     if V5Z_POST_BUILD_145:
         s.need(epoch == 145 and fleet is not None, "epoch 145 post build requires the current accepted fleet")
         manager = s.show(fit.A145)
