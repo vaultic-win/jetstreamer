@@ -222,6 +222,9 @@ fn v5w_semantic_owner(export: &str) -> Result<()> {
 #[cfg(all(incident_v7_post145_only, not(incident_v5z_post145_only)))]
 compile_error!("the V7 post verifier requires the qualified HTTP retry reader");
 
+#[cfg(all(incident_v9_post145_only, not(incident_v5z_post145_only)))]
+compile_error!("the V9 post verifier requires the qualified HTTP retry reader");
+
 #[cfg(all(incident_v5z_post145_only, not(incident_v5x_post145_only)))]
 compile_error!("the V5z post verifier requires the sealed successor reader");
 
@@ -236,15 +239,27 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
     const V7_SEAL: &str = "589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b";
     const V7_START: &str = "4c83262f7bb705f30f1850dcc1274a549b2f08b80618bc23c3c9955fae4f4163";
     let v7 = cfg!(incident_v7_post145_only);
+    const V9_IID: &str = "ebdfc34db47c4e7699ea5ccbada5d604";
+    const V9_SEAL: &str = "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd";
+    const V9_SUBMISSION: &str = "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973";
+    const V9_RECOVERY: &str = "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4";
+    let v9 = cfg!(incident_v9_post145_only);
     if v7 {
         ensure!(export == V7_IID, "foreign V7 semantic export");
     }
-    let (generation, schema) = if cfg!(incident_v5z_post145_only) {
+    if v9 {
+        ensure!(export == V9_IID, "foreign V9 semantic export");
+    }
+    let (generation, schema) = if v9 {
+        ("v9-census", "horizon-epoch145-v8-census-successor-semantic-completion-v1")
+    } else if cfg!(incident_v5z_post145_only) {
         ("v5z", "horizon-epoch145-v5z-custody-successor-semantic-completion-v1")
     } else {
         ("v5x", "horizon-epoch145-v5x-donor-successor-semantic-completion-v1")
     };
-    let authority = if v7 {
+    let authority = if v9 {
+        family.join("tools-v9-census-recovery")
+    } else if v7 {
         family.join("tools-v7-168-stop-v2")
     } else {
         family.join(format!("tools-{generation}"))
@@ -294,6 +309,12 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
             "different authenticated V7 semantic owner"
         );
     }
+    if v9 {
+        ensure!(
+            seal_ref.sha256 == V9_SEAL && start.sha256 == V9_SUBMISSION,
+            "different authenticated V9 semantic owner"
+        );
+    }
     let report = capacity::run(
         "/usr/bin/python3",
         &[
@@ -306,6 +327,19 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
     )?;
     let result: Value = serde_json::from_str(&report)?;
     let (_, captured) = publication::frozen_json(&handoff.join("SEMANTIC_COMPLETION.json"))?;
+    if v9 {
+        let recovery = Bound {
+            path: Path::new(RUNTIME)
+                .join("epoch145-guarded-export-20261121-v1/state")
+                .join(V9_IID)
+                .join("recovery-started.json"),
+            sha256: V9_RECOVERY.to_owned(),
+        };
+        ensure!(
+            result["start"] == json!(recovery) && result["startup_evidence"]["start"] == json!(recovery),
+            "different authenticated V9 recovery start"
+        );
+    }
     ensure!(
         result == captured
             && result["schema"] == schema
