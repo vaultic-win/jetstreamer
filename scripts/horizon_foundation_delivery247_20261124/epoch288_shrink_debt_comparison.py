@@ -81,11 +81,15 @@ CONTINUATION230_GUARDS = {
     for attempt in (2, 3)
 }
 RAM_TMPFS_FLOOR = 2 << 30
+REPLAY231 = V / 'horizon231-capped-replay-v1'
+REPLAY231_UNIT = 'horizon-perf-epoch231-capped-replay@v1.service'
 RAM_QUOTES = {
     229: (Path('/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1'),
           170_000_000_000, 395_000_000_000, frozenset(range(80, 88))),
     230: (Path('/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1'),
           150_000_000_000, MEMORY, frozenset(range(72, 80))),
+    231: (Path('/home/ubuntu/.jetstreamer-private/epoch231-capped-replay-tmpfs-v1'),
+          150_000_000_000, MEMORY, frozenset(range(40, 48))),
 }
 DEMOTION229_RETRY = (Path('/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v2'),
                      425_000_000_000, 475_000_000_000, frozenset(range(80, 88)))
@@ -93,6 +97,7 @@ GUARDS = {
     226: V / 'horizon226-extract-v2/guard-receipts',
     229: V / 'horizon229-trace-ram-v325/guard-receipts',
     230: V / 'horizon230-program-demotion-ram-v328/guard-receipts',
+    231: REPLAY231 / 'guard-receipts',
     252: V / 'horizon252-regional-full-guard-receipts-v1',
     257: V / 'horizon257-full-guard-receipts-v1',
     261: V / 'horizon261-full-guard-receipts-v1',
@@ -474,6 +479,13 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
         owner = helper.active_props(producer['Id'], producer['InvocationID'])
         assert owner['MainPID'] == producer['MainPID']
         owners[epoch] = owner
+        if epoch == 231:
+            loaded = read(binding(REPLAY231 / 'cadence-registration.json'))
+            assert row['phase'] == 'diagnostic-qualification' and row['scratch_path'] == loaded['run_root']
+            assert loaded['unit'] == producer['Id'] == REPLAY231_UNIT and loaded['epoch'] == 231
+            assert loaded['invocation_id'] == owner['InvocationID'] and loaded['main_pid'] == int(owner['MainPID'])
+            assert loaded['canonical_epoch_publication_authorized'] is False
+            assert loaded['guard_plan'] == binding(REPLAY231 / 'guard-plan.json')
         if epoch == 288:
             full = producer['Id'] == FULL_UNIT
             root = FULL_PACKAGE if full else PACKAGE
@@ -547,11 +559,11 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
     memory_commitments = sum(max(0, int(row['MemoryMax']) - int(row['MemoryCurrent'])) for row in live)
     memory_room = mem['MemAvailable'] - mem['MemTotal'] // 10 - memory_commitments
     root_device = Path('/').stat().st_dev
-    for epoch in (229, 230):
+    for epoch in RAM_QUOTES:
         if epoch in growth:
             diagnostic = kit.ops.bound(kit.ops.ref(guard_paths[epoch].parent / 'guard-plan.json'))
             assert Path(diagnostic['filesystem']).stat().st_dev != root_device
-    disk_growth = {epoch: row for epoch, row in growth.items() if epoch not in (229, 230)}
+    disk_growth = {epoch: row for epoch, row in growth.items() if epoch not in RAM_QUOTES}
     floor = max(row['floor_bytes'] for row in disk_growth.values())
     assert floor == FLOOR
     device = os.statvfs(RUN.parent)
@@ -964,6 +976,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'capacity-continuation230',
                                           'capacity-demotion229', 'capacity-demotion229-retry',
+                                          'capacity-replay231',
                                           'prepare', 'launch', 'launch-full'))
     parser.add_argument('reference', nargs='?')
     parser.add_argument('sha256', nargs='?')
@@ -977,6 +990,9 @@ def main():
         return
     if options.action == 'capacity-continuation230':
         print(json.dumps(capacity(load_existing(), candidate_epoch=230)))
+        return
+    if options.action == 'capacity-replay231':
+        print(json.dumps(capacity(load_existing(), candidate_epoch=231)))
         return
     if options.action in ('capacity-demotion229', 'capacity-demotion229-retry'):
         print(json.dumps(capacity(load_existing(), candidate_epoch=229,

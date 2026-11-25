@@ -17,6 +17,13 @@ WORKER_SHA = "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c"
 FIELDS = ["Id", "ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup"]
 JOIN = V / "horizon230-continuation-join-7f90bbed-v1/completion.json"
 SUCCESSOR = V / "horizon231-232-input-readmission-v300"
+REPLAY231 = V / "horizon231-capped-replay-v1"
+UNIT231 = "horizon-perf-epoch231-capped-replay@v1.service"
+ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-capped-replay-tmpfs-v1/run")
+INPUTS231 = {
+    "path": str(V / "horizon231-capped-replay-checkpoints-v1/inputs.json"),
+    "sha256": "9a9328d1863ac8b041c8283ffc73021b91dd7f874a13fa401de93956487a4227",
+}
 
 
 def receipt():
@@ -44,7 +51,7 @@ def receipt():
     return binding, row
 
 
-def configuration():
+def configuration230():
     registered = receipt()
     if registered is None:
         return []
@@ -60,6 +67,54 @@ def configuration():
     return [dict(range="230-230", controller_unit=UNIT, expected_controller_invocation_id=row["invocation_id"],
                  producer_unit=UNIT, expected_producer_invocation_id=row["invocation_id"],
                  scratch_path=str(RUN_ROOT), worker_executable_basename="historical-worker")]
+
+
+def receipt231():
+    path = REPLAY231 / "cadence-registration.json"
+    if not path.is_file():
+        return None
+    metadata = path.lstat()
+    assert path.resolve() == path and metadata.st_uid == 0 and metadata.st_nlink == 1
+    assert not metadata.st_mode & 0o222
+    source = ref(path)
+    row = bound(source)
+    assert row["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+    assert (row["epoch"], row["unit"], row["kind"]) == (231, UNIT231, "epoch231-capped-checkpoint-replay")
+    assert row["run_root"] == str(ROOT231) and row["last_slot"] == 99_803_089
+    assert row["launched"] and row["entry_replay_requested"]
+    assert all(row[key] is False for key in ("canonical_epoch_publication_authorized", "remote_mutations",
+                                            "r2_mutations", "full_cohort_resource_qualified"))
+    iid = row["invocation_id"]
+    assert re.fullmatch("[0-9a-f]{32}", iid) and row["main_pid"] > 0
+    admission = bound(row["admission"])
+    inputs = bound(INPUTS231)
+    assert admission["admitted"] and admission["inputs"] == INPUTS231
+    assert row["worker_sha256"] == inputs["worker_sha256"]
+    guard = bound(row["active_guard"])
+    assert guard["producer_invocation_id"] == iid and guard["producer"]["pid"] == row["main_pid"]
+    assert guard["producer_stop_enabled"] and guard["trip_reason"] is None
+    assert guard["plan_sha256"] == row["guard_plan"]["sha256"]
+    return source, row
+
+
+def configuration():
+    configured = configuration230()
+    registered = receipt231()
+    if registered is None:
+        return configured
+    _, row = registered
+    live = props(UNIT231, FIELDS)
+    if live["ActiveState"] in ("inactive", "failed"):
+        assert live["MainPID"] == "0" and not live["ControlGroup"]
+        return configured
+    assert (live["Id"], live["ActiveState"], live["SubState"]) == (UNIT231, "active", "running")
+    assert (live["InvocationID"], int(live["MainPID"])) == (row["invocation_id"], row["main_pid"])
+    assert live["ControlGroup"] == "/system.slice/" + UNIT231 and live["NRestarts"] == "0"
+    assert (Path("/proc") / live["MainPID"] / "exe").samefile(row["node_path"])
+    return [*configured, dict(range="231-231", controller_unit=UNIT231,
+        expected_controller_invocation_id=row["invocation_id"], producer_unit=UNIT231,
+        expected_producer_invocation_id=row["invocation_id"], scratch_path=str(ROOT231),
+        worker_executable_basename="historical-worker")]
 
 
 def register(plan):
@@ -131,10 +186,46 @@ def register_successor_inputs(plan):
                 "The generation-pinned bootstrap, five compact indexes, original cohort manifest and native "
                 "source edges are ready. Book the two-epoch replay and output capacity, then qualify the guarded producer."
             )
+    checkpoint = Path(INPUTS231["path"])
+    if checkpoint.is_file():
+        inputs = bound(INPUTS231)
+        assert inputs["epoch"] == 231 and inputs["checkpoint_slot"] == 99_803_089
+        gate = plan["gates"]["231"]
+        if INPUTS231 not in gate["evidence"]:
+            gate["evidence"].append(INPUTS231)
+        gate["next_action"] = "Qualify capped-worker growth through the generation-pinned checkpoint at slot 99,803,089."
+        registered = receipt231()
+        if registered is not None:
+            source, row = registered
+            claim = dict(epoch=231, unit=UNIT231, invocation_id=row["invocation_id"],
+                         scratch_path=str(ROOT231), launch_receipt=source)
+            diagnostics = plan.setdefault("diagnostics", [])
+            previous = [owner for owner in diagnostics if owner["unit"] == UNIT231]
+            assert not previous or previous == [claim]
+            if not previous:
+                diagnostics.append(claim)
+            if UNIT231 not in plan["tracked_units"]:
+                plan["tracked_units"].append(UNIT231)
+            if source not in gate["evidence"]:
+                gate["evidence"].append(source)
+            terminal = REPLAY231 / "terminal.json"
+            if terminal.is_file():
+                terminal_ref = ref(terminal)
+                result = bound(terminal_ref)
+                assert result["registration"] == source and not result["publication_authorized"]
+                if terminal_ref not in gate["evidence"]:
+                    gate["evidence"].append(terminal_ref)
+                gate["next_action"] = result["next_action"]
 
 
 def owns(row):
     producer = row.get("producer", {})
+    if producer.get("Id") == UNIT231:
+        _, registration = receipt231()
+        assert row["epoch"] == 231 and row["phase"] == "diagnostic-qualification"
+        assert producer["InvocationID"] == registration["invocation_id"] and row["scratch_path"] == str(ROOT231)
+        assert row["ordinary_replay_claim"] is False and row["current_sidecar_eta_valid"] is False
+        return True
     if producer.get("Id") != UNIT:
         return False
     _, registration = receipt()
