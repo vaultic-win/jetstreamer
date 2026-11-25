@@ -1,0 +1,127 @@
+Base: 46b4b4ad551b9f7866a8aa6fb8569dc9e9917908
+Private epoch 296 warmup diagnostic. Apply to the legacy worker build input.
+
+--- a/historical-runtime/v1_8_11/worker/src/runtime.rs
++++ b/historical-runtime/v1_8_11/worker/src/runtime.rs
+@@ -30,6 +30,14 @@
+ use std::{cmp, collections::HashMap, env, ops::Range, path::Path, sync::Arc};
+ use tempfile::TempDir;
+
++// Private one-transaction diagnostic for the epoch 296 warmup discrepancy.
++const TRACE_BOOTSTRAP_SLOT: u64 = 127_870_084;
++const TRACE_BOOTSTRAP_NAME: &str =
++    "snapshot-127870084-6kwopBU4LrPTowu5Kde1c3xpBATmLZFSBz6PRASgqDuv.tar.zst";
++const TRACE_SLOT: u64 = 127_870_085;
++const TRACE_ENTRY: u64 = 7;
++const TRACE_SIGNATURE: &str =
++    "2Frxp8iXa8u3nYTZxZZNNjNp7Py6Yidszb3NUCse3zML3aYcbW2pB1PVSs1H4xJxZRaxsk3enrFcdMPE99ezt68J";
+ const MAX_AGE_CORRECTION_EPOCH: u64 = 14;
+ // The epoch-265 terminal checkpoint is the bootstrap for this candidate.
+ // Admit entries through verification-tail epoch 301 so epochs 298-300 can
+@@ -147,6 +155,17 @@
+         initial_state: &jetstreamer_historical_protocol::InitialState,
+         scratch_root: Option<&str>,
+     ) -> Result<(Self, Initialized), String> {
++        let archive_path = match initial_state {
++            jetstreamer_historical_protocol::InitialState::SnapshotArchive { archive_path } => {
++                Path::new(archive_path)
++            }
++            _ => {
++                return Err("epoch296 meter diagnostic requires the pinned parent snapshot".into())
++            }
++        };
++        if archive_path.file_name().and_then(|name| name.to_str()) != Some(TRACE_BOOTSTRAP_NAME) {
++            return Err("epoch296 meter diagnostic requires the pinned parent snapshot".into());
++        }
+         let state_dir = snapshot::private_state_dir(scratch_root)?;
+         let genesis = snapshot::load_genesis(Path::new(ledger_path), &state_dir)?;
+         let genesis_hash = genesis.hash().to_string();
+@@ -189,6 +208,9 @@
+                 ));
+             }
+         };
++        if bank.slot() != TRACE_BOOTSTRAP_SLOT {
++            return Err("epoch296 meter diagnostic restored the wrong parent slot".into());
++        }
+         let write_cursor = bank.accounts().accounts_db.next_write_version();
+         let last_entry_hash = bank.last_blockhash();
+         let initialized = Initialized {
+@@ -269,6 +291,15 @@
+             )));
+         }
+
++        // The producer can prefetch past the target. Decode and commit only
++        // the canonical initial prefix, and fail closed if it misses the target.
++        let mut requests = requests;
++        let prefix_len = requests
++            .iter()
++            .take_while(|entry| entry.slot == TRACE_SLOT && entry.entry_index <= TRACE_ENTRY)
++            .count();
++        let crossed_bound = prefix_len < requests.len();
++        requests.truncate(prefix_len);
+         let prepared_results: Vec<Result<PreparedEntry, String>> = self
+             .poh_pool
+             .install(|| requests.into_par_iter().map(prepare_entry).collect());
+@@ -289,6 +320,12 @@
+                 .commit_prevalidated_entry(entry, validation)
+                 .map_err(ProcessEntriesError::Runtime)?;
+             emit(processed).map_err(ProcessEntriesError::Emit)?;
++        }
++        if crossed_bound {
++            return Err(ProcessEntriesError::Runtime(
++                "epoch296 meter diagnostic reached its input bound without the target transaction"
++                    .into(),
++            ));
+         }
+         Ok(())
+     }
+@@ -303,6 +340,21 @@
+             transactions,
+             ..
+         } = prepared;
++        let trace_meter = request.slot == TRACE_SLOT && request.entry_index == TRACE_ENTRY;
++        if trace_meter {
++            // The node's tx_start is block-wide. Worker transactions contain
++            // one entry only, so the sole target transaction has local index 0.
++            let signature = transactions
++                .first()
++                .and_then(|transaction| transaction.signatures.first());
++            if transactions.len() != 1
++                || signature.map(ToString::to_string).as_deref() != Some(TRACE_SIGNATURE)
++            {
++                return Err(
++                    "epoch296 meter diagnostic target entry shape or signature changed".into(),
++                );
++            }
++        }
+         let mut writes = if request.slot > self.bank.slot() {
+             self.advance_to(request.slot)?
+         } else {
+@@ -331,16 +383,25 @@
+                     self.bank.demote_program_write_locks(),
+                 )?;
+                 let batch = self.bank.prepare_batch(wave_transactions.iter());
+-                let (results, _balances, _inner_instructions, _log_messages) =
++                let (results, _balances, _inner_instructions, log_messages) =
+                     self.bank.load_execute_and_commit_transactions(
+                         &batch,
+                         max_age,
+                         false,
+                         false,
+-                        false,
++                        trace_meter,
+                         &mut ExecuteTimings::default(),
+                     );
+                 drop(batch);
++                if trace_meter {
++                    let result = results.execution_results.first().map(|result| &result.0);
++                    let logs = log_messages.first();
++                    eprintln!(
++                        "epoch296 compute meter: slot={} entry={} local_transaction=0 signature={} result={:?} logs={:?}",
++                        request.slot, request.entry_index, TRACE_SIGNATURE, result, logs,
++                    );
++                    return Err("epoch296 meter diagnostic stopped after the target transaction; no continuation".into());
++                }
+                 if env::var_os("JETSTREAMER_HISTORICAL_TRACE").is_some() {
+                     for (transaction, result) in
+                         wave_transactions.iter().zip(&results.execution_results)
