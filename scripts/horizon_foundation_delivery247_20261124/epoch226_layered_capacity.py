@@ -14,6 +14,10 @@ FAILED = STATE / "horizon226-extract-v2/failed-decode-terminal-v303.json"
 NODE = STATE / "horizon226-layered-range-release-726c38e5-v1/qualification.json"
 STAGING = STATE / "horizon292-closed-appendvec-staging-v304"
 STAGE_BYTES = 67_427_276_780
+RESTAGING = STATE / "horizon292-closed-appendvec-staging-v308"
+RESTAGE_UNIT = "foundation-292-closed-appendvec-staging-v308.service"
+RESTAGE_START_SHA = "05f9ea6221c08de8991036312640271e4861e6a8010f0c8f8069b4cad90d1776"
+RESTAGE_BYTES = 68 << 30
 START_RESERVE = 8 << 30
 PRODUCER_MEMORY = 6 << 30
 BROKER_MEMORY = 1 << 30
@@ -29,16 +33,35 @@ def toolkit():
 
 
 def staging_cost(ops, device, block):
-    start_ref = ops.ref(STAGING / "staging-start.json")
-    start = ops.bound(start_ref)
-    values = ops.props(start["unit"], list(start["process"]))
-    intent = ops.bound(start["intent"])
-    assert intent["epoch"] == 292 and intent["stage_peak_bytes"] == STAGE_BYTES
-    target = Path(intent["expected_bundle"])
-    assert target == STAGING / "bundle/epoch-292-closed-appendvecs.pax.zst"
-    maximum = (STAGE_BYTES + block - 1) // block * block
+    original_ref = ops.ref(STAGING / "staging-start.json")
+    original = ops.bound(original_ref)
+    restart = RESTAGING / "staging-start.json"
+    if restart.is_file():
+        predecessor = ops.props(original["unit"], ["ActiveState", "MainPID", "ControlGroup"])
+        assert predecessor == {"ActiveState": "failed", "MainPID": "0", "ControlGroup": ""}
+        assert not (Path("/sys/fs/cgroup/system.slice") / original["unit"]).exists()
+        start_ref = ops.ref(restart)
+        assert start_ref["sha256"] == RESTAGE_START_SHA
+        start = ops.bound(start_ref)
+        intent = ops.bound(start["intent"])
+        assert start["schema"] == "foundation-epoch292-appendvec-restage-start-v1"
+        assert intent["schema"] == "foundation-epoch292-appendvec-restage-intent-v1"
+        assert start["epoch"] == intent["epoch"] == 292 and intent["prior_staging"] == original_ref
+        unit, expected = intent["unit"], start["owner"]
+        assert unit == expected["Id"] == RESTAGE_UNIT and intent["kernel_output_cap_bytes"] == RESTAGE_BYTES
+        directory, target, cap = RESTAGING, Path(intent["output"]), RESTAGE_BYTES
+    else:
+        assert ops.props(RESTAGE_UNIT, ["ActiveState", "MainPID"]) == {"ActiveState": "inactive", "MainPID": "0"}
+        start_ref, start = original_ref, original
+        intent = ops.bound(start["intent"])
+        assert intent["epoch"] == 292 and intent["stage_peak_bytes"] == STAGE_BYTES
+        unit, expected = start["unit"], start["process"]
+        directory, target, cap = STAGING, Path(intent["expected_bundle"]), STAGE_BYTES
+    values = ops.props(unit, list(expected))
+    assert target == directory / "bundle/epoch-292-closed-appendvecs.pax.zst"
+    maximum = (cap + block - 1) // block * block
     if values["ActiveState"] == "active":
-        assert values == start["process"] and values["SubState"] == "running"
+        assert values == expected and values["SubState"] == "running"
         partial = target.with_suffix(target.suffix + ".part")
         try:
             detail = partial.lstat()
@@ -46,10 +69,10 @@ def staging_cost(ops, device, block):
             # Keep the full reservation when the stage has no observed local output.
             return start_ref, values, maximum, int(values["MemoryMax"])
         assert stat.S_ISREG(detail.st_mode) and detail.st_dev == device
-        assert detail.st_size <= STAGE_BYTES and detail.st_nlink == 1
+        assert detail.st_size <= cap and detail.st_nlink == 1
         return start_ref, values, max(0, maximum - 512 * detail.st_blocks), int(values["MemoryMax"])
     assert values["ActiveState"] in ("inactive", "failed") and values["MainPID"] == "0"
-    assert not (Path("/sys/fs/cgroup/system.slice") / start["unit"]).exists()
+    assert not (Path("/sys/fs/cgroup/system.slice") / unit).exists()
     # A drained producer has no remaining writes. Existing files are in statvfs.
     return start_ref, values, 0, 0
 
