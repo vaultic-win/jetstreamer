@@ -26,6 +26,7 @@ EVENT=R/'epoch166-retry10-delivery-20261121-v1/event-tools-current/terminal_even
 EVENT_SHA='2f04ec0a5825d98d39add39ad961d2dc71ea8aa94df8261adb6a3782bd737e43'
 PATTERN=re.compile(r'root(\d{6})-live166167170-(\d{8})-v1')
 FLEET='ROOT_COMPLETE_OPERATIONAL_FLEET.json'
+CADENCE_OWNER='horizon-archive-status-cadence-after172-20261120-v1.service'
 FIELD={166:'recovered166_local_commit',167:'indexed167_local_commit',168:'metered168_local_commit',170:'recovered170_local_commit',172:'full172_local_commit'}
 UNITS={166:'horizon-publish-166-retry10-committed.service',167:'horizon-publish-167-source-index-committed.service',168:'horizon-publish-168-metered-committed.service',170:'horizon-publish-170-retry10-committed.service',172:'horizon-publish-172-full-committed.service'}
 
@@ -51,6 +52,44 @@ def bound(event,ref,mode,where=None):
     need(actual==ref,'changed evidence '+str(p))
     return obj
 
+def authenticated_statuses(event, fleet):
+    report_ref = fleet['authenticated_status_audit']
+    report = bound(event, report_ref, 0o600)
+    owner = report['owner']
+    need(owner in ('/root', CADENCE_OWNER)
+         and report['schema'] == 'horizon-status-full-range-audit-v1'
+         and report['authenticated_readback'] is True
+         and report['observer'] == fleet['observer']
+         and report['sampled_at_utc'] == fleet['sampled_at_utc']
+         and report['archive_or_sidecar_mutations'] is False
+         and report['authenticated_status_count'] == fleet['authenticated_status_count'],
+         'unaccepted authenticated report')
+    if owner == '/root':
+        return
+
+    complete = bound(event, fleet['complete_active_status_audit'], 0o600,
+                     Path(report_ref['path']).with_name('COMPLETE_ACTIVE_STATUSES.json'))
+    receipts = report['receipts']
+    private = complete['private140']
+    need(report['authenticated_status_count'] == len(receipts) == 19
+         and '140' not in receipts and receipts == fleet['effective_status_receipts']
+         and complete['schema'] == 'horizon-all-current-authenticated-statuses-v1'
+         and complete['original_nineteen'] == report_ref
+         and complete['fleet_predecessor'] == report['fleet_predecessor'] == fleet['previous_Root_operational_review']
+         and complete['observer'] == report['observer']
+         and complete['sampled_at_utc'] == report['sampled_at_utc']
+         and complete['authenticated_readback'] is True
+         and complete['archives_or_sidecars_changed'] is False
+         and complete['authenticated_status_count'] == fleet['complete_active_status_count'] == 20
+         and complete['receipts'] == fleet['complete_active_status_receipts'] == {**receipts, '140': private}
+         and complete['status_epochs'] == sorted(map(int, complete['receipts']))
+         and private == fleet['current_private140_status_receipt'],
+         'unaccepted complete cadence status report')
+    private_receipt = bound(event, private, 0o600)
+    need(private_receipt['epoch'] == 140 and private_receipt['authenticated_readback'] is True
+         and private_receipt['after_status']['sampled_at_utc'] == fleet['sampled_at_utc'],
+         'unaccepted private epoch 140 status')
+
 def head(event):
     now=time.time(); candidates=[]
     for d in R.glob('root??????-live166167170-????????-v1'):
@@ -68,8 +107,7 @@ def head(event):
     scheduled=sample.strftime('%Y-%m-%dT%H:%M:%SZ')
     need(observer['schema']=='jetstreamer-horizon-live-resource-sample-v2' and clock['configured_not_before_utc']==scheduled and clock['observation_reason']=='routine' and clock['routine_minimum_interval_enforced'] is True and clock['observed_interval_seconds']>=clock['minimum_interval_seconds']==1800 and scheduled<=observer['recorded_at_utc']<=observer['completed_at_utc'],'unbound scheduled and actual observer times')
     need(f['owner']=='/root' and f['schema']=='horizon-Root-complete-fleet-operational-review-v1' and f['sampled_at_utc']==observer['recorded_at_utc'] and 0<=now-f['recorded_unix_seconds']<=2400 and f['all_active_status_reports_authenticated_readback'] is True,'unaccepted fleet or observer')
-    report=bound(event,f['authenticated_status_audit'],0o600)
-    need(report['owner']=='/root' and report['schema']=='horizon-status-full-range-audit-v1' and report['authenticated_readback'] is True and report['observer']==f['observer'] and report['sampled_at_utc']==f['sampled_at_utc'] and report['archive_or_sidecar_mutations'] is False and report['authenticated_status_count']==f['authenticated_status_count'],'unaccepted authenticated report')
+    authenticated_statuses(event, f)
     return f,fr
 
 def delivery(epoch):
