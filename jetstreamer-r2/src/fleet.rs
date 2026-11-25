@@ -2058,12 +2058,19 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["entry_replay_requested"] == true
             && receipt["source_prefix_retained"] == true
             && receipt["canonical_epoch_publication_authorized"] == false
-    } else if claim.unit == "horizon-qualify-229-called-program-demotion-v1.service"
+    } else if matches!(
+        claim.unit.as_str(),
+        "horizon-qualify-229-called-program-demotion-v1.service"
+            | "horizon-qualify-229-called-program-demotion-v2.service"
+    )
         || receipt["kind"] == "epoch229-called-program-demotion"
     {
         claim.epoch == 229
-            && claim.unit == "horizon-qualify-229-called-program-demotion-v1.service"
-            && claim.scratch_path == Path::new("/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1/run")
+            && matches!((claim.unit.as_str(), claim.scratch_path.to_str()),
+                ("horizon-qualify-229-called-program-demotion-v1.service",
+                 Some("/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1/run"))
+                | ("horizon-qualify-229-called-program-demotion-v2.service",
+                   Some("/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v2/run")))
             && receipt["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
             && receipt["kind"] == "epoch229-called-program-demotion"
             && receipt["epoch"] == 229
@@ -6189,7 +6196,7 @@ mod tests {
 
     #[test]
     fn epoch229_demotion_cannot_extend_its_pinned_scope() {
-        let claim = DiagnosticClaim {
+        let mut claim = DiagnosticClaim {
             epoch: 229,
             unit: "horizon-qualify-229-called-program-demotion-v1.service".into(),
             invocation_id: "a".repeat(32),
@@ -6199,7 +6206,7 @@ mod tests {
                 sha256: "b".repeat(64),
             },
         };
-        let receipt = json!({
+        let mut receipt = json!({
             "schema": "jetstreamer-historical-performance-launch-receipt-v1",
             "kind": "epoch229-called-program-demotion", "epoch": 229,
             "unit": claim.unit, "invocation_id": claim.invocation_id, "run_root": claim.scratch_path,
@@ -6223,6 +6230,13 @@ mod tests {
             changed[key] = replacement;
             assert!(validate_diagnostic_launch(&changed, &claim).is_err(), "{key}");
         }
+        claim.unit = "horizon-qualify-229-called-program-demotion-v2.service".into();
+        receipt["unit"] = json!(claim.unit);
+        receipt["evidence"]["units"][0]["unit"] = json!(claim.unit);
+        assert!(validate_diagnostic_launch(&receipt, &claim).is_err());
+        claim.scratch_path = "/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v2/run".into();
+        receipt["run_root"] = json!(claim.scratch_path);
+        validate_diagnostic_launch(&receipt, &claim).unwrap();
     }
 
     #[test]

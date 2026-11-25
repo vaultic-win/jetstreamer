@@ -20,6 +20,7 @@ epoch163-first-output128-diagnostic = []
 epoch228-called-program-demotion-qualification = []
 # Private epoch 230 through the first checked root after its bank divergence.
 epoch229-called-program-demotion-qualification = []
+epoch229-called-program-demotion-retry = ["epoch229-called-program-demotion-qualification"]
 epoch230-called-program-demotion-qualification = []
 # Exact private 207cohort through its own final slot; never ordinary support.
 epoch207-singleton-qualification = []

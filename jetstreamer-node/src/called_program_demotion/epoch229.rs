@@ -7,8 +7,11 @@ pub(crate) const BACKEND: &str = "solana-v1.6.20-epoch229-called-program-demotio
 pub(super) const WORKER_ENV: &str = "JETSTREAMER_HISTORICAL_WORKER_EPOCH229_DEMOTION";
 pub(super) const WORKER_SHA: Option<&str> =
     option_env!("JETSTREAMER_EPOCH229_DEMOTION_WORKER_SHA256");
-pub(super) const RUN_ROOT: &str =
-    "/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1/run";
+pub(super) const RUN_ROOT: &str = if cfg!(feature = "epoch229-called-program-demotion-retry") {
+    "/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v2/run"
+} else {
+    "/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1/run"
+};
 pub(super) const OUTPUT: &str = "epoch-229-program-demotion-diagnostic.jet";
 pub(super) const BOOT_ACCOUNTS: &str = "528ZGQNBRBC7RWW9SXMSBrPsa8Gf2admhkyKWe3n8ZmT";
 pub(super) const BOOT_BANK: &str = "J4fxR4FnK4QL43TGbNkLcYg5SsxCA7wK9RVPqL9mQTXN";
