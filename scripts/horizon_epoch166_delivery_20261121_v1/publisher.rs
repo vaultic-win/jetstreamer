@@ -507,6 +507,38 @@ fn admit(
 ))]
 mod reader_transition;
 
+fn ordinary_pair(qpath: &Path, qualification_sha: &str, _q: &Value) -> Result<Value> {
+    #[cfg(any(
+        feature = "source167",
+        feature = "retry170",
+        feature = "full172",
+        feature = "transition_reader"
+    ))]
+    if qualification_sha == reader_transition::HTTP_RETRY_READER_SHA {
+        return reader_transition::http_retry_pair(qpath, _q);
+    }
+    let paired = if qualification_sha == BOUNDED_READER_SHA {
+        let pair = document(&rt(BOUNDED_PAIR), BOUNDED_PAIR_SHA, false)?;
+        ensure!(
+            pair["reader"] == json!({"path":qpath, "sha256":qualification_sha})
+                && pair["uploader"] == json!({"path":rt(UPLOADER), "sha256":ELF})
+                && pair["threads"] == 1,
+            "qualified archive reader and one-worker uploader pairing changed"
+        );
+        pair
+    } else {
+        document(&rt(PAIR), PAIR_SHA, true)?
+    };
+    ensure!(
+        paired["schema"]
+            == "horizon-ordinary-uploader-and-current-reader-loopback-qualification-v1"
+            && paired["slot_count"] == 432000
+            && paired["ordinary_readback_type"] == "HashOnly",
+        "ordinary publication proof missing"
+    );
+    Ok(paired)
+}
+
 fn prepare(a: &Authority, len: u64, floor: u64) -> Result<(PathBuf, String)> {
     #[cfg(any(
         feature = "source167",
@@ -537,25 +569,7 @@ fn prepare(a: &Authority, len: u64, floor: u64) -> Result<(PathBuf, String)> {
             && q["full_and_plugin_capabilities_accepted"] == true,
         "reader proof or independent epoch expectation mismatch"
     );
-    let paired = if qualification_sha == BOUNDED_READER_SHA {
-        let pair = document(&rt(BOUNDED_PAIR), BOUNDED_PAIR_SHA, false)?;
-        ensure!(
-            pair["reader"] == json!({"path":qpath, "sha256":qualification_sha})
-                && pair["uploader"] == json!({"path":rt(UPLOADER), "sha256":ELF})
-                && pair["threads"] == 1,
-            "qualified archive reader and one-worker uploader pairing changed"
-        );
-        pair
-    } else {
-        document(&rt(PAIR), PAIR_SHA, true)?
-    };
-    ensure!(
-        paired["schema"]
-            == "horizon-ordinary-uploader-and-current-reader-loopback-qualification-v1"
-            && paired["slot_count"] == 432000
-            && paired["ordinary_readback_type"] == "HashOnly",
-        "ordinary publication proof missing"
-    );
+    let paired = ordinary_pair(&qpath, qualification_sha, &q)?;
     let seal = bound(&paired["uploader_seal"])?;
     ensure!(
         seal["members"]
