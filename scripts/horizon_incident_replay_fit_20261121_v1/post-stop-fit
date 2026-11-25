@@ -63,7 +63,7 @@ REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
 REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
 V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v2"
-RETRY5_168 = HERE == D / "tools-homefloor-cold168-retry5-v1"
+RETRY5_168 = HERE == D / "tools-homefloor-cold168-retry5-v2"
 STOPPED168_PRICE = RETRY5_168 or V7_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
@@ -139,7 +139,7 @@ if CURRENT_HOURLY169:
     fit.binary(HERE / "post-stop-fit", members["post-stop-fit"]["sha256"])
 if HOURLY169:
     hourly169 = runpy.run_path(str(HERE / "hourly169_actor.py"))
-if HOURLY170 or V7_145 or V5V_RECOVERY_145 or V5W_POST_145:
+if HOURLY170 or RETRY5_168 or V7_145 or V5V_RECOVERY_145 or V5W_POST_145:
     adapter = HERE / "hourly170_actor.py"
     seal, _ = s.read(HERE / "deployment-seal-receipt.json")
     member, = [row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444"]
@@ -1224,7 +1224,7 @@ def registered_status():
             retry2=cold168["registered_writer"](scope,prior)
             if RETRY4_168:
                 retry3=writer168["registered_writer"](scope,retry2,cold168["PREVIOUS_PREPARED_SHA"],cold168["PREVIOUS_GUARD_SHA"])
-                retry4=writer168v4["registered_writer"](scope,retry3,cold168["PREPARED_SHA"],cold168["GUARD_QUAL_SHA"])
+                retry4=writer168v4["registered_writer"](scope,retry3,cold168["RETRY4_PREPARED_SHA"],cold168["RETRY4_GUARD_SHA"])
                 if V5Q_136 or V5R_136:
                     s.need(retry4[1] == s.ref(R / "survivor172-cadence-20261122-v1/tools-cold168-retry4-resume-v1/deployment-seal-receipt.json",
                                              "a608208cd09681d366f0994dfc43406b4f8430330e13919a88b3af031efaf160")
@@ -1517,6 +1517,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         closed_before=closed_bootstrap["settled"](s,fit)
     stopped=proof_stops()
     f,fleet_rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
+    phase = phase145(epoch, ref) if RETRY5_168 else None
     if RETRY5_168 or V7_145 or V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145:
         s.need(not f["actual_active_holding_transfers"] and
                not fit.members("horizon-closed185-lanel-park-20261125-v1.service"),
@@ -1544,7 +1545,8 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     closed169=focused169_terminal(f,rows)
     closed172=full172_terminal(f,rows)
     peers=survivors(rows,ledger);status=registered_status()
-    phase=phase145(epoch, ref)
+    if not RETRY5_168:
+        phase = phase145(epoch, ref)
     hourly170_owner = hourly170_guard = hourly170_contract = hourly170_row = None
     full170_guard = None
     repro166 = reproduction166_owner(repro166_mode,ref)

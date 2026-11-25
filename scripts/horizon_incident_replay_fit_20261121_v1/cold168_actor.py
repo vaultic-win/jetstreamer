@@ -67,6 +67,7 @@ if RETRY4:
             or not re.fullmatch('[0-9a-f]{64}',generation[k]['sha256']) for k,path in expected.items()):
         raise ValueError('foreign epoch 168 retry4 generation')
     PREPARED_SHA,LOG_SHA,GUARD_QUAL_SHA,GATE_SHA,ROOT_SHA=(generation[k]['sha256'] for k in ('prepared','log','guard','gate','root'))
+    RETRY4_PREPARED_SHA, RETRY4_GUARD_SHA = PREPARED_SHA, GUARD_QUAL_SHA
     common_mount=runpy.run_path(str(Path(__file__).with_name('cold168_common_mount.py')))
     spent=runpy.run_path(str(Path(__file__).with_name('closed_retry3.py')))
     if ROOT_SHA != '713e94750dd3d430c2f54c1ccb2af7ed708dec802af5cbf210ee4963a992d0f4':

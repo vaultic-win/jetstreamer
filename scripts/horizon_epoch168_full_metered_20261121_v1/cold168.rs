@@ -113,7 +113,7 @@ mod route {
     pub const WITNESS: &str = "fa3ba73fbc164507e40b76f6653c1394df223b2bea0aa940b815baae16d868fc";
     pub const GUARD_BASE: &str = "epoch168-cold-guard-20261125-v5";
     pub const FIT: &str =
-        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-v1/post-stop-fit";
+        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-v2/post-stop-fit";
     pub const ROOT: &str = "4cd544fddda40cd81c94358b8c455feac24247b14f56e8fdb8ede2727c54af25";
     pub const ALIAS: &str = "/run/horizon-full168-cold-v5";
     pub const STATUS_QUALIFIED: &str = "FAILED166_CADENCE_V12_READY.json";
@@ -1054,34 +1054,46 @@ pub fn funded_guard_floor(price: &Value) -> Result<u64> {
         price["epoch"] == EPOCH
             && price["fits"] == true
             && quote["schema"] == "horizon-168-retry5-complete-booking-v1"
-            && quote["funded"] == true
-            && quote["producer_cpu_quota_micros"] == 9_000_000
-            && quote["producer_memory_bytes"] == 68u64 << 30
-            && quote["guard_cpu_quota_micros"] == 250_000
-            && quote["guard_memory_bytes"] == 1u64 << 30
-            && quote["producer_swap_bytes"] == 0
-            && quote["guard_swap_bytes"] == 0
-            && quote["prior_stop"] == price["stopped_cold168"]["terminal"]
+            && quote["funded"] == true,
+        "unfunded retry5 quote"
+    );
+    ensure!(
+        n(quote, "producer_cpu_quota_micros")? == 9_000_000
+            && n(quote, "producer_memory_bytes")? == (68 << 30)
+            && n(quote, "guard_cpu_quota_micros")? == 250_000
+            && n(quote, "guard_memory_bytes")? == (1 << 30)
+            && n(quote, "producer_swap_bytes")? == 0
+            && n(quote, "guard_swap_bytes")? == 0,
+        "wrong retry5 producer or guard limits"
+    );
+    ensure!(
+        quote["prior_stop"] == price["stopped_cold168"]["terminal"]
             && quote["prior_stop"]["sha256"]
-                == "b0538a4dee05df924a8d04f8562866df701c03996463552a932059826cdab"
+                == "b0538a4dee05df924a8d04f8562866df701c03996498963552a932059826cdab"
             && quote["retained_source"] == price["retry5_retained_source"]
             && quote["retained_source"]["sha256"]
                 == "488dbd9e630511b97a0ad0704241a0a1fdec71a614caf17c6cd1d3a63b3dc0b2"
             && retained >= n(&price["stopped_cold168"], "measured_physical_bytes")?
-            && retained <= physical
-            && physical.checked_add(remaining) == Some(CAP)
+            && retained <= physical,
+        "wrong retry5 predecessor charge"
+    );
+    ensure!(
+        physical.checked_add(remaining) == Some(CAP)
             && n(booking, "cap_bytes")? == CAP
             && booking["root"] == LANE
             && booking["run"] == json!(run())
-            && quote["candidate_remaining_bytes"] == remaining
-            && quote["outside_cap_stop_allowance_bytes"] == 8u64 << 30
+            && n(quote, "candidate_remaining_bytes")? == remaining,
+        "wrong retry5 whole-tree booking"
+    );
+    ensure!(
+        n(quote, "outside_cap_stop_allowance_bytes")? == (8 << 30)
             && quote["retained_base_HOME_bytes"]
                 == price["epoch159_donor_cover"]["native_home_required"]
             && n(quote, "retained_base_HOME_bytes")?.checked_add(8 << 30) == Some(floor)
             && floor == n(price, "protected_raw_floor_bytes")?
             && required == n(price, "complete_required_HOME_bytes")?
             && floor.checked_add(remaining) == Some(required),
-        "incomplete protected retry5 booking"
+        "wrong retry5 protected HOME floor"
     );
     let spare = n(price, "available_HOME_bytes")?
         .checked_sub(required)
