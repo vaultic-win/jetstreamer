@@ -60,7 +60,8 @@ FULL170 = HERE == D / "tools-homefloor-170-full-metered-v1"
 REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
 REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v1"
 REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
-REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
+REPRO166_POST_V9 = HERE == D / "tools-homefloor-166-write-version-post145-v9-v1"
+REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or REPRO166_POST_V9 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
 V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v2"
 V8_RUNTIME_145 = HERE == D / "tools-homefloor-145-v7-timeout-recovery-v1"
@@ -80,7 +81,7 @@ RETRY5_POST_145 = V7_POST_145 or V9_POST_145
 V7_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v7-build-v1"
 V9_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v9-build-v1"
 RETRY5_POST_BUILD_145 = V7_POST_BUILD_145 or V9_POST_BUILD_145
-RETRY5_168 = RETRY5_FIT_ROUTE or RETRY5_POST_145 or RETRY5_POST_BUILD_145
+RETRY5_168 = RETRY5_FIT_ROUTE or RETRY5_POST_145 or RETRY5_POST_BUILD_145 or REPRO166_POST_V9
 STOPPED168_PRICE = RETRY5_168 or STOP_RECOVERY_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
@@ -748,10 +749,10 @@ def v12_stopped145(fleet):
 
 
 def phase145(epoch, fleet=None):
-    if RETRY5_FIT_ROUTE or RETRY5_POST_BUILD_145:
-        generation = "V9" if V9_RETRY5_FIT or V9_POST_BUILD_145 else "V8" if V8_RETRY5_FIT else "V7"
+    if RETRY5_FIT_ROUTE or RETRY5_POST_BUILD_145 or REPRO166_POST_V9:
+        generation = "V9" if V9_RETRY5_FIT or V9_POST_BUILD_145 or REPRO166_POST_V9 else "V8" if V8_RETRY5_FIT else "V7"
         phase = retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit[generation])
-        if RETRY5_POST_BUILD_145:
+        if RETRY5_POST_BUILD_145 or REPRO166_POST_V9:
             proof = bound(phase["completion"])
             phase["semantic_receipt"] = phase["completion"]
             phase["completion"] = proof["completion"]
@@ -1942,9 +1943,6 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=needmem,available_memory_bytes=mem["MemAvailable:"],
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,**recovered_price,active168_guard_floor=floor168,
         population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
-    if RETRY5_168:
-        donor = retry5_fit["donor_cover"](s, retry5_donor, retry5_donor_before, native, f)
-        return retry5_fit["price"](s, native, retry5_current, books["168"], donor, cold168)
     if FULL170 or REPRO166:
         # At zero remaining growth, the same paid tree has realized its full
         # allowance. Re-evaluate the existing absolute floors and every other
@@ -1956,9 +1954,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         if lane not in full_replacements:
             full_replacements[lane] = dict(prestart_remaining=books[lane]["remaining_bytes"], floor=0)
         full_need, _, _ = disk_budget(raw, c136, full_books, epoch, peers,
-                                      full_replacements, floor168, closed_prepaid)
+                                      full_replacements, budget_floor168, closed_prepaid)
         full_zero, _, _ = disk_budget(raw, dict(remaining=0), full_books, epoch, peers,
-                                      full_replacements, floor168, closed_prepaid)
+                                      full_replacements, budget_floor168, closed_prepaid)
         full_need = post145_floor(full_need, full_zero, c136, growth)
         full_need = max(full_need, post145_floor(0, full_zero, c136, prefix_growth)) + after["missing_mirror_bytes"]
         native[f"full{lane}_zero_remaining_native_HOME_bytes"] = full_need
@@ -1975,6 +1973,10 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if REPRO166:
         s.need(reproduction166_owner(repro166_mode, ref) == repro166, "epoch 166 gate or first guard changed during capture")
         native["reproduction166_owner"] = repro166
+    if RETRY5_168:
+        donor = retry5_fit["donor_cover"](s, retry5_donor, retry5_donor_before, native, f)
+        price = "price166" if REPRO166_POST_V9 else "price"
+        return retry5_fit[price](s, native, retry5_current, books["168"], donor, cold168)
     if not HOURLY170:
         return native
     s.need(hourly170["ready_contract"]() == hourly170_contract, "sealed diagnostic changed during native price")
@@ -2066,7 +2068,21 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         return native
     if RETRY5_168:
         s.need(epoch == (168 if RETRY5_FIT_ROUTE else 145) and prestart136 is None,
-               "wrong epoch for the sealed retry5 or V7 post provider")
+               "wrong epoch for the sealed retry5 or post provider")
+        if REPRO166_POST_V9:
+            holding_program = holding185_program()
+
+            def holding():
+                return json.loads(subprocess.check_output([holding_program, "reconcile"], timeout=30))
+
+            before = holding()
+            s.need(before["holding_reservation"] is None and before["active_transfer"] is None,
+                   "V9 epoch 166 requires the serial holding slot to drain")
+            native = capture_native(epoch, ref, repro166_mode=repro166_mode)
+            s.need(holding() == before and registered_status() == native["status_registration"],
+                   "serial holding or V12 writer changed during epoch 166 capture")
+            native["epoch185_lanel_holding"] = before
+            return native
         return capture_native(epoch, ref)
     if STOPPED168_PRICE:
         s.need(epoch in (145, 166, 167, 170) and prestart136 is None,

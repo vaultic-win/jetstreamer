@@ -199,3 +199,23 @@ def price(s, native, current, ret, donor, cold168):
                   fits=native['fits'] and details['funded'], epoch159_donor_cover=donor)
     native['bookings']['168'] = current
     return native
+
+
+def price166(s, native, current, ret, donor, cold168):
+    """Carry the paid retry5 growth through both whole-tree 166 projections."""
+    base = native['complete_required_HOME_bytes']
+    zero = native['full166_zero_remaining_native_HOME_bytes']
+    donor_home = donor['native_home_required']
+    s.need(0 < zero <= base <= donor_home, 'inconsistent epoch 166 base and donor projections')
+    quote = price(s, native, current, ret, donor, cold168)
+    retry5 = quote['retry5_complete_booking']
+    zero_with_donor = zero + donor_home - base
+    zero_with_retry5 = (max(zero_with_donor + retry5['outside_cap_stop_allowance_bytes'],
+                            retry5['retained_guard_floor_bytes']) + retry5['candidate_remaining_bytes'])
+    quote['full166_retry5_projection'] = dict(
+        native_current_HOME_bytes=base,
+        native_zero_remaining_HOME_bytes=zero,
+        funded_current_HOME_bytes=quote['complete_required_HOME_bytes'],
+        funded_zero_remaining_HOME_bytes=zero_with_retry5,
+    )
+    return quote
