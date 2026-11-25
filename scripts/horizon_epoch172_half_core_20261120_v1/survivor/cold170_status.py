@@ -20,12 +20,13 @@ STOP = 'd670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a'
 FIELD = 'current_homefloor_cold166_167_170_owners'
 BINDING = LOCAL / f'{ATTEMPT}-170-generation.json'
 FAILED_RUN = ROOT / 'failed-replay-20261124T123309Z'
+V13_PACKAGE = 'tools-cold168-retry5-failed166-v13-entry146'
 METERED_FULL = LOCAL.name in ('tools-cold168-retry4-failed166-v6-entry146',
-                              'tools-cold168-retry4-failed166-v7-entry146')
+                             'tools-cold168-retry4-failed166-v7-entry146', V13_PACKAGE)
 if METERED_FULL:
     import full170_status as full170
 
-RETRY5_168 = LOCAL.name == 'tools-cold168-retry5-failed166-v12-entry146'
+RETRY5_168 = LOCAL.name in ('tools-cold168-retry5-failed166-v12-entry146', V13_PACKAGE)
 FAILED166_CADENCE = RETRY5_168 or METERED_FULL or LOCAL.name in (
     'tools-cold168-retry4-failed166-v1', 'tools-cold168-retry4-failed166-v2',
     'tools-cold168-retry4-failed166-v3', 'tools-cold168-retry4-failed166-v4-entry146',

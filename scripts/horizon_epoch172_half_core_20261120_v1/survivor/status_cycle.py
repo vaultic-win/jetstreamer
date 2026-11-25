@@ -24,16 +24,20 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
+RETRY5_CADENCE_VERSIONS = (12, 13)
+
+
 def failed166_package(version):
-    attempt = 5 if version == 12 else 4
+    attempt = 5 if version in RETRY5_CADENCE_VERSIONS else 4
     name = f'tools-cold168-retry{attempt}-failed166-v{version}'
     return name + '-entry146' if version >= 4 else name
 
 
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13)
                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
 FAILED166 = bool(FAILED166_VERSION)
-METERED_FULL170 = FAILED166_VERSION in (6, 7)
+RETRY5_168 = FAILED166_VERSION in RETRY5_CADENCE_VERSIONS
+METERED_FULL170 = FAILED166_VERSION in (6, 7, 13)
 HOLDING185 = FAILED166_VERSION == 7
 HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
 FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
@@ -297,7 +301,7 @@ def publish(c,store,refs,out,epoch,archive=None):
                          estimate_model='Retain the absolute publication forecast of the authenticated predecessor.')
         if epoch == 168 and getattr(c, 'retained168', None):
             extra['cold168_retry4_root_physical_stop'] = c.retained168
-            if FAILED166_VERSION == 12 and epoch not in c.new_rows:
+            if RETRY5_168 and epoch not in c.new_rows:
                 owner = c.recovered_owners.get('168')
                 if owner:
                     extra['current_cold168_retry5_held'] = owner
@@ -544,7 +548,7 @@ def census(c,bridge):
     if getattr(c, 'retained168', None):
         cap.pop('current_cold168_retry4_protection', None)
         cap['retained_cold168_retry4_reservation'] = c.retained168
-        if FAILED166_VERSION == 12 and '168' in c.recovered_owners and 168 not in c.new_rows:
+        if RETRY5_168 and '168' in c.recovered_owners and 168 not in c.new_rows:
             cap['current_cold168_retry5_startup'] = c.recovered_ref
         else:
             cap.pop('current_cold168_retry5_startup', None)
@@ -816,7 +820,7 @@ def entry():
         need(package == 'tools-cold168-retry4-v1', 'cadence resumption requires the qualified retry4 parent')
         package = 'tools-cold168-retry4-resume-v1'
     if FAILED170:
-        expected_attempt = 5 if FAILED166_VERSION == 12 else 4
+        expected_attempt = 5 if RETRY5_168 else 4
         need(package == f'tools-cold168-retry{expected_attempt}-v1', 'different cold168 receiver generation')
         package = 'tools-cold168-retry4-failed170-hourly170-v1' if HOURLY170 else 'tools-cold168-retry4-failed170-v1'
     if FAILED166:
@@ -835,14 +839,14 @@ def entry():
     if FAILED166_VERSION >= 4:
         need(cold_workers.FAILED166_CADENCE, 'cold worker census omits the drained epoch 166')
         validate_epoch146_modules(seal)
-    if FAILED166_VERSION in (10, 11, 12):
+    if FAILED166_VERSION in (10, 11) or RETRY5_168:
         need(getattr(cold_workers, 'cold168_commit', None), 'missing cold168 terminal cadence')
         path = CURRENT.with_name('cold168_commit.py')
         member, = (item for item in seal['members'] if item['name'] == path.name)
         need(Path(cold_workers.cold168_commit.__file__) == path
              and member['mode'] == '0444' and bound(path)['sha256'] == member['sha256'],
              'unsealed cold168 terminal cadence')
-    if FAILED166_VERSION == 12:
+    if RETRY5_168:
         need(cold_workers.RETRY5_168 and cold_workers.cold168.ATTEMPT == 5, 'missing retry5 receiver')
         for path in (CURRENT.with_name('cold170_status.py'), CURRENT.with_name('cold168_status.py'),
                      cold_workers.cold168.BINDING):
@@ -1026,6 +1030,30 @@ def failed166_resume(state, receipt, fd):
     return ready
 
 
+def check_v13_predecessor(incumbent_ref, incumbent, ready, route):
+    need(incumbent_ref['sha256'] == 'b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54'
+         and incumbent['schema'] == 'horizon-epoch166-cadence-rejoin-active-v1'
+         and incumbent['producer_mutations'] is False
+         and incumbent['ready']['path'] == str(ROOT/'FAILED166_CADENCE_V12_READY.json'),
+         'different immutable V12 owner registration')
+    previous_package = ROOT/failed166_package(12)
+    previous_ready = checked(incumbent['ready'])
+    previous_seal = previous_ready['package']
+    need(previous_seal == dict(path=str(previous_package/'deployment-seal-receipt.json'),
+                              sha256='6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac'),
+         'different immutable V12 package')
+    binding = previous_package/route.BINDING.name
+    member, = (row for row in checked(previous_seal)['members'] if row['name'] == binding.name)
+    need(member['mode'] == '0444'
+         and previous_ready['retry5_generation'] == bound(binding)
+         == dict(path=str(binding), sha256=member['sha256'])
+         and ready['retry5_generation']['sha256'] == member['sha256']
+         and previous_ready['retained_retry4_stop'] == ready['retained_retry4_stop'],
+         'V13 changed the sealed retry5 generation or retained retry4 stop')
+    need(ready['full170_receiver'] == bound(CURRENT.with_name('full170_status.py')),
+         'V13 ready receipt omitted the sealed metered epoch 170 receiver')
+
+
 def rejoin_failed166_cadence(state, receipt, fd):
     name = f'FAILED166_CADENCE_V{FAILED166_VERSION}'
     ready_ref = bound(ROOT/f'{name}_READY.json')
@@ -1039,7 +1067,8 @@ def rejoin_failed166_cadence(state, receipt, fd):
     need(ready['schema'] == 'horizon-epoch166-cadence-rejoin-ready-v1'
          and ready['package'] == receipt and ready['old_owner'] == incumbent_ref,
          'different epoch 166 cadence rejoin deployment')
-    old = checked(incumbent_ref)['new']
+    incumbent = checked(incumbent_ref)
+    old = incumbent['new']
     held = os.fstat(fd)
     need(state['Id'] == old['unit'] == CONTROLLER and state['ActiveState'] == 'active' and not state['Job']
          and state['InvocationID'] and state['InvocationID'] != old['invocation_id']
@@ -1078,12 +1107,16 @@ def rejoin_failed166_cadence(state, receipt, fd):
              'epoch 168 stop recovery requires the original completed sample')
         check_sample(fleet, completed, cfg)
         cold_workers.cold168_commit.guard_stop(fleet, cfg)
-    if FAILED166_VERSION == 12:
+    if RETRY5_168:
         route = cold_workers.cold168
         need(ready['retry5_generation'] == bound(route.BINDING)
              and ready['retained_retry4_stop'] == route.RETRY4_STOP
-             and old['program'] == str(ROOT/failed166_package(11)/'status_cycle.py'),
+             and old['program'] == str(ROOT/failed166_package(FAILED166_VERSION - 1)/'status_cycle.py'),
              'retry5 rejoin dropped the qualified generation or retry4 stop')
+        if FAILED166_VERSION == 13:
+            check_v13_predecessor(incumbent_ref, incumbent, ready, route)
+            need(all(row['range'] != '170' for row in cfg['diagnostic_replays']),
+                 'V13 observer still scheduled the settled epoch 170 diagnostic')
         route.generation()
         cold_workers.cold168_commit.guard_stop(fleet, cfg, successor=route)
     pid = os.getpid()
