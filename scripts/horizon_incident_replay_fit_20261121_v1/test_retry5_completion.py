@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 import retry5_fit
+import full170_capacity
 
 
 def need(condition, error):
@@ -79,6 +80,30 @@ class Retry5Completion(unittest.TestCase):
                     retry5_fit.drained145(status, self.fit, self.load, owner=retry5_fit.V9)
         self.load.assert_not_called()
         status.read.assert_not_called()
+
+    def test_full170_keeps_each_ownership_mode_under_the_exact_v12_charge(self):
+        provider = retry5_fit.R / "survivor172-cadence-20261122-v1"
+        v12 = provider / "tools-cold168-retry5-failed166-v12-entry146/deployment-seal-receipt.json"
+        status = {"consumer_seal": ref(v12, "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac")}
+        context = SimpleNamespace(need=need)
+        route = {"TIMER": "fixture.timer"}
+        with (
+            patch.object(full170_capacity, "prestart"),
+            patch.object(full170_capacity, "held", return_value="held"),
+            patch.object(full170_capacity, "idle"),
+            patch.object(full170_capacity, "first_guard", return_value="first"),
+            patch.object(full170_capacity, "active", return_value=("active", "current")) as active,
+        ):
+            for mode, result in (("prestart", (None, None)), ("held", ("held", None)),
+                                 ("post-guard", ("held", "first")), ("active", ("active", "current"))):
+                with self.subTest(mode=mode):
+                    self.assertEqual(full170_capacity.ownership(context, self.fit, route, {}, mode,
+                                                               {}, status, {}, v9=True), result)
+                    wrong_status = {"consumer_seal": ref(v12, "changed")}
+                    with self.assertRaisesRegex(ValueError, "registered V12 receiver"):
+                        full170_capacity.ownership(context, self.fit, route, {}, mode, {},
+                                                   wrong_status, {}, v9=True)
+            self.assertTrue(active.call_args.kwargs["v9"])
 
 
 if __name__ == "__main__":

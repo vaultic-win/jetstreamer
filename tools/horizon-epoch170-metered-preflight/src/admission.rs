@@ -7,10 +7,113 @@ const V10_PROVIDER_SHA: &str = "07c9d8a9fa3dda492348eff10e6eac13e9f496abb5d380f0
 const V10_SEAL_SHA: &str = "dd7b7dea1f90c170e6942b329980964b238fc5e539194e66519a55b940d253a6";
 const V5W: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-v5v-custody-recovery-v1";
 const FULL170: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v1";
+const FULL170_V9: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v3";
+const V9_IID: &str = "ebdfc34db47c4e7699ea5ccbada5d604";
+const V9_HANDOFF: &str = "epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff";
+const V9_CHECKER: &str = "epoch145-semantic-continuity-20261121-v1/tools-v9-census-recovery";
+const V12_REGISTRATION: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json";
+const V9_PHASE: &str = "v9-semantic-complete-drained";
 
 const HOST_MEMORY_WITH_RESERVE: u64 = 810_658_050_048;
 const HOST_CPU_MICROS: u64 = 64_000_000;
 const MAX_QUOTE_AGE: u64 = 120;
+
+fn check_v9_completion(phase: &Value, completion: &Value) -> Result<()> {
+    let handoff = rt(V9_HANDOFF);
+    let recovery = reference(
+        &rt(&format!(
+            "epoch145-guarded-export-20261121-v1/state/{V9_IID}/recovery-started.json"
+        )),
+        "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4",
+    );
+    let submission = reference(
+        &handoff.join("START_RESULT.json"),
+        "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973",
+    );
+    let checker = reference(
+        &rt(V9_CHECKER).join("deployment-seal-receipt.json"),
+        "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd",
+    );
+    let startup = &completion["startup_evidence"];
+    let success = &completion["native_success"];
+    ensure!(
+        phase["stage"] == V9_PHASE
+            && phase["completed_invocation_id"] == V9_IID
+            && phase["Id"] == "horizon-holding-export145-20261121-v1.service"
+            && phase["MainPID"] == "0"
+            && phase["completion"]["path"] == json!(handoff.join("SEMANTIC_COMPLETION.json"))
+            && phase["checker_seal"] == checker
+            && completion["schema"]
+                == "horizon-epoch145-v8-census-successor-semantic-completion-v1"
+            && completion["invocation_id"] == V9_IID
+            && startup["invocation_id"] == V9_IID
+            && startup["start"] == recovery
+            && completion["start"] == recovery
+            && startup["submission_result"] == submission
+            && startup["worker_seal"] == checker
+            && success["INVOCATION_ID"] == V9_IID
+            && success["UNIT"] == "horizon-holding-export145-20261121-v1.service"
+            && success["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+            && success["_PID"] == "1"
+            && completion["publication_authorized"] == false
+            && completion["r2_mutations"] == false,
+        "different epoch 145 V9 completion, checker, or startup custody"
+    );
+    Ok(())
+}
+
+fn validate_v9_phase(phase: &Value) -> Result<()> {
+    ensure!(
+        phase["completion"]["path"] == json!(rt(V9_HANDOFF).join("SEMANTIC_COMPLETION.json")),
+        "different epoch 145 V9 completion path"
+    );
+    check_v9_completion(phase, &bound(&phase["completion"], 0)?)
+}
+
+pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()> {
+    let phase = &price["phase145"];
+    let capture = &price["epoch170_metered_full"]["native_capture_receipt"];
+    let package = rt(FULL170_V9);
+    let receipt = package.join("deployment-seal-receipt.json");
+    let program = package.join("post-stop-fit");
+    if enrollment["incumbent_registration"]["path"] != json!(rt(V12_REGISTRATION))
+        && phase["stage"] != V9_PHASE
+        && capture["program"]["path"] != json!(program)
+    {
+        return Ok(());
+    }
+    ensure!(
+        enrollment["incumbent_registration"]
+            == reference(
+                &rt(V12_REGISTRATION),
+                "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54",
+            )
+            && capture["program"]["path"] == json!(program)
+            && capture["deployment"]["path"] == json!(receipt)
+            && capture["source_epoch"] == 145
+            && capture["recorded_unix_seconds"] == price["recorded_unix_seconds"],
+        "epoch 170 V9 quote requires the V12 incumbent and its successor provider"
+    );
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    ensure!(
+        now.checked_sub(number(price, "recorded_unix_seconds")?)
+            .is_some_and(|age| age <= MAX_QUOTE_AGE),
+        "stale or future epoch 170 V9 quote"
+    );
+    let seal = bound(&capture["deployment"], 0)?;
+    ensure!(
+        seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && seal["destination"] == json!(package)
+            && seal["members"].as_array().is_some_and(|rows| rows
+                .iter()
+                .any(|row| row["name"] == "post-stop-fit"
+                    && row["mode"] == "0555"
+                    && row["sha256"] == capture["program"]["sha256"])),
+        "epoch 170 V9 quote provider differs from its sealed member"
+    );
+    image(&capture["program"])?;
+    validate_v9_phase(phase)
+}
 
 pub(super) fn enrollment_path(fleet_sha: &str) -> PathBuf {
     rt(BASE).join(format!("OBSERVER_ENROLLMENT-{fleet_sha}.json"))
@@ -266,6 +369,7 @@ pub(super) fn quote(
         }
         "v5w" => rt(V5W),
         "full170" => rt(FULL170),
+        "full170-v9" => rt(FULL170_V9),
         _ => bail!("unknown epoch 170 capacity provider deployment"),
     };
     let sealed = reference(
@@ -297,7 +401,7 @@ pub(super) fn quote(
         "v10" => {
             command.arg("--hourly170=prestart");
         }
-        "full170" => {
+        "full170" | "full170-v9" => {
             command.arg("--full170=prestart");
         }
         _ => {}
@@ -322,12 +426,66 @@ pub(super) fn quote(
     unused_route(active)?;
     result["epoch170_metered_full"]["native_capture_receipt"] = json!({"program":program,"deployment":sealed,
         "source_json_sha256":sha(&output.stdout),"source_epoch":145,"recorded_unix_seconds":native["recorded_unix_seconds"]});
+    validate_v9_price(&result, &candidate)?;
     Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn v9_phase_binds_the_actual_owner_and_separate_startup_receipts() {
+        let handoff = rt(V9_HANDOFF);
+        let recovery = reference(
+            &rt(&format!(
+                "epoch145-guarded-export-20261121-v1/state/{V9_IID}/recovery-started.json"
+            )),
+            "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4",
+        );
+        let submission = reference(
+            &handoff.join("START_RESULT.json"),
+            "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973",
+        );
+        let checker = reference(
+            &rt(V9_CHECKER).join("deployment-seal-receipt.json"),
+            "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd",
+        );
+        let phase = json!({"stage": V9_PHASE, "completed_invocation_id": V9_IID,
+            "Id": "horizon-holding-export145-20261121-v1.service", "MainPID": "0",
+            "completion": {"path": handoff.join("SEMANTIC_COMPLETION.json"), "sha256": "fixture"},
+            "checker_seal": checker});
+        let completion = json!({"schema": "horizon-epoch145-v8-census-successor-semantic-completion-v1",
+            "invocation_id": V9_IID, "start": recovery,
+            "startup_evidence": {"invocation_id": V9_IID, "start": recovery,
+                "submission_result": submission, "worker_seal": checker},
+            "native_success": {"INVOCATION_ID": V9_IID, "UNIT": "horizon-holding-export145-20261121-v1.service",
+                "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448", "_PID": "1"},
+            "publication_authorized": false, "r2_mutations": false});
+        check_v9_completion(&phase, &completion).unwrap();
+
+        let mut other_owner = phase.clone();
+        other_owner["completed_invocation_id"] = json!("a71285e56d674de3bf793692f93dfbb3");
+        assert!(check_v9_completion(&other_owner, &completion).is_err());
+
+        let mut crossed = completion.clone();
+        crossed["startup_evidence"]["start"] = submission;
+        crossed["startup_evidence"]["submission_result"] = recovery;
+        assert!(check_v9_completion(&phase, &crossed).is_err());
+    }
+
+    #[test]
+    fn v12_enrollment_requires_the_v9_provider_and_phase() {
+        let enrollment = json!({"incumbent_registration": {"path": rt(V12_REGISTRATION)}});
+        let historic = json!({"phase145": {"stage": "v6-semantic-complete-drained"}});
+        assert!(
+            validate_v9_price(&historic, &enrollment)
+                .unwrap_err()
+                .to_string()
+                .contains("requires the V12 incumbent and its successor provider")
+        );
+        assert!(validate_v9_price(&historic, &Value::Null).is_ok());
+    }
 
     fn case() -> (Value, Value, Value, Value) {
         let fleet = json!({"path":"/fleet","sha256":"fleet"});
