@@ -9,6 +9,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import stat
 import subprocess
@@ -58,6 +59,8 @@ PARK292_UNIT = 'foundation-292-appendvec-custody-v308.service'
 PARK292_START = V / 'horizon292-closed-appendvec-staging-v308/custody-start.json'
 STAGE228_UNIT = 'foundation-228-sparse-bundle-v1.service'
 STAGE228 = V / 'horizon228-private-guest-staging-v1'
+PUBLIC_AUDIT = V / 'horizon-foundation-public-audit-148-156-v1'
+PUBLIC_AUDIT_RELEASE_SHA = 'ea750bf0be9c6742af0ca1503e8cba094594557e1b5225ad8ff93f693f2a344d'
 SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
 SUFFIX226_STATE = V / 'horizon226-suffix-v1'
 CONTINUATION230_GUARDS = {
@@ -81,6 +84,7 @@ GUARDS = {
     252: V / 'horizon252-regional-full-guard-receipts-v1',
     257: V / 'horizon257-full-guard-receipts-v1',
     261: V / 'horizon261-full-guard-receipts-v1',
+    288: RECEIPTS,
     292: V / 'horizon292-full-guard-receipts-v322',
 }
 
@@ -344,6 +348,33 @@ def active_228_staging(ops):
     return dict(start=start_ref, fit=fit_ref, owner=owner)
 
 
+def active_public_audit(helper, census):
+    units = [name for name in census if name.startswith('foundation-public-audit-')]
+    if not units:
+        return None
+    unit, = units
+    match = re.fullmatch(r'foundation-public-audit-epoch(14[89]|15[0-6])-256-cap1-v1\.service', unit)
+    assert match, unit
+    epoch = int(match[1])
+    launch_ref = binding(PUBLIC_AUDIT / f'launch-{epoch}.json')
+    launch = read(launch_ref)
+    admission = read(fixed(PUBLIC_AUDIT / f'admission-{epoch}.json', launch['admission_sha256']))
+    assert launch['schema'] == 'horizon-foundation-public-audit-launch-v1'
+    assert admission['schema'] == 'horizon-foundation-public-audit-admission-v1'
+    assert launch['unit'] == unit and launch['epoch'] == admission['epoch'] == epoch
+    assert admission['release_sha256'] == PUBLIC_AUDIT_RELEASE_SHA
+    assert admission['archive_scratch_bytes'] == admission['swap_max_bytes'] == 0
+    assert admission['remote_writes_authorized'] is False
+    owner = helper.active_props(unit, launch['launch']['InvocationID'])
+    for key in ('MainPID', 'ControlGroup', 'AllowedCPUs', 'MemoryMax'):
+        assert owner[key] == launch['launch'][key], (unit, key)
+    assert owner['AllowedCPUs'] == admission['requested_cpus'] == '60-63'
+    assert int(owner['MemoryMax']) == admission['requested_memory_max_bytes'] == 16 << 30
+    reader = checked(fixed(Path(admission['argv'][0]), admission['reader_sha256']))
+    assert Path('/proc', owner['MainPID'], 'exe').samefile(reader)
+    return dict(launch=launch_ref, owner=owner)
+
+
 def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
     assert not demotion_retry or candidate_epoch == 229
     ram_quote = DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch)
@@ -386,6 +417,15 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
         owner = helper.active_props(producer['Id'], producer['InvocationID'])
         assert owner['MainPID'] == producer['MainPID']
         owners[epoch] = owner
+        if epoch == 288:
+            registration = binding(PACKAGE / 'cadence-registration.json')
+            launched = read(registration)
+            assert row['phase'] == 'diagnostic-qualification' and row['scratch_path'] == str(RUN)
+            assert launched['epoch'] == 288 and launched['unit'] == producer['Id'] == UNIT
+            assert launched['invocation_id'] == owner['InvocationID']
+            assert launched['main_pid'] == int(owner['MainPID'])
+            assert launched['canonical_epoch_publication_authorized'] is False
+            assert launched['guard_plan'] == binding(PACKAGE / 'guard-plan.json')
         if producer['Id'] == BANK_DELTA229_UNIT:
             guard_paths[epoch] = BANK_DELTA229_GUARDS
         elif producer['Id'] in DEMOTION229_GUARDS:
@@ -399,6 +439,10 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
         else:
             guard_paths[epoch] = GUARDS[epoch]
         growth[epoch] = kit.measure.source.growth_for(epoch, owner, guard_paths[epoch])
+        if epoch == 288:
+            sample = kit.ops.bound(growth[epoch]['sample'])
+            assert sample['plan_sha256'] == launched['guard_plan']['sha256']
+            assert growth[epoch]['cap_bytes'] == CAP and growth[epoch]['floor_bytes'] == FLOOR
     broker = None
     live = list(owners.values())
     if terminal226 is None:
@@ -415,8 +459,13 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
         live.append(stage228['owner'])
     census = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
         '--no-pager', '--no-legend', '--plain', 'horizon-qualify-*', 'horizon-perf-*', 'horizon-upload-*',
-        'horizon-restore-*', 'foundation-*-broker-*', PARK292_UNIT, STAGE228_UNIT], text=True, timeout=10)
-    assert {line.split()[0] for line in census.splitlines() if line.strip()} == {row['Id'] for row in live}, census
+        'horizon-restore-*', 'foundation-*-broker-*', 'foundation-public-audit-*',
+        'foundation-*-ext4-*', PARK292_UNIT, STAGE228_UNIT], text=True, timeout=10)
+    listed_units = {line.split()[0] for line in census.splitlines() if line.strip()}
+    public_audit = active_public_audit(helper, listed_units)
+    if public_audit is not None:
+        live.append(public_audit['owner'])
+    assert listed_units == {row['Id'] for row in live}, census
     assert all(r['AllowedCPUs'] and not (candidate_cpus & helper.cpus(r['AllowedCPUs'])) for r in live)
     mem = {k: int(value.split()[0]) * 1024 for k, value in
            (line.split(':', 1) for line in Path('/proc/meminfo').read_text().splitlines())
@@ -458,7 +507,7 @@ def capacity(kit, candidate_epoch=288, *, demotion_retry=False):
     result = dict(epoch=candidate_epoch, fleet=fleet_ref, completion=completion, sampled_unix_seconds=int(time.time()),
                 live_units=owners, broker=broker, guards=growth, free_bytes=free, protected_disk_bytes=protected,
                 reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref, extraction226_terminal=terminal226,
-                staging292=staging, custody292=custody, staging228=stage228,
+                staging292=staging, custody292=custody, staging228=stage228, public_audit=public_audit,
                 guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=candidate_disk,
                 candidate_memory_max_bytes=candidate_memory, candidate_cpus=sorted(candidate_cpus),
                 disk_shortfall_bytes=max(0, protected + candidate_disk - free),
