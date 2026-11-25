@@ -435,6 +435,9 @@ def startup(result_ref):
     proof = json.loads(proof_bytes, object_pairs_hook=unique_object)
     _, provider = sealed_member(PROVIDER, fresh["provider_seal"], "post-stop-fit", 0o555)
     _, donor = sealed_member(PROVIDER, fresh["provider_seal"], "build_159_price.py", 0o444)
+    if DONOR_RETRY:
+        require(launch_quote["status_registration"] == fresh["status_registration"],
+                "different V5x startup cadence owner")
     require(donor["sha256"] == DONOR_SHA and intent["worker_seal"] == image_seal
             and intent["provider_seal"] == fresh["provider_seal"]
             and image == actual_image and window["continuity_build"] == actual_proof

@@ -448,7 +448,22 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and started_fit["provider_seal"]["path"] == str(BASE / "incident-replay-fit-20261121-v1"
                    / HOMEFLOOR_PROVIDER / "deployment-seal-receipt.json"), "foreign 145 pre-worker admission")
     if STATUS_OWNER_RECOVERY:
-        s.need(started_fit["status_registration"] == build["resumed_status"]
+        if V5W_DONOR_RECOVERY:
+            handoff = PKG.parent / "v5x-name-handoff"
+            intent, _ = s.read(handoff / "START_INTENT.json")
+            quoted = s.bound(intent["capacity"], handoff / "FIT.json")
+            s.need(intent["schema"] == "horizon-epoch145-v5v-custody-successor-start-intent-v1"
+                   and intent["worker_seal"] == seal_ref
+                   and intent["provider_seal"] == started_fit["provider_seal"]
+                   and intent["terminal"] == window["guard_terminal_predecessor"]
+                   and intent["fleet"] == quoted["fleet"] == started_fit["fleet"]
+                   and quoted["fits"] is True and quoted["phase145"]["stage"] == "v5w-drained"
+                   and quoted["phase145"]["guard_terminal"] == intent["terminal"] and quoted["resource_credit_bytes"] == 0,
+                   "V5x startup cadence selection differs from its sealed launch")
+            expected_status = quoted["status_registration"]
+        else:
+            expected_status = build["resumed_status"]
+        s.need(started_fit["status_registration"] == expected_status
                and all(started_fit["phase145"]["window"][key] == window[key] for key in
                        ("status_owner_failure", "status_owner_recovery", "status_owner_terminal")),
                "foreign status-owner pre-worker admission")
