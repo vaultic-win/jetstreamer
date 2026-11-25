@@ -637,7 +637,7 @@ pub(crate) async fn run(
         fs::metadata(&suffix).map_err(|e| e.to_string())?.len() <= 8u64 << 30,
         "203 suffix exceeded experimental 8 GiB reservation; preserve output and requalify peak before assembly",
     )?;
-    publish_historical_segment_manifest(EPOCH, q, &suffix, &result, candidate)?;
+    publish_historical_segment_manifest(EPOCH, q, &suffix, &result)?;
     require_no_checksum(&suffix)?;
     let suffix_manifest = read_and_validate_segment_manifest(&suffix).map_err(|e| e.to_string())?;
     let provenance = provenance(&validated.manifest, &suffix_manifest)?;

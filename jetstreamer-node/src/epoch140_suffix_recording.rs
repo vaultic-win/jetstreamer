@@ -345,7 +345,7 @@ pub(super) async fn run(
             && !evidence.emitted_write_versions.is_empty(),
         "suffix has incomplete account-write coverage",
     )?;
-    let manifest = publish_historical_segment_manifest(140, QUALIFICATION, &output, &result, true)?;
+    let manifest = publish_historical_segment_manifest(140, QUALIFICATION, &output, &result)?;
     require_no_checksum(&output)?;
     let receipt = json!({"schema":"jetstreamer-private-epoch140-suffix-recording-v1","invocation_id":invocation,
         "plan":args.plan,"prefix_audit":plan.prefix_audit,"snapshot_sha256":SNAPSHOT_SHA,"worker_sha256":WORKER_SHA,

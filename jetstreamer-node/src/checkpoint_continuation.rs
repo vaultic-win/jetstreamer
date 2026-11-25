@@ -864,7 +864,7 @@ pub(crate) async fn run(
         "continuation was interrupted",
     )?;
     verifier.finish()?;
-    publish_historical_segment_manifest(EPOCH, qualification, &suffix, &result, allow_candidate)?;
+    publish_historical_segment_manifest(EPOCH, qualification, &suffix, &result)?;
     require_no_checksum(&suffix)?;
     let suffix_manifest = read_and_validate_segment_manifest(&suffix).map_err(|e| e.to_string())?;
     let stats = assemble(

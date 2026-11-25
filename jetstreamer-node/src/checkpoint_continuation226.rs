@@ -742,7 +742,7 @@ async fn replay(
         "226 suffix interrupted or actual native barrier absent",
     )?;
     verifier.finish()?;
-    publish_historical_segment_manifest(EPOCH, q, &output, &result, candidate)?;
+    publish_historical_segment_manifest(EPOCH, q, &output, &result)?;
     let suffix = read_and_validate_segment_manifest(&output).map_err(|e| e.to_string())?;
     suffix_scope(&suffix)?;
     require_no_checksum(&output)?;

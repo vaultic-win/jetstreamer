@@ -10106,6 +10106,7 @@ impl CarriedRuntimeState {
 }
 
 struct ReplayRunResult {
+    execution: compatibility::RuntimeSelection,
     carried_state: Option<CarriedRuntimeState>,
     historical_evidence: Option<historical_replay::HistoricalReplayEvidence>,
     historical_worker_executable_sha256: Option<[u8; 32]>,
@@ -12145,7 +12146,6 @@ fn publish_historical_segment_manifest(
     plan: QualificationPlan,
     archive_path: &Path,
     result: &ReplayRunResult,
-    allow_candidate_runtime: bool,
 ) -> Result<HistoricalSegmentManifest, String> {
     let evidence = result.historical_evidence.as_ref().ok_or_else(|| {
         "focused historical segment completed without checkpoint evidence".to_string()
@@ -12162,10 +12162,7 @@ fn publish_historical_segment_manifest(
             evidence.terminal.slot, plan.end_inclusive
         ));
     }
-    let selection = compatibility::select_focused_qualification_runtime(
-        plan.output_runtime_range(),
-        allow_candidate_runtime,
-    )?;
+    let selection = result.execution;
     let identity = selection.descriptor.identity;
     let worker_executable_sha256 = result.historical_worker_executable_sha256.ok_or_else(|| {
         format!(
@@ -14328,6 +14325,7 @@ async fn run_geyser_replay(
         return Ok(ReplayRunOutcome::Paused(report));
     }
     Ok(ReplayRunOutcome::Completed(Box::new(ReplayRunResult {
+        execution,
         carried_state,
         historical_evidence,
         historical_worker_executable_sha256: worker_executable_sha256,
@@ -17181,13 +17179,7 @@ async fn run_mixed_runtime_root_cohort_first_epoch(
         )
         .await?
         .completed()?;
-        publish_historical_segment_manifest(
-            epoch,
-            plan,
-            &output,
-            &result,
-            allow_candidate_runtime,
-        )?;
+        publish_historical_segment_manifest(epoch, plan, &output, &result)?;
         let evidence = result
             .historical_evidence
             .clone()
@@ -22962,11 +22954,7 @@ async fn main() {
                     && result.historical_evidence.is_some()
                 {
                     let verified_segment = match publish_historical_segment_manifest(
-                        epoch,
-                        plan,
-                        &horizon_output,
-                        &result,
-                        allow_candidate_runtime,
+                        epoch, plan, &horizon_output, &result,
                     ) {
                         Ok(segment) => segment,
                         Err(err) => {
