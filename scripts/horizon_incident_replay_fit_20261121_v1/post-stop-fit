@@ -57,8 +57,11 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v3",
 )
 FULL170 = HERE == D / "tools-homefloor-170-full-metered-v1"
-V5W_RECOVERY_145 = FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
-V5W_POST_145 = HERE == D / "tools-homefloor-145-post-v5w-current-v1"
+REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
+REPRO166_POST = HERE == D / "tools-homefloor-166-write-version-post145-v1"
+REPRO166 = REPRO166_LIVE or REPRO166_POST
+V5W_RECOVERY_145 = REPRO166_LIVE or FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
+V5W_POST_145 = REPRO166_POST or HERE == D / "tools-homefloor-145-post-v5w-current-v1"
 V5V_RECOVERY_145 = V5W_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
 FRESH_CENSUS_RECOVERY_145 = V5V_RECOVERY_145 or HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
 RETAIN_FAILED166 = FAILED166_CADENCE or V5V_RECOVERY_145 or V5W_POST_145
@@ -119,7 +122,13 @@ if FULL170:
     loader["load_package"](observation,"7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e")
     sys.path.insert(0, str(observation))
     full170 = runpy.run_path(str(HERE / "full170_status.py"))
-    full170_capacity = runpy.run_path(str(HERE / "full170_capacity.py"))
+if FULL170 or REPRO166_LIVE:
+    adapter = HERE / "full170_capacity.py"
+    seal, _ = s.read(HERE / "deployment-seal-receipt.json")
+    member, = [row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444"]
+    s.need(seal["destination"] == str(HERE), "foreign native verifier census helper")
+    fit.binary(adapter, member["sha256"])
+    full170_capacity = runpy.run_path(str(adapter))
 RETRY4_145 = LEASE_RUNTIME_145 or LEASE_BUILD_145 or HOURLY169 or V5J_POST or DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
 RETRY4_168 = RETRY4_145 or HERE.name == "tools-homefloor-cold168-retry4-v1"
 CLOSED_RETRY3 = HERE.name == "tools-homefloor-closed168-retry3-v1"
@@ -708,7 +717,7 @@ def phase145(epoch, fleet=None):
                        "five-lane-semantic" if FIVE_LANE_145 else "homefloor-semantic")
             cfg, adapter, _ = profile145(here.parent, focused=focused)
             reader = runpy.run_path(str(adapter))
-            if FULL170:
+            if FULL170 or REPRO166_LIVE:
                 members = full170_capacity["epoch145_members"](s, fit)
             else:
                 members = hourly170["epoch145_members"](s, fit) if HOURLY170 else fit.members(fit.A145)
@@ -871,7 +880,20 @@ def closed168_tree():
     s.need(first==second and os.path.samestat(m,run.stat()),"retained metered 168 allocation changed during walk")
     return dict(physical_bytes=first,root=str(s.TREE),cap=fit.CAP)
 
-def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None,hourly170_owner=None):
+def reproduction166_owner(mode, ref):
+    if not REPRO166:
+        s.need(mode is None, "epoch 166 stage requires its dedicated capacity provider")
+        return None
+    s.need(mode in ("prestart", "held", "post-guard"), "missing reproduction stage")
+    seal, _ = s.read(HERE / "deployment-seal-receipt.json")
+    program = HERE / "reproduction-admission"
+    row, = [m for m in seal["members"] if m["name"] == program.name and m["mode"] == "0555"]
+    s.need(seal["destination"] == str(HERE), "different epoch 166 provider package")
+    fit.binary(program, row["sha256"])
+    return json.loads(subprocess.check_output([program, "owner", mode, ref["path"], ref["sha256"]], timeout=20))
+
+
+def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None,hourly170_owner=None,repro166=None):
     expect={v["unit"]:v["processes"] for v in peers.values()}
     expect.update({v["producer_unit"]:v["processes"] for v in replacements.values()})
     if extra and extra["actor"]:
@@ -887,6 +909,12 @@ def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None,
         s.need((HOURLY170 or FULL170) and own == 145 and hourly170_owner["unit"] not in expect and not c136["occupied"],
                "conflicting native epoch 170 capacity claimant")
         expect[hourly170_owner["unit"]] = hourly170_owner["processes"]
+    if repro166 is not None:
+        unit = "horizon-qualify-166-write-version-reproduction-20261124-v1.service"
+        s.need(REPRO166 and own == 145 and repro166["unit"] == unit and unit not in expect and
+               len(repro166["processes"]) == 1 and repro166["processes"][0][:2] ==
+               [repro166["producer_pid"], repro166["start_ticks"]], "different held epoch 166 qualifier")
+        expect[unit] = repro166["processes"]
     s.need(fit.units()==set(expect),"foreign qualifier unit")
     for u,prs in expect.items():
         members=fit.members(u);expected=tuple(sorted(p[0] for p in prs))
@@ -1255,7 +1283,7 @@ def settled_hourly170_for_145(fleet, fleet_ref, rows):
     return {"observation": receipt, "terminal": terminal}
 
 
-def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None):
+def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None,repro166_mode=None):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
     closed_before=None
     if CLOSED_RETRY3:
@@ -1279,6 +1307,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     phase=phase145(epoch, ref)
     hourly170_owner = hourly170_guard = hourly170_contract = hourly170_row = None
     full170_guard = None
+    repro166 = reproduction166_owner(repro166_mode,ref)
     if FULL170:
         s.need(epoch == 145 and prestart136 is None and failed170,
                "full epoch 170 requires the exact retained retry13 terminal")
@@ -1436,7 +1465,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         census_stops = {**stopped, "168": interrupted[168]}
     hourly = hourly169["archival_roster"](f)[1] if HOURLY169 else None
     entry_lease=f.get("epoch146_bounded_entry_lease")
-    population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner)
+    population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner,repro166)
     if closed169:books["169"]=focused169_booking(closed169)
     if closed172:books["172"]=full172_booking(closed172)
     raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
@@ -1448,7 +1477,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
     s.need(fleet_head(ref)[1]==rows and phase145(epoch, ref)==phase and registered_status()==status and
-           census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner)==(population,qualification),
+           census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner,repro166)==(population,qualification),
            "capacity generation changed during collection")
     if prestart136 is None and not c136["occupied"]:
         s.need(registered136(f,status["registration"])==c136,"136 idle or release generation changed during collection")
@@ -1544,6 +1573,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if FULL170:
         s.need(full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status)
                == (hourly170_owner, full170_guard), "full epoch 170 hold or first guard changed during price")
+    if REPRO166:
+        s.need(reproduction166_owner(repro166_mode, ref) == repro166, "epoch 166 gate or first guard changed during capture")
+        native["reproduction166_owner"] = repro166
     if not HOURLY170:
         return native
     s.need(hourly170["ready_contract"]() == hourly170_contract, "sealed diagnostic changed during native price")
@@ -1558,9 +1590,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     return hourly170["price"](native, hourly170_contract, hourly170_owner, hourly170_guard, hourly170_mode)
 
 
-def capture_native(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None):
+def capture_native(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None,repro166_mode=None):
     try:
-        return capture_once(epoch,ref,prestart136,hourly170_mode,full170_mode)
+        return capture_once(epoch,ref,prestart136,hourly170_mode,full170_mode,repro166_mode)
     except WorkerFork as fork:
         e,before=fork.epoch,fork.anchor
         after=confirm_fork(e,epoch,before,{} if FIFTH168 and e==168 else proof_stops()[str(e)])
@@ -1568,7 +1600,7 @@ def capture_native(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=N
         e,before,after=confirmed.epoch,confirmed.before,confirmed.after
     # Discard every earlier resource measurement. A second fork or a change of child
     # fails the capture instead of chaining unbounded retries.
-    result=capture_once(epoch,ref,prestart136,hourly170_mode,full170_mode)
+    result=capture_once(epoch,ref,prestart136,hourly170_mode,full170_mode,repro166_mode)
     row=result["candidate"] if e==epoch else result["replacements"].get(str(e))
     s.need(row is not None,"replacement disappeared during complete reprice")
     same_fork(after,row,False)
@@ -1577,7 +1609,10 @@ def capture_native(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=N
                                          final_guard=row["guard"],processes=row["processes"],complete_fit_repeated=True)
     return result
 
-def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None):
+def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None, repro166_mode=None):
+    s.need(REPRO166 == (repro166_mode is not None) and (not REPRO166 or
+           (epoch == 145 and prestart136 is None and repro166_mode in ("prestart", "held", "post-guard"))),
+           "wrong bounded epoch 166 capture route")
     s.need(HOURLY170 == (hourly170_mode is not None), "hourly 170 mode requires its own sealed provider")
     s.need(FULL170 == (full170_mode is not None), "full epoch 170 mode requires its own sealed provider")
     if FULL170:
@@ -1612,7 +1647,7 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
             return candidate
 
         native = capture_native(epoch,ref,verified_prestart if prestart136 is not None else None,
-                                hourly170_mode,full170_mode)
+                                hourly170_mode,full170_mode,repro166_mode)
         if guarded:
             s.need(feature_before == snapshot(donor), "corrected epoch 159 grant changed during census")
             native["corrected_159_donor"] = feature_before
@@ -1629,6 +1664,10 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
             native["epoch159_donor_cover"] = donor["cover"](left,native,right,exclusive136=native["candidate136"])
         else:
             native["epoch159_donor_cover"] = donor["cover"](before,donor_price,donor["snapshot"]())
+        if REPRO166:
+            s.need(registered_status() == native["status_registration"]
+                   and reproduction166_owner(repro166_mode, ref) == native["reproduction166_owner"],
+                   "changed epoch 166 claim after donor pricing")
         if FULL170:
             s.need(registered_status() == status and fleet_head(ref)[0] == fleet
                    and full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status)
@@ -1721,9 +1760,12 @@ if __name__=="__main__":
     full170_mode = None
     if args and args[0].startswith("--full170="):
         full170_mode = args.pop(0).split("=", 1)[1]
+    repro166_mode = None
+    if args and args[0].startswith("--repro166="):
+        repro166_mode = args.pop(0).split("=", 1)[1]
     review=args[:1]==["--next-admission"]
     if review:
-        s.need(not (HOURLY169 or HOURLY170 or FULL170), "use the dedicated actor complete quote directly")
+        s.need(not (HOURLY169 or HOURLY170 or FULL170 or REPRO166), "use the dedicated actor complete quote directly")
         args=args[1:]
     s.need(len(args)==3,"usage: post-stop-fit [--next-admission] EPOCH FLEET_ABSOLUTE_PATH FLEET_SHA256")
     signal.alarm(142)
@@ -1735,7 +1777,7 @@ if __name__=="__main__":
         runpy.run_path(str(HERE / "run-recovery"))["check_quote_parent"](ref)
     handback = semantic136_post_window() if launching_post else None
     try:
-        result=capture(int(args[0]),ref,hourly170_mode=hourly170_mode,full170_mode=full170_mode)
+        result=capture(int(args[0]),ref,hourly170_mode=hourly170_mode,full170_mode=full170_mode,repro166_mode=repro166_mode)
     except PublicReaderTurnover as error:
         print(error, file=sys.stderr)
         sys.exit(os.EX_TEMPFAIL)
