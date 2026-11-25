@@ -45,6 +45,11 @@ EXTRACT226_BROKER = 'foundation-226-original225-broker-v2.service'
 EXTRACT226_STATE = V / 'horizon226-extract-v2'
 SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
 SUFFIX226_STATE = V / 'horizon226-suffix-v1'
+CONTINUATION230_UNIT = 'horizon-qualify-230-checkpoint-continuation-fit-v1.service'
+CONTINUATION230_STATE = V / 'horizon230-checkpoint-continuation-fit-v1'
+CONTINUATION230_TMPFS = Path('/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1')
+CONTINUATION230_RAM_CAP = 150_000_000_000
+CONTINUATION230_TMPFS_FLOOR = 2 << 30
 GUARDS = {
     226: V / 'horizon226-extract-v2/guard-receipts',
     229: V / 'horizon229-trace-ram-v325/guard-receipts',
@@ -257,6 +262,8 @@ def capacity(kit, candidate_epoch=288):
         affinity, = [line.split('=', 1)[1] for line in template if line.startswith('AllowedCPUs=')]
         candidate_memory = int(memory)
         candidate_cpus = kit.measure.source.helper.cpus(affinity)
+    elif candidate_epoch == 230:
+        candidate_disk, candidate_memory, candidate_cpus = 0, MEMORY, frozenset(range(72, 80))
     else:
         candidate_disk, candidate_memory, candidate_cpus = CAP, MEMORY, CPUS
     completion, fleet_ref, fleet = latest_accepted_fleet(kit)
@@ -283,6 +290,8 @@ def capacity(kit, candidate_epoch=288):
             guard_paths[epoch] = BANK_DELTA229_GUARDS
         elif producer['Id'] == SUFFIX226_UNIT:
             guard_paths[epoch] = SUFFIX226_STATE / 'guard-receipts'
+        elif producer['Id'] == CONTINUATION230_UNIT:
+            guard_paths[epoch] = CONTINUATION230_STATE / 'guard-receipts'
         else:
             guard_paths[epoch] = GUARDS[epoch]
         growth[epoch] = kit.measure.source.growth_for(epoch, owner, guard_paths[epoch])
@@ -323,7 +332,7 @@ def capacity(kit, candidate_epoch=288):
         retired = read(retirement['check'])
         assert retirement['retirement_complete'] and retirement['end'] == retired['matching_files'] == 322833
         assert retired['matching_allocated_bytes'] == 51_918_905_344 and retired['protected_files'] == 7757
-    return dict(epoch=candidate_epoch, fleet=fleet_ref, completion=completion, sampled_unix_seconds=int(time.time()),
+    result = dict(epoch=candidate_epoch, fleet=fleet_ref, completion=completion, sampled_unix_seconds=int(time.time()),
                 live_units=owners, broker=broker, guards=growth, free_bytes=free, protected_disk_bytes=protected,
                 reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref, extraction226_terminal=terminal226,
                 guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=candidate_disk,
@@ -331,6 +340,14 @@ def capacity(kit, candidate_epoch=288):
                 disk_shortfall_bytes=max(0, protected + candidate_disk - free),
                 memory_shortfall_bytes=max(0, candidate_memory - memory_room),
                 publication_authorized=False)
+    if candidate_epoch == 230:
+        assert CONTINUATION230_TMPFS.is_mount() and CONTINUATION230_TMPFS.stat().st_dev != root_device
+        mount = os.statvfs(CONTINUATION230_TMPFS)
+        tmpfs_available_bytes = mount.f_bavail * mount.f_frsize
+        result.update(tmpfs_available_bytes=tmpfs_available_bytes, candidate_ram_cap_bytes=CONTINUATION230_RAM_CAP,
+                      tmpfs_shortfall_bytes=max(0, CONTINUATION230_RAM_CAP + CONTINUATION230_TMPFS_FLOOR
+                                                - tmpfs_available_bytes))
+    return result
 
 
 def cadence_changes():
@@ -590,7 +607,8 @@ def guarded_start(kit, profile_ref, fit, inventory, deployment):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'prepare', 'launch'))
+    parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'capacity-continuation230',
+                                          'prepare', 'launch'))
     parser.add_argument('reference', nargs='?')
     parser.add_argument('sha256', nargs='?')
     options = parser.parse_args()
@@ -600,6 +618,9 @@ def main():
         return
     if options.action == 'capacity-suffix226':
         print(json.dumps(capacity(load_existing(), candidate_epoch=226)))
+        return
+    if options.action == 'capacity-continuation230':
+        print(json.dumps(capacity(load_existing(), candidate_epoch=230)))
         return
     if options.action in ('prepare', 'launch'):
         kit = load_existing()

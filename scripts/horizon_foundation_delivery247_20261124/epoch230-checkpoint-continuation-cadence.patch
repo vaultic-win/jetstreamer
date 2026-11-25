@@ -1,0 +1,20 @@
+--- cycle.py
++++ cycle.py
+@@ -119,0 +120 @@
++import diagnostic230_checkpoint_continuation
+@@ -283,0 +285 @@
++cfg['diagnostic_replays'] += diagnostic230_checkpoint_continuation.configuration()
+@@ -699,0 +702,3 @@
++    continuation_image = diagnostic230_checkpoint_continuation.register(plan)
++    if continuation_image is not None:
++        fleet_image = Path(publication_handoff.checked_image(continuation_image))
+@@ -722 +727 @@
+-                and not diagnostic226_suffix.owns(r)]
++                and not diagnostic226_suffix.owns(r) and not diagnostic230_checkpoint_continuation.owns(r)]
+--- native_binding_replays.py
++++ native_binding_replays.py
+@@ -38,0 +39 @@
++import diagnostic230_checkpoint_continuation
+@@ -42 +43 @@
+-diagnostic_handlers = (diagnostic229, diagnostic229_bounded, diagnostic229_bounded_retry, diagnostic271_trace, diagnostic271_europe, diagnostic271_boundary, diagnostic271_reward_tuples, diagnostic271_stake_inputs, diagnostic230_slot_hashes, diagnostic230_bank_trace, diagnostic229_slot_hash_ram, diagnostic230_program_demotion_ram, diagnostic229_bank_delta, diagnostic226_suffix)
++diagnostic_handlers = (diagnostic229, diagnostic229_bounded, diagnostic229_bounded_retry, diagnostic271_trace, diagnostic271_europe, diagnostic271_boundary, diagnostic271_reward_tuples, diagnostic271_stake_inputs, diagnostic230_slot_hashes, diagnostic230_bank_trace, diagnostic229_slot_hash_ram, diagnostic230_program_demotion_ram, diagnostic230_checkpoint_continuation, diagnostic229_bank_delta, diagnostic226_suffix)
