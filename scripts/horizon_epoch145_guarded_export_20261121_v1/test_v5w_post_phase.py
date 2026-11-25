@@ -83,6 +83,12 @@ class V5wPostPhase(unittest.TestCase):
             "v5y-name-handoff/V5Y_TERMINAL_FAILURE_RECEIPT_MODE.json",
         )
 
+    def test_v6_post_binds_the_exact_guard_walk_successor(self):
+        self.check_successor(
+            "v6-guard-walk", "horizon-epoch145-v5z-custody-successor-semantic-completion-v1",
+            "v5z-name-handoff/V5Z_TERMINAL_FAILURE_GUARD_WALK.json",
+        )
+
     def check_successor(self, generation, schema, predecessor_path):
         root = Path("/private/runtime")
         family = root / "epoch145-semantic-continuity-20261121-v1"
@@ -128,7 +134,9 @@ class V5wPostPhase(unittest.TestCase):
         status = SimpleNamespace(read=lambda path:(records[path],ref(path)), need=need, bound=bound,
                                  iid=lambda value:value == actor)
         md = SimpleNamespace(st_uid=0,st_gid=0,st_nlink=1,st_mode=stat.S_IFREG|0o444,st_size=1)
-        with patch.dict(scope, ROOT=root, STATE=state, V5Z_POST=generation == "v5z"), \
+        v6 = generation == "v6-guard-walk"
+        with patch.dict(scope, ROOT=root, STATE=state, V5Z_POST=generation != "v5x", V6_POST=v6,
+                        V6_INVOCATION=actor, V6_START_SHA=expected_hash, V6_SEAL_SHA=expected_hash), \
              patch.object(Path,"lstat",return_value=md), \
              patch.object(Path,"resolve",autospec=True,side_effect=lambda p,**_:p), \
              patch.object(Path,"read_bytes",return_value=b"sealed tool"), \
@@ -136,6 +144,10 @@ class V5wPostPhase(unittest.TestCase):
              patch.object(scope["subprocess"],"check_output",return_value=json.dumps(result)) as checked:
             self.assertEqual(phase["v5x_completion"](status),(ref(done),extracted))
             self.assertEqual(checked.call_args.args[0][-2:], [str(start),expected_hash])
+            if v6:
+                with patch.dict(scope, V6_START_SHA="0" * 64):
+                    with self.assertRaisesRegex(ValueError, "different authenticated V6"):
+                        phase["v5x_completion"](status)
             wrong = dict(result,schema="horizon-epoch145-v5w-donor-successor-semantic-completion-v1")
             records[captured] = wrong
             checked.return_value = json.dumps(wrong)

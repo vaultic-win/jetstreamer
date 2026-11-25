@@ -338,8 +338,9 @@ def drained145(s, fit, root):
     manager = s.show(fit.A145)
     prior = '97bd2045ebe449e3ae77330c7e4ec7b4'
     family = root / 'epoch145-semantic-continuity-20261121-v1'
-    alternatives = [generation for generation in ('v5x', 'v5z')
-                    if (family / f'{generation}-name-handoff/SEMANTIC_COMPLETION.json').is_file()]
+    handoffs = {'v5x': 'v5x', 'v5z': 'v5z', 'v6': 'v6-guard-walk'}
+    alternatives = [generation for generation, handoff in handoffs.items()
+                    if (family / f'{handoff}-name-handoff/SEMANTIC_COMPLETION.json').is_file()]
     s.need(len(alternatives) <= 1, 'multiple epoch 145 successor completion claims')
     generation = alternatives[0] if alternatives else 'v5w'
     successor_generation = bool(alternatives)
@@ -351,10 +352,10 @@ def drained145(s, fit, root):
            and (successor_generation or manager['InvocationID'] in ('', prior)) and not manager['ControlGroup']
            and not manager['Job'] and not fit.members(fit.A145) and not cgroup.exists(),
            'epoch 145 semantic owner has not drained')
-    if generation == 'v5z':
+    if generation in ('v5z', 'v6'):
         # The sealed build provider already runs the exact V5z completion
         # reader. Epoch 170 does not consume the later archive delivery binary.
-        package = root / 'incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5z-build-v1'
+        package = root / f'incident-replay-fit-20261121-v1/tools-homefloor-145-post-{generation}-build-v1'
     else:
         package = family / {'v5w': 'tools-v13o', 'v5x': 'tools-v13p'}[generation]
     checker = package / 'incident-post-phase.py'
@@ -374,6 +375,8 @@ def drained145(s, fit, root):
     readers = runpy.run_path(str(checker))
     if generation == 'v5z':
         s.need(readers['V5Z_POST'], 'the sealed adapter does not read V5z completion')
+    if generation == 'v6':
+        s.need(readers['V6_POST'], 'the sealed adapter does not read V6 completion')
     complete, _ = readers['v5x_completion' if successor_generation else 'v5w_completion'](s)
     if successor_generation:
         successor = Path(complete['path']).parent.name

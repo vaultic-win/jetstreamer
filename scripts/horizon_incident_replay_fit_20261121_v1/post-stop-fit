@@ -59,7 +59,8 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
 FULL170 = HERE == D / "tools-homefloor-170-full-metered-v1"
 REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
 REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v1"
-REPRO166_POST = REPRO166_POST_V5Z or HERE == D / "tools-homefloor-166-write-version-post145-v1"
+REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
+REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
 V6_145 = HERE == D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
 V5Z_145 = HERE == D / "tools-homefloor-145-v5y-custody-recovery-v1" or V6_145
@@ -72,9 +73,10 @@ V5Y_BUILD_145 = HERE == D / "tools-homefloor-145-v5x-schema-build-v1"
 V5X_145 = HERE == D / "tools-homefloor-145-v5w-donor-recovery-v1"
 V5X_BUILD_145 = HERE == D / "tools-homefloor-145-v5w-donor-build-v1"
 V5W_RECOVERY_145 = V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145 or REPRO166_LIVE or FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
-V5Z_POST_145 = HERE == D / "tools-homefloor-145-post-v5z-current-v1"
+V5Z_POST_145 = HERE in (D / "tools-homefloor-145-post-v5z-current-v1", D / "tools-homefloor-145-post-v6-current-v1")
 CURRENT_HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v2"
-V5Z_POST_BUILD_145 = CURRENT_HOURLY169 or HERE == D / "tools-homefloor-145-post-v5z-build-v1"
+V6_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v6-build-v1"
+V5Z_POST_BUILD_145 = CURRENT_HOURLY169 or V6_POST_BUILD_145 or HERE == D / "tools-homefloor-145-post-v5z-build-v1"
 V5X_POST_145 = V5Z_POST_145 or HERE == D / "tools-homefloor-145-post-v5x-current-v1"
 V5W_POST_145 = V5X_POST_145 or V5Z_POST_BUILD_145 or REPRO166_POST or HERE == D / "tools-homefloor-145-post-v5w-current-v1"
 V5V_RECOVERY_145 = V5W_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
@@ -144,7 +146,7 @@ if FULL170:
     loader["load_package"](observation,"7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e")
     sys.path.insert(0, str(observation))
     full170 = runpy.run_path(str(HERE / "full170_status.py"))
-if FULL170 or REPRO166_LIVE or REPRO166_POST_V5Z:
+if FULL170 or REPRO166_LIVE or REPRO166_POST_V5Z or REPRO166_POST_V6:
     adapter = HERE / "full170_capacity.py"
     seal, _ = s.read(HERE / "deployment-seal-receipt.json")
     member, = [row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444"]
@@ -676,6 +678,14 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch, fleet=None):
+    if REPRO166_POST_V6:
+        s.need(epoch == 145 and fleet is not None, "epoch 166 requires an accepted fleet")
+        phase = full170_capacity["drained145"](s, fit, R)
+        s.need(phase["stage"] == "v6-semantic-complete-drained"
+               and phase["completed_invocation_id"] == "a71285e56d674de3bf793692f93dfbb3"
+               and phase["checker_seal"]["path"] == str(D / "tools-homefloor-145-post-v6-build-v1/deployment-seal-receipt.json"),
+               "epoch 166 requires the exact drained V6 verifier and sealed completion reader")
+        return phase
     if REPRO166_POST_V5Z:
         s.need(epoch == 145 and fleet is not None, "epoch 166 requires an accepted fleet")
         phase = full170_capacity["drained145"](s, fit, R)
@@ -694,23 +704,32 @@ def phase145(epoch, fleet=None):
                and not any(manager[key] for key in ("Job", "ControlGroup", "TriggeredBy"))
                and not fit.members(fit.A145) and not group.exists(),
                "the epoch 145 verifier still owns the post build slot")
-        package = D / "tools-homefloor-145-post-v5z-build-v1" if CURRENT_HOURLY169 else HERE
-        authority = "8e48c19a738a9ff4586c10fd4c7581b5c2a01133b5de5edbae8b7e26e241d4ea" if CURRENT_HOURLY169 else None
-        seal, _ = s.read(package / "deployment-seal-receipt.json", authority)
+        v6 = V6_POST_BUILD_145 or (CURRENT_HOURLY169 and
+            (R / "epoch145-semantic-continuity-20261121-v1/v6-guard-walk-name-handoff/SEMANTIC_COMPLETION.json").is_file())
+        if CURRENT_HOURLY169:
+            package = D / ("tools-homefloor-145-post-v6-build-v1" if v6 else "tools-homefloor-145-post-v5z-build-v1")
+        else:
+            package = HERE
+        authority = ("8e48c19a738a9ff4586c10fd4c7581b5c2a01133b5de5edbae8b7e26e241d4ea"
+                     if CURRENT_HOURLY169 and not v6 else None)
+        seal, seal_ref = s.read(package / "deployment-seal-receipt.json", authority)
         adapter = package / "incident-post-phase.py"
         member, = (row for row in seal["members"] if row["name"] == adapter.name and row["mode"] == "0444")
         s.need(seal["destination"] == str(package), "foreign epoch 145 post build provider")
         fit.binary(adapter, member["sha256"])
         adapter_scope = runpy.run_path(str(adapter))
-        s.need(adapter_scope["V5Z_POST"], "the post build must authenticate V5z completion")
+        s.need(adapter_scope["V6_POST" if v6 else "V5Z_POST"], "the post build must authenticate the semantic owner")
         complete, _ = adapter_scope["v5x_completion"](s)
         owner = Path(complete["path"]).parent.name
         s.need(s.iid(owner) and manager["InvocationID"] in ("", owner)
                and Path(complete["path"]) == R / "epoch145-guarded-export-20261121-v1/state" / owner / "complete.json"
                and s.show(fit.A145) == manager and not fit.members(fit.A145) and not group.exists(),
                "the successful epoch 145 owner changed during post build admission")
-        return {"Id": fit.A145, "MainPID": "0", "stage": "v5z-semantic-complete-drained",
-                "completed_invocation_id": owner, "completion": complete}
+        phase = {"Id": fit.A145, "MainPID": "0", "stage": f"{'v6' if v6 else 'v5z'}-semantic-complete-drained",
+                 "completed_invocation_id": owner, "completion": complete}
+        if v6:
+            phase["checker_seal"] = seal_ref
+        return phase
     if V5Z_BUILD_145 or V5Y_BUILD_145:
         s.need(epoch == 145 and fleet is not None and not fit.members(fit.A145),
                "V5y build cannot price an occupied verifier")
@@ -733,7 +752,7 @@ def phase145(epoch, fleet=None):
         return runpy.run_path(str(adapter))["v5w_stopped_phase"](s, fit, {"guard_terminal": terminal})
     if FULL170 and not fit.members(fit.A145) and any(
         (R / "epoch145-semantic-continuity-20261121-v1" / generation / "SEMANTIC_COMPLETION.json").is_file()
-        for generation in ("v5w-name-handoff", "v5x-name-handoff", "v5z-name-handoff")
+        for generation in ("v5w-name-handoff", "v5x-name-handoff", "v5z-name-handoff", "v6-guard-walk-name-handoff")
     ):
         return full170_capacity["drained145"](s, fit, R)
     if V5V_RECOVERY_145 and not fit.members(fit.A145):
@@ -1414,7 +1433,8 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         s.need(epoch == 145 and prestart136 is None and failed170,
                "full epoch 170 requires the exact retained retry13 terminal")
         if full170_mode != "prestart":
-            s.need(phase["stage"] in ("v5w-semantic-complete-drained", "v5x-semantic-complete-drained", "v5z-semantic-complete-drained"),
+            s.need(phase["stage"] in ("v5w-semantic-complete-drained", "v5x-semantic-complete-drained",
+                                     "v5z-semantic-complete-drained", "v6-semantic-complete-drained"),
                    "held or active full epoch 170 requires authenticated drained V5w")
         hourly170_owner, full170_guard = full170_capacity["ownership"](s, fit, full170, hourly170,
                                                                        full170_mode, ref, status, f)
