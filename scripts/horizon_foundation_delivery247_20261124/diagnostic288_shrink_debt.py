@@ -62,12 +62,10 @@ def gate(plan):
     diagnostics = plan.setdefault('diagnostics', [])
     previous = [row for row in diagnostics if row['unit'] == UNIT]
     assert not previous or previous == [diagnostic]
-    if not previous:
-        diagnostics.append(diagnostic)
     epoch = plan['gates']['288']
     if source not in epoch['evidence']:
         epoch['evidence'].append(source)
-    epoch['next_action'] = 'Measure storage across slot 124429562 and verify the canonical checkpoint at slot 124435861.'
+    replacement = 'horizon-qualify-288-root-shrink-debt-v1.service' in plan['tracked_units']
     terminal = PACKAGE / 'terminal.json'
     if terminal.is_file():
         terminal_ref = ref(terminal)
@@ -75,7 +73,19 @@ def gate(plan):
         assert result['registration'] == source and not result['publication_authorized']
         if terminal_ref not in epoch['evidence']:
             epoch['evidence'].append(terminal_ref)
+        if replacement:
+            assert result['candidate_terminal_checkpoint_passed']
+            assert result['manager']['INVOCATION_ID'] == record['invocation_id']
+            live = props(UNIT, FIELDS)
+            assert live['ActiveState'] == 'inactive' and live['MainPID'] == '0' and not live['ControlGroup']
+            diagnostics[:] = [row for row in diagnostics if row['unit'] != UNIT]
+            return
         epoch['next_action'] = result['next_action']
+    else:
+        assert not replacement
+        epoch['next_action'] = 'Measure storage across slot 124429562 and verify the canonical checkpoint at slot 124435861.'
+    if not previous:
+        diagnostics.append(diagnostic)
 
 
 def owns(row):
