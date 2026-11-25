@@ -16,7 +16,7 @@
 -    assert {r['range'] for r in rows} == {f'{e}-{e}' for e in expected} and len(rows)==len(expected)
 +    # This sealed observation has the old default display label. The native
 +    # memory join still requires its actual publisher, cgroup and mapped binary.
-+    wrong257_label = n == 335 and ref(obs)['sha256'] == '3e9646388780c95dd70b095b9b1b7d5567b9183f3ecba7900ac6cae0781808bd'
++    wrong257_label = obs == samplepath(335) and ref(obs)['sha256'] == '3e9646388780c95dd70b095b9b1b7d5567b9183f3ecba7900ac6cae0781808bd'
 +    ranges = []
 +    for row in rows:
 +        name = row['range']
