@@ -5,7 +5,7 @@ use horizon_singleton211_launch::foundation_holding_capacity as capacity;
 #[path = "holding_foundation_appendvec292_ram.rs"]
 mod ram;
 #[path = "holding_foundation_appendvec292_tree.rs"]
-mod tree;
+pub(super) mod tree;
 
 const PARK: &str = "holding-foundation-292-appendvec-park";
 const ADMIT: &str = "holding-foundation-292-appendvec-admit-restore";

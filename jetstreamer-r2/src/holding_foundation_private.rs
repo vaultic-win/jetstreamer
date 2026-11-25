@@ -3,6 +3,8 @@
 use super::*;
 use jetstreamer_horizon_observe::foundation_holding213_review as host;
 use std::os::fd::AsRawFd;
+#[path = "holding_foundation_appendvec288.rs"]
+mod appendvec288;
 #[path = "holding_foundation_appendvec292.rs"]
 mod appendvec292;
 #[path = "holding_foundation_ext4_228.rs"]
@@ -1008,7 +1010,7 @@ async fn restore(client: &Client, p: RestoreSpec, spec: &Bound) -> Result<()> {
 }
 
 pub(super) fn command(s: &str) -> bool {
-    ext4_228::command(s) || appendvec292::command(s) || matches!(
+    ext4_228::command(s) || appendvec288::command(s) || appendvec292::command(s) || matches!(
         s,
         "holding-foundation-private-inspect"
             | "holding-foundation-private-inspect-old-v2-237"
@@ -1055,6 +1057,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     );
     if appendvec292::command(action) {
         return appendvec292::run(action, v, spec).await;
+    }
+    if appendvec288::command(action) {
+        return appendvec288::run(action, v, spec).await;
     }
     if ext4_228::command(action) {
         return ext4_228::run(action, v, spec).await;

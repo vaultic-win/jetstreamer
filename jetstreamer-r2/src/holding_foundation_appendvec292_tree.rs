@@ -7,9 +7,9 @@ use std::{
     process::{Command, Stdio},
 };
 
-const TAR: &str = "/usr/bin/tar";
+pub(crate) const TAR: &str = "/usr/bin/tar";
 const TAR_SHA: &str = "6ab7a3e80cfd4ab35650bf11f48b662f616cd622c1f67d367d0341bc2f9c2245";
-const ZSTD: &str = "/usr/bin/zstd";
+pub(crate) const ZSTD: &str = "/usr/bin/zstd";
 const ZSTD_SHA: &str = "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6";
 
 #[derive(Deserialize)]
@@ -21,7 +21,7 @@ struct Plan {
     restoration: Bound,
 }
 
-pub(super) fn require_read_only(path: &Path) -> Result<()> {
+pub(crate) fn require_read_only(path: &Path) -> Result<()> {
     ensure!(path.canonicalize()? == path, "aliased tree or bundle");
     let path = CString::new(path.as_os_str().as_encoded_bytes())?;
     let mut value = std::mem::MaybeUninit::<libc::statvfs>::uninit();
@@ -157,7 +157,7 @@ fn compare_census(root: &Path, expected: &Value) -> Result<()> {
     Ok(())
 }
 
-fn compare_payload(bundle: &Path, source: &Path, expected: FileIdentity) -> Result<()> {
+pub(crate) fn verify_tools() -> Result<()> {
     for (path, sha) in [(TAR, TAR_SHA), (ZSTD, ZSTD_SHA)] {
         ensure!(
             hex_lower(&Sha256::digest(read_stable_bounded(
@@ -168,6 +168,11 @@ fn compare_payload(bundle: &Path, source: &Path, expected: FileIdentity) -> Resu
             "292 sparse restore tool changed at {path}"
         );
     }
+    Ok(())
+}
+
+fn compare_payload(bundle: &Path, source: &Path, expected: FileIdentity) -> Result<()> {
+    verify_tools()?;
     let bundle = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
