@@ -338,25 +338,28 @@ def drained145(s, fit, root):
     manager = s.show(fit.A145)
     prior = '97bd2045ebe449e3ae77330c7e4ec7b4'
     family = root / 'epoch145-semantic-continuity-20261121-v1'
-    v5x_handoff = family / 'v5x-name-handoff/SEMANTIC_COMPLETION.json'
-    v5x = v5x_handoff.is_file()
+    alternatives = [generation for generation in ('v5x', 'v5z')
+                    if (family / f'{generation}-name-handoff/SEMANTIC_COMPLETION.json').is_file()]
+    s.need(len(alternatives) <= 1, 'multiple epoch 145 successor completion claims')
+    generation = alternatives[0] if alternatives else 'v5w'
+    successor_generation = bool(alternatives)
     cgroup = Path('/sys/fs/cgroup/system.slice') / fit.A145
     s.need(manager['Id'] == fit.A145 and manager['ActiveState'] == 'inactive'
            and manager['SubState'] == 'dead' and manager['LoadState'] in ('loaded', 'not-found')
            and manager.get('Result', 'success') == 'success'
            and manager['MainPID'] == manager['ControlPID'] == '0'
-           and (v5x or manager['InvocationID'] in ('', prior)) and not manager['ControlGroup']
+           and (successor_generation or manager['InvocationID'] in ('', prior)) and not manager['ControlGroup']
            and not manager['Job'] and not fit.members(fit.A145) and not cgroup.exists(),
            'epoch 145 semantic owner has not drained')
-    package = family / ('tools-v13p' if v5x else 'tools-v13o')
+    package = family / {'v5w': 'tools-v13o', 'v5x': 'tools-v13p', 'v5z': 'tools-v13q'}[generation]
     checker = package / 'incident-post-phase.py'
     seal, seal_ref = s.read(package / 'deployment-seal-receipt.json',
-                            None if v5x else '5e297cce79ec8adb123ae4eb43f5f98a582cb469397db92de399fef262508ee3')
+                            None if successor_generation else '5e297cce79ec8adb123ae4eb43f5f98a582cb469397db92de399fef262508ee3')
     entry, = (m for m in seal['members'] if m['name'] == checker.name and m['mode'] == '0444')
     s.need(seal['destination'] == str(package) and (
-           v5x or entry['sha256'] == 'c5cce42fce69856c5f0be82d4bc0a622889ab18c48e587e724430024bfa74a9a'),
+           successor_generation or entry['sha256'] == 'c5cce42fce69856c5f0be82d4bc0a622889ab18c48e587e724430024bfa74a9a'),
            'foreign epoch 145 semantic completion checker')
-    if v5x:
+    if successor_generation:
         s.need(seal['schema'] == 'jetstreamer-sealed-deployment-receipt-v1'
                and seal['sealer_sha256'] == 'e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3'
                and seal['remote_mutations'] is seal['r2_mutations'] is False,
@@ -364,8 +367,8 @@ def drained145(s, fit, root):
     fit.binary(checker, entry['sha256'])
     import runpy
     readers = runpy.run_path(str(checker))
-    complete, _ = readers['v5x_completion' if v5x else 'v5w_completion'](s)
-    if v5x:
+    complete, _ = readers['v5x_completion' if successor_generation else 'v5w_completion'](s)
+    if successor_generation:
         successor = Path(complete['path']).parent.name
         s.need(s.iid(successor) and successor != prior and manager['InvocationID'] in ('', successor)
                and Path(complete['path']) == root / 'epoch145-guarded-export-20261121-v1/state' / successor / 'complete.json',
@@ -375,7 +378,7 @@ def drained145(s, fit, root):
     s.need(all(manager.get(key) == observed.get(key) for key in fields)
            and not fit.members(fit.A145) and not cgroup.exists(),
            'epoch 145 changed during the semantic handoff')
-    return dict(Id=fit.A145, MainPID='0', stage='v5x-semantic-complete-drained' if v5x else 'v5w-semantic-complete-drained',
+    return dict(Id=fit.A145, MainPID='0', stage=f'{generation}-semantic-complete-drained',
                 completed_invocation_id=prior, completion=complete, checker_seal=seal_ref)
 
 

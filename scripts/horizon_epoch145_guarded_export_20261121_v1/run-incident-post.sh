@@ -17,6 +17,7 @@ case "$(dirname "$(realpath -e -- "$0")")" in
     "${pkg%/*}/tools-v13n") pkg="${pkg%/*}/tools-v13n" ;;
     "${pkg%/*}/tools-v13o") pkg="${pkg%/*}/tools-v13o" ;;
     "${pkg%/*}/tools-v13p") pkg="${pkg%/*}/tools-v13p" ;;
+    "${pkg%/*}/tools-v13q") pkg="${pkg%/*}/tools-v13q" ;;
     "${pkg%/*}/tools-v13g") pkg="${pkg%/*}/tools-v13g" ;;
     "${pkg%/*}/tools-v13f") pkg="${pkg%/*}/tools-v13f" ;;
     "${pkg%/*}/tools-v13e") pkg="${pkg%/*}/tools-v13e" ;;
@@ -54,7 +55,7 @@ publish)
     ;;
 *) exit 2 ;;
 esac
-if [[ $pkg == */tools-v13d || $pkg == */tools-v13e || $pkg == */tools-v13f || $pkg == */tools-v13g || $pkg == */tools-v13h || $pkg == */tools-v13i || $pkg == */tools-v13j || $pkg == */tools-v13k || $pkg == */tools-v13l || $pkg == */tools-v13m || $pkg == */tools-v13n || $pkg == */tools-v13o || $pkg == */tools-v13p ]]; then
+if [[ $pkg == */tools-v13d || $pkg == */tools-v13e || $pkg == */tools-v13f || $pkg == */tools-v13g || $pkg == */tools-v13h || $pkg == */tools-v13i || $pkg == */tools-v13j || $pkg == */tools-v13k || $pkg == */tools-v13l || $pkg == */tools-v13m || $pkg == */tools-v13n || $pkg == */tools-v13o || $pkg == */tools-v13p || $pkg == */tools-v13q ]]; then
     version=v1
     if [[ $pkg == */tools-v13e ]]; then version=v2; fi
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5j-$version/post-stop-fit
@@ -88,6 +89,9 @@ if [[ $pkg == */tools-v13d || $pkg == */tools-v13e || $pkg == */tools-v13f || $p
     fi
     if [[ $pkg == */tools-v13p ]]; then
         provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5x-current-v1/post-stop-fit
+    fi
+    if [[ $pkg == */tools-v13q ]]; then
+        provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5z-current-v1/post-stop-fit
     fi
     if [[ $pkg == */tools-v13g ]]; then provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5m-v1/post-stop-fit; fi
     "$provider" "${provider_args[@]}" 145 "$fleet" "$fleet_sha" | /usr/bin/jq -e --arg f "$fleet" --arg h "$fleet_sha" '

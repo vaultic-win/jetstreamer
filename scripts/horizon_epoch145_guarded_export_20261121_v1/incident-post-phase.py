@@ -12,7 +12,8 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-V5X_POST = VERSION == "tools-v13p"
+V5Z_POST = VERSION == "tools-v13q"
+V5X_POST = VERSION == "tools-v13p" or V5Z_POST
 V5W_POST = VERSION == "tools-v13o" or V5X_POST
 V5U_POST = VERSION in ("tools-v13m", "tools-v13n") or V5W_POST
 ENCODED_POST = VERSION == "tools-v13l"
@@ -183,8 +184,11 @@ def v5w_completion(s):
 
 
 def v5x_completion(s):
-    authority = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v5x"
-    handoff = authority.parent / "v5x-name-handoff"
+    generation = "v5z" if V5Z_POST else "v5x"
+    authority = ROOT / "epoch145-semantic-continuity-20261121-v1" / ("tools-" + generation)
+    handoff = authority.parent / (generation + "-name-handoff")
+    schema = ("horizon-epoch145-v5z-custody-successor-semantic-completion-v1" if V5Z_POST
+              else "horizon-epoch145-v5x-donor-successor-semantic-completion-v1")
     tool = authority / "v5v_semantic_completion.py"
     seal, seal_ref = s.read(authority / "deployment-seal-receipt.json")
     build, build_ref = s.read(authority / "build-proof.json")
@@ -208,7 +212,7 @@ def v5x_completion(s):
     actor = selected["invocation_id"]
     startup = selected["startup_evidence"]
     s.need(selected == captured and s.iid(actor) and actor != "97bd2045ebe449e3ae77330c7e4ec7b4"
-           and selected["schema"] == "horizon-epoch145-v5x-donor-successor-semantic-completion-v1"
+           and selected["schema"] == schema
            and startup["invocation_id"] == actor and startup["submission_result"] == start_ref
            and startup["worker_build"] == build_ref and startup["worker_seal"] == seal_ref
            and startup["predecessor_terminal"] == build["guard_terminal"]

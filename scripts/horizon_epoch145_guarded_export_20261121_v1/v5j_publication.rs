@@ -219,6 +219,9 @@ fn v5w_semantic_owner(export: &str) -> Result<()> {
     terminal(export)
 }
 
+#[cfg(all(incident_v5z_post145_only, not(incident_v5x_post145_only)))]
+compile_error!("the V5z post verifier requires the sealed successor reader");
+
 #[cfg(incident_v5x_post145_only)]
 fn v5x_semantic_owner(export: &str) -> Result<()> {
     ensure!(
@@ -226,7 +229,12 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
         "foreign V5x semantic export"
     );
     let family = Path::new(RUNTIME).join("epoch145-semantic-continuity-20261121-v1");
-    let authority = family.join("tools-v5x");
+    let (generation, schema) = if cfg!(incident_v5z_post145_only) {
+        ("v5z", "horizon-epoch145-v5z-custody-successor-semantic-completion-v1")
+    } else {
+        ("v5x", "horizon-epoch145-v5x-donor-successor-semantic-completion-v1")
+    };
+    let authority = family.join(format!("tools-{generation}"));
     let helper = authority.join("v5v_semantic_completion.py");
     let (seal_ref, seal) =
         publication::frozen_json(&authority.join("deployment-seal-receipt.json"))?;
@@ -260,7 +268,7 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
         "foreign V5x semantic package"
     );
     custody::bytes(&binding, 128 << 10, true)?;
-    let handoff = family.join("v5x-name-handoff");
+    let handoff = family.join(format!("{generation}-name-handoff"));
     let (start, _) = publication::frozen_json(&handoff.join("START_RESULT.json"))?;
     let report = capacity::run(
         "/usr/bin/python3",
@@ -276,7 +284,7 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
     let (_, captured) = publication::frozen_json(&handoff.join("SEMANTIC_COMPLETION.json"))?;
     ensure!(
         result == captured
-            && result["schema"] == "horizon-epoch145-v5x-donor-successor-semantic-completion-v1"
+            && result["schema"] == schema
             && result["invocation_id"] == export
             && result["publication_authorized"] == false
             && result["r2_mutations"] == false

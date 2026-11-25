@@ -72,10 +72,22 @@ class V5wPostPhase(unittest.TestCase):
                 route(status)
 
     def test_v5x_post_uses_the_successor_receipt_schema_and_start(self):
+        self.check_successor(
+            "v5x", "horizon-epoch145-v5x-donor-successor-semantic-completion-v1",
+            "v5w-name-handoff/V5W_TERMINAL_FAILURE_DONOR.json",
+        )
+
+    def test_v5z_post_uses_the_custody_successor_start(self):
+        self.check_successor(
+            "v5z", "horizon-epoch145-v5z-custody-successor-semantic-completion-v1",
+            "v5y-name-handoff/V5Y_TERMINAL_FAILURE_RECEIPT_MODE.json",
+        )
+
+    def check_successor(self, generation, schema, predecessor_path):
         root = Path("/private/runtime")
         family = root / "epoch145-semantic-continuity-20261121-v1"
-        authority = family / "tools-v5x"
-        handoff = family / "v5x-name-handoff"
+        authority = family / f"tools-{generation}"
+        handoff = family / f"{generation}-name-handoff"
         actor = "a" * 32
         state = root / "state"
         helper = authority / "v5v_semantic_completion.py"
@@ -88,8 +100,8 @@ class V5wPostPhase(unittest.TestCase):
         def ref(path):
             return {"path": str(path), "sha256": expected_hash}
 
-        predecessor = ref(family / "v5w-name-handoff/V5W_TERMINAL_FAILURE_DONOR.json")
-        result = {"schema":"horizon-epoch145-v5x-donor-successor-semantic-completion-v1",
+        predecessor = ref(family / predecessor_path)
+        result = {"schema":schema,
                   "invocation_id":actor, "completion":ref(done), "extraction":ref(extraction),
                   "startup_evidence":{"invocation_id":actor,"submission_result":ref(start),
                                       "worker_build":ref(build),"worker_seal":ref(sealed),
@@ -116,7 +128,8 @@ class V5wPostPhase(unittest.TestCase):
         status = SimpleNamespace(read=lambda path:(records[path],ref(path)), need=need, bound=bound,
                                  iid=lambda value:value == actor)
         md = SimpleNamespace(st_uid=0,st_gid=0,st_nlink=1,st_mode=stat.S_IFREG|0o444,st_size=1)
-        with patch.dict(scope, ROOT=root,STATE=state), patch.object(Path,"lstat",return_value=md), \
+        with patch.dict(scope, ROOT=root, STATE=state, V5Z_POST=generation == "v5z"), \
+             patch.object(Path,"lstat",return_value=md), \
              patch.object(Path,"resolve",autospec=True,side_effect=lambda p,**_:p), \
              patch.object(Path,"read_bytes",return_value=b"sealed tool"), \
              patch.object(hashlib,"sha256",return_value=SimpleNamespace(hexdigest=lambda:expected_hash)), \
