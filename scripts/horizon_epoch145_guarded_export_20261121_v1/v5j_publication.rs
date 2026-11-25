@@ -183,7 +183,7 @@ fn v5u_semantic_owner(export: &str) -> Result<()> {
     terminal(export)
 }
 
-#[cfg(incident_v5w_post145_only)]
+#[cfg(all(incident_v5w_post145_only, not(incident_v5x_post145_only)))]
 fn v5w_semantic_owner(export: &str) -> Result<()> {
     ensure!(export == "97bd2045ebe449e3ae77330c7e4ec7b4", "foreign V5w semantic export");
     let family = Path::new(RUNTIME).join("epoch145-semantic-continuity-20261121-v1");
@@ -219,8 +219,81 @@ fn v5w_semantic_owner(export: &str) -> Result<()> {
     terminal(export)
 }
 
+#[cfg(incident_v5x_post145_only)]
+fn v5x_semantic_owner(export: &str) -> Result<()> {
+    ensure!(
+        custody::hex(export, 32) && export != "97bd2045ebe449e3ae77330c7e4ec7b4",
+        "foreign V5x semantic export"
+    );
+    let family = Path::new(RUNTIME).join("epoch145-semantic-continuity-20261121-v1");
+    let authority = family.join("tools-v5x");
+    let helper = authority.join("v5v_semantic_completion.py");
+    let (seal_ref, seal) =
+        publication::frozen_json(&authority.join("deployment-seal-receipt.json"))?;
+    let (build_ref, build) = publication::frozen_json(&authority.join("build-proof.json"))?;
+    let members = seal["members"]
+        .as_array()
+        .context("missing V5x deployment members")?;
+    let member = members
+        .iter()
+        .find(|row| row["name"] == "v5v_semantic_completion.py")
+        .context("missing V5x semantic checker")?;
+    let binding = Bound {
+        path: helper.clone(),
+        sha256: member["sha256"]
+            .as_str()
+            .context("missing V5x checker digest")?
+            .to_owned(),
+    };
+    ensure!(
+        seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && seal["destination"] == json!(authority)
+            && seal["sealer_sha256"]
+                == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+            && seal["remote_mutations"] == false
+            && seal["r2_mutations"] == false
+            && member["mode"] == "0444"
+            && build["semantic_checker"] == json!(binding)
+            && members.iter().any(|row| row["name"] == "build-proof.json"
+                && row["sha256"] == build_ref.sha256
+                && row["mode"] == "0444"),
+        "foreign V5x semantic package"
+    );
+    custody::bytes(&binding, 128 << 10, true)?;
+    let handoff = family.join("v5x-name-handoff");
+    let (start, _) = publication::frozen_json(&handoff.join("START_RESULT.json"))?;
+    let report = capacity::run(
+        "/usr/bin/python3",
+        &[
+            "-IB",
+            helper.to_str().context("V5x semantic checker")?,
+            start.path.to_str().context("V5x start result")?,
+            &start.sha256,
+        ],
+        "45",
+    )?;
+    let result: Value = serde_json::from_str(&report)?;
+    let (_, captured) = publication::frozen_json(&handoff.join("SEMANTIC_COMPLETION.json"))?;
+    ensure!(
+        result == captured
+            && result["schema"] == "horizon-epoch145-v5w-donor-successor-semantic-completion-v1"
+            && result["invocation_id"] == export
+            && result["publication_authorized"] == false
+            && result["r2_mutations"] == false
+            && result["startup_evidence"]["submission_result"] == json!(start)
+            && result["startup_evidence"]["worker_build"] == json!(build_ref)
+            && result["startup_evidence"]["worker_seal"] == json!(seal_ref)
+            && result["startup_evidence"]["predecessor_terminal"] == build["guard_terminal"],
+        "different accepted V5x semantic completion"
+    );
+    terminal(export)
+}
+
 pub(crate) fn semantic_owner(export: &str) -> Result<()> {
-    #[cfg(incident_v5w_post145_only)]
+    #[cfg(incident_v5x_post145_only)]
+    return v5x_semantic_owner(export);
+
+    #[cfg(all(incident_v5w_post145_only, not(incident_v5x_post145_only)))]
     return v5w_semantic_owner(export);
 
     #[cfg(all(incident_v5u_post145_only, not(incident_v5w_post145_only)))]

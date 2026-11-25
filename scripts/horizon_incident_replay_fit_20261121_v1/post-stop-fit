@@ -63,7 +63,8 @@ REPRO166 = REPRO166_LIVE or REPRO166_POST
 V5X_145 = HERE == D / "tools-homefloor-145-v5w-donor-recovery-v1"
 V5X_BUILD_145 = HERE == D / "tools-homefloor-145-v5w-donor-build-v1"
 V5W_RECOVERY_145 = V5X_145 or V5X_BUILD_145 or REPRO166_LIVE or FULL170 or HERE == D / "tools-homefloor-145-v5v-custody-recovery-v1"
-V5W_POST_145 = REPRO166_POST or HERE == D / "tools-homefloor-145-post-v5w-current-v1"
+V5X_POST_145 = HERE == D / "tools-homefloor-145-post-v5x-current-v1"
+V5W_POST_145 = V5X_POST_145 or REPRO166_POST or HERE == D / "tools-homefloor-145-post-v5w-current-v1"
 V5V_RECOVERY_145 = V5W_RECOVERY_145 or HERE == D / "tools-homefloor-145-v5u-guard-recovery-v1"
 FRESH_CENSUS_RECOVERY_145 = V5V_RECOVERY_145 or HOURLY170 or HERE == D / "tools-homefloor-145-v5t-guard-recovery-v1"
 RETAIN_FAILED166 = FAILED166_CADENCE or V5V_RECOVERY_145 or V5W_POST_145
@@ -606,7 +607,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
             (MISSED_RUNTIME_145, "tools-v5m"),
             (True, "tools-v5k"),
         ) if enabled)
-        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13o" if V5W_POST_145 else "tools-v13n" if V5U_GUARD_POST_145 else "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
+        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13p" if V5X_POST_145 else "tools-v13o" if V5W_POST_145 else "tools-v13n" if V5U_GUARD_POST_145 else "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
                     "lease-semantic": ("profile145-lease-semantic.json", lease_directory),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
@@ -662,9 +663,10 @@ def phase145(epoch, fleet=None):
         _, terminal = s.read(R / "epoch145-semantic-continuity-20261121-v1/v5w-name-handoff/V5W_TERMINAL_FAILURE_DONOR.json",
                              "8d36ea63912877df362dc33c21d4a834236d4cf36717ee7de9dafadd2153f288")
         return runpy.run_path(str(adapter))["v5w_stopped_phase"](s, fit, {"guard_terminal": terminal})
-    if FULL170 and not fit.members(fit.A145) and (
-        R / "epoch145-semantic-continuity-20261121-v1/v5w-name-handoff/SEMANTIC_COMPLETION.json"
-    ).exists():
+    if FULL170 and not fit.members(fit.A145) and any(
+        (R / "epoch145-semantic-continuity-20261121-v1" / generation / "SEMANTIC_COMPLETION.json").is_file()
+        for generation in ("v5w-name-handoff", "v5x-name-handoff")
+    ):
         return full170_capacity["drained145"](s, fit, R)
     if V5V_RECOVERY_145 and not fit.members(fit.A145):
         s.need(epoch == 145 and fleet is not None, "V5v requires the accepted fleet and paid predecessor")
@@ -1036,7 +1038,7 @@ def registered_status():
                     failed = writer168v4["registered_failed170_writer"](scope,retry4)
                     if RETAIN_FAILED166:
                         adopted = writer168v4["registered_hourly170_writer"](scope, failed, failed166=True)
-                        versions = (2, 3, 4, 5, 6, 7) if REPRO166 or FULL170 or V5X_145 or V5X_BUILD_145 else (2, 3, 4, 5, 6)
+                        versions = (2, 3, 4, 5, 6, 7) if REPRO166 or FULL170 or V5X_145 or V5X_BUILD_145 or V5X_POST_145 else (2, 3, 4, 5, 6)
                         for version in versions:
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():
@@ -1340,7 +1342,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         s.need(epoch == 145 and prestart136 is None and failed170,
                "full epoch 170 requires the exact retained retry13 terminal")
         if full170_mode != "prestart":
-            s.need(phase["stage"] == "v5w-semantic-complete-drained",
+            s.need(phase["stage"] in ("v5w-semantic-complete-drained", "v5x-semantic-complete-drained"),
                    "held or active full epoch 170 requires authenticated drained V5w")
         hourly170_owner, full170_guard = full170_capacity["ownership"](s, fit, full170, hourly170,
                                                                        full170_mode, ref, status, f)
