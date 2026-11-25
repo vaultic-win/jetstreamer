@@ -212,14 +212,17 @@ fn source_identity(path: &Path) -> Result<FileIdentity> {
     );
     Ok(id)
 }
+fn supports_reloaded_park(unit: &str) -> bool {
+    unit == super::epoch166_retry7_retire::PARK
+        || unit == super::epoch166_retry8_retire::PARK_UNIT
+        || unit == super::epoch166_retry10_retire::PARK_UNIT
+        || unit == super::epoch168_metered_retire::PARK
+}
 fn native(unit: &str) -> Result<Value> {
     let properties = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ExecMainPID,ExecMainStartTimestamp,NRestarts,Job,Result,ExecMainStatus,Restart,TriggeredBy,ExecStart,FragmentPath,DropInPaths";
     let mut command = std::process::Command::new("/usr/bin/systemctl");
     command.args(["show", unit, "-p", properties]);
-    if unit == super::epoch166_retry8_retire::PARK_UNIT
-        || unit == super::epoch166_retry10_retire::PARK_UNIT
-        || unit == super::epoch168_metered_retire::PARK
-    {
+    if supports_reloaded_park(unit) {
         command.args(["-p", "Names,Transient,NeedDaemonReload,ControlGroup,ExecMainCode,ExecMainExitTimestamp,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic"]);
     }
     native_fields(&mut command)
@@ -314,6 +317,14 @@ fn park(p: &Retire) -> Result<Value> {
     park_shape(&row, iid)?;
     if row["ExecStart"] != proof["native"]["ExecStart"] {
         match PARK {
+            super::epoch166_retry7_retire::PARK => {
+                super::epoch166_retry7_retire::validate_reloaded_park(
+                    &proof["native"],
+                    &row,
+                    &helper,
+                    &argv,
+                )?;
+            }
             super::epoch166_retry8_retire::PARK_UNIT => {
                 super::epoch166_retry8_retire::validate_reloaded_park(
                     &proof["native"],
@@ -604,10 +615,7 @@ pub(super) async fn run(
         "epoch 166 requires its sealed runtime and separate versioned evidence bundles"
     );
     scope(p)?;
-    if PARK == super::epoch166_retry8_retire::PARK_UNIT
-        || PARK == super::epoch166_retry10_retire::PARK_UNIT
-        || PARK == super::epoch168_metered_retire::PARK
-    {
+    if supports_reloaded_park(PARK) {
         // Check the recorded native dispatch before spending a full archive hash.
         // The normal closure still repeats this check before and after its census.
         park(p)?;
