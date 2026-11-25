@@ -138,7 +138,7 @@ fn shape(claim: &DiagnosticClaim, receipt: &Value, profile: &Profile) -> Result<
                 .is_some_and(|n| n <= 7 << 30)
             && receipt["broker_range_budget_bytes"]
                 .as_u64()
-                .is_some_and(|n| n >= 3 * ORIGINAL_SIZE && n <= 8 * ORIGINAL_SIZE)
+                .is_some_and(|n| (3 * ORIGINAL_SIZE..=8 * ORIGINAL_SIZE).contains(&n))
             && receipt["launched"] == true
             && receipt["local_retirement_authorized"] == false
             && receipt["publication_authorized"] == false
