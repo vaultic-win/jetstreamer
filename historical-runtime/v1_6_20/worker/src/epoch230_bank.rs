@@ -16,6 +16,47 @@ const PROGRAM_INDEX: usize = 8;
 const WRITABLE_ACCOUNT_INDEX: usize = 6;
 
 #[test]
+fn epoch229_signed_transaction_demotes_only_the_invoked_program_when_active() {
+    const WIRE: &[u8] = include_bytes!("../../../fixtures/epoch229-98931633-tx1764.bin");
+    const PROGRAM_INDEX: usize = 3;
+    let mut digest = Sha256::new();
+    digest.input(WIRE);
+    assert_eq!(
+        format!("{:x}", digest.result()),
+        "010b618395a83fe9dfaf6dd5b420e783485e55f43b8622efe3cc6d49741f6329"
+    );
+    let tx: Transaction = bincode::deserialize(WIRE).unwrap();
+    tx.verify().unwrap();
+    assert_eq!(bincode::serialize(&tx).unwrap().as_slice(), WIRE);
+    assert_eq!(
+        tx.signatures[0].to_string(),
+        "uS2Dba6JbiNK78LJm6BdqAfuzKbKCug6fRq7K3uGJNWzfzi2uWpXQMYZyUTNeGFmpCFnBznaYwWCrMKkDk5njeF"
+    );
+    let message = &tx.message;
+    let program = message.account_keys[PROGRAM_INDEX];
+    assert_eq!(
+        program.to_string(),
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    );
+    assert!(message.instructions.iter().any(|instruction| {
+        usize::from(instruction.program_id_index) == PROGRAM_INDEX
+    }));
+    assert!(message.instructions.iter().any(|instruction| {
+        instruction.accounts.contains(&(PROGRAM_INDEX as u8))
+    }));
+    assert!(!message.account_keys.contains(&bpf_loader_upgradeable::id()));
+
+    for &active in &[false, true] {
+        let program_writable = !(cfg!(feature = "epoch228-called-program-demotion")
+            || (crate::ACTIVATION_GATED_PROGRAM_DEMOTION && active));
+        assert_eq!(message.is_writable(PROGRAM_INDEX, active), program_writable);
+        let writes = writable_key_attribution(std::slice::from_ref(&tx), active).unwrap();
+        assert_eq!(writes.contains_key(program.as_ref()), program_writable);
+        assert!(writes.contains_key(message.account_keys[0].as_ref()));
+    }
+}
+
+#[test]
 fn signed_wire_selects_the_same_program_lock_and_write_attribution() {
     let mut hash = Sha256::new();
     hash.input(WIRE);
@@ -61,7 +102,7 @@ fn signed_wire_selects_the_same_program_lock_and_write_attribution() {
 
     for &demote in &[false, true] {
         let program_writable = !(cfg!(feature = "epoch228-called-program-demotion")
-            || (cfg!(feature = "epoch230-called-program-demotion") && demote));
+            || (crate::ACTIVATION_GATED_PROGRAM_DEMOTION && demote));
         assert_eq!(message.is_writable(PROGRAM_INDEX, demote), program_writable);
         assert!(message.is_writable(WRITABLE_ACCOUNT_INDEX, demote));
         let writes = writable_key_attribution(std::slice::from_ref(&tx), demote).unwrap();
@@ -99,10 +140,9 @@ fn signed_wire_selects_the_same_program_lock_and_write_attribution() {
         )
     };
     let read_program = read(program);
-    let expected = if cfg!(any(
-        feature = "epoch228-called-program-demotion",
-        feature = "epoch230-called-program-demotion",
-    )) {
+    let expected = if cfg!(feature = "epoch228-called-program-demotion")
+        || crate::ACTIVATION_GATED_PROGRAM_DEMOTION
+    {
         Ok(())
     } else {
         Err(TransactionError::AccountInUse)

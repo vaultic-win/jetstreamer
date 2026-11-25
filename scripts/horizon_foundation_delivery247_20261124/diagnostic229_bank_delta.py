@@ -12,6 +12,8 @@ FINALIZED_REWARDS = V / "horizon229-finalized-block-rewards-v1/completion.json"
 FINALIZED_REWARDS_SHA = "a353fd5134d3947788610f9b057442d64cfd2cda7e9835e267169a1eabf34923"
 PREDECESSOR_VOTES = V / "horizon229-predecessor-vote-comparison-v1/completion.json"
 PREDECESSOR_VOTES_SHA = "1f19af6492efbbcae54681b027ce6d922fc2956962c5ae6517ac7f882075a8ce"
+DEMOTION_EVIDENCE = V / "horizon229-demotion-native-input-v1/completion.json"
+DEMOTION_EVIDENCE_SHA = "768a2698fd86336735e85985a20e78733a662869ab01275f25dca6ffd5dde665"
 FIELDS = ["Id", "ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup"]
 
 
@@ -117,6 +119,27 @@ def gate(plan):
             gate_row["next_action"] = (
                 "Signed votes match the replayed Bank through slot 98,931,631 and diverge at slot 98,931,633. "
                 "Compare the finalized transaction outcomes and retained dirty-account writes in block 98,931,633."
+            )
+        if DEMOTION_EVIDENCE.is_file():
+            demotion_ref = ref(DEMOTION_EVIDENCE)
+            assert demotion_ref["sha256"] == DEMOTION_EVIDENCE_SHA
+            demotion = bound(demotion_ref)
+            assert demotion["schema"] == "foundation-epoch229-demotion-native-input-v1"
+            assert (demotion["epoch"], demotion["slot"], demotion["transaction_index"]) == (229, 98931633, 1764)
+            assert demotion["activation_slot"] == 84240008
+            counterfactual = bound(demotion["source_counterfactual"])
+            assert counterfactual["epoch"] == 229 and counterfactual["slot"] == 98931633
+            program = counterfactual["omit_candidate_leaf"]["account"]
+            assert counterfactual["matching_single_leaf_exclusions"] == [program]
+            assert counterfactual["omit_candidate_leaf"]["bank_hash"] == counterfactual["finalized_signed_hash"]
+            metadata = bound(counterfactual["block_metadata"])
+            assert bound(metadata["source"]["predecessor_votes"])["bank_evidence"] == acceptance["evidence"]
+            assert demotion["publication_authorized"] is False and counterfactual["replay_repair_verified"] is False
+            if demotion_ref not in gate_row["evidence"]:
+                gate_row["evidence"].append(demotion_ref)
+            gate_row["next_action"] = (
+                "Qualify the Token Program write-lock correction against the signed Bank hash at slot 98,931,633 "
+                "and the independent accounts root at slot 98,939,266."
             )
 
 
