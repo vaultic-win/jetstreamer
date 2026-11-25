@@ -253,7 +253,7 @@ fn file_stamp(m: &Metadata) -> Result<Stamp> {
 }
 
 // Publish a completely synchronized receipt under its final name in one no-clobber operation.
-fn record(path: &Path, data: &impl Serialize) -> Result<Binding> {
+pub(super) fn record(path: &Path, data: &impl Serialize) -> Result<Binding> {
     let parent = path.parent().context("receipt parent")?;
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?

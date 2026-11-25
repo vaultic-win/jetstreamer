@@ -1,4 +1,5 @@
 //! Retire individually qualified files and AccountsDb trees from stopped workers.
+mod appendvec292;
 #[path = "../../../scripts/horizon_standard_backfill_scratch_retirement_20261110_v1/source/process_references.rs"]
 mod process_references;
 mod selective_accounts;
@@ -368,6 +369,29 @@ fn retire_bootstrap(
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
+    if matches!(
+        args.get(1).map(String::as_str),
+        Some("--check-parked-292" | "--retire-parked-292")
+    ) {
+        ensure!(
+            unsafe { libc::geteuid() } == 0 && args.len() == 5,
+            "usage: horizon275-scratch-retire --check-parked-292|--retire-parked-292 SELF_SHA256 COMPARISON COMPARISON_SHA256"
+        );
+        let binary = File::open("/proc/self/exe")?;
+        let metadata = binary.metadata()?;
+        ensure!(
+            metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut &binary)? == args[2],
+            "unsealed retirement image"
+        );
+        return appendvec292::run(
+            args[1] == "--retire-parked-292",
+            &args[2],
+            Binding {
+                path: args[3].clone().into(),
+                sha256: args[4].clone(),
+            },
+        );
+    }
     ensure!(
         unsafe { libc::geteuid() } == 0
             && (args.len() == 3
