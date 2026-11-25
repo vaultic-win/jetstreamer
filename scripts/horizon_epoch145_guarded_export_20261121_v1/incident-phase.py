@@ -11,7 +11,8 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-V5W_DONOR_RECOVERY = VERSION == "tools-v5x"
+V5X_SCHEMA_RECOVERY = VERSION == "tools-v5y"
+V5W_DONOR_RECOVERY = VERSION == "tools-v5x" or V5X_SCHEMA_RECOVERY
 V5V_CUSTODY_RECOVERY = VERSION == "tools-v5w" or V5W_DONOR_RECOVERY
 V5U_QUERY_RECOVERY = VERSION == "tools-v5v" or V5V_CUSTODY_RECOVERY
 FRESH_CENSUS_RECOVERY = VERSION == "tools-v5u" or V5U_QUERY_RECOVERY
@@ -40,6 +41,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5v": "tools-homefloor-145-v5u-guard-recovery-v1",
                       "tools-v5w": "tools-homefloor-145-v5v-custody-recovery-v1",
                       "tools-v5x": "tools-homefloor-145-v5w-donor-recovery-v1",
+                      "tools-v5y": "tools-homefloor-145-v5x-schema-recovery-v1",
                       "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
@@ -246,6 +248,42 @@ def v5w_stopped_phase(s, fit, build):
                 recovery=terminal["recovery_started"], candidate=terminal["candidate"])
 
 
+def schema_retry_reader(s, package):
+    checker = package / "v5v_semantic_completion.py"
+    seal, _ = s.read(package / "deployment-seal-receipt.json")
+    member, = (row for row in seal["members"] if row["name"] == checker.name)
+    meta = checker.lstat()
+    s.need(seal["destination"] == str(package) and member["mode"] == "0444"
+           and member["sha256"] == hashlib.sha256(checker.read_bytes()).hexdigest()
+           and (meta.st_uid, meta.st_gid, meta.st_nlink, meta.st_mode) == (0, 0, 1, stat.S_IFREG | 0o444)
+           and checker.resolve(strict=True) == checker, "unsealed V5y journal reader")
+    return runpy.run_path(str(checker))
+
+
+def v5x_stopped_phase(s, fit, fleet, package):
+    reader = schema_retry_reader(s, package)
+    observed = reader["predecessor_preflight"](fleet)
+    terminal = s.bound(observed["failure"], reader["V5X_HANDOFF"] / "V5X_TERMINAL_FAILURE_STARTUP_SCHEMA.json")
+    manager = reader["manager_properties"](tuple(observed["manager"]))
+    s.need(not fit.members(UNIT) and observed["manager"] == manager,
+           "V5x manager or cgroup changed during price capture")
+    return dict(observed["manager"], stage="v5x-drained", guard_terminal=observed["failure"],
+                failure=terminal["native_failure"], recovery=observed["startup"], candidate=observed["candidate"])
+
+
+def v5x_failed_owner(s, build, successor):
+    reader = schema_retry_reader(s, PKG)
+    reference = build["guard_terminal"]
+    _terminal, exit_event = reader["startup_schema_failure"](reference)
+    history = reader["journal"](None, *(reader[key] for key in
+        ("STARTING", "STARTED", "PROCESS_EXIT", "FAILURE", "SUCCESS", "STOPPING", "STOPPED")),
+        after_cursor=exit_event["__CURSOR"])
+    s.need([(row["INVOCATION_ID"], row["MESSAGE_ID"]) for row in history] ==
+           [(successor, reader["STARTING"]), (successor, reader["STARTED"])],
+           "another invocation reused the failed V5x owner")
+    return reference
+
+
 def guard_terminal_predecessor(s, build, successor):
     if FRESH_CENSUS_RECOVERY:
         name = "V5T_FRESH_CENSUS_TERMINAL_105315.json"
@@ -417,7 +455,9 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and {path.name for path in prior.iterdir()} == {"failed.json", "recovery-started.json"},
                "unqualified retry of the V5p audit turnover failure")
         window["public_audit_terminal"] = terminal
-    if V5W_DONOR_RECOVERY:
+    if V5X_SCHEMA_RECOVERY:
+        window["guard_terminal_predecessor"] = v5x_failed_owner(s, build, generation)
+    elif V5W_DONOR_RECOVERY:
         _, window["guard_terminal_predecessor"] = v5w_failed_owner(s, build, generation)
     elif V5U_QUERY_RECOVERY:
         window["guard_terminal_predecessor"] = v5u_terminal_predecessor(s, seal, build, generation)
@@ -449,17 +489,20 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                    / HOMEFLOOR_PROVIDER / "deployment-seal-receipt.json"), "foreign 145 pre-worker admission")
     if STATUS_OWNER_RECOVERY:
         if V5W_DONOR_RECOVERY:
-            handoff = PKG.parent / "v5x-name-handoff"
+            handoff = PKG.parent / ("v5y-name-handoff" if V5X_SCHEMA_RECOVERY else "v5x-name-handoff")
             intent, _ = s.read(handoff / "START_INTENT.json")
             quoted = s.bound(intent["capacity"], handoff / "FIT.json")
-            s.need(intent["schema"] == "horizon-epoch145-v5v-custody-successor-start-intent-v1"
+            schema = ("horizon-epoch145-v5x-schema-successor-start-intent-v1" if V5X_SCHEMA_RECOVERY
+                      else "horizon-epoch145-v5v-custody-successor-start-intent-v1")
+            predecessor_stage = "v5x-drained" if V5X_SCHEMA_RECOVERY else "v5w-drained"
+            s.need(intent["schema"] == schema
                    and intent["worker_seal"] == seal_ref
                    and intent["provider_seal"] == started_fit["provider_seal"]
                    and intent["terminal"] == window["guard_terminal_predecessor"]
                    and intent["fleet"] == quoted["fleet"] == started_fit["fleet"]
-                   and quoted["fits"] is True and quoted["phase145"]["stage"] == "v5w-drained"
+                   and quoted["fits"] is True and quoted["phase145"]["stage"] == predecessor_stage
                    and quoted["phase145"]["guard_terminal"] == intent["terminal"] and quoted["resource_credit_bytes"] == 0,
-                   "V5x startup cadence selection differs from its sealed launch")
+                   "semantic successor startup cadence selection differs from its sealed launch")
             expected_status = quoted["status_registration"]
         else:
             expected_status = build["resumed_status"]
@@ -487,7 +530,8 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     if HOMEFLOOR_REJOIN:
         predecessor = "failed_retry1"
     if V5U_QUERY_RECOVERY:
-        predecessor_key = "failed_v5w" if V5W_DONOR_RECOVERY else "failed_v5v" if V5V_CUSTODY_RECOVERY else "failed_v5u"
+        predecessor_key = ("failed_v5x" if V5X_SCHEMA_RECOVERY else "failed_v5w" if V5W_DONOR_RECOVERY
+                           else "failed_v5v" if V5V_CUSTODY_RECOVERY else "failed_v5u")
         s.need(started["prior_frozen_recovery"][predecessor_key]["terminal"] == window["guard_terminal_predecessor"],
                "native worker has a different immediate predecessor")
     s.need(started["iid"] == generation and started["image"] == image_sha

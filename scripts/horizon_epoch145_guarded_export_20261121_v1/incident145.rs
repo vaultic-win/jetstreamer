@@ -19,7 +19,12 @@ compile_error!("the pre-read custody retry requires the entire V5v verifier guar
 #[cfg(all(incident_v5w_guard_recovery145_only, not(incident_v5v_guard_recovery145_only)))]
 compile_error!("the donor-lock retry requires the V5w verifier guard");
 
-#[cfg(incident_v5w_guard_recovery145_only)]
+#[cfg(all(incident_v5x_guard_recovery145_only, not(incident_v5w_guard_recovery145_only)))]
+compile_error!("the startup-schema retry requires the V5x verifier guard");
+
+#[cfg(incident_v5x_guard_recovery145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5y/export145";
+#[cfg(all(incident_v5w_guard_recovery145_only, not(incident_v5x_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5x/export145";
 #[cfg(all(incident_v5v_guard_recovery145_only, not(incident_v5w_guard_recovery145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5w/export145";
@@ -248,6 +253,56 @@ pub(super) fn failed_v5w() -> Result<Value> {
             && proof["archive_publication_authorized"] == false
             && proof["r2_mutations"] == false,
         "V5w donor-lock failure or paid candidate changed"
+    );
+    Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
+}
+
+#[cfg(incident_v5x_guard_recovery145_only)]
+pub(super) fn v5x_terminal() -> Result<Bound> {
+    let pin = Bound {
+        path: Path::new(RUNTIME).join(
+            "epoch145-semantic-continuity-20261121-v1/v5x-name-handoff/V5X_TERMINAL_FAILURE_STARTUP_SCHEMA.json",
+        ),
+        sha256: "b790f288c0b6f2d05a566c2a7e84fe675bcb9e63ae7c07694c53e10b0b5a84dd".into(),
+    };
+    ensure!(custody::binding(&pin.path)? == pin, "V5x terminal custody changed");
+    Ok(pin)
+}
+
+#[cfg(incident_v5x_guard_recovery145_only)]
+pub(super) fn failed_v5x(prior: &Value) -> Result<Value> {
+    let iid = "8f1fb9f6620947e8b7e899d2a436d9da";
+    let terminal = v5x_terminal()?;
+    let proof = custody::evidence(&terminal)?;
+    let state = Path::new(BASE).join("state").join(iid);
+    let startup = custody::binding(&state.join("recovery-started.json"))?;
+    let failure = custody::binding(&state.join("failed.json"))?;
+    let start = custody::evidence(&startup)?;
+    let error = custody::evidence(&failure)?;
+    let native = continuity::failure(iid)?;
+    let prior_terminal: Bound = serde_json::from_value(prior["terminal"].clone())?;
+    let prior_proof = custody::evidence(&prior_terminal)?;
+    ensure!(
+        proof["schema"] == "horizon-epoch145-v5x-terminal-startup-schema-failure-v1"
+            && proof["unit"] == UNIT
+            && proof["invocation_id"] == iid
+            && proof["predecessor"] == json!(prior_terminal)
+            && proof["native_failure"] == json!(failure)
+            && proof["recovery_started"] == json!(startup)
+            && proof["candidate"] == prior_proof["candidate"]
+            && native["failure"] == json!(failure)
+            && proof["native_events"][2]["__CURSOR"] == native["native"]["__CURSOR"]
+            && proof["boot_id"] == native["native"]["_BOOT_ID"]
+            && start["iid"] == iid
+            && start["image"] == proof["worker"]["sha256"]
+            && start["file"] == proof["candidate"]["path"]
+            && error["error"].as_str().is_some_and(|error| error.trim_end().ends_with(
+                "ValueError: V5x startup cadence selection differs from its sealed launch"))
+            && proof["semantic_completion"] == false
+            && proof["resource_credit_bytes"] == 0
+            && proof["archive_publication_authorized"] == false
+            && proof["r2_mutations"] == false,
+        "V5x startup failure and the unchanged paid candidate do not agree"
     );
     Ok(json!({"terminal":terminal,"current_boot_failure":native,"startup":startup}))
 }

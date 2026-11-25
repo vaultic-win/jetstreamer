@@ -13,15 +13,21 @@ import sys
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FAMILY = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
 GENERATION = Path(__file__).resolve().parent.name
-DONOR_RETRY = GENERATION == "tools-v5x"
+SCHEMA_RETRY = GENERATION in ("tools-v5y", "tools-homefloor-145-v5x-schema-build-v1")
+DONOR_RETRY = GENERATION == "tools-v5x" or SCHEMA_RETRY
 RETRY = GENERATION == "tools-v5w" or DONOR_RETRY
 V5V_HANDOFF = FAMILY / "v5v-name-handoff"
 V5V_PACKAGE = FAMILY / "tools-v5v"
 V5V_PROVIDER = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-v5u-guard-recovery-v1"
 V5X_HANDOFF = FAMILY / "v5x-name-handoff"
-PACKAGE = FAMILY / "tools-v5x" if DONOR_RETRY else FAMILY / "tools-v5w" if RETRY else V5V_PACKAGE
-PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v5w-donor-recovery-v1") if DONOR_RETRY else
+V5Y_HANDOFF = FAMILY / "v5y-name-handoff"
+PACKAGE = FAMILY / "tools-v5y" if SCHEMA_RETRY else FAMILY / GENERATION if RETRY else V5V_PACKAGE
+PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v5x-schema-recovery-v1") if SCHEMA_RETRY else
+            V5V_PROVIDER.with_name("tools-homefloor-145-v5w-donor-recovery-v1") if DONOR_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5v-custody-recovery-v1") if RETRY else V5V_PROVIDER)
+V5X = "8f1fb9f6620947e8b7e899d2a436d9da"
+V5X_SCHEMA_TERMINAL = "b790f288c0b6f2d05a566c2a7e84fe675bcb9e63ae7c07694c53e10b0b5a84dd"
+V5Y_START_INTENT = "horizon-epoch145-v5x-schema-successor-start-intent-v1"
 V5W = "97bd2045ebe449e3ae77330c7e4ec7b4"
 V5W_DONOR_TERMINAL = "8d36ea63912877df362dc33c21d4a834236d4cf36717ee7de9dafadd2153f288"
 V5V = "49ef63271f7345bd976c2897296ffbb7"
@@ -315,7 +321,60 @@ def donor_lock_failure(terminal_ref):
     return terminal, end
 
 
+def startup_schema_failure(terminal_ref):
+    path = V5X_HANDOFF / "V5X_TERMINAL_FAILURE_STARTUP_SCHEMA.json"
+    require(terminal_ref == reference(path, V5X_SCHEMA_TERMINAL), "different V5x startup terminal")
+    terminal = pinned_json(terminal_ref, path)
+    manager = terminal["manager"]
+    require(terminal["schema"] == "horizon-epoch145-v5x-terminal-startup-schema-failure-v1"
+            and terminal["boot_id"] == BOOT and terminal["unit"] == manager["Id"] == UNIT
+            and terminal["invocation_id"] == manager["InvocationID"] == V5X
+            and manager["ActiveState"] == manager["SubState"] == "failed"
+            and manager["Result"] == "exit-code" and manager["ExecMainStatus"] == "1"
+            and manager["MainPID"] == manager["ControlPID"] == "0"
+            and not manager["ControlGroup"] and not manager["Job"]
+            and terminal["resource_credit_bytes"] == 0
+            and terminal["semantic_completion"] is terminal["archive_publication_authorized"]
+            is terminal["r2_mutations"] is False, "different V5x failed native owner")
+    prior, prior_exit = donor_lock_failure(terminal["predecessor"])
+    intent = pinned_json(terminal["start_intent"], V5X_HANDOFF / "START_INTENT.json")
+    result = pinned_json(terminal["start_result"], V5X_HANDOFF / "START_RESULT.json")
+    old = STATE / V5X
+    failure = pinned_json(terminal["native_failure"], old / "failed.json")
+    started = pinned_json(terminal["recovery_started"], old / "recovery-started.json")
+    require(terminal["candidate"] == prior["candidate"]
+            and intent["schema"] == terminal["actual_start_intent_schema"]
+            == "horizon-epoch145-v5w-donor-successor-start-intent-v1"
+            and terminal["required_start_intent_schema"] == "horizon-epoch145-v5v-custody-successor-start-intent-v1"
+            and result["intent"] == terminal["start_intent"] and result["status"] == 0
+            and result["manager"]["InvocationID"] == V5X
+            and started["iid"] == failure["iid"] == V5X
+            and started["file"] == str(PAID) and started["image"] == terminal["worker"]["sha256"]
+            and started["r2_mutations"] is False
+            and failure["error"].rstrip().endswith(
+                "ValueError: V5x startup cadence selection differs from its sealed launch")
+            and {item.name for item in old.iterdir()} == {"failed.json", "recovery-started.json"},
+            "different failed V5x startup or paid candidate")
+    events = journal(V5X, STARTING, STARTED, PROCESS_EXIT, FAILURE, SUCCESS, STOPPING, STOPPED)
+    require(events == terminal["native_events"] and [item["MESSAGE_ID"] for item in events] ==
+            [STARTING, STARTED, PROCESS_EXIT, FAILURE], "different V5x PID1 terminal sequence")
+    validate_start_events(V5X, events[:2], intent["argv"][-5:], intent["not_before_monotonic_usec"], prior_exit)
+    scope_event(events[2], V5X, PROCESS_EXIT)
+    scope_event(events[3], V5X, FAILURE)
+    require(events[2]["EXIT_CODE"] == "exited" and events[2]["EXIT_STATUS"] == "1"
+            and events[3]["UNIT_RESULT"] == "exit-code", "different V5x PID1 exit")
+    unit_events = journal(None, STARTING, STARTED, PROCESS_EXIT, FAILURE, SUCCESS, STOPPING, STOPPED,
+                          after_cursor=prior_exit["__CURSOR"])
+    cutoff = int(events[-1]["__MONOTONIC_TIMESTAMP"])
+    require([event for event in unit_events if int(event["__MONOTONIC_TIMESTAMP"]) <= cutoff] == events,
+            "another native owner intervened before V5x failed")
+    return terminal, events[-1]
+
+
 def failed_predecessor(terminal_ref):
+    if SCHEMA_RETRY:
+        terminal, failed = startup_schema_failure(terminal_ref)
+        return terminal["candidate"], failed
     if DONOR_RETRY:
         terminal, failed = donor_lock_failure(terminal_ref)
         return terminal["candidate"], failed
@@ -348,7 +407,15 @@ def predecessor_preflight(fleet_ref):
     expected = dict(Id=UNIT, ActiveState="failed", SubState="failed", InvocationID=V5U,
                     MainPID="0", ControlPID="0", Job="", NRestarts="0", ControlGroup="",
                     ExecMainStatus="1", Result="exit-code")
-    if DONOR_RETRY:
+    if SCHEMA_RETRY:
+        terminal_ref = reference(V5X_HANDOFF / "V5X_TERMINAL_FAILURE_STARTUP_SCHEMA.json", V5X_SCHEMA_TERMINAL)
+        terminal, native_failure = startup_schema_failure(terminal_ref)
+        startup_ref, failure_ref, candidate = terminal["recovery_started"], terminal_ref, terminal["candidate"]
+        expected = terminal["manager"]
+        properties = tuple(expected)
+        require(not journal(None, STARTING, STARTED, PROCESS_EXIT, FAILURE, SUCCESS, STOPPING, STOPPED,
+                            after_cursor=native_failure["__CURSOR"]), "another owner followed failed V5x")
+    elif DONOR_RETRY:
         terminal_ref = reference(FAMILY / "v5w-name-handoff/V5W_TERMINAL_FAILURE_DONOR.json", V5W_DONOR_TERMINAL)
         terminal, native_failure = donor_lock_failure(terminal_ref)
         expected = terminal["manager"]
@@ -373,7 +440,8 @@ def predecessor_preflight(fleet_ref):
             }.items())
             and file_stamp(m) == file_stamp(PAID.lstat()) and manager_properties(properties) == expected and not group.exists(),
             "paid candidate or failed owner changed during preflight")
-    return {"schema": ("horizon-epoch145-v5x-predecessor-preflight-v1" if DONOR_RETRY else
+    return {"schema": ("horizon-epoch145-v5y-predecessor-preflight-v1" if SCHEMA_RETRY else
+                       "horizon-epoch145-v5x-predecessor-preflight-v1" if DONOR_RETRY else
                        "horizon-epoch145-v5w-predecessor-preflight-v1" if RETRY else
                        "horizon-epoch145-v5u-query-timeout-terminal-v1"),
             "fleet_review": fleet_ref, "sampled_at_utc": fleet["sampled_at_utc"],
@@ -387,10 +455,12 @@ def successor_manager(result, intent, *, retry=None):
     retry = RETRY if retry is None else retry
     manager = result["manager"]
     iid = manager["InvocationID"]
-    schema = "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
+    schema = V5Y_START_INTENT if SCHEMA_RETRY else "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
         "horizon-epoch145-v5u-semantic-successor-start-intent-v1"
     )
     predecessor_invocations = (V5U, V5V, V5W) if retry and DONOR_RETRY else (V5U, V5V) if retry else (V5U,)
+    if SCHEMA_RETRY:
+        predecessor_invocations += (V5X,)
     require(result["status"] == 0 and manager["Id"] == intent["unit"] == UNIT
             and re.fullmatch(r"[a-f0-9]{32}", iid) and iid not in predecessor_invocations
             and manager["ActiveState"] == "active" and manager["SubState"] == "running"
@@ -402,7 +472,7 @@ def successor_manager(result, intent, *, retry=None):
 
 
 def startup(result_ref):
-    submission = V5X_HANDOFF if DONOR_RETRY else FAMILY / "v5w-name-handoff" if RETRY else V5V_HANDOFF
+    submission = V5Y_HANDOFF if SCHEMA_RETRY else V5X_HANDOFF if DONOR_RETRY else FAMILY / "v5w-name-handoff" if RETRY else V5V_HANDOFF
     result = pinned_json(result_ref, submission / "START_RESULT.json")
     intent_ref = result["intent"]
     intent = pinned_json(intent_ref, submission / "START_INTENT.json")
@@ -417,7 +487,7 @@ def startup(result_ref):
     launch_quote = pinned_json(intent["capacity"], submission / "FIT.json")
     require(launch_quote["fleet"] == bounds and launch_quote["fits"] is True
             and launch_quote["epoch"] == 145 and launch_quote["candidate"] is None
-            and launch_quote["phase145"]["InvocationID"] == (V5W if DONOR_RETRY else V5V if RETRY else V5U)
+            and launch_quote["phase145"]["InvocationID"] == (V5X if SCHEMA_RETRY else V5W if DONOR_RETRY else V5V if RETRY else V5U)
             and launch_quote["phase145"]["guard_terminal"] == intent["terminal"]
             and launch_quote["resource_credit_bytes"] == 0
             and launch_quote["replay_launch_authorized"] is False,
@@ -553,7 +623,8 @@ def completion(anchors, started, success):
             "foreign promoted inode")
     require(not (state / "failed.json").exists() and file_stamp(info) == file_stamp(PROMOTED.lstat()),
             "promoted archive or terminal state changed")
-    schema = ("horizon-epoch145-v5x-donor-successor-semantic-completion-v1" if DONOR_RETRY else
+    schema = ("horizon-epoch145-v5y-schema-successor-semantic-completion-v1" if SCHEMA_RETRY else
+              "horizon-epoch145-v5x-donor-successor-semantic-completion-v1" if DONOR_RETRY else
               "horizon-epoch145-v5v-custody-successor-semantic-completion-v1" if RETRY else
               "horizon-epoch145-v5u-successor-semantic-completion-v1")
     return {"schema": schema, "invocation_id": iid, "start": anchors["start"], "verified": verified_ref,
