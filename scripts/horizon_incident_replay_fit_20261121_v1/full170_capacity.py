@@ -351,7 +351,12 @@ def drained145(s, fit, root):
            and (successor_generation or manager['InvocationID'] in ('', prior)) and not manager['ControlGroup']
            and not manager['Job'] and not fit.members(fit.A145) and not cgroup.exists(),
            'epoch 145 semantic owner has not drained')
-    package = family / {'v5w': 'tools-v13o', 'v5x': 'tools-v13p', 'v5z': 'tools-v13q'}[generation]
+    if generation == 'v5z':
+        # The sealed build provider already runs the exact V5z completion
+        # reader. Epoch 170 does not consume the later archive delivery binary.
+        package = root / 'incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5z-build-v1'
+    else:
+        package = family / {'v5w': 'tools-v13o', 'v5x': 'tools-v13p'}[generation]
     checker = package / 'incident-post-phase.py'
     seal, seal_ref = s.read(package / 'deployment-seal-receipt.json',
                             None if successor_generation else '5e297cce79ec8adb123ae4eb43f5f98a582cb469397db92de399fef262508ee3')
@@ -363,16 +368,18 @@ def drained145(s, fit, root):
         s.need(seal['schema'] == 'jetstreamer-sealed-deployment-receipt-v1'
                and seal['sealer_sha256'] == 'e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3'
                and seal['remote_mutations'] is seal['r2_mutations'] is False,
-               'foreign V13p deployment seal')
+               f'foreign {generation} semantic checker seal')
     fit.binary(checker, entry['sha256'])
     import runpy
     readers = runpy.run_path(str(checker))
+    if generation == 'v5z':
+        s.need(readers['V5Z_POST'], 'the sealed adapter does not read V5z completion')
     complete, _ = readers['v5x_completion' if successor_generation else 'v5w_completion'](s)
     if successor_generation:
         successor = Path(complete['path']).parent.name
         s.need(s.iid(successor) and successor != prior and manager['InvocationID'] in ('', successor)
                and Path(complete['path']) == root / 'epoch145-guarded-export-20261121-v1/state' / successor / 'complete.json',
-               'different successful V5x manager')
+               f'different successful {generation} manager')
         prior = successor
     observed = s.show(fit.A145)
     s.need(all(manager.get(key) == observed.get(key) for key in fields)
