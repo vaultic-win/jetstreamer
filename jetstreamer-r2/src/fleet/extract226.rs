@@ -4,7 +4,9 @@ use super::*;
 use std::{io::Read, os::unix::fs::MetadataExt};
 
 mod drain;
+mod suffix;
 pub(crate) use drain::run as drain_completed;
+pub(crate) use suffix::run as launch_suffix;
 
 pub(super) const SCHEMA: &str = "foundation-epoch226-held-extraction-launch-v1";
 const PREFIX: &str = "horizon-qualify-226-checkpoint-continuation-extract-";

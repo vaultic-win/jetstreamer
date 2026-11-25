@@ -2,20 +2,20 @@
 use super::*;
 use std::os::{fd::AsRawFd, unix::fs::OpenOptionsExt};
 
-const HANDOFF: &str = "/var/lib/jetstreamer/horizon226-suffix-v1/source-handoff.json";
+pub(super) const HANDOFF: &str = "/var/lib/jetstreamer/horizon226-suffix-v1/source-handoff.json";
 const LAUNCH_SHA: &str = "4826797399fcd448e82bddb975cf31101d958df17126dc29013a9282e3bcf66c";
-const CYCLE_LOCK: &str =
+pub(super) const CYCLE_LOCK: &str =
     "/var/lib/jetstreamer/horizon-seven-publication-controller-v222/cycle.lock";
 const GUARD: &str = "horizon-guard-226-checkpoint-continuation-extract-v2.service";
 const TIMER: &str = "horizon-guard-226-checkpoint-continuation-extract-v2.timer";
 const TIMER_ID: &str = "4bd82a58917b4c6dbbd3702391950200";
-const GUARD_IMAGE: &str =
+pub(super) const GUARD_IMAGE: &str =
     "/var/lib/jetstreamer/horizon251-published-guard-20261118-v1/horizon251-standalone-guard";
 const SUCCESS_ID: &str = "7ad2d189f7e94e70a38c781354912448";
 const INTENT_SCHEMA: &str = "foundation-epoch226-extraction-success-drain-intent-v1";
 const COMPLETION_SCHEMA: &str = "foundation-epoch226-extraction-success-drain-v1";
 
-fn show(name: &str) -> Result<Value> {
+pub(super) fn show(name: &str) -> Result<Value> {
     let result = ProcessCommand::new("/usr/bin/systemctl").args([
         "show", "--no-pager", "--property=Id,LoadState,ActiveState,SubState,InvocationID,Job,MainPID,ControlPID,ControlGroup,NRestarts,Result,ExecMainStatus,ExecStart,Type,Restart,Unit,FragmentPath",
         name,
@@ -147,7 +147,7 @@ fn authenticate_owners(launch: &Value) -> Result<Value> {
     Ok(json!({"timer":timer, "guard":guard, "broker":broker}))
 }
 
-fn stop(name: &str) -> Result<()> {
+pub(super) fn stop(name: &str) -> Result<()> {
     ensure!(
         ProcessCommand::new("/usr/bin/systemctl")
             .args(["stop", "--", name])
