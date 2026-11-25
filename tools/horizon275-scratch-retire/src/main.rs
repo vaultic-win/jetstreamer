@@ -381,13 +381,14 @@ fn retire_bootstrap(
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    if args
-        .get(1)
-        .is_some_and(|arg| arg == "--check-held-ext4-228")
-    {
+    if matches!(
+        args.get(1).map(String::as_str),
+        Some("--check-held-ext4-228" | "--retire-held-ext4-228")
+    ) {
+        let apply = args[1] == "--retire-held-ext4-228";
         ensure!(
-            unsafe { libc::geteuid() } == 0 && args.len() == 3,
-            "usage: horizon275-scratch-retire --check-held-ext4-228 SELF_SHA256"
+            unsafe { libc::geteuid() } == 0 && args.len() == if apply { 5 } else { 3 },
+            "usage: horizon275-scratch-retire --check-held-ext4-228 SELF_SHA256 or --retire-held-ext4-228 SELF_SHA256 FLEET_SHA256 REMOTE_RECHECK_SHA256"
         );
         let binary = File::open("/proc/self/exe")?;
         let metadata = binary.metadata()?;
@@ -395,6 +396,9 @@ fn main() -> Result<()> {
             metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut &binary)? == args[2],
             "unsealed retirement image"
         );
+        if apply {
+            return ext4_228::retire(&args[2], &args[3], &args[4]);
+        }
         return ext4_228::check(&args[2]);
     }
     if matches!(

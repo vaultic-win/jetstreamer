@@ -1,6 +1,11 @@
 //! Read-only closure and namespace check for the byte-restored epoch 228 image.
 use super::{snapshot288::Stamp, *};
 use std::collections::{BTreeMap, BTreeSet};
+mod retire;
+
+pub(super) fn retire(self_sha: &str, fit_sha: &str, remote_sha: &str) -> Result<()> {
+    retire::run(self_sha, fit_sha, remote_sha)
+}
 
 const IMAGE: &str = "/var/lib/jetstreamer/horizon228-native-root-tail-v166-a1/pilot/private.ext4";
 const TARGET: &str = "/home/ubuntu/.jetstreamer-private/qualification-228-demotion-root-tail-v1";
@@ -127,7 +132,7 @@ fn inherited_mount(table: &str, master: Option<&str>) -> Result<Option<String>> 
     Ok(Some((*row).to_owned()))
 }
 
-fn mount_census() -> Result<Value> {
+fn mount_census(expect_host_mount: bool) -> Result<Value> {
     let host = Path::new("/proc/1");
     let host_ns = host.join("ns/mnt").read_link()?;
     ensure!(
@@ -135,23 +140,35 @@ fn mount_census() -> Result<Value> {
         "check must use the host mount namespace"
     );
     let host_table = fs::read_to_string(host.join("mountinfo"))?;
-    let host_row = inherited_mount(&host_table, None)?.context("host loop6 mount missing")?;
-    let propagation = host_row
-        .split_once(" - ")
-        .context("host mountinfo")?
-        .0
-        .split_whitespace()
-        .skip(6)
-        .find_map(|tag| tag.strip_prefix("shared:"))
-        .context("host ext4 mount is not shared")?
-        .to_owned();
+    let host_row = inherited_mount(&host_table, None)?;
     ensure!(
-        propagation.bytes().all(|byte| byte.is_ascii_digit()),
-        "invalid mount propagation ID"
+        host_row.is_some() == expect_host_mount,
+        "host loop6 mount differs from the retirement phase"
     );
-    let master = format!("master:{propagation}");
+    let propagation = host_row
+        .as_ref()
+        .map(|row| {
+            let id = row
+                .split_once(" - ")
+                .context("host mountinfo")?
+                .0
+                .split_whitespace()
+                .skip(6)
+                .find_map(|tag| tag.strip_prefix("shared:"))
+                .context("host ext4 mount is not shared")?;
+            ensure!(
+                id.bytes().all(|byte| byte.is_ascii_digit()),
+                "invalid mount propagation ID"
+            );
+            Ok::<_, anyhow::Error>(id.to_owned())
+        })
+        .transpose()?;
+    let master = propagation.as_ref().map(|id| format!("master:{id}"));
     let mut visited = BTreeSet::from([host_ns.clone()]);
-    let mut matching = BTreeMap::from([(host_ns, host_row)]);
+    let mut matching = BTreeMap::new();
+    if let Some(row) = host_row {
+        matching.insert(host_ns, row);
+    }
     for entry in fs::read_dir("/proc")? {
         let process = entry?;
         if !process
@@ -178,7 +195,15 @@ fn mount_census() -> Result<Value> {
                 table.len() <= 16 << 20 && link.read_link()? == namespace,
                 "mount census changed"
             );
-            inherited_mount(&table, Some(&master))
+            if let Some(master) = &master {
+                inherited_mount(&table, Some(master))
+            } else {
+                ensure!(
+                    device_rows(&table).is_empty(),
+                    "loop6 mount survived host unmount"
+                );
+                Ok(None)
+            }
         })();
         match inspected {
             Ok(row) => {
@@ -196,8 +221,7 @@ fn mount_census() -> Result<Value> {
     )
 }
 
-pub(super) fn check(self_sha: &str) -> Result<()> {
-    let restore = clean_restore()?;
+fn closed() -> Result<()> {
     terminal_unit(UNIT)?;
     terminal_unit(RESTORE_UNIT)?;
     terminal_unit("horizon-228-root-tail-protective-v1.timer")?;
@@ -228,6 +252,10 @@ pub(super) fn check(self_sha: &str) -> Result<()> {
             "original 228 guard is not closed"
         );
     }
+    Ok(())
+}
+
+fn image_identity() -> Result<Metadata> {
     let image = Path::new(IMAGE);
     let file = open_regular(image)?;
     let meta = file.metadata()?;
@@ -247,6 +275,14 @@ pub(super) fn check(self_sha: &str) -> Result<()> {
             ) == (1795329893, 696304720, 1795329893, 696304720),
         "closed image no longer matches authenticated staging identity"
     );
+    ensure!(
+        identity(&meta) == identity(&image.symlink_metadata()?),
+        "closed ext4 image changed during check"
+    );
+    Ok(meta)
+}
+
+fn key_identity() -> Result<Metadata> {
     let key = Path::new(KEY).symlink_metadata()?;
     ensure!(
         Path::new(KEY).canonicalize()? == Path::new(KEY)
@@ -259,6 +295,10 @@ pub(super) fn check(self_sha: &str) -> Result<()> {
             && key.len() == 65,
         "durable custody key identity differs"
     );
+    Ok(key)
+}
+
+fn bound_loop() -> Result<()> {
     let loop_info = Command::new("/usr/sbin/losetup")
         .args(["-n", "-O", "NAME,RO,BACK-INO,BACK-FILE", LOOP])
         .output()?;
@@ -272,22 +312,36 @@ pub(super) fn check(self_sha: &str) -> Result<()> {
                 .is_none(),
         "loop6 was replaced, became writable, or has block consumers"
     );
-    let mounts = mount_census()?;
-    let schedule = scheduled_census(Path::new(TARGET), Path::new(TARGET))?;
+    Ok(())
+}
+
+fn references() -> Result<BTreeMap<&'static str, process_references::Scan>> {
     let mut references = BTreeMap::new();
     for path in [TARGET, IMAGE, LOOP] {
         let scan = process_references::scan(Path::new("/proc"), Path::new(path))?;
         references.insert(path, scan);
     }
+    Ok(references)
+}
+
+pub(super) fn check(self_sha: &str) -> Result<()> {
+    let restore = clean_restore()?;
+    closed()?;
+    let meta = image_identity()?;
+    let key = key_identity()?;
+    bound_loop()?;
+    let mounts = mount_census(true)?;
+    let schedule = scheduled_census(Path::new(TARGET), Path::new(TARGET))?;
+    let references = references()?;
     ensure!(
-        identity(&meta) == identity(&image.symlink_metadata()?),
+        identity(&meta) == identity(&Path::new(IMAGE).symlink_metadata()?),
         "closed ext4 image changed during check"
     );
     println!(
         "{}",
         json!({
             "schema":"foundation-epoch228-ext4-retirement-precheck-v1","epoch":228,
-            "self_sha256":self_sha,"authenticated_restore":restore,"image":image,"image_stamp":Stamp::of(&meta)?,
+            "self_sha256":self_sha,"authenticated_restore":restore,"image":IMAGE,"image_stamp":Stamp::of(&meta)?,
             "key_location":KEY,"key_device":key.dev(),"key_inode":key.ino(),
             "mount_census":mounts,"process_references":references,"scheduled_references":schedule,
             "historical_extent_credit_bytes":0,"reclaimed_bytes":0,"source_retirement_authorized":false,
