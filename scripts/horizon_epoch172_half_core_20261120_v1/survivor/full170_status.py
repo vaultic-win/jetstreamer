@@ -10,6 +10,8 @@ import stat
 from evidence import BASE, bound, checked, need
 
 PACKAGE = 'tools-cold168-retry4-failed166-v6-entry146'
+if Path(__file__).resolve().parent.name == 'tools-cold168-retry4-failed166-v7-entry146':
+    PACKAGE = 'tools-cold168-retry4-failed166-v7-entry146'
 ROOT = BASE / 'epoch170-full-metered-rebook-20261124-v1'
 QUAL = BASE / 'epoch170-full-metered-guard-20261124-v1/GUARD_QUALIFIED.json'
 LANE = Path('/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1')

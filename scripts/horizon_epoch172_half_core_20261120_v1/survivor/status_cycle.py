@@ -29,10 +29,11 @@ def failed166_package(version):
     return name + '-entry146' if version >= 4 else name
 
 
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7)
                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
 FAILED166 = bool(FAILED166_VERSION)
-METERED_FULL170 = FAILED166_VERSION == 6
+METERED_FULL170 = FAILED166_VERSION in (6, 7)
+HOLDING185 = FAILED166_VERSION == 7
 HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
 FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
 assert hashlib.sha256((PACKAGE/'deployment-seal-receipt.json').read_bytes()).hexdigest() == PARENT_SEAL
@@ -559,6 +560,60 @@ def publish_all(c,bridge,store,vs):
          private140=refs['140'],archives_or_sidecars_changed=False))
     return bound(p),bound(complete)
 
+def install_holding185(c, fleet):
+    package = BASE / 'epoch185-lanel-holding-20261125-v1/observer-v1/tools'
+    seal = checked(dict(path=str(package/'deployment-seal-receipt.json'),
+                        sha256='65062d37abf03585caabe61438b3bc4e87dba3e94bf9e55167e31b09c42d8e8d'))
+    member, = (row for row in seal['members'] if row['name'] == 'holding-observer')
+    tool = package/member['name']
+    need(seal['destination'] == str(package) and member['mode'] == '0555'
+         and bound(tool)['sha256'] == member['sha256'], 'different epoch 185 holding observer')
+    result = json.loads(run(tool, 'reconcile'))
+    install_holding185_result(c, fleet, result)
+
+
+def install_holding185_result(c, fleet, result):
+    field = 'epoch185_lanel_holding'
+    previous = fleet.get(field)
+    transfers = fleet['actual_active_holding_transfers']
+    if previous is not None:
+        old = checked(previous)
+        need(Path(previous['path']).parent == Path(c.fleet_ref['path']).parent
+             and old['schema'] == 'horizon-epoch185-lanel-cadence-event-v1'
+             and old['result']['observation']['unit'] == 'horizon-closed185-lanel-park-20261125-v1.service',
+             'different predecessor holding event')
+        active = old['result']['active_transfer'] is not None
+        need(transfers.count(previous) == int(active), 'different active holding list')
+        if active:
+            transfers.remove(previous)
+    observed = result['observation']
+    need(observed['schema'] == 'horizon-epoch185-lanel-holding-observation-v1'
+         and observed['unit'] == 'horizon-closed185-lanel-park-20261125-v1.service'
+         and observed['resource_credit_bytes'] == 0, 'unbound holding result')
+    if result['holding_reservation'] is None:
+        need(previous is None and result['active_transfer'] is None and observed['stage'] == 'vacant',
+             'booked epoch 185 holding reservation disappeared')
+        return
+    need((observed['stage'] == 'copying') == (result['active_transfer'] is not None),
+         'inconsistent epoch 185 holding stage')
+    if previous is not None:
+        prior = old['result']
+        need(prior['holding_reservation']['admission'] == result['holding_reservation']['admission']
+             and (prior['holding_reservation']['start'] is None or
+                  prior['holding_reservation']['start'] == result['holding_reservation']['start'])
+             and (prior['observation']['stage'] != 'custody-recorded' or
+                  (observed['stage'] == 'custody-recorded' and prior['observation']['custody'] == observed['custody'])),
+             'changed epoch 185 holding generation')
+    event = dict(schema='horizon-epoch185-lanel-cadence-event-v1', fleet=c.fleet_ref,
+                 observer=c.sample_ref, result=result)
+    key = hashlib.sha256(json.dumps(event, sort_keys=True).encode()).hexdigest()
+    path = c.paths['out']/f'HOLDING185-{key}.json'
+    durable(path, event)
+    fleet[field] = bound(path)
+    if result['active_transfer'] is not None:
+        transfers.append(fleet[field])
+
+
 def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
     fleet=copy.deepcopy(c.fleet)
     lookup={r['epoch']:r for r in fleet['epochs']}
@@ -612,6 +667,8 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
     if HOURLY170:
         hourly170_cadence.install(fleet,c.hourly170)
     install_epoch146_entry(c, fleet)
+    if HOLDING185:
+        install_holding185(c, fleet)
     if c.new_rows:
         active=', '.join(map(str,sorted([172,*c.new_rows])))
         pending=', '.join(map(str,sorted(set(CLOSED)-set(c.new_rows)-set(c.commits))))
@@ -938,6 +995,8 @@ def rejoin_failed166_cadence(state, receipt, fd):
     ready_ref = bound(ROOT/f'{name}_READY.json')
     ready = checked(ready_ref)
     previous = 'FAILED166_CADENCE' if FAILED166_VERSION == 2 else f'FAILED166_CADENCE_V{FAILED166_VERSION - 1}'
+    if HOLDING185 and ready['old_owner']['path'] == str(ROOT/'FAILED166_CADENCE_V5_ACTIVE.json'):
+        previous = 'FAILED166_CADENCE_V5'
     incumbent_ref = bound(ROOT/f'{previous}_ACTIVE.json')
     need(ready['schema'] == 'horizon-epoch166-cadence-rejoin-ready-v1'
          and ready['package'] == receipt and ready['old_owner'] == incumbent_ref,
