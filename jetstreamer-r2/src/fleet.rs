@@ -1439,6 +1439,13 @@ fn diagnostic_owns_observation(claims: &[DiagnosticClaim], entry: &Value) -> boo
     })
 }
 
+const EPOCH230_MIDDLE_UNIT: &str = "horizon-qualify-230-middle-v1.service";
+const EPOCH230_MIDDLE_KIND: &str = "epoch230-middle-continuation";
+const EPOCH230_MIDDLE_ROOT: &str =
+    "/home/ubuntu/.jetstreamer-private/qualification-230-middle-v1";
+const EPOCH230_MIDDLE_WORKER_SHA: &str =
+    "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c";
+
 fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bool {
     if epoch136::namespace(claim) {
         return bound_json(&claim.launch_receipt)
@@ -1495,6 +1502,16 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
     } else if bounded205::namespace(claim) {
         bound_json(&claim.launch_receipt)
             .is_ok_and(|receipt| bounded205::guard_matches(claim, &receipt, plan))
+    } else if claim.epoch == 230 && claim.unit == EPOCH230_MIDDLE_UNIT {
+        plan.get("bounded_canary").is_none_or(Value::is_null)
+            && plan.get("bounded_measurement").is_none_or(Value::is_null)
+            && plan["filesystem"] == "/"
+            && plan["worker_root"] == EPOCH230_MIDDLE_ROOT
+            && plan["receipt_directory"]
+                == "/var/lib/jetstreamer/horizon230-middle-fit-v1/guard-receipts"
+            && plan["minimum_free_bytes"] == 3_770_104_987_645u64
+            && plan["maximum_root_physical_bytes"] == 625_000_000_000u64
+            && plan["maximum_worker_vmas"] == 3_500_000
     } else if claim.epoch == 230 && claim.unit == "horizon-qualify-230-final-tail-v1.service" {
         plan.get("bounded_canary").is_none_or(Value::is_null)
             && plan.get("bounded_measurement").is_none_or(Value::is_null)
@@ -2116,6 +2133,23 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["last_slot"] == 99_383_572
             && receipt["worker_sha256"]
                 == "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c"
+            && receipt["entry_replay_requested"] == true
+            && receipt["full_continuation_peak_qualified"] == false
+            && receipt["canonical_epoch_publication_authorized"] == false
+    } else if claim.unit == EPOCH230_MIDDLE_UNIT || receipt["kind"] == EPOCH230_MIDDLE_KIND {
+        claim.epoch == 230
+            && claim.unit == EPOCH230_MIDDLE_UNIT
+            && claim.scratch_path == Path::new(EPOCH230_MIDDLE_ROOT)
+            && receipt["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+            && receipt["kind"] == EPOCH230_MIDDLE_KIND
+            && receipt["epoch"] == 230
+            && receipt["unit"] == claim.unit
+            && receipt["invocation_id"] == claim.invocation_id
+            && receipt["run_root"].as_str() == claim.scratch_path.to_str()
+            && receipt["bootstrap_slot"] == 99_383_572
+            && receipt["first_slot"] == 99_383_573
+            && receipt["last_slot"] == 99_791_404
+            && receipt["worker_sha256"] == EPOCH230_MIDDLE_WORKER_SHA
             && receipt["entry_replay_requested"] == true
             && receipt["full_continuation_peak_qualified"] == false
             && receipt["canonical_epoch_publication_authorized"] == false
@@ -6312,6 +6346,45 @@ mod tests {
         renamed["unit"] = json!(claim.unit);
         renamed["evidence"]["units"][0]["unit"] = json!(claim.unit);
         assert!(validate_diagnostic_launch(&renamed, &claim).is_err());
+    }
+
+    #[test]
+    fn epoch230_middle_claim_binds_the_exact_span_and_home_guard() {
+        let claim = DiagnosticClaim {
+            epoch: 230,
+            unit: EPOCH230_MIDDLE_UNIT.into(),
+            invocation_id: "a".repeat(32),
+            scratch_path: EPOCH230_MIDDLE_ROOT.into(),
+            launch_receipt: BoundFile {
+                path: "/var/lib/jetstreamer/launch.json".into(),
+                sha256: "b".repeat(64),
+            },
+        };
+        let mut receipt = json!({
+            "schema": "jetstreamer-historical-performance-launch-receipt-v1",
+            "kind": EPOCH230_MIDDLE_KIND, "epoch": 230,
+            "unit": claim.unit, "invocation_id": claim.invocation_id, "run_root": claim.scratch_path,
+            "bootstrap_slot": 99_383_572, "first_slot": 99_383_573, "last_slot": 99_791_404,
+            "worker_sha256": EPOCH230_MIDDLE_WORKER_SHA, "entry_replay_requested": true,
+            "canonical_epoch_publication_authorized": false, "full_continuation_peak_qualified": false,
+            "launched": true, "remote_mutations": false, "r2_mutations": false,
+            "evidence": {"units": [{"unit": claim.unit, "invocation_id": claim.invocation_id,
+                "restarts": 0, "load_state": "loaded", "result": "success", "main_pid": 42,
+                "active_state": "active", "sub_state": "running"}]},
+        });
+        validate_diagnostic_launch(&receipt, &claim).unwrap();
+        receipt["last_slot"] = json!(99_791_999);
+        assert!(validate_diagnostic_launch(&receipt, &claim).is_err());
+        let mut guard = json!({
+            "filesystem": "/", "worker_root": EPOCH230_MIDDLE_ROOT,
+            "receipt_directory": "/var/lib/jetstreamer/horizon230-middle-fit-v1/guard-receipts",
+            "minimum_free_bytes": 3_770_104_987_645u64,
+            "maximum_root_physical_bytes": 625_000_000_000u64,
+            "maximum_worker_vmas": 3_500_000,
+        });
+        assert!(diagnostic_guard_profile_matches(&claim, &guard));
+        guard["worker_root"] = json!("/home/ubuntu");
+        assert!(!diagnostic_guard_profile_matches(&claim, &guard));
     }
 
     #[test]

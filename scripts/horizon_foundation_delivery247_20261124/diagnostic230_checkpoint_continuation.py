@@ -23,6 +23,9 @@ ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-capped-replay-tmpfs-v
 TAIL_UNIT = "horizon-qualify-230-final-tail-v1.service"
 TAIL_PACKAGE = V / "horizon230-final-tail-v1"
 TAIL_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch230-final-tail-tmpfs-v1/run")
+MIDDLE_UNIT = "horizon-qualify-230-middle-v1.service"
+MIDDLE_PACKAGE = V / "horizon230-middle-fit-v1"
+MIDDLE_ROOT = Path("/home/ubuntu/.jetstreamer-private/qualification-230-middle-v1")
 TAIL_INPUTS = {
     "path": str(V / "horizon230-final-tail-static-v1/inputs.json"),
     "sha256": "91faca00759d243930050e2fa824e890953f9b329606675cba573d0f103fefc3",
@@ -117,9 +120,40 @@ def live230(unit, root, registered):
 
 
 def configuration230():
-    rows = live230(UNIT, RUN_ROOT, receipt()) + live230(TAIL_UNIT, TAIL_ROOT, tail_receipt())
+    rows = (live230(UNIT, RUN_ROOT, receipt()) + live230(TAIL_UNIT, TAIL_ROOT, tail_receipt())
+            + live230(MIDDLE_UNIT, MIDDLE_ROOT, middle_receipt()))
     assert len(rows) <= 1
     return rows
+
+
+def middle_receipt():
+    path = MIDDLE_PACKAGE / "cadence-registration.json"
+    if not path.is_file():
+        return None
+    metadata = path.lstat()
+    assert path.resolve() == path and metadata.st_uid == 0 and metadata.st_nlink == 1
+    assert not metadata.st_mode & 0o222
+    source = ref(path)
+    row = bound(source)
+    assert row["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+    assert (row["epoch"], row["unit"], row["kind"], row["run_root"]) == (
+        230, MIDDLE_UNIT, "epoch230-middle-continuation", str(MIDDLE_ROOT))
+    assert (row["bootstrap_slot"], row["first_slot"], row["last_slot"]) == (99_383_572, 99_383_573, 99_791_404)
+    assert row["worker_sha256"] == WORKER_SHA and row["entry_replay_requested"] and row["launched"]
+    assert re.fullmatch("[0-9a-f]{32}", row["invocation_id"]) and row["main_pid"] > 0
+    assert all(row[key] is False for key in ("canonical_epoch_publication_authorized",
+                                            "remote_mutations", "r2_mutations", "full_continuation_peak_qualified"))
+    admission = bound(row["admission"])
+    assert admission["admitted"] and admission["inputs"] == ref(MIDDLE_PACKAGE / "inputs.json")
+    stock = bound(admission["bootstrap"])
+    assert stock["native"]["checkpoint_matched"] and stock["native"]["worker_sha256"] == WORKER_SHA
+    assert stock["native"]["actual"]["slot"] == 99_383_572 and stock["native"]["replay_entries_sent"] == 0
+    assert admission["node"]["path"] == row["node_path"]
+    sample = bound(row["active_guard"])
+    assert sample["producer_invocation_id"] == row["invocation_id"] and sample["producer"]["pid"] == row["main_pid"]
+    assert sample["producer_stop_enabled"] and sample["trip_reason"] is None
+    assert sample["plan_sha256"] == row["guard_plan"]["sha256"]
+    return source, row
 
 
 def receipt231(unit):
@@ -186,6 +220,7 @@ def register(plan):
     registered = receipt()
     if registered is None:
         register_tail(plan)
+        register_middle(plan)
         return None
     source, row = registered
     if UNIT not in plan["tracked_units"]:
@@ -224,6 +259,7 @@ def register(plan):
     deployment = bound(ref(PACKAGE / "fleet-tool.json"))
     assert deployment["schema"] == "foundation-epoch230-checkpoint-continuation-fleet-tool-v1"
     register_tail(plan)
+    register_middle(plan)
     return deployment["artifact"]
 
 
@@ -258,6 +294,38 @@ def register_tail(plan):
         if not previous:
             diagnostics.append(claim)
         gate["next_action"] = "Verify the final 595 canonical slots and both downstream checkpoints for the epoch 230 tail."
+
+
+def register_middle(plan):
+    registered = middle_receipt()
+    if registered is None:
+        return
+    source, row = registered
+    if MIDDLE_UNIT not in plan["tracked_units"]:
+        plan["tracked_units"].append(MIDDLE_UNIT)
+    diagnostics = plan.setdefault("diagnostics", [])
+    claim = dict(epoch=230, unit=MIDDLE_UNIT, invocation_id=row["invocation_id"],
+                 scratch_path=str(MIDDLE_ROOT), launch_receipt=source)
+    previous = [owner for owner in diagnostics if owner["unit"] == MIDDLE_UNIT]
+    assert not previous or previous == [claim]
+    gate = plan["gates"]["230"]
+    for evidence in (source, row["admission"], row["active_guard"]):
+        if evidence not in gate["evidence"]:
+            gate["evidence"].append(evidence)
+    terminal = MIDDLE_PACKAGE / "terminal.json"
+    if terminal.is_file():
+        result = ref(terminal)
+        receipt = bound(result)
+        assert receipt["registration"] == source and receipt["epoch"] == 230
+        assert receipt["publication_authorized"] is False and not live230(MIDDLE_UNIT, MIDDLE_ROOT, registered)
+        if result not in gate["evidence"]:
+            gate["evidence"].append(result)
+        diagnostics[:] = [owner for owner in diagnostics if owner["unit"] != MIDDLE_UNIT]
+        gate["next_action"] = receipt["next_action"]
+    else:
+        if not previous:
+            diagnostics.append(claim)
+        gate["next_action"] = "Replay the middle span through the pinned AccountsDb root at slot 99,791,404."
 
 
 def register_successor_inputs(plan):
@@ -340,9 +408,10 @@ def owns(row):
         assert producer["InvocationID"] == registration["invocation_id"] and row["scratch_path"] == registration["run_root"]
         assert row["ordinary_replay_claim"] is False and row["current_sidecar_eta_valid"] is False
         return True
-    if unit not in (UNIT, TAIL_UNIT):
+    readers = {UNIT: receipt, TAIL_UNIT: tail_receipt, MIDDLE_UNIT: middle_receipt}
+    if unit not in readers:
         return False
-    _, registration = tail_receipt() if unit == TAIL_UNIT else receipt()
+    _, registration = readers[unit]()
     assert row["epoch"] == 230 and row["phase"] == "diagnostic-qualification"
     assert producer["InvocationID"] == registration["invocation_id"]
     assert row["ordinary_replay_claim"] is False and row["current_sidecar_eta_valid"] is False
