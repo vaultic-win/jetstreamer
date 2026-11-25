@@ -63,7 +63,8 @@ REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
 REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
 V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v2"
-STOPPED168_PRICE = V7_145 or HERE == D / "tools-homefloor-168-stop-v1"
+RETRY5_168 = HERE == D / "tools-homefloor-cold168-retry5-v1"
+STOPPED168_PRICE = RETRY5_168 or V7_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
 V6_POST_PROVIDER = D / "tools-homefloor-145-post-v6-build-v1"
@@ -181,8 +182,14 @@ class PublicReaderTurnover(Exception):
     pass
 
 
+if RETRY5_168:
+    _, retry5_seal = s.read(HERE / "deployment-seal-receipt.json")
+    loader["load_package"](HERE, retry5_seal["sha256"])
+    retry5_fit = runpy.run_path(str(HERE / "retry5_fit.py"))
+    retry5_donor = runpy.run_path(str(HERE / "build_159_price.py"))
 if FIFTH168:
-    cold168 = runpy.run_path(str(HERE / "cold168_actor.py"),init_globals={"RETRY3":RETRY3_168,"RETRY4":RETRY4_168})
+    cold168 = runpy.run_path(str(HERE / "cold168_actor.py"),
+                            init_globals={"RETRY3": RETRY3_168, "RETRY4": RETRY4_168, "RETRY5": RETRY5_168})
 if RETRY4_168:
     writer168v4=runpy.run_path(str(HERE / "retry4_status.py"))
 if CLOSED_RETRY3:
@@ -418,6 +425,12 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
         s.need(not ps and own!=168,"closed retry3 cannot grant a 168 slot")
         terminal=closed_bootstrap["settled"](s,fit)
     if not ps:
+        if RETRY5_168 and e == 168:
+            idle = ("ActiveState", "InvocationID", "Job")
+            for guard_unit in (timer, timer.removesuffix(".timer") + ".service"):
+                state = s.show(guard_unit)
+                s.need(tuple(state[k] for k in idle) == ("inactive", "", "") and not fit.members(guard_unit),
+                       "retry5 guard exists without its producer")
         s.need(manager["ActiveState"] in ("failed","inactive") and not manager["Job"] and (terminal is not None or not (d/"ACTUAL_ADMISSION_AND_PROTECTION.json").exists()),
                "replacement admission has no native producer")
         return None
@@ -447,6 +460,13 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
     s.need(pg=="0::"+group and s.same_file(pr/"fd/1",run/"producer.log")
            and s.same_file(pr/"fd/2",run/"producer.log"),"foreign replacement executable or output")
     cap,guard_image,contract=CAPS[e],IMAGE,CONTRACT
+    if RETRY5_168 and cold168_owner:
+        cap = cold168["CAP"]
+        settings = ("MemoryHigh", "TasksMax")
+        effective = dict(line.split("=", 1) for line in fit.command(
+            "/usr/bin/systemctl", "show", "--property=" + ",".join(settings), unit).splitlines())
+        s.need(effective == {"MemoryHigh": str(64*G), "TasksMax": "1024"},
+               "wrong retry5 memory pressure or task ceiling")
     if cold168_owner:
         guard_image, contract = cold168["verify_start"](
             s, d, pr, unit, timer, tree, run, intent, identity, held, retry11["readonly_mounts"]
@@ -686,6 +706,8 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch, fleet=None):
+    if RETRY5_168:
+        return retry5_fit["drained145"](s, fit, loader["load_package"])
     if V7_145:
         members = fit.members(fit.A145)
         if members:
@@ -1221,6 +1243,8 @@ def registered_status():
                             path = R / f"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V{version}_ACTIVE.json"
                             if path.exists():
                                 adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, version)
+                        if RETRY5_168:
+                            adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, 12)
                         return publication168["registered_writer"](scope, adopted) if PUBLISH168 else adopted
                     if HOURLY170_CADENCE and (
                         R / "survivor172-cadence-20261122-v1/HOURLY170_CADENCE_ACTIVE.json"
@@ -1493,7 +1517,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         closed_before=closed_bootstrap["settled"](s,fit)
     stopped=proof_stops()
     f,fleet_rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
-    if V7_145 or V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145:
+    if RETRY5_168 or V7_145 or V5Z_145 or V5Z_BUILD_145 or V5Y_145 or V5Y_BUILD_145 or V5X_145 or V5X_BUILD_145:
         s.need(not f["actual_active_holding_transfers"] and
                not fit.members("horizon-closed185-lanel-park-20261125-v1.service"),
                "V5x requires the completed handback of the 185 serial holding slot")
@@ -1501,9 +1525,12 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     rows = {e: row for e, row in fleet_rows.items() if not (active170 and e == 170)}
     failed170 = failed170_replay(f, rows) if V5U_POST_145 or FAILED170_BUILD_145 or FRESH_CENSUS_RECOVERY_145 else None
     failed166 = retry11["failed"](s, fit, f, rows) if RETAIN_FAILED166 else None
-    hourly170_settled = settled_hourly170_for_145(f, ref, rows) if V7_145 or V5V_RECOVERY_145 or V5W_POST_145 else None
+    hourly170_settled = (settled_hourly170_for_145(f, ref, rows)
+                         if RETRY5_168 or V7_145 or V5V_RECOVERY_145 or V5W_POST_145 else None)
     terminal168 = None
-    stopped168 = cold168_guard_stop(f, rows) if STOPPED168_PRICE else None
+    retained_retry5 = retry5_fit["retained"](s, fit, f, cold168) if RETRY5_168 else None
+    stopped168 = retained_retry5[0] if RETRY5_168 else cold168_guard_stop(f, rows) if STOPPED168_PRICE else None
+    retry5_donor_before = retry5_donor["snapshot"]() if RETRY5_168 else None
     if PUBLISH168:
         s.need(epoch == 145 and prestart136 is None, "cold168 provider only prices terminal publication")
         terminal168 = publication168["current"](s, loader["load_package"], f)
@@ -1628,7 +1655,40 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     extra=None if closed168 or 168 in interrupted else s.inspect()
     floor168=0;resident168=0;guard168=None
     tree_measurement="two complete stopped-tree walks"
-    if FIFTH168:
+    retry5_current = None
+    if RETRY5_168:
+        s.need(closed168 is None and 168 in interrupted and extra is None, "unexpected original 168 settlement")
+        run168 = cold168["RUN"]
+        cap168 = cold168["CAP"]
+        candidate168 = observe_actor(168, epoch, s.TREE, run168, interrupted[168])
+        if candidate168:
+            rep["168"] = candidate168
+            floor168 = candidate168["floor"]
+        if 168 in rows:
+            s.need(candidate168 and candidate168["admission"] and
+                   (rows[168]["unit"]["Id"], rows[168]["unit"]["InvocationID"]) ==
+                   (candidate168["producer_unit"], candidate168["producer_invocation_id"]),
+                   "foreign retry5 fleet row")
+        static = tree_size(s.TREE, cap168, run168)
+        s.need(static == tree_size(s.TREE, cap168, run168), "retained retry4 and sibling allocation changed")
+        charge = max(static, stopped168["measured_physical_bytes"])
+        measured = candidate168["physical"] if candidate168 else closed168_tree(allow_over_cap=True)["physical_bytes"]
+        if measured is None:
+            physical = charge
+            measurement = "two retained-tree walks excluding active run"
+        else:
+            s.need(static <= measured <= cap168, "retry5 guard and retained-tree walks do not reconcile")
+            physical = max(measured, charge)
+            measurement = ("two complete native whole-tree walks" if candidate168
+                           else "two complete stopped-tree walks")
+        retry5_current = dict(root=str(s.TREE), cap_bytes=cap168, physical_bytes=physical,
+                              measured_physical_bytes=measured, measurement=measurement,
+                              remaining_bytes=cap168 - physical, historical_realized_bytes=0,
+                              run=str(run168), stable_root=cold168["stable"](s))
+        # Keep the original 288 GiB obligation in the incumbent equation.
+        # The independent retry5 growth term is added after that equation.
+        tree = dict(physical_bytes=static, root=str(s.TREE), cap=fit.CAP)
+    elif FIFTH168:
         s.need(closed168 is None and 168 in interrupted and extra is None, "unexpected original 168 settlement")
         a = None if terminal168 or stopped168 else observe_actor(168,epoch,s.TREE,cold168["RUN"],interrupted[168])
         if a:
@@ -1682,8 +1742,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if guard168:books["168"]["measured_guard"]=guard168["receipt"]
     census_stops = stopped
     if FIFTH168:
-        books["168"]["run"] = str(cold168["RUN"])
-        books["168"]["stable_root"] = cold168["stable"](s)
+        if not RETRY5_168:
+            books["168"]["run"] = str(cold168["RUN"])
+            books["168"]["stable_root"] = cold168["stable"](s)
         census_stops = {**stopped, "168": interrupted[168]}
     hourly = hourly169_owner
     if HOURLY169 and not CURRENT_HOURLY169:
@@ -1770,7 +1831,12 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         s.need(closed_bootstrap["settled"](s,fit)==closed_before and "168" not in rep, "closed 168 changed")
         recovered_price["closed_retry3_bootstrap"]=closed_before
     if stopped168:
-        s.need(cold168_guard_stop(f, rows) == stopped168, "epoch 168 guard stop changed during price")
+        if RETRY5_168:
+            s.need(retry5_fit["retained"](s, fit, f, cold168) == retained_retry5,
+                   "retained retry4 evidence changed during price")
+            recovered_price["retry5_retained_source"] = retained_retry5[1]
+        else:
+            s.need(cold168_guard_stop(f, rows) == stopped168, "epoch 168 guard stop changed during price")
         recovered_price["stopped_cold168"] = stopped168
     if terminal168:
         s.need(publication168["current"](s, loader["load_package"], f) == terminal168,
@@ -1813,6 +1879,10 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=needmem,available_memory_bytes=mem["MemAvailable:"],
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,**recovered_price,active168_guard_floor=floor168,
         population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
+    if RETRY5_168:
+        donor = retry5_donor["cover"](retry5_donor_before, native, retry5_donor["snapshot"](),
+                                      cold168_retry5=True)
+        return retry5_fit["price"](s, native, retry5_current, books["168"], donor, cold168)
     if FULL170 or REPRO166:
         # At zero remaining growth, the same paid tree has realized its full
         # allowance. Re-evaluate the existing absolute floors and every other
@@ -1928,6 +1998,9 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         native = capture_native(epoch, ref)
         native["epoch159_donor_cover"] = donor["cover"](before, native, donor["snapshot"]())
         return native
+    if RETRY5_168:
+        s.need(epoch == 168 and prestart136 is None, "retry5 provider only prices epoch 168")
+        return capture_native(epoch, ref)
     if STOPPED168_PRICE:
         s.need(epoch in (145, 166, 167, 170) and prestart136 is None,
                "stopped epoch 168 pricing cannot fund a new epoch 168 producer")

@@ -116,9 +116,9 @@ mod route {
         "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-v1/post-stop-fit";
     pub const ROOT: &str = "4cd544fddda40cd81c94358b8c455feac24247b14f56e8fdb8ede2727c54af25";
     pub const ALIAS: &str = "/run/horizon-full168-cold-v5";
-    pub const STATUS_QUALIFIED: &str = "COLD168_RETRY5_V1_STATUS_QUALIFIED.json";
-    pub const STATUS_ACTIVE: &str = "COLD168_RETRY5_V1_STATUS_ACTIVE.json";
-    pub const STATUS_SCHEMA: &str = "horizon-168-retry5-v1-status-qualified-v1";
+    pub const STATUS_QUALIFIED: &str = "FAILED166_CADENCE_V12_READY.json";
+    pub const STATUS_ACTIVE: &str = "FAILED166_CADENCE_V12_ACTIVE.json";
+    pub const STATUS_SCHEMA: &str = "horizon-epoch166-cadence-rejoin-ready-v1";
     pub const GUARD_QUALIFIED: &str =
         "e237ca579a8921adaae0081ef71a82b35377e4ff80acaf8539c03cd68e3aa696";
     pub const DESCRIPTION: &str = "--description=guarded-full168-cold-retry5";
@@ -1016,6 +1016,7 @@ pub fn index_selected() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(epoch168_cold_retry5))]
 pub fn funded_guard_floor(price: &Value) -> Result<u64> {
     let c = &price["startup_nonexact_peer_floor"];
     let floor = n(c, "protected_raw_floor_bytes")?;
@@ -1040,6 +1041,56 @@ pub fn funded_guard_floor(price: &Value) -> Result<u64> {
         .context("168 floor overflow")
 }
 
+#[cfg(epoch168_cold_retry5)]
+pub fn funded_guard_floor(price: &Value) -> Result<u64> {
+    let booking = &price["bookings"]["168"];
+    let quote = &price["retry5_complete_booking"];
+    let retained = n(quote, "previous_producer_physical_charge_bytes")?;
+    let physical = n(booking, "physical_bytes")?;
+    let remaining = n(booking, "remaining_bytes")?;
+    let floor = n(quote, "protected_raw_floor_bytes")?;
+    let required = n(quote, "complete_required_HOME_bytes")?;
+    ensure!(
+        price["epoch"] == EPOCH
+            && price["fits"] == true
+            && quote["schema"] == "horizon-168-retry5-complete-booking-v1"
+            && quote["funded"] == true
+            && quote["producer_cpu_quota_micros"] == 9_000_000
+            && quote["producer_memory_bytes"] == 68u64 << 30
+            && quote["guard_cpu_quota_micros"] == 250_000
+            && quote["guard_memory_bytes"] == 1u64 << 30
+            && quote["producer_swap_bytes"] == 0
+            && quote["guard_swap_bytes"] == 0
+            && quote["prior_stop"] == price["stopped_cold168"]["terminal"]
+            && quote["prior_stop"]["sha256"]
+                == "b0538a4dee05df924a8d04f8562866df701c03996463552a932059826cdab"
+            && quote["retained_source"] == price["retry5_retained_source"]
+            && quote["retained_source"]["sha256"]
+                == "488dbd9e630511b97a0ad0704241a0a1fdec71a614caf17c6cd1d3a63b3dc0b2"
+            && retained >= n(&price["stopped_cold168"], "measured_physical_bytes")?
+            && retained <= physical
+            && physical.checked_add(remaining) == Some(CAP)
+            && n(booking, "cap_bytes")? == CAP
+            && booking["root"] == LANE
+            && booking["run"] == json!(run())
+            && quote["candidate_remaining_bytes"] == remaining
+            && quote["outside_cap_stop_allowance_bytes"] == 8u64 << 30
+            && quote["retained_base_HOME_bytes"]
+                == price["epoch159_donor_cover"]["native_home_required"]
+            && n(quote, "retained_base_HOME_bytes")?.checked_add(8 << 30) == Some(floor)
+            && floor == n(price, "protected_raw_floor_bytes")?
+            && required == n(price, "complete_required_HOME_bytes")?
+            && floor.checked_add(remaining) == Some(required),
+        "incomplete protected retry5 booking"
+    );
+    let spare = n(price, "available_HOME_bytes")?
+        .checked_sub(required)
+        .context("unfunded retry5 floor")?;
+    floor
+        .checked_add(spare.min(10 << 30))
+        .context("retry5 floor overflow")
+}
+
 pub fn peer_identity(price: &Value) -> Result<Value> {
     let survivors = price["survivors"].as_object().context("survivors")?;
     ensure!(
@@ -1054,7 +1105,7 @@ pub fn peer_identity(price: &Value) -> Result<Value> {
             continue;
         }
         ensure!(
-            matches!(k.as_str(), "166" | "167" | "170")
+            (k == "167" || !cfg!(epoch168_cold_retry5) && matches!(k.as_str(), "166" | "170"))
                 && p["admission"].is_object()
                 && p["first_guard"].is_object(),
             "unexpected peer or pending admission"
@@ -1067,7 +1118,7 @@ pub fn peer_identity(price: &Value) -> Result<Value> {
         ]);
     }
     ensure!(
-        ids.get("167").is_some() && ids.get("170").is_some(),
+        ids.get("167").is_some() && (cfg!(epoch168_cold_retry5) || ids.get("170").is_some()),
         "incomplete live 168 siblings"
     );
     for set in ids.as_object().unwrap().values() {
@@ -1123,7 +1174,10 @@ fn verify_held_price(held: &Value, plan: &Value, first: &Value, price: &Value) -
         record == *held && held["stage"] == "held",
         "different held 168 receipt"
     );
-    checked_quote(price, &provider, &actor, plan, first)
+    checked_quote(price, &provider, &actor, plan, first)?;
+    #[cfg(epoch168_cold_retry5)]
+    funded_guard_floor(price)?;
+    Ok(())
 }
 
 fn checked_quote(
@@ -1425,6 +1479,65 @@ mod tests {
             assert!(translate_payload(bad).is_err());
         }
     }
+    #[cfg(epoch168_cold_retry5)]
+    #[test]
+    fn retry5_price_keeps_the_retained_stop_and_outside_allowance() {
+        let (mut price, _) = doc(
+            &rt("epoch168-retry5-rebook-20261125-v1/RETRY5_INCREMENTAL_REVIEW_NATIVE.json"),
+            None,
+        )
+        .unwrap();
+        let peers = peer_identity(&price).unwrap();
+        assert_eq!(peers.as_object().unwrap().len(), 2);
+        let stop = price["stopped_cold168"]["terminal"].clone();
+        let physical = n(&price["stopped_cold168"], "measured_physical_bytes").unwrap();
+        let remaining = CAP - physical;
+        let base_home = n(&price["epoch159_donor_cover"], "native_home_required").unwrap();
+        let floor = base_home + (8 << 30);
+        let required = floor + remaining;
+        let source =
+            json!({"sha256":"488dbd9e630511b97a0ad0704241a0a1fdec71a614caf17c6cd1d3a63b3dc0b2"});
+        price["epoch"] = json!(EPOCH);
+        price["protected_raw_floor_bytes"] = json!(floor);
+        price["complete_required_HOME_bytes"] = json!(required);
+        price["available_HOME_bytes"] = json!(required + 12);
+        price["retry5_retained_source"] = source.clone();
+        price["bookings"]["168"] = json!({
+            "root": LANE, "run": run(), "cap_bytes": CAP, "physical_bytes": physical,
+            "remaining_bytes": remaining
+        });
+        price["retry5_complete_booking"] = json!({
+            "schema":"horizon-168-retry5-complete-booking-v1", "funded":true,
+            "prior_stop": stop, "retained_source": source,
+            "previous_producer_physical_charge_bytes": physical,
+            "producer_cpu_quota_micros":9_000_000, "producer_memory_bytes":68u64 << 30,
+            "guard_cpu_quota_micros":250_000, "guard_memory_bytes":1u64 << 30,
+            "producer_swap_bytes":0, "guard_swap_bytes":0,
+            "retained_base_HOME_bytes":base_home, "protected_raw_floor_bytes":floor,
+            "complete_required_HOME_bytes":required, "candidate_remaining_bytes":remaining,
+            "outside_cap_stop_allowance_bytes":8u64 << 30
+        });
+        assert_eq!(funded_guard_floor(&price).unwrap(), floor + 12);
+        for (key, replacement) in [
+            ("outside_cap_stop_allowance_bytes", json!(0)),
+            ("guard_cpu_quota_micros", json!(0)),
+            (
+                "previous_producer_physical_charge_bytes",
+                json!(physical - 1),
+            ),
+            ("prior_stop", json!({})),
+        ] {
+            let mut bad = price.clone();
+            bad["retry5_complete_booking"][key] = replacement;
+            assert!(funded_guard_floor(&bad).is_err(), "{key}");
+        }
+        price["replacements"]["170"] = price["replacements"]["167"].clone();
+        assert!(peer_identity(&price).is_err());
+        price["available_HOME_bytes"] = json!(required - 1);
+        assert!(funded_guard_floor(&price).is_err());
+    }
+
+    #[cfg(not(epoch168_cold_retry5))]
     #[test]
     fn actual_three_peer_price_and_caps() {
         let p = rt(
@@ -1452,6 +1565,7 @@ mod tests {
 }
 
 /// Require the sole writer qualified against this prepared lane.
+#[cfg(not(epoch168_cold_retry5))]
 pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
     let d = rt("survivor172-cadence-20261122-v1");
     let (q, qr) = doc(&d.join(STATUS_QUALIFIED), None)?;
@@ -1498,11 +1612,7 @@ pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
             && q["package"] == reg["consumer_seal"]
             && a["qualified"] == qr
             && hex(st(&q, "source_commit")?, 40)
-            && q["suites"].as_object().is_some_and(|s| !s.is_empty())
-            && actor["unit"] == "horizon-archive-status-cadence-after172-20261120-v1.service"
-            && actor["invocation_id"] == reg["invocation_id"]
-            && actor["pid"] == reg["pid"]
-            && actor["start_ticks"] == reg["start_ticks"],
+            && q["suites"].as_object().is_some_and(|s| !s.is_empty()),
         "unregistered 168 status receiver"
     );
     let seal_path = Path::new(st(&q["package"], "path")?);
@@ -1519,6 +1629,75 @@ pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
         "different qualified status program"
     );
     member(&entry, st(&q["package"], "sha256")?)?;
+    receiver_lock(actor, reg)?;
+    Ok(json!({"qualified":qr,"active":ar,"registration":reg}))
+}
+
+#[cfg(epoch168_cold_retry5)]
+pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
+    const SEAL: &str = "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac";
+    let status = rt("survivor172-cadence-20261122-v1");
+    let package = status.join("tools-cold168-retry5-failed166-v12-entry146");
+    let entry = package.join("status_cycle.py");
+    let seal = member(&entry, SEAL)?;
+    let marker = package.join("retry5-168-generation.json");
+    ensure!(
+        member(&marker, SEAL)? == seal,
+        "different retry5 generation seal"
+    );
+    let (generation, generation_ref) = doc(&marker, None)?;
+    let (ready, ready_ref) = doc(&status.join(STATUS_QUALIFIED), None)?;
+    let (active, active_ref) = doc(&status.join(STATUS_ACTIVE), None)?;
+    let previous = bound(
+        &ready["old_owner"],
+        &status.join("FAILED166_CADENCE_V11_ACTIVE.json"),
+    )?;
+    let fleet = bound(&ready["fleet"], Path::new(st(&ready["fleet"], "path")?))?;
+    let (_, root_ref) = doc(&base().join("SUCCESSOR_ROOT.json"), Some(ROOT))?;
+    let (_, guard_ref) = doc(
+        &rt(GUARD_BASE).join("GUARD_QUALIFIED.json"),
+        Some(GUARD_QUALIFIED),
+    )?;
+    let registration = &price["status_registration"];
+    let actor = &active["new"];
+    let lock = &actor["lock"];
+    let old = &previous["new"];
+    ensure!(
+        ready["schema"] == STATUS_SCHEMA
+            && ready["package"] == seal
+            && registration["consumer_seal"] == seal
+            && ready["retry5_generation"] == generation_ref
+            && generation["prepared"] == *prepared
+            && generation["successor_root"] == root_ref
+            && generation["guard_qualification"] == guard_ref
+            && generation["retained_source"] == price["retry5_retained_source"]
+            && ready["retained_retry4_stop"] == price["stopped_cold168"]["terminal"]
+            && ready["config"] == fleet["sole_next_observer"]
+            && ready["timer"] == fleet["sole_next_timer"]
+            && active["schema"] == "horizon-epoch166-cadence-rejoin-active-v1"
+            && active["ready"] == ready_ref
+            && active["producer_mutations"] == false
+            && active["old"] == *old
+            && actor["program"] == json!(entry)
+            && actor["invocation_id"] != old["invocation_id"]
+            && n(actor, "start_ticks")? > n(old, "start_ticks")?
+            && ["path", "device", "inode"]
+                .iter()
+                .all(|k| lock[*k] == old["lock"][*k]),
+        "unregistered retry5 status receiver or cadence handoff"
+    );
+    receiver_lock(actor, registration)?;
+    Ok(json!({"qualified":ready_ref,"active":active_ref,"registration":registration}))
+}
+
+fn receiver_lock(actor: &Value, registration: &Value) -> Result<()> {
+    ensure!(
+        actor["unit"] == "horizon-archive-status-cadence-after172-20261120-v1.service"
+            && actor["invocation_id"] == registration["invocation_id"]
+            && actor["pid"] == registration["pid"]
+            && actor["start_ticks"] == registration["start_ticks"],
+        "unregistered 168 status receiver"
+    );
     let ctl = native(st(actor, "unit")?)?;
     let pid = n(actor, "pid")?;
     let (_, ticks, group) = proc_row(pid)?;
@@ -1554,7 +1733,7 @@ pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
         }),
         "status receiver lacks original exclusive lock"
     );
-    Ok(json!({"qualified":qr,"active":ar,"registration":reg}))
+    Ok(())
 }
 
 pub fn inventory_record(v: &Value) -> Result<Value> {
