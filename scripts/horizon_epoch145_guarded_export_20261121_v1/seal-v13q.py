@@ -21,12 +21,14 @@ checkout = stage.parent / "source"
 continuity = runtime / "epoch145-semantic-continuity-20261121-v1"
 worker = continuity / "tools-v13q"
 fit = runtime / "incident-replay-fit-20261121-v1"
-provider = fit / "tools-homefloor-145-post-v5z-current-v1"
-original_provider = fit / "tools-homefloor-145-post-v5z-build-v1"
+provider = fit / "tools-homefloor-145-post-v6-current-v1"
+original_provider = fit / "tools-homefloor-145-post-v6-build-v1"
 evidence = stage / "evidence"
 source = stage / "source"
 worker_source = Path("scripts/horizon_epoch145_guarded_export_20261121_v1")
 fit_source = Path("scripts/horizon_incident_replay_fit_20261121_v1")
+semantic_owner = "a71285e56d674de3bf793692f93dfbb3"
+reader_commit = "e15f71a2a84c9f256c6fc3d5da34e9354430e702"
 
 def git(*args):
     return subprocess.check_output(["/usr/sbin/runuser", "-u", "sol", "--", "/usr/bin/git", "-C", str(checkout), *args])
@@ -82,24 +84,28 @@ stopped = checked(terminal)
 inputs = checked(build["inputs"])
 quote = checked(build["capacity"])["quote"]
 commit = build["source_commit"]
-reader_revisions = {
-    "a68223d33f132cc4bf28085b3b9ddfa687248a62": "6bc8f25405f86634f484e665a740ecf73845d691",
-    "3072a276dfedcc4b56b7586364572833fa03a647": "e15f71a2a84c9f256c6fc3d5da34e9354430e702",
-}
-need(commit == inputs["source_commit"] and commit in reader_revisions
+completion_ref = bound(continuity / "v6-guard-walk-name-handoff/SEMANTIC_COMPLETION.json")
+completion = checked(completion_ref)
+need(commit == inputs["source_commit"]
+     and build["schema"] == "horizon-epoch145-v13q-guarded-build-v1"
      and build["actor"]["InvocationID"] == stopped["invocation_id"] and stopped["build"] == qualified_build
-     and quote["fits"] is True and quote["resource_credit_bytes"] == 0
-     and quote["phase145"]["stage"] == "v5z-semantic-complete-drained"
-     and quote["phase145"]["completed_invocation_id"] == "4b6a40fe7a4441c28c229ad2b59e2503",
+     and quote["fits"] is True and quote["resource_credit_bytes"] == 0 and not quote["replay_launch_authorized"]
+     and quote["phase145"]["stage"] == "v6-semantic-complete-drained"
+     and quote["phase145"]["completed_invocation_id"] == completion["invocation_id"] == semantic_owner
+     and quote["phase145"]["completion"] == completion["completion"]
+     and quote["phase145"]["checker_seal"] == inputs["quote_program_seal"]
+     and completion["schema"] == "horizon-epoch145-v5z-custody-successor-semantic-completion-v1"
+     and completion["publication_authorized"] is completion["r2_mutations"] is False,
      "different native build provenance")
-tracked = [worker_source / name for name in ("incident-post-phase.py", "run-incident-post.sh", "reader_bridge.py")]
+tracked = [worker_source / name for name in (
+    "incident-post-phase.py", "run-incident-post.sh", "reader_bridge.py", "seal-v13q.py")]
 tracked += [fit_source / name for name in ("post-stop-fit", "retry4_status.py")]
 closure = sorted(set(map(Path, build["merged_source_closure"])) | set(tracked))
 source_receipt = stage / "SOURCE_CONTAINMENT.json"
 durable(source_receipt, source_containment(inputs, closure, commit, source_publication))
 reader_bridge = compiled_file(inputs, worker_source / "reader_bridge.py")
 fresh_reader = json.loads(subprocess.check_output(["/usr/bin/python3", "-IB", str(reader_bridge), "--guard-post-preflight"], timeout=45))
-need(fresh_reader["qualified_reader_commit"] == reader_revisions[commit]
+need(fresh_reader["qualified_reader_commit"] == reader_commit
    and fresh_reader["fetched_tip"] == source_publication
    and fresh_reader["publication_authorized"] is fresh_reader["r2_mutations"] is False,
    "paired reader equivalence differs from the current branch")
@@ -111,34 +117,36 @@ image = evidence / "export145"
 need(build["worker"] == bound(image) and build["tests"] == bound(tests)
      and build["phase_tests"] == bound(phase_tests)
      and "test result: ok." in tests.read_text() and "0 failed;" in tests.read_text()
-     and "Ran 3 tests" in phase_tests.read_text() and phase_tests.read_text().endswith("OK\n"),
+     and "Ran 4 tests" in phase_tests.read_text() and phase_tests.read_text().endswith("OK\n"),
      "native or phase test results differ")
-if reader_revisions[commit] == "e15f71a2a84c9f256c6fc3d5da34e9354430e702":
-    reader_test = evidence / "native-reader-test.log"
-    result = reader_test.read_text()
-    need(build["reader_test"] == bound(reader_test)
-         and "post::tests::current_full_and_plugin_use_the_same_qualified_plan_as_delivery ... ok" in result
-         and "test result: ok. 1 passed; 0 failed;" in result,
-         "the linked verifier did not prove the qualified HTTP retry reader")
+reader_test = evidence / "native-reader-test.log"
+result = reader_test.read_text()
+need(build["reader_test"] == bound(reader_test)
+     and "post::tests::current_full_and_plugin_use_the_same_qualified_plan_as_delivery ... ok" in result
+     and "test result: ok. 1 passed; 0 failed;" in result,
+     "the linked verifier did not prove the qualified HTTP retry reader")
 adapter = compiled_file(inputs, worker_source / "incident-post-phase.py")
 wrapper = compiled_file(inputs, worker_source / "run-incident-post.sh")
 post_fit = compiled_file(inputs, fit_source / "post-stop-fit")
 status_adapter = compiled_file(inputs, fit_source / "retry4_status.py")
 worker_proof = stage / "worker-build-proof.json"
 image_hash = build["worker"]["sha256"]
-helper = bound(continuity / "tools-v5z/v5v_semantic_completion.py")
-runtime_seal = bound(continuity / "tools-v5z/deployment-seal-receipt.json")
-qualified = checked(bound(stage.parent / "v5z-worker-seal-evidence/QUALIFIED_V5Z.json"))
-need(runtime_seal == qualified["worker"], "the V5z semantic deployment changed")
+helper = bound(continuity / "tools-v6-guard-walk/v5v_semantic_completion.py")
+runtime_seal = bound(continuity / "tools-v6-guard-walk/deployment-seal-receipt.json")
+qualified = checked(bound(stage.parent / "v6-worker-seal-evidence/QUALIFIED_V6.json"))
+need(runtime_seal == qualified["worker"] == completion["startup_evidence"]["worker_seal"]
+     and completion["startup_evidence"]["predecessor_terminal"] == qualified["predecessor"],
+     "the V6 semantic deployment changed")
 semantic_member, = (row for row in checked(runtime_seal)["members"]
                     if row["name"] == "v5v_semantic_completion.py" and row["mode"] == "0444")
-need(helper["sha256"] == semantic_member["sha256"], "V5z semantic checker changed")
+need(helper["sha256"] == semantic_member["sha256"], "V6 semantic checker changed")
 durable(worker_proof, {"schema":"horizon-145-v5j-post-build-v1",
     "source_commit":commit, "verifier_sha256":image_hash, "native_qualification":qualified_build,
     "native_terminal":terminal, "source_containment":bound(source_receipt),
     "tests":build["tests"], "phase_tests":build["phase_tests"], "build_price":build["capacity"],
     "reader_preflight":bound(reader_preflight), "reader_commit":fresh_reader["qualified_reader_commit"],
-    "semantic_checker":helper, "resource_credit_bytes":0, "archive_body_verified_by_this_build":False})
+    "semantic_checker":helper, "semantic_completion":completion_ref,
+    "resource_credit_bytes":0, "archive_body_verified_by_this_build":False})
 run_post = stage / "run-post"
 template = wrapper.read_text()
 need(template.count("PINNED_POST_SHA") == 1, "invalid run-post template")
@@ -178,6 +186,7 @@ result = stage / "SEALED_V13Q.json"
 durable(result, {"source_commit":commit, "native_qualification":qualified_build, "native_terminal":terminal,
                  "seal_operator":bound(Path(__file__).resolve()),
                  "source_containment":bound(source_receipt), "reader_preflight":bound(reader_preflight),
+                 "semantic_completion":completion_ref,
                  "worker":worker_ref, "provider":provider_ref, "predecessor_provider":prior_ref,
                  "post_worker_started":False, "r2_mutations":False})
 print(json.dumps(bound(result), sort_keys=True))

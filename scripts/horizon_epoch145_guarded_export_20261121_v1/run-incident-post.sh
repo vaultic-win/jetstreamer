@@ -91,7 +91,7 @@ if [[ $pkg == */tools-v13d || $pkg == */tools-v13e || $pkg == */tools-v13f || $p
         provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5x-current-v1/post-stop-fit
     fi
     if [[ $pkg == */tools-v13q ]]; then
-        provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5z-current-v1/post-stop-fit
+        provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v6-current-v1/post-stop-fit
     fi
     if [[ $pkg == */tools-v13g ]]; then provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5m-v1/post-stop-fit; fi
     "$provider" "${provider_args[@]}" 145 "$fleet" "$fleet_sha" | /usr/bin/jq -e --arg f "$fleet" --arg h "$fleet_sha" '
