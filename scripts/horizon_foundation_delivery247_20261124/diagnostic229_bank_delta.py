@@ -8,6 +8,8 @@ UNIT = "horizon-perf-epoch229-bank-delta@v334.service"
 PACKAGE = V / "horizon229-bank-delta-v334"
 RUN_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch229-bank-delta-tmpfs-v334/run")
 REGISTRATION = PACKAGE / "cadence-registration.json"
+FINALIZED_REWARDS = V / "horizon229-finalized-block-rewards-v1/completion.json"
+FINALIZED_REWARDS_SHA = "a353fd5134d3947788610f9b057442d64cfd2cda7e9835e267169a1eabf34923"
 FIELDS = ["Id", "ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup"]
 
 
@@ -75,6 +77,24 @@ def gate(plan):
         if terminal_ref not in gate_row["evidence"]:
             gate_row["evidence"].append(terminal_ref)
         gate_row["next_action"] = acceptance["next_action"]
+        if FINALIZED_REWARDS.is_file():
+            rewards_ref = ref(FINALIZED_REWARDS)
+            assert rewards_ref["sha256"] == FINALIZED_REWARDS_SHA
+            rewards = bound(rewards_ref)
+            assert rewards["schema"] == "foundation-epoch229-finalized-block-rewards-comparison-v1"
+            assert rewards["epoch"] == 229 and rewards["bank_evidence"] == acceptance["evidence"]
+            assert rewards["publication_authorized"] is False and rewards["remote_mutations"] is False
+            assert set(rewards["slots"]) == {"98931631", "98931633"}
+            for comparison in rewards["slots"].values():
+                assert comparison["status"] == 200 and comparison["block_identity_matched"] is True
+                assert comparison["comparison"] == "match"
+                assert comparison["native_only"] == comparison["finalized_only"] == 0
+            if rewards_ref not in gate_row["evidence"]:
+                gate_row["evidence"].append(rewards_ref)
+            gate_row["next_action"] = (
+                "Both block reward lists match finalized RPC. Compare the retained dirty-account hashes "
+                "with independently reconstructed account state at slots 98,931,631 and 98,931,633."
+            )
 
 
 def owns(row):
