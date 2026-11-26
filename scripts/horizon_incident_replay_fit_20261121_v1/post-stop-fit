@@ -57,7 +57,7 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v3",
 )
 FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
-FULL170_STOPPED_RETRY5 = HERE == D / "tools-homefloor-170-full-metered-independent-v2"
+FULL170_STOPPED_RETRY5 = HERE == D / "tools-homefloor-170-full-metered-independent-v3"
 FULL170_INDEPENDENT = FULL170_STOPPED_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-independent-v1"
 FULL170_RETRY5 = FULL170_RETRY5_V10 or FULL170_INDEPENDENT or HERE == D / "tools-homefloor-170-full-metered-v6"
 FULL170_V13 = FULL170_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-v5"
@@ -652,6 +652,8 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
 
 def observe_actor(e, own, tree, run, stop, terminal=None):
     if FIFTH168 and e == 168:
+        if FULL170_STOPPED_RETRY5:
+            return cold168["observe"](s, fit, native_actor, own, terminal)
         return cold168["observe"](s, fit, native_actor, own)
     if COLD170 and e == 170:
         return cold170["observe"](s, fit, native_actor, own)
@@ -1772,7 +1774,8 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         s.need(closed168 is None and 168 in interrupted and extra is None, "unexpected original 168 settlement")
         run168 = cold168["RUN"]
         cap168 = cold168["CAP"]
-        candidate168 = observe_actor(168, epoch, s.TREE, run168, interrupted[168])
+        stopped_retry5 = f["cold168_retry5_physical_scan_stop"] if FULL170_STOPPED_RETRY5 else None
+        candidate168 = observe_actor(168, epoch, s.TREE, run168, interrupted[168], stopped_retry5)
         if candidate168:
             rep["168"] = candidate168
             floor168 = candidate168["floor"]
@@ -2243,7 +2246,8 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
                                                   v9=FULL170_V9, v13=FULL170_V13, v14=FULL170_STOPPED_RETRY5)
             full170_capacity["unchanged"](s, full170_mode, (actor, guard), final)
             if FULL170_RETRY5:
-                peer = observe_actor(168, epoch, s.TREE, cold168["RUN"], {})
+                stopped_retry5 = fleet["cold168_retry5_physical_scan_stop"] if FULL170_STOPPED_RETRY5 else None
+                peer = observe_actor(168, epoch, s.TREE, cold168["RUN"], {}, stopped_retry5)
                 if FULL170_STOPPED_RETRY5:
                     s.need(retry5_fit["stopped_retry5"](s, cold168, fleet, peer) == native["full170_retry5_stopped"],
                            "retry5 stop changed during full epoch 170 pricing")

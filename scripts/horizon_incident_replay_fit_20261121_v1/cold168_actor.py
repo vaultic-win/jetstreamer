@@ -224,7 +224,7 @@ def stable(s):
     return ref
 
 
-def observe(s,fit,native_actor,own):
+def observe(s,fit,native_actor,own, terminal=None):
     rootref = stable(s)
     root = s.bound(rootref,R / DIRECTORY / 'SUCCESSOR_ROOT.json')
     if RETRY5:
@@ -232,10 +232,11 @@ def observe(s,fit,native_actor,own):
         home_stop, retry4 = retry5_preparation(s, root, prepared)
         s.need(retry5_stop(s, fit)[0] == retry4, 'different retry5 predecessor')
         predecessor = dict(original=dict(producer_invocation_id=PRIOR_IID), stop_completion=home_stop)
-        actor = native_actor(168, own, LANE, RUN, predecessor, generation=(DIRECTORY, NAME))
+        actor = native_actor(168, own, LANE, RUN, predecessor, terminal, generation=(DIRECTORY, NAME))
         s.need(actor is None or actor['producer_invocation_id'] != retry4['producer_invocation_id'],
                'spent retry4 invocation cannot admit retry5')
         return actor
+    s.need(terminal is None, 'unexpected stop for the older epoch 168 route')
     stopped=set(root['stopped_units'])
     if RETRY3:
         # The creation receipt includes the successor before admission. native_actor checks it below.
