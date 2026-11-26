@@ -57,7 +57,8 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v3",
 )
 FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
-FULL170_INDEPENDENT = HERE == D / "tools-homefloor-170-full-metered-independent-v1"
+FULL170_STOPPED_RETRY5 = HERE == D / "tools-homefloor-170-full-metered-independent-v2"
+FULL170_INDEPENDENT = FULL170_STOPPED_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-independent-v1"
 FULL170_RETRY5 = FULL170_RETRY5_V10 or FULL170_INDEPENDENT or HERE == D / "tools-homefloor-170-full-metered-v6"
 FULL170_V13 = FULL170_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-v5"
 FULL170_V9 = FULL170_V13 or HERE == D / "tools-homefloor-170-full-metered-v3"
@@ -1346,7 +1347,8 @@ def registered_status():
                                            "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54")
                             adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, 12)
                         if FULL170_V13 or V13_RETRY5_FIT:
-                            adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, 13,
+                            version = 14 if FULL170_STOPPED_RETRY5 else 13
+                            adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, version,
                                                                                 binary=fit.binary)
                         return publication168["registered_writer"](scope, adopted) if PUBLISH168 else adopted
                     if HOURLY170_CADENCE and (
@@ -1664,7 +1666,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
                    "held or active full epoch 170 requires authenticated drained V5w")
         hourly170_owner, full170_guard = full170_capacity["ownership"](s, fit, full170, hourly170,
                                                                        full170_mode, ref, status, f,
-                                                                       v9=FULL170_V9, v13=FULL170_V13)
+                                                                       v9=FULL170_V9, v13=FULL170_V13, v14=FULL170_STOPPED_RETRY5)
     if HOURLY170:
         s.need(epoch == 145 and prestart136 is None and hourly170_mode in ("prestart", "post-guard", "active")
                and failed170, "hourly 170 requires the positive retry 13 terminal")
@@ -1765,6 +1767,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     tree_measurement="two complete stopped-tree walks"
     retry5_current = None
     retry5_owner = None
+    retry5_stopped = None
     if RETRY5_168:
         s.need(closed168 is None and 168 in interrupted and extra is None, "unexpected original 168 settlement")
         run168 = cold168["RUN"]
@@ -1779,11 +1782,15 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
                    (candidate168["producer_unit"], candidate168["producer_invocation_id"]),
                    "foreign retry5 fleet row")
         if FULL170_RETRY5:
-            retry5_owner = retry5_fit["protected_owner"](s, cold168, f, candidate168)
+            if FULL170_STOPPED_RETRY5:
+                retry5_stopped = retry5_fit["stopped_retry5"](s, cold168, f, candidate168)
+            else:
+                retry5_owner = retry5_fit["protected_owner"](s, cold168, f, candidate168)
             if full170_mode in ("held", "post-guard"):
                 prestart = bound(hourly170_owner["prestart"])
-                s.need(prestart.get("full170_retry5_owner") == retry5_owner,
-                       "full epoch 170 hold changed the enrolled retry5 owner")
+                s.need(prestart.get("full170_retry5_owner") == retry5_owner and
+                       prestart.get("full170_retry5_stopped") == retry5_stopped,
+                       "full epoch 170 hold changed the retry5 authority")
         static = tree_size(s.TREE, cap168, run168)
         s.need(static == tree_size(s.TREE, cap168, run168), "retained retry4 and sibling allocation changed")
         charge = max(static, stopped168["measured_physical_bytes"])
@@ -2028,13 +2035,15 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         native["active_full170_guard"] = full170_guard
     if FULL170:
         final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, f,
-                                              v9=FULL170_V9, v13=FULL170_V13)
+                                              v9=FULL170_V9, v13=FULL170_V13, v14=FULL170_STOPPED_RETRY5)
         full170_capacity["unchanged"](s, full170_mode, (hourly170_owner, full170_guard), final)
     if REPRO166:
         s.need(reproduction166_owner(repro166_mode, ref) == repro166, "epoch 166 gate or first guard changed during capture")
         native["reproduction166_owner"] = repro166
     if FULL170_RETRY5:
         native.update(full170_retry5_owner=retry5_owner, full170_retry5_current=retry5_current)
+        if FULL170_STOPPED_RETRY5:
+            native["full170_retry5_stopped"] = retry5_stopped
         return native
     if RETRY5_168:
         writer = {"registered_writer": registered_status()} if V13_RETRY5_FIT else {}
@@ -2168,7 +2177,7 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         fleet, _ = fleet_head(ref)
         status = registered_status()
         actor, guard = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet,
-                                                     v9=FULL170_V9, v13=FULL170_V13)
+                                                     v9=FULL170_V9, v13=FULL170_V13, v14=FULL170_STOPPED_RETRY5)
     if STOPPED_GUARD_145 or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or LATE_HANDOFF_145:
         s.need(epoch == 145 and (prestart136 is None or POST_136), "unexpected missed-census pricing scope")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
@@ -2231,13 +2240,17 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
             s.need(registered_status() == status and fleet_head(ref)[0] == fleet,
                    "full epoch 170 fleet ownership changed after donor proof")
             final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet,
-                                                  v9=FULL170_V9, v13=FULL170_V13)
+                                                  v9=FULL170_V9, v13=FULL170_V13, v14=FULL170_STOPPED_RETRY5)
             full170_capacity["unchanged"](s, full170_mode, (actor, guard), final)
             if FULL170_RETRY5:
                 peer = observe_actor(168, epoch, s.TREE, cold168["RUN"], {})
-                s.need(retry5_fit["protected_owner"](s, cold168, fleet, peer) == native["full170_retry5_owner"]
-                       and peer["guard_time"] >= native["replacements"]["168"]["guard_time"],
-                       "retry5 owner or guard changed during full epoch 170 pricing")
+                if FULL170_STOPPED_RETRY5:
+                    s.need(retry5_fit["stopped_retry5"](s, cold168, fleet, peer) == native["full170_retry5_stopped"],
+                           "retry5 stop changed during full epoch 170 pricing")
+                else:
+                    s.need(retry5_fit["protected_owner"](s, cold168, fleet, peer) == native["full170_retry5_owner"]
+                           and peer["guard_time"] >= native["replacements"]["168"]["guard_time"],
+                           "retry5 owner or guard changed during full epoch 170 pricing")
                 retry5_fit["price170"](s, native, cold168)
             measured = guard
             if full170_mode == "active":

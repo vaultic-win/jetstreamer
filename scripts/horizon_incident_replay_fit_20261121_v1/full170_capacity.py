@@ -415,23 +415,27 @@ def require_v12(s, status):
            'full epoch 170 V9 pricing requires the registered V12 receiver')
 
 
-def require_v13(s, status):
+def require_v13(s, status, *, version=13):
     cadence = Path('/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1')
-    active, _ = s.read(cadence/'FAILED166_CADENCE_V13_ACTIVE.json')
-    ready = s.bound(active['ready'], cadence/'FAILED166_CADENCE_V13_READY.json')
+    active, _ = s.read(cadence/f'FAILED166_CADENCE_V{version}_ACTIVE.json')
+    ready = s.bound(active['ready'], cadence/f'FAILED166_CADENCE_V{version}_READY.json')
     actor = active['new']
-    package = cadence/'tools-cold168-retry5-failed166-v13-entry146'
+    package = cadence/f'tools-cold168-retry5-failed166-v{version}-entry146'
     s.need(ready['package'] == status['consumer_seal']
            and ready['package']['path'] == str(package/'deployment-seal-receipt.json')
            and actor['program'] == str(package/'status_cycle.py')
            and all(status[key] == actor[key] for key in ('invocation_id', 'pid', 'start_ticks')),
-           'full epoch 170 pricing requires the registered V13 receiver and actor')
+           f'full epoch 170 pricing requires the registered V{version} receiver and actor')
+    return ready
 
 
-def ownership(s, fit, route, hourly, mode, ref, status, fleet, *, v9=False, v13=False):
+def ownership(s, fit, route, hourly, mode, ref, status, fleet, *, v9=False, v13=False, v14=False):
     if v13:
-        s.need(v9, 'V13 requires the drained V9 pricing route')
-        require_v13(s, status)
+        s.need(v9, 'metered receiver requires the drained pricing route')
+        ready = require_v13(s, status, version=14 if v14 else 13)
+        if v14:
+            s.need(fleet['cold168_retry5_physical_scan_stop'] == ready['retry5_scan_stop'],
+                   'fleet lost the retry5 filesystem scan stop')
     elif v9:
         require_v12(s, status)
     if mode == 'prestart':

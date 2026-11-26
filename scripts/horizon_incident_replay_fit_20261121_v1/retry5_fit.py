@@ -118,6 +118,27 @@ def protected_owner(s, cold168, fleet, actor):
             'first_worker': first_ref}
 
 
+def stopped_retry5(s, cold168, fleet, actor):
+    """Preserve the released retry5 invocation's physical obligation after its stop."""
+    stop = fleet['cold168_retry5_physical_scan_stop']
+    source = R / cold168['DIRECTORY']
+    terminal = s.bound(stop['terminal'], source/'guard-receipts/stop-completion.json')
+    intent = s.bound(stop['stop_intent'], source/'guard-receipts/stop-intent.json')
+    admission = s.bound(stop['admission'], source/'ACTUAL_ADMISSION_AND_PROTECTION.json')
+    plan = s.bound(admission['actual_guard_plan'], source/'ACTUAL_GUARD_PLAN.json')
+    s.need(actor is None and not any(row['epoch'] == 168 for row in fleet['actual_executing_replays'])
+           and stop['resource_credit_bytes'] == stop['reservation_ending_bytes'] == 0
+           and stop['retained_cap_bytes'] == plan['maximum_root_physical_bytes'] == cold168['CAP']
+           and stop['producer_invocation_id'] == terminal['producer_invocation_id']
+           == admission['producer_invocation_id'] == plan['invocation_id']
+           and terminal['plan_sha256'] == intent['plan_sha256'] == admission['actual_guard_plan']['sha256']
+           and intent['reason'] == 'root-physical-observation-failed'
+           and intent['sample']['root_physical_observation_error'] == 'physical scan time bound exceeded'
+           and (plan['unit'], admission['timer_unit']) == (cold168['UNIT'], stop['retired_guard_timer']),
+           'invalid stopped retry5 resource authority')
+    return dict(stop=stop, floor=plan['minimum_free_bytes'])
+
+
 def donor_cover(s, donor, before, native, fleet, *, registered_writer=None,
                 independent_entry146=False, retry5_provider=None):
     """Price the paid donor with the V12 roster while retaining all old claims."""
@@ -230,11 +251,12 @@ def price(s, native, current, ret, donor, cold168):
            'invalid retained retry4 or retry5 physical booking')
     candidate = native['epoch'] == 168
     retained_floor = donor['native_home_required'] + lag
-    protected = retained_floor if candidate else max(retained_floor, native['active168_guard_floor'])
+    guard_floor = max(native['active168_guard_floor'], (native.get('full170_retry5_stopped') or {}).get('floor', 0))
+    protected = retained_floor if candidate else max(retained_floor, guard_floor)
     required = protected + current['remaining_bytes']
     available = donor['native_home_available']
     details = dict(schema='horizon-168-retry5-complete-booking-v1',
-                   retained_guard_floor_bytes=0 if candidate else native['active168_guard_floor'],
+                   retained_guard_floor_bytes=0 if candidate else guard_floor,
                    previous_producer_physical_charge_bytes=charge,
                    prior_stop=native['stopped_cold168']['terminal'],
                    outside_cap_stop_allowance_bytes=lag,
@@ -282,15 +304,19 @@ def price170(s, native, cold168):
     donor_home = donor['native_home_required']
     s.need(0 < zero <= base <= donor_home, 'inconsistent epoch 170 donor projections')
     owner = native['full170_retry5_owner']
-    s.need(owner['floor'] == native['active168_guard_floor'] > 0,
-           'missing retry5 absolute floor from the native price')
+    stopped = native.get('full170_retry5_stopped')
+    if stopped is None:
+        s.need(owner['floor'] == native['active168_guard_floor'] > 0, 'missing live retry5 floor')
+    else:
+        s.need(owner is None and native['active168_guard_floor'] == 0 and stopped['floor'] > 0,
+               'stopped retry5 price claimed a live guard')
     current = native.pop('full170_retry5_current')
     retained = native['bookings']['168']
     price(s, native, current, retained, donor, cold168)
     retry5 = native['retry5_complete_booking']
     required = native['complete_required_HOME_bytes']
     joint_zero = (max(zero + donor_home - base + retry5['outside_cap_stop_allowance_bytes'],
-                      owner['floor']) + current['remaining_bytes'])
+                      retry5['retained_guard_floor_bytes']) + current['remaining_bytes'])
     remaining = donor['remaining_home_bytes'] - (required - donor_home)
     native.update(full170_zero_remaining_native_HOME_bytes=joint_zero,
                   epoch159_donor_cover=dict(donor, native_home_required=required,
