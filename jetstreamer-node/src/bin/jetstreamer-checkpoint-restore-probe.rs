@@ -1,6 +1,6 @@
-//! Private, no-replay checkpoint comparison using the unchanged historical worker.
+//! Private, no-replay checkpoint comparison using a digest-pinned historical worker.
 //!
-//! This is intentionally limited to the retained epoch-213 restart candidate.
+//! The build selects an exact retained prefix and restart candidate.
 //! A successful restore does not authorize a suffix, assembly, or publication.
 
 #[allow(dead_code)]
@@ -10,7 +10,7 @@ mod historical;
 use {
     historical::{
         HistoricalCheckpoint, HistoricalInitialization, HistoricalRuntimeClient,
-        SOLANA_V1_6_16_CANDIDATE, SnapshotInitialization, WorkerSpawn,
+        SnapshotInitialization, WorkerProfile, WorkerSpawn,
     },
     jetstreamer_node::{
         archive_checksum::{
@@ -33,13 +33,57 @@ use {
     },
 };
 
-const WORKER_SHA256: &str = "3f5e8efec328b3e00dd9ce5ae396fc4067e6be6554e4da8831a13273186a748a";
-const SNAPSHOT_SHA256: &str = "bae33ebaeaa7bfb3c4c9230ef9f7aabb2e68628ac2fc0a8d435b7e2e976bbe08";
-const PREFIX_MANIFEST_SHA256: &str =
-    "1d74158c418f67443837b01ae3d218ace43c1e9998e6a91c4d3ead6e2b5e0581";
-// This lower bound is not full fleet admission. The sealed operational plan
-// must additionally protect every older invocation's remaining-growth claim.
-const MINIMUM_FREE_BYTES: u64 = 230_740_693_718 + (128 << 30);
+struct Profile {
+    plan_schema: &'static str,
+    receipt_schema: &'static str,
+    prefix_range: (u64, u64, u64, u64, u64),
+    prefix_runtime: &'static str,
+    prefix_worker_sha256: &'static str,
+    prefix_manifest_sha256: &'static str,
+    worker: WorkerProfile,
+    worker_sha256: &'static str,
+    snapshot_name: &'static str,
+    snapshot_sha256: &'static str,
+    snapshot_bytes: u64,
+    minimum_free_bytes: u64,
+}
+
+// The operational admission independently accounts for older invocations and
+// the backing filesystem. These are lower bounds for the configured scratch.
+#[cfg(not(feature = "epoch231-native-restore-diagnostic"))]
+const PROFILE: Profile = Profile {
+    plan_schema: "jetstreamer-private-epoch213-checkpoint-restore-probe-plan-v1",
+    receipt_schema: "jetstreamer-private-epoch213-checkpoint-restore-probe-v1",
+    prefix_range: (213, 92_016_000, 431_543, 92_015_419, 92_447_542),
+    prefix_runtime: "solana-v1.6.16",
+    prefix_worker_sha256: "3f5e8efec328b3e00dd9ce5ae396fc4067e6be6554e4da8831a13273186a748a",
+    prefix_manifest_sha256: "1d74158c418f67443837b01ae3d218ace43c1e9998e6a91c4d3ead6e2b5e0581",
+    worker: historical::SOLANA_V1_6_16_CANDIDATE,
+    worker_sha256: "3f5e8efec328b3e00dd9ce5ae396fc4067e6be6554e4da8831a13273186a748a",
+    snapshot_name: "snapshot-92447542-4gX8J8Y3c36L6W4D38ax2RYShfKmYxHWuDHAkQKeNzqd.tar.zst",
+    snapshot_sha256: "bae33ebaeaa7bfb3c4c9230ef9f7aabb2e68628ac2fc0a8d435b7e2e976bbe08",
+    snapshot_bytes: 8_894_131_881,
+    minimum_free_bytes: 230_740_693_718 + (128 << 30),
+};
+
+#[cfg(feature = "epoch231-native-restore-diagnostic")]
+const PROFILE: Profile = Profile {
+    plan_schema: "jetstreamer-private-epoch231-checkpoint-restore-probe-plan-v1",
+    receipt_schema: "jetstreamer-private-epoch231-checkpoint-restore-probe-v1",
+    prefix_range: (231, 99_792_000, 11_090, 99_791_404, 99_803_089),
+    prefix_runtime: "solana-v1.6.20-epoch231-called-program-demotion-candidate",
+    prefix_worker_sha256: "afc9739c8753f97ad0d278c2829f2808f80a612bac7b1c83852c3548ba05dc08",
+    prefix_manifest_sha256: "b760a45bc00c952fc93878480718f6b6a2333f496ac7080b1badb267dbc50fc1",
+    worker: WorkerProfile {
+        backend_id: "solana-v1.6.20-epoch231-checkpoint-continuation-candidate",
+        ..historical::SOLANA_V1_6_20_CANDIDATE
+    },
+    worker_sha256: "8f3e721a5ec255ffb7fd6fa848d2127740897476672eb2e8640f8bd449652859",
+    snapshot_name: "snapshot-99803089-42P5KSaezAgfvTUMtuFUiEtjpsmagMA2UbWoWJPAKCqr.tar.zst",
+    snapshot_sha256: "f4410a8f6710e2e55860c74501fa05255f052ca9b3c7be866b63d70e160e01fb",
+    snapshot_bytes: 9_930_565_789,
+    minimum_free_bytes: 128 << 30,
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -126,17 +170,19 @@ fn bound_bytes(
 fn validate_prefix(prefix: &HistoricalSegmentManifest) -> Result<(), String> {
     prefix.validate().map_err(|e| e.to_string())?;
     require(
-        prefix.epoch == 213
-            && prefix.output_slot_start == 92_016_000
-            && prefix.output_slot_count == 431_543
-            && prefix.bootstrap.slot == 92_015_419
-            && prefix.terminal.slot == 92_447_542,
+        (
+            prefix.epoch,
+            prefix.output_slot_start,
+            prefix.output_slot_count,
+            prefix.bootstrap.slot,
+            prefix.terminal.slot,
+        ) == PROFILE.prefix_range,
         "prefix range mismatch",
     )?;
     require(
-        prefix.runtime.runtime_profile == "solana-v1.6.16"
-            && prefix.runtime.runtime_revision == "86c26f843276581509c3434acc2efbf4202c44e0"
-            && prefix.worker_executable_sha256 == digest(WORKER_SHA256)?,
+        prefix.runtime.runtime_profile == PROFILE.prefix_runtime
+            && prefix.runtime.runtime_revision == PROFILE.worker.solana_commit
+            && prefix.worker_executable_sha256 == digest(PROFILE.prefix_worker_sha256)?,
         "prefix runtime mismatch",
     )
 }
@@ -217,13 +263,10 @@ fn execute(plan_path: &Path, plan_sha: &str, self_sha: &str) -> Result<(), Strin
     )?;
     let plan: Plan = serde_json::from_slice(&bound_bytes(plan_path, plan_sha, 1 << 20, true)?)
         .map_err(|e| e.to_string())?;
+    require(plan.schema == PROFILE.plan_schema, "plan schema mismatch")?;
     require(
-        plan.schema == "jetstreamer-private-epoch213-checkpoint-restore-probe-plan-v1",
-        "plan schema mismatch",
-    )?;
-    require(
-        plan.minimum_free_bytes >= MINIMUM_FREE_BYTES,
-        "free-space bound must protect the retained century floor plus the diagnostic budget",
+        plan.minimum_free_bytes >= PROFILE.minimum_free_bytes,
+        "free-space bound is below the diagnostic minimum",
     )?;
     validate_private_directory(&plan.scratch_directory)?;
     let output_parent = plan.output.parent().ok_or("output needs a parent")?;
@@ -243,7 +286,7 @@ fn execute(plan_path: &Path, plan_sha: &str, self_sha: &str) -> Result<(), Strin
     )?;
     let prefix: HistoricalSegmentManifest = serde_json::from_slice(&bound_bytes(
         &plan.prefix_manifest,
-        PREFIX_MANIFEST_SHA256,
+        PROFILE.prefix_manifest_sha256,
         1 << 20,
         true,
     )?)
@@ -252,11 +295,10 @@ fn execute(plan_path: &Path, plan_sha: &str, self_sha: &str) -> Result<(), Strin
     // Snapshot bytes are copied, fully hashed, and length/identity bound by
     // the reviewed historical client immediately before worker initialization.
     require(
-        plan.snapshot.file_name().and_then(|s| s.to_str())
-            == Some("snapshot-92447542-4gX8J8Y3c36L6W4D38ax2RYShfKmYxHWuDHAkQKeNzqd.tar.zst"),
+        plan.snapshot.file_name().and_then(|s| s.to_str()) == Some(PROFILE.snapshot_name),
         "snapshot filename mismatch",
     )?;
-    bound_bytes(&plan.worker, WORKER_SHA256, 256 << 20, true)?;
+    bound_bytes(&plan.worker, PROFILE.worker_sha256, 256 << 20, true)?;
     let genesis = plan.ledger_directory.join("genesis.tar.bz2");
     require(
         fs::canonicalize(&plan.ledger_directory).map_err(|e| e.to_string())?
@@ -283,7 +325,7 @@ fn execute(plan_path: &Path, plan_sha: &str, self_sha: &str) -> Result<(), Strin
         "free-space admission failed",
     )?;
     let mut client = HistoricalRuntimeClient::spawn(
-        SOLANA_V1_6_16_CANDIDATE,
+        PROFILE.worker,
         WorkerSpawn {
             executable: plan.worker.clone(),
             initialization: HistoricalInitialization::SnapshotArchive(SnapshotInitialization {
@@ -293,15 +335,15 @@ fn execute(plan_path: &Path, plan_sha: &str, self_sha: &str) -> Result<(), Strin
                 expected_accounts_hash: Hash::from_str(&prefix.terminal.accounts_hash)
                     .map_err(|e| e.to_string())?
                     .to_bytes(),
-                expected_archive_sha256: Some(digest(SNAPSHOT_SHA256)?),
-                expected_archive_size: Some(8_894_131_881),
+                expected_archive_sha256: Some(digest(PROFILE.snapshot_sha256)?),
+                expected_archive_size: Some(PROFILE.snapshot_bytes),
                 scratch_parent: Some(plan.scratch_directory.clone()),
             }),
         },
     )
     .map_err(|e| e.to_string())?;
     require(
-        client.executable_sha256() == digest(WORKER_SHA256)?,
+        client.executable_sha256() == digest(PROFILE.worker_sha256)?,
         "executed worker digest mismatch",
     )?;
     let checkpoint = client
@@ -315,12 +357,12 @@ fn execute(plan_path: &Path, plan_sha: &str, self_sha: &str) -> Result<(), Strin
     client.shutdown().map_err(|e| e.to_string())?;
     bound_bytes(&genesis, &plan.genesis_archive_sha256, 10 << 20, true)?;
     let receipt = json!({
-        "schema": "jetstreamer-private-epoch213-checkpoint-restore-probe-v1",
+        "schema": PROFILE.receipt_schema,
         "recorded_unix_seconds": SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e| e.to_string())?.as_secs(),
         "plan": {"path": plan_path, "sha256": plan_sha}, "probe_sha256": self_sha,
-        "worker": {"path": plan.worker, "sha256": WORKER_SHA256},
-        "snapshot": {"path": plan.snapshot, "sha256": SNAPSHOT_SHA256, "bytes": 8_894_131_881u64},
-        "prefix_manifest": {"path": plan.prefix_manifest, "sha256": PREFIX_MANIFEST_SHA256},
+        "worker": {"path": plan.worker, "sha256": PROFILE.worker_sha256},
+        "snapshot": {"path": plan.snapshot, "sha256": PROFILE.snapshot_sha256, "bytes": PROFILE.snapshot_bytes},
+        "prefix_manifest": {"path": plan.prefix_manifest, "sha256": PROFILE.prefix_manifest_sha256},
         "native_checkpoint": {
             "slot": checkpoint.slot, "bank_hash": Hash::new_from_array(checkpoint.bank_hash).to_string(),
             "accounts_hash": Hash::new_from_array(checkpoint.accounts_hash).to_string(),

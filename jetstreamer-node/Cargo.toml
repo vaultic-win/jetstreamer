@@ -39,6 +39,8 @@ epoch140-native-restore-diagnostic = ["dep:chrono"]
 epoch144-native-restore-diagnostic = ["dep:chrono"]
 epoch203-native-restore-diagnostic = ["dep:chrono"]
 epoch205-native-restore-diagnostic = ["dep:chrono"]
+# Checkpoint-only restore comparison for the retained epoch 231 prefix.
+epoch231-native-restore-diagnostic = []
 # Private epoch 213 prefix/checkpoint continuation. Never creates a canonical
 # checksum or enables ordinary archive reuse/publication.
 epoch213-checkpoint-continuation-diagnostic = []
