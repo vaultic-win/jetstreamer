@@ -1,0 +1,12 @@
+diff --git a/scope/gate.py b/scope/gate.py
+--- a/scope/gate.py
++++ b/scope/gate.py
+@@ -153,7 +153,7 @@
+     need(os.geteuid() == 1001 and os.getegid() == 1003 and re.fullmatch("[a-f0-9]{32}",iid)
+          and int(iid,16) and Path("/proc/self/cgroup").read_text().strip() == "0::"+control
+          and (group/"memory.max").read_text().strip() == str(59 << 30)
+-         and (group/"memory.high").read_text().strip() == str(60 << 30)
++         and (group/"memory.high").read_text().strip() == str(57 << 30)
+          and (group/"memory.swap.max").read_text().strip() == "0"
+          and quota * 4 == period * 7,
+          "producer cgroup, limits or generation differs")
