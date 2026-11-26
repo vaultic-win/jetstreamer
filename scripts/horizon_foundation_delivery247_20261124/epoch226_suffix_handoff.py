@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the epoch 226 extraction-to-suffix handoff without issuing admission."""
+"""Bind the private epoch 226 extraction and suffix outputs for the next stage."""
 
 import argparse
 import contextlib
@@ -20,6 +20,9 @@ SUFFIX = PRIVATE / 'checkpoint-continuation-226-suffix-v1'
 SUFFIX_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
 SEALED = V / 'horizon226-suffix-stage-evidence-v1'
 HANDOFF = V / 'horizon226-suffix-v1/source-handoff.json'
+ASSEMBLY_HANDOFF = HANDOFF.with_name('assembly-source-handoff.json')
+ASSEMBLY_ROOT = PRIVATE / 'checkpoint-continuation-226-assemble-v1'
+ASSEMBLY_UNIT = 'horizon-qualify-226-checkpoint-continuation-assemble-v1.service'
 PLAN_SCHEMA = 'jetstreamer-private-epoch226-scoped-repair-plan-v1'
 ADMISSION_SCHEMA = 'jetstreamer-epoch226-scoped-repair-admission-v1'
 SUCCESS = '7ad2d189f7e94e70a38c781354912448'
@@ -40,6 +43,7 @@ PREPARATION = {
 STAGE_INPUTS = {
     'extract': ('original_archive', 'original_manifest', 'native_review', 'restore_proof', 'verified225', 'held_broker'),
     'replay': ('prefix_archive', 'prefix_manifest', 'extraction', 'snapshot', 'worker', 'genesis'),
+    'assemble': ('prefix_archive', 'prefix_manifest', 'extraction', 'suffix_archive', 'suffix_manifest', 'replay'),
 }
 
 
@@ -206,7 +210,7 @@ def terminal_matches(live, journal, launch):
             and live.get('ControlGroup') == live.get('Job') == '' and live.get('Result') == 'success'
             and live.get('ExecMainStatus') == '0'
             and live.get('InvocationID') in ('', launch['invocation_id']),
-            'extraction producer has not drained successfully')
+            'producer has not drained successfully')
     exact = [row for row in journal if row.get('UNIT') == launch['unit']
              and row.get('INVOCATION_ID') == launch['invocation_id'] and row.get('_PID') == '1'
              and row.get('_UID') == '0' and row.get('MESSAGE_ID') == SUCCESS
@@ -219,7 +223,7 @@ def capture_terminal(launch):
     unit = launch['unit']
     live = systemd(unit, ('ActiveState', 'SubState', 'MainPID', 'ControlPID', 'NRestarts', 'InvocationID',
                           'ControlGroup', 'Job', 'Result', 'ExecMainStatus'))
-    require(live.get('ActiveState') == 'inactive', 'extraction producer is still running or has failed')
+    require(live.get('ActiveState') == 'inactive', 'producer is still running or has failed')
     lines = subprocess.check_output([
         'journalctl', '-b', '--no-pager', '-o', 'json',
         f'UNIT={unit}', f'INVOCATION_ID={launch["invocation_id"]}',
@@ -227,7 +231,7 @@ def capture_terminal(launch):
     ], text=True, timeout=10).splitlines()
     journal = terminal_matches(live, [json.loads(line) for line in lines], launch)
     group = Path('/sys/fs/cgroup/system.slice') / unit
-    require(not group.exists(), 'extraction producer still has a cgroup')
+    require(not group.exists(), 'producer still has a cgroup')
     return {'manager': live, 'pid1_cursor': journal['__CURSOR'],
             'terminal_unix_microseconds': journal['__REALTIME_TIMESTAMP']}
 
@@ -259,11 +263,12 @@ def validate_outputs(owner, extraction, manifest, launch, extract_plan, receipt_
 
 def durable_seal(path, payload):
     # Publish one immutable file atomically, without replacing prior custody.
-    require((path.parent == SEALED or path == HANDOFF) and path.parent.resolve(strict=True) == path.parent,
+    handoff = path in (HANDOFF, ASSEMBLY_HANDOFF)
+    require((path.parent == SEALED or handoff) and path.parent.resolve(strict=True) == path.parent,
             'sealed destination is not the exact stage custody path')
     parent = path.parent.stat()
     require(parent.st_uid == 0 and stat.S_IMODE(parent.st_mode) == 0o755, 'unsafe custody directory')
-    mode = 0o400 if path == HANDOFF else 0o444
+    mode = 0o400 if handoff else 0o444
     if not path.exists():
         fd, name = tempfile.mkstemp(prefix='.stage-', dir=path.parent)
         temporary = Path(name)
@@ -317,6 +322,86 @@ def bind_static_to_output(prep, launch, extract_plan, static, launch_ref):
             'guard_and_cadence_integration_required': True, 'work_started': False}
 
 
+def assembly_source(seal):
+    registration = HANDOFF.with_name('cadence-registration.json')
+    require(registration.is_file(), 'epoch 226 suffix launch has no registered invocation')
+    launch_data = read_bytes(registration)
+    launch = json.loads(launch_data)
+    require(launch['schema'] == 'jetstreamer-historical-performance-launch-receipt-v1'
+            and launch['kind'] == 'epoch226-checkpoint-suffix'
+            and (launch['epoch'], launch['unit'], launch['run_root']) == (226, SUFFIX_UNIT, str(SUFFIX))
+            and (launch['bootstrap_slot'], launch['first_slot'], launch['last_slot']) == (98063464, 98063465, 98063999)
+            and launch['launched'] and launch['canonical_epoch_publication_authorized'] is False,
+            'foreign epoch 226 suffix registration')
+    terminal = capture_terminal(launch)
+    admission = document(launch['admission'])
+    source_ref = pin(admission['handoff'])
+    require(source_ref['path'] == str(HANDOFF), 'foreign prefix handoff')
+    source = document(source_ref)
+    suffix_plan = document(launch['plan'])
+    stage = source['stage']
+    require(source['schema'] == 'foundation-epoch226-suffix-handoff-v1' and source['epoch'] == 226
+            and admission['admitted'] is True and admission['operation'] == 'replay'
+            and stage['operation'] == 'replay'
+            and admission['stage_sha256'] == source['stage_sha256'] == stage_digest(stage)
+            and suffix_plan['stage'] == stage and suffix_plan['admission'] == launch['admission']
+            and launch['worker_sha256'] == stage['worker']['sha256'],
+            'suffix admission and prefix handoff differ')
+    prefix = Path(stage['prefix_archive']['path'])
+    prefix_identity = metadata(prefix, uid=1000, writable=0o022)
+    require(list(prefix_identity) == source['prefix_identity'], 'original prefix identity changed')
+    suffix = SUFFIX / 'output/epoch-226-suffix.jet'
+    suffix_identity = metadata(suffix, uid=1000, writable=0o022)
+    require(suffix_identity[2] > 0 and not any(os.path.lexists(str(path) + '.sha256') for path in (prefix, suffix)),
+            'private archive is empty or has a canonical sidecar')
+    suffix_meta = suffix.with_suffix('.jet.segment.json')
+    replay_path = SUFFIX / 'receipts/replay.json'
+    owner_data = read_bytes(SUFFIX / 'receipts/owner.json', uid=1000, writable=0o022)
+    replay_data = read_bytes(replay_path, uid=1000, writable=0o022)
+    manifest_data = read_bytes(suffix_meta, uid=1000, writable=0o022)
+    owner, replay, manifest = map(json.loads, (owner_data, replay_data, manifest_data))
+    require(owner['producer_unit'] == SUFFIX_UNIT and owner['invocation_id'] == launch['invocation_id']
+            and owner['plan'] == launch['plan'] and owner['operation'] == 'replay'
+            and owner['receipt'] == str(replay_path) and owner['receipt_sha256'] == digest(replay_data)
+            and owner['source_must_be_retained'] and not owner['publication_authorized'] and not owner['r2_mutations'],
+            'foreign suffix output owner or replay receipt')
+    require(replay['schema'] == 'jetstreamer-private-epoch226-suffix-v1' and replay['epoch'] == 226
+            and replay['suffix_archive'] == str(suffix) and replay['suffix_manifest_sha256'] == digest(manifest_data)
+            and replay['prefix_archive_sha256'] == stage['prefix_archive']['sha256']
+            and replay['extraction'] == stage['extraction'] and replay['worker_sha256'] == stage['worker']['sha256']
+            and replay['snapshot_sha256'] == stage['snapshot']['sha256']
+            and replay['remaining_slots_replayed'] == 535 and replay['suffix_complete'] is True
+            and replay['actual_native_checkpoint_matches'] is True and replay['source_must_be_retained']
+            and not replay['publication_authorized'] and not replay['canonical_sidecar_authorized']
+            and manifest['epoch'] == 226 and manifest['output_slot_start'] == 98063465
+            and manifest['output_slot_count'] == 535 and manifest['bootstrap']['slot'] == 98063464
+            and manifest['terminal']['slot'] == 98063999 and manifest['terminal']['slot_complete']
+            and manifest['archive_sha256'] == replay['suffix_archive_sha256'],
+            'epoch 226 suffix lacks exact complete checkpoint and archive evidence')
+
+    def evidence(name, data):
+        path = SEALED / name
+        return durable_seal(path, data) if seal else {'path': str(path), 'sha256': digest(data)}
+
+    assembly = {'operation': 'assemble', **{key: stage[key] for key in ('prefix_archive', 'prefix_manifest', 'extraction')},
+                'suffix_archive': pin({'path': str(suffix), 'sha256': replay['suffix_archive_sha256']}),
+                'suffix_manifest': evidence(suffix_meta.name, manifest_data),
+                'replay': evidence(replay_path.name, replay_data)}
+    receipt = {'schema': 'foundation-epoch226-private-assembly-source-v1', 'epoch': 226,
+               'terminal': terminal, 'suffix_launch': {'path': str(registration), 'sha256': digest(launch_data)},
+               'suffix_owner': evidence('suffix-owner.json', owner_data), 'prefix_handoff': source_ref,
+               'prefix_identity': prefix_identity, 'suffix_identity': suffix_identity,
+               'stage': assembly, 'stage_sha256': stage_digest(assembly),
+               'producer_unit': ASSEMBLY_UNIT, 'run_root': str(ASSEMBLY_ROOT),
+               'admission_issued': False, 'work_started': False, 'publication_authorized': False}
+    require(metadata(prefix, uid=1000, writable=0o022) == prefix_identity
+            and metadata(suffix, uid=1000, writable=0o022) == suffix_identity,
+            'private archive identity changed while binding assembly sources')
+    if seal:
+        return durable_seal(ASSEMBLY_HANDOFF, (json.dumps(receipt, indent=2, sort_keys=True) + '\n').encode())
+    return receipt
+
+
 def plan_from_admission(handoff, admission_ref, admission):
     stage = handoff['stage']
     node = handoff['static']['node']
@@ -347,14 +432,17 @@ def plan_from_admission(handoff, admission_ref, admission):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('operation', choices=('verify-static', 'bind', 'emit-plan'))
+    parser.add_argument('operation', choices=('verify-static', 'bind', 'emit-plan', 'bind-assembly'))
     parser.add_argument('--extraction', choices=LAUNCHES, default='v2')
     parser.add_argument('--admission', nargs=2, metavar=('PATH', 'SHA256'))
     parser.add_argument('--seal-handoff', action='store_true')
     args = parser.parse_args()
     require(os.geteuid() == 0, 'run with root read and sealed-custody permissions')
     require((args.operation == 'emit-plan') == bool(args.admission), 'only emit-plan accepts external admission evidence')
-    require(not args.seal_handoff or args.operation == 'bind', 'only bind can seal the successful handoff')
+    require(not args.seal_handoff or args.operation in ('bind', 'bind-assembly'), 'only handoff binding can seal evidence')
+    if args.operation == 'bind-assembly':
+        print(json.dumps(assembly_source(args.seal_handoff), indent=2))
+        return
     prep, launch, extract_plan, static = static_inputs(
         full=args.operation == 'verify-static', extraction=args.extraction)
     result = static
