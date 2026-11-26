@@ -222,6 +222,126 @@ def activate_guarded(kit, epoch, state, tokens, producer_unit, guard_unit, guard
     return unit, plan, token, active_guard
 
 
+def start_vote_boundary(kit, roster_ref, remote):
+    """Admit the sealed vote-boundary repair through the existing guarded startup."""
+    assert __debug__ and os.geteuid() == 0 and os.environ['CODEX_THREAD_ID'] == kit.replay.THREAD
+    ops = kit.ops
+    state = BASE / 'horizon230-vote-boundary-runtime-v1'
+    tokens = BASE / 'horizon230-vote-boundary-tokens-v1'
+    source = ops.ref(state / 'profile.json')
+    assert source['sha256'] == 'd7df4effe7e674aa0dcdcf2978c0aed4b30630878d79192ba20e3ac07aff28f8'
+    profile = ops.bound(source)
+    root = Path(profile['run_root'])
+    producer, guard = profile['unit'], profile['guard_unit']
+    template_ref = profile['static_guard_plan']
+    template = ops.bound(template_ref)
+    namespace = ops.ref(state / 'namespace-validation.json')
+    assert namespace['sha256'] == 'a81ea8fcca0b8df1fc6b9ef5798a36543c2d269b943e23ee684fb4e580c46adc'
+    assert ops.bound(namespace)['profile'] == source
+    node = ops.checked_image(profile['node'])
+    worker = ops.checked_image(profile['worker'])
+    ops.checked_image(profile['guard'])
+    hook = BASE / 'horizon230-final-tail-tokens-v1/pre-start.sh'
+    ops.checked_image({'path': str(hook), 'sha256': '14c316bf3fc8ff28800c9b7bb673f42f95995a2a2b1ac0b9654c36c0a83832e0'})
+    assert profile['argv'][0] == node and profile['argv'][1] == '230'
+    assert ops.ref(Path(profile['epoch_hashes']['path'])) == profile['epoch_hashes']
+    bootstrap = profile['bootstrap']
+    live_bootstrap = Path(bootstrap['path']).lstat()
+    assert (live_bootstrap.st_dev, live_bootstrap.st_ino, live_bootstrap.st_size) == tuple(
+        bootstrap[field] for field in ('device', 'inode', 'size'))
+    assert remote['epoch'] == 230 and remote['state'] == 'missing'
+    roster = ops.bound(roster_ref)
+    fit = roster['capacity']
+    candidate = profile['memory_max_bytes'] + (1 << 30) + (256 << 20)
+    cpus = set(range(72, 80))
+    assert profile['allowed_cpus'] == '72-79'
+
+    def expand(value):
+        ranges = [token.split('-') for token in value.replace(',', ' ').split()]
+        return {cpu for r in ranges for cpu in range(int(r[0]), int(r[-1]) + 1)}
+
+    with kit.partition.take(), (CONTROL / 'cycle.lock').open('rb') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        assert kit.partition.locked(kit.partition.LOCK, os.getpid())
+        assert ops.props('foundation-publication-cadence-v222.service', ['ActiveState', 'Job']) == {'ActiveState': 'inactive', 'Job': ''}
+        assert 0 <= time.time() - roster['recorded_unix_seconds'] <= 60
+        assert not roster['admission_issued'] and cpus <= expand(Path('/sys/devices/system/cpu/online').read_text())
+        listed = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
+                                          '--plain', '--no-legend', '--no-pager'], text=True, timeout=10)
+        periodic = {g['unit'] for g in roster['periodic_guards'].values()}
+        owners = {line.split()[0] for line in listed.splitlines()
+                  if line.startswith(('horizon-', 'foundation-', 'archive-', 'jetstreamer-'))}
+        assert owners - periodic == set(roster['owners'])
+        for unit in (producer, guard, guard.replace('.service', '.timer')):
+            assert ops.props(unit, ['LoadState', 'ActiveState', 'Job']) == {'LoadState': 'not-found', 'ActiveState': 'inactive', 'Job': ''}
+        fields = ['Id', 'ActiveState', 'SubState', 'InvocationID', 'MainPID', 'AllowedCPUs', 'MemoryMax']
+        for unit, item in roster['owners'].items():
+            current = ops.props(unit, fields)
+            assert all(current[key] == item['systemd'][key] for key in fields)
+            assert cpus.isdisjoint(expand(current['AllowedCPUs']))
+        for directory in (root / 'scratch', root / 'state', state / 'guard-receipts'):
+            assert not any(directory.iterdir())
+        assert root.parent.is_mount() and not tokens.exists()
+        fs = os.statvfs(root.parent.parent)
+        free = min(fit['available_disk_bytes'], fs.f_bavail * fs.f_frsize)
+        hard = fit['required_hard_memory_bytes'] - fit['candidate_total_memory_bytes'] + candidate
+        remaining = fit['required_remaining_memory_bytes'] - fit['candidate_total_memory_bytes'] + candidate
+        assert hard <= fit['host_total_memory_bytes'] and remaining <= fit['available_memory_bytes']
+        assert free >= fit['protected_existing_disk_bytes'] + profile['root_receipt_reservation_bytes']
+
+        tokens.mkdir(mode=0o755)
+        tokens.chmod(0o755)
+        properties = {
+            'Type': 'exec', 'User': 'ubuntu', 'Group': 'ubuntu', 'UMask': '0077', 'Restart': 'no',
+            'KillMode': 'control-group', 'Delegate': 'no', 'OOMPolicy': 'kill',
+            'MemoryHigh': profile['memory_high_bytes'], 'MemoryMax': profile['memory_max_bytes'], 'MemorySwapMax': '0',
+            'AllowedCPUs': profile['allowed_cpus'], 'CPUAffinity': profile['allowed_cpus'], 'CPUQuota': '800%', 'TasksMax': '512',
+            'RuntimeMaxSec': profile['runtime_max_seconds'], 'TimeoutStopSec': '180', 'TimeoutStartSec': '180',
+            'ProtectSystem': 'strict', 'ProtectHome': 'read-only', 'ProtectControlGroups': 'yes',
+            'PrivateTmp': 'yes', 'NoNewPrivileges': 'yes', 'RestrictAddressFamilies': 'AF_UNIX AF_INET AF_INET6',
+            'ReadWritePaths': str(root), 'WorkingDirectory': str(root),
+            'ReadOnlyPaths': ' '.join([str(tokens), node, worker, profile['bootstrap']['path'], profile['epoch_hashes']['path']]),
+            'BindReadOnlyPaths': ' '.join(f'{b["source"]}:{b["destination"]}' for b in profile['binds']),
+            'UnsetEnvironment': 'HORIZON_S3_ENDPOINT HORIZON_ACCESS_KEY_ID HORIZON_SECRET_ACCESS_KEY HORIZON_PUBLIC_BASE_URL',
+        }
+        environment = {
+            'JETSTREAMER_ALLOW_CANDIDATE_RUNTIME': '1', 'JETSTREAMER_CLEAR_ACCOUNTS_ON_START': '1',
+            'JETSTREAMER_ENFORCE_ARCHIVE_HASH': '1', 'JETSTREAMER_PRIVATE_RUN_ROOT': str(root / 'state'),
+            'JETSTREAMER_PRUNE_EPOCH_SNAPSHOTS': '0', 'JETSTREAMER_SKIP_SNAPSHOT_VERIFY': '0',
+            'JETSTREAMER_VERIFY_SNAPSHOTS': '1', 'JETSTREAMER_NETWORK': 'mainnet',
+            'JETSTREAMER_FORCE_LEGACY_INDEX': '1', 'RUST_LOG': 'info', 'JETSTREAMER_RIPGET_THREADS': '1',
+            'SOLANA_RAYON_THREADS': '8', 'RAYON_NUM_THREADS': '8', 'JETSTREAMER_HISTORICAL_POH_THREADS': '8',
+            'TOKIO_WORKER_THREADS': '8', 'JETSTREAMER_REPLAY_THREADS': '8', 'RUST_MIN_STACK': '134217728',
+            'TMPDIR': str(root / 'tmp'), 'CLOUDSDK_CONFIG': str(root / 'tmp/isolated-empty-gcloud'),
+            'CLOUDSDK_CORE_DISABLE_PROMPTS': '1', 'CLOUDSDK_CORE_DISABLE_FILE_LOGGING': '1',
+            profile['worker_environment']: worker, 'JETSTREAMER_HISTORICAL_TRACE': '1',
+        }
+        props = [f'--property={key}={value}' for key, value in properties.items()]
+        props += [f'--setenv={key}={value}' for key, value in environment.items()]
+        admission = ops.funds.put(state / 'admission.json', {
+            'schema': 'foundation-epoch230-vote-boundary-admission-v1', 'epoch': 230, 'profile': source,
+            'namespace': namespace, 'roster': roster_ref, 'static_guard_plan': template_ref, 'inventory': remote,
+            'argv': profile['argv'], 'properties': properties, 'environment': environment,
+            'fit': {'available_bytes': free, 'required_hard_memory_bytes': hard, 'required_remaining_memory_bytes': remaining,
+                    'candidate_memory_bytes': candidate, 'cpus': sorted(cpus)},
+            'admitted': True, 'publication_authorized': False,
+        })
+        identity, plan, token, active_guard = activate_guarded(
+            kit, 230, state, tokens, producer, guard, profile['guard'], template, admission,
+            props, f'ExecStartPre=/usr/bin/bash {hook} 60 {tokens}', profile['argv'])
+        return ops.funds.put(state / 'cadence-registration.json', {
+            'schema': 'jetstreamer-historical-performance-launch-receipt-v1',
+            'kind': 'epoch230-vote-boundary-demotion', 'epoch': 230, 'unit': producer,
+            'invocation_id': identity['invocation_id'], 'main_pid': identity['main_pid'],
+            'node_path': node, 'run_root': str(root), 'worker_sha256': profile['worker']['sha256'],
+            'bootstrap_slot': 99_430_284, 'first_slot': profile['first_slot'], 'target_slot': profile['target_slot'],
+            'last_slot': profile['last_slot'], 'launched': True, 'entry_replay_requested': True,
+            'canonical_epoch_publication_authorized': False, 'full_continuation_peak_qualified': False,
+            'remote_mutations': False, 'r2_mutations': False, 'admission': admission, 'guard_plan': plan,
+            'launch_token': token, 'active_guard': active_guard, 'evidence': {'units': [identity]},
+        })
+
+
 def main():
     assert os.geteuid() == 0 and __debug__
     assert len(sys.argv) == 2 and re.fullmatch('[0-9a-f]{64}', sys.argv[1]), 'provide the sealed fleet-tool receipt hash'
