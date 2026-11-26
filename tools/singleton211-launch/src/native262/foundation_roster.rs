@@ -549,8 +549,9 @@ fn terminal_delivery_257(n: &mut Native, booking: &Value, fleet: &Value) -> Resu
     let claim = binding(&completion["claim"])?.sealed()?;
     let handoff = Bound::new(HANDOFF_UPLOAD_257.0, HANDOFF_UPLOAD_257.1).sealed()?;
     let finished = &handoff["terminal"]["finished"];
-    let archive = binding(&completion["archive"])?.sealed()?;
-    let deletion = binding(&completion["deletion"])?.sealed()?;
+    // The uploader and status verifier write root-private 0600 receipts.
+    let archive = binding(&completion["archive"])?.json()?;
+    let deletion = binding(&completion["deletion"])?.json()?;
     let invocation = text(&booking["owners"][UPLOAD_257], "InvocationID")?;
     let entry = fleet["inventory"]["entries"]
         .as_array()
