@@ -1,0 +1,48 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -149,6 +149,7 @@
+ import diagnostic288_shrink_debt
+ import diagnostic229_bank_delta
+ import diagnostic226_suffix
++import diagnostic296_meter
+ import publication_handoff
+ import staged211
+ import staged211retry
+@@ -325,6 +326,7 @@
+ cfg['diagnostic_replays'] += diagnostic288_shrink_debt.configuration()
+ cfg['diagnostic_replays'] += diagnostic229_bank_delta.configuration()
+ cfg['diagnostic_replays'] += diagnostic226_suffix.configuration()
++cfg['diagnostic_replays'] += diagnostic296_meter.configuration()
+ cfg.update(previous_sample=str(old),output=str(obs),not_before_utc=utc(math.ceil(next_time)))
+ # A retry reuses the original observation and config, including an owner that
+ # closed during that observation. Its durable terminal receipt closes the row.
+@@ -805,6 +807,7 @@
+         fleet_image = retry_226_image()
+     if staged_retries:
+         fleet_image = Path(staged_retries[max(staged_retries)][1]['fleet']['path'])
++    diagnostic296_meter.register(plan)
+     suffix_image = diagnostic226_suffix.register(plan)
+     if suffix_image is not None:
+         fleet_image = Path(publication_handoff.checked_image(suffix_image))
+@@ -886,7 +889,8 @@
+         assert resources['producer']['invocation_id'] == row['producer']['InvocationID']
+         assert resources['broker']['unit'] == EXTRACTION226_OWNERS[row['producer']['Id']]
+     ordinary = [r for r in f['active'] if r['phase'] != EXTRACTION226_PHASE and not diagnostic229.owns(r) and not diagnostic229_bounded.owns(r) and not diagnostic229_bounded_retry.owns(r) and not diagnostic271_trace.owns(r) and not diagnostic271_europe.owns(r) and not diagnostic271_boundary.owns(r) and not diagnostic271_reward_tuples.owns(r) and not diagnostic271_stake_inputs.owns(r) and not diagnostic230_slot_hashes.owns(r) and not diagnostic230_bank_trace.owns(r) and not diagnostic229_slot_hash_ram.owns(r) and not diagnostic288_shrink_debt.owns(r) and not diagnostic230_program_demotion_ram.owns(r) and not diagnostic229_bank_delta.owns(r)
+-                and not diagnostic226_suffix.owns(r) and not diagnostic230_checkpoint_continuation.owns(r)]
++                and not diagnostic226_suffix.owns(r) and not diagnostic230_checkpoint_continuation.owns(r)
++                and not diagnostic296_meter.owns(r)]
+     ordinary = [row for row in ordinary
+                 if not (row['epoch'] == 257 and row['phase'] == 'upload-readback'
+                         and row['unit']['Id'] == 'horizon-upload-257-current-reader-v1.service')]
+--- a/native_binding_replays.py
++++ b/native_binding_replays.py
+@@ -42,7 +42,8 @@
+ import diagnostic288_shrink_debt
+ import diagnostic229_bank_delta
+ import diagnostic226_suffix
+-diagnostic_handlers = (diagnostic229, diagnostic229_bounded, diagnostic229_bounded_retry, diagnostic271_trace, diagnostic271_europe, diagnostic271_boundary, diagnostic271_reward_tuples, diagnostic271_stake_inputs, diagnostic230_slot_hashes, diagnostic230_bank_trace, diagnostic288_shrink_debt, diagnostic229_slot_hash_ram, diagnostic230_program_demotion_ram, diagnostic230_checkpoint_continuation, diagnostic229_bank_delta, diagnostic226_suffix)
++import diagnostic296_meter
++diagnostic_handlers = (diagnostic229, diagnostic229_bounded, diagnostic229_bounded_retry, diagnostic271_trace, diagnostic271_europe, diagnostic271_boundary, diagnostic271_reward_tuples, diagnostic271_stake_inputs, diagnostic230_slot_hashes, diagnostic230_bank_trace, diagnostic288_shrink_debt, diagnostic229_slot_hash_ram, diagnostic230_program_demotion_ram, diagnostic230_checkpoint_continuation, diagnostic229_bank_delta, diagnostic226_suffix, diagnostic296_meter)
+ ordinary = [r for r in f['active'] if r not in sample_publishers and r not in extract226
+             and not (r['epoch'] == 257 and r['phase'] == 'upload-readback'
+                      and r['unit']['Id'] == 'horizon-upload-257-current-reader-v1.service')
