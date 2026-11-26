@@ -15,11 +15,12 @@ const DELIVERY_BOOKING: (&str, &str) = (
 const OWNER_FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemorySwapMax,ExecStart,AllowedCPUs";
 const GUARD_FIELDS: &str =
     "Id,LoadState,ActiveState,SubState,InvocationID,Unit,MemoryMax,ExecStart";
-const KNOWN_GUARDS: [(u64, &str); 5] = [
+const KNOWN_GUARDS: [(u64, &str); 6] = [
     (226, "horizon-guard-226-checkpoint-continuation-extract-v3"),
     (230, "horizon-230-middle-protective-v1"),
     (252, "horizon-252-regional-singleton-protective-v1"),
     (261, "horizon-261-singleton-protective-v1"),
+    (262, "horizon-262-singleton-protective-v1"),
     (288, "horizon-288-full-shrink-debt-protective-v1"),
 ];
 const AUXILIARY: [&str; 2] = [
@@ -49,6 +50,7 @@ const STANDARD_GUARD: &str =
     "/var/lib/jetstreamer/horizon251-published-guard-20261118-v1/horizon251-standalone-guard";
 const GUARD_288: &str = "/var/lib/jetstreamer/horizon288-shrink-debt-comparison-tools-v327/guard";
 const GUARD_ENV_261: &str = "/var/lib/jetstreamer/horizon261-full-guard-v1/guard.env";
+const GUARD_ENV_262: &str = "/var/lib/jetstreamer/horizon262-full-guard-v1/guard.env";
 const FULL_REPLAY_INPUTS: (&str, &str) = (
     "/var/lib/jetstreamer/horizon262-full-node-b9b95b02-v1/replay-inputs.json",
     "4375f4e590dc98d3f37ba6c646fa2c93cc65680267c7c920ba5d3255b67661d2",
@@ -79,6 +81,15 @@ const CLAIM_261: (&str, &str) = (
 );
 const UPLOAD_261_MEMORY: u64 = 64 << 30;
 const UPLOAD_261_DISK: u64 = 1 << 30;
+const REPLAY_262: &str = "horizon-qualify-262-singleton-v1.service";
+const RUN_262: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon262-full-guard-v1/cadence-registration.json",
+    "1d509e8cf8217b6bff3d911cc340bb9d68b919450c5d29ab9a6f103c6581ca35",
+);
+const RECOVERY_296: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon296-unbounded-worker-build-v1/full-fit-v341.json",
+    "1fb5f9af69d405b32a0098bde182ac105e853b877572c7285eaf4be494453281",
+);
 
 struct FullReplayQuote {
     reference: Bound,
@@ -91,6 +102,23 @@ enum Quote {
     FullReplay(FullReplayQuote),
     Suffix226(Bound),
     Delivery261(Bound),
+    Replay296(Replay296Quote),
+}
+
+struct Replay296Quote {
+    prior_fit: Bound,
+    worker: Bound,
+    disk: u64,
+    memory: u64,
+}
+
+struct LiveReplay262 {
+    reference: Bound,
+    owner: Value,
+    memory: u64,
+    ticks: u64,
+    guard_booking: Value,
+    receipt_disk: u64,
 }
 
 fn full_replay_quote() -> Result<FullReplayQuote> {
@@ -114,6 +142,50 @@ fn full_replay_quote() -> Result<FullReplayQuote> {
         inputs,
         working_disk: num(&profile, "maximum_root_physical_bytes")?,
         producer_memory: num(&profile, "maximum_memory_bytes")?,
+    })
+}
+
+fn replay_296_quote() -> Result<Replay296Quote> {
+    let prior_fit = Bound::new(RECOVERY_296.0, RECOVERY_296.1);
+    let prior = prior_fit.sealed()?;
+    let sizing = binding(&prior["earlier_full_booking"])?.sealed()?;
+    let deployment = binding(&prior["sealed_worker"])?.sealed()?;
+    let member = deployment["members"]
+        .as_array()
+        .context("epoch 296 sealed worker members")?
+        .iter()
+        .find(|row| row["name"] == "jetstreamer-historical-worker-v1-8-11")
+        .context("epoch 296 repaired worker missing")?;
+    let worker = Bound::new(
+        Path::new(text(&deployment, "destination")?).join(text(member, "name")?),
+        text(member, "sha256")?,
+    );
+    let sizing = &sizing["quote"];
+    let disk = num(&prior, "required_disk_bytes")?;
+    let memory = num(&prior, "required_memory_bytes")?;
+    ensure!(
+        prior["epoch"] == 296
+            && prior["replay_admitted"] == false
+            && deployment["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && member["mode"] == "0555"
+            && disk
+                == capacity::add(
+                    num(sizing, "maximum_whole_tree_bytes")?,
+                    num(sizing, "staging_reserve_bytes")?
+                )?
+            && memory
+                == capacity::add(
+                    num(sizing, "memory_max_bytes")?,
+                    num(sizing, "guard_memory_bytes")?
+                )?,
+        "epoch 296 replay sizing or worker evidence changed"
+    );
+    worker.artifact()?;
+    Ok(Replay296Quote {
+        prior_fit,
+        worker,
+        disk,
+        memory,
     })
 }
 
@@ -197,6 +269,61 @@ fn live_delivery_261(n: &mut Native) -> Result<(Bound, Value, u64, u64)> {
     }
     let memory = live::finite_owner(&owner, UPLOAD_261, invocation, UPLOAD_261_MEMORY)?;
     Ok((reference, owner, memory, ticks))
+}
+
+fn live_replay_262(n: &mut Native) -> Result<LiveReplay262> {
+    let reference = Bound::new(RUN_262.0, RUN_262.1);
+    let registered = reference.sealed()?;
+    let profile = binding(&registered["profile"])?.sealed()?;
+    let admission = binding(&registered["admission"])?.sealed()?;
+    let handoff = binding(&registered["handoff"])?.sealed()?;
+    let admitted_fit = binding(&admission["roster"])?.sealed()?;
+    let inputs = binding(&profile["inputs"])?.sealed()?;
+    let node = binding(&inputs["replay_node"])?;
+    node.artifact()?;
+    let owner = n.show_fields(REPLAY_262, OWNER_FIELDS)?;
+    let invocation = text(&registered, "invocation_id")?;
+    let pid: u64 = text(&owner, "MainPID")?.parse()?;
+    let ticks = process_ticks(pid)?;
+    let running = fs::metadata(format!("/proc/{pid}/exe"))?;
+    let sealed = fs::metadata(&node.path)?;
+    let sample_ref = binding(&registered["active_guard"])?;
+    let sample = sample_ref.json()?;
+    let guard_plan = Bound::new(text(&sample, "plan")?, text(&sample, "plan_sha256")?).sealed()?;
+    let floor = num(&admission, "guard_minimum_free_bytes")?;
+    let cap = num(&profile, "maximum_root_physical_bytes")?;
+    let receipt_disk = num(&profile, "receipt_disk_reservation_bytes")?;
+    let memory_cap = num(&profile, "maximum_memory_bytes")?;
+    ensure!(
+        registered["schema"] == "foundation-epoch262-replay-cadence-registration-v1"
+            && registered["epoch"] == EPOCH
+            && registered["unit"] == REPLAY_262
+            && registered["main_pid"] == pid
+            && registered["run_root"] == profile["worker_root"]
+            && registered["run_root"] == guard_plan["worker_root"]
+            && registered["ready"] == false
+            && handoff["producer"] == REPLAY_262
+            && handoff["invocation_id"] == invocation
+            && admission["schema"] == "foundation-epoch262-full-replay-admission-v1"
+            && admission["epoch"] == EPOCH
+            && admitted_fit["capacity"]["guard_floor_bytes"] == floor
+            && admitted_fit["capacity"]["fits"] == true
+            && admitted_fit["capacity"]["candidate_disk_bytes"]
+                == capacity::add(cap, receipt_disk)?
+            && admitted_fit["full_replay_quote"]["producer_memory_bytes"] == memory_cap
+            && owner["AllowedCPUs"] == profile["allowed_cpus"]
+            && (running.dev(), running.ino()) == (sealed.dev(), sealed.ino()),
+        "epoch 262 replay booking or live invocation changed"
+    );
+    let memory = live::finite_owner(&owner, REPLAY_262, invocation, memory_cap)?;
+    Ok(LiveReplay262 {
+        reference,
+        owner,
+        memory,
+        ticks,
+        guard_booking: json!({"sample":sample_ref,"floor_bytes":floor,"cap_bytes":cap}),
+        receipt_disk,
+    })
 }
 
 fn latest_completion() -> Result<Bound> {
@@ -360,6 +487,7 @@ fn fleet_roster<'a>(
     booking: &Value,
     released: &BTreeMap<u64, &str>,
     delivery_261: Option<&Value>,
+    replay_262: Option<&Value>,
 ) -> Result<BTreeMap<u64, &'a Value>> {
     let rows = fleet["active"]
         .as_array()
@@ -369,6 +497,7 @@ fn fleet_roster<'a>(
         .context("Foundation booked owners")?;
     let mut roster = BTreeMap::new();
     let mut observed_delivery = None;
+    let mut observed_replay_262 = false;
     for row in rows {
         let epoch = num(row, "epoch")?;
         if epoch == 261 && row["phase"] == "upload-readback" {
@@ -378,6 +507,16 @@ fn fleet_roster<'a>(
                 "duplicate epoch 261 delivery in fleet"
             );
             live::same_owner(&row["unit"], owner)?;
+            continue;
+        }
+        if epoch == 262 {
+            let owner = replay_262.context("unbooked epoch 262 replay in fleet")?;
+            ensure!(
+                row["phase"] == "replay" && !observed_replay_262,
+                "unexpected or duplicate epoch 262 phase in fleet"
+            );
+            live::same_owner(&row["producer"], owner)?;
+            observed_replay_262 = true;
             continue;
         }
         let owner = match (epoch, text(row, "phase")?) {
@@ -464,21 +603,21 @@ mod roster_tests {
         let none = BTreeMap::new();
         let first = BTreeMap::from([(261, REPLAY_261)]);
         let both = BTreeMap::from([(226, EXTRACT_226), (261, REPLAY_261)]);
-        assert!(fleet_roster(&before, &booking, &none, None).is_ok());
-        assert!(fleet_roster(&before, &booking, &both, None).is_ok());
+        assert!(fleet_roster(&before, &booking, &none, None, None).is_ok());
+        assert!(fleet_roster(&before, &booking, &both, None, None).is_ok());
 
         rows.retain(|row| row["epoch"] != 261);
         let after = json!({"active":rows});
-        assert!(fleet_roster(&after, &booking, &none, None).is_err());
-        assert!(fleet_roster(&after, &booking, &first, None).is_ok());
+        assert!(fleet_roster(&after, &booking, &none, None, None).is_err());
+        assert!(fleet_roster(&after, &booking, &first, None, None).is_ok());
 
         rows.retain(|row| row["epoch"] != 226);
         let after = json!({"active":rows});
-        assert!(fleet_roster(&after, &booking, &first, None).is_err());
-        assert!(fleet_roster(&after, &booking, &both, None).is_ok());
+        assert!(fleet_roster(&after, &booking, &first, None, None).is_err());
+        assert!(fleet_roster(&after, &booking, &both, None, None).is_ok());
 
         rows.retain(|row| row["epoch"] != 252);
-        assert!(fleet_roster(&json!({"active":rows}), &booking, &both, None).is_err());
+        assert!(fleet_roster(&json!({"active":rows}), &booking, &both, None, None).is_err());
     }
 }
 
@@ -561,27 +700,40 @@ fn guard_binding(
         text(&sample, "guard_sha256")?,
     );
     guard_pin.artifact()?;
-    let plan_arg = if epoch == 261 {
+    let guard_environment = match epoch {
+        261 => Some((
+            GUARD_ENV_261,
+            "HORIZON261_GUARD_PLAN_SHA256",
+            "${HORIZON261_GUARD_PLAN_SHA256}",
+        )),
+        262 => Some((
+            GUARD_ENV_262,
+            "HORIZON262_GUARD_PLAN_SHA256",
+            "${HORIZON262_GUARD_PLAN_SHA256}",
+        )),
+        _ => None,
+    };
+    let plan_arg = if let Some((path, variable, argument)) = guard_environment {
         let env = n.show_fields(
             &guard_unit,
             "Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment",
         )?;
         ensure!(
-            env["EnvironmentFiles"] == format!("{GUARD_ENV_261} (ignore_errors=no)")
+            env["EnvironmentFiles"] == format!("{path} (ignore_errors=no)")
                 && ["Environment", "PassEnvironment", "UnsetEnvironment"]
                     .iter()
                     .all(|key| env[*key] == ""),
-            "epoch 261 guard environment changed"
+            "epoch {epoch} guard environment changed"
         );
-        let path = Path::new(GUARD_ENV_261);
+        let path = Path::new(path);
         let source = Bound::new(path, hash(path)?);
         trusted_parents(path)?;
         let bytes = source.bytes(true)?;
         ensure!(
-            bytes == format!("HORIZON261_GUARD_PLAN_SHA256={}\n", plan.sha256).as_bytes(),
-            "epoch 261 guard plan environment differs"
+            bytes == format!("{variable}={}\n", plan.sha256).as_bytes(),
+            "epoch {epoch} guard plan environment differs"
         );
-        "${HORIZON261_GUARD_PLAN_SHA256}"
+        argument
     } else {
         &plan.sha256
     };
@@ -745,15 +897,26 @@ fn measure(
     } else {
         None
     };
+    let active_262 = if before.contains(REPLAY_262) {
+        ensure!(
+            matches!(&quote, Some(Quote::Suffix226(_) | Quote::Replay296(_))),
+            "epoch 262 full replay already owns its lane"
+        );
+        Some(live_replay_262(n)?)
+    } else {
+        None
+    };
     let roster = fleet_roster(
         &fleet,
         &booking,
         &released_replays,
         active_delivery.as_ref().map(|(_, owner, _, _)| owner),
+        active_262.as_ref().map(|replay| &replay.owner),
     )?;
     let epoch = match &quote {
         Some(Quote::Suffix226(_)) => 226,
         Some(Quote::Delivery261(_)) => 261,
+        Some(Quote::Replay296(_)) => 296,
         _ => EPOCH,
     };
     let missing: Vec<_> = fleet["inventory"]["entries"]
@@ -826,6 +989,12 @@ fn measure(
             "epoch 261 delivery booked twice"
         );
     }
+    if active_262.is_some() {
+        ensure!(
+            expected.insert(REPLAY_262.to_owned()),
+            "epoch 262 replay booked twice"
+        );
+    }
     ensure!(
         before == expected,
         "unaccounted or missing Foundation owners: {:?}",
@@ -849,6 +1018,7 @@ fn measure(
     let selected = units::parse_cpu_list(match epoch {
         226 => "16-23",
         261 => "24-31",
+        296 => "56-63",
         _ => "40-47",
     })?;
     let cpus = units::affinity(&json!({"cpu_affinity":selected}))?;
@@ -890,6 +1060,16 @@ fn measure(
         );
         recorded.insert(UPLOAD_261.to_owned(), (owner.clone(), *memory, *ticks));
     }
+    if let Some(replay) = &active_262 {
+        ensure!(
+            selected.is_disjoint(&units::parse_cpu_list(text(&replay.owner, "AllowedCPUs")?)?),
+            "epoch {epoch} CPUs overlap the epoch 262 replay"
+        );
+        recorded.insert(
+            REPLAY_262.to_owned(),
+            (replay.owner.clone(), replay.memory, replay.ticks),
+        );
+    }
     let mut guards = BTreeMap::new();
     for (guard_epoch, guard) in KNOWN_GUARDS {
         if (guard_epoch == 226 && suffix.is_some())
@@ -898,17 +1078,19 @@ fn measure(
         {
             continue;
         }
-        let unit = text(roster[&guard_epoch], "Id")?;
+        let (owner, guard_booking) = if guard_epoch == EPOCH {
+            let Some(replay) = &active_262 else { continue };
+            (&replay.owner, &replay.guard_booking)
+        } else {
+            let unit = text(roster[&guard_epoch], "Id")?;
+            (
+                &recorded[unit].0,
+                &booking["guard_growth"][guard_epoch.to_string()],
+            )
+        };
         guards.insert(
             guard_epoch,
-            guard_binding(
-                n,
-                guard_epoch,
-                guard,
-                &booking["guard_growth"][guard_epoch.to_string()],
-                &recorded[unit].0,
-                device,
-            )?,
+            guard_binding(n, guard_epoch, guard, guard_booking, owner, device)?,
         );
     }
     let allocation = allocation::measure(n, &guards, device)?;
@@ -1005,10 +1187,11 @@ fn measure(
             capacity::add(sum, num(row, "remaining_upper_bound_bytes")?)
         })?;
     let delivery_261_disk = active_delivery.as_ref().map_or(0, |_| UPLOAD_261_DISK);
+    let replay_262_disk = active_262.as_ref().map_or(0, |replay| replay.receipt_disk);
     let protected = capacity::add(
         capacity::add(
             capacity::add(disk_floor, non_guard_disk)?,
-            delivery_261_disk,
+            capacity::add(delivery_261_disk, replay_262_disk)?,
         )?,
         growth,
     )?;
@@ -1031,6 +1214,9 @@ fn measure(
                 capacity::add(CONTROLLER_MEMORY, num(&delivery, "guard_memory_allowance")?)?,
             )?,
         ),
+        Some(Quote::Replay296(quote)) => {
+            (quote.disk, capacity::add(quote.memory, CONTROLLER_MEMORY)?)
+        }
         None => (
             DISK_RECEIPTS,
             capacity::add(MEMORY, capacity::add(CONTROLLER_MEMORY, GUARD_MEMORY)?)?,
@@ -1040,10 +1226,11 @@ fn measure(
     let free = num(&allocation, "conservative_available_bytes")?
         .min(resources_before.2)
         .min(resources_after.2);
-    let reserve = capacity::add(
-        resources_before.0 / 10,
+    let periodic_reserve = capacity::add(
         num(&delivery, "guard_memory_allowance")?,
+        if active_262.is_some() { 1 << 30 } else { 0 },
     )?;
+    let reserve = capacity::add(resources_before.0 / 10, periodic_reserve)?;
     let base_memory = capacity::add(capacity::add(reserve, candidate)?, reserved_audit_memory)?;
     let (hard, growth_memory) = recorded.values().try_fold(
         (base_memory, base_memory),
@@ -1062,6 +1249,7 @@ fn measure(
     let available_memory = resources_before.1.min(resources_after.1);
     let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
         "active_delivery_261_disk_bytes":delivery_261_disk,
+        "active_replay_262_receipt_disk_bytes":replay_262_disk,
         "remaining_guard_growth_bytes":growth,"protected_existing_disk_bytes":protected,
         "candidate_disk_bytes":candidate_disk,"required_disk_bytes":required,"available_disk_bytes":free,
         "disk_shortfall_bytes":required.saturating_sub(free),"disk_margin_bytes":free.saturating_sub(required),
@@ -1083,6 +1271,7 @@ fn measure(
     let schema = match epoch {
         226 => "foundation-epoch226-suffix-roster-binding-v1",
         261 => "foundation-epoch261-delivery-roster-binding-v1",
+        296 => "foundation-epoch296-replay-roster-binding-v1",
         _ => "foundation-epoch262-roster-binding-v1",
     };
     let mut evidence = json!({"schema":schema,"epoch":epoch,
@@ -1091,7 +1280,8 @@ fn measure(
         "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
         "closed_middle_replay":closed_230,
-        "active_delivery_261_claim":active_delivery.as_ref().map(|(claim, _, _, _)| claim)});
+        "active_delivery_261_claim":active_delivery.as_ref().map(|(claim, _, _, _)| claim),
+        "active_replay_262_registration":active_262.as_ref().map(|replay| &replay.reference)});
     if let Some(Quote::FullReplay(quote)) = &quote {
         evidence["full_replay_quote"] = json!({"sizing_reference":quote.reference,"inputs":quote.inputs,
             "whole_tree_bytes":quote.working_disk,"producer_memory_bytes":quote.producer_memory,
@@ -1111,6 +1301,14 @@ fn measure(
         evidence["delivery_quote"] = json!({
             "preparation":preparation,"delivery_memory_max_bytes":num(&delivery, "memory_max_bytes")?,
             "receipt_scratch_maximum_bytes":candidate_disk,"candidate_cpus":selected,
+            "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
+            "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
+        });
+    }
+    if let Some(Quote::Replay296(quote)) = &quote {
+        evidence["replay_296_quote"] = json!({
+            "prior_fit":quote.prior_fit,"repaired_worker":quote.worker,
+            "candidate_disk_bytes":quote.disk,"candidate_memory_bytes":candidate,
             "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
             "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
         });
@@ -1187,14 +1385,22 @@ pub fn run() -> Result<()> {
     let command = args.next();
     let controller_unit = match command.as_deref() {
         None => None,
-        Some(flag) if flag == "--full-replay-quote" || flag == "--delivery261-quote" => None,
+        Some(flag)
+            if flag == "--full-replay-quote"
+                || flag == "--delivery261-quote"
+                || flag == "--replay296-quote" =>
+        {
+            None
+        }
         Some(flag) if flag == "--as-controller" => Some(
             args.next()
                 .context("controller unit")?
                 .into_string()
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
-        Some(_) => bail!("use --as-controller UNIT, --full-replay-quote or --delivery261-quote"),
+        Some(_) => bail!(
+            "use --as-controller UNIT, --full-replay-quote, --delivery261-quote or --replay296-quote"
+        ),
     };
     let synchronize = match args.next() {
         None => false,
@@ -1237,6 +1443,8 @@ pub fn run() -> Result<()> {
             .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),
         Some(flag) if flag == "--delivery261-quote" => delivery_261_preparation()
             .and_then(|prep| measure(&mut native, None, Some(Quote::Delivery261(prep)))),
+        Some(flag) if flag == "--replay296-quote" => replay_296_quote()
+            .and_then(|quote| measure(&mut native, None, Some(Quote::Replay296(quote)))),
         _ => receipt(&mut native, controller),
     };
     match result {
