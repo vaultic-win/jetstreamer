@@ -4,6 +4,7 @@ mod allocation;
 mod delivery252;
 mod focused;
 use focused::{FEATURE_296, GAP_230, LOADER_296, RESTORE_258, SCOPES, TRACE_296};
+mod suffix226;
 mod vote_boundary;
 
 const FLEET_ROOT: &str = "/home/ubuntu/.codex/diagnostics";
@@ -651,7 +652,9 @@ fn fleet_roster<'a>(
             continue;
         }
         if let Some(replay) = live_replays.get(&epoch) {
-            let phase = if epoch == 230 || SCOPES.iter().any(|spec| spec.unit == replay.unit) {
+            let phase = if matches!(epoch, 226 | 230)
+                || SCOPES.iter().any(|spec| spec.unit == replay.unit)
+            {
                 "diagnostic-qualification"
             } else {
                 "replay"
@@ -694,6 +697,10 @@ fn fleet_roster<'a>(
             .is_some_and(|replay| replay.unit == vote_boundary::UNIT)
             || observed_replays.contains(&230),
         "epoch 230 diagnostic is missing from the accepted fleet"
+    );
+    ensure!(
+        !live_replays.contains_key(&226) || observed_replays.contains(&226),
+        "epoch 226 suffix is missing from the accepted fleet"
     );
     let missing: BTreeMap<_, _> = released
         .iter()
@@ -804,6 +811,31 @@ mod roster_tests {
         let mut all_released = after_delivery;
         all_released.insert(252, delivery252::REPLAY);
         assert!(fleet_roster(&after, &booking, &all_released, &deliveries, &live_replays).is_ok());
+
+        let successor = json!({"Id":suffix226::UNIT,"InvocationID":"suffix-invocation",
+            "MainPID":"1226","ControlGroup":"/test/226-suffix","NRestarts":"0","Result":"success",
+            "LoadState":"loaded","ActiveState":"active","SubState":"running",
+            "ExecStart":"{ path=/node ; argv[]=/node 226 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=1226 ; code=(null) ; status=0/0 }"});
+        let live_suffix = BTreeMap::from([(
+            226,
+            LiveReplay {
+                reference: Bound::new("/test/226-suffix.json", "test"),
+                unit: suffix226::UNIT,
+                owner: successor.clone(),
+                memory: 0,
+                ticks: 0,
+                guard_booking: Value::Null,
+                receipt_disk: DISK_RECEIPTS,
+            },
+        )]);
+        assert!(fleet_roster(&after, &booking, &all_released, &deliveries, &live_suffix).is_err());
+        rows.push(json!({"epoch":226,"phase":"diagnostic-qualification","producer":successor}));
+        let handoff = json!({"active":rows});
+        assert!(fleet_roster(&handoff, &booking, &all_released, &deliveries, &live_suffix).is_ok());
+        all_released.remove(&226);
+        assert!(
+            fleet_roster(&handoff, &booking, &all_released, &deliveries, &live_suffix).is_err()
+        );
     }
 }
 
@@ -828,6 +860,7 @@ fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
                 .any(|prefix| unit.starts_with(prefix));
             (scoped
                 && unit != vote_boundary::GUARD_SERVICE
+                && unit != suffix226::GUARD_SERVICE
                 && !SCOPES
                     .iter()
                     .any(|spec| unit == format!("{}.service", spec.guard))
@@ -1055,12 +1088,20 @@ fn measure(
     let booking_ref = Bound::new(REPLAY_BOOKING.0, REPLAY_BOOKING.1);
     let booking = booking_ref.sealed()?;
     let mut released_replays = BTreeMap::new();
-    let suffix = match &quote {
-        Some(Quote::Suffix226(proof)) => {
-            terminal_extract_226(n, &booking, proof)?;
-            released_replays.insert(226, EXTRACT_226);
-            Some(proof)
+    let extraction_drain = match &quote {
+        Some(Quote::Suffix226(proof)) => Some(proof.clone()),
+        Some(Quote::Suffix226Preview) | None => None,
+        Some(_) if Path::new(DRAIN_226).try_exists()? => {
+            Some(Bound::new(DRAIN_226, hash(Path::new(DRAIN_226))?))
         }
+        _ => None,
+    };
+    if let Some(proof) = &extraction_drain {
+        terminal_extract_226(n, &booking, proof)?;
+        released_replays.insert(226, EXTRACT_226);
+    }
+    let suffix = match &quote {
+        Some(Quote::Suffix226(proof)) => Some(proof),
         _ => None,
     };
     let closed_replay252 = if quote.is_some() {
@@ -1133,6 +1174,13 @@ fn measure(
         _ => EPOCH,
     };
     let mut live_replays = BTreeMap::new();
+    if before.contains(suffix226::UNIT) {
+        ensure!(
+            extraction_drain.is_some() && epoch != 226,
+            "epoch 226 suffix overlaps an existing booking"
+        );
+        live_replays.insert(226, suffix226::live(n)?);
+    }
     for spec in &REGISTERED_REPLAYS {
         if before.contains(spec.unit) {
             ensure!(
@@ -1184,7 +1232,7 @@ fn measure(
         .cloned()
         .collect();
     let mut released_units: BTreeSet<_> = released_replays.into_values().collect();
-    if suffix.is_some() {
+    if extraction_drain.is_some() {
         released_units.insert(BROKER_226);
     }
     let closed_audit = quote.as_ref().map(|_| closed_audit()).transpose()?;
@@ -1326,13 +1374,28 @@ fn measure(
     }
     let mut guards = BTreeMap::new();
     for (guard_epoch, guard) in KNOWN_GUARDS {
+        if guard_epoch == 226 && extraction_drain.is_some() {
+            if let Some(replay) = live_replays.get(&226) {
+                guards.insert(
+                    226,
+                    guard_binding(
+                        n,
+                        226,
+                        suffix226::GUARD,
+                        &replay.guard_booking,
+                        &replay.owner,
+                        device,
+                    )?,
+                );
+            }
+            continue;
+        }
         let focused = SCOPES.into_iter().find(|spec| {
             live_replays
                 .get(&guard_epoch)
                 .is_some_and(|row| row.unit == spec.unit)
         });
-        if (guard_epoch == 226 && suffix.is_some())
-            || (guard_epoch == 230 && closed_230.is_some() && focused.is_none())
+        if (guard_epoch == 230 && closed_230.is_some() && focused.is_none())
             || (guard_epoch == 252 && closed_replay252.is_some())
             || (guard_epoch == 261 && closed_replay.is_some())
         {
@@ -1406,7 +1469,7 @@ fn measure(
             "epoch 230 terminal changed during roster binding"
         );
     }
-    if let Some(proof) = suffix {
+    if let Some(proof) = &extraction_drain {
         terminal_extract_226(n, &booking, proof)?;
     }
     for guard in guards.values() {
@@ -1582,6 +1645,8 @@ fn measure(
         "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
         "closed_middle_replay":closed_230,
+        "closed_extraction_226":extraction_drain,
+        "active_suffix_226_registration":live_replays.get(&226).map(|replay| &replay.reference),
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
         "active_restore_258_registration":live_replays.get(&258).map(|replay| &replay.reference),
         "closed_delivery_257":closed_257,
