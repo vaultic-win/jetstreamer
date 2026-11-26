@@ -15,13 +15,14 @@ const DELIVERY_BOOKING: (&str, &str) = (
 const OWNER_FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemorySwapMax,ExecStart,AllowedCPUs";
 const GUARD_FIELDS: &str =
     "Id,LoadState,ActiveState,SubState,InvocationID,Unit,MemoryMax,ExecStart";
-const KNOWN_GUARDS: [(u64, &str); 6] = [
+const KNOWN_GUARDS: [(u64, &str); 7] = [
     (226, "horizon-guard-226-checkpoint-continuation-extract-v3"),
     (230, "horizon-230-middle-protective-v1"),
     (252, "horizon-252-regional-singleton-protective-v1"),
     (261, "horizon-261-singleton-protective-v1"),
     (262, "horizon-262-singleton-protective-v1"),
     (288, "horizon-288-full-shrink-debt-protective-v1"),
+    (296, "horizon-296-full-retry-protective-v1"),
 ];
 const AUXILIARY: [&str; 2] = [
     BROKER_226,
@@ -51,6 +52,7 @@ const STANDARD_GUARD: &str =
 const GUARD_288: &str = "/var/lib/jetstreamer/horizon288-shrink-debt-comparison-tools-v327/guard";
 const GUARD_ENV_261: &str = "/var/lib/jetstreamer/horizon261-full-guard-v1/guard.env";
 const GUARD_ENV_262: &str = "/var/lib/jetstreamer/horizon262-full-guard-v1/guard.env";
+const GUARD_ENV_296: &str = "/var/lib/jetstreamer/horizon296-full-retry-guard-v1/guard.env";
 const FULL_REPLAY_INPUTS: (&str, &str) = (
     "/var/lib/jetstreamer/horizon262-full-node-b9b95b02-v1/replay-inputs.json",
     "4375f4e590dc98d3f37ba6c646fa2c93cc65680267c7c920ba5d3255b67661d2",
@@ -81,11 +83,30 @@ const CLAIM_261: (&str, &str) = (
 );
 const UPLOAD_261_MEMORY: u64 = 64 << 30;
 const UPLOAD_261_DISK: u64 = 1 << 30;
-const REPLAY_262: &str = "horizon-qualify-262-singleton-v1.service";
-const RUN_262: (&str, &str) = (
-    "/var/lib/jetstreamer/horizon262-full-guard-v1/cadence-registration.json",
-    "1d509e8cf8217b6bff3d911cc340bb9d68b919450c5d29ab9a6f103c6581ca35",
-);
+const REGISTERED_REPLAYS: [ReplayRegistration; 2] = [
+    ReplayRegistration {
+        epoch: 262,
+        unit: "horizon-qualify-262-singleton-v1.service",
+        receipt: (
+            "/var/lib/jetstreamer/horizon262-full-guard-v1/cadence-registration.json",
+            "1d509e8cf8217b6bff3d911cc340bb9d68b919450c5d29ab9a6f103c6581ca35",
+        ),
+        schema: "foundation-epoch262-replay-cadence-registration-v1",
+        node_key: "replay_node",
+        receipt_disk: 256 << 20,
+    },
+    ReplayRegistration {
+        epoch: 296,
+        unit: "horizon-qualify-296-full-retry-v1.service",
+        receipt: (
+            "/var/lib/jetstreamer/horizon296-full-retry-guard-v1/cadence-registration.json",
+            "237a6a85b3325572e86f432b1277d7f1febbce80238adc94a6b604d623300164",
+        ),
+        schema: "foundation-epoch296-full-retry-cadence-registration-v1",
+        node_key: "node",
+        receipt_disk: 64 << 20,
+    },
+];
 const RECOVERY_296: (&str, &str) = (
     "/var/lib/jetstreamer/horizon296-unbounded-worker-build-v1/full-fit-v341.json",
     "1fb5f9af69d405b32a0098bde182ac105e853b877572c7285eaf4be494453281",
@@ -101,6 +122,7 @@ struct FullReplayQuote {
 enum Quote {
     FullReplay(FullReplayQuote),
     Suffix226(Bound),
+    Suffix226Preview,
     Delivery261(Bound),
     Replay296(Replay296Quote),
 }
@@ -112,8 +134,18 @@ struct Replay296Quote {
     memory: u64,
 }
 
-struct LiveReplay262 {
+struct ReplayRegistration {
+    epoch: u64,
+    unit: &'static str,
+    receipt: (&'static str, &'static str),
+    schema: &'static str,
+    node_key: &'static str,
+    receipt_disk: u64,
+}
+
+struct LiveReplay {
     reference: Bound,
+    unit: &'static str,
     owner: Value,
     memory: u64,
     ticks: u64,
@@ -271,17 +303,25 @@ fn live_delivery_261(n: &mut Native) -> Result<(Bound, Value, u64, u64)> {
     Ok((reference, owner, memory, ticks))
 }
 
-fn live_replay_262(n: &mut Native) -> Result<LiveReplay262> {
-    let reference = Bound::new(RUN_262.0, RUN_262.1);
+fn live_replay(n: &mut Native, spec: &ReplayRegistration) -> Result<LiveReplay> {
+    let ReplayRegistration {
+        epoch,
+        unit,
+        receipt,
+        schema,
+        node_key,
+        receipt_disk,
+    } = *spec;
+    let reference = Bound::new(receipt.0, receipt.1);
     let registered = reference.sealed()?;
     let profile = binding(&registered["profile"])?.sealed()?;
     let admission = binding(&registered["admission"])?.sealed()?;
     let handoff = binding(&registered["handoff"])?.sealed()?;
     let admitted_fit = binding(&admission["roster"])?.sealed()?;
     let inputs = binding(&profile["inputs"])?.sealed()?;
-    let node = binding(&inputs["replay_node"])?;
+    let node = binding(&inputs[node_key])?;
     node.artifact()?;
-    let owner = n.show_fields(REPLAY_262, OWNER_FIELDS)?;
+    let owner = n.show_fields(unit, OWNER_FIELDS)?;
     let invocation = text(&registered, "invocation_id")?;
     let pid: u64 = text(&owner, "MainPID")?.parse()?;
     let ticks = process_ticks(pid)?;
@@ -292,32 +332,34 @@ fn live_replay_262(n: &mut Native) -> Result<LiveReplay262> {
     let guard_plan = Bound::new(text(&sample, "plan")?, text(&sample, "plan_sha256")?).sealed()?;
     let floor = num(&admission, "guard_minimum_free_bytes")?;
     let cap = num(&profile, "maximum_root_physical_bytes")?;
-    let receipt_disk = num(&profile, "receipt_disk_reservation_bytes")?;
     let memory_cap = num(&profile, "maximum_memory_bytes")?;
     ensure!(
-        registered["schema"] == "foundation-epoch262-replay-cadence-registration-v1"
-            && registered["epoch"] == EPOCH
-            && registered["unit"] == REPLAY_262
+        registered["schema"] == schema
+            && registered["epoch"] == epoch
+            && registered["unit"] == unit
             && registered["main_pid"] == pid
             && registered["run_root"] == profile["worker_root"]
             && registered["run_root"] == guard_plan["worker_root"]
-            && registered["ready"] == false
-            && handoff["producer"] == REPLAY_262
+            && handoff["ready"] == false
+            && handoff["producer"] == unit
             && handoff["invocation_id"] == invocation
-            && admission["schema"] == "foundation-epoch262-full-replay-admission-v1"
-            && admission["epoch"] == EPOCH
+            && admission["schema"] == format!("foundation-epoch{epoch}-full-replay-admission-v1")
+            && admission["epoch"] == epoch
+            && admission["publication_authorized"] == false
             && admitted_fit["capacity"]["guard_floor_bytes"] == floor
             && admitted_fit["capacity"]["fits"] == true
             && admitted_fit["capacity"]["candidate_disk_bytes"]
                 == capacity::add(cap, receipt_disk)?
-            && admitted_fit["full_replay_quote"]["producer_memory_bytes"] == memory_cap
+            && admitted_fit["capacity"]["candidate_total_memory_bytes"]
+                == capacity::add(memory_cap, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?
             && owner["AllowedCPUs"] == profile["allowed_cpus"]
             && (running.dev(), running.ino()) == (sealed.dev(), sealed.ino()),
-        "epoch 262 replay booking or live invocation changed"
+        "epoch {epoch} replay booking or live invocation changed"
     );
-    let memory = live::finite_owner(&owner, REPLAY_262, invocation, memory_cap)?;
-    Ok(LiveReplay262 {
+    let memory = live::finite_owner(&owner, unit, invocation, memory_cap)?;
+    Ok(LiveReplay {
         reference,
+        unit,
         owner,
         memory,
         ticks,
@@ -487,7 +529,7 @@ fn fleet_roster<'a>(
     booking: &Value,
     released: &BTreeMap<u64, &str>,
     delivery_261: Option<&Value>,
-    replay_262: Option<&Value>,
+    live_replays: &BTreeMap<u64, LiveReplay>,
 ) -> Result<BTreeMap<u64, &'a Value>> {
     let rows = fleet["active"]
         .as_array()
@@ -497,7 +539,7 @@ fn fleet_roster<'a>(
         .context("Foundation booked owners")?;
     let mut roster = BTreeMap::new();
     let mut observed_delivery = None;
-    let mut observed_replay_262 = false;
+    let mut observed_replays = BTreeSet::new();
     for row in rows {
         let epoch = num(row, "epoch")?;
         if epoch == 261 && row["phase"] == "upload-readback" {
@@ -509,14 +551,12 @@ fn fleet_roster<'a>(
             live::same_owner(&row["unit"], owner)?;
             continue;
         }
-        if epoch == 262 {
-            let owner = replay_262.context("unbooked epoch 262 replay in fleet")?;
+        if let Some(replay) = live_replays.get(&epoch) {
             ensure!(
-                row["phase"] == "replay" && !observed_replay_262,
-                "unexpected or duplicate epoch 262 phase in fleet"
+                row["phase"] == "replay" && observed_replays.insert(epoch),
+                "unexpected or duplicate epoch {epoch} phase in fleet"
             );
-            live::same_owner(&row["producer"], owner)?;
-            observed_replay_262 = true;
+            live::same_owner(&row["producer"], &replay.owner)?;
             continue;
         }
         let owner = match (epoch, text(row, "phase")?) {
@@ -603,21 +643,31 @@ mod roster_tests {
         let none = BTreeMap::new();
         let first = BTreeMap::from([(261, REPLAY_261)]);
         let both = BTreeMap::from([(226, EXTRACT_226), (261, REPLAY_261)]);
-        assert!(fleet_roster(&before, &booking, &none, None, None).is_ok());
-        assert!(fleet_roster(&before, &booking, &both, None, None).is_ok());
+        let live_replays = BTreeMap::new();
+        assert!(fleet_roster(&before, &booking, &none, None, &live_replays).is_ok());
+        assert!(fleet_roster(&before, &booking, &both, None, &live_replays).is_ok());
 
         rows.retain(|row| row["epoch"] != 261);
         let after = json!({"active":rows});
-        assert!(fleet_roster(&after, &booking, &none, None, None).is_err());
-        assert!(fleet_roster(&after, &booking, &first, None, None).is_ok());
+        assert!(fleet_roster(&after, &booking, &none, None, &live_replays).is_err());
+        assert!(fleet_roster(&after, &booking, &first, None, &live_replays).is_ok());
 
         rows.retain(|row| row["epoch"] != 226);
         let after = json!({"active":rows});
-        assert!(fleet_roster(&after, &booking, &first, None, None).is_err());
-        assert!(fleet_roster(&after, &booking, &both, None, None).is_ok());
+        assert!(fleet_roster(&after, &booking, &first, None, &live_replays).is_err());
+        assert!(fleet_roster(&after, &booking, &both, None, &live_replays).is_ok());
 
         rows.retain(|row| row["epoch"] != 252);
-        assert!(fleet_roster(&json!({"active":rows}), &booking, &both, None, None).is_err());
+        assert!(
+            fleet_roster(
+                &json!({"active":rows}),
+                &booking,
+                &both,
+                None,
+                &live_replays
+            )
+            .is_err()
+        );
     }
 }
 
@@ -710,6 +760,11 @@ fn guard_binding(
             GUARD_ENV_262,
             "HORIZON262_GUARD_PLAN_SHA256",
             "${HORIZON262_GUARD_PLAN_SHA256}",
+        )),
+        296 => Some((
+            GUARD_ENV_296,
+            "HORIZON296_GUARD_PLAN_SHA256",
+            "${HORIZON296_GUARD_PLAN_SHA256}",
         )),
         _ => None,
     };
@@ -897,28 +952,30 @@ fn measure(
     } else {
         None
     };
-    let active_262 = if before.contains(REPLAY_262) {
-        ensure!(
-            matches!(&quote, Some(Quote::Suffix226(_) | Quote::Replay296(_))),
-            "epoch 262 full replay already owns its lane"
-        );
-        Some(live_replay_262(n)?)
-    } else {
-        None
+    let epoch = match &quote {
+        Some(Quote::Suffix226(_) | Quote::Suffix226Preview) => 226,
+        Some(Quote::Delivery261(_)) => 261,
+        Some(Quote::Replay296(_)) => 296,
+        _ => EPOCH,
     };
+    let mut live_replays = BTreeMap::new();
+    for spec in &REGISTERED_REPLAYS {
+        if before.contains(spec.unit) {
+            ensure!(
+                quote.is_some() && spec.epoch != epoch,
+                "epoch {} full replay already owns its lane",
+                spec.epoch
+            );
+            live_replays.insert(spec.epoch, live_replay(n, spec)?);
+        }
+    }
     let roster = fleet_roster(
         &fleet,
         &booking,
         &released_replays,
         active_delivery.as_ref().map(|(_, owner, _, _)| owner),
-        active_262.as_ref().map(|replay| &replay.owner),
+        &live_replays,
     )?;
-    let epoch = match &quote {
-        Some(Quote::Suffix226(_)) => 226,
-        Some(Quote::Delivery261(_)) => 261,
-        Some(Quote::Replay296(_)) => 296,
-        _ => EPOCH,
-    };
     let missing: Vec<_> = fleet["inventory"]["entries"]
         .as_array()
         .context("Foundation inventory")?
@@ -989,10 +1046,11 @@ fn measure(
             "epoch 261 delivery booked twice"
         );
     }
-    if active_262.is_some() {
+    for replay in live_replays.values() {
         ensure!(
-            expected.insert(REPLAY_262.to_owned()),
-            "epoch 262 replay booked twice"
+            expected.insert(replay.unit.to_owned()),
+            "replay {} booked twice",
+            replay.unit
         );
     }
     ensure!(
@@ -1060,13 +1118,14 @@ fn measure(
         );
         recorded.insert(UPLOAD_261.to_owned(), (owner.clone(), *memory, *ticks));
     }
-    if let Some(replay) = &active_262 {
+    for replay in live_replays.values() {
         ensure!(
             selected.is_disjoint(&units::parse_cpu_list(text(&replay.owner, "AllowedCPUs")?)?),
-            "epoch {epoch} CPUs overlap the epoch 262 replay"
+            "epoch {epoch} CPUs overlap {}",
+            replay.unit
         );
         recorded.insert(
-            REPLAY_262.to_owned(),
+            replay.unit.to_owned(),
             (replay.owner.clone(), replay.memory, replay.ticks),
         );
     }
@@ -1078,10 +1137,15 @@ fn measure(
         {
             continue;
         }
-        let (owner, guard_booking) = if guard_epoch == EPOCH {
-            let Some(replay) = &active_262 else { continue };
+        let (owner, guard_booking) = if let Some(replay) = live_replays.get(&guard_epoch) {
             (&replay.owner, &replay.guard_booking)
         } else {
+            if REGISTERED_REPLAYS
+                .iter()
+                .any(|spec| spec.epoch == guard_epoch)
+            {
+                continue;
+            }
             let unit = text(roster[&guard_epoch], "Id")?;
             (
                 &recorded[unit].0,
@@ -1187,11 +1251,13 @@ fn measure(
             capacity::add(sum, num(row, "remaining_upper_bound_bytes")?)
         })?;
     let delivery_261_disk = active_delivery.as_ref().map_or(0, |_| UPLOAD_261_DISK);
-    let replay_262_disk = active_262.as_ref().map_or(0, |replay| replay.receipt_disk);
+    let replay_disk = live_replays
+        .values()
+        .try_fold(0, |total, replay| capacity::add(total, replay.receipt_disk))?;
     let protected = capacity::add(
         capacity::add(
             capacity::add(disk_floor, non_guard_disk)?,
-            capacity::add(delivery_261_disk, replay_262_disk)?,
+            capacity::add(delivery_261_disk, replay_disk)?,
         )?,
         growth,
     )?;
@@ -1203,7 +1269,7 @@ fn measure(
                 capacity::add(CONTROLLER_MEMORY, 1 << 30)?,
             )?,
         ),
-        Some(Quote::Suffix226(_)) => (
+        Some(Quote::Suffix226(_) | Quote::Suffix226Preview) => (
             capacity::add(SUFFIX_226_CAP, DISK_RECEIPTS)?,
             capacity::add(SUFFIX_226_CAP, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
         ),
@@ -1228,7 +1294,7 @@ fn measure(
         .min(resources_after.2);
     let periodic_reserve = capacity::add(
         num(&delivery, "guard_memory_allowance")?,
-        if active_262.is_some() { 1 << 30 } else { 0 },
+        (live_replays.len() as u64) << 30,
     )?;
     let reserve = capacity::add(resources_before.0 / 10, periodic_reserve)?;
     let base_memory = capacity::add(capacity::add(reserve, candidate)?, reserved_audit_memory)?;
@@ -1249,7 +1315,8 @@ fn measure(
     let available_memory = resources_before.1.min(resources_after.1);
     let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
         "active_delivery_261_disk_bytes":delivery_261_disk,
-        "active_replay_262_receipt_disk_bytes":replay_262_disk,
+        "active_replay_262_receipt_disk_bytes":live_replays.get(&262).map_or(0, |lane| lane.receipt_disk),
+        "active_replay_296_receipt_disk_bytes":live_replays.get(&296).map_or(0, |lane| lane.receipt_disk),
         "remaining_guard_growth_bytes":growth,"protected_existing_disk_bytes":protected,
         "candidate_disk_bytes":candidate_disk,"required_disk_bytes":required,"available_disk_bytes":free,
         "disk_shortfall_bytes":required.saturating_sub(free),"disk_margin_bytes":free.saturating_sub(required),
@@ -1281,7 +1348,8 @@ fn measure(
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
         "closed_middle_replay":closed_230,
         "active_delivery_261_claim":active_delivery.as_ref().map(|(claim, _, _, _)| claim),
-        "active_replay_262_registration":active_262.as_ref().map(|replay| &replay.reference)});
+        "active_replay_262_registration":live_replays.get(&262).map(|replay| &replay.reference),
+        "active_replay_296_registration":live_replays.get(&296).map(|replay| &replay.reference)});
     if let Some(Quote::FullReplay(quote)) = &quote {
         evidence["full_replay_quote"] = json!({"sizing_reference":quote.reference,"inputs":quote.inputs,
             "whole_tree_bytes":quote.working_disk,"producer_memory_bytes":quote.producer_memory,
@@ -1295,6 +1363,17 @@ fn measure(
             "candidate_memory_max_bytes":SUFFIX_226_CAP,"candidate_cpus":selected,
             "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
             "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
+        });
+    }
+    if matches!(&quote, Some(Quote::Suffix226Preview)) {
+        ensure!(
+            before.contains(EXTRACT_226),
+            "epoch 226 preview requires live extraction"
+        );
+        evidence["suffix_preview"] = json!({
+            "extraction_reservation_retained":true,
+            "candidate_cap_bytes":SUFFIX_226_CAP,"candidate_memory_max_bytes":SUFFIX_226_CAP,
+            "candidate_cpus":selected,
         });
     }
     if let Some(Quote::Delivery261(preparation)) = &quote {
@@ -1386,9 +1465,15 @@ pub fn run() -> Result<()> {
     let controller_unit = match command.as_deref() {
         None => None,
         Some(flag)
-            if flag == "--full-replay-quote"
-                || flag == "--delivery261-quote"
-                || flag == "--replay296-quote" =>
+            if matches!(
+                flag.to_str(),
+                Some(
+                    "--full-replay-quote"
+                        | "--delivery261-quote"
+                        | "--replay296-quote"
+                        | "--suffix226-preview"
+                )
+            ) =>
         {
             None
         }
@@ -1399,7 +1484,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --delivery261-quote or --replay296-quote"
+            "use --as-controller UNIT, --full-replay-quote, --delivery261-quote, --replay296-quote or --suffix226-preview"
         ),
     };
     let synchronize = match args.next() {
@@ -1445,6 +1530,9 @@ pub fn run() -> Result<()> {
             .and_then(|prep| measure(&mut native, None, Some(Quote::Delivery261(prep)))),
         Some(flag) if flag == "--replay296-quote" => replay_296_quote()
             .and_then(|quote| measure(&mut native, None, Some(Quote::Replay296(quote)))),
+        Some(flag) if flag == "--suffix226-preview" => {
+            measure(&mut native, None, Some(Quote::Suffix226Preview))
+        }
         _ => receipt(&mut native, controller),
     };
     match result {
