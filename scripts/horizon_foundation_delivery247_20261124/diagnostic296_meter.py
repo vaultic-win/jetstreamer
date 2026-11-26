@@ -74,7 +74,7 @@ def configuration():
     return active
 
 
-def register_attempt(plan, version):
+def register_attempt(plan, version, ordinary_replay):
     unit, state, root = attempt_paths(version)
     profile = state / "generic-unit-profile.json"
     if not profile.is_file():
@@ -86,12 +86,6 @@ def register_attempt(plan, version):
         source, row = registered
         if unit not in plan["tracked_units"]:
             plan["tracked_units"].append(unit)
-        claim = dict(epoch=296, unit=unit, invocation_id=row["invocation_id"],
-                     scratch_path=str(root), launch_receipt=source)
-        existing = [item for item in plan["diagnostics"] if item["unit"] == unit]
-        assert not existing or existing == [claim]
-        if not existing:
-            plan["diagnostics"].append(claim)
         evidence.extend((source, row["admission"], row["active_guard"]))
         terminal_path = state / "terminal.json"
         if terminal_path.is_file():
@@ -99,19 +93,30 @@ def register_attempt(plan, version):
             closed = bound(terminal)
             assert closed["launch"] == source and closed["guard_drained"]
             evidence.append(terminal)
-            gate["next_action"] = closed["next_action"]
-        else:
+            if not ordinary_replay:
+                gate["next_action"] = closed["next_action"]
+        elif not ordinary_replay:
             gate["next_action"] = "Collect the private meter trace and drain guards after its terminal result."
-    else:
+        claim = dict(epoch=296, unit=unit, invocation_id=row["invocation_id"],
+                     scratch_path=str(root), launch_receipt=source)
+        existing = [item for item in plan["diagnostics"] if item["unit"] == unit]
+        assert not existing or existing == [claim]
+        if ordinary_replay:
+            assert terminal_path.is_file() and not active_configuration(version)
+            if existing:
+                plan["diagnostics"].remove(claim)
+        elif not existing:
+            plan["diagnostics"].append(claim)
+    elif not ordinary_replay:
         gate["next_action"] = "Admit the bounded meter diagnostic against the complete live fleet."
     for item in evidence:
         if item not in gate["evidence"]:
             gate["evidence"].append(item)
 
 
-def register(plan):
+def register(plan, ordinary_replay=False):
     for version in ATTEMPTS:
-        register_attempt(plan, version)
+        register_attempt(plan, version, ordinary_replay)
 
 
 def owns(row):
