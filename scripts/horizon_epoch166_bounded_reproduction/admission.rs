@@ -34,12 +34,37 @@ const V8_ACTIVE: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V8_AC
 const V8_ACTIVE_SHA: &str = "5af272261eaf8c57abc806e03778cc0d6657a7fd118fd58476387ed7dd0d39b3";
 const V8_SEAL: &str = "survivor172-cadence-20261122-v1/tools-cold168-retry4-failed166-v8-entry146/deployment-seal-receipt.json";
 const V8_SEAL_SHA: &str = "3ae90b99cc09e7b58d1f88bc5ed72e8150d0383c906c0a169e401f262dab370a";
-const V9_INVOCATION: &str = "ebdfc34db47c4e7699ea5ccbada5d604";
-const V9_CHECKER: &str = "epoch145-semantic-continuity-20261121-v1/tools-v9-census-recovery";
-const V9_CHECKER_SHA: &str = "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd";
-const V9_HANDOFF: &str = "epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff";
-const V9_SUBMISSION_SHA: &str = "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973";
-const V9_RECOVERY_SHA: &str = "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4";
+struct SemanticCompletion {
+    stage: &'static str,
+    schema: &'static str,
+    invocation: &'static str,
+    checker: &'static str,
+    checker_sha: &'static str,
+    handoff: &'static str,
+    submission_sha: &'static str,
+    recovery_sha: &'static str,
+}
+
+const V9_COMPLETION: SemanticCompletion = SemanticCompletion {
+    stage: "v9-semantic-complete-drained",
+    schema: "horizon-epoch145-v8-census-successor-semantic-completion-v1",
+    invocation: "ebdfc34db47c4e7699ea5ccbada5d604",
+    checker: "epoch145-semantic-continuity-20261121-v1/tools-v9-census-recovery",
+    checker_sha: "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd",
+    handoff: "epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff",
+    submission_sha: "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973",
+    recovery_sha: "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4",
+};
+const V10_COMPLETION: SemanticCompletion = SemanticCompletion {
+    stage: "v10-semantic-complete-drained",
+    schema: "horizon-epoch145-v9-census-successor-semantic-completion-v1",
+    invocation: "104f023c5cd24a55b6585ef525b80067",
+    checker: "epoch145-semantic-continuity-20261121-v1/tools-v10-census-recovery",
+    checker_sha: "29aac4e0527dcea47f4e9bcb14c5e071b67b8d749669873cc04d7cd1cc5d4e75",
+    handoff: "epoch145-semantic-continuity-20261121-v1/v10-census-name-handoff",
+    submission_sha: "63afb9ef8ffa492e2fe12b05b9eccd6bd2e1c533d024f59ebeb21460e43da8cf",
+    recovery_sha: "ed1dd13fb7803f31e90b7040b09359a484f0fef2608bce74a0c65bd2c37fa605",
+};
 const V12_ACTIVE: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json";
 const V12_READY: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_READY.json";
 const V12_PACKAGE: &str =
@@ -780,33 +805,35 @@ fn verify_v6_dependencies(native: &Value) -> Result<()> {
     Ok(())
 }
 
-fn v9_price_refs(native: &Value) -> Result<[&Value; 3]> {
+fn census_price_refs<'a>(native: &'a Value, owner: &SemanticCompletion) -> Result<[&'a Value; 3]> {
     let root = Path::new(RT);
     let phase = &native["phase145"];
     let complete = &phase["completion"];
     let checker = &phase["checker_seal"];
     let semantic = &phase["semantic_receipt"];
     ensure!(
-        phase["stage"] == "v9-semantic-complete-drained"
-            && phase["completed_invocation_id"] == V9_INVOCATION
+        phase["stage"] == owner.stage
+            && phase["completed_invocation_id"] == owner.invocation
             && complete["path"]
                 == json!(
                     root.join("epoch145-guarded-export-20261121-v1/state")
-                        .join(V9_INVOCATION)
+                        .join(owner.invocation)
                         .join("complete.json")
                 )
-            && semantic["path"] == json!(root.join(V9_HANDOFF).join("SEMANTIC_COMPLETION.json"))
+            && semantic["path"] == json!(root.join(owner.handoff).join("SEMANTIC_COMPLETION.json"))
             && *checker
                 == reference(
-                    &root.join(V9_CHECKER).join("deployment-seal-receipt.json"),
-                    V9_CHECKER_SHA
+                    &root
+                        .join(owner.checker)
+                        .join("deployment-seal-receipt.json"),
+                    owner.checker_sha
                 )
             && native["status_registration"]["consumer_seal"]
                 == reference(
                     &root.join(V12_PACKAGE).join("deployment-seal-receipt.json"),
                     V12_SEAL_SHA
                 ),
-        "epoch 166 requires the exact V9 semantic completion and V12 quote"
+        "epoch 166 requires the exact semantic completion and V12 quote"
     );
     Ok([complete, checker, semantic])
 }
@@ -833,45 +860,46 @@ fn v12_identity(writer: &Value, active: &Value, ready: &Value) -> Result<()> {
     Ok(())
 }
 
-fn verify_v9_dependencies(native: &Value) -> Result<Value> {
-    let [complete, checker, semantic] = v9_price_refs(native)?;
+fn verify_census_dependencies(native: &Value, owner: &SemanticCompletion) -> Result<Value> {
+    let [complete, checker, semantic] = census_price_refs(native, owner)?;
     let root = Path::new(RT);
     let package = bound(checker)?;
     ensure!(
         package["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
-            && package["destination"] == json!(root.join(V9_CHECKER))
+            && package["destination"] == json!(root.join(owner.checker))
             && package["sealer_sha256"] == SEALER_SHA
             && package["remote_mutations"] == false
             && package["r2_mutations"] == false,
-        "foreign V9 semantic checker seal"
+        "foreign semantic checker seal"
     );
     member(&package, "v5v_semantic_completion.py")?;
     let terminal = bound(semantic)?;
     ensure!(
-        terminal["schema"] == "horizon-epoch145-v8-census-successor-semantic-completion-v1"
-            && terminal["invocation_id"] == V9_INVOCATION
+        terminal["schema"] == owner.schema
+            && terminal["invocation_id"] == owner.invocation
             && terminal["completion"] == *complete
-            && bound(complete)?["iid"] == V9_INVOCATION
+            && bound(complete)?["iid"] == owner.invocation
             && terminal["startup_evidence"]["worker_seal"] == *checker
             && terminal["startup_evidence"]["submission_result"]
                 == reference(
-                    &root.join(V9_HANDOFF).join("START_RESULT.json"),
-                    V9_SUBMISSION_SHA
+                    &root.join(owner.handoff).join("START_RESULT.json"),
+                    owner.submission_sha
                 )
             && terminal["start"] == terminal["startup_evidence"]["start"]
             && terminal["start"]
                 == reference(
-                    &root.join("epoch145-guarded-export-20261121-v1/state")
-                        .join(V9_INVOCATION)
+                    &root
+                        .join("epoch145-guarded-export-20261121-v1/state")
+                        .join(owner.invocation)
                         .join("recovery-started.json"),
-                    V9_RECOVERY_SHA,
+                    owner.recovery_sha,
                 )
-            && terminal["native_success"]["INVOCATION_ID"] == V9_INVOCATION
+            && terminal["native_success"]["INVOCATION_ID"] == owner.invocation
             && terminal["native_success"]["_PID"] == "1"
             && terminal["native_success"]["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
             && terminal["publication_authorized"] == false
             && terminal["r2_mutations"] == false,
-        "epoch 166 V9 semantic completion changed"
+        "epoch 166 semantic completion changed"
     );
     let writer = &native["status_registration"];
     bound(&writer["consumer_seal"])?;
@@ -906,7 +934,7 @@ fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Re
     ensure!(
         matches!(
             generation_name,
-            "v5w" | "post145" | "post145-v5z" | "post145-v6" | "post145-v9"
+            "v5w" | "post145" | "post145-v5z" | "post145-v6" | "post145-v9" | "post145-v10"
         ),
         "unknown epoch 145 provider generation"
     );
@@ -950,16 +978,19 @@ fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Re
         "unbound held owner"
     );
     let requires_v6 = generation_name == "post145-v6";
-    let requires_v9 = generation_name == "post145-v9";
+    let semantic_owner = match generation_name {
+        "post145-v9" => Some(&V9_COMPLETION),
+        "post145-v10" => Some(&V10_COMPLETION),
+        _ => None,
+    };
     if requires_v6 {
         verify_v6_dependencies(&n)?;
     }
-    let active_v12 = if requires_v9 {
-        Some(verify_v9_dependencies(&n)?)
-    } else {
-        None
-    };
-    let mut result = prestart_price(&n, fleet, &f, &evidence, now()?, requires_v9)?;
+    let active_v12 = semantic_owner
+        .map(|owner| verify_census_dependencies(&n, owner))
+        .transpose()?;
+    let requires_v12 = semantic_owner.is_some();
+    let mut result = prestart_price(&n, fleet, &f, &evidence, now()?, requires_v12)?;
     if !before.is_null() {
         let prior = bound(&before["prestart"])?;
         if requires_v6 {
@@ -970,16 +1001,16 @@ fn price(mode: &str, fleet: &Value, generation_name: &str, seal_sha: &str) -> Re
                 "V6 completion or native provider changed since epoch 166 prestart"
             );
         }
-        if let Some(active) = &active_v12 {
+        if let (Some(owner), Some(active)) = (semantic_owner, &active_v12) {
             let saved = &prior["epoch166_write_version_reproduction"]["native_capture"];
             ensure!(
-                v9_price_refs(&prior)? == v9_price_refs(&n)?
+                census_price_refs(&prior, owner)? == census_price_refs(&n, owner)?
                     && saved["deployment"] == sr
                     && saved["cadence_active"] == *active,
-                "V9 completion, V12 receipt or native provider changed since epoch 166 prestart"
+                "semantic completion, V12 receipt or native provider changed since epoch 166 prestart"
             );
         }
-        reprice_held(&mut result, &n, &before, &prior, &f, requires_v9)?;
+        reprice_held(&mut result, &n, &before, &prior, &f, requires_v12)?;
     }
     result["epoch166_write_version_reproduction"]["native_capture"] =
         json!({"deployment":sr,"program":program,"stdout_sha256":digest(&out.stdout)});
@@ -1136,29 +1167,36 @@ mod tests {
     }
 
     #[test]
-    fn v9_rejects_crossed_completion_and_v12_process() {
+    fn rejects_crossed_semantic_completion_and_v12_process() {
         let root = Path::new(RT);
         let seal = reference(
             &root.join(V12_PACKAGE).join("deployment-seal-receipt.json"),
             V12_SEAL_SHA,
         );
         let writer = json!({"consumer_seal":seal,"invocation_id":"3".repeat(32),"pid":723,"start_ticks":931});
-        let mut n = json!({
-            "phase145":{
-                "stage":"v9-semantic-complete-drained","completed_invocation_id":V9_INVOCATION,
-                "completion":reference(&root.join("epoch145-guarded-export-20261121-v1/state")
-                    .join(V9_INVOCATION).join("complete.json"),"completion"),
-                "semantic_receipt":reference(&root.join(V9_HANDOFF).join("SEMANTIC_COMPLETION.json"),"semantics"),
-                "checker_seal":reference(&root.join(V9_CHECKER).join("deployment-seal-receipt.json"),V9_CHECKER_SHA)
-            },
-            "status_registration":writer
-        });
-        v9_price_refs(&n).unwrap();
-        n["phase145"]["completed_invocation_id"] = json!(V6_INVOCATION);
-        assert!(v9_price_refs(&n).is_err());
-        n["phase145"]["completed_invocation_id"] = json!(V9_INVOCATION);
-        n["status_registration"]["consumer_seal"] = json!({"path":V8_SEAL,"sha256":V8_SEAL_SHA});
-        assert!(v9_price_refs(&n).is_err());
+        for (owner, other) in [
+            (&V9_COMPLETION, &V10_COMPLETION),
+            (&V10_COMPLETION, &V9_COMPLETION),
+        ] {
+            let mut n = json!({
+                "phase145":{
+                    "stage":owner.stage,"completed_invocation_id":owner.invocation,
+                    "completion":reference(&root.join("epoch145-guarded-export-20261121-v1/state")
+                        .join(owner.invocation).join("complete.json"),"completion"),
+                    "semantic_receipt":reference(&root.join(owner.handoff).join("SEMANTIC_COMPLETION.json"),"semantics"),
+                    "checker_seal":reference(&root.join(owner.checker).join("deployment-seal-receipt.json"),owner.checker_sha)
+                },
+                "status_registration":writer
+            });
+            census_price_refs(&n, owner).unwrap();
+            assert!(census_price_refs(&n, other).is_err());
+            n["phase145"]["completed_invocation_id"] = json!(other.invocation);
+            assert!(census_price_refs(&n, owner).is_err());
+            n["phase145"]["completed_invocation_id"] = json!(owner.invocation);
+            n["status_registration"]["consumer_seal"] =
+                json!({"path":V8_SEAL,"sha256":V8_SEAL_SHA});
+            assert!(census_price_refs(&n, owner).is_err());
+        }
         let ready = json!({"schema":"horizon-epoch166-cadence-rejoin-ready-v1","package":seal});
         let mut active = json!({
             "schema":"horizon-epoch166-cadence-rejoin-active-v1","producer_mutations":false,

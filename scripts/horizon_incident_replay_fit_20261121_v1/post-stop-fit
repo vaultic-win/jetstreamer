@@ -65,7 +65,9 @@ REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
 REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v1"
 REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
 REPRO166_POST_V9 = HERE == D / "tools-homefloor-166-write-version-post145-v9-v1"
-REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or REPRO166_POST_V9 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
+REPRO166_POST_V10 = HERE == D / "tools-homefloor-166-write-version-post145-v10-v1"
+REPRO166_POST_V12 = REPRO166_POST_V9 or REPRO166_POST_V10
+REPRO166_POST = REPRO166_POST_V5Z or REPRO166_POST_V6 or REPRO166_POST_V12 or HERE == D / "tools-homefloor-166-write-version-post145-v1"
 REPRO166 = REPRO166_LIVE or REPRO166_POST
 V7_145 = HERE == D / "tools-homefloor-145-v6-stop-recovery-v2"
 V8_RUNTIME_145 = HERE == D / "tools-homefloor-145-v7-timeout-recovery-v1"
@@ -92,7 +94,7 @@ V7_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v7-build-v1"
 V9_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v9-build-v1"
 V10_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v10-build-v1"
 RETRY5_POST_BUILD_145 = V7_POST_BUILD_145 or V9_POST_BUILD_145 or V10_POST_BUILD_145
-RETRY5_168 = RETRY5_FIT_ROUTE or RETRY5_POST_145 or RETRY5_POST_BUILD_145 or REPRO166_POST_V9 or FULL170_RETRY5
+RETRY5_168 = RETRY5_FIT_ROUTE or RETRY5_POST_145 or RETRY5_POST_BUILD_145 or REPRO166_POST_V12 or FULL170_RETRY5
 STOPPED168_PRICE = FULL170_V9 or RETRY5_168 or STOP_RECOVERY_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
@@ -772,12 +774,12 @@ def phase145(epoch, fleet=None):
     if FULL170_V9:
         generation = "V10" if FULL170_RETRY5_V10 else "V9"
         return retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit[generation])
-    if RETRY5_FIT_ROUTE or RETRY5_POST_BUILD_145 or REPRO166_POST_V9:
-        generation = ("V10" if V10_RETRY5_FIT or V10_POST_BUILD_145 else
-                      "V9" if V9_RETRY5_FIT or V9_POST_BUILD_145 or REPRO166_POST_V9 else
+    if RETRY5_FIT_ROUTE or RETRY5_POST_BUILD_145 or REPRO166_POST_V12:
+        generation = ("V10" if V10_RETRY5_FIT or V10_POST_BUILD_145 or REPRO166_POST_V10 else
+                      "V9" if V9_RETRY5_FIT or V9_POST_BUILD_145 or REPRO166_POST_V12 else
                       "V8" if V8_RETRY5_FIT else "V7")
         phase = retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit[generation])
-        if RETRY5_POST_BUILD_145 or REPRO166_POST_V9:
+        if RETRY5_POST_BUILD_145 or REPRO166_POST_V12:
             proof = bound(phase["completion"])
             phase["semantic_receipt"] = phase["completion"]
             phase["completion"] = proof["completion"]
@@ -2017,7 +2019,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if RETRY5_168:
         writer = {"registered_writer": registered_status()} if V13_RETRY5_FIT else {}
         donor = retry5_fit["donor_cover"](s, retry5_donor, retry5_donor_before, native, f, **writer)
-        price = "price166" if REPRO166_POST_V9 else "price"
+        price = "price166" if REPRO166_POST_V12 else "price"
         return retry5_fit[price](s, native, retry5_current, books["168"], donor, cold168)
     if not HOURLY170:
         return native
@@ -2111,7 +2113,7 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
     if RETRY5_168 and not FULL170_RETRY5:
         s.need(epoch == (168 if RETRY5_FIT_ROUTE else 145) and prestart136 is None,
                "wrong epoch for the sealed retry5 or post provider")
-        if REPRO166_POST_V9:
+        if REPRO166_POST_V12:
             holding_program = holding185_program()
 
             def holding():
@@ -2119,7 +2121,7 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
 
             before = holding()
             s.need(before["holding_reservation"] is None and before["active_transfer"] is None,
-                   "V9 epoch 166 requires the serial holding slot to drain")
+                   "epoch 166 reproduction requires the serial holding slot to drain")
             native = capture_native(epoch, ref, repro166_mode=repro166_mode)
             s.need(holding() == before and registered_status() == native["status_registration"],
                    "serial holding or V12 writer changed during epoch 166 capture")
