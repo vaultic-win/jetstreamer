@@ -24,7 +24,11 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
-RETRY5_CADENCE_VERSIONS = (12, 13, 14)
+RETRY5_CADENCE_VERSIONS = (12, 13, 14, 15)
+PUBLICATION_INVOCATIONS = {
+    145: ('horizon-retained-publish-145-20261126-v1.service', '166133c4366c47cdad3caf1748404541'),
+    199: ('horizon-retained-publish-199-20261126-v1.service', 'd12158c94a7a4e53af92671cb4a2a8b9'),
+}
 
 
 def failed166_package(version):
@@ -33,11 +37,11 @@ def failed166_package(version):
     return name + '-entry146' if version >= 4 else name
 
 
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15)
                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
 FAILED166 = bool(FAILED166_VERSION)
 RETRY5_168 = FAILED166_VERSION in RETRY5_CADENCE_VERSIONS
-METERED_FULL170 = FAILED166_VERSION in (6, 7, 13, 14)
+METERED_FULL170 = FAILED166_VERSION in (6, 7, 13, 14, 15)
 HOLDING185 = FAILED166_VERSION == 7
 HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
 FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
@@ -555,17 +559,56 @@ def census(c,bridge):
     durable(path,witness)
     return witness
 
+def staged_delivery_inventory(c, store):
+    statuses, ready, archives = store.inventory()
+    original = checked(c.prior['inventory'], root=False)
+    pinned = {row['epoch'] for row in original['entries'] if row['state'] in ('ready-pair', 'archive-only')}
+    extra = archives.keys() - pinned
+    need(extra <= PUBLICATION_INVOCATIONS.keys() and extra.isdisjoint(ready),
+         'unexpected canonical publication requires authenticated reconciliation')
+    for epoch in sorted(extra):
+        unit, invocation = PUBLICATION_INVOCATIONS[epoch]
+        etag, size = archives[epoch]
+        entry, = (row for row in c.fleet['epochs'] if row['epoch'] == epoch)
+        need(epoch in statuses and entry['current_repair_owner'] == '/root'
+             and entry['current_status']['jet_size_bytes'] == size and size > 0,
+             'different staged archive owner or length')
+        output = subprocess.check_output([
+            '/usr/bin/journalctl', '--no-pager', '-o', 'json', '--grep=r2-readback-start',
+            f'_SYSTEMD_UNIT={unit}', f'_SYSTEMD_INVOCATION_ID={invocation}',
+        ], text=True, timeout=10)
+        proof = None
+        for line in output.splitlines():
+            native = json.loads(line)
+            message = json.loads(native['MESSAGE'])
+            if (native['_SYSTEMD_UNIT'] == unit and native['_SYSTEMD_INVOCATION_ID'] == invocation
+                    and message['event'] == 'r2-readback-start' and message['key'] == f'epoch-{epoch}.jet'
+                    and message['total_bytes'] == size and message['expected_etag'].strip('"') == etag):
+                proof = dict(unit=unit, invocation_id=invocation, cursor=native['__CURSOR'],
+                             journal_realtime=native['__REALTIME_TIMESTAMP'], native_readback=message,
+                             etag=etag, size_bytes=size)
+        need(proof is not None, 'staged archive lacks the exact native publisher and readback identity')
+        prior = c.staged_deliveries.setdefault(epoch, proof)
+        need(prior == proof, 'staged archive or publisher changed during the coordinated sample')
+        del archives[epoch]
+    inventory = SimpleNamespace(inventory=lambda: (statuses, ready, archives))
+    return status.inventory(c, inventory)
+
+
 def publish_all(c,bridge,store,vs):
     target=names(c.cfg['not_before_utc'])['statuses'];ensure_dir(target)
     refs=baselines(c.fleet_ref,c.fleet,bridge)
     initial=set(int(k) for k in refs)
     need(initial==set(status.EPOCHS)|{140},'different status population')
-    ready=status.inventory(c,store)
+    if FAILED166_VERSION == 15:
+        c.staged_deliveries = {}
+    inventory = staged_delivery_inventory if FAILED166_VERSION == 15 else status.inventory
+    ready=inventory(c,store)
     read_statuses(store,refs,target)
     for e in sorted(initial):
         publish(c,store,refs,target,e,vs['archive172'] if e==172 else None)
     for e,r in refs.items(): authenticated(store,int(e),r)
-    need(ready==status.inventory(c,store),'archive inventory changed during status refresh')
+    need(ready==inventory(c,store),'archive inventory changed during status refresh')
     counts=cold167_status.counts(c)
     diagnostic_count=private136.active(c.private136) if PRIVATE136 else 0
     diagnostic_count+=int(bool(HOURLY170 and c.hourly170 and c.hourly170.get('row')))
@@ -650,6 +693,13 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
         new=checked(ref)['after_status'];entry=lookup[int(e)]
         entry.update(status=new,current_status=new,status_publication=ref,current_authenticated_status_receipt=ref,
                      current_coordinated_observer=c.sample_ref)
+    if FAILED166_VERSION == 15:
+        proof = base/'STAGED_DELIVERY_INVENTORY.json'
+        durable(proof, dict(observer=c.sample_ref, staged=c.staged_deliveries))
+        fleet['current_staged_delivery_inventory'] = bound(proof)
+        for epoch, staged in c.staged_deliveries.items():
+            lookup[epoch].update(inventory_state='archive-only',
+                                 staged_delivery_readback=staged)
     for e in CLOSED:
         entry=lookup[e];entry.pop('current_replay',None);entry.pop('current_bootstrap',None)
         entry.update(no_live_producer_claimed=True,current_repair_owner='/root',repair_open=True,state='verification',
@@ -1126,6 +1176,14 @@ def rejoin_failed166_cadence(state, receipt, fd):
                  and ready['retry5_scan_stop'] == cold_workers.cold168_commit.retry5_scan_stop(fleet, cfg, route),
                  'V14 rejoin lost the original sample or retry5 stop')
             check_sample(fleet, checked(sample), cfg)
+        if FAILED166_VERSION == 15:
+            previous_ready = checked(incumbent['ready'])
+            need(incumbent_ref['sha256'] == '92d8399739b8b93e65b82f0810c730adcbe41e39e9a4d08db34e21a759c220b6'
+                 and previous_ready['package']['sha256'] == '1b9f179d7ad7802c637f2203f0d1151b0a244b328fabc872936dcb11c54ec2fd'
+                 and ready['full170_receiver'] == bound(CURRENT.with_name('full170_status.py'))
+                 and ready['retry5_scan_stop'] == previous_ready['retry5_scan_stop']
+                 == cold_workers.cold168_commit.retry5_scan_stop(fleet, cfg, route),
+                 'different prior writer, metered receiver or retry5 stop')
         route.generation()
         cold_workers.cold168_commit.guard_stop(fleet, cfg, successor=route)
     pid = os.getpid()
