@@ -31,6 +31,11 @@ elif [[ ${1:-} == epoch168-cold-v5 && $# == 1 ]]; then
     base=/var/lib/jetstreamer/horizon_runtime_data/epoch168-cold-guard-20261125-v5
     group=/sys/fs/cgroup/system.slice/horizon-168-cold-guard-v5-build.service
     features+=(--cfg 'feature="epoch168-cold-v5"')
+elif [[ ${1:-} == epoch168-cold-v6 && $# == 1 ]]; then
+    src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
+    base=/var/lib/jetstreamer/horizon_runtime_data/epoch168-cold-guard-20261126-v6
+    group=/sys/fs/cgroup/system.slice/horizon-168-cold-guard-v6-build.service
+    features+=(--cfg 'feature="epoch168-cold-v6"' --cfg 'feature="root-budget-fd"')
 elif [[ ${1:-} == epoch166-retry11 && $# == 1 ]]; then
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
     base=/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry11-guard-20261122-v1
@@ -65,7 +70,7 @@ test "$(cat "$group/cpu.max")" = '100000 100000'
 test "$(cat "$group/memory.max")" = '1073741824'
 test "$(cat "$group/memory.swap.max")" = '0'
 test "$(findmnt -n -T "$work" -o SOURCE)" = /dev/loop4
-if [[ ${1:-} == epoch168-cold-v5 || ${1:-} == epoch168-cold-v4 || ${1:-} == epoch168-cold-v3 || ${1:-} == epoch168-cold-v2 || ${1:-} == epoch167-cold-v3 || ${1:-} == epoch166-retry11 || ${1:-} == epoch170-retry11 || ${1:-} == epoch170-retry12 || ${1:-} == epoch170-retry13 ]]; then
+if [[ ${1:-} == epoch168-cold-v6 || ${1:-} == epoch168-cold-v5 || ${1:-} == epoch168-cold-v4 || ${1:-} == epoch168-cold-v3 || ${1:-} == epoch168-cold-v2 || ${1:-} == epoch167-cold-v3 || ${1:-} == epoch166-retry11 || ${1:-} == epoch170-retry11 || ${1:-} == epoch170-retry12 || ${1:-} == epoch170-retry13 ]]; then
     # Reuse the already allocated compiler filesystem for intermediates. Leave the
     # older read-only dependency filesystem and its remaining free space alone.
     scratch=/home/sol/.jetstreamer-private/epoch168-extractor-build-20261120-v1/work
@@ -85,6 +90,9 @@ cd "$src"
 g=scripts/horizon_cold166_20261120_v1/guard
 f=scripts/horizon_retry8_166_20261119_v1/guard/external
 cp --parents "$g"/{guard_main.rs,data_fulfillment.rs,Cargo.toml,Cargo.lock} "$f"/* scripts/horizon_epoch166_guard_recovery_20261121_v1/incident_guard.rs "$out"
+if [[ ${1:-} == epoch168-cold-v6 ]]; then
+    cp --parents "$g/root_budget_fd.rs" "$out"
+fi
 cd "$out"
 find scripts -type f -print0 | sort -z | xargs -0 sha256sum > "$stage/sources"
 args=(--edition=2024 "${features[@]}" -C opt-level=0 -C codegen-units=4 -C strip=symbols -C linker=clang -C link-arg=-fuse-ld=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld/ld.lld -C link-arg=-Wl,--threads=1 -L "dependency=$deps")

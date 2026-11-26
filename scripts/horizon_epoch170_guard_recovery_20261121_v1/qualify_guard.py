@@ -1,14 +1,15 @@
 import hashlib,json,os,re,stat,subprocess,sys
 from pathlib import Path
 work=Path(__file__).resolve().parents[2]
-assert len(sys.argv)==3 or (len(sys.argv)==4 and sys.argv[3] in ('epoch167-cold-v3','epoch168-cold-v2','epoch168-cold-v3','epoch168-cold-v4','epoch168-cold-v5','epoch166-retry11','epoch170-retry11','epoch170-retry12','epoch170-retry13'))
+assert len(sys.argv)==3 or (len(sys.argv)==4 and sys.argv[3] in ('epoch167-cold-v3','epoch168-cold-v2','epoch168-cold-v3','epoch168-cold-v4','epoch168-cold-v5','epoch168-cold-v6','epoch166-retry11','epoch170-retry11','epoch170-retry12','epoch170-retry13'))
 cold167=sys.argv[3:]==['epoch167-cold-v3']
 cold168v3=sys.argv[3:]==['epoch168-cold-v3']
 cold168v4=sys.argv[3:]==['epoch168-cold-v4']
 cold168v5=sys.argv[3:]==['epoch168-cold-v5']
-cold168=sys.argv[3:]==['epoch168-cold-v2'] or cold168v3 or cold168v4 or cold168v5
-guard168ver='v5' if cold168v5 else ('v4' if cold168v4 else ('v3' if cold168v3 else 'v2'))
-guard168date='20261125' if cold168v5 else ('20261123' if cold168v3 or cold168v4 else '20261122')
+cold168v6=sys.argv[3:]==['epoch168-cold-v6']
+cold168=sys.argv[3:]==['epoch168-cold-v2'] or cold168v3 or cold168v4 or cold168v5 or cold168v6
+guard168ver=sys.argv[3].rsplit('-',1)[-1] if cold168 else 'v2'
+guard168date={'v2':'20261122','v3':'20261123','v4':'20261123','v5':'20261125','v6':'20261126'}[guard168ver]
 attempt168=int(guard168ver[1:])
 retry11=sys.argv[3:]==['epoch166-retry11']
 retry170=sys.argv[3:] in (['epoch170-retry11'],['epoch170-retry12'],['epoch170-retry13'])
@@ -83,7 +84,8 @@ w=base/'NATIVE_WITNESS.json'
 exe=base/'tools/guard'
 if not w.exists():
  subprocess.run([exe,'--qualify-data-witness',seed['path'],'--seed-sha256',seed['sha256'],'--seal',ss['path'],'--seal-sha256',ss['sha256'],'--output',w,'--self-sha256',sha(exe)],check=True)
-j=json.loads(w.read_bytes());assert (j['native_identity']['executable_sha256']==sha(exe) and j['native_identity']['executable']==str(exe) and j['allocation']['first']==j['allocation']['second'] and len(j['allocation']['first'])==12 and len(j['independent_roots_receipt']['receipts'])==(5 if cold168v5 else (4 if retry11 or retry170 or cold168 else 3)))
+expected_roots=3+int(retry11 or retry170 or cold168)+int(cold168v5 or cold168v6)+int(cold168v6)
+j=json.loads(w.read_bytes());assert (j['native_identity']['executable_sha256']==sha(exe) and j['native_identity']['executable']==str(exe) and j['allocation']['first']==j['allocation']['second'] and len(j['allocation']['first'])==12 and len(j['independent_roots_receipt']['receipts'])==expected_roots)
 c['qualified_native_witness']=ref(w);cp=base/'qualified-contract.json';durable(cp,c)
 cs=seal('contract',[member('contract.json',cp,0o444)])
 binding={'contract':ref(base/'contract/contract.json'),'deployment_seal':cs}
@@ -95,7 +97,7 @@ plan=dict(schema="jetstreamer-horizon-standalone-guard-plan-v1",unit=unit,invoca
 if cold168:
  plan.update(unit=f'horizon-qualify-168-full-metered-cold-{guard168ver}-{guard168date}.service',
              worker_root='/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1',
-             maximum_root_physical_bytes=(512 if cold168v5 else 288)<<30,
+             maximum_root_physical_bytes=(512 if cold168v5 or cold168v6 else 288)<<30,
              receipt_directory=str(runtime/f'epoch168-retry{attempt168}-rebook-{guard168date}-v1/guard-receipts'))
 if cold167:
  plan.update(unit='horizon-qualify-167-source-index-v3-20261122.service',
@@ -117,20 +119,25 @@ cases=[("positive",plan),("wrong-cap",dict(plan,maximum_root_physical_bytes=(384
                 ("missing-witness",{k:v for k,v in plan.items() if k!="data_fulfillment"})]
 if cold168:
  cases.append(('wrong-predecessor-168',dict(plan,unit='horizon-qualify-168-full-metered-20261121-v1.service')))
-if cold168v3 or cold168v4 or cold168v5:
+if cold168v3 or cold168v4 or cold168v5 or cold168v6:
  cases.append(('spent-retry2-168',dict(plan,unit='horizon-qualify-168-full-metered-cold-v2-20261122.service')))
  old=runtime/'epoch168-cold-guard-20261122-v2/contract'
  cases.append(('spent-retry2-contract',dict(plan,data_fulfillment={'contract':ref(old/'contract.json'),'deployment_seal':ref(old/'deployment-seal-receipt.json')})))
-if cold168v4 or cold168v5:
+if cold168v4 or cold168v5 or cold168v6:
  cases.append(('spent-retry3-168',dict(plan,unit='horizon-qualify-168-full-metered-cold-v3-20261123.service')))
  old=runtime/'epoch168-cold-guard-20261123-v3/contract'
  cases.append(('spent-retry3-contract',dict(plan,data_fulfillment={'contract':ref(old/'contract.json'),'deployment_seal':ref(old/'deployment-seal-receipt.json')})))
-if cold168v5:
+if cold168v5 or cold168v6:
  cases.append(('spent-retry4-168',dict(plan,unit='horizon-qualify-168-full-metered-cold-v4-20261123.service')))
  old=runtime/'epoch168-cold-guard-20261123-v4/contract'
  cases.extend([('spent-retry4-contract',dict(plan,data_fulfillment={'contract':ref(old/'contract.json'),
                 'deployment_seal':ref(old/'deployment-seal-receipt.json')})),
                ('spent-retry4-cap',dict(plan,maximum_root_physical_bytes=288<<30))])
+if cold168v6:
+ old=runtime/'epoch168-cold-guard-20261125-v5/contract'
+ cases.extend([('spent-retry5-168',dict(plan,unit='horizon-qualify-168-full-metered-cold-v5-20261125.service')),
+               ('spent-retry5-contract',dict(plan,data_fulfillment={'contract':ref(old/'contract.json'),
+                   'deployment_seal':ref(old/'deployment-seal-receipt.json')}))])
 if retry170:
  predecessor={'retry11':'retry10','retry12':'retry11','retry13':'retry12'}[attempt]
  old_170_contract=runtime/(f'epoch170-{predecessor}-guard-20261122-v1/contract' if predecessor!='retry10' else 'epoch170-retry10-guard384-20261121-v1/contract')
