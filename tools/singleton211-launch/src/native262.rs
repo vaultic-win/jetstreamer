@@ -1,9 +1,8 @@
 //! Invocation-bound cold restore for the sealed epoch 262 bootstrap.
 use super::*;
 pub mod foundation_roster;
-mod funding {
-    include!("native261/funding.rs");
-}
+mod funding;
+mod peer_window;
 use native257::{process_ticks, publication};
 mod first_guard {
     include!("../../native265-launch/src/first_guard.rs");
@@ -56,7 +55,7 @@ const PACKET: &str = "/var/lib/jetstreamer/horizon262-native-input-tmpfs-2026112
 const PACKET_SHA: &str = "08bb1abfc6da49a6917784d23a1f9f983f91c22bcc8ed686ee048ef8a7e56b7d";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
-const LAUNCHER: &str = "/var/lib/jetstreamer/horizon262-native-launch-v1/horizon-native262-launch";
+const LAUNCHER: &str = "/var/lib/jetstreamer/horizon262-native-launch-v2/horizon-native262-launch";
 
 const EPOCH: u64 = 262;
 const RETENTION_DESCRIPTION_EPOCH: u64 = EPOCH;
@@ -86,8 +85,14 @@ const SCRATCH: u64 = ROOT_CAP;
 const EXPECTED_FILESYSTEM: &str = FILESYSTEM;
 const PRODUCER_SANDBOX: &str = "WorkingDirectory=/run/horizon262-native-cold-v1\nInaccessiblePaths=/tmp /var/tmp /dev/shm\nPrivateDevices=yes\nProtectControlGroups=yes\nRestrictAddressFamilies=AF_UNIX\nOOMPolicy=kill\nOOMScoreAdjust=1000\nAmbientCapabilities=\nStandardOutput=journal\nStandardError=journal\nLogRateLimitIntervalSec=30s\nLogRateLimitBurst=100\n";
 
-fn permits_predecessor(_reference: &Bound, _launcher: &Bound, _source: &Value) -> bool {
-    false
+fn permits_predecessor(reference: &Bound, launcher: &Bound, source: &Value) -> bool {
+    *reference == Bound::new(
+        "/var/lib/jetstreamer/horizon-native262-prepared-cold-v1/prepared.json",
+        "c6bcf30316ffa9f83acf8b4c383579fc4b2dd052ad3c0d0678b072c39df20094",
+    ) && *launcher == Bound::new(
+        "/var/lib/jetstreamer/horizon262-native-launch-v1/horizon-native262-launch",
+        "91dba2d3940a854a5058347d703b318cf8b00bc8a742790416f42af1e67fceb2",
+    ) && source == "04f98e96a96e3dbdbc27c82659090324042ae8ae"
 }
 
 include!("native261/controller.rs");

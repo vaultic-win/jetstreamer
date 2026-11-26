@@ -65,8 +65,11 @@ fn evaluate(
     timed_stop: bool,
 ) -> Result<(Value, peer_window::Window)> {
     let initial = funding::current(n, r, false)?;
-    let context = json!({"epoch":EPOCH,"boot_id":initial["boot_id"],"review":source,
+    let mut context = json!({"epoch":EPOCH,"boot_id":initial["boot_id"],"review":source,
         "actual_current_memory":initial["actual_current_memory"]});
+    if EPOCH == 262 {
+        context["foundation_roster"] = initial["foundation_roster"].clone();
+    }
     let limit = n.deadline.context("admission clock")?;
     let (current, mut peers) = if timed_stop {
         // Finish both full funding views before binding a guard firing. Startup
@@ -270,6 +273,11 @@ pub fn run() -> Result<()> {
     );
     let rf = Bound::new(&args[2], &args[3]);
     let r = rf.sealed()?;
+    let _campaign_lock = if EPOCH == 262 {
+        Some(crate::native262::foundation_roster::cadence_lock()?)
+    } else {
+        None
+    };
     let root = PathBuf::from(&args[5]);
     ensure!(
         root.parent() == Some(Path::new("/var/lib/jetstreamer"))
@@ -304,6 +312,8 @@ pub fn run() -> Result<()> {
             args[1] == "admit" || (args[1] == "qualify-guard") == qualify(&r)?,
             "operation mismatch"
         );
+        ensure!(EPOCH != 262 || args[1] != "admit" || r["synchronize_peer_guards"] != true,
+            "read-only epoch 262 admission cannot advance guard firings");
         if args[1] != "admit" {
             prestart(&r)?;
         }

@@ -1,4 +1,4 @@
-//! Bind the current Foundation cohort for epoch 262 funding. This command is read-only.
+//! Bind the current Foundation cohort for epoch 262 funding and guard qualification.
 use super::*;
 mod allocation;
 
@@ -249,11 +249,50 @@ fn guard_binding(
     Ok(
         json!({"unit":guard_unit,"timer":timer_unit,"timer_invocation_id":timer["InvocationID"],
         "plan":plan,"executable":guard_pin,"retained_guard_sample":proof,"latest_guard_sample":latest_proof,
+        "guard_command":expected,"producer":owner,
         "minimum_free_bytes":body["minimum_free_bytes"],"maximum_root_physical_bytes":body["maximum_root_physical_bytes"]}),
     )
 }
 
-fn receipt(n: &mut Native) -> Result<Value> {
+pub(super) struct Controller<'a> {
+    pub unit: &'a str,
+    pub invocation: &'a str,
+    pub held: bool,
+}
+
+impl Controller<'_> {
+    fn check(&self, n: &mut Native) -> Result<Value> {
+        ensure!(
+            self.unit.starts_with("horizon-native262-controller-")
+                && self.unit.ends_with(".service")
+                && self
+                    .unit
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c))
+                && fs::read_to_string("/proc/self/cgroup")?.trim()
+                    == format!("0::/system.slice/{}", self.unit),
+            "capacity check is outside epoch 262's booked controller"
+        );
+        let row = n.show_fields(self.unit, &format!("{OWNER_FIELDS},Type"))?;
+        ensure!(
+            row["Type"] == "exec" && text(&row, "MainPID")?.parse::<u32>()? == std::process::id(),
+            "epoch 262 capacity checker is not the booked main process"
+        );
+        live::finite_owner(&row, self.unit, self.invocation, CONTROLLER_MEMORY)?;
+        Ok(row)
+    }
+}
+
+fn held_owner(n: &mut Native) -> Result<(Value, u64)> {
+    let held = n.show_fields(UNIT, OWNER_FIELDS)?;
+    let iid = text(&held, "InvocationID")?;
+    let pid = text(&held, "MainPID")?.parse()?;
+    live::finite_owner(&held, UNIT, iid, MEMORY)?;
+    gate::held_image(pid, iid, UNIT, HARNESS)?;
+    Ok((held, process_ticks(pid)?))
+}
+
+pub(super) fn receipt(n: &mut Native, controller: Option<Controller<'_>>) -> Result<Value> {
     let completion = latest_completion()?;
     let done = completion.json()?;
     let fleet_ref = binding(&done["fleet"])?;
@@ -289,12 +328,31 @@ fn receipt(n: &mut Native) -> Result<Value> {
         missing.len() == 1 && missing[0]["state"] == "missing",
         "epoch 262 inventory no longer missing"
     );
-    let expected: BTreeSet<String> = booking["owners"]
+    let booked: BTreeSet<String> = booking["owners"]
         .as_object()
         .context("booked owners")?
         .keys()
         .cloned()
         .collect();
+    let mut expected = booked.clone();
+    let controller_owner = controller.as_ref().map(|c| c.check(n)).transpose()?;
+    let held = if controller.as_ref().is_some_and(|c| c.held) {
+        Some(held_owner(n)?)
+    } else {
+        None
+    };
+    if let Some(c) = &controller {
+        ensure!(
+            expected.insert(c.unit.to_owned()),
+            "epoch 262 controller already booked as a peer"
+        );
+    }
+    if held.is_some() {
+        ensure!(
+            expected.insert(UNIT.to_owned()),
+            "epoch 262 held owner already booked as a peer"
+        );
+    }
     let before = listed_owners(n)?;
     ensure!(
         before == expected,
@@ -311,7 +369,7 @@ fn receipt(n: &mut Native) -> Result<Value> {
     let cpus = units::affinity(&json!({"cpu_affinity":(40..48).collect::<Vec<_>>() }))?;
     let selected = units::parse_cpu_list("40-47")?;
     let mut recorded = BTreeMap::new();
-    for unit in &before {
+    for unit in &booked {
         let owner = n.show_fields(unit, OWNER_FIELDS)?;
         let recorded_owner = &booking["owners"][unit];
         for field in [
@@ -382,6 +440,14 @@ fn receipt(n: &mut Native) -> Result<Value> {
                 && timer["Unit"] == guard["unit"],
             "Foundation guard timer changed during roster binding"
         );
+    }
+    if let (Some(controller), Some(prior)) = (&controller, &controller_owner) {
+        live::same_owner(prior, &controller.check(n)?)?;
+    }
+    if let Some((prior, start)) = &held {
+        let (after, new_start) = held_owner(n)?;
+        live::same_owner(prior, &after)?;
+        ensure!(*start == new_start, "held epoch 262 process was replaced");
     }
     let resources_after = live::resources_at(Path::new(FILESYSTEM))?;
     ensure!(
@@ -466,9 +532,30 @@ fn receipt(n: &mut Native) -> Result<Value> {
     let mut evidence = json!({"schema":"foundation-epoch262-roster-binding-v1","epoch":EPOCH,
         "recorded_unix_seconds":now()?,"fleet":fleet_ref,"observer":observer_ref,
         "completion":completion,"booking":booking_ref,"filesystem_device":device,
-        "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,"admission_issued":false});
+        "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
+        "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false});
     deny_authority(&mut evidence);
     Ok(evidence)
+}
+
+pub(crate) fn cadence_lock() -> Result<File> {
+    let path = Path::new(CADENCE_LOCK);
+    trusted_parents(path)?;
+    let lock = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(path)?;
+    let metadata = lock.metadata()?;
+    ensure!(
+        metadata.is_file() && metadata.uid() == 0 && metadata.mode() & 0o022 == 0,
+        "Foundation cadence lock custody"
+    );
+    use std::os::fd::AsRawFd;
+    ensure!(
+        unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+        "Foundation cadence lock is busy"
+    );
+    Ok(lock)
 }
 
 pub fn run() -> Result<()> {
@@ -478,6 +565,21 @@ pub fn run() -> Result<()> {
         args.next()
             .context("provide a new Foundation roster evidence directory")?,
     );
+    let controller_unit = match args.next() {
+        None => None,
+        Some(flag) if flag == "--as-controller" => Some(
+            args.next()
+                .context("controller unit")?
+                .into_string()
+                .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
+        ),
+        Some(_) => bail!("use --as-controller UNIT for a controller-scoped fit check"),
+    };
+    let synchronize = match args.next() {
+        None => false,
+        Some(flag) if flag == "--synchronize-peer-guards" && controller_unit.is_some() => true,
+        Some(_) => bail!("guard synchronization requires the booked controller"),
+    };
     ensure!(
         args.next().is_none()
             && unsafe { libc::geteuid() } == 0
@@ -489,24 +591,60 @@ pub fn run() -> Result<()> {
         "Foundation roster evidence directory scope"
     );
     trusted_parents(&root)?;
-    let lock = File::open(CADENCE_LOCK)?;
-    use std::os::fd::AsRawFd;
-    ensure!(
-        unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-        "Foundation cadence lock is busy"
-    );
+    let _lock = cadence_lock()?;
     fs::DirBuilder::new().mode(0o700).create(&root)?;
     let mut native = Native {
         root,
         counter: 0,
         deadline: Some(capacity::add(mono()?, 60_000_000)?),
     };
-    let result = receipt(&mut native);
+    let invocation = controller_unit
+        .as_ref()
+        .map(|_| std::env::var("INVOCATION_ID"))
+        .transpose()?;
+    let controller =
+        controller_unit
+            .as_deref()
+            .zip(invocation.as_deref())
+            .map(|(unit, invocation)| Controller {
+                unit,
+                invocation,
+                held: false,
+            });
+    let result = receipt(&mut native, controller);
     match result {
-        Ok(evidence) => println!(
-            "{}",
-            serde_json::to_string(&save_json(&native.root, "roster.json", &evidence)?)?
-        ),
+        Ok(evidence) => {
+            let fit = save_json(&native.root, "roster.json", &evidence)?;
+            if controller_unit.is_some() {
+                let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+                let review = json!({"fleet":evidence["fleet"],"observer":evidence["observer"],"boot_id":boot.trim(),
+                    "synchronize_peer_guards":synchronize});
+                let review_ref = save_json(&native.root, "controller-check-review.json", &review)?;
+                let context = json!({"review":review_ref,"foundation_roster":fit});
+                let result = if synchronize {
+                    peer_window::capture(&mut native, &review, &context)
+                } else {
+                    peer_window::select_minimum(&mut native, &review, &context, 1)
+                };
+                let window = match result {
+                    Ok(window) => window,
+                    Err(error) => {
+                        save_json(
+                            &native.root,
+                            "peer-window-failure.json",
+                            &json!({"fit":fit,"error":format!("{error:#}"),"admission_issued":false}),
+                        )?;
+                        return Err(error);
+                    }
+                };
+                println!(
+                    "{}",
+                    json!({"fit":fit,"peer_window":window.receipt,"admission_issued":false})
+                );
+            } else {
+                println!("{}", serde_json::to_string(&fit)?);
+            }
+        }
         Err(error) => {
             save_json(
                 &native.root,
