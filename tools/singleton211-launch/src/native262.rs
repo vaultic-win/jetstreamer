@@ -1,5 +1,6 @@
 //! Invocation-bound cold restore for the sealed epoch 262 bootstrap.
 use super::*;
+pub mod foundation_roster;
 mod funding {
     include!("native261/funding.rs");
 }
