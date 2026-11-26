@@ -12,7 +12,11 @@ pub(super) fn validate(
         proof,
         guard,
         self_sha,
-        prepare_only,
+        if prepare_only {
+            SourceScope::Preparation
+        } else {
+            SourceScope::Runtime
+        },
         &SourceProfile {
             epoch: 257,
             harness: Bound::new(HARNESS, HARNESS_SHA),
@@ -26,12 +30,18 @@ pub(crate) struct SourceProfile {
     pub(crate) harness: Bound,
     pub(crate) worker: Bound,
 }
+pub(crate) enum SourceScope {
+    Preparation,
+    ProtectiveStop,
+    Runtime,
+}
+
 pub(crate) fn validate_native(
     n: &mut Native,
     proof: &Value,
     guard: &Bound,
     self_sha: &str,
-    prepare_only: bool,
+    scope: SourceScope,
     profile: &SourceProfile,
 ) -> Result<()> {
     ensure!(
@@ -125,21 +135,24 @@ pub(crate) fn validate_native(
             _ => bail!("unregistered source artifact role {role}"),
         }
     }
-    ensure!(
-        (prepare_only && roles == BTreeSet::from(["harness", "guard", "launcher"]))
-            || roles
-                == BTreeSet::from([
-                    "harness",
-                    "worker",
-                    "guard",
-                    "sealer",
-                    "launcher",
-                    "fleet",
-                    "observer",
-                    "inactive-status"
-                ]),
-        "incomplete source role coverage"
-    );
+    let full = BTreeSet::from([
+        "harness",
+        "worker",
+        "guard",
+        "sealer",
+        "launcher",
+        "fleet",
+        "observer",
+        "inactive-status",
+    ]);
+    let complete = match scope {
+        SourceScope::Preparation => roles == BTreeSet::from(["harness", "guard", "launcher"]),
+        SourceScope::ProtectiveStop => {
+            roles == BTreeSet::from(["harness", "worker", "guard", "sealer", "launcher"])
+        }
+        SourceScope::Runtime => false,
+    } || roles == full;
+    ensure!(complete, "incomplete source role coverage");
     Ok(())
 }
 

@@ -16,6 +16,7 @@ fn pristine(disk: u64) -> Result<Value> {
 }
 
 fn review_scope(n: &mut Native, r: &Value, self_sha: &str, prepare_only: bool) -> Result<()> {
+    use native257::publication::SourceScope;
     no_authority(r)?;
     ensure!(
         r["schema"] == format!("horizon-native{EPOCH}-launch-review-v1")
@@ -33,12 +34,19 @@ fn review_scope(n: &mut Native, r: &Value, self_sha: &str, prepare_only: bool) -
     native257::controller_scope(r)?;
     units::affinity(r)?;
     let source = binding(&r["source_publication"])?.sealed()?;
+    let source_scope = if prepare_only {
+        SourceScope::Preparation
+    } else if EPOCH == 262 && qualify(r)? {
+        SourceScope::ProtectiveStop
+    } else {
+        SourceScope::Runtime
+    };
     native257::publication::validate_native(
         n,
         &source,
         &Bound::new(GUARD, GUARD_SHA),
         self_sha,
-        prepare_only,
+        source_scope,
         &native257::publication::SourceProfile {
             epoch: EPOCH,
             harness: Bound::new(INPUT, INPUT_SHA),
@@ -195,6 +203,9 @@ fn qualify(r: &Value) -> Result<bool> {
 }
 fn prestart(r: &Value) -> Result<()> {
     let qual = qualify(r)?;
+    if EPOCH == 262 && qual {
+        return crate::native262::protective_stop_prestart(r);
+    }
     let lifecycle = binding(&r["prestart_qualification"])?.sealed()?;
     ensure!(
         lifecycle["schema"] == format!("horizon-native{EPOCH}-prestart-qualification-v1")

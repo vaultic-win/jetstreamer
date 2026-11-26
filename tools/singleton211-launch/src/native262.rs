@@ -55,7 +55,7 @@ const PACKET: &str = "/var/lib/jetstreamer/horizon262-native-input-tmpfs-2026112
 const PACKET_SHA: &str = "08bb1abfc6da49a6917784d23a1f9f983f91c22bcc8ed686ee048ef8a7e56b7d";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
-const LAUNCHER: &str = "/var/lib/jetstreamer/horizon262-native-launch-v3/horizon-native262-launch";
+const LAUNCHER: &str = "/var/lib/jetstreamer/horizon262-native-launch-v4/horizon-native262-launch";
 
 const EPOCH: u64 = 262;
 const RETENTION_DESCRIPTION_EPOCH: u64 = EPOCH;
@@ -86,13 +86,43 @@ const EXPECTED_FILESYSTEM: &str = FILESYSTEM;
 const PRODUCER_SANDBOX: &str = "WorkingDirectory=/run/horizon262-native-cold-v1\nInaccessiblePaths=/tmp /var/tmp /dev/shm\nPrivateDevices=yes\nProtectControlGroups=yes\nRestrictAddressFamilies=AF_UNIX\nOOMPolicy=kill\nOOMScoreAdjust=1000\nAmbientCapabilities=\nStandardOutput=journal\nStandardError=journal\nLogRateLimitIntervalSec=30s\nLogRateLimitBurst=100\n";
 
 fn permits_predecessor(reference: &Bound, launcher: &Bound, source: &Value) -> bool {
-    *reference == Bound::new(
-        "/var/lib/jetstreamer/horizon-native262-prepared-cold-v1/prepared.json",
-        "c6bcf30316ffa9f83acf8b4c383579fc4b2dd052ad3c0d0678b072c39df20094",
-    ) && *launcher == Bound::new(
-        "/var/lib/jetstreamer/horizon262-native-launch-v1/horizon-native262-launch",
-        "91dba2d3940a854a5058347d703b318cf8b00bc8a742790416f42af1e67fceb2",
-    ) && source == "04f98e96a96e3dbdbc27c82659090324042ae8ae"
+    *reference
+        == Bound::new(
+            "/var/lib/jetstreamer/horizon-native262-prepared-cold-v1/prepared.json",
+            "c6bcf30316ffa9f83acf8b4c383579fc4b2dd052ad3c0d0678b072c39df20094",
+        )
+        && *launcher
+            == Bound::new(
+                "/var/lib/jetstreamer/horizon262-native-launch-v1/horizon-native262-launch",
+                "91dba2d3940a854a5058347d703b318cf8b00bc8a742790416f42af1e67fceb2",
+            )
+        && source == "04f98e96a96e3dbdbc27c82659090324042ae8ae"
+}
+
+// This control can start only the token-held harness, and its first guard must stop
+// it before worker execution. The campaign lock excludes cadence overlap. The
+// full live and terminal consumer proof is still required to release a real token.
+pub(super) fn protective_stop_prestart(review: &Value) -> Result<()> {
+    let inputs = Bound::new(
+        "/var/lib/jetstreamer/horizon262-native-bootstrap-build-v1/namespace-controls-v342.json",
+        "f52ebb48a22a51fd6a243648839507098a217d30a06fa77941212aea4e403775",
+    );
+    ensure!(
+        review["protective_stop_namespace_controls"] == json!(inputs),
+        "unbound epoch 262 pretoken namespace qualification"
+    );
+    let controls = inputs.sealed()?;
+    ensure!(
+        controls["schema"] == "foundation-epoch262-native-namespace-controls-v1"
+            && controls["missing_first_guard_rejected"] == true
+            && controls["mount_namespace_discarded"] == true
+            && controls["nonempty_root_rejected"] == true
+            && controls["worker_launched"] == false
+            && controls["inputs"]["bootstrap_slot"] == SLOT
+            && controls["inputs"]["input_packet_sha256"] == PACKET_SHA,
+        "epoch 262 pretoken namespace scope changed"
+    );
+    Ok(())
 }
 
 include!("native261/controller.rs");
