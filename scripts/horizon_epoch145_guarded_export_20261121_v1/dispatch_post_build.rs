@@ -1,4 +1,4 @@
-//! Start the prepared post-verification build when the semantic receipt is captured.
+//! Dispatch the prepared epoch 145 build or admission after its predecessor receipt.
 use std::{
     env, fs, io,
     os::unix::fs::MetadataExt,
@@ -64,7 +64,7 @@ fn latest_fleet() -> io::Result<PathBuf> {
     Ok(path)
 }
 
-fn fleet_digest(path: &Path) -> io::Result<String> {
+fn file_digest(path: &Path) -> io::Result<String> {
     let output = Command::new("/usr/bin/sha256sum")
         .arg("--")
         .arg(path)
@@ -80,37 +80,46 @@ fn fleet_digest(path: &Path) -> io::Result<String> {
             .iter()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
     {
-        return Err(io::Error::other("could not hash the latest fleet receipt"));
+        return Err(io::Error::other(format!(
+            "could not hash {}",
+            path.display()
+        )));
     }
     Ok(String::from_utf8_lossy(digest).into_owned())
 }
 
 fn run() -> io::Result<()> {
     let arguments: Vec<_> = env::args_os().skip(1).collect();
-    let [argument] = arguments.as_slice() else {
-        return Err(io::Error::other(
-            "expected --inspect or a prepared build launcher",
-        ));
+    let (launcher, deployment) = match arguments.as_slice() {
+        [argument] if argument == "--inspect" => (None, None),
+        [launcher] => (Some(Path::new(launcher)), None),
+        [launcher, deployment] if cfg!(epoch145_v10_completion) => {
+            (Some(Path::new(launcher)), Some(Path::new(deployment)))
+        }
+        _ => {
+            return Err(io::Error::other(
+                "expected --inspect, a build launcher, or an admission launcher and deployment receipt",
+            ));
+        }
     };
-    let inspect = argument == "--inspect";
-    let launcher = Path::new(argument);
-    if !inspect {
+    if let Some(launcher) = launcher {
         private_root_file(Path::new(COMPLETION), 0o600)?;
         private_root_file(launcher, 0o400)?;
     }
     let fleet = latest_fleet()?;
-    let digest = fleet_digest(&fleet)?;
+    let digest = file_digest(&fleet)?;
     println!("{}  {}", digest, fleet.display());
-    if !inspect {
-        let result = Command::new("/usr/bin/python3")
-            .args(["-IB"])
-            .arg(launcher)
-            .arg(fleet)
-            .arg(digest)
-            .status()?;
+    if let Some(launcher) = launcher {
+        let mut command = Command::new("/usr/bin/python3");
+        command.arg("-IB").arg(launcher).arg(fleet).arg(digest);
+        if let Some(deployment) = deployment {
+            private_root_file(deployment, 0o600)?;
+            command.arg(file_digest(deployment)?);
+        }
+        let result = command.status()?;
         if !result.success() {
             return Err(io::Error::other(format!(
-                "prepared build launcher exited with {result}"
+                "prepared epoch 145 launcher exited with {result}"
             )));
         }
     }
