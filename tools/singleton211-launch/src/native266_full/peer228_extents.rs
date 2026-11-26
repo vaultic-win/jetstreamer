@@ -404,23 +404,40 @@ fn retained(first: &[Extent], second: &[Extent]) -> u64 {
 
 /// Physical ranges are data only. Callers must bind the filesystem, file identity and
 /// complete scope and reject duplicate allocation before applying any credit.
-pub(crate) fn stable_file_ranges(file: &File) -> Result<Vec<(u64, u64)>> {
+pub(crate) fn stable_file_ranges(file: &File, allow_growth: bool) -> Result<Vec<(u64, u64)>> {
     let before = file.metadata()?;
-    ensure!(before.is_file(), "physical range scan requires a regular file");
+    ensure!(
+        before.is_file(),
+        "physical range scan requires a regular file"
+    );
     let cap = before.len() / BLOCK * BLOCK;
     let first = scan(file, cap)?;
     let second = scan(file, cap)?;
     let after = file.metadata()?;
-    if metadata_identity(&before) != metadata_identity(&after) || before.nlink() != after.nlink() {
+    let unchanged = metadata_identity(&before) == metadata_identity(&after);
+    let nonshrinking = allow_growth
+        && before.dev() == after.dev()
+        && before.ino() == after.ino()
+        && before.uid() == after.uid()
+        && before.gid() == after.gid()
+        && before.mode() == after.mode()
+        && before.len() <= after.len()
+        && before.blocks() <= after.blocks();
+    if !(unchanged || nonshrinking) || before.nlink() != after.nlink() {
         return Ok(Vec::new());
     }
-    let allocated = after.blocks().checked_mul(512).context("allocation count wraps")?;
+    let allocated = after
+        .blocks()
+        .checked_mul(512)
+        .context("allocation count wraps")?;
     ensure!(
         exclusive(&first, cap)? <= allocated && exclusive(&second, cap)? <= allocated,
         "extent map exceeds kernel allocation count"
     );
     let mut matched = Vec::new();
-    visit_retained(&first, &second, |start, length| matched.push((start, length)));
+    visit_retained(&first, &second, |start, length| {
+        matched.push((start, length))
+    });
     Ok(matched)
 }
 struct Sample {

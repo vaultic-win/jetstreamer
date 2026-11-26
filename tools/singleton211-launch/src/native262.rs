@@ -55,7 +55,7 @@ const PACKET: &str = "/var/lib/jetstreamer/horizon262-native-input-tmpfs-2026112
 const PACKET_SHA: &str = "08bb1abfc6da49a6917784d23a1f9f983f91c22bcc8ed686ee048ef8a7e56b7d";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
-const LAUNCHER: &str = "/var/lib/jetstreamer/horizon262-native-launch-v2/horizon-native262-launch";
+const LAUNCHER: &str = "/var/lib/jetstreamer/horizon262-native-launch-v3/horizon-native262-launch";
 
 const EPOCH: u64 = 262;
 const RETENTION_DESCRIPTION_EPOCH: u64 = EPOCH;

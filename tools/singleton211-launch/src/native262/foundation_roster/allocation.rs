@@ -78,6 +78,45 @@ impl FileStamp {
             ctime_nsec: metadata.ctime_nsec(),
         }
     }
+
+    fn grows_to(&self, next: &Self) -> bool {
+        self.inode == next.inode && self.len <= next.len && self.blocks <= next.blocks
+    }
+}
+
+fn growing_archive(directory: &Path, name: &OsStr) -> bool {
+    directory.file_name() == Some(OsStr::new("archives"))
+        && name
+            .to_str()
+            .and_then(|name| name.strip_prefix("epoch-"))
+            .and_then(|name| name.strip_suffix(".jet"))
+            .is_some_and(|epoch| epoch.parse::<u64>().is_ok())
+}
+
+// Every extent was checked for overflow and exclusive allocation at ingestion.
+fn common_ranges(a: &[(u64, u64)], mut b: Vec<(u64, u64)>) -> Vec<(u64, u64)> {
+    let mut a = a.to_vec();
+    a.sort_unstable();
+    b.sort_unstable();
+    let (mut i, mut j) = (0, 0);
+    let mut retained = Vec::new();
+    while i < a.len() && j < b.len() {
+        let (left, right) = (a[i], b[j]);
+        let left_end = left.0 + left.1;
+        let right_end = right.0 + right.1;
+        let start = left.0.max(right.0);
+        let end = left_end.min(right_end);
+        if start < end {
+            retained.push((start, end - start));
+        }
+        if left_end <= right_end {
+            i += 1;
+        }
+        if right_end <= left_end {
+            j += 1;
+        }
+    }
+    retained
 }
 
 struct Claim {
@@ -162,8 +201,13 @@ fn gather(n: &Native, root: &File) -> Result<Vec<Group>> {
                         continue;
                     }
                     let stamp = FileStamp::of(&before);
-                    let ranges = native266_full::peer228_extents::stable_file_ranges(&file);
-                    if FileStamp::of(&file.metadata()?) != stamp {
+                    let growing = growing_archive(&group.parent, &name);
+                    let ranges =
+                        native266_full::peer228_extents::stable_file_ranges(&file, growing);
+                    let after = file.metadata()?;
+                    let last = FileStamp::of(&after);
+                    if after.nlink() != 1 || (last != stamp && !(growing && stamp.grows_to(&last)))
+                    {
                         continue;
                     }
                     let ranges = ranges?;
@@ -264,18 +308,36 @@ pub(super) fn measure(n: &Native, guards: &BTreeMap<u64, Value>, device: u64) ->
                 let ranges = &group.ranges[extent_start..claim.ranges_end as usize];
                 name_start = claim.names_end as usize;
                 extent_start = claim.ranges_end as usize;
-                let Some(file) =
-                    open_member(&parent, Path::new(OsStr::from_bytes(name)), libc::O_PATH)?
-                else {
+                let name = OsStr::from_bytes(name);
+                let growing = growing_archive(&group.parent, name);
+                let flags = if growing {
+                    libc::O_RDONLY | libc::O_NONBLOCK
+                } else {
+                    libc::O_PATH
+                };
+                let Some(file) = open_member(&parent, Path::new(name), flags)? else {
                     continue;
                 };
                 let current = file.metadata()?;
-                if !current.is_file()
-                    || current.nlink() != 1
-                    || FileStamp::of(&current) != claim.stamp
-                {
+                if !current.is_file() || current.nlink() != 1 {
                     continue;
                 }
+                let current_stamp = FileStamp::of(&current);
+                let remeasured;
+                let ranges = if current_stamp == claim.stamp {
+                    ranges
+                } else if growing && claim.stamp.grows_to(&current_stamp) {
+                    remeasured = common_ranges(
+                        ranges,
+                        native266_full::peer228_extents::stable_file_ranges(&file, true)?,
+                    );
+                    if remeasured.is_empty() || file.metadata()?.nlink() != 1 {
+                        continue;
+                    }
+                    &remeasured
+                } else {
+                    continue;
+                };
                 manifest.update(current.ino().to_le_bytes());
                 manifest.update(current.ctime().to_le_bytes());
                 manifest.update(current.ctime_nsec().to_le_bytes());
@@ -303,9 +365,22 @@ pub(super) fn measure(n: &Native, guards: &BTreeMap<u64, Value>, device: u64) ->
     );
     let free_after = live::resources_at(Path::new(FILESYSTEM))?.2;
     Ok(
-        json!({"method":"same exclusive physical data extents in two FIEMAP reads per unchanged regular inode",
+        json!({"method":"bracketed exclusive physical extents on each checked inode, with a renewed physical intersection for growing archives",
         "minimum_measured_file_bytes":MIN_MEASURED_FILE_BYTES,
         "first_available_bytes":free_before,"last_available_bytes":free_after,
         "conservative_available_bytes":free_before.min(free_after),"roots":witnesses}),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::common_ranges;
+
+    #[test]
+    fn growing_archive_credits_only_the_physically_retained_range() {
+        assert_eq!(
+            common_ranges(&[(64, 16), (0, 32)], vec![(32, 16), (56, 16), (8, 8)]),
+            vec![(8, 8), (64, 8)]
+        );
+    }
 }
