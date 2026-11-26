@@ -245,7 +245,7 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str) -> Result<Value> {
     let clock = now()?;
     validate_baseline(&fit, &fleet_ref, text(&status, "InvocationID")?, clock)?;
     let completion = &fit["phase145"]["semantic_receipt"];
-    let semantic = document(Path::new(V9_COMPLETION), text(completion, "sha256")?, 0o400)?;
+    let semantic = document(Path::new(V9_COMPLETION), text(completion, "sha256")?, 0o600)?;
     ensure!(
         semantic["schema"] == "horizon-epoch145-v8-census-successor-semantic-completion-v1"
             && semantic["invocation_id"] == V9_IID
