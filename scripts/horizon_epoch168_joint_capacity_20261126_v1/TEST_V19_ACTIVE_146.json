@@ -1,0 +1,57 @@
+{
+  "schema": "horizon-epoch146-full-accounted-fit-v1",
+  "active_full146": {
+    "mode": "active",
+    "phase": "worker",
+    "actor": {
+      "producer_invocation_id": "8335cc04ab4947109edac899552ac2f8"
+    },
+    "enrollment": {
+      "fixture": "epoch146-enrollment"
+    }
+  },
+  "pending_epoch168_followup": {
+    "additive_home_bytes": 0,
+    "cpu_quota_micros": 2000000,
+    "memory_bytes": 8589934592
+  },
+  "fit": {
+    "armed_floor_shortfall_bytes": 0,
+    "available_home_bytes": 9388709687296,
+    "available_memory_bytes": 726347403264,
+    "cpu_shortfall_micros": 0,
+    "donor_cpu_quota_micros_used": 9250000,
+    "donor_memory_bytes_used": 74088185856,
+    "existing_cpu_quota_micros": 64000000,
+    "existing_home_floor_bytes": 9113207738261,
+    "existing_required_memory_bytes": 660036448256,
+    "fits": true,
+    "home_shortfall_bytes": 0,
+    "memory_shortfall_bytes": 0,
+    "projected_cpu_quota_micros": 64000000,
+    "projected_home_floor_bytes": 9380497698709,
+    "projected_required_memory_bytes": 668626382848
+  },
+  "pending_guard": {
+    "minimum_free_bytes": 9113207738261
+  },
+  "bookings": {
+    "146": {
+      "remaining_bytes": 267289960448
+    },
+    "168": {
+      "remaining_bytes": 203176382464
+    }
+  },
+  "resource_credit_bytes": 0,
+  "replay_launch_authorized": false,
+  "retained_168_disk_bytes": 203176382464,
+  "retained_185_restore_overlap_bytes": 123350028052,
+  "fleet": {
+    "fixture": "coordinated-fleet"
+  },
+  "proposal": {
+    "fixture": "epoch146-proposal"
+  },
+  "recorded_unix_seconds": 1795723655
+}
