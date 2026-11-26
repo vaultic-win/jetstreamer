@@ -125,6 +125,30 @@ fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
         .collect())
 }
 
+fn latest_guard_invocation(n: &Native, plan: &Value) -> Result<String> {
+    let directory = Path::new(text(plan, "receipt_directory")?);
+    trusted_parents(&directory.join("sample.json"))?;
+    let mut latest = None;
+    for entry in fs::read_dir(directory)? {
+        n.check()?;
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(iid) = name.to_str().and_then(|name| {
+            name.strip_prefix("sample-")
+                .and_then(|name| name.strip_suffix(".json"))
+        }) else {
+            continue;
+        };
+        if hex(iid, 32) && entry.file_type()?.is_file() {
+            let candidate = (entry.metadata()?.modified()?, iid.to_owned());
+            if latest.as_ref().is_none_or(|prior| candidate > *prior) {
+                latest = Some(candidate);
+            }
+        }
+    }
+    Ok(latest.context("no completed Foundation guard sample")?.1)
+}
+
 fn guard_binding(
     n: &mut Native,
     epoch: u64,
@@ -209,9 +233,17 @@ fn guard_binding(
             && fs::metadata(text(&body, "filesystem")?)?.dev() == device,
         "Foundation guard plan differs from booked peer {guard}"
     );
+    let latest_iid = latest_guard_invocation(n, &body)?;
+    let latest_proof = peer_window::guard_sample_ref(&body, &latest_iid)?;
+    let latest =
+        peer_window::validate_guard_sample(&latest_proof, &plan, &guard_pin, &body, &latest_iid)?;
+    ensure!(
+        latest["producer"] == sample["producer"],
+        "Foundation guard changed producer identity: {guard}"
+    );
     Ok(
         json!({"unit":guard_unit,"timer":timer_unit,"timer_invocation_id":timer["InvocationID"],
-        "plan":plan,"executable":guard_pin,"retained_guard_sample":proof,
+        "plan":plan,"executable":guard_pin,"retained_guard_sample":proof,"latest_guard_sample":latest_proof,
         "minimum_free_bytes":body["minimum_free_bytes"],"maximum_root_physical_bytes":body["maximum_root_physical_bytes"]}),
     )
 }

@@ -106,17 +106,33 @@ pub(super) fn peer_state(
     Ok((gid.into(), tid.into(), next))
 }
 pub(super) fn healthy_sample(c: &periodic::Control, p: &Value, gid: &str) -> Result<Bound> {
-    let path = Path::new(text(p, "receipt_directory")?).join(format!("sample-{gid}.json"));
+    let sample = guard_sample_ref(p, gid)?;
+    validate_guard_sample(&sample, &c.guard_plan, &c.executable, p, gid)?;
+    Ok(sample)
+}
+
+pub(super) fn guard_sample_ref(plan: &Value, iid: &str) -> Result<Bound> {
+    ensure!(hex(iid, 32), "invalid guard invocation ID");
+    let path = Path::new(text(plan, "receipt_directory")?).join(format!("sample-{iid}.json"));
     trusted_parents(&path)?;
-    let sample = Bound::new(&path, hash(&path)?);
+    Ok(Bound::new(&path, hash(&path)?))
+}
+
+pub(super) fn validate_guard_sample(
+    sample: &Bound,
+    guard_plan: &Bound,
+    executable: &Bound,
+    p: &Value,
+    gid: &str,
+) -> Result<Value> {
     let s = sample.json()?;
     ensure!(
         s["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
             && s["guard_invocation_id"] == gid
             && s["producer_invocation_id"] == p["invocation_id"]
-            && s["plan"] == json!(c.guard_plan.path)
-            && s["plan_sha256"] == c.guard_plan.sha256
-            && s["guard_sha256"] == c.executable.sha256
+            && s["plan"] == json!(guard_plan.path)
+            && s["plan_sha256"] == guard_plan.sha256
+            && s["guard_sha256"] == executable.sha256
             && s["producer_stop_enabled"] == true,
         "retained peer guard sample differs"
     );
@@ -140,7 +156,7 @@ pub(super) fn healthy_sample(c: &periodic::Control, p: &Value, gid: &str) -> Res
     ] {
         ensure!(s[key] == p[key], "retained guard envelope changed");
     }
-    Ok(sample)
+    Ok(s)
 }
 pub(super) struct Window {
     peers: Vec<Peer>,
@@ -246,7 +262,8 @@ pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Windo
         native266_full::closed266_for257::booking(review)?;
         ensure!(a["epoch"]==257 && a["capacity"]["closed266_booking"]==review["closed266_booking"]
             && native266_full::closed266_for257::confirmed_census(&a["actual_current_memory"])?,
-            "missing 257 funding census");
+            "missing 257 funding census"
+        );
         // The enrolled cohort consists solely of uploaders and private transfers. Its
         // exact manager/cgroup roster is rechecked before activation and token release.
         return capture_roster(n,review,a,vec![]);
