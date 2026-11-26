@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import stat
 import subprocess
 import sys
@@ -72,6 +73,11 @@ V8_SEAL = "970f9aa956611e499ce1582d37dc845c5e7bfacd639c6002a6c72ccb1a3d718c"
 V8_EXIT_CURSOR = "s=7f76387dd96140468b39dcf01e726fea;i=397e3d9;b=763ea84ca81f4dddad364b1ea2ba36dd;m=39fd67e4398;t=6611fa351a0d0;x=cf965a2c6213f3bb"
 V9_HANDOFF = FAMILY / "v9-census-name-handoff"
 V9_START_INTENT = "horizon-epoch145-v8-census-successor-start-intent-v1"
+V9 = "ebdfc34db47c4e7699ea5ccbada5d604"
+V9_PREFLIGHT_FAILURE = "06a40561caf40e7d7e5e37d618fb068c98e44377f4fa457b8472500e856b8728"
+V9_RESULT = "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973"
+V9_SEAL = "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd"
+V9_EXIT_CURSOR = "s=7f76387dd96140468b39dcf01e726fea;i=398814f;b=763ea84ca81f4dddad364b1ea2ba36dd;m=3a7ad9e9bd3;t=661277a71f90b;x=9337fae3be91b4da"
 PACKAGE = (FAMILY / "tools-v9-census-recovery" if CENSUS_RETRY else
            FAMILY / "tools-v8-pid1-timeout" if TIMEOUT_RETRY else FAMILY / "tools-v7-168-stop-v2" if STOP_RETRY else FAMILY / "tools-v6-guard-walk" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
            FAMILY / "tools-v5y" if SCHEMA_RETRY else FAMILY / GENERATION if RETRY else V5V_PACKAGE)
@@ -726,6 +732,58 @@ def v8_census_failure(terminal_ref):
             "guard_stop_168": prior["guard_stop_168"]}, failed
 
 
+def v9_preflight_terminal():
+    return reference(STATE / V9 / "failed.json", V9_PREFLIGHT_FAILURE)
+
+
+def v9_preflight_failure(terminal_ref):
+    require(terminal_ref == v9_preflight_terminal(), "different V9 verifier terminal")
+    state = STATE / V9
+    failure = pinned_json(terminal_ref, state / "failed.json", mode=0o600)
+    incident = RUNTIME / "epoch145-v9-terminal-20261126-v1/TERMINAL.json"
+    evidence = pinned_json(reference(incident, "5aadd592a498e12166befaa78b4b7f7693b244a70e33bf00ed4fa2f2f015bc9d"),
+                           incident, mode=0o444)
+    worker = FAMILY / "tools-v9-census-recovery"
+    seal = reference(worker / "deployment-seal-receipt.json", V9_SEAL)
+    _, checker = sealed_member(worker, seal, "v5v_semantic_completion.py", 0o444)
+    original = runpy.run_path(checker["path"])
+    submission = reference(V9_HANDOFF / "START_RESULT.json", V9_RESULT)
+    anchors = original["startup"](submission)
+    prior, prior_exit = v8_census_failure(v8_census_terminal())
+    require(failure["iid"] == evidence["invocation_id"] == anchors["invocation_id"] == V9
+            and terminal_ref in evidence["source_evidence"] and anchors["start"] in evidence["source_evidence"]
+            and evidence["cause"] == {
+                "kind": "unregistered-native-epoch147-preflight", "pid": 3483823,
+                "unit": "horizon-epoch147-root-entry-control-20261126-v2.service",
+                "invocation_id": "6b673fd8a3cd43f6a0ff8df658eb1711",
+            }
+            and evidence["durable_semantic_completion"] is False
+            and anchors["worker_seal"] == seal and anchors["predecessor_terminal"] == v8_census_terminal()
+            and anchors["candidate"] == prior["candidate"] and anchors["predecessor_native"] == prior_exit
+            and failure["error"].rstrip().endswith("ValueError: unregistered replay process 3483823")
+            and {p.name for p in state.iterdir()} == {"recovery-started.json", "failed.json"}
+            and not os.path.lexists(V9_HANDOFF / "SEMANTIC_COMPLETION.json"),
+            "different V9 startup, probe collision or paid candidate")
+    events = journal(V9, *LIFECYCLE)
+    require([row["MESSAGE_ID"] for row in events] == [STARTING, STARTED, PROCESS_EXIT, FAILURE],
+            "different V9 PID1 lifecycle")
+    started, _ = validate_start_events(V9, events[:2], anchors["argv_tail"], anchors["intent_floor"], prior_exit)
+    process_exit, failed = events[2:]
+    scope_event(process_exit, V9, PROCESS_EXIT)
+    scope_event(failed, V9, FAILURE)
+    require(process_exit["__CURSOR"] == V9_EXIT_CURSOR
+            and process_exit["EXIT_CODE"] == "exited" and process_exit["EXIT_STATUS"] == "1"
+            and failed["UNIT_RESULT"] == "exit-code"
+            and int(started["__MONOTONIC_TIMESTAMP"]) < int(process_exit["__MONOTONIC_TIMESTAMP"])
+            < int(failed["__MONOTONIC_TIMESTAMP"]), "different V9 PID1 failure")
+    history = journal(None, *LIFECYCLE, after_cursor=prior_exit["__CURSOR"])
+    cutoff = int(failed["__MONOTONIC_TIMESTAMP"])
+    require([row for row in history if int(row["__MONOTONIC_TIMESTAMP"]) <= cutoff] == events,
+            "another owner intervened before V9 failed")
+    return {"recovery_started": anchors["start"], "candidate": prior["candidate"],
+            "guard_stop_168": prior["guard_stop_168"]}, failed
+
+
 def manager_properties(properties):
     output = subprocess.check_output(
         ["/usr/bin/systemctl", "show", "--property=" + ",".join(properties), "--", UNIT],
@@ -733,7 +791,7 @@ def manager_properties(properties):
     return dict(line.split("=", 1) for line in output.splitlines())
 
 
-def predecessor_preflight(fleet_ref):
+def predecessor_preflight(fleet_ref, *, v9=False):
     fleet_path = Path(fleet_ref["path"])
     require(fleet_path.parent.parent == RUNTIME
             and re.fullmatch(r"root[0-9]{6}-live166167170-[0-9]{8}-v1", fleet_path.parent.name)
@@ -749,7 +807,15 @@ def predecessor_preflight(fleet_ref):
     expected = dict(Id=UNIT, ActiveState="failed", SubState="failed", InvocationID=V5U,
                     MainPID="0", ControlPID="0", Job="", NRestarts="0", ControlGroup="",
                     ExecMainStatus="1", Result="exit-code")
-    if CENSUS_RETRY:
+    if v9:
+        failure_ref = v9_preflight_terminal()
+        terminal, native_failure = v9_preflight_failure(failure_ref)
+        startup_ref, candidate = terminal["recovery_started"], terminal["candidate"]
+        expected["InvocationID"] = V9
+        require(fleet["cold168_retry4_root_physical_stop"] == terminal["guard_stop_168"]
+                and not journal(None, *LIFECYCLE, after_cursor=native_failure["__CURSOR"]),
+                "retained 168 stop or failed V9 owner changed")
+    elif CENSUS_RETRY:
         failure_ref = v8_census_terminal()
         terminal, native_failure = v8_census_failure(failure_ref)
         startup_ref, candidate = terminal["recovery_started"], terminal["candidate"]
@@ -824,7 +890,8 @@ def predecessor_preflight(fleet_ref):
             }.items())
             and file_stamp(m) == file_stamp(PAID.lstat()) and manager_properties(properties) == expected and not group.exists(),
             "paid candidate or failed owner changed during preflight")
-    return {"schema": ("horizon-epoch145-v9-predecessor-preflight-v1" if CENSUS_RETRY else
+    return {"schema": ("horizon-epoch145-v10-predecessor-preflight-v1" if v9 else
+                       "horizon-epoch145-v9-predecessor-preflight-v1" if CENSUS_RETRY else
                        "horizon-epoch145-v8-predecessor-preflight-v1" if TIMEOUT_RETRY else
                        "horizon-epoch145-v7-predecessor-preflight-v1" if STOP_RETRY else
                        "horizon-epoch145-v6-predecessor-preflight-v1" if WALK_RETRY else
@@ -1049,6 +1116,8 @@ def main():
     parser.add_argument("--check-start", action="store_true", help="report checked startup while the generation runs")
     parser.add_argument("--inspect-predecessor", action="store_true",
                         help="validate the drained predecessor using the supplied accepted fleet")
+    parser.add_argument("--inspect-v10-predecessor", action="store_true",
+                        help="validate the stopped V9 verifier and paid archive for recovery")
     parser.add_argument("receipt", type=Path, help="absolute path to the native start result or accepted fleet")
     parser.add_argument("receipt_sha256", help="digest of the supplied receipt")
     args = parser.parse_args()
@@ -1056,8 +1125,12 @@ def main():
         require(os.geteuid() == 0 and sys.flags.isolated and sys.dont_write_bytecode,
                 "use a privileged isolated interpreter with bytecode writes disabled")
         require(SHA256.fullmatch(args.receipt_sha256), "invalid receipt SHA-256")
-        require(not (args.inspect_predecessor and args.check_start), "ambiguous inspection mode")
+        require(sum((args.inspect_predecessor, args.inspect_v10_predecessor, args.check_start)) <= 1,
+                "ambiguous inspection mode")
         ref = reference(args.receipt, args.receipt_sha256)
+        if args.inspect_v10_predecessor:
+            print(json.dumps(predecessor_preflight(ref, v9=True), indent=2, sort_keys=True))
+            return 0
         if args.inspect_predecessor:
             print(json.dumps(predecessor_preflight(ref), indent=2, sort_keys=True))
             return 0
