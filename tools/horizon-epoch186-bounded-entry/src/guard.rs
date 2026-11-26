@@ -373,7 +373,7 @@ pub fn inspect(
     let quote_path = Path::new(STATE).join("PRESTART_CAPACITY.json");
     let quote = document(&quote_path, quote_sha, 0o400)?;
     ensure!(
-        quote["schema"] == "horizon-epoch186-post-v9-source-capacity-v1"
+        quote["schema"] == price::CAPACITY_SCHEMA
             && quote["source_entry"]["unit"] == UNIT
             && quote["source_entry"]["private_tree"] == ROOT
             && quote["replay_launch_authorized"] == false

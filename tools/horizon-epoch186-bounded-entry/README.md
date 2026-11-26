@@ -15,7 +15,7 @@ archive verification.
   SHA-256. Use this before production entry when the transfer fits the host
   budget.
 - `quote FLEET SHA256` takes the existing transition lock, proves the native
-  epoch 145 V9 verifier has drained, and invokes the sealed post-V9 provider
+  epoch 145 V10 verifier has drained, and invokes the sealed post-V10 provider
   with its supported epoch 145 scope. The epoch 186 report preserves the
   incumbent and donor floors, the retained publication-copy allowance, the
   138 GiB tree reservation, and 96 GiB of producer plus 1 GiB of guard RAM.

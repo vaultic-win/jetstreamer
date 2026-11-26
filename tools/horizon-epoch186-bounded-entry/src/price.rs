@@ -1,15 +1,16 @@
 use super::*;
 use std::{os::fd::AsRawFd, path::PathBuf, process::Command};
 
-const PROVIDER_DIR: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v9-build-v1";
-const PROVIDER_SEAL: &str = "f650a4acb3f901ba82fe36e6014d6b48176c9365d4750ba80d71debeaa3942c6";
-const PROVIDER_SHA: &str = "512a70862c19f662d900955adeaa37587c129912d9847a64beb1e910ecdb8004";
+pub(super) const CAPACITY_SCHEMA: &str = "horizon-epoch186-post-v10-source-capacity-v1";
+const PROVIDER_DIR: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v10-build-v1";
+const PROVIDER_SEAL: &str = "4c8907433fddc6a19cf7708fafb3b0e977aba6f00d38f73d87d14cb8ea87d436";
+const PROVIDER_SHA: &str = "cd8009f1cf3650e9c3b22777be93884c7aaba3b296e43a19da3f83dcb866031f";
 const PROVIDER_BYTES: u64 = 149_523;
 const TRANSITION_LOCK: &str =
     "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/transition.lock";
-const V9_IID: &str = "ebdfc34db47c4e7699ea5ccbada5d604";
-const V9_UNIT: &str = "horizon-holding-export145-20261121-v1.service";
-const V9_COMPLETION: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff/SEMANTIC_COMPLETION.json";
+const V10_IID: &str = "104f023c5cd24a55b6585ef525b80067";
+const V10_UNIT: &str = "horizon-holding-export145-20261121-v1.service";
+const V10_COMPLETION: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/v10-census-name-handoff/SEMANTIC_COMPLETION.json";
 const V12_CONSUMER_SHA: &str = "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac";
 const V12_UNIT: &str = "horizon-archive-status-cadence-after172-20261120-v1.service";
 
@@ -90,11 +91,11 @@ fn validate_baseline(fit: &Value, fleet: &Value, incumbent_iid: &str, clock: u64
     );
     fresh(fit, "recorded_unix_seconds", clock, MAX_QUOTE_AGE)?;
     ensure!(
-        phase["stage"] == "v9-semantic-complete-drained"
-            && phase["completed_invocation_id"] == V9_IID
-            && phase["Id"] == V9_UNIT
+        phase["stage"] == "v10-semantic-complete-drained"
+            && phase["completed_invocation_id"] == V10_IID
+            && phase["Id"] == V10_UNIT
             && phase["MainPID"] == "0"
-            && phase["semantic_receipt"]["path"] == V9_COMPLETION
+            && phase["semantic_receipt"]["path"] == V10_COMPLETION
             && lower_hex(text(&phase["semantic_receipt"], "sha256")?, 32)
             && status["invocation_id"] == incumbent_iid
             && iid(incumbent_iid)
@@ -186,18 +187,18 @@ fn vacant() -> Result<Value> {
             && iid(text(&status, "InvocationID")?),
         "missing current V12 incumbent identity"
     );
-    let v9 = guard::properties(V9_UNIT)?;
+    let verifier = guard::properties(V10_UNIT)?;
     ensure!(
-        v9["ActiveState"] == "inactive"
-            && v9["SubState"] == "dead"
-            && v9["MainPID"] == "0"
-            && v9["ControlPID"] == "0"
-            && v9["ControlGroup"] == ""
-            && v9["Job"] == ""
+        verifier["ActiveState"] == "inactive"
+            && verifier["SubState"] == "dead"
+            && verifier["MainPID"] == "0"
+            && verifier["ControlPID"] == "0"
+            && verifier["ControlGroup"] == ""
+            && verifier["Job"] == ""
             && !Path::new("/sys/fs/cgroup/system.slice")
-                .join(V9_UNIT)
+                .join(V10_UNIT)
                 .exists(),
-        "epoch 145 V9 must drain before epoch 186 pricing"
+        "epoch 145 V10 must drain before epoch 186 pricing"
     );
     Ok(status)
 }
@@ -237,7 +238,7 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str) -> Result<Value> {
         .output()?;
     ensure!(
         output.status.success() && output.stderr.is_empty(),
-        "post-V9 incumbent provider refused: {}",
+        "post-V10 incumbent provider refused: {}",
         String::from_utf8_lossy(&output.stderr).trim()
     );
     let fit: Value = serde_json::from_slice(&output.stdout)?;
@@ -245,17 +246,21 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str) -> Result<Value> {
     let clock = now()?;
     validate_baseline(&fit, &fleet_ref, text(&status, "InvocationID")?, clock)?;
     let completion = &fit["phase145"]["semantic_receipt"];
-    let semantic = document(Path::new(V9_COMPLETION), text(completion, "sha256")?, 0o600)?;
+    let semantic = document(
+        Path::new(V10_COMPLETION),
+        text(completion, "sha256")?,
+        0o600,
+    )?;
     ensure!(
-        semantic["schema"] == "horizon-epoch145-v8-census-successor-semantic-completion-v1"
-            && semantic["invocation_id"] == V9_IID
+        semantic["schema"] == "horizon-epoch145-v9-census-successor-semantic-completion-v1"
+            && semantic["invocation_id"] == V10_IID
             && semantic["native_success"]["_PID"] == "1"
-            && semantic["native_success"]["UNIT"] == V9_UNIT
-            && semantic["native_success"]["INVOCATION_ID"] == V9_IID
+            && semantic["native_success"]["UNIT"] == V10_UNIT
+            && semantic["native_success"]["INVOCATION_ID"] == V10_IID
             && semantic["native_success"]["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
             && semantic["publication_authorized"] == false
             && semantic["r2_mutations"] == false,
-        "foreign native epoch 145 V9 completion"
+        "foreign native epoch 145 V10 completion"
     );
     ensure!(
         vacant()? == status && current_fleet(fleet_path, fleet_sha)? == fleet,
@@ -263,12 +268,12 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str) -> Result<Value> {
     );
     stable(Path::new(TRANSITION_LOCK), &lock, &lock_identity)?;
     Ok(json!({
-        "schema":"horizon-epoch186-post-v9-source-capacity-v1","recorded_unix_seconds":clock,
+        "schema":CAPACITY_SCHEMA,"recorded_unix_seconds":clock,
         "fleet":fleet_ref,"incumbent_writer_invocation":status["InvocationID"],
         "incumbent_price_provider":binding(image,PROVIDER_SHA),
         "incumbent_price_seal":binding(PathBuf::from(PROVIDER_DIR).join("deployment-seal-receipt.json"),PROVIDER_SEAL),
         "incumbent_price_stdout_sha256":format!("{:x}",Sha256::digest(&output.stdout)),
-        "incumbent_v9_completion":completion,"source_entry":source,"resource_screen":budget(&fit)?,
+        "incumbent_v10_completion":completion,"source_entry":source,"resource_screen":budget(&fit)?,
         "replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false
     }))
 }
@@ -279,8 +284,8 @@ mod tests {
 
     fn fixture() -> Value {
         json!({"schema":"horizon-incident-replay-fit-v1","epoch":145,"fleet":{"sha256":"bound"},
-            "phase145":{"stage":"v9-semantic-complete-drained","completed_invocation_id":V9_IID,
-                "Id":V9_UNIT,"MainPID":"0","semantic_receipt":{"path":V9_COMPLETION,"sha256":"1".repeat(64)}},
+            "phase145":{"stage":"v10-semantic-complete-drained","completed_invocation_id":V10_IID,
+                "Id":V10_UNIT,"MainPID":"0","semantic_receipt":{"path":V10_COMPLETION,"sha256":"1".repeat(64)}},
             "status_registration":{"invocation_id":"1".repeat(32),"consumer_seal":{"sha256":V12_CONSUMER_SHA}},
             "resource_credit_bytes":0,"stopped_generation_resident_credit_bytes":0,
             "replay_launch_authorized":false,"candidate":null,"bounded_qualification":null,
@@ -296,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    fn requires_exact_drained_v9_current_writer_and_fresh_scope() {
+    fn requires_exact_drained_v10_current_writer_and_fresh_scope() {
         let quote = fixture();
         let check = |q: &Value, time| validate_baseline(q, &quote["fleet"], &"1".repeat(32), time);
         check(&quote, 220).unwrap();
