@@ -7,11 +7,13 @@ from ordinary249.delivery248 import V, bound, props, ref
 
 LOADER = "loader-upgrade-focused-v2"
 GAP = "short-gap-v1"
+RESTORE = "native-restore-v1"
 FOCUSED = {
     LOADER: (296, "horizon296-loader-upgrade-focused-v2", "epoch296-private-loader-upgrade-diagnostic"),
     GAP: (230, "horizon230-short-gap-runtime-v1", "epoch230-private-short-gap"),
+    RESTORE: (258, "horizon258-native-restore-runtime-v1", "epoch258-private-native-restore"),
 }
-ATTEMPTS = ("v2", "v3", LOADER, GAP)
+ATTEMPTS = ("v2", "v3", *FOCUSED)
 FIELDS = ("ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup")
 
 
@@ -115,6 +117,8 @@ def register_attempt(plan, version, ordinary_replay):
                 gate["next_action"] = closed["next_action"]
         elif not ordinary_replay:
             gate["next_action"] = (
+                "Verify the restored accounts root and drain its guard."
+                if version == RESTORE else
                 "Collect the bounded replay result and drain its guard."
                 if version in FOCUSED else
                 "Collect the private meter trace and drain guards after its terminal result.")
@@ -135,6 +139,8 @@ def register_attempt(plan, version, ordinary_replay):
             plan["diagnostics"].append(claim)
     elif not ordinary_replay:
         gate["next_action"] = (
+            "Admit the no-replay snapshot restore against the complete live fleet."
+            if version == RESTORE else
             "Admit the checkpoint-bounded replay against the complete live fleet."
             if version in FOCUSED else
             "Admit the bounded meter diagnostic against the complete live fleet.")

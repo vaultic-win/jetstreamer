@@ -55,6 +55,26 @@ pub(super) const GAP_230: Focused = Focused {
     profile_sha: "95aebc954169426d79663a297b8c445a9c3ca5b759a84fc96e51cd5f77313982",
 };
 
+pub(super) const RESTORE_258: Focused = Focused {
+    epoch: 258,
+    unit: "horizon-qualify-258-native-restore-v1.service",
+    guard: "horizon-258-native-restore-protective-v1",
+    cpus: "56-63",
+    scratch_cap: 96 << 30,
+    receipt_disk: 64 << 20,
+    producer_memory: 160 << 30,
+    root: "/home/ubuntu/.jetstreamer-private/qualification-258-native-restore-v1",
+    first: 111_455_044,
+    last: 111_455_044,
+    kind: "epoch258-private-native-restore",
+    preflight_schema: "foundation-epoch258-native-restore-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon258-native-restore-runtime-v1",
+    preflight_sha: "ac7cef6418be874cf8437171323fa2f9f1c1cf84ce41917096df4c489f270c6d",
+    profile_sha: "1cc91a3e939dd93920ddc6efbd720b9f558b00b3f27d2b6d654362068d2af035",
+};
+
+pub(super) const SCOPES: [&Focused; 3] = [&GAP_230, &RESTORE_258, &LOADER_296];
+
 impl Focused {
     pub(super) fn quote_key(&self) -> String {
         format!("focused_{}_quote", self.epoch)

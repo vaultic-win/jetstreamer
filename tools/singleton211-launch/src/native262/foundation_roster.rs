@@ -2,7 +2,7 @@
 use super::*;
 mod allocation;
 mod focused;
-use focused::{GAP_230, LOADER_296};
+use focused::{GAP_230, LOADER_296, RESTORE_258, SCOPES};
 mod vote_boundary;
 
 const FLEET_ROOT: &str = "/home/ubuntu/.codex/diagnostics";
@@ -27,10 +27,11 @@ const HANDOFF_UPLOAD_257: (&str, &str) = (
 const OWNER_FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemorySwapMax,ExecStart,AllowedCPUs";
 const GUARD_FIELDS: &str =
     "Id,LoadState,ActiveState,SubState,InvocationID,Unit,MemoryMax,ExecStart";
-const KNOWN_GUARDS: [(u64, &str); 7] = [
+const KNOWN_GUARDS: [(u64, &str); 8] = [
     (226, "horizon-guard-226-checkpoint-continuation-extract-v3"),
     (230, "horizon-230-middle-protective-v1"),
     (252, "horizon-252-regional-singleton-protective-v1"),
+    (258, RESTORE_258.guard),
     (261, "horizon-261-singleton-protective-v1"),
     (262, "horizon-262-singleton-protective-v1"),
     (288, "horizon-288-full-shrink-debt-protective-v1"),
@@ -634,7 +635,7 @@ fn fleet_roster<'a>(
             continue;
         }
         if let Some(replay) = live_replays.get(&epoch) {
-            let phase = if epoch == 230 || replay.unit == LOADER_296.unit {
+            let phase = if epoch == 230 || SCOPES.iter().any(|spec| spec.unit == replay.unit) {
                 "diagnostic-qualification"
             } else {
                 "replay"
@@ -794,7 +795,7 @@ fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
                 .any(|prefix| unit.starts_with(prefix));
             (scoped
                 && unit != vote_boundary::GUARD_SERVICE
-                && ![&GAP_230, &LOADER_296]
+                && !SCOPES
                     .iter()
                     .any(|spec| unit == format!("{}.service", spec.guard))
                 && !KNOWN_GUARDS
@@ -1093,7 +1094,7 @@ fn measure(
         );
         live_replays.insert(230, vote_boundary::live(n)?);
     }
-    for spec in [&GAP_230, &LOADER_296] {
+    for spec in SCOPES {
         if before.contains(spec.unit) {
             ensure!(
                 quote.is_some() && epoch != spec.epoch && !live_replays.contains_key(&spec.epoch),
@@ -1210,6 +1211,7 @@ fn measure(
     let selected = units::parse_cpu_list(match epoch {
         226 => "16-23",
         230 => GAP_230.cpus,
+        258 => RESTORE_258.cpus,
         261 => "24-31",
         296 => "56-63",
         _ => "40-47",
@@ -1266,7 +1268,7 @@ fn measure(
     }
     let mut guards = BTreeMap::new();
     for (guard_epoch, guard) in KNOWN_GUARDS {
-        let focused = [&GAP_230, &LOADER_296].into_iter().find(|spec| {
+        let focused = SCOPES.into_iter().find(|spec| {
             live_replays
                 .get(&guard_epoch)
                 .is_some_and(|row| row.unit == spec.unit)
@@ -1280,9 +1282,10 @@ fn measure(
         let (owner, guard_booking) = if let Some(replay) = live_replays.get(&guard_epoch) {
             (&replay.owner, &replay.guard_booking)
         } else {
-            if REGISTERED_REPLAYS
-                .iter()
-                .any(|spec| spec.epoch == guard_epoch)
+            if guard_epoch == RESTORE_258.epoch
+                || REGISTERED_REPLAYS
+                    .iter()
+                    .any(|spec| spec.epoch == guard_epoch)
             {
                 continue;
             }
@@ -1500,6 +1503,7 @@ fn measure(
     let schema = match epoch {
         226 => "foundation-epoch226-suffix-roster-binding-v1",
         230 => "foundation-epoch230-short-gap-roster-binding-v1",
+        258 => "foundation-epoch258-native-restore-roster-binding-v1",
         261 => "foundation-epoch261-delivery-roster-binding-v1",
         296 => "foundation-epoch296-replay-roster-binding-v1",
         _ => "foundation-epoch262-roster-binding-v1",
@@ -1511,6 +1515,7 @@ fn measure(
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
         "closed_middle_replay":closed_230,
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
+        "active_restore_258_registration":live_replays.get(&258).map(|replay| &replay.reference),
         "closed_delivery_257":closed_257,
         "active_delivery_261_claim":active_delivery.as_ref().map(|(claim, _, _, _)| claim),
         "active_replay_262_registration":live_replays.get(&262).map(|replay| &replay.reference),
@@ -1643,6 +1648,7 @@ pub fn run() -> Result<()> {
                         | "--delivery261-quote"
                         | "--replay296-quote"
                         | "--focused230-quote"
+                        | "--focused258-quote"
                         | "--focused296-quote"
                         | "--suffix226-preview"
                 )
@@ -1657,7 +1663,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused296-quote or --suffix226-preview"
+            "use --as-controller UNIT, --full-replay-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused296-quote or --suffix226-preview"
         ),
     };
     let synchronize = match args.next() {
@@ -1706,13 +1712,13 @@ pub fn run() -> Result<()> {
         Some(flag)
             if matches!(
                 flag.to_str(),
-                Some("--focused230-quote" | "--focused296-quote")
+                Some("--focused230-quote" | "--focused258-quote" | "--focused296-quote")
             ) =>
         {
-            let spec = if flag == "--focused230-quote" {
-                &GAP_230
-            } else {
-                &LOADER_296
+            let spec = match flag.to_str() {
+                Some("--focused230-quote") => &GAP_230,
+                Some("--focused258-quote") => &RESTORE_258,
+                _ => &LOADER_296,
             };
             spec.preflight()
                 .and_then(|receipt| measure(&mut native, None, Some(Quote::Focused(spec, receipt))))

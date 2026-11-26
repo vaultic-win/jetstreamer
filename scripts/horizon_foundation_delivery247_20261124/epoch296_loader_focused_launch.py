@@ -68,6 +68,15 @@ GAP_230 = Scope(
     "1b9a96e850cb4b050f2f64ee90665399dbddc7c9b2a71fe5afb32796b2518dcb",
     225_000_000_000, 208 << 30, 256 << 20, "72-79",
 )
+RESTORE_258 = Scope(
+    258, V / "horizon258-native-restore-runtime-v1",
+    "horizon-qualify-258-native-restore-v1.service", "horizon-258-native-restore-protective-v1.service",
+    "epoch258-private-native-restore", "foundation-epoch258-native-restore-roster-binding-v1",
+    "1cc91a3e939dd93920ddc6efbd720b9f558b00b3f27d2b6d654362068d2af035",
+    "ac7cef6418be874cf8437171323fa2f9f1c1cf84ce41917096df4c489f270c6d",
+    160 << 30, 96 << 30, 64 << 20, "56-63",
+)
+SCOPED_ARGS = {"--epoch230": GAP_230, "--epoch258": RESTORE_258}
 
 
 def current_fit(kit, roster, root, scope):
@@ -191,9 +200,7 @@ def launch(kit, roster_ref, scope):
 if __name__ == "__main__":
     assert __debug__ and os.geteuid() == 0
     args = sys.argv[1:]
-    scope = GAP_230 if args[:1] == ["--epoch230"] else LOADER_296
-    if scope is GAP_230:
-        args = args[1:]
+    scope = SCOPED_ARGS[args.pop(0)] if args and args[0] in SCOPED_ARGS else LOADER_296
     roster_path, roster_sha = args
     kit = load_existing()
     assert os.environ["CODEX_THREAD_ID"] == kit.replay.THREAD
