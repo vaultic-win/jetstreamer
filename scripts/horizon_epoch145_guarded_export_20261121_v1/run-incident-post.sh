@@ -58,7 +58,7 @@ publish)
     ;;
 *) exit 2 ;;
 esac
-if [[ $pkg == */tools-v13[d-s] ]]; then
+if [[ $pkg == */tools-v13[d-t] ]]; then
     version=v1
     if [[ $pkg == */tools-v13e ]]; then version=v2; fi
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5j-$version/post-stop-fit

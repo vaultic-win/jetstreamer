@@ -86,7 +86,7 @@ if TIMER_SUCCESSOR:
     else:
         ADVANCING_NAME = "V5E_ACTUAL_ADVANCING_WORKER.json"
 
-if VERSION in ("tools-v13q", "tools-v13r", "tools-v13s"):
+if VERSION in ("tools-v13q", "tools-v13r", "tools-v13s", "tools-v13t"):
     PIPE = Path("/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1/pinned-http500-4bc299e03b21/horizon_pipeline")
 
 
