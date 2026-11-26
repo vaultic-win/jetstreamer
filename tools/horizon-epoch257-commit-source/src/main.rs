@@ -1,4 +1,4 @@
-//! Collect the local archive committed by the admitted epoch 257 cohort.
+//! Collect the local archive committed by an admitted Foundation singleton cohort.
 //! The uploader still performs its own exact archive, reader, and R2 checks.
 
 use anyhow::{Context, Result, ensure};
@@ -13,22 +13,62 @@ use std::{
     process::Command,
 };
 
-const EPOCH: u64 = 257;
-const UNIT: &str = "horizon-qualify-257-singleton-v1.service";
-const INVOCATION: &str = "56bd4392e9c04b758825b5c94dfc8f9a";
-const PID: u64 = 4_128_343;
-const NODE: &str = "/var/lib/jetstreamer/horizon257-full-producer-v222-a1/jetstreamer-node";
-const RUN: &str = "/home/ubuntu/.jetstreamer-private/qualification-257-singleton-v1";
-const HANDOFF: &str = "/var/lib/jetstreamer/horizon257-paired-reader-88315624-v1/handoff.json";
-const HANDOFF_SHA: &str = "48983dfe40cfe490947204e8880e6c559fa6cd654594316c6f76cdf7d2565a00";
-const FINGERPRINT: &str = "1db8722474c1b2b30d08c6956767d25bf7ee52e88bf43cb3d73b004eb622ea14";
-const BOOTSTRAP: u64 = 111_022_755;
-const CHECKPOINT: u64 = 111_455_524;
-const EPOCH_END: u64 = 111_455_999;
-const BOOTSTRAP_HASH: &str = "8bRdfjkM7Lst2wWtAyv56VKTprAYt1DKPuVy2HzK1wX3";
-const CHECKPOINT_HASH: &str = "EKfxe81ej53cPZXptcBTgvJLQwSZ3k4nqdaxyUGTRYCw";
-const COMMIT_MARKER: &str =
-    "root-checkpoint cohort 257-257 published 1 archive(s) with checksums in transaction ";
+struct Cohort {
+    epoch: u64,
+    unit: &'static str,
+    invocation: &'static str,
+    pid: u64,
+    node: &'static str,
+    run: &'static str,
+    handoff: Option<(&'static str, &'static str)>,
+    fingerprint: &'static str,
+    bootstrap: u64,
+    checkpoint: u64,
+    epoch_end: u64,
+    bootstrap_hash: &'static str,
+    checkpoint_hash: &'static str,
+}
+
+const EPOCH_257: Cohort = Cohort {
+    epoch: 257,
+    unit: "horizon-qualify-257-singleton-v1.service",
+    invocation: "56bd4392e9c04b758825b5c94dfc8f9a",
+    pid: 4_128_343,
+    node: "/var/lib/jetstreamer/horizon257-full-producer-v222-a1/jetstreamer-node",
+    run: "/home/ubuntu/.jetstreamer-private/qualification-257-singleton-v1",
+    handoff: Some((
+        "/var/lib/jetstreamer/horizon257-paired-reader-88315624-v1/handoff.json",
+        "48983dfe40cfe490947204e8880e6c559fa6cd654594316c6f76cdf7d2565a00",
+    )),
+    fingerprint: "1db8722474c1b2b30d08c6956767d25bf7ee52e88bf43cb3d73b004eb622ea14",
+    bootstrap: 111_022_755,
+    checkpoint: 111_455_524,
+    epoch_end: 111_455_999,
+    bootstrap_hash: "8bRdfjkM7Lst2wWtAyv56VKTprAYt1DKPuVy2HzK1wX3",
+    checkpoint_hash: "EKfxe81ej53cPZXptcBTgvJLQwSZ3k4nqdaxyUGTRYCw",
+};
+
+const EPOCH_261: Cohort = Cohort {
+    epoch: 261,
+    unit: "horizon-qualify-261-singleton-v1.service",
+    invocation: "bca65ead67144a92af798fd8d1c8f533",
+    pid: 3_912_288,
+    node: "/var/lib/jetstreamer/horizon261-full-producer-v224-a1/jetstreamer-node",
+    run: "/home/ubuntu/.jetstreamer-private/qualification-261-singleton-v1",
+    handoff: None,
+    fingerprint: "c5667ace6837b1f039bad3c4f66937ecad4f5d4596bb491ee5070292b59d7919",
+    bootstrap: 112_751_208,
+    checkpoint: 113_182_967,
+    epoch_end: 113_183_999,
+    bootstrap_hash: "Hgio4phsEt74AkKo6KdVmFzDoK35yS3fUkF6u3RkhSut",
+    checkpoint_hash: "39EumnbfaaQdkf2ZMjL1uvVR9T9HcmE1RUP1xeCfpXVU",
+};
+
+fn commit_marker(epoch: u64) -> String {
+    format!(
+        "root-checkpoint cohort {epoch}-{epoch} published 1 archive(s) with checksums in transaction "
+    )
+}
 
 fn sha256(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
@@ -44,12 +84,12 @@ fn command(program: &str, args: &[&str]) -> Result<Vec<u8>> {
     Ok(output.stdout)
 }
 
-fn current_invocation() -> Result<Option<Value>> {
+fn current_invocation(cohort: &Cohort) -> Result<Option<Value>> {
     let output = command(
         "/usr/bin/systemctl",
         &[
             "show",
-            UNIT,
+            cohort.unit,
             "-p",
             "ActiveState",
             "-p",
@@ -71,21 +111,25 @@ fn current_invocation() -> Result<Option<Value>> {
     let pid = field("MainPID")?.parse::<u64>()?;
     if field("ActiveState")? == "active" {
         ensure!(
-            invocation == INVOCATION && pid == PID,
-            "another replay owns {UNIT}"
+            invocation == cohort.invocation && pid == cohort.pid,
+            "another replay owns {}",
+            cohort.unit
         );
         return Ok(Some(json!({
-            "epoch": EPOCH, "state": "replay-active", "unit": UNIT,
-            "invocation_id": INVOCATION, "main_pid": PID, "archive_ready": false
+            "epoch": cohort.epoch, "state": "replay-active", "unit": cohort.unit,
+            "invocation_id": cohort.invocation, "main_pid": cohort.pid, "archive_ready": false
         })));
     }
     ensure!(
         field("ActiveState")? == "inactive"
             && pid == 0
             && field("ControlGroup")?.is_empty()
-            && (invocation.is_empty() || invocation == INVOCATION)
-            && !Path::new("/sys/fs/cgroup/system.slice").join(UNIT).exists(),
-        "epoch 257 producer has not cleanly drained"
+            && (invocation.is_empty() || invocation == cohort.invocation)
+            && !Path::new("/sys/fs/cgroup/system.slice")
+                .join(cohort.unit)
+                .exists(),
+        "epoch {} producer has not cleanly drained",
+        cohort.epoch
     );
     Ok(None)
 }
@@ -100,9 +144,9 @@ fn one_event(args: &[&str]) -> Result<Value> {
     Ok(serde_json::from_str(event)?)
 }
 
-fn commit_message(message: &str) -> Result<(&str, &str)> {
+fn commit_message(message: &str, epoch: u64) -> Result<(&str, &str)> {
     let (_, tail) = message
-        .split_once(COMMIT_MARKER)
+        .split_once(&commit_marker(epoch))
         .context("missing commit marker")?;
     let (id, receipt) = tail
         .split_once("; receipt ")
@@ -172,7 +216,7 @@ fn base58_bytes(hash: &str) -> Result<Value> {
     Ok(json!(bytes))
 }
 
-fn validate_gate(receipt: &Value) -> Result<()> {
+fn validate_gate(receipt: &Value, cohort: &Cohort) -> Result<()> {
     let gate = &receipt["root_checkpoint_gate"];
     let [checkpoint] = gate["verified_manifest_checkpoints"]
         .as_array()
@@ -191,17 +235,18 @@ fn validate_gate(receipt: &Value) -> Result<()> {
     ensure!(
         gate["kind"] == "sealed-root-checkpoint-cohort"
             && gate["version"] == 1
-            && checkpoint["slot"] == CHECKPOINT
-            && checkpoint["accounts_hash"] == base58_bytes(CHECKPOINT_HASH)?
-            && member["epoch"] == EPOCH
-            && member["bootstrap"]["slot"] == BOOTSTRAP
-            && member["bootstrap"]["accounts_hash"] == base58_bytes(BOOTSTRAP_HASH)?
+            && checkpoint["slot"] == cohort.checkpoint
+            && checkpoint["accounts_hash"] == base58_bytes(cohort.checkpoint_hash)?
+            && member["epoch"] == cohort.epoch
+            && member["bootstrap"]["slot"] == cohort.bootstrap
+            && member["bootstrap"]["accounts_hash"] == base58_bytes(cohort.bootstrap_hash)?
             && member["bootstrap"]["slot_complete"] == true
             && member["terminal"]["slot_complete"] == true
             && member["terminal"]["slot"]
                 .as_u64()
-                .is_some_and(|slot| (CHECKPOINT..=EPOCH_END).contains(&slot)),
-        "native receipt differs from the admitted epoch 257 checkpoint scope"
+                .is_some_and(|slot| (cohort.checkpoint..=cohort.epoch_end).contains(&slot)),
+        "native receipt differs from the admitted epoch {} checkpoint scope",
+        cohort.epoch
     );
     let raw = STANDARD.decode(
         receipt["publication_context_base64"]
@@ -211,40 +256,43 @@ fn validate_gate(receipt: &Value) -> Result<()> {
     let context: Value = serde_json::from_slice(&raw)?;
     let fingerprint = (0..64)
         .step_by(2)
-        .map(|i| u8::from_str_radix(&FINGERPRINT[i..i + 2], 16))
+        .map(|i| u8::from_str_radix(&cohort.fingerprint[i..i + 2], 16))
         .collect::<Result<Vec<_>, _>>()?;
     ensure!(
         context["schema"] == "jetstreamer-root-checkpoint-gate-context-v1"
             && context["manifest_fingerprint"] == json!(fingerprint)
-            && context["epochs"] == json!([EPOCH])
+            && context["epochs"] == json!([cohort.epoch])
             && context["gate"] == *gate,
         "durable transaction context differs from receipt"
     );
     Ok(())
 }
 
-fn collect() -> Result<Value> {
-    if let Some(live) = current_invocation()? {
+fn collect(cohort: &Cohort) -> Result<Value> {
+    if let Some(live) = current_invocation(cohort)? {
         return Ok(live);
     }
     let terminal = one_event(&[
         "_PID=1",
-        &format!("UNIT={UNIT}"),
-        &format!("INVOCATION_ID={INVOCATION}"),
+        &format!("UNIT={}", cohort.unit),
+        &format!("INVOCATION_ID={}", cohort.invocation),
         r"--grep=Deactivated successfully\.",
     ])?;
     ensure!(
-        terminal["MESSAGE"] == format!("{UNIT}: Deactivated successfully."),
+        terminal["MESSAGE"] == format!("{}: Deactivated successfully.", cohort.unit),
         "foreign manager result"
     );
     let native = one_event(&[
-        &format!("_PID={PID}"),
-        &format!("_SYSTEMD_INVOCATION_ID={INVOCATION}"),
-        "--grep=root-checkpoint cohort 257-257 published 1 archive",
+        &format!("_PID={}", cohort.pid),
+        &format!("_SYSTEMD_INVOCATION_ID={}", cohort.invocation),
+        &format!(
+            "--grep=root-checkpoint cohort {0}-{0} published 1 archive",
+            cohort.epoch
+        ),
     ])?;
     ensure!(
-        native["_EXE"] == NODE
-            && native["_SYSTEMD_UNIT"] == UNIT
+        native["_EXE"] == cohort.node
+            && native["_SYSTEMD_UNIT"] == cohort.unit
             && native["__REALTIME_TIMESTAMP"]
                 .as_str()
                 .context("missing native timestamp")?
@@ -259,14 +307,15 @@ fn collect() -> Result<Value> {
         native["MESSAGE"]
             .as_str()
             .context("missing native commit")?,
+        cohort.epoch,
     )?;
-    let destination = Path::new(RUN).join("output");
+    let destination = Path::new(cohort.run).join("output");
     let dest = fs::symlink_metadata(&destination)?;
     ensure!(
         destination.canonicalize()? == destination && dest.is_dir() && dest.uid() == 1000,
         "foreign archive directory"
     );
-    let receipt = Path::new(RUN)
+    let receipt = Path::new(cohort.run)
         .join("state")
         .join(format!(
             "destination-{}",
@@ -288,8 +337,8 @@ fn collect() -> Result<Value> {
     ensure!(
         batch["schema"] == "jetstreamer-root-cohort-publication-receipt-v2"
             && batch["transaction_id"] == transaction
-            && batch["manifest_fingerprint"] == format!("sha256:{FINGERPRINT}")
-            && batch["epochs"] == json!([EPOCH])
+            && batch["manifest_fingerprint"] == format!("sha256:{}", cohort.fingerprint)
+            && batch["epochs"] == json!([cohort.epoch])
             && batch["destination"]
                 == json!({
                     "path_base64": STANDARD.encode(destination.as_os_str().as_encoded_bytes()),
@@ -298,23 +347,24 @@ fn collect() -> Result<Value> {
             && batch["outcome"]["kind"] == "committed",
         "foreign or uncommitted native cohort receipt"
     );
-    validate_gate(&batch)?;
+    validate_gate(&batch, cohort)?;
     let [member] = batch["outcome"]["members"]
         .as_array()
         .context("missing committed member")?
         .as_slice()
     else {
-        anyhow::bail!("expected the one committed epoch 257 archive");
+        anyhow::bail!("expected one committed epoch {} archive", cohort.epoch);
     };
-    let archive = destination.join("epoch-257.jet");
-    let sidecar = destination.join("epoch-257.jet.sha256");
+    let archive_name = format!("epoch-{}.jet", cohort.epoch);
+    let archive = destination.join(&archive_name);
+    let sidecar = destination.join(format!("{archive_name}.sha256"));
     let meta = fs::symlink_metadata(&archive)?;
     let digest = member["archive_sha256"]
         .as_str()
         .context("missing native archive digest")?;
     let (checksum, checksum_identity) = read_bound(&sidecar, 256, 1000)?;
     ensure!(
-        member["epoch"] == EPOCH
+        member["epoch"] == cohort.epoch
             && member["archive_path_base64"]
                 == STANDARD.encode(archive.as_os_str().as_encoded_bytes())
             && member["checksum_path_base64"]
@@ -329,26 +379,29 @@ fn collect() -> Result<Value> {
             && digest
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-            && checksum == format!("{digest}  epoch-257.jet\n").as_bytes(),
+            && checksum == format!("{digest}  {archive_name}\n").as_bytes(),
         "native committed pair changed or is unsafe"
     );
-    let (handoff, _) = read_bound(Path::new(HANDOFF), 1 << 20, 0)?;
-    ensure!(
-        sha256(&handoff) == HANDOFF_SHA,
-        "publication handoff changed"
-    );
-    let handoff: Value = serde_json::from_slice(&handoff)?;
-    let output = json!({
-        "epoch": EPOCH, "schema": "foundation-epoch257-committed-cohort-source-v1",
-        "state": "local-cohort-committed", "unit": UNIT, "invocation_id": INVOCATION,
+    let mut output = json!({
+        "epoch": cohort.epoch, "schema": format!("foundation-epoch{}-committed-cohort-source-v1", cohort.epoch),
+        "state": "local-cohort-committed", "unit": cohort.unit, "invocation_id": cohort.invocation,
         "publication_authorized": false, "archive": {"path": archive, "sha256": digest, "identity": identity(&meta)},
         "sidecar": {"path": sidecar, "sha256": sha256(&checksum), "identity": checksum_identity},
         "cohort_receipt": {"path": receipt, "sha256": sha256(&body)},
-        "native_journal_cursor": native["__CURSOR"], "terminal_journal_cursor": terminal["__CURSOR"],
-        "reader_plan": handoff["reader_plan"], "uploader": handoff["uploader"]
+        "native_journal_cursor": native["__CURSOR"], "terminal_journal_cursor": terminal["__CURSOR"]
     });
+    if let Some((path, expected_sha256)) = cohort.handoff {
+        let (handoff, _) = read_bound(Path::new(path), 1 << 20, 0)?;
+        ensure!(
+            sha256(&handoff) == expected_sha256,
+            "publication handoff changed"
+        );
+        let handoff: Value = serde_json::from_slice(&handoff)?;
+        output["reader_plan"] = handoff["reader_plan"].clone();
+        output["uploader"] = handoff["uploader"].clone();
+    }
     ensure!(
-        current_invocation()?.is_none()
+        current_invocation(cohort)?.is_none()
             && identity(&fs::symlink_metadata(&archive)?) == identity(&meta),
         "producer or archive changed during collection"
     );
@@ -356,11 +409,17 @@ fn collect() -> Result<Value> {
 }
 
 fn main() -> Result<()> {
+    let mut args = std::env::args_os().skip(1);
+    let cohort = match args.next().as_deref() {
+        None => &EPOCH_257,
+        Some(flag) if flag == "--epoch261" => &EPOCH_261,
+        _ => anyhow::bail!("usage: horizon-epoch257-commit-source [--epoch261]"),
+    };
     ensure!(
-        std::env::args_os().count() == 1,
-        "usage: horizon-epoch257-commit-source"
+        args.next().is_none(),
+        "usage: horizon-epoch257-commit-source [--epoch261]"
     );
-    let report = collect()?;
+    let report = collect(cohort)?;
     println!("{}", serde_json::to_string_pretty(&report)?);
     Ok(())
 }
@@ -371,41 +430,52 @@ mod tests {
 
     #[test]
     fn commit_event_requires_complete_native_message() {
-        let transaction = "a".repeat(64);
-        let message = format!(
-            "2026-11-25 INFO {COMMIT_MARKER}{transaction}; receipt /private/batch.json is durable"
-        );
-        assert_eq!(
-            commit_message(&message).unwrap(),
-            (transaction.as_str(), "/private/batch.json")
-        );
-        assert!(commit_message(&message.replace("/private/batch.json", "batch.json")).is_err());
-        assert!(commit_message(message.trim_end_matches(" is durable")).is_err());
+        for cohort in [&EPOCH_257, &EPOCH_261] {
+            let epoch = cohort.epoch;
+            let transaction = "a".repeat(64);
+            let marker = commit_marker(epoch);
+            let message = format!(
+                "2026-11-25 INFO {marker}{transaction}; receipt /private/batch.json is durable"
+            );
+            assert_eq!(
+                commit_message(&message, epoch).unwrap(),
+                (transaction.as_str(), "/private/batch.json")
+            );
+            assert!(
+                commit_message(&message.replace("/private/batch.json", "batch.json"), epoch)
+                    .is_err()
+            );
+            assert!(commit_message(message.trim_end_matches(" is durable"), epoch).is_err());
+        }
     }
 
     #[test]
     fn published_checkpoint_must_match_embedded_transaction_context() {
-        let gate = json!({
-            "kind": "sealed-root-checkpoint-cohort", "version": 1,
-            "verified_manifest_checkpoints": [{"slot": CHECKPOINT, "accounts_hash": base58_bytes(CHECKPOINT_HASH).unwrap()}],
-            "members": [{"epoch": EPOCH,
-                "bootstrap": {"slot": BOOTSTRAP, "accounts_hash": base58_bytes(BOOTSTRAP_HASH).unwrap(), "slot_complete": true},
-                "terminal": {"slot": EPOCH_END, "slot_complete": true}
-            }]
-        });
-        let fingerprint = (0..64)
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&FINGERPRINT[i..i + 2], 16).unwrap())
-            .collect::<Vec<_>>();
-        let context = json!({"schema":"jetstreamer-root-checkpoint-gate-context-v1",
-            "manifest_fingerprint": fingerprint, "epochs": [EPOCH], "gate": gate});
-        let mut receipt = json!({"root_checkpoint_gate": gate,
-            "publication_context_base64": STANDARD.encode(serde_json::to_vec(&context).unwrap())});
-        validate_gate(&receipt).unwrap();
-        receipt["root_checkpoint_gate"]["members"][0]["terminal"]["slot"] = json!(CHECKPOINT);
-        assert!(validate_gate(&receipt).is_err());
-        receipt["root_checkpoint_gate"]["verified_manifest_checkpoints"][0]["slot"] =
-            json!(CHECKPOINT + 1);
-        assert!(validate_gate(&receipt).is_err());
+        for (cohort, other) in [(&EPOCH_257, &EPOCH_261), (&EPOCH_261, &EPOCH_257)] {
+            let gate = json!({
+                "kind": "sealed-root-checkpoint-cohort", "version": 1,
+                "verified_manifest_checkpoints": [{"slot": cohort.checkpoint, "accounts_hash": base58_bytes(cohort.checkpoint_hash).unwrap()}],
+                "members": [{"epoch": cohort.epoch,
+                    "bootstrap": {"slot": cohort.bootstrap, "accounts_hash": base58_bytes(cohort.bootstrap_hash).unwrap(), "slot_complete": true},
+                    "terminal": {"slot": cohort.epoch_end, "slot_complete": true}
+                }]
+            });
+            let fingerprint = (0..64)
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&cohort.fingerprint[i..i + 2], 16).unwrap())
+                .collect::<Vec<_>>();
+            let context = json!({"schema":"jetstreamer-root-checkpoint-gate-context-v1",
+                "manifest_fingerprint": fingerprint, "epochs": [cohort.epoch], "gate": gate});
+            let mut receipt = json!({"root_checkpoint_gate": gate,
+                "publication_context_base64": STANDARD.encode(serde_json::to_vec(&context).unwrap())});
+            validate_gate(&receipt, cohort).unwrap();
+            assert!(validate_gate(&receipt, other).is_err());
+            receipt["root_checkpoint_gate"]["members"][0]["terminal"]["slot"] =
+                json!(cohort.checkpoint);
+            assert!(validate_gate(&receipt, cohort).is_err());
+            receipt["root_checkpoint_gate"]["verified_manifest_checkpoints"][0]["slot"] =
+                json!(cohort.checkpoint + 1);
+            assert!(validate_gate(&receipt, cohort).is_err());
+        }
     }
 }
