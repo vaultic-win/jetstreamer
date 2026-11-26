@@ -73,7 +73,25 @@ pub(super) const RESTORE_258: Focused = Focused {
     profile_sha: "1cc91a3e939dd93920ddc6efbd720b9f558b00b3f27d2b6d654362068d2af035",
 };
 
-pub(super) const SCOPES: [&Focused; 3] = [&GAP_230, &RESTORE_258, &LOADER_296];
+pub(super) const TRACE_296: Focused = Focused {
+    epoch: 296,
+    unit: "horizon-qualify-296-loader-log-v3.service",
+    guard: "horizon-296-loader-log-protective-v3",
+    cpus: "56-63",
+    scratch_cap: 112 << 30,
+    receipt_disk: 64 << 20,
+    producer_memory: 173_207_977_984,
+    root: "/home/ubuntu/.jetstreamer-private/qualification-296-loader-log-v3",
+    first: 127_953_994,
+    last: 127_961_108,
+    kind: "epoch296-private-loader-log-diagnostic",
+    preflight_schema: "foundation-epoch296-loader-log-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon296-loader-log-v3",
+    preflight_sha: "6e8be02054f2d53f51636239e2372572892dd8571f318c9af5342c2f2fe22b3f",
+    profile_sha: "a65a727024c8cc64796ce89daf0fe0ec134117a20907a8fa030526e1cfe7a073",
+};
+
+pub(super) const SCOPES: [&Focused; 4] = [&GAP_230, &RESTORE_258, &LOADER_296, &TRACE_296];
 
 impl Focused {
     pub(super) fn quote_key(&self) -> String {

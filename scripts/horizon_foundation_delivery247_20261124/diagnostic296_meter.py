@@ -8,10 +8,12 @@ from ordinary249.delivery248 import V, bound, props, ref
 LOADER = "loader-upgrade-focused-v2"
 GAP = "short-gap-v1"
 RESTORE = "native-restore-v1"
+TRACE = "loader-log-v3"
 FOCUSED = {
     LOADER: (296, "horizon296-loader-upgrade-focused-v2", "epoch296-private-loader-upgrade-diagnostic"),
     GAP: (230, "horizon230-short-gap-runtime-v1", "epoch230-private-short-gap"),
     RESTORE: (258, "horizon258-native-restore-runtime-v1", "epoch258-private-native-restore"),
+    TRACE: (296, "horizon296-loader-log-v3", "epoch296-private-loader-log-diagnostic"),
 }
 ATTEMPTS = ("v2", "v3", *FOCUSED)
 FIELDS = ("ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup")

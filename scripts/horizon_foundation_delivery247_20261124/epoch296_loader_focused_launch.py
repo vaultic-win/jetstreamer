@@ -76,7 +76,15 @@ RESTORE_258 = Scope(
     "ac7cef6418be874cf8437171323fa2f9f1c1cf84ce41917096df4c489f270c6d",
     160 << 30, 96 << 30, 64 << 20, "56-63",
 )
-SCOPED_ARGS = {"--epoch230": GAP_230, "--epoch258": RESTORE_258}
+TRACE_296 = Scope(
+    296, V / "horizon296-loader-log-v3",
+    "horizon-qualify-296-loader-log-v3.service", "horizon-296-loader-log-protective-v3.service",
+    "epoch296-private-loader-log-diagnostic", "foundation-epoch296-replay-roster-binding-v1",
+    "a65a727024c8cc64796ce89daf0fe0ec134117a20907a8fa030526e1cfe7a073",
+    "6e8be02054f2d53f51636239e2372572892dd8571f318c9af5342c2f2fe22b3f",
+    173_207_977_984, 112 << 30, 64 << 20, "56-63",
+)
+SCOPED_ARGS = {"--epoch230": GAP_230, "--epoch258": RESTORE_258, "--trace296": TRACE_296}
 
 
 def current_fit(kit, roster, root, scope):
