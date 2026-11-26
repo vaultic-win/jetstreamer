@@ -225,6 +225,9 @@ compile_error!("the V7 post verifier requires the qualified HTTP retry reader");
 #[cfg(all(incident_v9_post145_only, not(incident_v5z_post145_only)))]
 compile_error!("the V9 post verifier requires the qualified HTTP retry reader");
 
+#[cfg(all(incident_v10_post145_only, not(incident_v5z_post145_only)))]
+compile_error!("the V10 post verifier requires the qualified HTTP retry reader");
+
 #[cfg(all(incident_v5z_post145_only, not(incident_v5x_post145_only)))]
 compile_error!("the V5z post verifier requires the sealed successor reader");
 
@@ -238,7 +241,7 @@ fn semantic_handoff_receipt(path: &Path, v9: bool) -> Result<(Bound, Value)> {
     Ok((receipt, value))
 }
 
-#[cfg(all(test, incident_v9_post145_only))]
+#[cfg(all(test, any(incident_v9_post145_only, incident_v10_post145_only)))]
 #[test]
 fn v9_handoff_receipts_accept_private_root_custody() -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
@@ -277,22 +280,39 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
     const V9_SEAL: &str = "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd";
     const V9_SUBMISSION: &str = "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973";
     const V9_RECOVERY: &str = "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4";
-    let v9 = cfg!(incident_v9_post145_only);
+    let census = if cfg!(incident_v10_post145_only) {
+        Some((
+            "104f023c5cd24a55b6585ef525b80067",
+            "29aac4e0527dcea47f4e9bcb14c5e071b67b8d749669873cc04d7cd1cc5d4e75",
+            "63afb9ef8ffa492e2fe12b05b9eccd6bd2e1c533d024f59ebeb21460e43da8cf",
+            "ed1dd13fb7803f31e90b7040b09359a484f0fef2608bce74a0c65bd2c37fa605",
+            "v10-census",
+            "horizon-epoch145-v9-census-successor-semantic-completion-v1",
+        ))
+    } else if cfg!(incident_v9_post145_only) {
+        Some((
+            V9_IID, V9_SEAL, V9_SUBMISSION, V9_RECOVERY,
+            "v9-census",
+            "horizon-epoch145-v8-census-successor-semantic-completion-v1",
+        ))
+    } else {
+        None
+    };
     if v7 {
         ensure!(export == V7_IID, "foreign V7 semantic export");
     }
-    if v9 {
-        ensure!(export == V9_IID, "foreign V9 semantic export");
+    if let Some((owner, ..)) = census {
+        ensure!(export == owner, "foreign census recovery semantic export");
     }
-    let (generation, schema) = if v9 {
-        ("v9-census", "horizon-epoch145-v8-census-successor-semantic-completion-v1")
+    let (generation, schema) = if let Some((_, _, _, _, generation, schema)) = census {
+        (generation, schema)
     } else if cfg!(incident_v5z_post145_only) {
         ("v5z", "horizon-epoch145-v5z-custody-successor-semantic-completion-v1")
     } else {
         ("v5x", "horizon-epoch145-v5x-donor-successor-semantic-completion-v1")
     };
-    let authority = if v9 {
-        family.join("tools-v9-census-recovery")
+    let authority = if census.is_some() {
+        family.join(format!("tools-{generation}-recovery"))
     } else if v7 {
         family.join("tools-v7-168-stop-v2")
     } else {
@@ -336,17 +356,17 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
     } else {
         family.join(format!("{generation}-name-handoff"))
     };
-    let (start, _) = semantic_handoff_receipt(&handoff.join("START_RESULT.json"), v9)?;
+    let (start, _) = semantic_handoff_receipt(&handoff.join("START_RESULT.json"), census.is_some())?;
     if v7 {
         ensure!(
             seal_ref.sha256 == V7_SEAL && start.sha256 == V7_START,
             "different authenticated V7 semantic owner"
         );
     }
-    if v9 {
+    if let Some((_, expected_seal, submission, ..)) = census {
         ensure!(
-            seal_ref.sha256 == V9_SEAL && start.sha256 == V9_SUBMISSION,
-            "different authenticated V9 semantic owner"
+            seal_ref.sha256 == expected_seal && start.sha256 == submission,
+            "different authenticated census recovery owner"
         );
     }
     let report = capacity::run(
@@ -360,18 +380,19 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
         "45",
     )?;
     let result: Value = serde_json::from_str(&report)?;
-    let (_, captured) = semantic_handoff_receipt(&handoff.join("SEMANTIC_COMPLETION.json"), v9)?;
-    if v9 {
+    let (_, captured) =
+        semantic_handoff_receipt(&handoff.join("SEMANTIC_COMPLETION.json"), census.is_some())?;
+    if let Some((owner, _, _, recovery_sha, ..)) = census {
         let recovery = Bound {
             path: Path::new(RUNTIME)
                 .join("epoch145-guarded-export-20261121-v1/state")
-                .join(V9_IID)
+                .join(owner)
                 .join("recovery-started.json"),
-            sha256: V9_RECOVERY.to_owned(),
+            sha256: recovery_sha.to_owned(),
         };
         ensure!(
             result["start"] == json!(recovery) && result["startup_evidence"]["start"] == json!(recovery),
-            "different authenticated V9 recovery start"
+            "different authenticated census recovery start"
         );
     }
     ensure!(

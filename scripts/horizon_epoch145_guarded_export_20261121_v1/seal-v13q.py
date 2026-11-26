@@ -14,15 +14,15 @@ from evidence import SEALER, bound, checked, durable, need, raw, syncdir
 
 sealer = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment"
 need(os.geteuid() == 0 and sys.flags.isolated and sys.dont_write_bytecode
-     and (len(sys.argv) == 2 or sys.argv[2:] in (["--v7"], ["--v9"])),
-     "run as root with python3 -IB seal-v13q.py STAGE [--v7|--v9]")
+     and (len(sys.argv) == 2 or sys.argv[2:] in (["--v7"], ["--v9"], ["--v10"])),
+     "run as root with python3 -IB seal-v13q.py STAGE [--v7|--v9|--v10]")
 generation = sys.argv[2][2:] if len(sys.argv) == 3 else "v6"
-retry5 = generation in ("v7", "v9")
+retry5 = generation in ("v7", "v9", "v10")
 stage = Path(sys.argv[1])
 need(stage.is_absolute() and stage.resolve(strict=True) == stage and stage.is_dir(), "invalid V13q build stage")
 checkout = stage.parent / "source"
 continuity = runtime / "epoch145-semantic-continuity-20261121-v1"
-worker = continuity / {"v6": "tools-v13q", "v7": "tools-v13r", "v9": "tools-v13s"}[generation]
+worker = continuity / {"v6": "tools-v13q", "v7": "tools-v13r", "v9": "tools-v13s", "v10": "tools-v13t"}[generation]
 fit = runtime / "incident-replay-fit-20261121-v1"
 provider = fit / f"tools-homefloor-145-post-{generation}-current-v1"
 original_provider = fit / f"tools-homefloor-145-post-{generation}-build-v1"
@@ -36,10 +36,13 @@ semantic_owner, semantic_package_name, semantic_handoff_name, semantic_seal = {
            "589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b"),
     "v9": ("ebdfc34db47c4e7699ea5ccbada5d604", "tools-v9-census-recovery", "v9-census-name-handoff",
            "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd"),
+    "v10": ("104f023c5cd24a55b6585ef525b80067", "tools-v10-census-recovery", "v10-census-name-handoff",
+            "29aac4e0527dcea47f4e9bcb14c5e071b67b8d749669873cc04d7cd1cc5d4e75"),
 }[generation]
 semantic_package = continuity / semantic_package_name
 semantic_handoff = continuity / semantic_handoff_name
-semantic_schema = ("horizon-epoch145-v8-census-successor-semantic-completion-v1" if generation == "v9"
+semantic_schema = ("horizon-epoch145-v9-census-successor-semantic-completion-v1" if generation == "v10"
+                   else "horizon-epoch145-v8-census-successor-semantic-completion-v1" if generation == "v9"
                    else "horizon-epoch145-v5z-custody-successor-semantic-completion-v1")
 reader_commit = "e15f71a2a84c9f256c6fc3d5da34e9354430e702"
 
@@ -140,7 +143,7 @@ need(build["worker"] == bound(image) and build["tests"] == bound(tests)
      and build["phase_tests"] == bound(phase_tests)
      and "test result: ok." in tests.read_text() and "0 failed;" in tests.read_text()
      and ("Ran 6 tests" in phase_tests.read_text() or
-          generation != "v9" and "Ran 5 tests" in phase_tests.read_text() or
+          generation not in ("v9", "v10") and "Ran 5 tests" in phase_tests.read_text() or
           generation == "v6" and "Ran 4 tests" in phase_tests.read_text())
      and phase_tests.read_text().endswith("OK\n"),
      "native or phase test results differ")
@@ -216,7 +219,8 @@ for row in prior["members"]:
 members.extend([member(profile.name, profile, 0o444), member(post_fit.name, post_fit, 0o555),
                 member(status_adapter.name, status_adapter, 0o444)])
 provider_ref = seal("provider", provider, members)
-result = stage / {"v6": "SEALED_V13Q.json", "v7": "SEALED_V13R.json", "v9": "SEALED_V13S.json"}[generation]
+result = stage / {"v6": "SEALED_V13Q.json", "v7": "SEALED_V13R.json",
+                  "v9": "SEALED_V13S.json", "v10": "SEALED_V13T.json"}[generation]
 durable(result, {"source_commit":commit, "native_qualification":qualified_build, "native_terminal":terminal,
                  "seal_operator":bound(Path(__file__).resolve()),
                  "source_containment":bound(source_receipt), "reader_preflight":bound(reader_preflight),

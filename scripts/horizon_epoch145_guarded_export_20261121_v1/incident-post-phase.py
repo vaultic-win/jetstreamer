@@ -19,6 +19,11 @@ V9_INVOCATION = "ebdfc34db47c4e7699ea5ccbada5d604"
 V9_SUBMISSION_SHA = "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973"
 V9_RECOVERY_SHA = "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4"
 V9_SEAL_SHA = "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd"
+V10_POST = VERSION == "tools-v13t"
+V10_INVOCATION = "104f023c5cd24a55b6585ef525b80067"
+V10_SUBMISSION_SHA = "63afb9ef8ffa492e2fe12b05b9eccd6bd2e1c533d024f59ebeb21460e43da8cf"
+V10_RECOVERY_SHA = "ed1dd13fb7803f31e90b7040b09359a484f0fef2608bce74a0c65bd2c37fa605"
+V10_SEAL_SHA = "29aac4e0527dcea47f4e9bcb14c5e071b67b8d749669873cc04d7cd1cc5d4e75"
 V6_HANDOFF = ROOT / "epoch145-semantic-continuity-20261121-v1/v6-guard-walk-name-handoff"
 V6_INVOCATION = "a71285e56d674de3bf793692f93dfbb3"
 V6_START_SHA = "6eb0a91c59e96a6e0be337c130610f8264e8195c6a2da7a84b456551c2b2b996"
@@ -27,7 +32,7 @@ V6_POST = (VERSION in ("tools-homefloor-145-post-v6-build-v1", "tools-homefloor-
            or VERSION == "tools-v13q" and (V6_HANDOFF / "SEMANTIC_COMPLETION.json").is_file())
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-V5Z_POST = V9_POST or V7_POST or V6_POST or VERSION in ("tools-v13q", "tools-homefloor-145-post-v5z-build-v1")
+V5Z_POST = V10_POST or V9_POST or V7_POST or V6_POST or VERSION in ("tools-v13q", "tools-homefloor-145-post-v5z-build-v1")
 V5X_POST = VERSION == "tools-v13p" or V5Z_POST
 V5W_POST = VERSION == "tools-v13o" or V5X_POST
 V5U_POST = VERSION in ("tools-v13m", "tools-v13n") or V5W_POST
@@ -210,18 +215,26 @@ def v5x_completion(s):
         handoff = authority.parent / "v7-168-stop-name-handoff"
     schema = ("horizon-epoch145-v5z-custody-successor-semantic-completion-v1" if V5Z_POST
               else "horizon-epoch145-v5x-donor-successor-semantic-completion-v1")
-    if V9_POST:
+    if V10_POST:
+        authority = authority.parent / "tools-v10-census-recovery"
+        handoff = authority.parent / "v10-census-name-handoff"
+        schema = "horizon-epoch145-v9-census-successor-semantic-completion-v1"
+        census_owner = V10_INVOCATION, V10_SEAL_SHA, V10_SUBMISSION_SHA, V10_RECOVERY_SHA
+    elif V9_POST:
         authority = authority.parent / "tools-v9-census-recovery"
         handoff = authority.parent / "v9-census-name-handoff"
         schema = "horizon-epoch145-v8-census-successor-semantic-completion-v1"
+        census_owner = V9_INVOCATION, V9_SEAL_SHA, V9_SUBMISSION_SHA, V9_RECOVERY_SHA
     tool = authority / "v5v_semantic_completion.py"
     seal, seal_ref = s.read(authority / "deployment-seal-receipt.json")
     build, build_ref = s.read(authority / "build-proof.json")
     _, start_ref = s.read(handoff / "START_RESULT.json")
     captured, _ = s.read(handoff / "SEMANTIC_COMPLETION.json")
-    if V9_POST:
-        s.need(seal_ref["sha256"] == V9_SEAL_SHA and start_ref["sha256"] == V9_SUBMISSION_SHA,
-               "different authenticated V9 semantic owner")
+    if V10_POST or V9_POST:
+        owner, seal_sha, submit_sha, recovery_sha = census_owner
+        generation = "V10" if V10_POST else "V9"
+        s.need(seal_ref["sha256"] == seal_sha and start_ref["sha256"] == submit_sha,
+               f"different authenticated {generation} semantic owner")
     elif V7_POST:
         s.need(seal_ref["sha256"] == V7_SEAL_SHA and start_ref["sha256"] == V7_START_SHA,
                "different authenticated V7 semantic owner")
@@ -245,11 +258,10 @@ def v5x_completion(s):
         ["/usr/bin/python3", "-IB", tool, start_ref["path"], start_ref["sha256"]], timeout=45))
     actor = selected["invocation_id"]
     startup = selected["startup_evidence"]
-    if V9_POST:
-        recovery = {"path": str(STATE / V9_INVOCATION / "recovery-started.json"),
-                    "sha256": V9_RECOVERY_SHA}
-        s.need(actor == V9_INVOCATION and selected["start"] == startup["start"] == recovery,
-               "different authenticated V9 recovery start")
+    if V10_POST or V9_POST:
+        recovery = {"path": str(STATE / owner / "recovery-started.json"), "sha256": recovery_sha}
+        s.need(actor == owner and selected["start"] == startup["start"] == recovery,
+               f"different authenticated {generation} recovery start")
     s.need(selected == captured and s.iid(actor) and actor != "97bd2045ebe449e3ae77330c7e4ec7b4"
            and (not V7_POST or (actor == V7_INVOCATION and selected["start"] == start_ref))
            and (not V6_POST or actor == V6_INVOCATION)

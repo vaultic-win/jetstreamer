@@ -1,4 +1,4 @@
-//! Start the prepared post-verification build when the V9 receipt is captured.
+//! Start the prepared post-verification build when the semantic receipt is captured.
 use std::{
     env, fs, io,
     os::unix::fs::MetadataExt,
@@ -10,7 +10,11 @@ use std::{
 const RUNTIME: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 const FLEET: &str = "ROOT_COMPLETE_OPERATIONAL_FLEET.json";
 const MAX_FLEET_AGE: Duration = Duration::from_secs(2_400);
-const COMPLETION: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff/SEMANTIC_COMPLETION.json";
+const COMPLETION: &str = if cfg!(epoch145_v10_completion) {
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/v10-census-name-handoff/SEMANTIC_COMPLETION.json"
+} else {
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff/SEMANTIC_COMPLETION.json"
+};
 
 fn private_root_file(path: &Path, mode: u32) -> io::Result<fs::Metadata> {
     let metadata = fs::symlink_metadata(path)?;

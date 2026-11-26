@@ -83,10 +83,12 @@ V8_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v3"
 RETRY5_FIT_ROUTE = V9_RETRY5_FIT or V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
 V7_POST_145 = HERE == D / "tools-homefloor-145-post-v7-current-v1"
 V9_POST_145 = HERE == D / "tools-homefloor-145-post-v9-current-v1"
-RETRY5_POST_145 = V7_POST_145 or V9_POST_145
+V10_POST_145 = HERE == D / "tools-homefloor-145-post-v10-current-v1"
+RETRY5_POST_145 = V7_POST_145 or V9_POST_145 or V10_POST_145
 V7_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v7-build-v1"
 V9_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v9-build-v1"
-RETRY5_POST_BUILD_145 = V7_POST_BUILD_145 or V9_POST_BUILD_145
+V10_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v10-build-v1"
+RETRY5_POST_BUILD_145 = V7_POST_BUILD_145 or V9_POST_BUILD_145 or V10_POST_BUILD_145
 RETRY5_168 = RETRY5_FIT_ROUTE or RETRY5_POST_145 or RETRY5_POST_BUILD_145 or REPRO166_POST_V9
 STOPPED168_PRICE = FULL170_V9 or RETRY5_168 or STOP_RECOVERY_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
@@ -692,7 +694,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
             (MISSED_RUNTIME_145, "tools-v5m"),
             (True, "tools-v5k"),
         ) if enabled)
-        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13s" if V9_POST_145 else "tools-v13r" if V7_POST_145 else "tools-v13q" if V5Z_POST_145 else "tools-v13p" if V5X_POST_145 else "tools-v13o" if V5W_POST_145 else "tools-v13n" if V5U_GUARD_POST_145 else "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
+        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13t" if V10_POST_145 else "tools-v13s" if V9_POST_145 else "tools-v13r" if V7_POST_145 else "tools-v13q" if V5Z_POST_145 else "tools-v13p" if V5X_POST_145 else "tools-v13o" if V5W_POST_145 else "tools-v13n" if V5U_GUARD_POST_145 else "tools-v13m" if V5U_POST_145 else "tools-v13l" if V5R_136 else "tools-v13k" if V5Q_136 else "tools-v13j" if V5O_136 else "tools-v13i" if V5N_136 else "tools-v13h" if V5N_POST else "tools-v13g" if V5M_POST else "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
                     "lease-semantic": ("profile145-lease-semantic.json", lease_directory),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
@@ -767,7 +769,9 @@ def phase145(epoch, fleet=None):
     if FULL170_V9:
         return retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit["V9"])
     if RETRY5_FIT_ROUTE or RETRY5_POST_BUILD_145 or REPRO166_POST_V9:
-        generation = "V9" if V9_RETRY5_FIT or V9_POST_BUILD_145 or REPRO166_POST_V9 else "V8" if V8_RETRY5_FIT else "V7"
+        generation = ("V10" if V10_POST_BUILD_145 else
+                      "V9" if V9_RETRY5_FIT or V9_POST_BUILD_145 or REPRO166_POST_V9 else
+                      "V8" if V8_RETRY5_FIT else "V7")
         phase = retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit[generation])
         if RETRY5_POST_BUILD_145 or REPRO166_POST_V9:
             proof = bound(phase["completion"])
