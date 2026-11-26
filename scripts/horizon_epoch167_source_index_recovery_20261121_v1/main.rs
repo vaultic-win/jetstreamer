@@ -27,8 +27,10 @@ const COLD168_LAUNCHER: &str = "tools/recover168";
 const COLD168_LAUNCHER: &str = "fit-launcher-v3/recover168";
 #[cfg(all(epoch168_cold_retry5, epoch168_cold_retry5_v13))]
 const COLD168_LAUNCHER: &str = "fit-launcher-v4/recover168";
-#[cfg(all(epoch168_cold_retry5, epoch168_cold_retry5_v10))]
+#[cfg(all(epoch168_cold_retry5, epoch168_cold_retry5_v10, not(epoch168_cold_retry5_independent145)))]
 const COLD168_LAUNCHER: &str = "fit-launcher-v5/recover168";
+#[cfg(all(epoch168_cold_retry5, epoch168_cold_retry5_v10, epoch168_cold_retry5_independent145))]
+const COLD168_LAUNCHER: &str = "fit-launcher-v6/recover168";
 mod actor;
 #[cfg(epoch166_after168)]
 #[path = "../horizon_epoch166_guard_recovery_20261121_v1/after168.rs"]
@@ -182,11 +184,22 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
         150,
     )?;
     let mut v: Value = serde_json::from_slice(&b)?;
-    #[cfg(all(epoch168_cold_retry5, epoch168_cold_retry5_v10))]
+    #[cfg(all(epoch168_cold_retry5, epoch168_cold_retry5_v10, not(epoch168_cold_retry5_independent145)))]
     ensure!(
         v["phase145"]["stage"] == "v10-semantic-complete-drained"
             && v["phase145"]["completed_invocation_id"] == "104f023c5cd24a55b6585ef525b80067",
         "epoch 168 capacity requires the drained V10 verifier"
+    );
+    #[cfg(all(epoch168_cold_retry5, epoch168_cold_retry5_v10, epoch168_cold_retry5_independent145))]
+    ensure!(
+        v["phase145"]["stage"] == "independent-semantic-complete-v10-drained"
+            && v["phase145"]["previous_verifier_invocation_id"] == "104f023c5cd24a55b6585ef525b80067"
+            && matches!(
+                v["phase145"]["completed_invocation_id"].as_str(),
+                Some("cb3313b857d94b9f82e06d5c033c0ac5" | "a89c1de125694cb3bdcef19a8c82848a")
+            )
+            && v["phase145"]["resource_credit_bytes"] == 0,
+        "epoch 168 capacity requires the selected verified archive and drained V10"
     );
     ensure!(
         v["schema"] == "horizon-incident-replay-fit-v1"

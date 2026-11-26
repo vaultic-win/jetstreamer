@@ -83,9 +83,10 @@ V12_RECOVERY_145 = V8_145 or V9_145 or V10_145
 STOP_RECOVERY_145 = V7_145 or V12_RECOVERY_145
 V13_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v5"
 V10_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v6"
+INDEPENDENT_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-independent-v1"
 V9_RETRY5_FIT = V13_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v4"
 V8_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v3"
-RETRY5_FIT_ROUTE = V10_RETRY5_FIT or V9_RETRY5_FIT or V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
+RETRY5_FIT_ROUTE = INDEPENDENT_RETRY5_FIT or V10_RETRY5_FIT or V9_RETRY5_FIT or V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
 V7_POST_145 = HERE == D / "tools-homefloor-145-post-v7-current-v1"
 V9_POST_145 = HERE == D / "tools-homefloor-145-post-v9-current-v1"
 V10_POST_145 = HERE == D / "tools-homefloor-145-post-v10-current-v1"
@@ -218,7 +219,7 @@ if RETRY5_168 or FULL170_V9:
     retry5_bundle, retry5_seal = s.read(HERE / "deployment-seal-receipt.json")
     loader["load_package"](HERE, retry5_seal["sha256"])
     retry5_fit = runpy.run_path(str(HERE / "retry5_fit.py"))
-if INDEPENDENT_ENTRY146:
+if INDEPENDENT_ENTRY146 or INDEPENDENT_RETRY5_FIT:
     independent145_entry146 = runpy.run_path(str(HERE / "independent145_entry146.py"))
     independent_selection, = [member for member in retry5_bundle["members"]
                               if member["name"] == independent145_entry146["SELECT"] and member["mode"] == "0444"]
@@ -778,6 +779,9 @@ def v12_stopped145(fleet):
 def phase145(epoch, fleet=None):
     if INDEPENDENT_ENTRY146:
         s.need(epoch == 145, "independent 145 handoff is reserved for the epoch 146 entry price")
+        return independent145_entry146["phase"](s, fit, HERE, independent_selection["sha256"])
+    if INDEPENDENT_RETRY5_FIT:
+        s.need(epoch == 168, "independent 145 handoff is reserved for the epoch 168 replay price")
         return independent145_entry146["phase"](s, fit, HERE, independent_selection["sha256"])
     if FULL170_V9:
         generation = "V10" if FULL170_RETRY5_V10 else "V9"
@@ -2030,6 +2034,8 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         writer = {"registered_writer": registered_status()} if V13_RETRY5_FIT else {}
         if INDEPENDENT_ENTRY146:
             writer["independent_entry146"] = True
+        if INDEPENDENT_RETRY5_FIT:
+            writer["independent_retry5"] = True
         donor = retry5_fit["donor_cover"](s, retry5_donor, retry5_donor_before, native, f, **writer)
         price = "price166" if REPRO166_POST_V12 else "price"
         return retry5_fit[price](s, native, retry5_current, books["168"], donor, cold168)
