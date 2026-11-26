@@ -41,6 +41,8 @@ fn worker_remains_alive_across_framed_requests() -> io::Result<()> {
                 "solana-v1.6.20-epoch228-called-program-demotion-candidate"
             } else if cfg!(feature = "epoch229-called-program-demotion") {
                 "solana-v1.6.20-epoch229-called-program-demotion-candidate"
+            } else if cfg!(feature = "epoch230-vote-boundary-demotion") {
+                "solana-v1.6.20-epoch230-vote-boundary-demotion-candidate"
             } else if cfg!(feature = "epoch230-called-program-demotion") {
                 "solana-v1.6.20-epoch230-called-program-demotion-candidate"
             } else if cfg!(feature = "epoch231-checkpoint-continuation") {

@@ -40,6 +40,8 @@ epoch228-called-program-demotion = ["epoch228-capped-qualification", "solana-pro
 epoch229-called-program-demotion = ["solana-program/epoch230-called-program-demotion"]
 # Private epoch 230 replay through its independently verified hourly root.
 epoch230-called-program-demotion = ["solana-program/epoch230-called-program-demotion"]
+# Repeat the later vote-boundary failure with the same activation-gated rule.
+epoch230-vote-boundary-demotion = ["epoch230-called-program-demotion"]
 # Compare the same storage profile with the activation-gated lock rule at epoch 231.
 epoch231-called-program-demotion = ["capped-shrink-candidate", "solana-program/epoch230-called-program-demotion"]
 # Continue the separately verified prefix from its exact hourly snapshot.

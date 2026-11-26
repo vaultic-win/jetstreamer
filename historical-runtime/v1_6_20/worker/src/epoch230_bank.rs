@@ -57,6 +57,43 @@ fn epoch229_signed_transaction_demotes_only_the_invoked_program_when_active() {
 }
 
 #[test]
+fn preceding_bank_transaction_preserves_only_the_writable_non_program_keys() {
+    const WIRE: &[u8] = include_bytes!("../../../fixtures/epoch230-99435889-tx1618.bin");
+    let mut digest = Sha256::new();
+    digest.input(WIRE);
+    assert_eq!(
+        format!("{:x}", digest.result()),
+        "9572c35a33dfa7eadfdf69f2611f1574aa24075e22290740896590cbf3ffe4ff"
+    );
+    let transaction: Transaction = bincode::deserialize(WIRE).unwrap();
+    transaction.verify().unwrap();
+    assert_eq!(bincode::serialize(&transaction).unwrap().as_slice(), WIRE);
+    assert_eq!(
+        transaction.signatures[0].to_string(),
+        "Z3HdXzUAZ57yeWrMib3rNiorVvMyJpKvWfTeTy2VjSt1jjECLPnn2bXjoPVxfjP7k25Wek2GUnFPpSsNBYXxqsS"
+    );
+    let message = &transaction.message;
+    let token_program = message.account_keys[8];
+    assert_eq!(
+        token_program.to_string(),
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    );
+    assert!(message.instructions[0].accounts.contains(&8));
+    assert_eq!(message.instructions[1].program_id_index, 8);
+    assert!(message.is_non_loader_key(&token_program, 8));
+    assert!(!message.account_keys.contains(&bpf_loader_upgradeable::id()));
+
+    for &active in &[false, true] {
+        let program_writable = !(cfg!(feature = "epoch228-called-program-demotion")
+            || (crate::ACTIVATION_GATED_PROGRAM_DEMOTION && active));
+        assert_eq!(message.is_writable(8, active), program_writable);
+        let writes = writable_key_attribution(std::slice::from_ref(&transaction), active).unwrap();
+        assert_eq!(writes.contains_key(token_program.as_ref()), program_writable);
+        assert!(writes.contains_key(message.account_keys[0].as_ref()));
+    }
+}
+
+#[test]
 fn signed_wire_selects_the_same_program_lock_and_write_attribution() {
     let mut hash = Sha256::new();
     hash.input(WIRE);

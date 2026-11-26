@@ -1723,6 +1723,12 @@ mod tests {
             assert!(validate_candidate_snapshot_slot(98_927_417).is_ok());
             assert!(validate_candidate_snapshot_slot(98_927_416).is_err());
             assert!(validate_candidate_snapshot_slot(98_927_418).is_err());
+        } else if cfg!(feature = "epoch230-vote-boundary-demotion") {
+            assert!(validate_candidate_snapshot_slot(99_430_284).is_ok());
+            assert!(validate_candidate_snapshot_slot(99_359_376).is_err());
+            assert!(validate_candidate_snapshot_slot(99_430_283).is_err());
+            assert!(validate_candidate_snapshot_slot(99_430_285).is_err());
+            assert_eq!(effective_min_supported_entry_slot(), 99_430_285);
         } else if cfg!(feature = "epoch230-called-program-demotion") {
             assert!(validate_candidate_snapshot_slot(99_359_376).is_ok());
             assert!(validate_candidate_snapshot_slot(99_359_375).is_err());
@@ -1765,6 +1771,8 @@ mod tests {
             entry_end,
             if cfg!(feature = "epoch229-called-program-demotion") {
                 98_939_267
+            } else if cfg!(feature = "epoch230-vote-boundary-demotion") {
+                99_437_434
             } else if cfg!(feature = "epoch230-called-program-demotion") {
                 99_375_856
             } else if cfg!(feature = "epoch231-checkpoint-continuation") {
