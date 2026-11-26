@@ -12,6 +12,11 @@ const DELIVERY_BOOKING: (&str, &str) = (
     "/var/lib/jetstreamer/horizon257-current-reader-delivery-v2/booking.json",
     "fe90d6ab3c352bf4f6f903457b16edb48c8a10d1a836941df5c8aa9544f51d13",
 );
+const UPLOAD_257: &str = "horizon-upload-257-current-reader-v2.service";
+const TERMINAL_UPLOAD_257: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon257-current-reader-delivery-v2/publication/completion.json",
+    "ac5480340fabbafd8b80244ef95b7d3ad4a0ee1bbc51ad9bf5abb6de8bd29775",
+);
 const OWNER_FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemorySwapMax,ExecStart,AllowedCPUs";
 const GUARD_FIELDS: &str =
     "Id,LoadState,ActiveState,SubState,InvocationID,Unit,MemoryMax,ExecStart";
@@ -524,6 +529,74 @@ fn terminal_replay_230(n: &mut Native, booking: &Value) -> Result<Option<Bound>>
     Ok(Some(proof))
 }
 
+fn terminal_delivery_257(n: &mut Native, booking: &Value, fleet: &Value) -> Result<Option<Bound>> {
+    let state = n.show_fields(
+        UPLOAD_257,
+        "ActiveState,InvocationID,MainPID,ControlPID,ControlGroup,Job,NRestarts,Result",
+    )?;
+    if state["ActiveState"] == "active" {
+        return Ok(None);
+    }
+    let terminal = Bound::new(TERMINAL_UPLOAD_257.0, TERMINAL_UPLOAD_257.1);
+    if !terminal.path.try_exists()? {
+        return Ok(None);
+    }
+    let completion = terminal.sealed()?;
+    let claim = binding(&completion["claim"])?.sealed()?;
+    let handoff = binding(&completion["intent"])?.sealed()?;
+    let finished = &handoff["terminal"]["finished"];
+    let archive = binding(&completion["archive"])?.sealed()?;
+    let deletion = binding(&completion["deletion"])?.sealed()?;
+    let invocation = text(&booking["owners"][UPLOAD_257], "InvocationID")?;
+    let entry = fleet["inventory"]["entries"]
+        .as_array()
+        .context("Foundation inventory")?
+        .iter()
+        .find(|row| row["epoch"] == 257)
+        .context("missing epoch 257 inventory row")?;
+    ensure!(
+        state["ActiveState"] == "inactive"
+            && matches!(state["InvocationID"].as_str(), Some(id) if id.is_empty() || id == invocation)
+            && state["MainPID"] == "0"
+            && state["ControlPID"] == "0"
+            && state["ControlGroup"] == ""
+            && state["Job"] == ""
+            && state["NRestarts"] == "0"
+            && state["Result"] == "success"
+            && !Path::new("/sys/fs/cgroup/system.slice")
+                .join(UPLOAD_257)
+                .exists(),
+        "epoch 257 delivery owner has not drained"
+    );
+    ensure!(
+        completion["ready"] == true
+            && completion["capacity_released"] == false
+            && completion["local_retirement_authorized"] == false
+            && claim["epoch"] == 257
+            && claim["unit"] == UPLOAD_257
+            && claim["invocation_id"] == invocation
+            && handoff["claim"] == completion["claim"]
+            && handoff["archive"] == completion["archive"]
+            && finished["UNIT"] == UPLOAD_257
+            && finished["INVOCATION_ID"] == invocation
+            && finished["_PID"] == "1"
+            && finished["_UID"] == "0"
+            && finished["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+            && archive["epoch"] == 257
+            && archive["remote_sha256_readback"] == true
+            && deletion["binding"]["archive_receipt"] == completion["archive"]
+            && deletion["authenticated_ready_pair_after"] == true
+            && deletion["authenticated_status_absent_after"] == true
+            && entry["state"] == "ready-pair"
+            && entry["archive_length"] == archive["archive_length"]
+            && entry["archive_etag"] == archive["archive_etag"]
+            && entry["archive_metadata_sha256"] == archive["archive_sha256"]
+            && entry["sidecar_sha256"] == archive["archive_sha256"],
+        "epoch 257 completion does not match the booked upload and ready pair"
+    );
+    Ok(Some(terminal))
+}
+
 fn fleet_roster<'a>(
     fleet: &'a Value,
     booking: &Value,
@@ -627,6 +700,7 @@ mod roster_tests {
         ] {
             let unit = match epoch {
                 226 => EXTRACT_226.to_owned(),
+                257 => UPLOAD_257.to_owned(),
                 261 => REPLAY_261.to_owned(),
                 _ => format!("test-{epoch}.service"),
             };
@@ -657,12 +731,19 @@ mod roster_tests {
         assert!(fleet_roster(&after, &booking, &first, None, &live_replays).is_err());
         assert!(fleet_roster(&after, &booking, &both, None, &live_replays).is_ok());
 
+        rows.retain(|row| row["epoch"] != 257);
+        let after = json!({"active":rows});
+        assert!(fleet_roster(&after, &booking, &both, None, &live_replays).is_err());
+        let after_delivery =
+            BTreeMap::from([(226, EXTRACT_226), (257, UPLOAD_257), (261, REPLAY_261)]);
+        assert!(fleet_roster(&after, &booking, &after_delivery, None, &live_replays).is_ok());
+
         rows.retain(|row| row["epoch"] != 252);
         assert!(
             fleet_roster(
                 &json!({"active":rows}),
                 &booking,
-                &both,
+                &after_delivery,
                 None,
                 &live_replays
             )
@@ -941,6 +1022,14 @@ fn measure(
     };
     if closed_230.is_some() {
         released_replays.insert(230, REPLAY_230);
+    }
+    let closed_257 = if quote.is_some() {
+        terminal_delivery_257(n, &booking, &fleet)?
+    } else {
+        None
+    };
+    if closed_257.is_some() {
+        released_replays.insert(257, UPLOAD_257);
     }
     let before = listed_owners(n)?;
     let active_delivery = if quote.is_some() && before.contains(UPLOAD_261) {
@@ -1347,6 +1436,7 @@ fn measure(
         "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
         "closed_middle_replay":closed_230,
+        "closed_delivery_257":closed_257,
         "active_delivery_261_claim":active_delivery.as_ref().map(|(claim, _, _, _)| claim),
         "active_replay_262_registration":live_replays.get(&262).map(|replay| &replay.reference),
         "active_replay_296_registration":live_replays.get(&296).map(|replay| &replay.reference)});
