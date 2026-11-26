@@ -1,4 +1,4 @@
-//! Bind the current Foundation cohort for epoch 262 funding and guard qualification.
+//! Bind the live Foundation cohort for replay funding and guard qualification.
 use super::*;
 mod allocation;
 
@@ -23,9 +23,21 @@ const KNOWN_GUARDS: [(u64, &str); 5] = [
     (288, "horizon-288-full-shrink-debt-protective-v1"),
 ];
 const AUXILIARY: [&str; 2] = [
-    "foundation-226-original225-broker-v3.service",
+    BROKER_226,
     "foundation-public-audit-epoch148-256-cap1-v1.service",
 ];
+const EXTRACT_226: &str = "horizon-qualify-226-checkpoint-continuation-extract-v3.service";
+const BROKER_226: &str = "foundation-226-original225-broker-v3.service";
+const GUARD_226: &str = "horizon-guard-226-checkpoint-continuation-extract-v3.service";
+const TIMER_226: &str = "horizon-guard-226-checkpoint-continuation-extract-v3.timer";
+const DRAIN_226: &str =
+    "/var/lib/jetstreamer/horizon226-extract-v3/control/success-drain-completion.json";
+const LAUNCH_226: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon226-extract-v3/fleet-launch.json",
+    "30f1fd1a0009ff63c22f1aac39438caf570acaddfaf90bd656331e2895294df8",
+);
+const SUFFIX_226_ROOT: &str = "/var/lib/jetstreamer/horizon226-suffix-v1";
+const SUFFIX_226_CAP: u64 = 160 << 30;
 const CADENCE_LOCK: &str =
     "/var/lib/jetstreamer/horizon-seven-publication-controller-v222/cycle.lock";
 const STANDARD_GUARD: &str =
@@ -57,8 +69,11 @@ struct FullReplayQuote {
     inputs: Bound,
     working_disk: u64,
     producer_memory: u64,
-    closed_audit: Bound,
-    closed_audit_invocation: String,
+}
+
+enum Quote {
+    FullReplay(FullReplayQuote),
+    Suffix226(Bound),
 }
 
 fn full_replay_quote() -> Result<FullReplayQuote> {
@@ -67,19 +82,13 @@ fn full_replay_quote() -> Result<FullReplayQuote> {
     let inputs = Bound::new(FULL_REPLAY_INPUTS.0, FULL_REPLAY_INPUTS.1);
     let plan = inputs.sealed()?;
     let terminal = binding(&plan["native_bootstrap_terminal"])?.sealed()?;
-    let closed_audit = Bound::new(AUDIT_148_TERMINAL.0, AUDIT_148_TERMINAL.1);
-    let audit = closed_audit.sealed()?;
     ensure!(
         plan["schema"] == "foundation-epoch262-full-replay-input-envelope-v1"
             && plan["epoch"] == EPOCH
             && plan["full_replay_admitted"] == false
             && terminal["epoch"] == EPOCH
             && terminal["native_input_qualified"] == true
-            && profile["unit"] == REPLAY_261
-            && audit["schema"] == "foundation-epoch148-pinned-public-audit-acceptance-v1"
-            && audit["epoch"] == 148
-            && audit["unit"] == AUXILIARY[1]
-            && audit["authenticated_readiness_rechecked"] == true,
+            && profile["unit"] == REPLAY_261,
         "epoch 262 full-replay quote inputs changed"
     );
     binding(&plan["replay_node"])?.artifact()?;
@@ -88,9 +97,20 @@ fn full_replay_quote() -> Result<FullReplayQuote> {
         inputs,
         working_disk: num(&profile, "maximum_root_physical_bytes")?,
         producer_memory: num(&profile, "maximum_memory_bytes")?,
-        closed_audit,
-        closed_audit_invocation: text(&audit, "invocation_id")?.to_owned(),
     })
+}
+
+fn closed_audit() -> Result<(Bound, String)> {
+    let reference = Bound::new(AUDIT_148_TERMINAL.0, AUDIT_148_TERMINAL.1);
+    let audit = reference.sealed()?;
+    ensure!(
+        audit["schema"] == "foundation-epoch148-pinned-public-audit-acceptance-v1"
+            && audit["epoch"] == 148
+            && audit["unit"] == AUXILIARY[1]
+            && audit["authenticated_readiness_rechecked"] == true,
+        "epoch 148 terminal audit receipt changed"
+    );
+    Ok((reference, text(&audit, "invocation_id")?.to_owned()))
 }
 
 fn latest_completion() -> Result<Bound> {
@@ -154,10 +174,62 @@ fn terminal_replay_261(n: &mut Native, booking: &Value) -> Result<Option<Value>>
     Ok(Some(json!({"collector":collector,"terminal":terminal})))
 }
 
+fn terminal_extract_226(n: &mut Native, booking: &Value, proof: &Bound) -> Result<()> {
+    ensure!(
+        proof.path == Path::new(DRAIN_226),
+        "foreign extraction drain"
+    );
+    let terminal = proof.sealed()?;
+    let launch_ref = Bound::new(LAUNCH_226.0, LAUNCH_226.1);
+    let launch = launch_ref.sealed()?;
+    let handoff = binding(&terminal["handoff"])?.sealed()?;
+    ensure!(
+        terminal["schema"] == "foundation-epoch226-extraction-success-drain-v1"
+            && terminal["epoch"] == 226
+            && terminal["prefix_retained"] == true
+            && terminal["suffix_started"] == false
+            && terminal["producer"]["Id"] == EXTRACT_226
+            && terminal["producer"]["Result"] == "success"
+            && terminal["after"]["broker"]["Id"] == BROKER_226
+            && handoff["launch"] == json!(launch_ref)
+            && launch["invocation_id"] == booking["owners"][EXTRACT_226]["InvocationID"]
+            && launch["broker_invocation_id"] == booking["owners"][BROKER_226]["InvocationID"],
+        "epoch 226 drain is outside the booked extraction"
+    );
+    let timer = n.show_fields(TIMER_226, "ActiveState,Job")?;
+    ensure!(
+        timer["ActiveState"] == "inactive" && timer["Job"] == "",
+        "epoch 226 extraction timer has not drained"
+    );
+    for unit in [EXTRACT_226, BROKER_226, GUARD_226] {
+        let state = n.show_fields(
+            unit,
+            "ActiveState,MainPID,ControlPID,ControlGroup,Job,InvocationID,Result",
+        )?;
+        ensure!(
+            matches!(state["ActiveState"].as_str(), Some("inactive" | "failed"))
+                && state["MainPID"] == "0"
+                && state["ControlPID"] == "0"
+                && state["ControlGroup"] == ""
+                && state["Job"] == ""
+                && !Path::new("/sys/fs/cgroup/system.slice").join(unit).exists(),
+            "epoch 226 extraction owner {unit} has not drained"
+        );
+        if unit == EXTRACT_226 || unit == BROKER_226 {
+            ensure!(
+                state["InvocationID"] == ""
+                    || state["InvocationID"] == booking["owners"][unit]["InvocationID"],
+                "epoch 226 extraction owner {unit} was replaced"
+            );
+        }
+    }
+    Ok(())
+}
+
 fn fleet_roster<'a>(
     fleet: &'a Value,
     booking: &Value,
-    released_261: bool,
+    released: &BTreeMap<u64, &str>,
 ) -> Result<BTreeMap<u64, &'a Value>> {
     let rows = fleet["active"]
         .as_array()
@@ -187,11 +259,14 @@ fn fleet_roster<'a>(
             "Foundation owner changed or duplicated for epoch {epoch}"
         );
     }
-    let missing_261 = released_261 && !roster.contains_key(&261);
+    let missing: BTreeMap<_, _> = released
+        .iter()
+        .filter_map(|(&epoch, &unit)| (!roster.contains_key(&epoch)).then_some((epoch, unit)))
+        .collect();
     ensure!(
         roster.keys().copied().eq([226, 230, 252, 257, 261, 288]
             .into_iter()
-            .filter(|&epoch| epoch != 261 || !missing_261)),
+            .filter(|epoch| !missing.contains_key(epoch))),
         "incomplete Foundation live roster"
     );
     let selected: BTreeSet<_> = roster
@@ -204,7 +279,7 @@ fn fleet_roster<'a>(
                 == selected
                     .into_iter()
                     .chain(AUXILIARY)
-                    .chain(missing_261.then_some(REPLAY_261))
+                    .chain(missing.into_values())
                     .collect(),
         "missing or duplicate Foundation capacity booking"
     );
@@ -227,10 +302,10 @@ mod roster_tests {
             (261, "replay"),
             (288, "replay"),
         ] {
-            let unit = if epoch == 261 {
-                REPLAY_261.to_owned()
-            } else {
-                format!("test-{epoch}.service")
+            let unit = match epoch {
+                226 => EXTRACT_226.to_owned(),
+                261 => REPLAY_261.to_owned(),
+                _ => format!("test-{epoch}.service"),
             };
             let owner = json!({"Id":unit,"InvocationID":format!("invocation-{epoch}"),
                 "MainPID":epoch.to_string(),"ControlGroup":format!("/test/{epoch}")});
@@ -242,16 +317,24 @@ mod roster_tests {
         }
         let booking = json!({"owners": owners});
         let before = json!({"active":rows});
-        assert!(fleet_roster(&before, &booking, false).is_ok());
-        assert!(fleet_roster(&before, &booking, true).is_ok());
+        let none = BTreeMap::new();
+        let first = BTreeMap::from([(261, REPLAY_261)]);
+        let both = BTreeMap::from([(226, EXTRACT_226), (261, REPLAY_261)]);
+        assert!(fleet_roster(&before, &booking, &none).is_ok());
+        assert!(fleet_roster(&before, &booking, &both).is_ok());
 
         rows.retain(|row| row["epoch"] != 261);
         let after = json!({"active":rows});
-        assert!(fleet_roster(&after, &booking, false).is_err());
-        assert!(fleet_roster(&after, &booking, true).is_ok());
+        assert!(fleet_roster(&after, &booking, &none).is_err());
+        assert!(fleet_roster(&after, &booking, &first).is_ok());
+
+        rows.retain(|row| row["epoch"] != 226);
+        let after = json!({"active":rows});
+        assert!(fleet_roster(&after, &booking, &first).is_err());
+        assert!(fleet_roster(&after, &booking, &both).is_ok());
 
         rows.retain(|row| row["epoch"] != 252);
-        assert!(fleet_roster(&json!({"active":rows}), &booking, true).is_err());
+        assert!(fleet_roster(&json!({"active":rows}), &booking, &both).is_err());
     }
 }
 
@@ -452,7 +535,7 @@ pub(super) fn receipt(n: &mut Native, controller: Option<Controller<'_>>) -> Res
 fn measure(
     n: &mut Native,
     controller: Option<Controller<'_>>,
-    quote: Option<FullReplayQuote>,
+    quote: Option<Quote>,
 ) -> Result<Value> {
     let completion = latest_completion()?;
     let done = completion.json()?;
@@ -478,21 +561,34 @@ fn measure(
     );
     let booking_ref = Bound::new(REPLAY_BOOKING.0, REPLAY_BOOKING.1);
     let booking = booking_ref.sealed()?;
+    let mut released_replays = BTreeMap::new();
+    let suffix = match &quote {
+        Some(Quote::Suffix226(proof)) => {
+            terminal_extract_226(n, &booking, proof)?;
+            released_replays.insert(226, EXTRACT_226);
+            Some(proof)
+        }
+        _ => None,
+    };
     let closed_replay = if quote.is_some() {
         terminal_replay_261(n, &booking)?
     } else {
         None
     };
-    let roster = fleet_roster(&fleet, &booking, closed_replay.is_some())?;
+    if closed_replay.is_some() {
+        released_replays.insert(261, REPLAY_261);
+    }
+    let roster = fleet_roster(&fleet, &booking, &released_replays)?;
+    let epoch = if suffix.is_some() { 226 } else { EPOCH };
     let missing: Vec<_> = fleet["inventory"]["entries"]
         .as_array()
         .context("Foundation inventory")?
         .iter()
-        .filter(|row| row["epoch"] == EPOCH)
+        .filter(|row| row["epoch"] == epoch)
         .collect();
     ensure!(
         missing.len() == 1 && missing[0]["state"] == "missing",
-        "epoch 262 inventory no longer missing"
+        "epoch {epoch} inventory no longer missing"
     );
     let booked: BTreeSet<String> = booking["owners"]
         .as_object()
@@ -500,34 +596,36 @@ fn measure(
         .keys()
         .cloned()
         .collect();
-    let mut expected = booked.clone();
-    let reserved_audit_memory = if let Some(quote) = &quote {
+    let mut released_units: BTreeSet<_> = released_replays.into_values().collect();
+    if suffix.is_some() {
+        released_units.insert(BROKER_226);
+    }
+    let closed_audit = quote.as_ref().map(|_| closed_audit()).transpose()?;
+    let reserved_audit_memory = if let Some((_, invocation)) = &closed_audit {
         let audit = AUXILIARY[1];
         let reservation = &booking["owners"][audit];
         let current = n.show_fields(audit, "ActiveState,MainPID,InvocationID,ControlGroup,Job")?;
         ensure!(
-            expected.remove(audit)
-                && reservation["InvocationID"] == quote.closed_audit_invocation
+            reservation["InvocationID"] == *invocation
                 && current["ActiveState"] == "inactive"
                 && current["MainPID"] == "0"
-                && matches!(current["InvocationID"].as_str(), Some(id) if id.is_empty() || id == quote.closed_audit_invocation)
+                && matches!(current["InvocationID"].as_str(), Some(id) if id.is_empty() || id == invocation)
                 && current["ControlGroup"] == ""
                 && current["Job"] == "",
             "epoch 148 audit closure no longer matches the booked auxiliary"
         );
+        released_units.insert(audit);
         text(reservation, "MemoryMax")?.parse()?
     } else {
         0
     };
-    if closed_replay.is_some() {
+    let mut expected = booked.clone();
+    for unit in &released_units {
         ensure!(
-            expected.remove(REPLAY_261),
-            "epoch 261 reservation is missing"
+            expected.remove(*unit),
+            "released Foundation reservation {unit} is missing"
         );
     }
-    let released = |unit: &str| {
-        (quote.is_some() && unit == AUXILIARY[1]) || (closed_replay.is_some() && unit == REPLAY_261)
-    };
     let controller_owner = controller.as_ref().map(|c| c.check(n)).transpose()?;
     let held = if controller.as_ref().is_some_and(|c| c.held) {
         Some(held_owner(n)?)
@@ -560,17 +658,20 @@ fn measure(
     let mount = if quote.is_some() {
         ensure!(
             fs::metadata("/home/ubuntu/.jetstreamer-private")?.dev() == device,
-            "epoch 262 full replay output filesystem changed"
+            "Foundation replay output filesystem changed"
         );
         Value::Null
     } else {
         pristine(device)?
     };
     let resources_before = live::resources_at(Path::new(FILESYSTEM))?;
-    let cpus = units::affinity(&json!({"cpu_affinity":(40..48).collect::<Vec<_>>() }))?;
-    let selected = units::parse_cpu_list("40-47")?;
+    let selected = units::parse_cpu_list(if suffix.is_some() { "16-23" } else { "40-47" })?;
+    let cpus = units::affinity(&json!({"cpu_affinity":selected}))?;
     let mut recorded = BTreeMap::new();
-    for unit in booked.iter().filter(|unit| !released(unit)) {
+    for unit in booked
+        .iter()
+        .filter(|unit| !released_units.contains(unit.as_str()))
+    {
         let owner = n.show_fields(unit, OWNER_FIELDS)?;
         let recorded_owner = &booking["owners"][unit];
         for field in [
@@ -591,25 +692,27 @@ fn measure(
         let cap = text(&owner, "MemoryMax")?.parse()?;
         ensure!(
             selected.is_disjoint(&units::parse_cpu_list(text(&owner, "AllowedCPUs")?)?),
-            "epoch 262 CPUs overlap {unit}"
+            "epoch {epoch} CPUs overlap {unit}"
         );
         let memory = live::finite_owner(&owner, unit, text(&owner, "InvocationID")?, cap)?;
         let process_start_ticks = process_ticks(text(&owner, "MainPID")?.parse()?)?;
         recorded.insert(unit.clone(), (owner, memory, process_start_ticks));
     }
     let mut guards = BTreeMap::new();
-    for (epoch, guard) in KNOWN_GUARDS {
-        if epoch == 261 && closed_replay.is_some() {
+    for (guard_epoch, guard) in KNOWN_GUARDS {
+        if (guard_epoch == 226 && suffix.is_some())
+            || (guard_epoch == 261 && closed_replay.is_some())
+        {
             continue;
         }
-        let unit = text(roster[&epoch], "Id")?;
+        let unit = text(roster[&guard_epoch], "Id")?;
         guards.insert(
-            epoch,
+            guard_epoch,
             guard_binding(
                 n,
-                epoch,
+                guard_epoch,
                 guard,
-                &booking["guard_growth"][epoch.to_string()],
+                &booking["guard_growth"][guard_epoch.to_string()],
                 &recorded[unit].0,
                 device,
             )?,
@@ -642,6 +745,9 @@ fn measure(
             "epoch 261 terminal changed during roster binding"
         );
     }
+    if let Some(proof) = suffix {
+        terminal_extract_226(n, &booking, proof)?;
+    }
     for guard in guards.values() {
         let timer = n.show_fields(text(guard, "timer")?, "ActiveState,InvocationID,Unit")?;
         ensure!(
@@ -667,7 +773,7 @@ fn measure(
             } else {
                 mount == pristine(device)?
             },
-        "epoch 262 resources or scratch mount changed"
+        "epoch {epoch} resources or scratch mount changed"
     );
     let delivery_ref = Bound::new(DELIVERY_BOOKING.0, DELIVERY_BOOKING.1);
     let delivery = delivery_ref.sealed()?;
@@ -700,19 +806,22 @@ fn measure(
             capacity::add(sum, num(row, "remaining_upper_bound_bytes")?)
         })?;
     let protected = capacity::add(capacity::add(disk_floor, non_guard_disk)?, growth)?;
-    let (candidate_disk, candidate) = if let Some(quote) = &quote {
-        (
+    let (candidate_disk, candidate) = match &quote {
+        Some(Quote::FullReplay(quote)) => (
             capacity::add(quote.working_disk, DISK_RECEIPTS)?,
             capacity::add(
                 quote.producer_memory,
                 capacity::add(CONTROLLER_MEMORY, 1 << 30)?,
             )?,
-        )
-    } else {
-        (
+        ),
+        Some(Quote::Suffix226(_)) => (
+            capacity::add(SUFFIX_226_CAP, DISK_RECEIPTS)?,
+            capacity::add(SUFFIX_226_CAP, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
+        ),
+        None => (
             DISK_RECEIPTS,
             capacity::add(MEMORY, capacity::add(CONTROLLER_MEMORY, GUARD_MEMORY)?)?,
-        )
+        ),
     };
     let required = capacity::add(protected, candidate_disk)?;
     let free = num(&allocation, "conservative_available_bytes")?
@@ -757,20 +866,71 @@ fn measure(
             )
         })
         .collect();
-    let mut evidence = json!({"schema":"foundation-epoch262-roster-binding-v1","epoch":EPOCH,
+    let schema = if suffix.is_some() {
+        "foundation-epoch226-suffix-roster-binding-v1"
+    } else {
+        "foundation-epoch262-roster-binding-v1"
+    };
+    let mut evidence = json!({"schema":schema,"epoch":epoch,
         "recorded_unix_seconds":now()?,"fleet":fleet_ref,"observer":observer_ref,
         "completion":completion,"booking":booking_ref,"filesystem_device":device,
         "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false});
-    if let Some(quote) = quote {
+    if let Some(Quote::FullReplay(quote)) = &quote {
         evidence["full_replay_quote"] = json!({"sizing_reference":quote.reference,"inputs":quote.inputs,
             "whole_tree_bytes":quote.working_disk,"producer_memory_bytes":quote.producer_memory,
             "receipt_disk_bytes":DISK_RECEIPTS,"control_memory_bytes":CONTROLLER_MEMORY,
-            "guard_memory_bytes":1u64 << 30,"closed_audit":quote.closed_audit,
+            "guard_memory_bytes":1u64 << 30,"closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
             "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay});
+    }
+    if let Some(proof) = suffix {
+        evidence["suffix_quote"] = json!({
+            "completion":proof,"candidate_cap_bytes":SUFFIX_226_CAP,
+            "candidate_memory_max_bytes":SUFFIX_226_CAP,"candidate_cpus":selected,
+            "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
+            "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
+        });
     }
     deny_authority(&mut evidence);
     Ok(evidence)
+}
+
+/// Price the layered Foundation suffix while the caller holds the fleet cadence lock.
+pub fn quote_226_suffix(drain_path: &Path, drain_sha256: &str) -> Result<Value> {
+    use std::os::unix::fs::DirBuilderExt;
+
+    ensure!(
+        unsafe { libc::geteuid() } == 0 && drain_path == Path::new(DRAIN_226),
+        "epoch 226 suffix quote scope"
+    );
+    let proof = Bound::new(drain_path, drain_sha256);
+    let root = Path::new(SUFFIX_226_ROOT).join(format!(
+        "capacity-witness-{}-{}",
+        std::process::id(),
+        mono()?
+    ));
+    trusted_parents(&root)?;
+    fs::DirBuilder::new().mode(0o700).create(&root)?;
+    let mut native = Native {
+        root,
+        counter: 0,
+        deadline: Some(capacity::add(mono()?, 60_000_000)?),
+    };
+    let roster = measure(&mut native, None, Some(Quote::Suffix226(proof.clone())))?;
+    let fit = &roster["capacity"];
+    let suffix = &roster["suffix_quote"];
+    Ok(json!({
+        "epoch":226,"resource_fit":fit["fits"],
+        "disk_shortfall_bytes":fit["disk_shortfall_bytes"],
+        "memory_shortfall_bytes":fit["memory_shortfall_bytes"],
+        "protected_disk_bytes":fit["protected_existing_disk_bytes"],
+        "required_disk_bytes":fit["required_disk_bytes"],
+        "candidate_cap_bytes":suffix["candidate_cap_bytes"],
+        "candidate_memory_max_bytes":suffix["candidate_memory_max_bytes"],
+        "candidate_cpus":suffix["candidate_cpus"],
+        "extraction226_terminal":{"completion":proof},
+        "capacity_witness":native.root,"roster":roster,"publication_authorized":false,
+    }))
 }
 
 pub(crate) fn cadence_lock() -> Result<File> {
@@ -852,7 +1012,8 @@ pub fn run() -> Result<()> {
                 held: false,
             });
     let result = if quote {
-        full_replay_quote().and_then(|quote| measure(&mut native, None, Some(quote)))
+        full_replay_quote()
+            .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote))))
     } else {
         receipt(&mut native, controller)
     };
