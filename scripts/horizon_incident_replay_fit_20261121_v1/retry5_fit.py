@@ -251,7 +251,7 @@ def price(s, native, current, ret, donor, cold168):
            'invalid retained retry4 or retry5 physical booking')
     candidate = native['epoch'] == 168
     retained_floor = donor['native_home_required'] + lag
-    guard_floor = max(native['active168_guard_floor'], (native.get('full170_retry5_stopped') or {}).get('floor', 0))
+    guard_floor = native['active168_guard_floor']
     protected = retained_floor if candidate else max(retained_floor, guard_floor)
     required = protected + current['remaining_bytes']
     available = donor['native_home_available']

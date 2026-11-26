@@ -57,7 +57,7 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v3",
 )
 FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
-FULL170_STOPPED_RETRY5 = HERE == D / "tools-homefloor-170-full-metered-independent-v4"
+FULL170_STOPPED_RETRY5 = HERE == D / "tools-homefloor-170-full-metered-independent-v5"
 FULL170_INDEPENDENT = FULL170_STOPPED_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-independent-v1"
 FULL170_RETRY5 = FULL170_RETRY5_V10 or FULL170_INDEPENDENT or HERE == D / "tools-homefloor-170-full-metered-v6"
 FULL170_V13 = FULL170_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-v5"

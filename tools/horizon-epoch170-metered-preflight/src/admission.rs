@@ -15,7 +15,7 @@ const FULL170_RETRY5_V10: &str =
 const FULL170_INDEPENDENT: &str =
     "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v1";
 const FULL170_AFTER_STOP: &str =
-    "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v4";
+    "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v5";
 const RETRY5_UNIT: &str = "horizon-qualify-168-full-metered-cold-v5-20261125.service";
 const RETRY5_TIMER: &str = "horizon-guard-168-full-metered-cold-v5-20261125.timer";
 const V12_REGISTRATION: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json";
@@ -363,7 +363,9 @@ fn check_retry5_price(price: &Value, fleet: &Value) -> Result<()> {
                     && timer["InvocationID"] == "",
                 "epoch 170 lost the stopped retry5 budget"
             );
-            check_retry5_budget(price, floor)?;
+            // The stopped guard's recorded floor describes its history.
+            // Its remaining physical reservation is still charged below.
+            check_retry5_budget(price, 0)?;
         }
         return Ok(());
     }
@@ -402,7 +404,7 @@ fn check_retry5_price(price: &Value, fleet: &Value) -> Result<()> {
     );
     let floor = number(owner, "floor")?;
     ensure!(
-        number(price, "active168_guard_floor")? == floor,
+        floor > 0 && number(price, "active168_guard_floor")? == floor,
         "different live retry5 floor"
     );
     check_retry5_budget(price, floor)
@@ -421,7 +423,6 @@ fn check_retry5_budget(price: &Value, floor: u64) -> Result<()> {
         0 < zero
             && zero <= base
             && base <= donor
-            && floor > 0
             && number(retry5, "retained_guard_floor_bytes")? == floor
             && number(retry5, "retained_base_HOME_bytes")? == donor
             && number(retry5, "candidate_remaining_bytes")? == growth
