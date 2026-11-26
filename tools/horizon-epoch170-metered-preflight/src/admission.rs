@@ -12,6 +12,8 @@ const FULL170_V13: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-f
 const FULL170_RETRY5: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v6";
 const FULL170_RETRY5_V10: &str =
     "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v7";
+const FULL170_INDEPENDENT: &str =
+    "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v1";
 const RETRY5_UNIT: &str = "horizon-qualify-168-full-metered-cold-v5-20261125.service";
 const RETRY5_TIMER: &str = "horizon-guard-168-full-metered-cold-v5-20261125.timer";
 const V12_REGISTRATION: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json";
@@ -27,6 +29,7 @@ const RETRY5_SHA: &str = "906eabc8de4ead288fcae3b514daff4a18786fd9e7200ff8fbbac6
 const RETRY4_STOP_SHA: &str = "b0538a4dee05df924a8d04f8562866df701c03996498963552a932059826cdab";
 const V9_PHASE: &str = "v9-semantic-complete-drained";
 const V10_PHASE: &str = "v10-semantic-complete-drained";
+const INDEPENDENT_PHASE: &str = "independent-semantic-complete-v10-drained";
 
 const HOST_MEMORY_WITH_RESERVE: u64 = 810_658_050_048;
 const HOST_CPU_MICROS: u64 = 64_000_000;
@@ -121,6 +124,58 @@ fn validate_verifier_phase(owner: &VerifierCompletion, phase: &Value) -> Result<
     check_verifier_completion(owner, phase, &bound(&phase["completion"], 0)?)
 }
 
+fn validate_independent_phase(package: &Path, phase: &Value) -> Result<()> {
+    let selection = &phase["selection"];
+    ensure!(
+        selection["path"] == json!(package.join("independent145-selection.json"))
+            && phase["stage"] == INDEPENDENT_PHASE
+            && phase["Id"] == "horizon-holding-export145-20261121-v1.service"
+            && phase["MainPID"] == "0"
+            && phase["previous_verifier_invocation_id"] == V10_COMPLETION.invocation
+            && phase["resource_credit_bytes"] == 0,
+        "incomplete independent epoch 145 handback"
+    );
+    let selection = bound(selection, 0)?;
+    let terminal = &phase["semantic_receipt"];
+    let (root, invocation) = match selection["candidate"].as_str() {
+        Some("four") => (
+            rt("epoch145-parallel-full-verification-20261126-v1"),
+            "cb3313b857d94b9f82e06d5c033c0ac5",
+        ),
+        Some("scaled") => (
+            rt("epoch145-parallel-full-verification-20261126-v1/scaled-candidate-v1"),
+            "a89c1de125694cb3bdcef19a8c82848a",
+        ),
+        _ => bail!("unknown independent epoch 145 verification"),
+    };
+    ensure!(
+        selection["schema"] == "horizon-epoch146-independent-145-selection-v1"
+            && selection["terminal"] == *terminal
+            && terminal["path"] == json!(root.join("INDEPENDENT_TERMINAL_ACCEPTED.json"))
+            && phase["completed_invocation_id"] == invocation
+            && phase["native_handback"]["stopped"]
+                .as_str()
+                .is_some_and(|s| !s.is_empty()),
+        "different independent epoch 145 terminal selection"
+    );
+    let receipt = bound(terminal, 0)?;
+    let report = &receipt["report"];
+    ensure!(
+        receipt["schema"] == "horizon-epoch145-independent-terminal-acceptance-v1"
+            && receipt["epoch"] == 145
+            && receipt["native"]["InvocationID"] == invocation
+            && receipt["native"]["ExecMainStatus"] == "0"
+            && report["invocation_id"] == invocation
+            && report["archive_sha256"]
+                == "df194137df5de51ae628160854cabafc9e180b4e7058cab3fba6aac4621a7b4d"
+            && report["source_tail_verified"] == true
+            && report["verified_canonical_slots"] == 432000
+            && receipt["r2_mutations"] == false,
+        "independent epoch 145 result does not prove the exact frozen archive"
+    );
+    Ok(())
+}
+
 fn validate_v13_actor(active: &Value, previous: &Value) -> Result<()> {
     let old = &previous["new"];
     let actor = &active["new"];
@@ -192,11 +247,16 @@ fn drained_provider(price: &Value, enrollment: &Value) -> Result<Option<PathBuf>
     let v13 = incumbent["path"] == json!(rt(V13_REGISTRATION));
     let retry5 = !price["full170_retry5_owner"].is_null();
     let v10 = phase["stage"] == V10_PHASE;
-    let package = rt(match (v13, retry5, v10) {
-        (true, true, true) => FULL170_RETRY5_V10,
-        (true, true, false) => FULL170_RETRY5,
-        (true, false, _) => FULL170_V13,
-        _ => FULL170_V9,
+    let independent = phase["stage"] == INDEPENDENT_PHASE;
+    let package = rt(if independent {
+        FULL170_INDEPENDENT
+    } else {
+        match (v13, retry5, v10) {
+            (true, true, true) => FULL170_RETRY5_V10,
+            (true, true, false) => FULL170_RETRY5,
+            (true, false, _) => FULL170_V13,
+            _ => FULL170_V9,
+        }
     });
     let receipt = package.join("deployment-seal-receipt.json");
     let program = package.join("post-stop-fit");
@@ -204,15 +264,22 @@ fn drained_provider(price: &Value, enrollment: &Value) -> Result<Option<PathBuf>
         && incumbent["path"] != json!(rt(V12_REGISTRATION))
         && phase["stage"] != V9_PHASE
         && !v10
+        && !independent
         && !retry5
-        && ![FULL170_V9, FULL170_V13, FULL170_RETRY5, FULL170_RETRY5_V10]
-            .iter()
-            .any(|route| capture["program"]["path"] == json!(rt(route).join("post-stop-fit")))
+        && ![
+            FULL170_V9,
+            FULL170_V13,
+            FULL170_RETRY5,
+            FULL170_RETRY5_V10,
+            FULL170_INDEPENDENT,
+        ]
+        .iter()
+        .any(|route| capture["program"]["path"] == json!(rt(route).join("post-stop-fit")))
     {
         return Ok(None);
     }
     ensure!(
-        (!v10 || v13 && retry5)
+        (!(v10 || independent) || v13 && retry5)
             && (v13 || !retry5 && *incumbent == reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA))
             && capture["program"]["path"] == json!(program)
             && capture["deployment"]["path"] == json!(receipt)
@@ -370,6 +437,9 @@ pub(super) fn validate_drained_price(price: &Value, enrollment: &Value) -> Resul
                 "retry5 producer or guard timer changed after joint pricing"
             );
         }
+    }
+    if package == rt(FULL170_INDEPENDENT) {
+        return validate_independent_phase(&package, phase);
     }
     let owner = if package == rt(FULL170_RETRY5_V10) {
         &V10_COMPLETION
@@ -637,6 +707,7 @@ pub(super) fn quote(
         "full170-v9-v13" => rt(FULL170_V13),
         "full170-v9-v13-retry5" => rt(FULL170_RETRY5),
         "full170-v10-v13-retry5" => rt(FULL170_RETRY5_V10),
+        "full170-independent-v13-retry5" => rt(FULL170_INDEPENDENT),
         _ => bail!("unknown epoch 170 capacity provider deployment"),
     };
     let sealed = reference(
@@ -672,7 +743,8 @@ pub(super) fn quote(
         | "full170-v9"
         | "full170-v9-v13"
         | "full170-v9-v13-retry5"
-        | "full170-v10-v13-retry5" => {
+        | "full170-v10-v13-retry5"
+        | "full170-independent-v13-retry5" => {
             command.arg("--full170=prestart");
         }
         _ => {}
@@ -776,6 +848,7 @@ mod tests {
             (FULL170_V13, V9_PHASE, &v13, &v12),
             (FULL170_RETRY5, V9_PHASE, &v13, &v12),
             (FULL170_RETRY5_V10, V10_PHASE, &v13, &v12),
+            (FULL170_INDEPENDENT, INDEPENDENT_PHASE, &v13, &v12),
         ] {
             let dir = rt(package);
             let mut native = json!({"phase145":{"stage":phase}, "recorded_unix_seconds":1,
@@ -783,12 +856,20 @@ mod tests {
                     "program":{"path":dir.join("post-stop-fit")},
                     "deployment":{"path":dir.join("deployment-seal-receipt.json")},
                     "source_epoch":145,"recorded_unix_seconds":1}}});
-            if matches!(package, FULL170_RETRY5 | FULL170_RETRY5_V10) {
+            if matches!(
+                package,
+                FULL170_RETRY5 | FULL170_RETRY5_V10 | FULL170_INDEPENDENT
+            ) {
                 native["full170_retry5_owner"] = json!({"fixture": true});
             }
             assert_eq!(drained_provider(&native, exact).unwrap(), Some(dir));
             assert!(drained_provider(&native, foreign).is_err());
             assert!(drained_provider(&native, &Value::Null).is_err());
+            if phase == INDEPENDENT_PHASE {
+                let mut without_retry5 = native.clone();
+                without_retry5["full170_retry5_owner"] = Value::Null;
+                assert!(drained_provider(&without_retry5, exact).is_err());
+            }
             native["phase145"]["stage"] = json!(if phase == V10_PHASE {
                 V9_PHASE
             } else {

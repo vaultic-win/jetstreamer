@@ -28,7 +28,11 @@ OWNER_FIELDS = ("Id", "MainPID", "InvocationID", "ControlGroup", "ActiveState", 
                 "NRestarts", "MemoryMax", "CPUQuotaPerSecUSec", "MemorySwapMax")
 TIMER_FIELDS = ("Id", "InvocationID", "ActiveState", "SubState", "Triggers", "Job",
                 "Requisite", "After", "StopPropagatedFrom")
-V13_DRAINED_PHASES = ("v9-semantic-complete-drained", "v10-semantic-complete-drained")
+V13_DRAINED_PHASES = (
+    "v9-semantic-complete-drained",
+    "v10-semantic-complete-drained",
+    "independent-semantic-complete-v10-drained",
+)
 
 sys.path.insert(0, str(EVIDENCE))
 from evidence import bound, checked, need

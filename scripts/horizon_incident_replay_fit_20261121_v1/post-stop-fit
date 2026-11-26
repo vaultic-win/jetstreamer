@@ -57,7 +57,8 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v3",
 )
 FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
-FULL170_RETRY5 = FULL170_RETRY5_V10 or HERE == D / "tools-homefloor-170-full-metered-v6"
+FULL170_INDEPENDENT = HERE == D / "tools-homefloor-170-full-metered-independent-v1"
+FULL170_RETRY5 = FULL170_RETRY5_V10 or FULL170_INDEPENDENT or HERE == D / "tools-homefloor-170-full-metered-v6"
 FULL170_V13 = FULL170_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-v5"
 FULL170_V9 = FULL170_V13 or HERE == D / "tools-homefloor-170-full-metered-v3"
 FULL170 = FULL170_V9 or HERE == D / "tools-homefloor-170-full-metered-v1"
@@ -219,7 +220,7 @@ if RETRY5_168 or FULL170_V9:
     retry5_bundle, retry5_seal = s.read(HERE / "deployment-seal-receipt.json")
     loader["load_package"](HERE, retry5_seal["sha256"])
     retry5_fit = runpy.run_path(str(HERE / "retry5_fit.py"))
-if INDEPENDENT_ENTRY146 or INDEPENDENT_RETRY5_FIT:
+if INDEPENDENT_ENTRY146 or INDEPENDENT_RETRY5_FIT or FULL170_INDEPENDENT:
     independent145_entry146 = runpy.run_path(str(HERE / "independent145_entry146.py"))
     independent_selection, = [member for member in retry5_bundle["members"]
                               if member["name"] == independent145_entry146["SELECT"] and member["mode"] == "0444"]
@@ -782,6 +783,9 @@ def phase145(epoch, fleet=None):
         return independent145_entry146["phase"](s, fit, HERE, independent_selection["sha256"])
     if INDEPENDENT_RETRY5_FIT:
         s.need(epoch == 168, "independent 145 handoff is reserved for the epoch 168 replay price")
+        return independent145_entry146["phase"](s, fit, HERE, independent_selection["sha256"])
+    if FULL170_INDEPENDENT:
+        s.need(epoch == 145, "wrong source epoch for the independent full epoch 170 price")
         return independent145_entry146["phase"](s, fit, HERE, independent_selection["sha256"])
     if FULL170_V9:
         generation = "V10" if FULL170_RETRY5_V10 else "V9"
