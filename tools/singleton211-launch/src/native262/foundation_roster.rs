@@ -2,7 +2,7 @@
 use super::*;
 mod allocation;
 mod focused;
-use focused::{GAP_230, LOADER_296, RESTORE_258, SCOPES, TRACE_296};
+use focused::{FEATURE_296, GAP_230, LOADER_296, RESTORE_258, SCOPES, TRACE_296};
 mod vote_boundary;
 
 const FLEET_ROOT: &str = "/home/ubuntu/.codex/diagnostics";
@@ -1651,6 +1651,7 @@ pub fn run() -> Result<()> {
                         | "--focused258-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
+                        | "--feature296-quote"
                         | "--suffix226-preview"
                 )
             ) =>
@@ -1664,7 +1665,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused296-quote, --trace296-quote or --suffix226-preview"
+            "use --as-controller UNIT, --full-replay-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
         ),
     };
     let synchronize = match args.next() {
@@ -1718,6 +1719,7 @@ pub fn run() -> Result<()> {
                         | "--focused258-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
+                        | "--feature296-quote"
                 )
             ) =>
         {
@@ -1725,6 +1727,7 @@ pub fn run() -> Result<()> {
                 Some("--focused230-quote") => &GAP_230,
                 Some("--focused258-quote") => &RESTORE_258,
                 Some("--trace296-quote") => &TRACE_296,
+                Some("--feature296-quote") => &FEATURE_296,
                 _ => &LOADER_296,
             };
             spec.preflight()

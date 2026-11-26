@@ -84,7 +84,18 @@ TRACE_296 = Scope(
     "6e8be02054f2d53f51636239e2372572892dd8571f318c9af5342c2f2fe22b3f",
     173_207_977_984, 112 << 30, 64 << 20, "56-63",
 )
-SCOPED_ARGS = {"--epoch230": GAP_230, "--epoch258": RESTORE_258, "--trace296": TRACE_296}
+FEATURE_296 = Scope(
+    296, V / "horizon296-feature-account-v4",
+    "horizon-qualify-296-feature-account-v4.service", "horizon-296-feature-account-protective-v4.service",
+    "epoch296-private-feature-account-qualification", "foundation-epoch296-replay-roster-binding-v1",
+    "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
+    "76227fad5187badf638fff0220a12499f7133de851400e7b770fba712fdf05f7",
+    173_207_977_984, 112 << 30, 64 << 20, "56-63",
+)
+SCOPED_ARGS = {
+    "--epoch230": GAP_230, "--epoch258": RESTORE_258,
+    "--trace296": TRACE_296, "--feature296": FEATURE_296,
+}
 
 
 def current_fit(kit, roster, root, scope):

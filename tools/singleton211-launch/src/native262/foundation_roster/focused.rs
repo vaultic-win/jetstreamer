@@ -91,7 +91,31 @@ pub(super) const TRACE_296: Focused = Focused {
     profile_sha: "a65a727024c8cc64796ce89daf0fe0ec134117a20907a8fa030526e1cfe7a073",
 };
 
-pub(super) const SCOPES: [&Focused; 4] = [&GAP_230, &RESTORE_258, &LOADER_296, &TRACE_296];
+pub(super) const FEATURE_296: Focused = Focused {
+    epoch: 296,
+    unit: "horizon-qualify-296-feature-account-v4.service",
+    guard: "horizon-296-feature-account-protective-v4",
+    cpus: "56-63",
+    scratch_cap: 112 << 30,
+    receipt_disk: 64 << 20,
+    producer_memory: 173_207_977_984,
+    root: "/home/ubuntu/.jetstreamer-private/qualification-296-feature-account-v4",
+    first: 127_953_994,
+    last: 127_961_108,
+    kind: "epoch296-private-feature-account-qualification",
+    preflight_schema: "foundation-epoch296-feature-account-preflight-v4",
+    state: "/var/lib/jetstreamer/horizon296-feature-account-v4",
+    preflight_sha: "76227fad5187badf638fff0220a12499f7133de851400e7b770fba712fdf05f7",
+    profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
+};
+
+pub(super) const SCOPES: [&Focused; 5] = [
+    &GAP_230,
+    &RESTORE_258,
+    &LOADER_296,
+    &TRACE_296,
+    &FEATURE_296,
+];
 
 impl Focused {
     pub(super) fn quote_key(&self) -> String {
