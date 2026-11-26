@@ -66,6 +66,12 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon261-native-input-tmpfs-20261120-v1/horizon261-native-input",
                 "b657cbaa98f543bb40fd9d01786ae0747ef30f4d2ed4727d81469461ea02d899",
             ),
+            262 => (
+                "horizon-262-native-input-20261126-v1.service",
+                cold262::ROOT,
+                "/var/lib/jetstreamer/horizon262-native-input-tmpfs-20261126-v1/horizon262-native-input",
+                "6b14b1ec1a5a5db6b3fb4d216cb75d882366a77ef7bd913ce1926eda97939a72",
+            ),
             265 => (
                 "horizon-265-native-input-20261119-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1",
@@ -159,7 +165,7 @@ fn identity(u: &UnitObservation, n: &NativeConfig) -> Result<()> {
         rss["census_stable"] == true
             && rss["error"].is_null()
             && rss["processes"].as_array().is_some_and(|v| {
-                if matches!(n.epoch, 212 | 257 | 261 | 265 | 266) {
+                if matches!(n.epoch, 212 | 257 | 261 | 262 | 265 | 266) {
                     (1..=2).contains(&v.len())
                         && v.iter().filter(|p| p["pid"] == n.main_pid).count() == 1
                 } else {
@@ -246,7 +252,7 @@ fn same_file(a: &fs::Metadata, b: &fs::Metadata) -> bool {
         && a.mtime_nsec() == b.mtime_nsec()
 }
 fn bootstrap_child(n: &NativeConfig, u: &UnitObservation) -> Result<Value> {
-    if !matches!(n.epoch, 212 | 257 | 261 | 265 | 266) {
+    if !matches!(n.epoch, 212 | 257 | 261 | 262 | 265 | 266) {
         return Ok(Value::Null);
     }
     let rss = serde_json::to_value(&u.rss)?;
@@ -363,12 +369,25 @@ mod cold261 {
     const ROOT_CAP: u64 = 124 << 30;
     include!("native_tmpfs_sample.rs");
 }
+mod cold262 {
+    pub(super) use profile::ROOT;
+    mod profile {
+        pub(crate) const ROOT: &str = "/run/horizon262-native-cold-v1";
+        pub(super) const FILESYSTEM: &str = "/var/lib/jetstreamer";
+    }
+    mod tmpfs {
+        include!("../../tools/horizon262-native-input/src/tmpfs.rs");
+    }
+    const ROOT_CAP: u64 = 124 << 30;
+    include!("native_tmpfs_sample.rs");
+}
 fn scratch_sample(n: &NativeConfig) -> Result<(Value, u64)> {
     match n.epoch {
         266 if n.unit==capped266::UNIT => return capped266::sample(n),
         266 => return cold266::sample(n),
         212 => return cold212::sample(n),
         261 => return cold261::sample(n),
+        262 => return cold262::sample(n),
         _ => (),
     }
     let scan = scan_scratch(&n.scratch_path)?;
@@ -433,7 +452,7 @@ fn observe(n: &NativeConfig) -> Result<Value> {
         serde_json::json!({"range":format!("{}-{}",n.epoch,n.epoch),"resource_only":true,"native_input_diagnostic":true,
         "controller_before":before,"producer_before":before,"controller_after":after,"producer_after":after,
         "native_main_before":mapped_before,"native_main_after":mapped_after,"native_child_before":child_before,"native_child_after":child_after,"scratch_path":n.scratch_path,
-        "scratch_measurement_method":if matches!(n.epoch, 212 | 261 | 266) {"dedicated tmpfs superblock"} else {"two race-tolerant non-symlink-following physical-block scans"},
+        "scratch_measurement_method":if matches!(n.epoch, 212 | 261 | 262 | 266) {"dedicated tmpfs superblock"} else {"two race-tolerant non-symlink-following physical-block scans"},
         "scratch_pass_1":first,"scratch_pass_2":second,"conservative_observed_physical_bytes":first_bytes.max(second_bytes),
         "invocation_binding_stable":true,"useful_work":{"sufficient_for_rates":false,"entry_progress_observed":false},
         "entry_replay":false,"native_input_qualified":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
@@ -599,6 +618,27 @@ mod tests {
         assert_eq!(unavailable["entry_replay"], false);
         assert_eq!(unavailable["ordinary_replay_claim"], false);
     }
+
+    #[test]
+    fn native262_uses_its_own_bootstrap_tuple() {
+        let mut config = serde_json::from_value::<NativeConfig>(json!({
+            "epoch": 262,
+            "unit": "horizon-262-native-input-20261126-v1.service",
+            "expected_invocation_id": "a".repeat(32),
+            "main_pid": 42,
+            "scratch_path": "/run/horizon262-native-cold-v1",
+            "executable": "/var/lib/jetstreamer/horizon262-native-input-tmpfs-20261126-v1/horizon262-native-input",
+            "executable_sha256": "6b14b1ec1a5a5db6b3fb4d216cb75d882366a77ef7bd913ce1926eda97939a72"
+        }))
+        .unwrap();
+        config.validate().unwrap();
+        let unavailable = row(&config, Err(anyhow!("epoch 262 bootstrap inactive")));
+        assert_eq!(unavailable["range"], "262-262");
+        assert_eq!(unavailable["ordinary_replay_claim"], false);
+        config.scratch_path = "/run/horizon261-native-cold-v1".into();
+        assert!(config.validate().is_err());
+    }
+
     #[test]
     fn native265_tuple_is_closed_and_unavailable_never_claims_replay() {
         let good = json!({"epoch":265,"unit":"horizon-265-native-input-20261119-v1.service","expected_invocation_id":"a".repeat(32),"main_pid":42,
