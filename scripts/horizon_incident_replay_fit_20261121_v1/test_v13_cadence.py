@@ -11,6 +11,7 @@ from unittest.mock import Mock
 HERE = Path(__file__).resolve().parent
 ROUTE = runpy.run_path(str(HERE/'retry4_status.py'))
 CAPACITY = runpy.run_path(str(HERE/'full170_capacity.py'))
+RETRY5 = runpy.run_path(str(HERE/'retry5_fit.py'))
 
 
 def ref(path, sha='a'*64):
@@ -140,6 +141,43 @@ class V13Cadence(unittest.TestCase):
         self.ready['retry5_generation'] = ref(self.v13/'retry5-168-generation.json', 'c'*64)
         with self.assertRaisesRegex(ValueError, 'retry5 generation or retained stop'):
             self.rejoin()
+
+
+class JointReplayPrice(unittest.TestCase):
+    def setUp(self):
+        self.scope = SimpleNamespace(need=need)
+        self.gib = 1 << 30
+        self.cold168 = dict(CAP=512 * self.gib, OUTSIDE_CAP_STOP_ALLOWANCE=8 * self.gib)
+
+    def quote(self, guard, available, donor_margin):
+        g = self.gib
+        native = dict(epoch=145, fits=True, active168_guard_floor=guard * g,
+                      full170_retry5_owner=dict(floor=guard * g),
+                      complete_required_HOME_bytes=120 * g,
+                      full170_zero_remaining_native_HOME_bytes=97 * g,
+                      stopped_cold168=dict(measured_physical_bytes=289 * g, terminal=ref('/stop')),
+                      bookings={'168': dict(physical_bytes=288 * g, remaining_bytes=0)},
+                      retry5_retained_source=ref('/retained'),
+                      full170_retry5_current=dict(physical_bytes=492 * g, remaining_bytes=20 * g),
+                      epoch159_donor_cover=dict(native_home_required=130 * g,
+                                               native_home_available=available * g,
+                                               remaining_home_bytes=donor_margin * g))
+        return RETRY5['price170'](self.scope, native, self.cold168)
+
+    def test_current_and_zero_floors_include_donor_guard_and_retry5_once(self):
+        quote = self.quote(136, 161, 31)
+        self.assertTrue(quote['fits'])
+        self.assertEqual(quote['complete_required_HOME_bytes'], 158 * self.gib)
+        self.assertEqual(quote['full170_zero_remaining_native_HOME_bytes'], 156 * self.gib)
+        self.assertEqual(quote['epoch159_donor_cover']['native_home_required'], 158 * self.gib)
+        self.assertEqual(quote['epoch159_donor_cover']['remaining_home_bytes'], 3 * self.gib)
+        self.assertEqual(quote['bookings']['168']['remaining_bytes'], 20 * self.gib)
+        quote = self.quote(100, 161, 31)
+        self.assertEqual(quote['full170_zero_remaining_native_HOME_bytes'], 135 * self.gib)
+
+    def test_joint_growth_must_fit_both_native_home_and_donor_budget(self):
+        self.assertFalse(self.quote(136, 157, 31)['fits'])
+        self.assertFalse(self.quote(136, 161, 27)['fits'])
 
 
 if __name__ == '__main__':

@@ -91,6 +91,33 @@ def retained(s, fit, fleet, cold168):
     return stop, source
 
 
+def protected_owner(s, cold168, fleet, actor):
+    """Require the exact admitted retry5 worker in the coordinated replay census."""
+    rows = [row for row in fleet['actual_executing_replays'] if row['epoch'] == 168]
+    s.need(actor is not None and len(rows) == 1 and len(actor['processes']) == 2
+           and actor['admission'] is not None, 'full epoch 170 requires a protected retry5 worker')
+    row, = rows
+    unit, invocation = actor['producer_unit'], actor['producer_invocation_id']
+    producer, worker = actor['processes']
+    first, first_ref = s.read(R / cold168['DIRECTORY'] / 'FIRST_PROTECTED_WORKER.json')
+    s.need(unit == cold168['UNIT'] == row['unit']['Id'] == first['producer_unit']
+           and invocation == row['unit']['InvocationID'] == first['producer_invocation_id']
+           and producer[:2] == [int(row['unit']['MainPID']), row['start_ticks']]
+           == [first['producer_pid'], first['start_ticks']]
+           and worker[:2] == [first['worker_pid'], first['worker_start_ticks']]
+           and first['worker_sha256'] == cold168['WORKER_SHA']
+           and actor['admission'] == row['admission'] == first['admission']
+           and first['observer_row'] == row['observer_config']
+           and row['guard_timer']['Id'] == actor['timer']
+           and row['guard_timer']['InvocationID'] == actor['timer_invocation_id']
+           == first['worker_guard']['timer']['InvocationID'],
+           'full epoch 170 retry5 owner differs from its protected fleet row')
+    return {**{key: actor[key] for key in ('producer_unit', 'producer_invocation_id', 'producer_pid',
+                                          'start_ticks', 'admission', 'plan', 'timer',
+                                          'timer_invocation_id', 'floor', 'processes')},
+            'first_worker': first_ref}
+
+
 def donor_cover(s, donor, before, native, fleet, *, registered_writer=None):
     """Price the paid donor with the V12 roster while retaining all old claims."""
     after = donor['snapshot']()
@@ -234,3 +261,33 @@ def price166(s, native, current, ret, donor, cold168):
         funded_zero_remaining_HOME_bytes=zero_with_retry5,
     )
     return quote
+
+
+def price170(s, native, cold168):
+    """Apply retry5 to both 170 projections after the donor and holding price."""
+    base = native['complete_required_HOME_bytes']
+    zero = native['full170_zero_remaining_native_HOME_bytes']
+    donor = native['epoch159_donor_cover']
+    donor_home = donor['native_home_required']
+    s.need(0 < zero <= base <= donor_home, 'inconsistent epoch 170 donor projections')
+    owner = native['full170_retry5_owner']
+    s.need(owner['floor'] == native['active168_guard_floor'] > 0,
+           'missing retry5 absolute floor from the native price')
+    current = native.pop('full170_retry5_current')
+    retained = native['bookings']['168']
+    price(s, native, current, retained, donor, cold168)
+    retry5 = native['retry5_complete_booking']
+    required = native['complete_required_HOME_bytes']
+    joint_zero = (max(zero + donor_home - base + retry5['outside_cap_stop_allowance_bytes'],
+                      owner['floor']) + current['remaining_bytes'])
+    remaining = donor['remaining_home_bytes'] - (required - donor_home)
+    native.update(full170_zero_remaining_native_HOME_bytes=joint_zero,
+                  epoch159_donor_cover=dict(donor, native_home_required=required,
+                                           remaining_home_bytes=max(0, remaining)),
+                  fits=native['fits'] and remaining >= 0,
+                  full170_retry5_projection=dict(native_current_HOME_bytes=base,
+                                                 native_zero_remaining_HOME_bytes=zero,
+                                                 donor_HOME_bytes=donor_home,
+                                                 funded_current_HOME_bytes=required,
+                                                 funded_zero_remaining_HOME_bytes=joint_zero))
+    return native

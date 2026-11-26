@@ -9,6 +9,9 @@ const V5W: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-v5v-custo
 const FULL170: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v1";
 const FULL170_V9: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v3";
 const FULL170_V13: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v5";
+const FULL170_RETRY5: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v6";
+const RETRY5_UNIT: &str = "horizon-qualify-168-full-metered-cold-v5-20261125.service";
+const RETRY5_TIMER: &str = "horizon-guard-168-full-metered-cold-v5-20261125.timer";
 const V9_IID: &str = "ebdfc34db47c4e7699ea5ccbada5d604";
 const V9_HANDOFF: &str = "epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff";
 const V9_CHECKER: &str = "epoch145-semantic-continuity-20261121-v1/tools-v9-census-recovery";
@@ -150,20 +153,26 @@ fn v9_provider(price: &Value, enrollment: &Value) -> Result<Option<PathBuf>> {
     let capture = &price["epoch170_metered_full"]["native_capture_receipt"];
     let incumbent = &enrollment["incumbent_registration"];
     let v13 = incumbent["path"] == json!(rt(V13_REGISTRATION));
-    let package = rt(if v13 { FULL170_V13 } else { FULL170_V9 });
+    let retry5 = !price["full170_retry5_owner"].is_null();
+    let package = rt(match (v13, retry5) {
+        (true, true) => FULL170_RETRY5,
+        (true, false) => FULL170_V13,
+        _ => FULL170_V9,
+    });
     let receipt = package.join("deployment-seal-receipt.json");
     let program = package.join("post-stop-fit");
     if !v13
         && incumbent["path"] != json!(rt(V12_REGISTRATION))
         && phase["stage"] != V9_PHASE
-        && ![FULL170_V9, FULL170_V13]
+        && !retry5
+        && ![FULL170_V9, FULL170_V13, FULL170_RETRY5]
             .iter()
             .any(|route| capture["program"]["path"] == json!(rt(route).join("post-stop-fit")))
     {
         return Ok(None);
     }
     ensure!(
-        (v13 || *incumbent == reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA))
+        (v13 || !retry5 && *incumbent == reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA))
             && capture["program"]["path"] == json!(program)
             && capture["deployment"]["path"] == json!(receipt)
             && capture["source_epoch"] == 145
@@ -171,6 +180,103 @@ fn v9_provider(price: &Value, enrollment: &Value) -> Result<Option<PathBuf>> {
         "epoch 170 V9 quote requires the registered cadence and its matching provider"
     );
     Ok(Some(package))
+}
+
+fn check_retry5_price(price: &Value, fleet: &Value) -> Result<()> {
+    let rows: Vec<_> = fleet["actual_executing_replays"]
+        .as_array()
+        .context("missing current replay roster")?
+        .iter()
+        .filter(|row| row["epoch"] == 168)
+        .collect();
+    let owner = &price["full170_retry5_owner"];
+    if owner.is_null() {
+        ensure!(
+            rows.is_empty(),
+            "epoch 170 price omitted the live retry5 owner"
+        );
+        return Ok(());
+    }
+    let [row] = rows.as_slice() else {
+        bail!("epoch 170 price requires one protected retry5 fleet row");
+    };
+    let peer = &price["replacements"]["168"];
+    ensure!(
+        owner["producer_unit"] == RETRY5_UNIT
+            && row["unit"]["Id"] == RETRY5_UNIT
+            && row["unit"]["InvocationID"] == owner["producer_invocation_id"]
+            && row["start_ticks"] == owner["start_ticks"]
+            && row["admission"] == owner["admission"]
+            && !owner["admission"].is_null()
+            && !owner["first_worker"].is_null()
+            && owner["timer"] == RETRY5_TIMER
+            && row["guard_timer"]["Id"] == RETRY5_TIMER
+            && row["guard_timer"]["InvocationID"] == owner["timer_invocation_id"]
+            && [
+                "producer_unit",
+                "producer_invocation_id",
+                "producer_pid",
+                "start_ticks",
+                "admission",
+                "plan",
+                "timer",
+                "timer_invocation_id",
+                "floor",
+                "processes"
+            ]
+            .iter()
+            .all(|key| peer[*key] == owner[*key])
+            && peer["processes"].as_array().is_some_and(|p| p.len() == 2)
+            && !peer["guard"].is_null(),
+        "different retry5 claimant, admission or guard in epoch 170 price"
+    );
+    let projection = &price["full170_retry5_projection"];
+    let booking = &price["bookings"]["168"];
+    let retry5 = &price["retry5_complete_booking"];
+    let base = number(projection, "native_current_HOME_bytes")?;
+    let zero = number(projection, "native_zero_remaining_HOME_bytes")?;
+    let donor = number(projection, "donor_HOME_bytes")?;
+    let floor = number(owner, "floor")?;
+    let growth = number(booking, "remaining_bytes")?;
+    let lag = number(retry5, "outside_cap_stop_allowance_bytes")?;
+    ensure!(
+        0 < zero
+            && zero <= base
+            && base <= donor
+            && floor > 0
+            && number(price, "active168_guard_floor")? == floor
+            && number(retry5, "retained_guard_floor_bytes")? == floor
+            && number(retry5, "retained_base_HOME_bytes")? == donor
+            && number(retry5, "candidate_remaining_bytes")? == growth
+            && number(booking, "cap_bytes")? == 512 << 30
+            && number(booking, "physical_bytes")?.checked_add(growth) == Some(512 << 30)
+            && lag == 8 << 30,
+        "different retained retry5 allowance or disk floor"
+    );
+    let joint_required = donor
+        .checked_add(lag)
+        .and_then(|v| v.max(floor).checked_add(growth));
+    let joint_zero = (donor - (base - zero))
+        .checked_add(lag)
+        .and_then(|v| v.max(floor).checked_add(growth));
+    ensure!(
+        joint_required == Some(number(projection, "funded_current_HOME_bytes")?)
+            && joint_required == Some(number(retry5, "complete_required_HOME_bytes")?)
+            && joint_required
+                == Some(number(
+                    &price["epoch159_donor_cover"],
+                    "native_home_required"
+                )?)
+            && joint_required
+                == Some(number(
+                    &price["epoch170_metered_full"],
+                    "original_complete_required_home_bytes"
+                )?)
+            && joint_zero == Some(number(projection, "funded_zero_remaining_HOME_bytes")?)
+            && joint_zero == Some(number(price, "full170_zero_remaining_native_HOME_bytes")?),
+        "epoch 170 did not charge retry5 exactly once in both projections"
+    );
+    Ok(())
 }
 
 pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()> {
@@ -189,7 +295,7 @@ pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()>
     ensure!(
         seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
             && seal["destination"] == json!(package)
-            && (package != rt(FULL170_V13) || seal["remote_mutations"] == false)
+            && (package == rt(FULL170_V9) || seal["remote_mutations"] == false)
             && seal["members"].as_array().is_some_and(|rows| rows
                 .iter()
                 .any(|row| row["name"] == "post-stop-fit"
@@ -198,7 +304,7 @@ pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()>
         "epoch 170 V9 quote provider differs from its sealed member"
     );
     image(&capture["program"])?;
-    if package == rt(FULL170_V13) {
+    if package != rt(FULL170_V9) {
         let registration = cadence_registration(&enrollment["incumbent_registration"])?;
         let actor = &registration["incumbent"];
         let quoted = &price["status_registration"];
@@ -210,6 +316,19 @@ pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()>
                     .all(|key| quoted[*key] == actor[*key]),
             "epoch 170 V9 quote belongs to a different V13 writer"
         );
+        check_retry5_price(price, &bound(&price["fleet"], 0)?)?;
+        if package == rt(FULL170_RETRY5) {
+            let owner = &price["full170_retry5_owner"];
+            let producer = properties(RETRY5_UNIT)?;
+            let timer = properties(RETRY5_TIMER)?;
+            ensure!(
+                producer["ActiveState"] == "active"
+                    && producer["InvocationID"] == owner["producer_invocation_id"]
+                    && timer["ActiveState"] == "active"
+                    && timer["InvocationID"] == owner["timer_invocation_id"],
+                "retry5 producer or guard timer changed after joint pricing"
+            );
+        }
     }
     validate_v9_phase(phase)
 }
@@ -470,6 +589,7 @@ pub(super) fn quote(
         "full170" => rt(FULL170),
         "full170-v9" => rt(FULL170_V9),
         "full170-v9-v13" => rt(FULL170_V13),
+        "full170-v9-v13-retry5" => rt(FULL170_RETRY5),
         _ => bail!("unknown epoch 170 capacity provider deployment"),
     };
     let sealed = reference(
@@ -501,7 +621,7 @@ pub(super) fn quote(
         "v10" => {
             command.arg("--hourly170=prestart");
         }
-        "full170" | "full170-v9" | "full170-v9-v13" => {
+        "full170" | "full170-v9" | "full170-v9-v13" | "full170-v9-v13-retry5" => {
             command.arg("--full170=prestart");
         }
         _ => {}
@@ -592,16 +712,76 @@ mod tests {
         let v12 =
             json!({"incumbent_registration":reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA)});
         let v13 = json!({"incumbent_registration":reference(&rt(V13_REGISTRATION), "fixture")});
-        for (package, exact, foreign) in [(FULL170_V9, &v12, &v13), (FULL170_V13, &v13, &v12)] {
+        for (package, exact, foreign) in [
+            (FULL170_V9, &v12, &v13),
+            (FULL170_V13, &v13, &v12),
+            (FULL170_RETRY5, &v13, &v12),
+        ] {
             let dir = rt(package);
-            let native = json!({"phase145":{"stage":V9_PHASE}, "recorded_unix_seconds":1,
+            let mut native = json!({"phase145":{"stage":V9_PHASE}, "recorded_unix_seconds":1,
                 "epoch170_metered_full":{"native_capture_receipt":{
                     "program":{"path":dir.join("post-stop-fit")},
                     "deployment":{"path":dir.join("deployment-seal-receipt.json")},
                     "source_epoch":145,"recorded_unix_seconds":1}}});
+            if package == FULL170_RETRY5 {
+                native["full170_retry5_owner"] = json!({"fixture": true});
+            }
             assert_eq!(v9_provider(&native, exact).unwrap(), Some(dir));
             assert!(v9_provider(&native, foreign).is_err());
             assert!(v9_provider(&native, &Value::Null).is_err());
+        }
+    }
+
+    #[test]
+    fn full170_requires_the_protected_retry5_owner_and_both_charges() {
+        let owner = json!({
+            "producer_unit": RETRY5_UNIT, "producer_invocation_id": "producer", "producer_pid": 21,
+            "start_ticks": 100, "admission": "admission", "first_worker": "first",
+            "plan": "guard-plan", "timer": RETRY5_TIMER, "timer_invocation_id": "timer",
+            "floor": 136u64 << 30, "processes": [[21, 100, 5, 6], [22, 101, 5, 7]],
+            "guard": "guard"
+        });
+        let fleet = json!({"actual_executing_replays": [{"epoch": 168,
+            "unit": {"Id": RETRY5_UNIT, "InvocationID": "producer"}, "start_ticks": 100,
+            "admission": "admission", "guard_timer": {"Id": RETRY5_TIMER, "InvocationID": "timer"}
+        }]});
+        let quote = json!({"full170_retry5_owner": owner, "active168_guard_floor": 136u64 << 30,
+            "replacements": {"168": owner},
+            "bookings": {"168": {"cap_bytes": 512u64 << 30, "physical_bytes": 492u64 << 30,
+                                  "remaining_bytes": 20u64 << 30}},
+            "retry5_complete_booking": {"outside_cap_stop_allowance_bytes": 8u64 << 30,
+                "retained_guard_floor_bytes": 136u64 << 30, "retained_base_HOME_bytes": 130u64 << 30,
+                "candidate_remaining_bytes": 20u64 << 30, "complete_required_HOME_bytes": 158u64 << 30},
+            "full170_retry5_projection": {"native_current_HOME_bytes": 120u64 << 30,
+                "native_zero_remaining_HOME_bytes": 97u64 << 30, "donor_HOME_bytes": 130u64 << 30,
+                "funded_current_HOME_bytes": 158u64 << 30, "funded_zero_remaining_HOME_bytes": 156u64 << 30},
+            "epoch159_donor_cover": {"native_home_required": 158u64 << 30},
+            "epoch170_metered_full": {"original_complete_required_home_bytes": 158u64 << 30},
+            "full170_zero_remaining_native_HOME_bytes": 156u64 << 30
+        });
+        check_retry5_price(&quote, &fleet).unwrap();
+        check_retry5_price(&Value::Null, &json!({"actual_executing_replays": []})).unwrap();
+        assert!(check_retry5_price(&Value::Null, &fleet).is_err());
+        for (path, wrong) in [
+            (
+                "/full170_retry5_owner/producer_invocation_id",
+                json!("other"),
+            ),
+            ("/full170_retry5_owner/timer_invocation_id", json!("other")),
+            ("/replacements/168/plan", json!("other")),
+            ("/bookings/168/remaining_bytes", json!(0)),
+            (
+                "/full170_zero_remaining_native_HOME_bytes",
+                json!(136u64 << 30),
+            ),
+            (
+                "/epoch159_donor_cover/native_home_required",
+                json!(168u64 << 30),
+            ),
+        ] {
+            let mut bad = quote.clone();
+            *bad.pointer_mut(path).unwrap() = wrong;
+            assert!(check_retry5_price(&bad, &fleet).is_err(), "{path}");
         }
     }
 

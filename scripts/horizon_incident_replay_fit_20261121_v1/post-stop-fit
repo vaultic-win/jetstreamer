@@ -56,7 +56,8 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v2",
     D / "tools-homefloor-170-metered-hourly-v3",
 )
-FULL170_V13 = HERE == D / "tools-homefloor-170-full-metered-v5"
+FULL170_RETRY5 = HERE == D / "tools-homefloor-170-full-metered-v6"
+FULL170_V13 = FULL170_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-v5"
 FULL170_V9 = FULL170_V13 or HERE == D / "tools-homefloor-170-full-metered-v3"
 FULL170 = FULL170_V9 or HERE == D / "tools-homefloor-170-full-metered-v1"
 REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
@@ -89,7 +90,7 @@ V7_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v7-build-v1"
 V9_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v9-build-v1"
 V10_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v10-build-v1"
 RETRY5_POST_BUILD_145 = V7_POST_BUILD_145 or V9_POST_BUILD_145 or V10_POST_BUILD_145
-RETRY5_168 = RETRY5_FIT_ROUTE or RETRY5_POST_145 or RETRY5_POST_BUILD_145 or REPRO166_POST_V9
+RETRY5_168 = RETRY5_FIT_ROUTE or RETRY5_POST_145 or RETRY5_POST_BUILD_145 or REPRO166_POST_V9 or FULL170_RETRY5
 STOPPED168_PRICE = FULL170_V9 or RETRY5_168 or STOP_RECOVERY_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
 V6_LIVE_PROVIDER = D / "tools-homefloor-145-v5z-guard-walk-recovery-v1"
@@ -1612,7 +1613,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     terminal168 = None
     retained_retry5 = retry5_fit["retained"](s, fit, f, cold168) if RETRY5_168 else None
     stopped168 = retained_retry5[0] if RETRY5_168 else cold168_guard_stop(f, rows) if STOPPED168_PRICE else None
-    retry5_donor_before = retry5_donor["snapshot"]() if RETRY5_168 else None
+    retry5_donor_before = retry5_donor["snapshot"]() if RETRY5_168 and not FULL170_RETRY5 else None
     if PUBLISH168:
         s.need(epoch == 145 and prestart136 is None, "cold168 provider only prices terminal publication")
         terminal168 = publication168["current"](s, loader["load_package"], f)
@@ -1740,6 +1741,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     floor168=0;resident168=0;guard168=None
     tree_measurement="two complete stopped-tree walks"
     retry5_current = None
+    retry5_owner = None
     if RETRY5_168:
         s.need(closed168 is None and 168 in interrupted and extra is None, "unexpected original 168 settlement")
         run168 = cold168["RUN"]
@@ -1753,6 +1755,12 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
                    (rows[168]["unit"]["Id"], rows[168]["unit"]["InvocationID"]) ==
                    (candidate168["producer_unit"], candidate168["producer_invocation_id"]),
                    "foreign retry5 fleet row")
+        if FULL170_RETRY5:
+            retry5_owner = retry5_fit["protected_owner"](s, cold168, f, candidate168)
+            if full170_mode in ("held", "post-guard"):
+                prestart = bound(hourly170_owner["prestart"])
+                s.need(prestart.get("full170_retry5_owner") == retry5_owner,
+                       "full epoch 170 hold changed the enrolled retry5 owner")
         static = tree_size(s.TREE, cap168, run168)
         s.need(static == tree_size(s.TREE, cap168, run168), "retained retry4 and sibling allocation changed")
         charge = max(static, stopped168["measured_physical_bytes"])
@@ -2000,6 +2008,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if REPRO166:
         s.need(reproduction166_owner(repro166_mode, ref) == repro166, "epoch 166 gate or first guard changed during capture")
         native["reproduction166_owner"] = repro166
+    if FULL170_RETRY5:
+        native.update(full170_retry5_owner=retry5_owner, full170_retry5_current=retry5_current)
+        return native
     if RETRY5_168:
         writer = {"registered_writer": registered_status()} if V13_RETRY5_FIT else {}
         donor = retry5_fit["donor_cover"](s, retry5_donor, retry5_donor_before, native, f, **writer)
@@ -2094,7 +2105,7 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         options = {"v8": True} if V12_RECOVERY_145 else {}
         native["epoch159_donor_cover"] = donor["cover"](before, native, donor["snapshot"](), **options)
         return native
-    if RETRY5_168:
+    if RETRY5_168 and not FULL170_RETRY5:
         s.need(epoch == (168 if RETRY5_FIT_ROUTE else 145) and prestart136 is None,
                "wrong epoch for the sealed retry5 or post provider")
         if REPRO166_POST_V9:
@@ -2176,6 +2187,8 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
                 options["registered_writer"] = status
             if FULL170 and full170_mode == "active":
                 options["full170"] = native["active_full170"]
+            if FULL170_RETRY5:
+                options["retry5_owner"] = native["full170_retry5_owner"]
             native["epoch159_donor_cover"] = donor["cover"](before,donor_price,donor["snapshot"](), **options)
         if REPRO166 or FULL170:
             lane = "166" if REPRO166 else "170"
@@ -2191,6 +2204,12 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
             final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet,
                                                   v9=FULL170_V9, v13=FULL170_V13)
             full170_capacity["unchanged"](s, full170_mode, (actor, guard), final)
+            if FULL170_RETRY5:
+                peer = observe_actor(168, epoch, s.TREE, cold168["RUN"], {})
+                s.need(retry5_fit["protected_owner"](s, cold168, fleet, peer) == native["full170_retry5_owner"]
+                       and peer["guard_time"] >= native["replacements"]["168"]["guard_time"],
+                       "retry5 owner or guard changed during full epoch 170 pricing")
+                retry5_fit["price170"](s, native, cold168)
             measured = guard
             if full170_mode == "active":
                 basis = native["active_full170_guard"]

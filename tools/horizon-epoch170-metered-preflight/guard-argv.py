@@ -85,6 +85,35 @@ def v13_writer(price, enrollment):
          "V13 writer changed before the epoch 170 transition")
 
 
+def protected_retry5(price, now):
+    owner = price.get("full170_retry5_owner")
+    if owner is None:
+        return
+    from owners import show, ticks
+
+    peer = price["replacements"]["168"]
+    sample_path = Path(peer["guard"]["path"])
+    sample = checked(peer["guard"])
+    unit = "horizon-qualify-168-full-metered-cold-v5-20261125.service"
+    timer = "horizon-guard-168-full-metered-cold-v5-20261125.timer"
+    producer, worker = owner["processes"]
+    manager = show(unit, ("Id", "InvocationID", "MainPID", "ActiveState", "NRestarts", "Job"))
+    current = show(timer, ("Id", "InvocationID", "ActiveState", "Job"))
+    need(owner["producer_unit"] == unit and owner["timer"] == timer
+         and manager == dict(Id=unit, InvocationID=owner["producer_invocation_id"],
+                             MainPID=str(producer[0]), ActiveState="active", NRestarts="0", Job="")
+         and current == dict(Id=timer, InvocationID=owner["timer_invocation_id"], ActiveState="active", Job="")
+         and all(ticks(process[0]) == process[1] for process in (producer, worker))
+         and sample["producer_invocation_id"] == owner["producer_invocation_id"]
+         and sample["plan_sha256"] == owner["plan"]["sha256"]
+         and sample["minimum_free_bytes"] == owner["floor"]
+         and sample["producer_stop_enabled"] and sample["trip_reason"] is None
+         and [row[0] for row in sample["workers"]] == [worker[0]]
+         and 0 <= now - sample["recorded_unix_seconds"] <= 90
+         and not any(sample_path.parent.glob("stop-*.json")),
+         "retry5 producer or protective guard changed before the epoch 170 transition")
+
+
 def start_intent(route, review_ref):
     review = checked(review_ref)
     profile = review["profile"]
@@ -105,6 +134,7 @@ def start_intent(route, review_ref):
          and not os.path.lexists(route["PERMIT"]), "epoch 170 start basis differs")
     if price.get("phase145", {}).get("stage") == "v9-semantic-complete-drained":
         v13_writer(price, enrollment)
+    protected_retry5(price, time.time())
     predecessor = bound(PREDECESSOR)
     need(predecessor["sha256"] == PREDECESSOR_SHA, "original epoch 170 stop proof changed")
     return dict(schema="horizon-170-full-metered-start-intent-v1", epoch=170, fleet=fleet_ref,
@@ -219,6 +249,9 @@ def release_record(route, actor, intent, plan_ref, first_ref, post_ref, boot, no
              and stage["observer_enrollment"] == enrollment_ref,
              "epoch 170 post-guard quote changed the enrolled V13 writer")
         v13_writer(post, checked(enrollment_ref))
+    need(post.get("full170_retry5_owner") == pre.get("full170_retry5_owner"),
+         "retry5 ownership differs between epoch 170 prestart and post-guard prices")
+    protected_retry5(post, now)
     return dict(actor, intent=intent_ref, actual_guard_plan=plan_ref, first_guard=first_ref,
                 post_guard_capacity=post_ref, transaction_replay_claimed=False)
 

@@ -176,7 +176,7 @@ def stopped168_writer(status, *, v8):
 
 
 def cover(before, native, after, build_bytes=0, build_ram=0, *,
-          exclusive136=None, full170=None, v8=False, registered_writer=None):
+          exclusive136=None, full170=None, v8=False, registered_writer=None, retry5_owner=None):
     need(before == after and before["invocation_id"] == IID and before["grant_sha256"] == GRANT and
          before["driver_exit"] == EXIT and 0 <= build_bytes <= 104 * MIB and 0 <= build_ram <= 768 * MIB,
          "transition during pricing or unqualified build bound")
@@ -198,6 +198,11 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *,
     if v8:
         need(native["epoch"] == 145 and failed170 and native.get("stopped_cold168"),
              "V8 donor requires the retained epoch 168 and 170 bookings")
+    if retry5_owner is not None:
+        need(v8 and retry5_owner == native["full170_retry5_owner"]
+             and native["retry5_retained_source"]["sha256"]
+             == "488dbd9e630511b97a0ad0704241a0a1fdec71a614caf17c6cd1d3a63b3dc0b2",
+             "joint donor price lacks the authenticated retry5 owner or retained source")
     if failed170:
         failed166 = native.get("failed_cold166")
         running = {167, 168, 172}
@@ -219,7 +224,8 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *,
                  max(0, stopped168["measured_physical_bytes"] - max(book["cap_bytes"], book["physical_bytes"]))
                  and valid_writer,
                  "changed retained epoch 168 booking or cadence")
-            running.remove(168)
+            if retry5_owner is None:
+                running.remove(168)
         if failed166:
             stopped166 = native["bookings"]["166"]
             need(failed166 == fleet["cold166_retry11_write_version_failure"]
@@ -254,6 +260,16 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *,
             measured = booking["measurement"] == "bound full epoch 170 active native guard whole-tree observation"
             active_count = len(rows)
             replay_rows = [row for row in replay_rows if row["epoch"] != 170]
+        if retry5_owner is not None:
+            rows = [row for row in replay_rows if row["epoch"] == 168]
+            peer = native["replacements"]["168"]
+            need(len(rows) == 1 and all(peer[key] == retry5_owner[key] for key in
+                 ("producer_unit", "producer_invocation_id", "admission", "plan",
+                  "timer_invocation_id", "processes", "floor"))
+                 and rows[0]["admission"] == peer["admission"]
+                 and rows[0]["unit"]["Id"] == peer["producer_unit"]
+                 and rows[0]["unit"]["InvocationID"] == peer["producer_invocation_id"],
+                 "different protected retry5 claimant in the donor census")
         need(exclusive136 is None and failed170 == fleet["cold170_retry13_execution_failure"]
              and failed170["reservation_ending_bytes"] == 0
              and fleet["canonical_producer_count"] == len(replay_rows) + active_count == len(running) + active_count
