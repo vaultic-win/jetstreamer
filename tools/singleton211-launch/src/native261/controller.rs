@@ -121,12 +121,21 @@ fn evaluate(
     let valid = remaining.min(60);
     ensure!(valid > 0, "no current owner guard window remains");
     n.check()?;
+    let measured_floor = num(&current["capacity"], "protected_existing_floor_bytes")?;
+    let protected_floor = if EPOCH == 262 && !qualify(r)? {
+        crate::native262::startup_guard_floor(
+            measured_floor,
+            num(&current["capacity"], "observed_available_bytes")?,
+        )?
+    } else {
+        measured_floor
+    };
     let mut value = json!({"schema":ADMISSION_SCHEMA,"epoch":EPOCH,"mode":"native-cold",
         "operation":r["operation"],"unit":UNIT,"guard_unit":GUARD_UNIT,"timer":TIMER,"admitted":true,
         "harness":Bound::new(INPUT,INPUT_SHA),"guard":Bound::new(GUARD,GUARD_SHA),
         "worker":Bound::new(WORKER,WORKER_SHA),"input_packet":Bound::new(PACKET,PACKET_SHA),
         "maximum_memory_bytes":MEMORY,"maximum_root_physical_bytes":ROOT_CAP,"candidate_incremental_peak_bytes":DISK_RECEIPTS,
-        "protected_existing_floor_bytes":current["capacity"]["protected_existing_floor_bytes"],
+        "protected_existing_floor_bytes":protected_floor,
         "disk_filesystem":FILESYSTEM,"disk_device":current["disk_device"],"tmpfs":current["tmpfs"],
         "boot_id":current["boot_id"],"source_publication":r["source_publication"],"review":source,"fleet":r["fleet"],
         "observer":r["observer"],"reservation_ledger":r["reservation_ledger"],"century":r["century"],

@@ -55,7 +55,36 @@ const PACKET: &str = "/var/lib/jetstreamer/horizon262-native-input-tmpfs-2026112
 const PACKET_SHA: &str = "08bb1abfc6da49a6917784d23a1f9f983f91c22bcc8ed686ee048ef8a7e56b7d";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
-const LAUNCHER: &str = "/var/lib/jetstreamer/horizon262-native-launch-v4/horizon-native262-launch";
+const LAUNCHER: &str = "/var/lib/jetstreamer/horizon262-native-launch-v5/horizon-native262-launch";
+
+// A fresh extent scan can lose allocation credit while the peers are still writing.
+// Reserve headroom for that movement before sealing the startup guard's disk floor.
+const STARTUP_FLOOR_HEADROOM: u64 = 16 << 30;
+
+pub(crate) fn startup_guard_floor(measured: u64, available: u64) -> Result<u64> {
+    let floor = capacity::add(measured, STARTUP_FLOOR_HEADROOM)?;
+    let required = capacity::add(floor, DISK_RECEIPTS)?;
+    ensure!(
+        available >= required,
+        "epoch 262 guard floor and receipt reservation require {required} bytes, with {available} available"
+    );
+    Ok(floor)
+}
+
+#[cfg(test)]
+mod startup_floor_tests {
+    use super::*;
+
+    #[test]
+    fn accounts_for_the_observed_floor_rise_with_a_funded_reservation() {
+        let measured = 5_074_173_605_125;
+        let refreshed = 5_076_887_545_093;
+        let floor = startup_guard_floor(measured, 5_230_827_241_472).unwrap();
+        assert!(floor >= refreshed);
+        assert!(startup_guard_floor(measured, floor + DISK_RECEIPTS - 1).is_err());
+        assert_eq!(startup_guard_floor(measured, floor + DISK_RECEIPTS).unwrap(), floor);
+    }
+}
 
 const EPOCH: u64 = 262;
 const RETENTION_DESCRIPTION_EPOCH: u64 = EPOCH;
