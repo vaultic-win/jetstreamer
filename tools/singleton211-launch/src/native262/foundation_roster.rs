@@ -32,6 +32,45 @@ const STANDARD_GUARD: &str =
     "/var/lib/jetstreamer/horizon251-published-guard-20261118-v1/horizon251-standalone-guard";
 const GUARD_288: &str = "/var/lib/jetstreamer/horizon288-shrink-debt-comparison-tools-v327/guard";
 const GUARD_ENV_261: &str = "/var/lib/jetstreamer/horizon261-full-guard-v1/guard.env";
+const FULL_REPLAY_INPUTS: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon262-full-node-b9b95b02-v1/replay-inputs.json",
+    "4375f4e590dc98d3f37ba6c646fa2c93cc65680267c7c920ba5d3255b67661d2",
+);
+const SIZING_REFERENCE: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon261-full-profile-v226-a1/profile.json",
+    "6b27a27ff1596fe6688f207d460566c51d5c9552cef47817358d2008b484f281",
+);
+
+struct FullReplayQuote {
+    reference: Bound,
+    inputs: Bound,
+    working_disk: u64,
+    producer_memory: u64,
+}
+
+fn full_replay_quote() -> Result<FullReplayQuote> {
+    let reference = Bound::new(SIZING_REFERENCE.0, SIZING_REFERENCE.1);
+    let profile = reference.sealed()?;
+    let inputs = Bound::new(FULL_REPLAY_INPUTS.0, FULL_REPLAY_INPUTS.1);
+    let plan = inputs.sealed()?;
+    let terminal = binding(&plan["native_bootstrap_terminal"])?.sealed()?;
+    ensure!(
+        plan["schema"] == "foundation-epoch262-full-replay-input-envelope-v1"
+            && plan["epoch"] == EPOCH
+            && plan["full_replay_admitted"] == false
+            && terminal["epoch"] == EPOCH
+            && terminal["native_input_qualified"] == true
+            && profile["unit"] == "horizon-qualify-261-singleton-v1.service",
+        "epoch 262 full-replay quote inputs changed"
+    );
+    binding(&plan["replay_node"])?.artifact()?;
+    Ok(FullReplayQuote {
+        reference,
+        inputs,
+        working_disk: num(&profile, "maximum_root_physical_bytes")?,
+        producer_memory: num(&profile, "maximum_memory_bytes")?,
+    })
+}
 
 fn latest_completion() -> Result<Bound> {
     let mut latest = None;
@@ -293,6 +332,14 @@ fn held_owner(n: &mut Native) -> Result<(Value, u64)> {
 }
 
 pub(super) fn receipt(n: &mut Native, controller: Option<Controller<'_>>) -> Result<Value> {
+    measure(n, controller, None)
+}
+
+fn measure(
+    n: &mut Native,
+    controller: Option<Controller<'_>>,
+    quote: Option<FullReplayQuote>,
+) -> Result<Value> {
     let completion = latest_completion()?;
     let done = completion.json()?;
     let fleet_ref = binding(&done["fleet"])?;
@@ -364,7 +411,15 @@ pub(super) fn receipt(n: &mut Native, controller: Option<Controller<'_>>) -> Res
         fs::metadata(text(&observer["filesystem"], "path")?)?.dev() == device,
         "Foundation filesystem changed"
     );
-    let mount = pristine(device)?;
+    let mount = if quote.is_some() {
+        ensure!(
+            fs::metadata("/home/ubuntu/.jetstreamer-private")?.dev() == device,
+            "epoch 262 full replay output filesystem changed"
+        );
+        Value::Null
+    } else {
+        pristine(device)?
+    };
     let resources_before = live::resources_at(Path::new(FILESYSTEM))?;
     let cpus = units::affinity(&json!({"cpu_affinity":(40..48).collect::<Vec<_>>() }))?;
     let selected = units::parse_cpu_list("40-47")?;
@@ -451,7 +506,12 @@ pub(super) fn receipt(n: &mut Native, controller: Option<Controller<'_>>) -> Res
     }
     let resources_after = live::resources_at(Path::new(FILESYSTEM))?;
     ensure!(
-        resources_before.0 == resources_after.0 && mount == pristine(device)?,
+        resources_before.0 == resources_after.0
+            && if quote.is_some() {
+                fs::metadata("/home/ubuntu/.jetstreamer-private")?.dev() == device
+            } else {
+                mount == pristine(device)?
+            },
         "epoch 262 resources or scratch mount changed"
     );
     let delivery_ref = Bound::new(DELIVERY_BOOKING.0, DELIVERY_BOOKING.1);
@@ -485,7 +545,15 @@ pub(super) fn receipt(n: &mut Native, controller: Option<Controller<'_>>) -> Res
             capacity::add(sum, num(row, "remaining_upper_bound_bytes")?)
         })?;
     let protected = capacity::add(capacity::add(disk_floor, non_guard_disk)?, growth)?;
-    let required = capacity::add(protected, DISK_RECEIPTS)?;
+    let (candidate_disk, candidate) = if let Some(quote) = &quote {
+        (
+            capacity::add(quote.working_disk, DISK_RECEIPTS)?,
+            capacity::add(quote.producer_memory, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
+        )
+    } else {
+        (DISK_RECEIPTS, capacity::add(MEMORY, capacity::add(CONTROLLER_MEMORY, GUARD_MEMORY)?)?)
+    };
+    let required = capacity::add(protected, candidate_disk)?;
     let free = num(&allocation, "conservative_available_bytes")?
         .min(resources_before.2)
         .min(resources_after.2);
@@ -493,7 +561,6 @@ pub(super) fn receipt(n: &mut Native, controller: Option<Controller<'_>>) -> Res
         resources_before.0 / 10,
         num(&delivery, "guard_memory_allowance")?,
     )?;
-    let candidate = capacity::add(MEMORY, capacity::add(CONTROLLER_MEMORY, GUARD_MEMORY)?)?;
     let base_memory = capacity::add(reserve, candidate)?;
     let (hard, growth_memory) = recorded.values().try_fold(
         (base_memory, base_memory),
@@ -512,7 +579,7 @@ pub(super) fn receipt(n: &mut Native, controller: Option<Controller<'_>>) -> Res
     let available_memory = resources_before.1.min(resources_after.1);
     let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
         "remaining_guard_growth_bytes":growth,"protected_existing_disk_bytes":protected,
-        "candidate_disk_bytes":DISK_RECEIPTS,"required_disk_bytes":required,"available_disk_bytes":free,
+        "candidate_disk_bytes":candidate_disk,"required_disk_bytes":required,"available_disk_bytes":free,
         "disk_shortfall_bytes":required.saturating_sub(free),"disk_margin_bytes":free.saturating_sub(required),
         "combined_host_and_periodic_memory_reserve_bytes":reserve,"candidate_total_memory_bytes":candidate,
         "required_hard_memory_bytes":hard,"host_total_memory_bytes":resources_before.0,
@@ -534,6 +601,12 @@ pub(super) fn receipt(n: &mut Native, controller: Option<Controller<'_>>) -> Res
         "completion":completion,"booking":booking_ref,"filesystem_device":device,
         "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false});
+    if let Some(quote) = quote {
+        evidence["full_replay_quote"] = json!({"sizing_reference":quote.reference,"inputs":quote.inputs,
+            "whole_tree_bytes":quote.working_disk,"producer_memory_bytes":quote.producer_memory,
+            "receipt_disk_bytes":DISK_RECEIPTS,"control_memory_bytes":CONTROLLER_MEMORY,
+            "guard_memory_bytes":1u64 << 30});
+    }
     deny_authority(&mut evidence);
     Ok(evidence)
 }
@@ -565,15 +638,20 @@ pub fn run() -> Result<()> {
         args.next()
             .context("provide a new Foundation roster evidence directory")?,
     );
+    let mut quote = false;
     let controller_unit = match args.next() {
         None => None,
+        Some(flag) if flag == "--full-replay-quote" => {
+            quote = true;
+            None
+        }
         Some(flag) if flag == "--as-controller" => Some(
             args.next()
                 .context("controller unit")?
                 .into_string()
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
-        Some(_) => bail!("use --as-controller UNIT for a controller-scoped fit check"),
+        Some(_) => bail!("use --as-controller UNIT or --full-replay-quote"),
     };
     let synchronize = match args.next() {
         None => false,
@@ -611,7 +689,11 @@ pub fn run() -> Result<()> {
                 invocation,
                 held: false,
             });
-    let result = receipt(&mut native, controller);
+    let result = if quote {
+        full_replay_quote().and_then(|quote| measure(&mut native, None, Some(quote)))
+    } else {
+        receipt(&mut native, controller)
+    };
     match result {
         Ok(evidence) => {
             let fit = save_json(&native.root, "roster.json", &evidence)?;
