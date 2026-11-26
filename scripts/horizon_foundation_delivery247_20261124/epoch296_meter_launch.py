@@ -105,10 +105,10 @@ def launch(kit):
     profile = ops.bound(profile_ref)
     assert (profile["epoch"], profile["unit"], profile["guarded_whole_tree_cap_bytes"]) == (296, UNIT, CAP)
     guard = profile["guard"]
-    assert sealed(Path(guard["path"])) == guard
-    assert sealed(Path(profile["worker"]["path"])) == profile["worker"]
-    node = Path(profile["argv"][0])
-    assert sealed(node)["sha256"] == "bf90af5f3d6ca5f973fc607bc54c0cb0e1cabdc82e61a19f020cef5187939d08"
+    capacity.checked(guard)
+    capacity.checked(profile["worker"])
+    node = capacity.checked(capacity.fixed(profile["argv"][0],
+        "bf90af5f3d6ca5f973fc607bc54c0cb0e1cabdc82e61a19f020cef5187939d08"))
     assert ops.bound(profile["cache_namespace"])["host_guard_sees_empty_placeholders"]
     bootstrap = ops.bound(profile["route"])["bootstrap"]
     observed = Path(bootstrap["path"]).stat()
