@@ -13,25 +13,37 @@ import time
 
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 EPOCH = ROOT / "epoch146-singleton-20261122-v1"
-V9_DEPLOYMENT = EPOCH / "tools-post145-v9-v12-sequence-20261125-v1"
-V9_ENTRY = Path(__file__).resolve().parent.name == V9_DEPLOYMENT.name
-GENERATION = "v9" if V9_ENTRY else "v7"
-DEPLOYMENT = V9_DEPLOYMENT if V9_ENTRY else EPOCH / "tools-post145-v7-v12-sequence-20261125-v1"
+DEPLOYMENTS = {
+    "v7": "tools-post145-v7-v12-sequence-20261125-v1",
+    "v9": "tools-post145-v9-v12-sequence-20261125-v1",
+    "v10": "tools-post145-v10-v12-sequence-20261126-v1",
+}
+GENERATION = next((version for version, directory in DEPLOYMENTS.items()
+                   if Path(__file__).resolve().parent.name == directory), "v7")
+DEPLOYMENT = EPOCH / DEPLOYMENTS[GENERATION]
 LEGACY = EPOCH / "tools-post145-v6-v8-sequence-20261125-v1"
 LEGACY_SHA = "13c45accc31c3c3db84f43701a310eb4aae3cd3ec4bc1c92cd8f7845ef046365"
 WATCH = EPOCH / "tools-post145-v6-v8-operator-20261125-v1"
 WATCH_SHA = "d60fc69ba8330a2dd246f83f6f1347ad93966d7865a3d8694284dc02332ec096"
 PROVIDER = ROOT / "incident-replay-fit-20261121-v1" / f"tools-homefloor-145-post-{GENERATION}-build-v1/post-stop-fit"
-PROVIDER_SHA = ("f650a4acb3f901ba82fe36e6014d6b48176c9365d4750ba80d71debeaa3942c6" if V9_ENTRY else
-                "db8beab61152a7852b890b1c8b1d985c83c4d9ae9bd4c0db6138887367b950cc")
+PROVIDER_SHA = {
+    "v7": "db8beab61152a7852b890b1c8b1d985c83c4d9ae9bd4c0db6138887367b950cc",
+    "v9": "f650a4acb3f901ba82fe36e6014d6b48176c9365d4750ba80d71debeaa3942c6",
+    "v10": "4c8907433fddc6a19cf7708fafb3b0e977aba6f00d38f73d87d14cb8ea87d436",
+}[GENERATION]
 CADENCE = ROOT / "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v12-entry146"
 CADENCE_SHA = "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac"
 FAMILY145 = ROOT / "epoch145-semantic-continuity-20261121-v1"
-CHECKER145 = FAMILY145 / ("tools-v9-census-recovery" if V9_ENTRY else "tools-v7-168-stop-v2")
-CHECKER145_SHA = ("8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd" if V9_ENTRY else
-                  "589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b")
-SEMANTIC145 = FAMILY145 / ("v9-census-name-handoff" if V9_ENTRY else "v7-168-stop-name-handoff") / "SEMANTIC_COMPLETION.json"
-OWNER145 = "ebdfc34db47c4e7699ea5ccbada5d604" if V9_ENTRY else "f7043fd6595a4151b659d4b098bede11"
+checker, CHECKER145_SHA, handoff, OWNER145 = {
+    "v7": ("tools-v7-168-stop-v2", "589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b",
+           "v7-168-stop-name-handoff", "f7043fd6595a4151b659d4b098bede11"),
+    "v9": ("tools-v9-census-recovery", "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd",
+           "v9-census-name-handoff", "ebdfc34db47c4e7699ea5ccbada5d604"),
+    "v10": ("tools-v10-census-recovery", "29aac4e0527dcea47f4e9bcb14c5e071b67b8d749669873cc04d7cd1cc5d4e75",
+            "v10-census-name-handoff", "104f023c5cd24a55b6585ef525b80067"),
+}[GENERATION]
+CHECKER145 = FAMILY145 / checker
+SEMANTIC145 = FAMILY145 / handoff / "SEMANTIC_COMPLETION.json"
 COMPLETE145 = ROOT / "epoch145-guarded-export-20261121-v1/state" / OWNER145 / "complete.json"
 LEASE_FIELD = "epoch146_bounded_entry_lease"
 HOLD_SECONDS = 320

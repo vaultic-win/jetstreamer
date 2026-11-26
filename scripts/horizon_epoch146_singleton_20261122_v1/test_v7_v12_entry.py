@@ -68,26 +68,36 @@ class BoundedEntry(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "V12 status"):
             scope["writer_contract"](dict(self.writer, consumer_seal=ref("/fixture/v8", "f" * 64)))
 
-    def test_v9_entry_binds_its_provider_and_rejects_old_completion(self):
+    def test_successor_entry_binds_its_provider_and_rejects_other_completions(self):
         source = Path(__file__).with_name("run-v7-v12-entry.py")
+        routes = {"v9": "20261125", "v10": "20261126"}
+        accepted = {"v7": self.phase}
+        operators = {}
         with TemporaryDirectory() as temporary:
-            package = Path(temporary) / "tools-post145-v9-v12-sequence-20261125-v1"
-            package.mkdir()
-            operator = package / "run-v9-v12-entry.py"
-            operator.write_bytes(source.read_bytes())
-            successor = runpy.run_path(str(operator))
-        self.assertIn("tools-homefloor-145-post-v9-build-v1", str(successor["PROVIDER"]))
-        completion = {
-            "stage": "v9-semantic-complete-drained",
-            "completed_invocation_id": successor["OWNER145"],
-            "checker_seal": ref(successor["CHECKER145"] / "deployment-seal-receipt.json",
-                                successor["CHECKER145_SHA"]),
-            "completion": ref(successor["COMPLETE145"], "d" * 64),
-            "semantic_receipt": ref(successor["SEMANTIC145"], "e" * 64),
-        }
-        self.assertEqual(successor["completion_contract"](completion), completion)
-        with self.assertRaisesRegex(ValueError, "V9 semantic"):
-            successor["completion_contract"](self.phase)
+            for version, date in routes.items():
+                package = Path(temporary) / f"tools-post145-{version}-v12-sequence-{date}-v1"
+                package.mkdir()
+                operator = package / "run-v7-v12-entry.py"
+                operator.write_bytes(source.read_bytes())
+                successor = runpy.run_path(str(operator))
+                self.assertIn(f"tools-homefloor-145-post-{version}-build-v1", str(successor["PROVIDER"]))
+                operators[version] = successor["completion_contract"]
+                accepted[version] = {
+                    "stage": f"{version}-semantic-complete-drained",
+                    "completed_invocation_id": successor["OWNER145"],
+                    "checker_seal": ref(successor["CHECKER145"] / "deployment-seal-receipt.json",
+                                        successor["CHECKER145_SHA"]),
+                    "completion": ref(successor["COMPLETE145"], "d" * 64),
+                    "semantic_receipt": ref(successor["SEMANTIC145"], "e" * 64),
+                }
+        for version, check in operators.items():
+            for other, completion in accepted.items():
+                with self.subTest(version=version, receipt=other):
+                    if version == other:
+                        self.assertEqual(check(completion), completion)
+                    else:
+                        with self.assertRaisesRegex(ValueError, f"{version.upper()} semantic"):
+                            check(completion)
 
     def test_price_retains_both_replay_rosters_and_delivery_coverage(self):
         self.check_price(self.quote)
