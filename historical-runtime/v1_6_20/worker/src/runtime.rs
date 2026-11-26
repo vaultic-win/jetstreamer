@@ -1727,6 +1727,12 @@ mod tests {
             assert!(validate_candidate_snapshot_slot(99_359_376).is_ok());
             assert!(validate_candidate_snapshot_slot(99_359_375).is_err());
             assert!(validate_candidate_snapshot_slot(99_359_377).is_err());
+        } else if cfg!(feature = "epoch231-checkpoint-continuation") {
+            assert!(validate_candidate_snapshot_slot(99_803_089).is_ok());
+            assert!(validate_candidate_snapshot_slot(99_791_404).is_err());
+            assert!(validate_candidate_snapshot_slot(99_803_088).is_err());
+            assert!(validate_candidate_snapshot_slot(99_803_090).is_err());
+            assert_eq!(effective_min_supported_entry_slot(), 99_803_090);
         } else if cfg!(feature = "epoch231-called-program-demotion") {
             assert!(validate_candidate_snapshot_slot(99_791_404).is_ok());
             assert!(validate_candidate_snapshot_slot(99_791_403).is_err());
@@ -1761,6 +1767,8 @@ mod tests {
                 98_939_267
             } else if cfg!(feature = "epoch230-called-program-demotion") {
                 99_375_856
+            } else if cfg!(feature = "epoch231-checkpoint-continuation") {
+                100_656_000
             } else if cfg!(feature = "epoch231-called-program-demotion") {
                 99_803_090
             } else if cfg!(feature = "epoch228-capped-qualification") {

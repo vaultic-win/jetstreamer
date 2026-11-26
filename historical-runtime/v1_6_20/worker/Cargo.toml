@@ -42,6 +42,8 @@ epoch229-called-program-demotion = ["solana-program/epoch230-called-program-demo
 epoch230-called-program-demotion = ["solana-program/epoch230-called-program-demotion"]
 # Compare the same storage profile with the activation-gated lock rule at epoch 231.
 epoch231-called-program-demotion = ["capped-shrink-candidate", "solana-program/epoch230-called-program-demotion"]
+# Continue the separately verified prefix from its exact hourly snapshot.
+epoch231-checkpoint-continuation = ["epoch231-called-program-demotion"]
 
 [[example]]
 name = "snapshot_hard_forks"
