@@ -8,6 +8,8 @@ use std::{env, fs::OpenOptions, io::Read, os::unix::fs::OpenOptionsExt};
 // Every listed legacy false positive lies strictly between CID-rooted, consecutive
 // physical parent and child blocks in the qualified CAR windows.
 const MANIFEST_SHA: &str = "cc4250c62eee9136933a87909891041c40bf5f2bc28fde36906e071a1b7156d0";
+const COHORT_257_258_MANIFEST_SHA: &str =
+    "fdbc02de4dd32bcedba61b142e4c21108f7ae56f174d225b806a03f634b64941";
 const COHORT_261_262_MANIFEST_SHA: &str =
     "03cf5ee3c3a92e9e167dbf0728388fa7169c09cd1b104c3fe87608a01fcd2be4";
 const COHORT_267_268_MANIFEST_SHA: &str =
@@ -103,6 +105,16 @@ const EPOCH_257: Profile = Profile {
         111246308, 111272761, 111276536, 111326683, 111336127, 111340860,
         111372207, 111376136, 111377548, 111379295, 111384354, 111403610,
         111410333, 111413030, 111425950, 111435316, 111435952,
+    ],
+};
+
+const EPOCH_258: Profile = Profile {
+    epoch: 258,
+    raw_sha: "480d09c1e7d163c2f976940d4012c02c75ac383039b5515dc86a81368dbee240",
+    compact_sha: "749892ec382d1b19317e6e5c6cbb171e32d269ba9e9c108525e4e010a17bc878",
+    proven_skips: &[
+        111456012, 111472744, 111505468, 111513184, 111533811, 111593843, 111611977, 111682235,
+        111695458, 111713666, 111746497, 111844715,
     ],
 };
 
@@ -295,6 +307,7 @@ impl RootedSlotPresence {
             199 => (&EPOCH_199, MANIFEST_SHA),
             200 => (&EPOCH_200, MANIFEST_SHA),
             257 => (&EPOCH_257, "8ee8ed720d8c7e96ebc9ada87817896b8be8ed1d7703d8ff112aec7f8d4087e7"),
+            258 => (&EPOCH_258, COHORT_257_258_MANIFEST_SHA),
             261 => (&EPOCH_261, "3bd36d83a86989c8db03fcdb2c5c41950182ae99b4f16202f5bc115d4357e8f9"),
             262 => (&EPOCH_262, COHORT_261_262_MANIFEST_SHA),
             267 => (
@@ -378,6 +391,7 @@ impl RootedSlotPresence {
         };
         let configured = env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").ok();
         let in_cohort = match configured.as_deref() {
+            Some(COHORT_257_258_MANIFEST_SHA) => (257..=258).contains(&epoch),
             Some(COHORT_261_262_MANIFEST_SHA) => (261..=262).contains(&epoch),
             Some(COHORT_267_268_MANIFEST_SHA) => (267..=268).contains(&epoch),
             Some(COHORT_267_270_SHA) => (267..=270).contains(&epoch),
@@ -886,7 +900,7 @@ mod qualified_epoch268 {
 #[cfg(test)]
 mod qualified_epoch257 {
     use super::super::{LocalSlotIndex, SlotPresenceState, build_slot_presence_map};
-    use super::{EPOCH_257, EPOCH_261, Profile, RootedSlotPresence};
+    use super::{EPOCH_257, EPOCH_258, EPOCH_261, Profile, RootedSlotPresence};
     use jetstreamer_firehose::index::{SlotOffsetIndex, SlotOffsetIndexError, get_index_base_url};
     use sha2::{Digest, Sha256};
     use std::{
@@ -906,6 +920,20 @@ mod qualified_epoch257 {
             "bafyreief4qucc6dk7mq62wl4jbglnii745jd6aipu52cjwbo4u6wgkwrye",
             "7fd2e109d93533c85f597f843a39ff4a34d34d69b962911452bc41f42f0d8548",
             "0138424f86f813d47e402175746e4d554dfd8d183acf2369e85b0a1f2fb4c065",
+        ).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires the sealed epoch 257 and 258 range and compact indexes"]
+    async fn singleton_258_warmup_and_epoch_use_qualified_membership() {
+        check_singleton(
+            &EPOCH_258,
+            111455045,
+            "bafyreicszutajk2nhrbkpfscbidbqpno6toqvwin65e77naxkzhfmltb74",
+            "/var/lib/jetstreamer/horizon258-rooted-replay-inputs-v1/epoch-258-slot-ranges.candidate.raw",
+            "bafyreienrbuyzpqtxdf2sywy67idahbpakcahmqeonwz276n62pupetgbu",
+            EPOCH_257.raw_sha,
+            EPOCH_257.compact_sha,
         ).await;
     }
 
@@ -978,8 +1006,15 @@ mod qualified_epoch257 {
             )))
             .unwrap();
             assert_eq!(format!("{:x}", Sha256::digest(&compact)), slot_sha);
+            let rooted_profile = if e == epoch {
+                Some(profile)
+            } else if epoch == 258 {
+                Some(&EPOCH_257)
+            } else {
+                None
+            };
             let rooted = RootedSlotPresence::configured(e).await.unwrap();
-            assert_eq!(rooted.is_some(), e == epoch);
+            assert_eq!(rooted.is_some(), rooted_profile.is_some());
             if let Some(r) = &rooted {
                 r.verify_compact(&compact).unwrap();
                 assert!(r.verify_compact(&compact[..compact.len() - 1]).is_err());
@@ -1000,7 +1035,7 @@ mod qualified_epoch257 {
                     Err(SlotOffsetIndexError::SlotNotFound(m, url)) => {
                         assert_eq!(m, slot);
                         assert_eq!((o, n), (0, 0));
-                        assert_eq!(url.scheme(), if e == epoch { "file" } else { "http" });
+                        assert_eq!(url.scheme(), if rooted_profile.is_some() { "file" } else { "http" });
                     }
                     Err(err) => panic!("unexpected range result at {slot}: {err}"),
                 }
@@ -1026,8 +1061,10 @@ mod qualified_epoch257 {
                 }
             }
             exceptions.reverse();
-            if e == epoch {
-                assert_eq!(exceptions, profile.proven_skips);
+            if let Some(p) = rooted_profile {
+                let skips: Vec<_> = p.proven_skips.iter().copied()
+                    .filter(|slot| (start..=end).contains(slot)).collect();
+                assert_eq!(exceptions, skips);
             } else {
                 assert!(exceptions.is_empty());
             }

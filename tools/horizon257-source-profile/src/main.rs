@@ -3,6 +3,7 @@ mod edges;
 mod manifest;
 mod ranges;
 mod repair;
+mod repair258;
 mod repair261;
 mod repair262;
 mod tables;
@@ -90,6 +91,16 @@ fn packet_bounded(
     names: &BTreeSet<String>,
     limit: impl Fn(&str) -> u64,
 ) -> Result<BTreeMap<String, Vec<u8>>> {
+    packet_with_sealer(dir, seal_sha, SEALER, names, limit)
+}
+
+fn packet_with_sealer(
+    dir: &str,
+    seal_sha: &str,
+    sealer_sha: &str,
+    names: &BTreeSet<String>,
+    limit: impl Fn(&str) -> u64,
+) -> Result<BTreeMap<String, Vec<u8>>> {
     let dir = Path::new(dir);
     let md = fs::symlink_metadata(dir)?;
     ensure!(
@@ -105,7 +116,7 @@ fn packet_bounded(
     ensure!(
         seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
             && seal["destination"] == dir.to_str().context("path")?
-            && seal["sealer_sha256"] == SEALER
+            && seal["sealer_sha256"] == sealer_sha
             && seal["remote_mutations"] == false
             && seal["replay_launch_authorized"] == false,
         "seal identity"
@@ -223,6 +234,9 @@ fn main() -> Result<()> {
     if args.len() == 2 && args[0] == "repair-261" {
         return repair261::run(Path::new(&args[1]));
     }
+    if args.len() == 2 && args[0] == "repair-258" {
+        return repair258::run(Path::new(&args[1]));
+    }
     if args.len() == 2 && args[0] == "repair-262" {
         return repair262::run(Path::new(&args[1]));
     }
@@ -231,7 +245,7 @@ fn main() -> Result<()> {
     }
     ensure!(
         args.is_empty(),
-        "usage: horizon257-source-profile [measure-bootstrap-inputs|compact-tables|repair NEW_OUTPUT|repair-261 NEW_OUTPUT|repair-262 NEW_OUTPUT]"
+        "usage: horizon257-source-profile [measure-bootstrap-inputs|compact-tables|repair NEW_OUTPUT|repair-258 NEW_OUTPUT|repair-261 NEW_OUTPUT|repair-262 NEW_OUTPUT]"
     );
     println!("{}", serde_json::to_string_pretty(&inspect()?)?);
     Ok(())
