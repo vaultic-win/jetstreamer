@@ -19,7 +19,7 @@
 +            "Bind the remaining generation-pinned bootstrap copy and qualify the full replay envelope "
 +            "against the current fleet and restored accounts demand.")
 +    bootstrap262 = V / "horizon262-native-bootstrap-build-v1/namespace-controls-v342.json"
-+    if bootstrap262.is_file():
++    if bootstrap262.is_file() and plan["gates"]["262"]["state"] == "not-yet-staged":
 +        native262 = sealed_226_file(bootstrap262)
 +        controls = bound(native262)
 +        assert controls["inputs"]["bootstrap_slot"] == 113182967
@@ -32,7 +32,7 @@
 +            "Bind the exact native launcher and invocation guard for the sealed epoch 262 cold restore. "
 +            "Then measure native bootstrap and qualify the full replay and archive allocation.")
 +    production296 = V / "horizon296-unbounded-worker-build-v1/full-fit-v341.json"
-+    if production296.is_file():
++    if production296.is_file() and not any(item['range'] == "296-296" for item in cfg["replays"] + cfg["diagnostic_replays"]):
 +        fit296 = sealed_226_file(production296)
 +        assessed = bound(fit296)
 +        assert assessed["epoch"] == 296 and assessed["disk_margin_bytes"] < 0
