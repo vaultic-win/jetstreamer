@@ -24,6 +24,8 @@ use std::{
 mod anza_closed_154;
 #[cfg(feature = "anza-closed-canaries")]
 mod anza_closed_canaries;
+#[cfg(feature = "anza-closed-canaries")]
+use anza_closed_canaries::closed_bootstrap_cohort;
 #[cfg(feature = "anza-parked-183")]
 mod anza_parked_183;
 
@@ -357,6 +359,8 @@ fn check_target(t: &Target) -> Result<()> {
         #[cfg(feature = "anza-closed-canaries")]
         119 | 121 | 129 | 130 | 133 | 134 | 149 | 191..=197 => anza_closed_canaries::is_target(t),
         #[cfg(feature = "anza-closed-canaries")]
+        198 => closed_bootstrap_cohort::is_target(t),
+        #[cfg(feature = "anza-closed-canaries")]
         154 if anza_closed_canaries::is_target(t) => true,
         #[cfg(feature = "anza-closed-154")]
         154 => anza_closed_154::is_target(t),
@@ -587,6 +591,11 @@ fn scan_consumers(targets: &[Target]) -> Result<()> {
             for name in ["cmdline", "maps"] {
                 let data = fs::read(root.join(name))?;
                 for t in targets {
+                    #[cfg(feature = "anza-closed-canaries")]
+                    ensure!(
+                        !closed_bootstrap_cohort::alias_in_command(t, &data),
+                        "PID {pid} references a reviewed bootstrap alias in {name}"
+                    );
                     ensure!(
                         !contains(&data, t.path.as_os_str().as_bytes()),
                         "PID {pid} references {} in {name}",
@@ -763,6 +772,11 @@ fn run() -> Result<()> {
         .contains(&149)
         .then(anza_closed_canaries::lock_epoch149_controllers)
         .transpose()?;
+    #[cfg(feature = "anza-closed-canaries")]
+    let _closed_bootstrap_locks = epochs
+        .contains(&198)
+        .then(closed_bootstrap_cohort::lock_controllers)
+        .transpose()?;
     let receipts = Path::new(HOME_ROOT).join(".jetstreamer-private/r2-receipts");
     #[cfg(feature = "anza-parked-183")]
     let _holding_locks = epochs
@@ -796,6 +810,10 @@ fn run() -> Result<()> {
     }
     #[cfg(feature = "anza-closed-canaries")]
     let canary_review = anza_closed_canaries::verify_scope(&p, &epochs, &lock)?;
+    #[cfg(feature = "anza-closed-canaries")]
+    if epochs.contains(&198) {
+        closed_bootstrap_cohort::verify_scope(&p, &lock)?;
+    }
     let bm = exact(&p.inventory_binary.path)?;
     ensure!(
         bm.uid() == 0
@@ -819,6 +837,8 @@ fn run() -> Result<()> {
     } else {
         range
     };
+    #[cfg(feature = "anza-closed-canaries")]
+    let range = if epochs.contains(&198) { (195, 198) } else { range };
     let output = Command::new(&p.inventory_binary.path)
         .env("TOKIO_WORKER_THREADS", "2")
         .arg("inventory")
@@ -846,6 +866,11 @@ fn run() -> Result<()> {
     #[cfg(feature = "anza-closed-canaries")]
     if let Some(review) = &canary_review {
         anza_closed_canaries::verify_delivery(review, &epochs, &inventory)?;
+    }
+    #[cfg(feature = "anza-closed-canaries")]
+    if epochs.contains(&198) {
+        closed_bootstrap_cohort::verify_delivery(&receipts, &inventory)?;
+        closed_bootstrap_cohort::check_owners()?;
     }
     inactive(&p.inactive_units)?;
     scan_consumers(&p.targets)?;
@@ -897,7 +922,17 @@ fn run() -> Result<()> {
             &mut log,
             json!({"event":"intent","epoch":t.epoch,"path":t.path,"identity":t.identity,"reason":t.reason}),
         )?;
+        #[cfg(feature = "anza-closed-canaries")]
+        if closed_bootstrap_cohort::is_target(t) {
+            closed_bootstrap_cohort::check_owners()?;
+            closed_bootstrap_cohort::check_aliases(t, false)?;
+            scan_consumers(std::slice::from_ref(t))?;
+        }
         remove_exact(t)?;
+        #[cfg(feature = "anza-closed-canaries")]
+        if closed_bootstrap_cohort::is_target(t) {
+            closed_bootstrap_cohort::check_aliases(t, true)?;
+        }
         bytes += t.identity.blocks * 512;
         event(
             &mut log,

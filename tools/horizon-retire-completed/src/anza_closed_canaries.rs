@@ -1,5 +1,6 @@
 use super::*;
 
+pub(super) mod closed_bootstrap_cohort;
 mod closed_indexes;
 pub(super) use closed_indexes::{
     is_early_singleton_index, is_epoch149_index, is_index, is_singleton_index,
