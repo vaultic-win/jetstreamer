@@ -6,7 +6,7 @@ mod fourth;
 use anyhow::{Context, Result, ensure};
 use jetstreamer_horizon_observe::staged247_rss::{
     CURRENT257_DIRECTORY, CURRENT257_IMAGE, CURRENT257_IMAGE_SHA, CURRENT257_MEMORY_CAP,
-    CURRENT257_START_TICKS, CURRENT257_UNIT,
+    CURRENT257_START_TICKS, CURRENT257_UNIT, RETRY257_DIRECTORY, RETRY257_MEMORY_CAP, RETRY257_UNIT,
 };
 use jetstreamer_horizon_observe::successor247 as successor;
 use serde_json::{Value, json};
@@ -133,6 +133,7 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
         (248, STAGED_248_UNIT) => Some(10 << 30),
         (250, STAGED_250_UNIT) => Some(STAGED_250_MEMORY_CAP),
         (257, CURRENT257_UNIT) => Some(CURRENT257_MEMORY_CAP),
+        (257, RETRY257_UNIT) => Some(RETRY257_MEMORY_CAP),
         (265, STAGED_265_UNIT) => Some(10 << 30),
         _ => None,
     };
@@ -141,11 +142,10 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
             && stem.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-'),
         "ordinary delivery epoch or unit changed"
     );
-    let current257 = name == CURRENT257_UNIT;
-    let root = if current257 {
-        Path::new(CURRENT257_DIRECTORY).to_owned()
-    } else {
-        Path::new("/home/ubuntu/.codex/diagnostics").join(stem)
+    let root = match name {
+        CURRENT257_UNIT => Path::new(CURRENT257_DIRECTORY).to_owned(),
+        RETRY257_UNIT => Path::new(RETRY257_DIRECTORY).to_owned(),
+        _ => Path::new("/home/ubuntu/.codex/diagnostics").join(stem),
     };
     let claim = fourth::read(&row["delivery_claim"], &root.join("pipeline-claim.json"))?;
     let records = claim["evidence"].as_array().context("delivery evidence")?;
@@ -162,18 +162,25 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
         .as_str()
         .context("ordinary PID")?
         .parse::<u32>()?;
-    let (launch_unit, ticks) = if current257 {
-        (&launch["owner"], CURRENT257_START_TICKS)
-    } else {
-        let micros = launch["unit"]["ExecMainStartTimestampMonotonic"]
-            .as_str()
-            .context("ordinary launch time")?
-            .parse::<u64>()?;
-        (&launch["unit"], micros / 10_000)
+    let (launch_unit, ticks) = match name {
+        CURRENT257_UNIT => (&launch["owner"], CURRENT257_START_TICKS),
+        RETRY257_UNIT => (
+            &launch["owner"],
+            launch["process_start_ticks"]
+                .as_u64()
+                .context("epoch 257 retry start ticks")?,
+        ),
+        _ => {
+            let micros = launch["unit"]["ExecMainStartTimestampMonotonic"]
+                .as_str()
+                .context("ordinary launch time")?
+                .parse::<u64>()?;
+            (&launch["unit"], micros / 10_000)
+        }
     };
     // The first 257 sample used the 247 default label. Only that immutable
     // observation can use the old label; its actual owner is validated below.
-    let range = if current257
+    let range = if name == CURRENT257_UNIT
         && fleet["observer_sha256"]
             == "3e9646388780c95dd70b095b9b1b7d5567b9183f3ecba7900ac6cae0781808bd"
         && fleet["observer_receipt"]
@@ -227,8 +234,8 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
                 == 1,
         "ordinary delivery claim, endpoints or sample clock changed"
     );
-    let (image, image_sha, cap) = if current257 {
-        (CURRENT257_IMAGE, CURRENT257_IMAGE_SHA, CURRENT257_MEMORY_CAP)
+    let (image, image_sha, cap) = if matches!(name, CURRENT257_UNIT | RETRY257_UNIT) {
+        (CURRENT257_IMAGE, CURRENT257_IMAGE_SHA, pinned_cap.context("epoch 257 memory cap")?)
     } else if let Some(cap) = pinned_cap {
         (PINNED_247_IMAGE, PINNED_247_IMAGE_SHA, cap)
     } else {
@@ -362,6 +369,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                 | STAGED_248_UNIT
                 | STAGED_250_UNIT
                 | CURRENT257_UNIT
+                | RETRY257_UNIT
                 | STAGED_265_UNIT
         ) || (owners.contains_key(fourth::V221_UNIT)
             && name.starts_with("horizon-upload-")

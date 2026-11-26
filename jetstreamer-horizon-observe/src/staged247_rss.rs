@@ -10,6 +10,9 @@ pub const CURRENT257_IMAGE_SHA: &str =
     "206cd7c558fff3992a14607c18363522a4f54b9840d6bd96ad0dfc86e22344ff";
 pub const CURRENT257_MEMORY_CAP: u64 = 32 << 30;
 pub const CURRENT257_START_TICKS: u64 = 78_209_038;
+pub const RETRY257_UNIT: &str = "horizon-upload-257-current-reader-v2.service";
+pub const RETRY257_DIRECTORY: &str = "/var/lib/jetstreamer/horizon257-current-reader-delivery-v2";
+pub const RETRY257_MEMORY_CAP: u64 = 64 << 30;
 
 pub const UNIT: &str = "horizon-upload-247-staged-680e1173-v1.service";
 pub const IID: &str = "3e08307874db424886cd8c46b3ecfba6";
