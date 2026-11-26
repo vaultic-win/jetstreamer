@@ -52,16 +52,23 @@ fn hex_prefix(bytes: &[u8], take: usize) -> String {
 
 fn main() {
     const EPOCH229: &str = "CARGO_FEATURE_EPOCH229_CHECKPOINT_CONTINUATION_DIAGNOSTIC";
-    if env::var_os(EPOCH229).is_some() {
-        assert!(
-            env::vars_os().all(|(key, _)| {
-                let key = key.to_string_lossy();
-                !key.starts_with("CARGO_FEATURE_")
-                    || key == EPOCH229
-                    || key == "CARGO_FEATURE_DEFAULT"
-            }),
-            "epoch 229 continuation requires an exclusive build"
-        );
+    const EPOCH230_VOTE_BOUNDARY: &str =
+        "CARGO_FEATURE_EPOCH230_VOTE_BOUNDARY_DEMOTION_QUALIFICATION";
+    for (feature, scope) in [
+        (EPOCH229, "epoch 229 continuation"),
+        (EPOCH230_VOTE_BOUNDARY, "epoch 230 vote boundary"),
+    ] {
+        if env::var_os(feature).is_some() {
+            assert!(
+                env::vars_os().all(|(key, _)| {
+                    let key = key.to_string_lossy();
+                    !key.starts_with("CARGO_FEATURE_")
+                        || key == feature
+                        || key == "CARGO_FEATURE_DEFAULT"
+                }),
+                "{scope} requires an exclusive build"
+            );
+        }
     }
     let suffix_recording = env::var_os("CARGO_FEATURE_EPOCH140_SUFFIX_RECORDING").is_some();
     println!("cargo:rustc-check-cfg=cfg(original_entry_replay)");
@@ -69,6 +76,7 @@ fn main() {
     if env::var_os("CARGO_FEATURE_EPOCH229_CALLED_PROGRAM_DEMOTION_QUALIFICATION").is_some()
         || env::var_os("CARGO_FEATURE_EPOCH230_CALLED_PROGRAM_DEMOTION_QUALIFICATION").is_some()
         || env::var_os("CARGO_FEATURE_EPOCH231_CALLED_PROGRAM_DEMOTION_QUALIFICATION").is_some()
+        || env::var_os(EPOCH230_VOTE_BOUNDARY).is_some()
     {
         println!("cargo:rustc-cfg=called_program_demotion_replay");
     }

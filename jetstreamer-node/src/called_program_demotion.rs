@@ -39,15 +39,22 @@ compile_error!("epoch 231 requires its own called-program demotion qualification
     path = "called_program_demotion/epoch231.rs"
 )]
 #[cfg_attr(
+    feature = "epoch230-vote-boundary-demotion-qualification",
+    path = "called_program_demotion/epoch230_vote_boundary.rs"
+)]
+#[cfg_attr(
     not(any(
         feature = "epoch229-called-program-demotion-qualification",
         feature = "epoch231-called-program-demotion-qualification",
+        feature = "epoch230-vote-boundary-demotion-qualification",
     )),
     path = "called_program_demotion/epoch230.rs"
 )]
 mod profile;
 use profile::*;
 pub(crate) use profile::{BACKEND, BOOTSTRAP, CAPABILITY_ARG, DIVERGENT_SLOT, EPOCH};
+
+const VOTE_BOUNDARY: bool = cfg!(feature = "epoch230-vote-boundary-demotion-qualification");
 
 #[cfg(any(
     original_entry_replay,
@@ -187,8 +194,14 @@ pub(crate) fn launch(
     }
     let (ledger, output, scratch) =
         paths.ok_or_else(|| format!("explicit private epoch {EPOCH} paths required"))?;
-    let ledger_path = Path::new(RUN_ROOT).join("output");
-    if ledger != ledger_path || scratch != ledger_path || output != ledger_path.join(OUTPUT) {
+    let root = Path::new(RUN_ROOT);
+    let ledger_path = root.join("output");
+    let scratch_path = if VOTE_BOUNDARY {
+        root.join("scratch")
+    } else {
+        ledger_path.clone()
+    };
+    if ledger != ledger_path || scratch != scratch_path || output != ledger_path.join(OUTPUT) {
         return Err(format!(
             "epoch {EPOCH} requires the guarded ledger, scratch and output"
         ));
@@ -205,20 +218,22 @@ pub(crate) fn fresh_filesystem(ledger: &Path) -> Result<(), String> {
         ));
     }
     let indexes = ledger.join("compact-indexes");
-    let first_index_epoch = if cfg!(feature = "epoch230-final-tail-demotion-qualification") {
-        EPOCH
+    let index_epochs = if VOTE_BOUNDARY {
+        EPOCH..=EPOCH
+    } else if cfg!(feature = "epoch230-final-tail-demotion-qualification") {
+        EPOCH..=EPOCH + 1
     } else {
-        EPOCH - 1
+        EPOCH - 1..=EPOCH
     };
-    for path in [
-        root,
-        ledger,
-        &state,
-        &indexes,
-        &indexes.join(first_index_epoch.to_string()),
-        &indexes.join((first_index_epoch + 1).to_string()),
-    ] {
-        let metadata = std::fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    let scratch = root.join("scratch");
+    let index_dirs = index_epochs.map(|epoch| indexes.join(epoch.to_string()));
+    let dirs = [root, ledger, state.as_path(), indexes.as_path()]
+        .into_iter()
+        .map(Path::to_path_buf)
+        .chain(index_dirs)
+        .chain(VOTE_BOUNDARY.then(|| scratch.clone()));
+    for path in dirs {
+        let metadata = std::fs::symlink_metadata(&path).map_err(|error| error.to_string())?;
         if !metadata.is_dir()
             || metadata.uid() != unsafe { libc::geteuid() }
             || metadata.mode() & 0o077 != 0
@@ -252,6 +267,14 @@ pub(crate) fn fresh_filesystem(ledger: &Path) -> Result<(), String> {
         .is_some()
     {
         return Err(format!("epoch {EPOCH} refuses occupied private run state"));
+    }
+    if VOTE_BOUNDARY
+        && std::fs::read_dir(scratch)
+            .map_err(|error| error.to_string())?
+            .next()
+            .is_some()
+    {
+        return Err(format!("epoch {EPOCH} refuses occupied replay scratch"));
     }
     Ok(())
 }
@@ -490,7 +513,12 @@ mod tests {
         };
         let ledger = Path::new(RUN_ROOT).join("output");
         let output = ledger.join(OUTPUT);
-        let paths = Some((ledger.as_path(), output.as_path(), ledger.as_path()));
+        let scratch = if VOTE_BOUNDARY {
+            Path::new(RUN_ROOT).join("scratch")
+        } else {
+            ledger.clone()
+        };
+        let paths = Some((ledger.as_path(), output.as_path(), scratch.as_path()));
         assert!(launch(EPOCH, EPOCH, Some(expected), false, paths).is_ok());
         assert!(launch(EPOCH, EPOCH + 1, Some(expected), false, paths).is_err());
         assert!(launch(EPOCH, EPOCH, Some(expected), true, paths).is_err());
