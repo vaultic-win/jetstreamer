@@ -101,7 +101,10 @@ impl Focused {
         let body = plan.sealed()?;
         let sample_ref = binding(&launch["active_guard"])?;
         let sample = sample_ref.json()?;
-        let node = binding(&profile["node"])?;
+        let node = Bound::new(
+            text(&profile["node"], "path")?,
+            text(&profile["node"], "sha256")?,
+        );
         node.artifact()?;
         let owner = n.show_fields(self.unit, OWNER_FIELDS)?;
         let invocation = text(&launch, "invocation_id")?;
@@ -109,6 +112,9 @@ impl Focused {
         let ticks = process_ticks(pid)?;
         let running = fs::metadata(format!("/proc/{pid}/exe"))?;
         let sealed = fs::metadata(&node.path)?;
+        if let Some(bytes) = profile["node"]["bytes"].as_u64() {
+            ensure!(sealed.len() == bytes, "focused replay node size changed");
+        }
         let floor = num(&body, "minimum_free_bytes")?;
         ensure!(
             launch["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
