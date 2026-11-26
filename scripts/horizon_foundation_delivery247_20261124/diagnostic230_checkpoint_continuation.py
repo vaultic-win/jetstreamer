@@ -41,10 +41,17 @@ STOCK_WORKER_SHA231 = "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46
 DEMOTION231 = V / "horizon231-demotion-v1"
 DEMOTION_UNIT231 = "horizon-perf-epoch231-program-demotion@v1.service"
 DEMOTION_ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-demotion-tmpfs-v1/run")
+RESTORE231 = V / "horizon231-native-restore-runtime-v1"
+RESTORE_UNIT231 = "horizon-perf-epoch231-native-restore@v1.service"
+RESTORE_ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-native-restore-tmpfs-v1/run")
+RESTORE_PROBE231 = V / "horizon231-native-restore-probe-v1/jetstreamer-checkpoint-restore-probe"
+RESTORE_PLAN231 = V / "horizon231-native-restore-guard-v1/restore-plan.json"
+RESTORE_WORKER231 = "8f3e721a5ec255ffb7fd6fa848d2127740897476672eb2e8640f8bd449652859"
 RUNS231 = {
     UNIT231: (REPLAY231, ROOT231, "epoch231-capped-checkpoint-replay"),
     STOCK_UNIT231: (STOCK231, STOCK_ROOT231, "epoch231-stock-warmup"),
     DEMOTION_UNIT231: (DEMOTION231, DEMOTION_ROOT231, "epoch231-program-demotion"),
+    RESTORE_UNIT231: (RESTORE231, RESTORE_ROOT231, "epoch231-native-restore"),
 }
 INPUTS231 = {
     "path": str(V / "horizon231-capped-replay-checkpoints-v1/inputs.json"),
@@ -206,22 +213,30 @@ def receipt231(unit):
     assert row["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
     assert (row["epoch"], row["unit"], row["kind"]) == (231, unit, kind)
     assert row["run_root"] == str(root) and row["last_slot"] == 99_803_089
-    assert row["launched"] and row["entry_replay_requested"]
+    assert row["launched"] and row["entry_replay_requested"] == (unit != RESTORE_UNIT231)
     assert all(row[key] is False for key in ("canonical_epoch_publication_authorized", "remote_mutations",
                                             "r2_mutations", "full_cohort_resource_qualified"))
     iid = row["invocation_id"]
     assert re.fullmatch("[0-9a-f]{32}", iid) and row["main_pid"] > 0
     admission = bound(row["admission"])
-    inputs = bound(INPUTS231)
-    assert admission["admitted"] and admission["inputs"] == INPUTS231
-    expected_worker = STOCK_WORKER_SHA231 if unit == STOCK_UNIT231 else inputs["worker_sha256"]
-    if unit == DEMOTION_UNIT231:
-        profile = bound(admission["profile"])
-        pair = bound(profile["pair"])
-        assert pair["schema"] == "foundation-epoch231-program-demotion-pair-v1"
-        assert pair["parent"] == profile["node"] and pair["worker"] == profile["worker"]
-        assert pair["parent"]["path"] == row["node_path"] and not pair["publication_authorized"]
-        expected_worker = pair["worker"]["sha256"]
+    assert admission["admitted"]
+    if unit == RESTORE_UNIT231:
+        assert row["node_path"] == str(RESTORE_PROBE231)
+        assert (row["bootstrap_slot"], row["first_slot"], row["last_slot"]) == (99_803_089,) * 3
+        assert admission["probe"] == ref(RESTORE_PROBE231)
+        assert admission["restore_plan"] == ref(RESTORE_PLAN231)
+        expected_worker = RESTORE_WORKER231
+    else:
+        inputs = bound(INPUTS231)
+        assert admission["inputs"] == INPUTS231
+        expected_worker = STOCK_WORKER_SHA231 if unit == STOCK_UNIT231 else inputs["worker_sha256"]
+        if unit == DEMOTION_UNIT231:
+            profile = bound(admission["profile"])
+            pair = bound(profile["pair"])
+            assert pair["schema"] == "foundation-epoch231-program-demotion-pair-v1"
+            assert pair["parent"] == profile["node"] and pair["worker"] == profile["worker"]
+            assert pair["parent"]["path"] == row["node_path"] and not pair["publication_authorized"]
+            expected_worker = pair["worker"]["sha256"]
     assert row["worker_sha256"] == expected_worker
     guard = bound(row["active_guard"])
     assert guard["producer_invocation_id"] == iid and guard["producer"]["pid"] == row["main_pid"]
@@ -456,6 +471,8 @@ def register_warmup231(plan, gate):
                 gate["next_action"] = "Measure the stock runtime at the finalized warmup vote in slot 99,791,499."
             if unit == DEMOTION_UNIT231:
                 gate["next_action"] = "Compare Bank 99,791,498 with the finalized vote and verify the hourly AccountsDb root."
+            if unit == RESTORE_UNIT231:
+                gate["next_action"] = "Compare the restored checkpoint at slot 99,803,089 with the verified prefix terminal."
             terminal = package / "terminal.json"
             if terminal.is_file():
                 terminal_ref = ref(terminal)
