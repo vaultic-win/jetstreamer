@@ -1,20 +1,28 @@
-"""Track the private one-transaction epoch 296 warmup diagnostic."""
+"""Track the private epoch 296 warmup and loader diagnostics."""
 
 from pathlib import Path
 
 from ordinary249.delivery248 import V, bound, props, ref
 
 
-ATTEMPTS = ("v2", "v3")
+LOADER = "loader-upgrade-focused-v1"
+ATTEMPTS = ("v2", "v3", LOADER)
 FIELDS = ("ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup")
 
 
 def attempt_paths(version):
     assert version in ATTEMPTS
+    if version == LOADER:
+        return (f"horizon-qualify-296-{version}.service", V / f"horizon296-{version}",
+                Path(f"/home/ubuntu/.jetstreamer-private/qualification-296-{version}"))
     unit = f"horizon-perf-epoch296-meter-bounded@{version}.service"
     state = V / f"horizon296-meter-bounded-{version}"
     root = Path(f"/home/ubuntu/.jetstreamer-private/qualification-296-meter-bounded-{version}")
     return unit, state, root
+
+
+def profile_path(state, version):
+    return state / ("profile.json" if version == LOADER else "generic-unit-profile.json")
 
 
 def sealed(path):
@@ -32,11 +40,13 @@ def registration(version):
     source = sealed(path)
     row = bound(source)
     assert row["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+    kind = ("epoch296-private-loader-upgrade-diagnostic" if version == LOADER
+            else "epoch296-private-meter-diagnostic")
     assert (row["kind"], row["epoch"], row["unit"], row["run_root"]) == (
-        "epoch296-private-meter-diagnostic", 296, unit, str(root))
+        kind, 296, unit, str(root))
     assert row["launched"] and not row["remote_mutations"] and not row["r2_mutations"]
     assert row["canonical_epoch_publication_authorized"] is False
-    profile_ref = sealed(state / "generic-unit-profile.json")
+    profile_ref = sealed(profile_path(state, version))
     profile = bound(profile_ref)
     assert row["profile"] == profile_ref and row["worker"] == profile["worker"]
     admission = bound(row["admission"])
@@ -76,7 +86,7 @@ def configuration():
 
 def register_attempt(plan, version, ordinary_replay):
     unit, state, root = attempt_paths(version)
-    profile = state / "generic-unit-profile.json"
+    profile = profile_path(state, version)
     if not profile.is_file():
         return
     gate = plan["gates"]["296"]
@@ -96,7 +106,10 @@ def register_attempt(plan, version, ordinary_replay):
             if not ordinary_replay:
                 gate["next_action"] = closed["next_action"]
         elif not ordinary_replay:
-            gate["next_action"] = "Collect the private meter trace and drain guards after its terminal result."
+            gate["next_action"] = (
+                "Collect the bounded loader replay result and drain its guard."
+                if version == LOADER else
+                "Collect the private meter trace and drain guards after its terminal result.")
         claim = dict(epoch=296, unit=unit, invocation_id=row["invocation_id"],
                      scratch_path=str(root), launch_receipt=source)
         existing = [item for item in plan["diagnostics"] if item["unit"] == unit]
@@ -108,7 +121,10 @@ def register_attempt(plan, version, ordinary_replay):
         elif not existing:
             plan["diagnostics"].append(claim)
     elif not ordinary_replay:
-        gate["next_action"] = "Admit the bounded meter diagnostic against the complete live fleet."
+        gate["next_action"] = (
+            "Admit the checkpoint-bounded loader diagnostic against the complete live fleet."
+            if version == LOADER else
+            "Admit the bounded meter diagnostic against the complete live fleet.")
     for item in evidence:
         if item not in gate["evidence"]:
             gate["evidence"].append(item)
