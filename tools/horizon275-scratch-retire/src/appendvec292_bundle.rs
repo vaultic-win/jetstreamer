@@ -8,6 +8,18 @@ const SOURCE_ROOT: &str = "/var/lib/jetstreamer/horizon292-closed-appendvec-stag
 const BUNDLE: &str = "epoch-292-closed-appendvecs.pax.zst";
 const COMPLETION_SHA: &str = "d2fed211df5d4e55808b400e6b48ce1ece8b03a5fdf9b11cd63500649f130a17";
 
+fn matching_etag(head: &Value, custody: &Value) -> bool {
+    head.as_str()
+        .zip(custody.as_str())
+        .is_some_and(|(head, custody)| {
+            !custody.is_empty()
+                && head
+                    .strip_prefix('"')
+                    .and_then(|etag| etag.strip_suffix('"'))
+                    == Some(custody)
+        })
+}
+
 fn same_bundle(metadata: &Metadata, expected: &Value, renamed: bool) -> bool {
     metadata.is_file()
         && expected["device"] == metadata.dev()
@@ -93,7 +105,7 @@ pub(super) fn run(apply: bool, self_sha: &str, recheck: Binding) -> Result<()> {
             && custody["remote_sha256_readback"] == true
             && custody["local_source_revalidated"] == true
             && remote["object_key"] == custody["object_key"]
-            && remote["object_etag"] == custody["object_etag"]
+            && matching_etag(&remote["object_etag"], &custody["object_etag"])
             && remote["sha256"] == custody["manifest"]["sha256"]
             && remote["length"] == custody["manifest"]["length"]
             && remote["manifest_key"] == custody["manifest_key"]
@@ -247,6 +259,19 @@ pub(super) fn run(apply: bool, self_sha: &str, recheck: Binding) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn authenticated_head_quotes_the_custody_etag() {
+        assert!(matching_etag(
+            &json!("\"digest-1005\""),
+            &json!("digest-1005")
+        ));
+        assert!(!matching_etag(
+            &json!("\"digest-1004\""),
+            &json!("digest-1005")
+        ));
+        assert!(!matching_etag(&Value::Null, &Value::Null));
+    }
 
     #[test]
     fn quarantine_relaxes_only_the_rename_timestamp() -> Result<()> {
