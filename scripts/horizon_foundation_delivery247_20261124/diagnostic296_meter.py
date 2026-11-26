@@ -5,7 +5,7 @@ from pathlib import Path
 from ordinary249.delivery248 import V, bound, props, ref
 
 
-LOADER = "loader-upgrade-focused-v1"
+LOADER = "loader-upgrade-focused-v2"
 ATTEMPTS = ("v2", "v3", LOADER)
 FIELDS = ("ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup")
 

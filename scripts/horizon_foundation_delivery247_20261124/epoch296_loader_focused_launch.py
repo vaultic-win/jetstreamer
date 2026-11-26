@@ -16,11 +16,11 @@ from epoch288_shrink_debt_comparison import load_existing
 from epoch230_checkpoint_continuation_launch import activate_guarded, git, inventory, SOURCE
 
 
-STATE = V / "horizon296-loader-upgrade-focused-v1"
+STATE = V / "horizon296-loader-upgrade-focused-v2"
 CONTROL = V / "horizon-seven-publication-controller-v222"
 ADAPTER = "diagnostic296_meter.py"
-UNIT = "horizon-qualify-296-loader-upgrade-focused-v1.service"
-GUARD = "horizon-296-loader-upgrade-focused-protective-v1.service"
+UNIT = "horizon-qualify-296-loader-upgrade-focused-v2.service"
+GUARD = "horizon-296-loader-upgrade-focused-protective-v2.service"
 TOKENS = STATE / "tokens"
 HOOK = {
     "path": str(V / "horizon230-final-tail-tokens-v1/pre-start.sh"),
@@ -28,11 +28,11 @@ HOOK = {
 }
 PROFILE = {
     "path": str(STATE / "profile.json"),
-    "sha256": "e886d3df327a95953fc8a564606ac356895429fdb68507dc5cb2a58a1606cfd0",
+    "sha256": "f6318333fc088dee3c6109cb6434eba0fddb916ed6ed143bfd7ffca27a59beba",
 }
 PREFLIGHT = {
     "path": str(STATE / "preflight.json"),
-    "sha256": "2c8d70032485b0be54e2a2aa52d62e60cb7d28193159366418ea4610d39b82e1",
+    "sha256": "d93ae64c1058439379dafd6e9ffe3c1622ffaa9c8bbf8f16c8d505704c54e260",
 }
 RAM = 173_207_977_984
 CAP = 160 << 30
@@ -92,6 +92,11 @@ def launch(kit, roster_ref):
     for entry in preflight["evidence"]:
         assert ops.ref(Path(entry["path"])) == entry
     root = Path(profile["run_root"])
+    writable = Path(profile["properties"]["ReadWritePaths"])
+    runtime_state = Path(profile["environment"]["JETSTREAMER_PRIVATE_RUN_ROOT"])
+    assert preflight["writable_private_state_validated"] and writable == root / "work"
+    assert runtime_state.is_relative_to(writable) and runtime_state.is_dir()
+    assert runtime_state.resolve() == runtime_state
     assert profile["unit"] == UNIT and profile["properties"]["AllowedCPUs"] == CPUS
     assert int(profile["properties"]["MemoryMax"]) == RAM
     assert profile["guarded_whole_tree_cap_bytes"] == CAP
@@ -124,7 +129,7 @@ def launch(kit, roster_ref):
     for unit in (UNIT, GUARD, GUARD.removesuffix(".service") + ".timer"):
         assert ops.props(unit, ["LoadState", "ActiveState", "Job"]) == {
             "LoadState": "not-found", "ActiveState": "inactive", "Job": ""}
-    remote = inventory(kit, epoch=296, unit="foundation-296-focused-admission-inventory-v1")
+    remote = inventory(kit, epoch=296, unit="foundation-296-focused-admission-inventory-v2")
     measured = current_fit(kit, roster, root)
     properties = dict(profile["properties"], BindReadOnlyPaths=" ".join(bindings),
                       ReadOnlyPaths=str(TOKENS), Delegate="no", OOMPolicy="kill",

@@ -1,23 +1,23 @@
 //! Bind the bounded epoch 296 loader diagnostic to the ordinary fleet reserves.
 use super::*;
 
-pub(super) const UNIT: &str = "horizon-qualify-296-loader-upgrade-focused-v1.service";
-pub(super) const GUARD: &str = "horizon-296-loader-upgrade-focused-protective-v1";
-pub(super) const GUARD_SERVICE: &str = "horizon-296-loader-upgrade-focused-protective-v1.service";
+pub(super) const UNIT: &str = "horizon-qualify-296-loader-upgrade-focused-v2.service";
+pub(super) const GUARD: &str = "horizon-296-loader-upgrade-focused-protective-v2";
+pub(super) const GUARD_SERVICE: &str = "horizon-296-loader-upgrade-focused-protective-v2.service";
 pub(super) const SCRATCH_CAP: u64 = 160 << 30;
 pub(super) const RECEIPT_DISK: u64 = 64 << 20;
 pub(super) const PRODUCER_MEMORY: u64 = 173_207_977_984;
-const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-296-loader-upgrade-focused-v1";
+const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-296-loader-upgrade-focused-v2";
 const PREFLIGHT: (&str, &str) = (
-    "/var/lib/jetstreamer/horizon296-loader-upgrade-focused-v1/preflight.json",
-    "2c8d70032485b0be54e2a2aa52d62e60cb7d28193159366418ea4610d39b82e1",
+    "/var/lib/jetstreamer/horizon296-loader-upgrade-focused-v2/preflight.json",
+    "d93ae64c1058439379dafd6e9ffe3c1622ffaa9c8bbf8f16c8d505704c54e260",
 );
 const PROFILE: (&str, &str) = (
-    "/var/lib/jetstreamer/horizon296-loader-upgrade-focused-v1/profile.json",
-    "e886d3df327a95953fc8a564606ac356895429fdb68507dc5cb2a58a1606cfd0",
+    "/var/lib/jetstreamer/horizon296-loader-upgrade-focused-v2/profile.json",
+    "f6318333fc088dee3c6109cb6434eba0fddb916ed6ed143bfd7ffca27a59beba",
 );
 const REGISTRATION: &str =
-    "/var/lib/jetstreamer/horizon296-loader-upgrade-focused-v1/cadence-registration.json";
+    "/var/lib/jetstreamer/horizon296-loader-upgrade-focused-v2/cadence-registration.json";
 
 pub(super) fn preflight() -> Result<Bound> {
     let reference = Bound::new(PREFLIGHT.0, PREFLIGHT.1);
@@ -31,6 +31,7 @@ pub(super) fn preflight() -> Result<Bound> {
             && receipt["snapshot_sha256_rechecked"] == true
             && receipt["private_namespace_validated"] == true
             && receipt["static_guard_validated"] == true
+            && receipt["writable_private_state_validated"] == true
             && receipt["publication_authorized"] == false
             && profile["unit"] == UNIT
             && profile["run_root"] == ROOT
