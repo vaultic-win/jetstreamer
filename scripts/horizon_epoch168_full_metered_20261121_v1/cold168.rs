@@ -113,7 +113,7 @@ mod route {
     pub const WITNESS: &str = "fa3ba73fbc164507e40b76f6653c1394df223b2bea0aa940b815baae16d868fc";
     pub const GUARD_BASE: &str = "epoch168-cold-guard-20261125-v5";
     pub const FIT: &str = if cfg!(epoch168_cold_retry5_independent145) {
-        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-independent-v1/post-stop-fit"
+        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-independent-v2/post-stop-fit"
     } else if cfg!(epoch168_cold_retry5_v10) {
         "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry5-v6/post-stop-fit"
     } else if cfg!(epoch168_cold_retry5_v13) {
