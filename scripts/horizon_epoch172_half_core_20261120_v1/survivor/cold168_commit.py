@@ -30,6 +30,62 @@ FAILED_INTENT = dict(path=str(SOURCE/'guard-receipts/stop-intent.json'),
                      sha256='b3dab5e0a743cfd42a7380cfa623db61c978e15c1d9b0b034d7760eead1d2926')
 FAILED_COMPLETION = dict(path=str(SOURCE/'guard-receipts/stop-completion.json'),
                          sha256='b0538a4dee05df924a8d04f8562866df701c03996498963552a932059826cdab')
+RETRY5_STOP_FIELD = 'cold168_retry5_physical_scan_stop'
+
+
+def retry5_scan_stop(fleet, config, route):
+    """Bind a retry5 guard stop before the first observer enrollment."""
+    intent_ref = bound(route.ROOT/'guard-receipts/stop-intent.json')
+    terminal_ref = bound(route.ROOT/'guard-receipts/stop-completion.json')
+    admission_ref = bound(route.ROOT/'ACTUAL_ADMISSION_AND_PROTECTION.json')
+    first_ref = bound(route.ROOT/'FIRST_PROTECTED_WORKER.json')
+    intent, stopped = checked(intent_ref), checked(terminal_ref)
+    admission, first = checked(admission_ref), checked(first_ref)
+    plan_ref = admission['actual_guard_plan']
+    plan, post = checked(plan_ref), checked(admission['post_guard_capacity'])
+    terminal, sample = stopped['terminal'], intent['sample']
+    iid = admission['producer_invocation_id']
+    cap = route.CAP_GIB << 30
+    need(route.ATTEMPT == 5
+         and intent['schema'] == 'jetstreamer-horizon-standalone-stop-intent-v1'
+         and stopped['schema'] == 'jetstreamer-horizon-standalone-stop-completion-v1'
+         and stopped['intent'] == intent_ref['path']
+         and stopped['plan_sha256'] == intent['plan_sha256'] == sample['plan_sha256'] == plan_ref['sha256']
+         and stopped['producer_invocation_id'] == intent['producer_invocation_id']
+         == sample['producer_invocation_id'] == terminal['invocation_id'] == plan['invocation_id']
+         == first['producer_invocation_id'] == iid
+         and admission['producer_unit'] == first['producer_unit'] == plan['unit'] == route.UNIT
+         and admission['timer_unit'] == route.TIMER and first['admission'] == admission_ref
+         and intent['reason'] == sample['trip_reason'] == 'root-physical-observation-failed'
+         and sample['root_physical_observation_error'] == 'physical scan time bound exceeded'
+         and plan['maximum_root_physical_bytes'] == sample['maximum_root_physical_bytes']
+         == post['bookings']['168']['cap_bytes'] == cap
+         and post['fits'] is True and post['bookings']['168']['root'] == plan['worker_root']
+         and terminal['active'] == 'inactive' and terminal['sub'] == 'dead' and terminal['pid'] == 0
+         and terminal['restart_policy'] == 'no' and terminal['restarts'] == 0
+         and stopped['scratch_deleted'] is stopped['r2_mutations'] is stopped['remote_mutations'] is False,
+         'different epoch 168 retry5 filesystem scan stop')
+    from owners import show
+    for unit in (route.UNIT, route.TIMER.removesuffix('.timer') + '.service'):
+        fields = ('ActiveState', 'MainPID', 'ControlPID', 'ControlGroup', 'Job', 'InvocationID')
+        need(show(unit, fields) == dict(ActiveState='inactive', MainPID='0', ControlPID='0',
+                                        ControlGroup='', Job='', InvocationID=''),
+             'epoch 168 retry5 producer or guard remains present')
+    need(show(route.TIMER, ('ActiveState', 'Job', 'InvocationID')) ==
+         dict(ActiveState='inactive', Job='', InvocationID='')
+         and not Path('/sys/fs/cgroup/system.slice', route.UNIT).exists(),
+         'epoch 168 retry5 timer or cgroup remains present')
+    need(not fleet.get(OWNERS, {}).get('168')
+         and not any(row['epoch'] == 168 for field in (
+             'actual_executing_replays', 'actual_active_bootstraps', 'actual_active_private_diagnostics'
+         ) for row in fleet[field])
+         and not any(row['range'] == '168' for row in config['replays']),
+         'retry5 stopped after observer enrollment')
+    proof = dict(terminal=terminal_ref, stop_intent=intent_ref, admission=admission_ref,
+                 first_worker=first_ref, producer_invocation_id=iid, retired_guard_timer=route.TIMER,
+                 retained_cap_bytes=cap, resource_credit_bytes=0, reservation_ending_bytes=0)
+    need(fleet.get(RETRY5_STOP_FIELD, proof) == proof, 'changed adopted retry5 scan stop')
+    return proof
 
 
 def closure():

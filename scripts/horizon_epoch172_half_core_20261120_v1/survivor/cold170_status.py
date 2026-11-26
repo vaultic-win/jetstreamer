@@ -21,12 +21,13 @@ FIELD = 'current_homefloor_cold166_167_170_owners'
 BINDING = LOCAL / f'{ATTEMPT}-170-generation.json'
 FAILED_RUN = ROOT / 'failed-replay-20261124T123309Z'
 V13_PACKAGE = 'tools-cold168-retry5-failed166-v13-entry146'
+V14_PACKAGE = 'tools-cold168-retry5-failed166-v14-entry146'
 METERED_FULL = LOCAL.name in ('tools-cold168-retry4-failed166-v6-entry146',
-                             'tools-cold168-retry4-failed166-v7-entry146', V13_PACKAGE)
+                             'tools-cold168-retry4-failed166-v7-entry146', V13_PACKAGE, V14_PACKAGE)
 if METERED_FULL:
     import full170_status as full170
 
-RETRY5_168 = LOCAL.name in ('tools-cold168-retry5-failed166-v12-entry146', V13_PACKAGE)
+RETRY5_168 = LOCAL.name in ('tools-cold168-retry5-failed166-v12-entry146', V13_PACKAGE, V14_PACKAGE)
 FAILED166_CADENCE = RETRY5_168 or METERED_FULL or LOCAL.name in (
     'tools-cold168-retry4-failed166-v1', 'tools-cold168-retry4-failed166-v2',
     'tools-cold168-retry4-failed166-v3', 'tools-cold168-retry4-failed166-v4-entry146',
@@ -265,6 +266,8 @@ def reconcile(c, observed_lane):
     c.failed168 = cold168_commit.guard_stop(c.fleet, c.cfg) if stopped168 else None
     c.retained168 = (cold168_commit.guard_stop(c.fleet, c.cfg, successor=cold168) if RETRY5_168
                      else c.failed168)
+    c.failed168_retry5 = (cold168_commit.retry5_scan_stop(c.fleet, c.cfg, cold168)
+                          if LOCAL.name == V14_PACKAGE else None)
     terminal168 = (cold168_commit.current(c.fleet, c.cfg)
                    if cold168_commit and not (stopped168 or RETRY5_168) else None)
     c.failed170 = failed_route(c.fleet)
@@ -275,7 +278,9 @@ def reconcile(c, observed_lane):
         full170.historical_diagnostic(c.fleet)
     blocking170 = terminal or (c.failed170 if not METERED_FULL else None)
     enrolled = roster(module, c.fleet_ref, c.fleet, blocking170, c.failed166,
-                      terminal168=terminal168 or c.failed168)
+                      terminal168=terminal168 or c.failed168 or c.failed168_retry5)
+    if c.failed168_retry5:
+        module.ROUTES.pop(168)
     if c.failed166:
         module.ROUTES.pop(166)
         need(all(r['range'] != '166' for r in c.cfg['replays']), 'failed epoch 166 remained in sampled roster')
@@ -456,3 +461,11 @@ def install_retry5(c, fleet):
         row.pop('current_cold168_retry5_held', None)
     if 168 in c.new_rows:
         row['current_status_scope'] = 'Epoch 168 retry5 is running under its admitted guard.'
+    if c.failed168_retry5:
+        key = cold168_commit.RETRY5_STOP_FIELD
+        fleet[key] = c.failed168_retry5
+        row[key] = c.failed168_retry5
+        row.update(state='verification', no_live_producer_claimed=True, repair_open=True,
+                   current_repair_owner='/root',
+                   current_status_scope='Epoch 168 retry5 stopped when the guard filesystem scan timed out.',
+                   next_action='Qualify a guard scan under replay load before admitting a successor.')

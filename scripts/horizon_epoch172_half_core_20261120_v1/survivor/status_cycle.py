@@ -24,7 +24,7 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
-RETRY5_CADENCE_VERSIONS = (12, 13)
+RETRY5_CADENCE_VERSIONS = (12, 13, 14)
 
 
 def failed166_package(version):
@@ -33,11 +33,11 @@ def failed166_package(version):
     return name + '-entry146' if version >= 4 else name
 
 
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14)
                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
 FAILED166 = bool(FAILED166_VERSION)
 RETRY5_168 = FAILED166_VERSION in RETRY5_CADENCE_VERSIONS
-METERED_FULL170 = FAILED166_VERSION in (6, 7, 13)
+METERED_FULL170 = FAILED166_VERSION in (6, 7, 13, 14)
 HOLDING185 = FAILED166_VERSION == 7
 HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
 FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
@@ -1063,6 +1063,8 @@ def rejoin_failed166_cadence(state, receipt, fd):
         previous = 'FAILED166_CADENCE_V5'
     if FAILED166_VERSION in (10, 11):
         previous = 'FAILED166_CADENCE_V8'
+    if FAILED166_VERSION == 14:
+        previous = 'FAILED166_CADENCE_V12'
     incumbent_ref = bound(ROOT/f'{previous}_ACTIVE.json')
     need(ready['schema'] == 'horizon-epoch166-cadence-rejoin-ready-v1'
          and ready['package'] == receipt and ready['old_owner'] == incumbent_ref,
@@ -1109,14 +1111,21 @@ def rejoin_failed166_cadence(state, receipt, fd):
         cold_workers.cold168_commit.guard_stop(fleet, cfg)
     if RETRY5_168:
         route = cold_workers.cold168
+        previous_version = 12 if FAILED166_VERSION == 14 else FAILED166_VERSION - 1
         need(ready['retry5_generation'] == bound(route.BINDING)
              and ready['retained_retry4_stop'] == route.RETRY4_STOP
-             and old['program'] == str(ROOT/failed166_package(FAILED166_VERSION - 1)/'status_cycle.py'),
+             and old['program'] == str(ROOT/failed166_package(previous_version)/'status_cycle.py'),
              'retry5 rejoin dropped the qualified generation or retry4 stop')
-        if FAILED166_VERSION == 13:
+        if FAILED166_VERSION in (13, 14):
             check_v13_predecessor(incumbent_ref, incumbent, ready, route)
             need(all(row['range'] != '170' for row in cfg['diagnostic_replays']),
                  'V13 observer still scheduled the settled epoch 170 diagnostic')
+        if FAILED166_VERSION == 14:
+            sample = bound(Path(cfg['output']))
+            need(not timer_names() and ready['completed_sample'] == sample
+                 and ready['retry5_scan_stop'] == cold_workers.cold168_commit.retry5_scan_stop(fleet, cfg, route),
+                 'V14 rejoin lost the original sample or retry5 stop')
+            check_sample(fleet, checked(sample), cfg)
         route.generation()
         cold_workers.cold168_commit.guard_stop(fleet, cfg, successor=route)
     pid = os.getpid()
