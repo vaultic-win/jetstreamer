@@ -1,6 +1,7 @@
 //! Bind the live Foundation cohort for replay funding and guard qualification.
 use super::*;
 mod allocation;
+mod vote_boundary;
 
 const FLEET_ROOT: &str = "/home/ubuntu/.codex/diagnostics";
 const FLEET_PREFIX: &str = "horizon-foundation-seven-lane-v";
@@ -630,8 +631,13 @@ fn fleet_roster<'a>(
             continue;
         }
         if let Some(replay) = live_replays.get(&epoch) {
+            let phase = if epoch == 230 {
+                "diagnostic-qualification"
+            } else {
+                "replay"
+            };
             ensure!(
-                row["phase"] == "replay" && observed_replays.insert(epoch),
+                row["phase"] == phase && observed_replays.insert(epoch),
                 "unexpected or duplicate epoch {epoch} phase in fleet"
             );
             live::same_owner(&row["producer"], &replay.owner)?;
@@ -659,6 +665,10 @@ fn fleet_roster<'a>(
     ensure!(
         observed_delivery.is_none() || !roster.contains_key(&261),
         "duplicate epoch 261 phases in fleet"
+    );
+    ensure!(
+        !live_replays.contains_key(&230) || observed_replays.contains(&230),
+        "epoch 230 diagnostic is missing from the accepted fleet"
     );
     let missing: BTreeMap<_, _> = released
         .iter()
@@ -777,6 +787,7 @@ fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
                 .iter()
                 .any(|prefix| unit.starts_with(prefix));
             (scoped
+                && unit != vote_boundary::GUARD_SERVICE
                 && !KNOWN_GUARDS
                     .iter()
                     .any(|(_, guard)| unit == format!("{guard}.service")))
@@ -828,7 +839,9 @@ fn guard_binding(
     let command = text(&service, "ExecStart")?;
     // Systemd appends changing execution timestamps after the stable argument framing.
     let guard_pin = Bound::new(
-        if epoch == 288 {
+        if guard == vote_boundary::GUARD {
+            vote_boundary::GUARD_BINARY
+        } else if epoch == 288 {
             GUARD_288
         } else {
             STANDARD_GUARD
@@ -1063,6 +1076,13 @@ fn measure(
             live_replays.insert(spec.epoch, live_replay(n, spec)?);
         }
     }
+    if before.contains(vote_boundary::UNIT) {
+        ensure!(
+            closed_230.is_some(),
+            "previous epoch 230 owner has not drained"
+        );
+        live_replays.insert(230, vote_boundary::live(n)?);
+    }
     let roster = fleet_roster(
         &fleet,
         &booking,
@@ -1251,7 +1271,17 @@ fn measure(
             guard_binding(n, guard_epoch, guard, guard_booking, owner, device)?,
         );
     }
+    let disk_floor = guards
+        .values()
+        .map(|guard| num(guard, "minimum_free_bytes"))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .max()
+        .context("missing Foundation guard floor")?;
     let allocation = allocation::measure(n, &guards, device)?;
+    if let Some(diagnostic) = live_replays.get(&230) {
+        guards.insert(230, vote_boundary::guard(n, diagnostic, device)?);
+    }
     for (unit, (owner, memory, start_ticks)) in &mut recorded {
         let after = n.show_fields(unit, OWNER_FIELDS)?;
         live::same_owner(owner, &after)?;
@@ -1316,13 +1346,6 @@ fn measure(
     );
     let delivery_ref = Bound::new(DELIVERY_BOOKING.0, DELIVERY_BOOKING.1);
     let delivery = delivery_ref.sealed()?;
-    let disk_floor = guards
-        .values()
-        .map(|g| num(g, "minimum_free_bytes"))
-        .collect::<Result<Vec<_>>>()?
-        .into_iter()
-        .max()
-        .context("missing Foundation guard floor")?;
     let prior_growth = booking["guard_growth"]
         .as_object()
         .context("prior growth reservations")?
@@ -1388,7 +1411,14 @@ fn measure(
         .min(resources_after.2);
     let periodic_reserve = capacity::add(
         num(&delivery, "guard_memory_allowance")?,
-        (live_replays.len() as u64) << 30,
+        capacity::add(
+            (live_replays.len() as u64) << 30,
+            if live_replays.contains_key(&230) {
+                CONTROLLER_MEMORY
+            } else {
+                0
+            },
+        )?,
     )?;
     let reserve = capacity::add(resources_before.0 / 10, periodic_reserve)?;
     let base_memory = capacity::add(capacity::add(reserve, candidate)?, reserved_audit_memory)?;
@@ -1409,6 +1439,7 @@ fn measure(
     let available_memory = resources_before.1.min(resources_after.1);
     let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
         "active_delivery_261_disk_bytes":delivery_261_disk,
+        "active_diagnostic_230_receipt_disk_bytes":live_replays.get(&230).map_or(0, |lane| lane.receipt_disk),
         "active_replay_262_receipt_disk_bytes":live_replays.get(&262).map_or(0, |lane| lane.receipt_disk),
         "active_replay_296_receipt_disk_bytes":live_replays.get(&296).map_or(0, |lane| lane.receipt_disk),
         "remaining_guard_growth_bytes":growth,"protected_existing_disk_bytes":protected,
@@ -1441,6 +1472,7 @@ fn measure(
         "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
         "closed_middle_replay":closed_230,
+        "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
         "closed_delivery_257":closed_257,
         "active_delivery_261_claim":active_delivery.as_ref().map(|(claim, _, _, _)| claim),
         "active_replay_262_registration":live_replays.get(&262).map(|replay| &replay.reference),
