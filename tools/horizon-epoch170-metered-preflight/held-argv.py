@@ -69,7 +69,9 @@ def held_argv(profile, payload, digest):
              and str(ALIAS / "payload.json") not in command[index]
              and str(ALIAS / "barrier") not in command[index], f"held binding already present in {prop}")
         command[index] += " " + projection
-    return [*command, str(ALIAS / "preflight"), "hold", digest]
+    # systemd-run checks its initial executable before mounting the service
+    # namespace. Resolve the read-only alias after that namespace is active.
+    return [*command, "/usr/bin/env", str(ALIAS / "preflight"), "hold", digest]
 
 
 def review_command(review_path, review_sha, payload_seal):
