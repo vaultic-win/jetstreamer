@@ -62,10 +62,12 @@ def terminal_evidence(claim):
     return {"started": starts[0], "finished": stops[0]}
 
 
-def fallback_publication(directory, completion, wd, record):
+def fallback_publication(completion, wd, record):
     """Bind the exact conditional write, prior bytes, and authenticated readback."""
     done = bound(completion)
-    intent = bound(done["intent"])
+    intent_ref = done["intent"]
+    intent = bound(intent_ref)
+    directory = Path(intent_ref["path"]).parent
     old = bound(intent["previous"])
     raw = done["readback"]
     assert old["key"] == done["key"] and done["authenticated_exact_byte_readback"]
@@ -139,13 +141,17 @@ def status_cleanup(epoch, claim_ref, spec, proof, completion, wd, record):
         assert result["status_publication_receipt_sha256"] == native["sha256"]
         assert result["archive_receipt_sha256"] == proof["archive"]["sha256"]
     else:
-        publisher = fallback_publication(Path(completion["path"]).parent, completion, wd, record)
-        dest = wd / f"epoch-{epoch}.fallback-ready-status-deletion.json"
-        policy = record(wd / "fallback-plan.json", {
+        publisher = fallback_publication(completion, wd, record)
+        # Keep existing private-state bindings valid across retries. Runtime
+        # directories outside private state must use the qualified receipt root.
+        evidence = wd if wd.is_relative_to(STATUS.parent) else STATUS
+        plan = wd / "fallback-plan.json" if evidence == wd else evidence / f"epoch-{epoch}.fallback-ready-status-plan.json"
+        dest = evidence / f"epoch-{epoch}.fallback-ready-status-deletion.json"
+        policy = record(plan, {
             "schema": "jetstreamer-r2-fallback-ready-status-plan-v1", "epoch": epoch, "bucket": spec["bucket"],
             "status_delete_authorized": True, "archive_or_sidecar_mutations": False,
             "fallback_completion": publisher, "raw_status": raw, "archive_receipt": proof["archive"],
-            "deletion_intent": str(wd / f"epoch-{epoch}.fallback-ready-status-delete-intent.json"), "deletion_receipt": str(dest),
+            "deletion_intent": str(evidence / f"epoch-{epoch}.fallback-ready-status-delete-intent.json"), "deletion_receipt": str(dest),
         })
         command = [tool, "status-delete-fallback-ready", policy["path"], "--plan-sha256", policy["sha256"], "--self-sha256", R2["sha256"]]
         check = json.loads(subprocess.check_output([*command, "--check-only"], timeout=60))
