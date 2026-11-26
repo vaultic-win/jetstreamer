@@ -38,6 +38,11 @@ const LAUNCH_226: (&str, &str) = (
 );
 const SUFFIX_226_ROOT: &str = "/var/lib/jetstreamer/horizon226-suffix-v1";
 const SUFFIX_226_CAP: u64 = 160 << 30;
+const REPLAY_230: &str = "horizon-qualify-230-middle-v1.service";
+const TERMINAL_230: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon230-middle-fit-v1/terminal-execution-mismatch.json",
+    "bd5e40f2c612b5e20cb9607379b2a8511983c4a7d9c71409ed3ed0fa3472882b",
+);
 const CADENCE_LOCK: &str =
     "/var/lib/jetstreamer/horizon-seven-publication-controller-v222/cycle.lock";
 const STANDARD_GUARD: &str =
@@ -246,6 +251,49 @@ fn terminal_extract_226(n: &mut Native, booking: &Value, proof: &Bound) -> Resul
         }
     }
     Ok(())
+}
+
+fn terminal_replay_230(n: &mut Native, booking: &Value) -> Result<Option<Bound>> {
+    let producer = n.show_fields(
+        REPLAY_230,
+        "ActiveState,InvocationID,MainPID,ControlGroup,Job,NRestarts,Result,ExecMainStatus",
+    )?;
+    if producer["ActiveState"] == "active" {
+        return Ok(None);
+    }
+    let proof = Bound::new(TERMINAL_230.0, TERMINAL_230.1);
+    let closed = proof.sealed()?;
+    let invocation = &booking["owners"][REPLAY_230]["InvocationID"];
+    let timer = n.show_fields("horizon-230-middle-protective-v1.timer", "ActiveState,Job")?;
+    let guard = n.show_fields(
+        "horizon-230-middle-protective-v1.service",
+        "ActiveState,MainPID,ControlGroup,Job",
+    )?;
+    ensure!(
+        closed["schema"] == "foundation-epoch230-middle-execution-mismatch-terminal-v1"
+            && closed["epoch"] == 230
+            && closed["producer"]["Id"] == REPLAY_230
+            && &closed["producer"]["InvocationID"] == invocation
+            && &closed["manager_event"]["INVOCATION_ID"] == invocation
+            && closed["diagnostics_retained"] == true
+            && closed["physical_reclamation_bytes"] == 0
+            && producer["ActiveState"] == "failed"
+            && &producer["InvocationID"] == invocation
+            && producer["Result"] == "exit-code"
+            && producer["ExecMainStatus"] == "1"
+            && producer["MainPID"] == "0"
+            && producer["ControlGroup"] == ""
+            && producer["Job"] == ""
+            && producer["NRestarts"] == "0"
+            && timer["ActiveState"] == "inactive"
+            && timer["Job"] == ""
+            && matches!(guard["ActiveState"].as_str(), Some("inactive" | "failed"))
+            && guard["MainPID"] == "0"
+            && guard["ControlGroup"] == ""
+            && guard["Job"] == "",
+        "epoch 230 failed replay and protective guard do not match the recorded drain"
+    );
+    Ok(Some(proof))
 }
 
 fn fleet_roster<'a>(
@@ -605,6 +653,14 @@ fn measure(
     if closed_replay.is_some() {
         released_replays.insert(261, REPLAY_261);
     }
+    let closed_230 = if quote.is_some() {
+        terminal_replay_230(n, &booking)?
+    } else {
+        None
+    };
+    if closed_230.is_some() {
+        released_replays.insert(230, REPLAY_230);
+    }
     let roster = fleet_roster(&fleet, &booking, &released_replays)?;
     let epoch = match &quote {
         Some(Quote::Suffix226(_)) => 226,
@@ -736,6 +792,7 @@ fn measure(
     let mut guards = BTreeMap::new();
     for (guard_epoch, guard) in KNOWN_GUARDS {
         if (guard_epoch == 226 && suffix.is_some())
+            || (guard_epoch == 230 && closed_230.is_some())
             || (guard_epoch == 261 && closed_replay.is_some())
         {
             continue;
@@ -778,6 +835,12 @@ fn measure(
         ensure!(
             terminal_replay_261(n, &booking)? == closed_replay,
             "epoch 261 terminal changed during roster binding"
+        );
+    }
+    if closed_230.is_some() {
+        ensure!(
+            terminal_replay_230(n, &booking)? == closed_230,
+            "epoch 230 terminal changed during roster binding"
         );
     }
     if let Some(proof) = suffix {
@@ -917,7 +980,8 @@ fn measure(
         "recorded_unix_seconds":now()?,"fleet":fleet_ref,"observer":observer_ref,
         "completion":completion,"booking":booking_ref,"filesystem_device":device,
         "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
-        "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false});
+        "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
+        "closed_middle_replay":closed_230});
     if let Some(Quote::FullReplay(quote)) = &quote {
         evidence["full_replay_quote"] = json!({"sizing_reference":quote.reference,"inputs":quote.inputs,
             "whole_tree_bytes":quote.working_disk,"producer_memory_bytes":quote.producer_memory,
