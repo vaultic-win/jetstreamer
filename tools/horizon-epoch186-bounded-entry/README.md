@@ -43,13 +43,20 @@ archive verification.
   guard invocation.
 - `capture-prefix-completion ADOPTED_CHECK SHA256` emits the assembler's
   prefix-completion JSON to stdout. Retain the successful `check-guard adopted`
-  report as a root-owned `0400` receipt and leave the producer unit loaded
-  after clean exit. The producer journal must retain the adapter's native
-  segment-manifest readback message at info level. After drain, freeze the
-  two singly linked producer outputs without changing their contents.
-  Capture rechecks the exact PID 1 success and node readback, then measures
-  both files. Seal the JSON as a root-owned immutable receipt and bind its
-  hash in the assembler plan. Price the archive read in the completion step.
+  report as a root-owned `0400` receipt. Keep the node's info-level stderr
+  in the journal. The tested settings are `StandardOutput=journal`,
+  `StandardError=inherit`, and `RemainAfterExit=no` on the producer. While
+  the held producer is running, the controller can retain its terminal
+  properties with a separate active, exited oneshot whose only reference to
+  the producer is an `After=` dependency. Apply `RemainAfterExit=yes` to
+  that oneshot. This ordering dependency adds no producer start request.
+  Keep the reference through capture so the producer can reach
+  `inactive/dead` with its invocation and exit result still available.
+  After drain, freeze the two singly linked producer outputs. Capture
+  rechecks the exact PID 1 success and node readback, then measures both
+  files. Seal the JSON as a root-owned immutable receipt and bind its hash
+  in the assembler plan. Release the reference after capture. Price the
+  archive read in the completion step.
   This command is specific to the bounded prefix. The verification tail
   needs its own invocation-bound guard adoption and completion capture.
 

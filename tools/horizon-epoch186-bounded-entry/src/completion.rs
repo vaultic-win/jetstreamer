@@ -7,7 +7,6 @@ const CLEAN_DEACTIVATION: &str = "7ad2d189f7e94e70a38c781354912448";
 const SEGMENT_READBACK: &str = "published verified historical segment evidence ";
 
 fn check_terminal(unit: &Value, invocation: &str, node_pid: u64) -> Result<()> {
-    let observed_invocation = text(unit, "InvocationID")?;
     ensure!(
         iid(invocation)
             && node_pid > 1
@@ -15,7 +14,7 @@ fn check_terminal(unit: &Value, invocation: &str, node_pid: u64) -> Result<()> {
             && unit["LoadState"] == "loaded"
             && unit["ActiveState"] == "inactive"
             && unit["SubState"] == "dead"
-            && (observed_invocation.is_empty() || observed_invocation == invocation)
+            && unit["InvocationID"] == invocation
             && text(unit, "ExecMainPID")?.parse::<u64>()? == node_pid
             && unit["MainPID"] == "0"
             && unit["ControlPID"] == "0"
@@ -27,7 +26,7 @@ fn check_terminal(unit: &Value, invocation: &str, node_pid: u64) -> Result<()> {
             && unit["ExecMainStatus"] == "0",
         "the adopted epoch 186 producer is not cleanly terminal"
     );
-    Ok(())
+    guard::check_producer_journal(unit)
 }
 
 fn journal_records(filters: &[&str]) -> Result<Vec<Value>> {
@@ -283,12 +282,15 @@ mod tests {
     fn terminal_must_identify_the_clean_nonrestarting_adopted_process() {
         let state = json!({
             "Id": UNIT, "LoadState": "loaded", "ActiveState": "inactive", "SubState": "dead",
-            "InvocationID": "", "ExecMainPID": NODE_PID.to_string(), "MainPID": "0",
+            "InvocationID": INVOCATION, "ExecMainPID": NODE_PID.to_string(), "MainPID": "0",
             "ControlPID": "0", "Job": "", "Restart": "no", "NRestarts": "0",
             "Result": "success", "ExecMainCode": "1", "ExecMainStatus": "0",
+            "StandardOutput": "journal", "StandardError": "inherit", "RemainAfterExit": "no",
         });
         check_terminal(&state, INVOCATION, NODE_PID).unwrap();
         for (field, wrong) in [
+            ("LoadState", "not-found"),
+            ("InvocationID", ""),
             ("InvocationID", "99999999999999999999999999999999"),
             ("ExecMainPID", "43"),
             ("ActiveState", "active"),
@@ -296,6 +298,7 @@ mod tests {
             ("Result", "timeout"),
             ("ExecMainCode", "2"),
             ("ExecMainStatus", "1"),
+            ("StandardError", "append"),
         ] {
             let mut changed = state.clone();
             changed[field] = wrong.into();

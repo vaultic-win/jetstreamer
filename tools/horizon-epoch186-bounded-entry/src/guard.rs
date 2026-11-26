@@ -125,7 +125,7 @@ pub(crate) fn validate_sample(
 pub fn properties(unit: &str) -> Result<Value> {
     let output = Command::new("/usr/bin/timeout").args([
         "10", "/usr/bin/systemctl", "show", "--all", "--no-pager",
-        "--property=Id,ActiveState,SubState,LoadState,MainPID,ControlPID,Job,InvocationID,ControlGroup,NRestarts,Restart,Delegate,KillMode,User,Group,RuntimeMaxUSec,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,ExecMainPID,ExecMainStatus,ExecMainCode,Result,Triggers,TriggeredBy",
+        "--property=Id,ActiveState,SubState,LoadState,MainPID,ControlPID,Job,InvocationID,ControlGroup,NRestarts,Restart,Delegate,KillMode,User,Group,RuntimeMaxUSec,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,ExecMainPID,ExecMainStatus,ExecMainCode,Result,Triggers,TriggeredBy,StandardOutput,StandardError,RemainAfterExit",
         unit,
     ]).env_clear().env("PATH","/usr/bin:/bin").env("LC_ALL", "C").output()?;
     ensure!(
@@ -156,8 +156,19 @@ fn system_state() -> Result<[Value; 3]> {
     ])
 }
 
+pub(crate) fn check_producer_journal(producer: &Value) -> Result<()> {
+    let stderr = text(producer, "StandardError")?;
+    ensure!(
+        (stderr == "journal" || (stderr == "inherit" && producer["StandardOutput"] == "journal"))
+            && producer["RemainAfterExit"] == "no",
+        "prefix producer must let the node's stderr reach the journal and exit normally"
+    );
+    Ok(())
+}
+
 fn check_system_state(state: &[Value; 3], plan_ref: &Value, sample: &Value) -> Result<()> {
     let [producer, guard, timer] = state;
+    check_producer_journal(producer)?;
     let pid = number(&sample["producer"], "pid")?;
     let image = format!("{IMAGE_DIR}/guard");
     let path = text(plan_ref, "path")?;
@@ -420,6 +431,29 @@ pub fn inspect(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_node_journal_accepts_inherited_stderr_and_requires_a_natural_exit() {
+        let mut producer = json!({
+            "StandardOutput":"journal", "StandardError":"inherit", "RemainAfterExit":"no",
+        });
+        check_producer_journal(&producer).unwrap();
+        producer["StandardError"] = "journal".into();
+        producer["StandardOutput"] = "append".into();
+        check_producer_journal(&producer).unwrap();
+        producer["StandardError"] = "inherit".into();
+        assert!(check_producer_journal(&producer).is_err());
+        producer["StandardOutput"] = "journal".into();
+        for (field, wrong) in [
+            ("StandardOutput", "append"),
+            ("StandardError", "append"),
+            ("RemainAfterExit", "yes"),
+        ] {
+            let mut changed = producer.clone();
+            changed[field] = wrong.into();
+            assert!(check_producer_journal(&changed).is_err(), "{field}");
+        }
+    }
 
     #[test]
     fn guard_requires_same_live_invocation_and_distinguishes_held_from_adopted() {
