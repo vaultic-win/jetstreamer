@@ -118,7 +118,7 @@ def protected_owner(s, cold168, fleet, actor):
             'first_worker': first_ref}
 
 
-def donor_cover(s, donor, before, native, fleet, *, registered_writer=None):
+def donor_cover(s, donor, before, native, fleet, *, registered_writer=None, independent_entry146=False):
     """Price the paid donor with the V12 roster while retaining all old claims."""
     after = donor['snapshot']()
     fits = (native['fits'] and native['schema'] == 'horizon-incident-replay-fit-v1' and
@@ -160,6 +160,11 @@ def donor_cover(s, donor, before, native, fleet, *, registered_writer=None):
               'v9-semantic-complete-drained', 'v10-semantic-complete-drained'}
     if native['epoch'] == 145:
         phases |= {'v5j-semantic-complete', 'post-full', 'publish'}
+        if independent_entry146:
+            entry = native['bounded_qualification']
+            s.need(entry is not None and entry['registration'] == fleet['epoch146_bounded_entry_lease'],
+                   'independent 145 handoff lost the accepted epoch 146 lease')
+            phases = {'independent-semantic-complete-v10-drained'}
     peers = native['replacements']
     own = native['candidate'] if fit168 else peers.get('168')
     roster = fleet['actual_executing_replays']

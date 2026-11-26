@@ -17,6 +17,7 @@ DEPLOYMENTS = {
     "v7": "tools-post145-v7-v12-sequence-20261125-v1",
     "v9": "tools-post145-v9-v12-sequence-20261125-v1",
     "v10": "tools-post145-v10-v12-sequence-20261126-v1",
+    "independent": "tools-post145-independent-v12-sequence-20261126-v1",
 }
 GENERATION = next((version for version, directory in DEPLOYMENTS.items()
                    if Path(__file__).resolve().parent.name == directory), "v7")
@@ -25,12 +26,14 @@ LEGACY = EPOCH / "tools-post145-v6-v8-sequence-20261125-v1"
 LEGACY_SHA = "13c45accc31c3c3db84f43701a310eb4aae3cd3ec4bc1c92cd8f7845ef046365"
 WATCH = EPOCH / "tools-post145-v6-v8-operator-20261125-v1"
 WATCH_SHA = "d60fc69ba8330a2dd246f83f6f1347ad93966d7865a3d8694284dc02332ec096"
-PROVIDER = ROOT / "incident-replay-fit-20261121-v1" / f"tools-homefloor-145-post-{GENERATION}-build-v1/post-stop-fit"
+PROVIDER_NAME = ("tools-homefloor-145-post-independent-entry146-v1" if GENERATION == "independent"
+                 else f"tools-homefloor-145-post-{GENERATION}-build-v1")
+PROVIDER = ROOT / "incident-replay-fit-20261121-v1" / PROVIDER_NAME / "post-stop-fit"
 PROVIDER_SHA = {
     "v7": "db8beab61152a7852b890b1c8b1d985c83c4d9ae9bd4c0db6138887367b950cc",
     "v9": "f650a4acb3f901ba82fe36e6014d6b48176c9365d4750ba80d71debeaa3942c6",
     "v10": "4c8907433fddc6a19cf7708fafb3b0e977aba6f00d38f73d87d14cb8ea87d436",
-}[GENERATION]
+}.get(GENERATION)
 CADENCE = ROOT / "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v12-entry146"
 CADENCE_SHA = "6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac"
 FAMILY145 = ROOT / "epoch145-semantic-continuity-20261121-v1"
@@ -41,13 +44,20 @@ checker, CHECKER145_SHA, handoff, OWNER145 = {
            "v9-census-name-handoff", "ebdfc34db47c4e7699ea5ccbada5d604"),
     "v10": ("tools-v10-census-recovery", "29aac4e0527dcea47f4e9bcb14c5e071b67b8d749669873cc04d7cd1cc5d4e75",
             "v10-census-name-handoff", "104f023c5cd24a55b6585ef525b80067"),
-}[GENERATION]
+}["v10" if GENERATION == "independent" else GENERATION]
 CHECKER145 = FAMILY145 / checker
 SEMANTIC145 = FAMILY145 / handoff / "SEMANTIC_COMPLETION.json"
 COMPLETE145 = ROOT / "epoch145-guarded-export-20261121-v1/state" / OWNER145 / "complete.json"
 LEASE_FIELD = "epoch146_bounded_entry_lease"
 HOLD_SECONDS = 320
 PROVIDER_SECONDS = 142
+INDEPENDENT145 = ROOT / "epoch145-parallel-full-verification-20261126-v1"
+INDEPENDENT_CANDIDATES = {
+    "cb3313b857d94b9f82e06d5c033c0ac5":
+        (INDEPENDENT145, "horizon-145-parallel-full-verification-20261126-v1.service"),
+    "a89c1de125694cb3bdcef19a8c82848a":
+        (INDEPENDENT145 / "scaled-candidate-v1", "horizon-145-scaled-independent-verification-20261126-v1.service"),
+}
 
 
 def require(condition, reason):
@@ -78,7 +88,29 @@ def sealed_package(evidence, package, digest=None):
     return members
 
 
+def independent_completion(phase):
+    iid = phase.get("completed_invocation_id")
+    require(iid in INDEPENDENT_CANDIDATES and phase.get("stage") == "independent-semantic-complete-v10-drained"
+            and phase.get("Id") == "horizon-holding-export145-20261121-v1.service"
+            and phase.get("MainPID") == "0" and phase.get("previous_verifier_invocation_id") == OWNER145
+            and type(phase.get("resource_credit_bytes")) is int and phase["resource_credit_bytes"] == 0,
+            "epoch 146 requires a clean independent 145 completion and exact V10 handback")
+    path, unit = INDEPENDENT_CANDIDATES[iid]
+    require(phase.get("verifier_unit") == unit and
+            set(phase.get("native_handback", ())) == {"started", "stopping", "stopped"}
+            and all(phase["native_handback"].values()), "foreign independent verifier or V10 terminal")
+    for role, want in (("semantic_receipt", path / "INDEPENDENT_TERMINAL_ACCEPTED.json"),
+                       ("collector", path / "capture-independent-terminal.py"),
+                       ("selection", PROVIDER.parent / "independent145-selection.json")):
+        binding = phase.get(role, {})
+        require(binding.get("path") == str(want) and isinstance(binding.get("sha256"), str)
+                and re.fullmatch("[0-9a-f]{64}", binding["sha256"]), f"foreign independent 145 {role}")
+    return phase
+
+
 def completion_contract(phase):
+    if GENERATION == "independent":
+        return independent_completion(phase)
     require(phase["stage"] == f"{GENERATION}-semantic-complete-drained"
             and phase["completed_invocation_id"] == OWNER145
             and phase["checker_seal"] == ref(CHECKER145 / "deployment-seal-receipt.json", CHECKER145_SHA)
@@ -274,7 +306,11 @@ def main():
     mode.add_argument("--run", action="store_true")
     parser.add_argument("fleet", type=Path)
     parser.add_argument("sha256")
+    parser.add_argument("--provider-sha256", help="sealed provider receipt SHA-256 for the independent handoff")
     opts = parser.parse_args()
+    require((GENERATION == "independent") == (opts.provider_sha256 is not None)
+            and (opts.provider_sha256 is None or re.fullmatch("[0-9a-f]{64}", opts.provider_sha256)),
+            "the independent handoff requires its exact provider seal SHA-256")
     require(os.geteuid() == 0 and sys.flags.isolated and sys.dont_write_bytecode
             and re.fullmatch("[0-9a-f]{64}", opts.sha256), "use a privileged isolated interpreter")
     evidence = runpy.run_path(str(ROOT / "prefix140-status-cadence-20261122-v1/cadence-tools/evidence.py"))
@@ -284,7 +320,7 @@ def main():
     sealed_package(evidence, LEGACY, LEGACY_SHA)
     legacy = runpy.run_path(str(LEGACY / "run_sequence.py"))
     draft = original_inputs(legacy)
-    provider_seal = sealed_package(evidence, PROVIDER.parent, PROVIDER_SHA)
+    provider_seal = sealed_package(evidence, PROVIDER.parent, opts.provider_sha256 or PROVIDER_SHA)
     cadence_seal = sealed_package(evidence, CADENCE, CADENCE_SHA)
     require(provider_seal["bounded142.py"]["sha256"] == cadence_seal["bounded142.py"]["sha256"],
             "V12 and the native price qualify different bounded entry behavior")

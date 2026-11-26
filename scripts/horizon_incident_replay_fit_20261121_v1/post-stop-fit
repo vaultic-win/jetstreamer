@@ -93,7 +93,8 @@ RETRY5_POST_145 = V7_POST_145 or V9_POST_145 or V10_POST_145
 V7_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v7-build-v1"
 V9_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v9-build-v1"
 V10_POST_BUILD_145 = HERE == D / "tools-homefloor-145-post-v10-build-v1"
-RETRY5_POST_BUILD_145 = V7_POST_BUILD_145 or V9_POST_BUILD_145 or V10_POST_BUILD_145
+INDEPENDENT_ENTRY146 = HERE == D / "tools-homefloor-145-post-independent-entry146-v1"
+RETRY5_POST_BUILD_145 = V7_POST_BUILD_145 or V9_POST_BUILD_145 or V10_POST_BUILD_145 or INDEPENDENT_ENTRY146
 RETRY5_168 = RETRY5_FIT_ROUTE or RETRY5_POST_145 or RETRY5_POST_BUILD_145 or REPRO166_POST_V12 or FULL170_RETRY5
 STOPPED168_PRICE = FULL170_V9 or RETRY5_168 or STOP_RECOVERY_145 or HERE == D / "tools-homefloor-168-stop-v1"
 PUBLISH168 = HERE == D / "tools-homefloor-publish-cold168-retry4-v1"
@@ -214,9 +215,13 @@ class PublicReaderTurnover(Exception):
 
 
 if RETRY5_168 or FULL170_V9:
-    _, retry5_seal = s.read(HERE / "deployment-seal-receipt.json")
+    retry5_bundle, retry5_seal = s.read(HERE / "deployment-seal-receipt.json")
     loader["load_package"](HERE, retry5_seal["sha256"])
     retry5_fit = runpy.run_path(str(HERE / "retry5_fit.py"))
+if INDEPENDENT_ENTRY146:
+    independent145_entry146 = runpy.run_path(str(HERE / "independent145_entry146.py"))
+    independent_selection, = [member for member in retry5_bundle["members"]
+                              if member["name"] == independent145_entry146["SELECT"] and member["mode"] == "0444"]
 if RETRY5_168:
     retry5_donor = runpy.run_path(str(HERE / "build_159_price.py"))
 if FIFTH168:
@@ -771,6 +776,9 @@ def v12_stopped145(fleet):
 
 
 def phase145(epoch, fleet=None):
+    if INDEPENDENT_ENTRY146:
+        s.need(epoch == 145, "independent 145 handoff is reserved for the epoch 146 entry price")
+        return independent145_entry146["phase"](s, fit, HERE, independent_selection["sha256"])
     if FULL170_V9:
         generation = "V10" if FULL170_RETRY5_V10 else "V9"
         return retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit[generation])
@@ -1847,6 +1855,8 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     if HOURLY169 and not CURRENT_HOURLY169:
         hourly = hourly169["archival_roster"](f)[1]
     entry_lease=f.get("epoch146_bounded_entry_lease")
+    if INDEPENDENT_ENTRY146:
+        s.need(entry_lease is not None, "the independent handoff requires an accepted epoch 146 lease")
     population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner,repro166)
     if closed169:books["169"]=focused169_booking(closed169)
     if closed172:books["172"]=full172_booking(closed172)
@@ -2018,6 +2028,8 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         return native
     if RETRY5_168:
         writer = {"registered_writer": registered_status()} if V13_RETRY5_FIT else {}
+        if INDEPENDENT_ENTRY146:
+            writer["independent_entry146"] = True
         donor = retry5_fit["donor_cover"](s, retry5_donor, retry5_donor_before, native, f, **writer)
         price = "price166" if REPRO166_POST_V12 else "price"
         return retry5_fit[price](s, native, retry5_current, books["168"], donor, cold168)

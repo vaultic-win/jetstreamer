@@ -99,6 +99,45 @@ class BoundedEntry(unittest.TestCase):
                         with self.assertRaisesRegex(ValueError, f"{version.upper()} semantic"):
                             check(completion)
 
+    def test_independent_generation_accepts_only_exact_completions_and_handback(self):
+        source = Path(__file__).with_name("run-v7-v12-entry.py")
+        with TemporaryDirectory() as temporary:
+            package = Path(temporary) / "tools-post145-independent-v12-sequence-20261126-v1"
+            package.mkdir()
+            operator = package / "run-v10-v12-entry.py"
+            operator.write_bytes(source.read_bytes())
+            successor = runpy.run_path(str(operator))
+        check = successor["completion_contract"]
+        self.assertIn("tools-homefloor-145-post-independent-entry146-v1", str(successor["PROVIDER"]))
+        for iid, (path, unit) in successor["INDEPENDENT_CANDIDATES"].items():
+            valid = {
+                "Id": "horizon-holding-export145-20261121-v1.service",
+                "MainPID": "0",
+                "stage": "independent-semantic-complete-v10-drained",
+                "completed_invocation_id": iid,
+                "previous_verifier_invocation_id": successor["OWNER145"],
+                "verifier_unit": unit,
+                "semantic_receipt": ref(path / "INDEPENDENT_TERMINAL_ACCEPTED.json", "d" * 64),
+                "collector": ref(path / "capture-independent-terminal.py", "e" * 64),
+                "selection": ref(successor["PROVIDER"].parent / "independent145-selection.json", "f" * 64),
+                "resource_credit_bytes": 0,
+                "native_handback": {"started": "one", "stopping": "two", "stopped": "three"},
+            }
+            self.assertEqual(check(valid), valid)
+            for key, wrong in (
+                ("previous_verifier_invocation_id", "9" * 32),
+                ("completed_invocation_id", "9" * 32),
+                ("verifier_unit", "foreign.service"),
+                ("semantic_receipt", ref(path / "REREAD_STARTED.json", "d" * 64)),
+                ("selection", ref(path / "foreign-selection.json", "f" * 64)),
+                ("native_handback", {"started": "one", "stopping": "two"}),
+                ("resource_credit_bytes", 1),
+            ):
+                with self.subTest(key=key), self.assertRaises(ValueError):
+                    check({**valid, key: wrong})
+        with self.assertRaisesRegex(ValueError, "independent 145 completion"):
+            check(self.phase)
+
     def test_price_retains_both_replay_rosters_and_delivery_coverage(self):
         self.check_price(self.quote)
         self.quote["replacements"]["168"] = {}
