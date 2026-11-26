@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from ordinary249.delivery248 import V, bound, props, ref
+from publication_handoff import checked_image
 
 UNIT = "horizon-qualify-230-checkpoint-continuation-fit-v3.service"
 PACKAGE = V / "horizon230-checkpoint-continuation-fit-v3"
@@ -229,7 +230,7 @@ def receipt231(unit):
     if unit == RESTORE_UNIT231:
         assert row["node_path"] == str(RESTORE_PROBE231)
         assert (row["bootstrap_slot"], row["first_slot"], row["last_slot"]) == (99_803_089,) * 3
-        assert admission["probe"] == ref(RESTORE_PROBE231)
+        assert checked_image(admission["probe"]) == str(RESTORE_PROBE231)
         assert admission["restore_plan"] == ref(RESTORE_PLAN231)
         expected_worker = RESTORE_WORKER231
     else:
