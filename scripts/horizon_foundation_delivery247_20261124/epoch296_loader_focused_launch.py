@@ -1,8 +1,9 @@
-"""Admit the private checkpoint-bounded epoch 296 replay using the sealed guard."""
+"""Admit a private checkpoint-bounded replay using the sealed guard."""
 
 import fcntl
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 import sys
@@ -16,44 +17,71 @@ from epoch288_shrink_debt_comparison import load_existing
 from epoch230_checkpoint_continuation_launch import activate_guarded, git, inventory, SOURCE
 
 
-STATE = V / "horizon296-loader-upgrade-focused-v2"
 CONTROL = V / "horizon-seven-publication-controller-v222"
 ADAPTER = "diagnostic296_meter.py"
-UNIT = "horizon-qualify-296-loader-upgrade-focused-v2.service"
-GUARD = "horizon-296-loader-upgrade-focused-protective-v2.service"
-TOKENS = STATE / "tokens"
 HOOK = {
     "path": str(V / "horizon230-final-tail-tokens-v1/pre-start.sh"),
     "sha256": "14c316bf3fc8ff28800c9b7bb673f42f95995a2a2b1ac0b9654c36c0a83832e0",
 }
-PROFILE = {
-    "path": str(STATE / "profile.json"),
-    "sha256": "f6318333fc088dee3c6109cb6434eba0fddb916ed6ed143bfd7ffca27a59beba",
-}
-PREFLIGHT = {
-    "path": str(STATE / "preflight.json"),
-    "sha256": "d93ae64c1058439379dafd6e9ffe3c1622ffaa9c8bbf8f16c8d505704c54e260",
-}
-RAM = 173_207_977_984
-CAP = 160 << 30
-RECEIPTS = 64 << 20
-CPUS = "56-63"
 FIELDS = ("Id", "ActiveState", "SubState", "InvocationID", "MainPID", "ControlGroup",
           "AllowedCPUs", "MemoryMax")
 
 
-def current_fit(kit, roster, root):
+@dataclass(frozen=True)
+class Scope:
+    epoch: int
+    state: Path
+    unit: str
+    guard: str
+    kind: str
+    roster_schema: str
+    profile_sha: str
+    preflight_sha: str
+    ram: int
+    cap: int
+    receipts: int
+    cpus: str
+
+    @property
+    def profile(self):
+        return {"path": str(self.state / "profile.json"), "sha256": self.profile_sha}
+
+    @property
+    def preflight(self):
+        return {"path": str(self.state / "preflight.json"), "sha256": self.preflight_sha}
+
+
+LOADER_296 = Scope(
+    296, V / "horizon296-loader-upgrade-focused-v2",
+    "horizon-qualify-296-loader-upgrade-focused-v2.service",
+    "horizon-296-loader-upgrade-focused-protective-v2.service",
+    "epoch296-private-loader-upgrade-diagnostic", "foundation-epoch296-replay-roster-binding-v1",
+    "f6318333fc088dee3c6109cb6434eba0fddb916ed6ed143bfd7ffca27a59beba",
+    "d93ae64c1058439379dafd6e9ffe3c1622ffaa9c8bbf8f16c8d505704c54e260",
+    173_207_977_984, 160 << 30, 64 << 20, "56-63",
+)
+GAP_230 = Scope(
+    230, V / "horizon230-short-gap-runtime-v1",
+    "horizon-qualify-230-short-gap-v1.service", "horizon-230-short-gap-protective-v1.service",
+    "epoch230-private-short-gap", "foundation-epoch230-short-gap-roster-binding-v1",
+    "95aebc954169426d79663a297b8c445a9c3ca5b759a84fc96e51cd5f77313982",
+    "1b9a96e850cb4b050f2f64ee90665399dbddc7c9b2a71fe5afb32796b2518dcb",
+    225_000_000_000, 208 << 30, 256 << 20, "72-79",
+)
+
+
+def current_fit(kit, roster, root, scope):
     ops = kit.ops
     fit = roster["capacity"]
-    assert roster["schema"] == "foundation-epoch296-replay-roster-binding-v1"
+    assert roster["schema"] == scope.roster_schema
     assert not roster["admission_issued"] and not roster["candidate_held"]
     assert 0 <= time.time() - roster["recorded_unix_seconds"] <= 90
-    assert roster["focused_296_quote"]["preflight"] == PREFLIGHT and fit["fits"]
-    assert fit["candidate_disk_bytes"] == CAP + RECEIPTS
-    assert fit["candidate_total_memory_bytes"] == RAM + (1 << 30) + (256 << 20)
+    assert roster[f"focused_{scope.epoch}_quote"]["preflight"] == scope.preflight and fit["fits"]
+    assert fit["candidate_disk_bytes"] == scope.cap + scope.receipts
+    assert fit["candidate_total_memory_bytes"] == scope.ram + (1 << 30) + (256 << 20)
     assert fit["guard_floor_bytes"] == 3_770_104_987_645
     cpus = kit.measure.source.helper.cpus
-    assert cpus(fit["cpus"]) == cpus(CPUS)
+    assert cpus(fit["cpus"]) == cpus(scope.cpus)
     listing = subprocess.check_output(
         ["systemctl", "list-units", "--type=service", "--state=running,activating",
          "--plain", "--no-legend", "--no-pager"], text=True, timeout=10)
@@ -65,7 +93,7 @@ def current_fit(kit, roster, root):
     for unit, row in roster["owners"].items():
         current = ops.props(unit, [*FIELDS, "MemoryCurrent"])
         assert all(current[key] == row["systemd"][key] for key in FIELDS)
-        assert cpus(CPUS).isdisjoint(cpus(current["AllowedCPUs"]))
+        assert cpus(scope.cpus).isdisjoint(cpus(current["AllowedCPUs"]))
         growth += max(0, row["memory_current_bytes"] - int(current["MemoryCurrent"]))
     for guard in roster["periodic_guards"].values():
         row = ops.props(guard["timer"], ["ActiveState", "InvocationID", "Unit"])
@@ -83,12 +111,14 @@ def current_fit(kit, roster, root):
             "required_remaining_memory_bytes": growth, "sampled_unix_seconds": time.time()}
 
 
-def launch(kit, roster_ref):
+def launch(kit, roster_ref, scope):
     ops = kit.ops
-    assert not (STATE / "admission.json").exists() and not TOKENS.exists()
+    state = scope.state
+    tokens = state / "tokens"
+    assert not (state / "admission.json").exists() and not tokens.exists()
     roster = ops.bound(roster_ref)
-    preflight = ops.bound(PREFLIGHT)
-    profile = ops.bound(PROFILE)
+    preflight = ops.bound(scope.preflight)
+    profile = ops.bound(scope.profile)
     for entry in preflight["evidence"]:
         assert ops.ref(Path(entry["path"])) == entry
     root = Path(profile["run_root"])
@@ -97,16 +127,16 @@ def launch(kit, roster_ref):
     assert preflight["writable_private_state_validated"] and writable == root / "work"
     assert runtime_state.is_relative_to(writable) and runtime_state.is_dir()
     assert runtime_state.resolve() == runtime_state
-    assert profile["unit"] == UNIT and profile["properties"]["AllowedCPUs"] == CPUS
-    assert int(profile["properties"]["MemoryMax"]) == RAM
-    assert profile["guarded_whole_tree_cap_bytes"] == CAP
+    assert profile["unit"] == scope.unit and profile["properties"]["AllowedCPUs"] == scope.cpus
+    assert int(profile["properties"]["MemoryMax"]) == scope.ram
+    assert profile["guarded_whole_tree_cap_bytes"] == scope.cap
     for name in ("node", "worker", "guard"):
         ops.checked_image(profile[name])
     node = profile["node"]["path"]
     hook = ops.checked_image(HOOK)
-    namespace = ops.bound(ops.ref(STATE / "namespace.json"))
-    bootstrap = ops.bound(ops.ref(STATE / "bootstrap-recheck.json"))["bootstrap"]
-    assert namespace["profile"] == PROFILE and namespace["host_guard_sees_empty_placeholders"]
+    namespace = ops.bound(ops.ref(state / "namespace.json"))
+    bootstrap = ops.bound(ops.ref(state / "bootstrap-recheck.json"))["bootstrap"]
+    assert namespace["profile"] == scope.profile and namespace["host_guard_sees_empty_placeholders"]
     bindings = []
     for binding, measured in zip(profile["readonly_bindings"],
                                  namespace["mounted_device_inode_size"], strict=True):
@@ -122,35 +152,35 @@ def launch(kit, roster_ref):
         f"{snapshot.st_dev}:{snapshot.st_ino}:{snapshot.st_size}:"
         f"{int(snapshot.st_mtime)}:{int(snapshot.st_ctime)}")
     template = ops.bound(profile["static_guard_plan"])
-    assert template["unit"] == UNIT and template["worker_root"] == str(root)
-    assert template["maximum_root_physical_bytes"] == CAP
-    for directory in (root / "work/scratch", root / "work/tmp", STATE / "guard-receipts"):
+    assert template["unit"] == scope.unit and template["worker_root"] == str(root)
+    assert template["maximum_root_physical_bytes"] == scope.cap
+    for directory in (root / "work/scratch", state / "guard-receipts"):
         assert not any(directory.iterdir()), directory
-    for unit in (UNIT, GUARD, GUARD.removesuffix(".service") + ".timer"):
+    for unit in (scope.unit, scope.guard, scope.guard.removesuffix(".service") + ".timer"):
         assert ops.props(unit, ["LoadState", "ActiveState", "Job"]) == {
             "LoadState": "not-found", "ActiveState": "inactive", "Job": ""}
-    remote = inventory(kit, epoch=296, unit="foundation-296-focused-admission-inventory-v2")
-    measured = current_fit(kit, roster, root)
+    remote = inventory(kit, epoch=scope.epoch, unit=f"foundation-{scope.epoch}-focused-inventory")
+    measured = current_fit(kit, roster, root, scope)
     properties = dict(profile["properties"], BindReadOnlyPaths=" ".join(bindings),
-                      ReadOnlyPaths=str(TOKENS), Delegate="no", OOMPolicy="kill",
+                      ReadOnlyPaths=str(tokens), Delegate="no", OOMPolicy="kill",
                       UnsetEnvironment="HORIZON_S3_ENDPOINT HORIZON_ACCESS_KEY_ID HORIZON_SECRET_ACCESS_KEY")
     props = [f"--property={key}={value}" for key, value in properties.items()]
     props.extend(f"--setenv={key}={value}" for key, value in profile["environment"].items())
-    TOKENS.mkdir(mode=0o755)
-    TOKENS.chmod(0o755)
-    admission = ops.funds.put(STATE / "admission.json", {
-        "schema": "foundation-epoch296-focused-admission-v1", "epoch": 296,
-        "profile": PROFILE, "preflight": PREFLIGHT, "roster": roster_ref, "fit": measured,
+    tokens.mkdir(mode=0o755)
+    tokens.chmod(0o755)
+    admission = ops.funds.put(state / "admission.json", {
+        "schema": f"foundation-epoch{scope.epoch}-focused-admission-v1", "epoch": scope.epoch,
+        "profile": scope.profile, "preflight": scope.preflight, "roster": roster_ref, "fit": measured,
         "inventory": remote, "admitted": True, "publication_authorized": False,
     })
     owner, plan, token, active_guard = activate_guarded(
-        kit, 296, STATE, TOKENS, UNIT, GUARD, profile["guard"], template, admission,
-        props, f"ExecStartPre=/usr/bin/bash {hook} 60 {TOKENS}", profile["argv"])
-    return ops.funds.put(STATE / "cadence-registration.json", {
+        kit, scope.epoch, state, tokens, scope.unit, scope.guard, profile["guard"], template, admission,
+        props, f"ExecStartPre=/usr/bin/bash {hook} 60 {tokens}", profile["argv"])
+    return ops.funds.put(state / "cadence-registration.json", {
         "schema": "jetstreamer-historical-performance-launch-receipt-v1",
-        "kind": "epoch296-private-loader-upgrade-diagnostic", "epoch": 296, "unit": UNIT,
+        "kind": scope.kind, "epoch": scope.epoch, "unit": scope.unit,
         "run_root": str(root), "invocation_id": owner["invocation_id"], "main_pid": owner["main_pid"],
-        "node_path": node, "worker": profile["worker"], "profile": PROFILE, "admission": admission,
+        "node_path": node, "worker": profile["worker"], "profile": scope.profile, "admission": admission,
         "guard_plan": plan, "launch_token": token, "active_guard": active_guard,
         "launched": True, "evidence": {"units": [owner]},
         "canonical_epoch_publication_authorized": False, "remote_mutations": False,
@@ -159,18 +189,23 @@ def launch(kit, roster_ref):
 
 
 if __name__ == "__main__":
-    assert __debug__ and os.geteuid() == 0 and len(sys.argv) == 3
+    assert __debug__ and os.geteuid() == 0
+    args = sys.argv[1:]
+    scope = GAP_230 if args[:1] == ["--epoch230"] else LOADER_296
+    if scope is GAP_230:
+        args = args[1:]
+    roster_path, roster_sha = args
     kit = load_existing()
     assert os.environ["CODEX_THREAD_ID"] == kit.replay.THREAD
     os.umask(0o077)
     remote = git("rev-parse", "origin/account-updates").decode().strip()
     for path in (Path(__file__), CONTROL / ADAPTER):
         assert path.read_bytes() == git("show", f"{remote}:{SOURCE / path.name}")
-    path = Path(sys.argv[1])
+    path = Path(roster_path)
     assert path.parent.parent == V and path.name == "roster.json"
     assert path.parent.name.startswith("horizon262-foundation-roster-")
     with kit.partition.take(), (CONTROL / "cycle.lock").open("rb") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         assert kit.ops.props("foundation-publication-cadence-v222.service", ["ActiveState", "Job"]) == {
             "ActiveState": "inactive", "Job": ""}
-        print(json.dumps(launch(kit, {"path": str(path), "sha256": sys.argv[2]}), indent=2))
+        print(json.dumps(launch(kit, {"path": str(path), "sha256": roster_sha}, scope), indent=2))

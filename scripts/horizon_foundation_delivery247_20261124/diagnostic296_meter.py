@@ -1,4 +1,4 @@
-"""Track the private epoch 296 warmup and loader diagnostics."""
+"""Track the private epoch 296 diagnostics and epoch 230 gap replay."""
 
 from pathlib import Path
 
@@ -6,15 +6,21 @@ from ordinary249.delivery248 import V, bound, props, ref
 
 
 LOADER = "loader-upgrade-focused-v2"
-ATTEMPTS = ("v2", "v3", LOADER)
+GAP = "short-gap-v1"
+FOCUSED = {
+    LOADER: (296, "horizon296-loader-upgrade-focused-v2", "epoch296-private-loader-upgrade-diagnostic"),
+    GAP: (230, "horizon230-short-gap-runtime-v1", "epoch230-private-short-gap"),
+}
+ATTEMPTS = ("v2", "v3", LOADER, GAP)
 FIELDS = ("ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup")
 
 
 def attempt_paths(version):
     assert version in ATTEMPTS
-    if version == LOADER:
-        return (f"horizon-qualify-296-{version}.service", V / f"horizon296-{version}",
-                Path(f"/home/ubuntu/.jetstreamer-private/qualification-296-{version}"))
+    if version in FOCUSED:
+        epoch, directory, _ = FOCUSED[version]
+        return (f"horizon-qualify-{epoch}-{version}.service", V / directory,
+                Path(f"/home/ubuntu/.jetstreamer-private/qualification-{epoch}-{version}"))
     unit = f"horizon-perf-epoch296-meter-bounded@{version}.service"
     state = V / f"horizon296-meter-bounded-{version}"
     root = Path(f"/home/ubuntu/.jetstreamer-private/qualification-296-meter-bounded-{version}")
@@ -22,7 +28,7 @@ def attempt_paths(version):
 
 
 def profile_path(state, version):
-    return state / ("profile.json" if version == LOADER else "generic-unit-profile.json")
+    return state / ("profile.json" if version in FOCUSED else "generic-unit-profile.json")
 
 
 def sealed(path):
@@ -40,10 +46,9 @@ def registration(version):
     source = sealed(path)
     row = bound(source)
     assert row["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
-    kind = ("epoch296-private-loader-upgrade-diagnostic" if version == LOADER
-            else "epoch296-private-meter-diagnostic")
+    epoch, _, kind = FOCUSED.get(version, (296, None, "epoch296-private-meter-diagnostic"))
     assert (row["kind"], row["epoch"], row["unit"], row["run_root"]) == (
-        kind, 296, unit, str(root))
+        kind, epoch, unit, str(root))
     assert row["launched"] and not row["remote_mutations"] and not row["r2_mutations"]
     assert row["canonical_epoch_publication_authorized"] is False
     profile_ref = sealed(profile_path(state, version))
@@ -72,7 +77,8 @@ def active_configuration(version):
     assert live["InvocationID"] == row["invocation_id"] and int(live["MainPID"]) == row["main_pid"]
     assert live["ControlGroup"] == "/system.slice/" + unit
     assert (Path("/proc") / live["MainPID"] / "exe").samefile(row["node_path"])
-    return [dict(range="296-296", controller_unit=unit, producer_unit=unit,
+    epoch = row["epoch"]
+    return [dict(range=f"{epoch}-{epoch}", controller_unit=unit, producer_unit=unit,
                  expected_controller_invocation_id=row["invocation_id"],
                  expected_producer_invocation_id=row["invocation_id"],
                  scratch_path=str(root), worker_executable_basename="historical-worker")]
@@ -80,7 +86,7 @@ def active_configuration(version):
 
 def configuration():
     active = [item for version in ATTEMPTS for item in active_configuration(version)]
-    assert len(active) <= 1
+    assert len({item["range"] for item in active}) == len(active)
     return active
 
 
@@ -89,7 +95,9 @@ def register_attempt(plan, version, ordinary_replay):
     profile = profile_path(state, version)
     if not profile.is_file():
         return
-    gate = plan["gates"]["296"]
+    epoch = FOCUSED.get(version, (296,))[0]
+    ordinary_replay = ordinary_replay and epoch == 296
+    gate = plan["gates"][str(epoch)]
     registered = registration(version)
     evidence = [sealed(profile)]
     if registered is not None:
@@ -107,10 +115,10 @@ def register_attempt(plan, version, ordinary_replay):
                 gate["next_action"] = closed["next_action"]
         elif not ordinary_replay:
             gate["next_action"] = (
-                "Collect the bounded loader replay result and drain its guard."
-                if version == LOADER else
+                "Collect the bounded replay result and drain its guard."
+                if version in FOCUSED else
                 "Collect the private meter trace and drain guards after its terminal result.")
-        claim = dict(epoch=296, unit=unit, invocation_id=row["invocation_id"],
+        claim = dict(epoch=epoch, unit=unit, invocation_id=row["invocation_id"],
                      scratch_path=str(root), launch_receipt=source)
         existing = [item for item in plan["diagnostics"] if item["unit"] == unit]
         assert not existing or existing == [claim]
@@ -118,7 +126,7 @@ def register_attempt(plan, version, ordinary_replay):
             assert terminal_path.is_file() and not active_configuration(version)
             if existing:
                 plan["diagnostics"].remove(claim)
-        elif version == LOADER:
+        elif version in FOCUSED:
             # The deployed fleet image accepts the historical @instance scope.
             # Keep this invocation in the observer and unit census until a
             # fleet image recognizes its exact systemd unit.
@@ -127,8 +135,8 @@ def register_attempt(plan, version, ordinary_replay):
             plan["diagnostics"].append(claim)
     elif not ordinary_replay:
         gate["next_action"] = (
-            "Admit the checkpoint-bounded loader diagnostic against the complete live fleet."
-            if version == LOADER else
+            "Admit the checkpoint-bounded replay against the complete live fleet."
+            if version in FOCUSED else
             "Admit the bounded meter diagnostic against the complete live fleet.")
     for item in evidence:
         if item not in gate["evidence"]:
@@ -149,7 +157,7 @@ def owns(row):
     else:
         return False
     _, launch = registration(version)
-    assert row["epoch"] == 296 and row["phase"] == "diagnostic-qualification"
+    assert row["epoch"] == launch["epoch"] and row["phase"] == "diagnostic-qualification"
     assert row["producer"]["InvocationID"] == launch["invocation_id"]
     assert row["scratch_path"] == str(root) and row["ordinary_replay_claim"] is False
     return True

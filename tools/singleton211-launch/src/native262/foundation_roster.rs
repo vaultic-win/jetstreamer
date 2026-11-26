@@ -1,7 +1,8 @@
 //! Bind the live Foundation cohort for replay funding and guard qualification.
 use super::*;
 mod allocation;
-mod focused296;
+mod focused;
+use focused::{GAP_230, LOADER_296};
 mod vote_boundary;
 
 const FLEET_ROOT: &str = "/home/ubuntu/.codex/diagnostics";
@@ -136,7 +137,7 @@ enum Quote {
     Suffix226Preview,
     Delivery261(Bound),
     Replay296(Replay296Quote),
-    Focused296(Bound),
+    Focused(&'static focused::Focused, Bound),
 }
 
 struct Replay296Quote {
@@ -633,7 +634,7 @@ fn fleet_roster<'a>(
             continue;
         }
         if let Some(replay) = live_replays.get(&epoch) {
-            let phase = if epoch == 230 || replay.unit == focused296::UNIT {
+            let phase = if epoch == 230 || replay.unit == LOADER_296.unit {
                 "diagnostic-qualification"
             } else {
                 "replay"
@@ -669,7 +670,10 @@ fn fleet_roster<'a>(
         "duplicate epoch 261 phases in fleet"
     );
     ensure!(
-        !live_replays.contains_key(&230) || observed_replays.contains(&230),
+        !live_replays
+            .get(&230)
+            .is_some_and(|replay| replay.unit == vote_boundary::UNIT)
+            || observed_replays.contains(&230),
         "epoch 230 diagnostic is missing from the accepted fleet"
     );
     let missing: BTreeMap<_, _> = released
@@ -790,7 +794,9 @@ fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
                 .any(|prefix| unit.starts_with(prefix));
             (scoped
                 && unit != vote_boundary::GUARD_SERVICE
-                && unit != focused296::GUARD_SERVICE
+                && ![&GAP_230, &LOADER_296]
+                    .iter()
+                    .any(|spec| unit == format!("{}.service", spec.guard))
                 && !KNOWN_GUARDS
                     .iter()
                     .any(|(_, guard)| unit == format!("{guard}.service")))
@@ -863,7 +869,7 @@ fn guard_binding(
             "HORIZON262_GUARD_PLAN_SHA256",
             "${HORIZON262_GUARD_PLAN_SHA256}",
         )),
-        296 if guard != focused296::GUARD => Some((
+        296 if guard != LOADER_296.guard => Some((
             GUARD_ENV_296,
             "HORIZON296_GUARD_PLAN_SHA256",
             "${HORIZON296_GUARD_PLAN_SHA256}",
@@ -1065,7 +1071,8 @@ fn measure(
     let epoch = match &quote {
         Some(Quote::Suffix226(_) | Quote::Suffix226Preview) => 226,
         Some(Quote::Delivery261(_)) => 261,
-        Some(Quote::Replay296(_) | Quote::Focused296(_)) => 296,
+        Some(Quote::Replay296(_)) => 296,
+        Some(Quote::Focused(spec, _)) => spec.epoch,
         _ => EPOCH,
     };
     let mut live_replays = BTreeMap::new();
@@ -1079,19 +1086,22 @@ fn measure(
             live_replays.insert(spec.epoch, live_replay(n, spec)?);
         }
     }
-    if before.contains(focused296::UNIT) {
-        ensure!(
-            quote.is_some() && epoch != 296 && !live_replays.contains_key(&296),
-            "epoch 296 already has a live replay or diagnostic"
-        );
-        live_replays.insert(296, focused296::live(n)?);
-    }
     if before.contains(vote_boundary::UNIT) {
         ensure!(
-            closed_230.is_some(),
-            "previous epoch 230 owner has not drained"
+            closed_230.is_some() && epoch != 230,
+            "another epoch 230 owner has not drained"
         );
         live_replays.insert(230, vote_boundary::live(n)?);
+    }
+    for spec in [&GAP_230, &LOADER_296] {
+        if before.contains(spec.unit) {
+            ensure!(
+                quote.is_some() && epoch != spec.epoch && !live_replays.contains_key(&spec.epoch),
+                "epoch {} already has a live replay or diagnostic",
+                spec.epoch
+            );
+            live_replays.insert(spec.epoch, spec.live(n)?);
+        }
     }
     let roster = fleet_roster(
         &fleet,
@@ -1199,6 +1209,7 @@ fn measure(
     let resources_before = live::resources_at(Path::new(FILESYSTEM))?;
     let selected = units::parse_cpu_list(match epoch {
         226 => "16-23",
+        230 => GAP_230.cpus,
         261 => "24-31",
         296 => "56-63",
         _ => "40-47",
@@ -1255,8 +1266,13 @@ fn measure(
     }
     let mut guards = BTreeMap::new();
     for (guard_epoch, guard) in KNOWN_GUARDS {
+        let focused = [&GAP_230, &LOADER_296].into_iter().find(|spec| {
+            live_replays
+                .get(&guard_epoch)
+                .is_some_and(|row| row.unit == spec.unit)
+        });
         if (guard_epoch == 226 && suffix.is_some())
-            || (guard_epoch == 230 && closed_230.is_some())
+            || (guard_epoch == 230 && closed_230.is_some() && focused.is_none())
             || (guard_epoch == 261 && closed_replay.is_some())
         {
             continue;
@@ -1276,11 +1292,7 @@ fn measure(
                 &booking["guard_growth"][guard_epoch.to_string()],
             )
         };
-        let guard = if owner["Id"] == focused296::UNIT {
-            focused296::GUARD
-        } else {
-            guard
-        };
+        let guard = focused.map_or(guard, |spec| spec.guard);
         guards.insert(
             guard_epoch,
             guard_binding(n, guard_epoch, guard, guard_booking, owner, device)?,
@@ -1294,7 +1306,10 @@ fn measure(
         .max()
         .context("missing Foundation guard floor")?;
     let allocation = allocation::measure(n, &guards, device)?;
-    if let Some(diagnostic) = live_replays.get(&230) {
+    if let Some(diagnostic) = live_replays
+        .get(&230)
+        .filter(|row| row.unit == vote_boundary::UNIT)
+    {
         guards.insert(230, vote_boundary::guard(n, diagnostic, device)?);
     }
     for (unit, (owner, memory, start_ticks)) in &mut recorded {
@@ -1415,10 +1430,10 @@ fn measure(
         Some(Quote::Replay296(quote)) => {
             (quote.disk, capacity::add(quote.memory, CONTROLLER_MEMORY)?)
         }
-        Some(Quote::Focused296(_)) => (
-            capacity::add(focused296::SCRATCH_CAP, focused296::RECEIPT_DISK)?,
+        Some(Quote::Focused(spec, _)) => (
+            capacity::add(spec.scratch_cap, spec.receipt_disk)?,
             capacity::add(
-                focused296::PRODUCER_MEMORY,
+                spec.producer_memory,
                 capacity::add(CONTROLLER_MEMORY, 1 << 30)?,
             )?,
         ),
@@ -1484,6 +1499,7 @@ fn measure(
         .collect();
     let schema = match epoch {
         226 => "foundation-epoch226-suffix-roster-binding-v1",
+        230 => "foundation-epoch230-short-gap-roster-binding-v1",
         261 => "foundation-epoch261-delivery-roster-binding-v1",
         296 => "foundation-epoch296-replay-roster-binding-v1",
         _ => "foundation-epoch262-roster-binding-v1",
@@ -1541,8 +1557,8 @@ fn measure(
             "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
         });
     }
-    if let Some(Quote::Focused296(preflight)) = &quote {
-        evidence["focused_296_quote"] = json!({
+    if let Some(Quote::Focused(spec, preflight)) = &quote {
+        evidence[spec.quote_key()] = json!({
             "preflight":preflight,"candidate_disk_bytes":candidate_disk,
             "candidate_memory_bytes":candidate,"candidate_cpus":selected,
         });
@@ -1626,6 +1642,7 @@ pub fn run() -> Result<()> {
                     "--full-replay-quote"
                         | "--delivery261-quote"
                         | "--replay296-quote"
+                        | "--focused230-quote"
                         | "--focused296-quote"
                         | "--suffix226-preview"
                 )
@@ -1640,7 +1657,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --delivery261-quote, --replay296-quote, --focused296-quote or --suffix226-preview"
+            "use --as-controller UNIT, --full-replay-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused296-quote or --suffix226-preview"
         ),
     };
     let synchronize = match args.next() {
@@ -1686,8 +1703,20 @@ pub fn run() -> Result<()> {
             .and_then(|prep| measure(&mut native, None, Some(Quote::Delivery261(prep)))),
         Some(flag) if flag == "--replay296-quote" => replay_296_quote()
             .and_then(|quote| measure(&mut native, None, Some(Quote::Replay296(quote)))),
-        Some(flag) if flag == "--focused296-quote" => focused296::preflight()
-            .and_then(|receipt| measure(&mut native, None, Some(Quote::Focused296(receipt)))),
+        Some(flag)
+            if matches!(
+                flag.to_str(),
+                Some("--focused230-quote" | "--focused296-quote")
+            ) =>
+        {
+            let spec = if flag == "--focused230-quote" {
+                &GAP_230
+            } else {
+                &LOADER_296
+            };
+            spec.preflight()
+                .and_then(|receipt| measure(&mut native, None, Some(Quote::Focused(spec, receipt))))
+        }
         Some(flag) if flag == "--suffix226-preview" => {
             measure(&mut native, None, Some(Quote::Suffix226Preview))
         }
