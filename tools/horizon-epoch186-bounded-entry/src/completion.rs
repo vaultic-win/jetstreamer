@@ -146,7 +146,7 @@ fn adopted_prefix(path: &Path, sha: &str) -> Result<AdoptedPrefix> {
         0o400,
     )?;
     ensure!(
-        quote["schema"] == "horizon-epoch186-post-v9-source-capacity-v1"
+        quote["schema"] == price::CAPACITY_SCHEMA
             && quote["source_entry"]["unit"] == UNIT
             && quote["source_entry"]["argv"] == json!(source::argv())
             && quote["source_entry"]["bootstrap"]["sha256"] == source::BOOTSTRAP_SHA
