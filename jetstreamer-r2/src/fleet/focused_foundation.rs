@@ -41,6 +41,13 @@ const SCOPES: &[Scope] = &[
         state: "horizon296-loader-log-v3",
         kind: "epoch296-private-loader-log-diagnostic",
     },
+    Scope {
+        epoch: 296,
+        unit: "horizon-qualify-296-feature-account-v4.service",
+        attempt: "feature-account-v4",
+        state: "horizon296-feature-account-v4",
+        kind: "epoch296-private-feature-account-qualification",
+    },
 ];
 
 pub(super) fn contains(unit: &str) -> bool {

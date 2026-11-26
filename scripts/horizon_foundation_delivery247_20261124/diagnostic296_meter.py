@@ -9,11 +9,13 @@ LOADER = "loader-upgrade-focused-v2"
 GAP = "short-gap-v1"
 RESTORE = "native-restore-v1"
 TRACE = "loader-log-v3"
+FEATURE_ACCOUNTS = "feature-account-v4"
 FOCUSED = {
     LOADER: (296, "horizon296-loader-upgrade-focused-v2", "epoch296-private-loader-upgrade-diagnostic"),
     GAP: (230, "horizon230-short-gap-runtime-v1", "epoch230-private-short-gap"),
     RESTORE: (258, "horizon258-native-restore-runtime-v1", "epoch258-private-native-restore"),
     TRACE: (296, "horizon296-loader-log-v3", "epoch296-private-loader-log-diagnostic"),
+    FEATURE_ACCOUNTS: (296, "horizon296-feature-account-v4", "epoch296-private-feature-account-qualification"),
 }
 ATTEMPTS = ("v2", "v3", *FOCUSED)
 FIELDS = ("ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup")
@@ -132,9 +134,7 @@ def register_attempt(plan, version, ordinary_replay, include_focused):
             assert terminal_path.is_file() and not active_configuration(version)
             if existing:
                 plan["diagnostics"].remove(claim)
-        elif version in FOCUSED and not include_focused:
-            assert not existing
-        elif not existing:
+        elif not existing and (version not in FOCUSED or include_focused):
             plan["diagnostics"].append(claim)
     elif not ordinary_replay:
         gate["next_action"] = (
