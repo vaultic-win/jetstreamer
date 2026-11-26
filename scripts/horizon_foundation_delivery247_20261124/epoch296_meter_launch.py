@@ -11,16 +11,20 @@ import time
 import epoch288_shrink_debt_comparison as capacity
 from epoch230_checkpoint_continuation_launch import activate_guarded, inventory
 
-from diagnostic296_meter import PROFILE, REGISTRATION, ROOT, STATE, TERMINAL, UNIT, sealed
+from diagnostic296_meter import attempt_paths, sealed
 
 
 CONTROL = capacity.V / "horizon-seven-publication-controller-v222"
+UNIT, STATE, ROOT = attempt_paths("v3")
+PROFILE = STATE / "generic-unit-profile.json"
+REGISTRATION = STATE / "cadence-registration.json"
+TERMINAL = STATE / "terminal.json"
 REPO = Path("/home/ubuntu/workspace/jetstreamer")
 SOURCE = Path("scripts/horizon_foundation_delivery247_20261124")
 BOOKING = capacity.V / "horizon257-current-reader-delivery-v1/booking.json"
 HOOK = capacity.V / "horizon230-final-tail-tokens-v1/pre-start.sh"
-TOKENS = capacity.V / "horizon296-meter-bounded-v2-tokens"
-GUARD = "horizon-296-meter-bounded-v2-protective.service"
+TOKENS = capacity.V / "horizon296-meter-bounded-v3-tokens"
+GUARD = "horizon-296-meter-bounded-v3-protective.service"
 TIMER = GUARD.removesuffix(".service") + ".timer"
 CPUS = "40-47"
 CAP = 128_347_983_872
@@ -171,12 +175,23 @@ def settle(kit):
     prefix = "epoch296 compute meter: slot=127870085 entry=7 local_transaction=0 signature="
     trace = [line for line in lines if line.startswith(prefix)]
     assert len(trace) <= 1
+    canonical = capacity.V / "horizon296-guarded-singleton-v1/canonical-first-failure-v1/completion.json"
+    canonical_ref = sealed(canonical)
+    expected = ops.bound(canonical_ref)
+    assert expected["slot"] == 127_870_085 and expected["canonical_error"] == "ComputationalBudgetExceeded"
+    matches = False
     if trace:
         assert trace[0].startswith(prefix + "2Frxp8iXa8u3nYTZxZZNNjNp7Py6Yidszb3NUCse3zML3aYcbW2pB1PVSs1H4xJxZRaxsk3enrFcdMPE99ezt68J ")
+        matches = ("InstructionError(0, ComputationalBudgetExceeded)" in trace[0]
+            and all(log in trace[0] for log in expected["canonical_program_logs"]))
+    next_action = "Diagnose the private diagnostic exit before requesting another invocation."
+    if trace:
+        next_action = ("Qualify the repaired worker on the complete epoch and its canonical checkpoint."
+            if matches else "Resolve the remaining difference from canonical execution.")
     return ops.funds.put(TERMINAL, dict(schema="foundation-epoch296-meter-diagnostic-terminal-v1",
         launch=source, guard_drained=True, producer=terminal, target_trace=trace,
-        journal_tail=lines[-25:], next_action=("Compare the recorded meter and VM error to canonical execution."
-            if trace else "Diagnose the private diagnostic exit before requesting another invocation."),
+        canonical_transaction=canonical_ref, target_matches_canonical=matches,
+        journal_tail=lines[-25:], next_action=next_action,
         publication_authorized=False, r2_mutations=False))
 
 

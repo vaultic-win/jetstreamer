@@ -5,13 +5,16 @@ from pathlib import Path
 from ordinary249.delivery248 import V, bound, props, ref
 
 
-UNIT = "horizon-perf-epoch296-meter-bounded@v2.service"
-STATE = V / "horizon296-meter-bounded-v2"
-ROOT = Path("/home/ubuntu/.jetstreamer-private/qualification-296-meter-bounded-v2")
-PROFILE = STATE / "generic-unit-profile.json"
-REGISTRATION = STATE / "cadence-registration.json"
-TERMINAL = STATE / "terminal.json"
+ATTEMPTS = ("v2", "v3")
 FIELDS = ("ActiveState", "SubState", "InvocationID", "MainPID", "NRestarts", "ControlGroup")
+
+
+def attempt_paths(version):
+    assert version in ATTEMPTS
+    unit = f"horizon-perf-epoch296-meter-bounded@{version}.service"
+    state = V / f"horizon296-meter-bounded-{version}"
+    root = Path(f"/home/ubuntu/.jetstreamer-private/qualification-296-meter-bounded-{version}")
+    return unit, state, root
 
 
 def sealed(path):
@@ -21,18 +24,21 @@ def sealed(path):
     return ref(path)
 
 
-def registration():
-    if not REGISTRATION.is_file():
+def registration(version):
+    unit, state, root = attempt_paths(version)
+    path = state / "cadence-registration.json"
+    if not path.is_file():
         return None
-    source = sealed(REGISTRATION)
+    source = sealed(path)
     row = bound(source)
     assert row["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
     assert (row["kind"], row["epoch"], row["unit"], row["run_root"]) == (
-        "epoch296-private-meter-diagnostic", 296, UNIT, str(ROOT))
+        "epoch296-private-meter-diagnostic", 296, unit, str(root))
     assert row["launched"] and not row["remote_mutations"] and not row["r2_mutations"]
     assert row["canonical_epoch_publication_authorized"] is False
-    profile = bound(sealed(PROFILE))
-    assert row["profile"] == sealed(PROFILE) and row["worker"] == profile["worker"]
+    profile_ref = sealed(state / "generic-unit-profile.json")
+    profile = bound(profile_ref)
+    assert row["profile"] == profile_ref and row["worker"] == profile["worker"]
     admission = bound(row["admission"])
     assert admission["profile"] == row["profile"] and admission["admitted"]
     guard = bound(row["active_guard"])
@@ -42,44 +48,54 @@ def registration():
     return source, row
 
 
-def configuration():
-    registered = registration()
+def active_configuration(version):
+    unit, _, root = attempt_paths(version)
+    registered = registration(version)
     if registered is None:
         return []
     _, row = registered
-    live = props(UNIT, FIELDS)
+    live = props(unit, FIELDS)
     if live["ActiveState"] in ("inactive", "failed"):
         assert live["MainPID"] == "0" and not live["ControlGroup"]
         return []
     assert (live["ActiveState"], live["SubState"], live["NRestarts"]) == ("active", "running", "0")
     assert live["InvocationID"] == row["invocation_id"] and int(live["MainPID"]) == row["main_pid"]
-    assert live["ControlGroup"] == "/system.slice/" + UNIT
+    assert live["ControlGroup"] == "/system.slice/" + unit
     assert (Path("/proc") / live["MainPID"] / "exe").samefile(row["node_path"])
-    return [dict(range="296-296", controller_unit=UNIT, producer_unit=UNIT,
+    return [dict(range="296-296", controller_unit=unit, producer_unit=unit,
                  expected_controller_invocation_id=row["invocation_id"],
                  expected_producer_invocation_id=row["invocation_id"],
-                 scratch_path=str(ROOT), worker_executable_basename="historical-worker")]
+                 scratch_path=str(root), worker_executable_basename="historical-worker")]
 
 
-def register(plan):
-    if not PROFILE.is_file():
+def configuration():
+    active = [item for version in ATTEMPTS for item in active_configuration(version)]
+    assert len(active) <= 1
+    return active
+
+
+def register_attempt(plan, version):
+    unit, state, root = attempt_paths(version)
+    profile = state / "generic-unit-profile.json"
+    if not profile.is_file():
         return
     gate = plan["gates"]["296"]
-    registered = registration()
-    evidence = [sealed(PROFILE)]
+    registered = registration(version)
+    evidence = [sealed(profile)]
     if registered is not None:
         source, row = registered
-        if UNIT not in plan["tracked_units"]:
-            plan["tracked_units"].append(UNIT)
-        claim = dict(epoch=296, unit=UNIT, invocation_id=row["invocation_id"],
-                     scratch_path=str(ROOT), launch_receipt=source)
-        existing = [item for item in plan["diagnostics"] if item["unit"] == UNIT]
+        if unit not in plan["tracked_units"]:
+            plan["tracked_units"].append(unit)
+        claim = dict(epoch=296, unit=unit, invocation_id=row["invocation_id"],
+                     scratch_path=str(root), launch_receipt=source)
+        existing = [item for item in plan["diagnostics"] if item["unit"] == unit]
         assert not existing or existing == [claim]
         if not existing:
             plan["diagnostics"].append(claim)
         evidence.extend((source, row["admission"], row["active_guard"]))
-        if TERMINAL.is_file():
-            terminal = sealed(TERMINAL)
+        terminal_path = state / "terminal.json"
+        if terminal_path.is_file():
+            terminal = sealed(terminal_path)
             closed = bound(terminal)
             assert closed["launch"] == source and closed["guard_drained"]
             evidence.append(terminal)
@@ -93,11 +109,21 @@ def register(plan):
             gate["evidence"].append(item)
 
 
+def register(plan):
+    for version in ATTEMPTS:
+        register_attempt(plan, version)
+
+
 def owns(row):
-    if row.get("producer", {}).get("Id") != UNIT:
+    owner = row.get("producer", {}).get("Id")
+    for version in ATTEMPTS:
+        unit, _, root = attempt_paths(version)
+        if owner == unit:
+            break
+    else:
         return False
-    _, launch = registration()
+    _, launch = registration(version)
     assert row["epoch"] == 296 and row["phase"] == "diagnostic-qualification"
     assert row["producer"]["InvocationID"] == launch["invocation_id"]
-    assert row["scratch_path"] == str(ROOT) and row["ordinary_replay_claim"] is False
+    assert row["scratch_path"] == str(root) and row["ordinary_replay_claim"] is False
     return True
