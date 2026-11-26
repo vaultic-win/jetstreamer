@@ -41,11 +41,13 @@ STOCK_WORKER_SHA231 = "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46
 DEMOTION231 = V / "horizon231-demotion-v1"
 DEMOTION_UNIT231 = "horizon-perf-epoch231-program-demotion@v1.service"
 DEMOTION_ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-demotion-tmpfs-v1/run")
-RESTORE231 = V / "horizon231-native-restore-runtime-v1"
-RESTORE_UNIT231 = "horizon-perf-epoch231-native-restore@v1.service"
-RESTORE_ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-native-restore-tmpfs-v1/run")
-RESTORE_PROBE231 = V / "horizon231-native-restore-probe-v1/jetstreamer-checkpoint-restore-probe"
-RESTORE_PLAN231 = V / "horizon231-native-restore-guard-v1/restore-plan.json"
+RESTORE231 = V / "horizon231-native-restore-runtime-v2"
+RESTORE_UNIT231 = "horizon-perf-epoch231-native-restore@v2.service"
+RESTORE_ROOT231 = Path("/home/ubuntu/.jetstreamer-private/epoch231-native-restore-tmpfs-v2/run")
+RESTORE_PACKAGE231 = V / "horizon231-native-restore-guard-v2"
+RESTORE_PROBE231 = RESTORE_PACKAGE231 / "jetstreamer-checkpoint-restore-probe"
+RESTORE_PLAN231 = RESTORE_PACKAGE231 / "restore-plan.json"
+FAILED_RESTORE231 = V / "horizon231-native-restore-runtime-v1/failed-probe-terminal.json"
 RESTORE_WORKER231 = "8f3e721a5ec255ffb7fd6fa848d2127740897476672eb2e8640f8bd449652859"
 RUNS231 = {
     UNIT231: (REPLAY231, ROOT231, "epoch231-capped-checkpoint-replay"),
@@ -450,6 +452,15 @@ def register_successor_inputs(plan):
         if INPUTS231 not in gate["evidence"]:
             gate["evidence"].append(INPUTS231)
         gate["next_action"] = "Qualify capped-worker growth through the generation-pinned checkpoint at slot 99,803,089."
+        if FAILED_RESTORE231.is_file():
+            failed = ref(FAILED_RESTORE231)
+            result = bound(failed)
+            assert result["schema"] == "foundation-epoch231-native-restore-startup-failure-v1"
+            assert result["unit"] == "horizon-perf-epoch231-native-restore@v1.service"
+            assert result["worker_launched"] is False and result["guard_timer_drained"] is True
+            if failed not in gate["evidence"]:
+                gate["evidence"].append(failed)
+            gate["next_action"] = "Run the stripped restore probe against the generation-pinned checkpoint and verified prefix."
         register_warmup231(plan, gate)
 
 
