@@ -681,6 +681,32 @@ fn validate_plan(plan: &Plan) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "epoch168-joint-reduced")]
+fn validate_joint168_scope(plan: &Plan) -> Result<()> {
+    ensure!(
+        plan.unit == "horizon-qualify-168-joint-checkpoint-reduced-20261126-v1.service"
+            && plan.filesystem == Path::new("/home/sol")
+            && plan.worker_root
+                == Path::new("/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1")
+            && plan.receipt_directory
+                == Path::new(concat!(
+                    "/var/lib/jetstreamer/horizon_runtime_data/",
+                    "epoch168-joint-checkpoint-reduced-run-20261126-v1/guard-receipts"
+                ))
+            && plan.minimum_free_bytes >= 8_297_502_499_408
+            && plan
+                .maximum_root_physical_bytes
+                .is_some_and(|bytes| bytes > 0 && bytes <= 512 << 30)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.data_fulfillment.is_none()
+            && plan.native_main.is_none()
+            && plan.bounded_canary.is_none()
+            && plan.bounded_measurement.is_none(),
+        "invalid reduced epoch 168 checkpoint guard scope"
+    );
+    Ok(())
+}
+
 fn data_proof_trip(error: Option<&str>) -> Option<&'static str> {
     error.map(|_| "DATA-fulfillment-observation-failed")
 }
@@ -730,7 +756,9 @@ fn run() -> Result<()> {
         feature = "epoch166-write-version-reproduction"
     ))]
     data_fulfillment::incident::validate_cold_contract(&plan, &args[5])?;
-    #[cfg(not(feature = "incident-recovery"))]
+    #[cfg(feature = "epoch168-joint-reduced")]
+    validate_joint168_scope(&plan)?;
+    #[cfg(not(any(feature = "incident-recovery", feature = "epoch168-joint-reduced")))]
     ensure!(
         plan.unit == data_fulfillment::COLD_UNIT
             && plan.worker_root == Path::new(data_fulfillment::COLD_ROOT)
