@@ -6,6 +6,8 @@ mod prefix203;
 mod prefix223;
 #[path = "qualification_verify/tail223.rs"]
 mod tail223;
+#[path = "qualification_verify/vote230.rs"]
+mod vote230;
 
 use {
     jetstreamer_horizon::{
@@ -433,6 +435,12 @@ fn retained_prefix_157(arguments: &Arguments) -> bool {
 }
 
 fn validate_archive_name(arguments: &Arguments, archive: &Path) -> Result<(), String> {
+    if vote230::namespace(archive) && !vote230::matches(arguments) {
+        return Err(
+            "epoch 230 vote-boundary archive requires its exact checkpoint and transaction scope"
+                .into(),
+        );
+    }
     if prefix223::namespace(arguments) && !prefix223::matches(arguments) {
         return Err(
             "epoch 223 prefix namespace requires its exact checkpoint-bounded partial scope".into(),
@@ -451,7 +459,8 @@ fn validate_archive_name(arguments: &Arguments, archive: &Path) -> Result<(), St
                 || complete_span_225(arguments)
                 || tail223::matches(arguments)
                 || prefix223::matches(arguments)
-                || retained_prefix_157(arguments)))
+                || retained_prefix_157(arguments)
+                || vote230::matches(arguments)))
     {
         return Err(format!(
             "qualification archive filename must be {expected_name}: {}",
@@ -586,6 +595,7 @@ fn verify(arguments: &Arguments) -> Result<serde_json::Value, String> {
         &manifest.terminal.bank_hash,
         &manifest.runtime.runtime_revision,
     )?;
+    vote230::validate_roots(arguments, &manifest)?;
 
     let successful_transaction = if let Some(expected) = &arguments.expected_successful_transaction
     {
