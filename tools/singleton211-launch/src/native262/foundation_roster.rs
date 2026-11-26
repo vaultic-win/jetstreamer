@@ -40,12 +40,18 @@ const SIZING_REFERENCE: (&str, &str) = (
     "/var/lib/jetstreamer/horizon261-full-profile-v226-a1/profile.json",
     "6b27a27ff1596fe6688f207d460566c51d5c9552cef47817358d2008b484f281",
 );
+const AUDIT_148_TERMINAL: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon-foundation-public-audit-148-accepted-v1/acceptance.json",
+    "f91e7a158ce64ab2f0d6be6c8f29499d086660a07831d1775299c5eebe0336f7",
+);
 
 struct FullReplayQuote {
     reference: Bound,
     inputs: Bound,
     working_disk: u64,
     producer_memory: u64,
+    closed_audit: Bound,
+    closed_audit_invocation: String,
 }
 
 fn full_replay_quote() -> Result<FullReplayQuote> {
@@ -54,13 +60,19 @@ fn full_replay_quote() -> Result<FullReplayQuote> {
     let inputs = Bound::new(FULL_REPLAY_INPUTS.0, FULL_REPLAY_INPUTS.1);
     let plan = inputs.sealed()?;
     let terminal = binding(&plan["native_bootstrap_terminal"])?.sealed()?;
+    let closed_audit = Bound::new(AUDIT_148_TERMINAL.0, AUDIT_148_TERMINAL.1);
+    let audit = closed_audit.sealed()?;
     ensure!(
         plan["schema"] == "foundation-epoch262-full-replay-input-envelope-v1"
             && plan["epoch"] == EPOCH
             && plan["full_replay_admitted"] == false
             && terminal["epoch"] == EPOCH
             && terminal["native_input_qualified"] == true
-            && profile["unit"] == "horizon-qualify-261-singleton-v1.service",
+            && profile["unit"] == "horizon-qualify-261-singleton-v1.service"
+            && audit["schema"] == "foundation-epoch148-pinned-public-audit-acceptance-v1"
+            && audit["epoch"] == 148
+            && audit["unit"] == AUXILIARY[1]
+            && audit["authenticated_readiness_rechecked"] == true,
         "epoch 262 full-replay quote inputs changed"
     );
     binding(&plan["replay_node"])?.artifact()?;
@@ -69,6 +81,8 @@ fn full_replay_quote() -> Result<FullReplayQuote> {
         inputs,
         working_disk: num(&profile, "maximum_root_physical_bytes")?,
         producer_memory: num(&profile, "maximum_memory_bytes")?,
+        closed_audit,
+        closed_audit_invocation: text(&audit, "invocation_id")?.to_owned(),
     })
 }
 
@@ -382,6 +396,24 @@ fn measure(
         .cloned()
         .collect();
     let mut expected = booked.clone();
+    let reserved_audit_memory = if let Some(quote) = &quote {
+        let audit = AUXILIARY[1];
+        let reservation = &booking["owners"][audit];
+        let current = n.show_fields(audit, "ActiveState,MainPID,InvocationID,ControlGroup,Job")?;
+        ensure!(
+            expected.remove(audit)
+                && reservation["InvocationID"] == quote.closed_audit_invocation
+                && current["ActiveState"] == "inactive"
+                && current["MainPID"] == "0"
+                && matches!(current["InvocationID"].as_str(), Some(id) if id.is_empty() || id == quote.closed_audit_invocation)
+                && current["ControlGroup"] == ""
+                && current["Job"] == "",
+            "epoch 148 audit closure no longer matches the booked auxiliary"
+        );
+        text(reservation, "MemoryMax")?.parse()?
+    } else {
+        0
+    };
     let controller_owner = controller.as_ref().map(|c| c.check(n)).transpose()?;
     let held = if controller.as_ref().is_some_and(|c| c.held) {
         Some(held_owner(n)?)
@@ -424,7 +456,7 @@ fn measure(
     let cpus = units::affinity(&json!({"cpu_affinity":(40..48).collect::<Vec<_>>() }))?;
     let selected = units::parse_cpu_list("40-47")?;
     let mut recorded = BTreeMap::new();
-    for unit in &booked {
+    for unit in booked.iter().filter(|unit| quote.is_none() || unit.as_str() != AUXILIARY[1]) {
         let owner = n.show_fields(unit, OWNER_FIELDS)?;
         let recorded_owner = &booking["owners"][unit];
         for field in [
@@ -561,7 +593,7 @@ fn measure(
         resources_before.0 / 10,
         num(&delivery, "guard_memory_allowance")?,
     )?;
-    let base_memory = capacity::add(reserve, candidate)?;
+    let base_memory = capacity::add(capacity::add(reserve, candidate)?, reserved_audit_memory)?;
     let (hard, growth_memory) = recorded.values().try_fold(
         (base_memory, base_memory),
         |(hard, growth), (owner, current, _)| {
@@ -605,7 +637,8 @@ fn measure(
         evidence["full_replay_quote"] = json!({"sizing_reference":quote.reference,"inputs":quote.inputs,
             "whole_tree_bytes":quote.working_disk,"producer_memory_bytes":quote.producer_memory,
             "receipt_disk_bytes":DISK_RECEIPTS,"control_memory_bytes":CONTROLLER_MEMORY,
-            "guard_memory_bytes":1u64 << 30});
+            "guard_memory_bytes":1u64 << 30,"closed_audit":quote.closed_audit,
+            "reserved_audit_memory_bytes":reserved_audit_memory});
     }
     deny_authority(&mut evidence);
     Ok(evidence)
