@@ -1,4 +1,5 @@
 //! Source, capacity and native guard checks for epoch 186.
+mod completion;
 mod guard;
 mod price;
 mod source;
@@ -205,8 +206,11 @@ fn run() -> Result<Value> {
                 quote_sha,
             )
         }
+        [mode, adopted, sha] if mode == "capture-prefix-completion" => {
+            completion::capture_prefix(Path::new(adopted), sha)
+        }
         _ => bail!(
-            "usage: horizon-epoch186-bounded-entry source | rehash-source | tail-source | quote FLEET SHA256 | repair-tail-index INDEX NATIVE_REPORT OUTPUT | static-guard-plan | check-guard held|adopted PLAN PLAN_SHA256 SAMPLE SAMPLE_SHA256 QUOTE_SHA256"
+            "usage: horizon-epoch186-bounded-entry source | rehash-source | tail-source | quote FLEET SHA256 | repair-tail-index INDEX NATIVE_REPORT OUTPUT | static-guard-plan | check-guard held|adopted PLAN PLAN_SHA256 SAMPLE SAMPLE_SHA256 QUOTE_SHA256 | capture-prefix-completion ADOPTED_CHECK SHA256"
         ),
     }
 }

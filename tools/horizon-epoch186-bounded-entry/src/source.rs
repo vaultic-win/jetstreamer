@@ -14,7 +14,12 @@ const MANIFEST: &str = "preflight-186-singleton-v4.json";
 const MANIFEST_SHA: &str = "58c38fb8e6b6f4adce290cccfe8922613a6cffda5cb3eb320de424438e11d47e";
 const FINGERPRINT: &str = "sha256:08f4c224485297f5468d2a3d43bb5e73bbd9993c873d949c2f62de41d2a7029d";
 const BOOTSTRAP: &str = "snapshot-80351283-Dq1knez4dNLE3zsSM69ve8Gd96LKJLJz4f56ysEHjfT8.tar.zst";
-const BOOTSTRAP_SHA: &str = "2b128e27dce19d7df54cbcdba52e9fc6e6897fcdce288d05369c41e9382b5112";
+pub(crate) const BOOTSTRAP_SHA: &str =
+    "2b128e27dce19d7df54cbcdba52e9fc6e6897fcdce288d05369c41e9382b5112";
+pub(crate) const ARCHIVE: &str = concat!(
+    "/home/sol/.jetstreamer-private/epoch186-bounded-source-20261125-v1",
+    "/private/epoch-186-bounded.jet"
+);
 const BOOTSTRAP_BYTES: u64 = 7_316_986_109;
 const BOOTSTRAP_SLOT: u64 = 80_351_283;
 const CHECKPOINT: &str = "snapshot-80783539-EWu2G86akFM3CKJ8D4YZzi8ASZeaPKm2WXLG239Zjnj9.tar.zst";
@@ -44,7 +49,7 @@ pub fn argv() -> Vec<String> {
         format!("--qualification-end-slot={END_SLOT}"),
         format!("--snapshot-archive={VIEW}/{BOOTSTRAP}"),
         format!("--epoch-hashes={VIEW}/{HASH_FILE}"),
-        format!("--horizon-output={ROOT}/private/epoch-186-bounded.jet"),
+        format!("--horizon-output={ARCHIVE}"),
     ]
 }
 

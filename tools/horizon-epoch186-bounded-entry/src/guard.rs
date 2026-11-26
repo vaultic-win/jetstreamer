@@ -37,7 +37,7 @@ pub fn plan(invocation: &str, floor: u64) -> Result<Value> {
     )
 }
 
-fn validate_sample(
+pub(crate) fn validate_sample(
     plan_ref: &Value,
     plan_value: &Value,
     sample: &Value,
@@ -125,7 +125,7 @@ fn validate_sample(
 pub fn properties(unit: &str) -> Result<Value> {
     let output = Command::new("/usr/bin/timeout").args([
         "10", "/usr/bin/systemctl", "show", "--all", "--no-pager",
-        "--property=Id,ActiveState,SubState,LoadState,MainPID,ControlPID,Job,InvocationID,ControlGroup,NRestarts,Restart,Delegate,KillMode,User,Group,RuntimeMaxUSec,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,ExecMainStatus,ExecMainCode,Result,Triggers,TriggeredBy",
+        "--property=Id,ActiveState,SubState,LoadState,MainPID,ControlPID,Job,InvocationID,ControlGroup,NRestarts,Restart,Delegate,KillMode,User,Group,RuntimeMaxUSec,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,ExecStart,ExecMainPID,ExecMainStatus,ExecMainCode,Result,Triggers,TriggeredBy",
         unit,
     ]).env_clear().env("PATH","/usr/bin:/bin").env("LC_ALL", "C").output()?;
     ensure!(
