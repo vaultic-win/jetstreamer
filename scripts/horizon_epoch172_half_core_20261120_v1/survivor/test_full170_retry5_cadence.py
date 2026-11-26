@@ -1,5 +1,6 @@
 """Exercise the retry5/full170 cadence switch with offline owner and receipt fixtures."""
 import ast
+import json
 import os
 from pathlib import Path
 import runpy
@@ -230,6 +231,47 @@ class Receivers(unittest.TestCase):
         first['producer_invocation_id'] = '0'*32
         with self.assertRaisesRegex(ValueError, 'different metered 170 worker projection'):
             reader.ownership({})
+
+
+class ReadyDeliveryInventory(unittest.TestCase):
+    def setUp(self):
+        self.owner = ('publish-199.service', 'a' * 32)
+        self.completion = reference('/completion.json')
+        self.original = reference('/inventory.json')
+        self.inventory = SimpleNamespace(inventory=lambda: ({140, 199}, {148, 199}, {148: ('old', 1), 199: ('new', 2)}))
+        self.context = SimpleNamespace(prior={'inventory': self.original}, completed_deliveries={}, staged_deliveries={},
+            fleet={'epochs': [{'epoch': 199, 'current_repair_owner': '/root', 'current_status': {'jet_size_bytes': 2}}]})
+        self.legacy = Mock(side_effect=lambda c, source: source.inventory())
+        event = {'event': 'r2-readback-start', 'key': 'epoch-199.jet', 'total_bytes': 2, 'expected_etag': 'new'}
+        self.journal = Mock(return_value=json.dumps({'_SYSTEMD_UNIT': self.owner[0],
+            '_SYSTEMD_INVOCATION_ID': self.owner[1], 'MESSAGE': json.dumps(event), '__CURSOR': 'cursor',
+            '__REALTIME_TIMESTAMP': '1'}))
+        self.scope = cycle_functions('staged_delivery_inventory', FAILED166_VERSION=16,
+            PUBLICATION_INVOCATIONS={199: self.owner}, checked=lambda ref, **kw: {
+                '/completion.json': {'etag': 'new', 'length': 2},
+                '/inventory.json': {'entries': [{'epoch': 148, 'state': 'ready-pair'}]},
+            }[ref['path']], need=need, SimpleNamespace=SimpleNamespace, json=json,
+            status=SimpleNamespace(inventory=self.legacy), subprocess=SimpleNamespace(check_output=self.journal))
+
+    def observe(self):
+        return self.scope['staged_delivery_inventory'](self.context, self.inventory)
+
+    def test_visible_sidecar_waits_for_native_completion_before_status_removal(self):
+        self.assertEqual(self.observe(), ({140, 199}, {148}, {148: ('old', 1)}))
+        self.assertEqual(self.context.staged_deliveries[199]['size_bytes'], 2)
+        self.context.completed_deliveries = {'199': self.completion}
+        self.context.staged_deliveries = {}
+        self.inventory.inventory = lambda: ({140}, {148, 199}, {148: ('old', 1), 199: ('new', 2)})
+        self.assertEqual(self.observe(), ({140, 199}, {148}, {148: ('old', 1)}))
+        self.assertEqual(self.context.staged_deliveries, {})
+
+    def test_changed_ready_identity_or_new_status_fails_closed(self):
+        self.context.completed_deliveries = {'199': self.completion}
+        with self.assertRaisesRegex(ValueError, 'new status claim'):
+            self.observe()
+        self.inventory.inventory = lambda: ({140}, {148, 199}, {148: ('old', 1), 199: ('other', 2)})
+        with self.assertRaisesRegex(ValueError, 'archive identity changed'):
+            self.observe()
 
 
 if __name__ == '__main__':

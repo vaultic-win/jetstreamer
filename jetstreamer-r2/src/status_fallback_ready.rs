@@ -5,6 +5,7 @@ use super::*;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
 const PLAN_SCHEMA: &str = "jetstreamer-r2-fallback-ready-status-plan-v1";
+const ANZA_PLAN_SCHEMA: &str = "jetstreamer-r2-anza-cadence-ready-status-plan-v1";
 const COMPLETION_SCHEMA: &str = "horizon-status-only-correction-completion-v1";
 const INTENT_SCHEMA: &str = "jetstreamer-r2-fallback-ready-status-delete-intent-v1";
 const DELETION_SCHEMA: &str = "jetstreamer-r2-fallback-ready-status-deletion-v1";
@@ -50,6 +51,19 @@ struct FallbackCompletion {
     authenticated_exact_byte_readback: bool,
     conditional_header: String,
     archive_or_sidecar_mutation: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct AnzaCadenceCompletion {
+    epoch: u64,
+    key: String,
+    before_etag: String,
+    after_etag: String,
+    after_sha256: String,
+    after_status: EpochStatus,
+    authenticated_readback: bool,
+    conditional_header: String,
+    archive_publication_authorized: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -152,7 +166,7 @@ fn bound_bytes(bound: &Bound, limit: u64, label: &str) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn destination(path: &Path, epoch: u64, kind: &str) -> Result<()> {
+fn destination(path: &Path, epoch: u64, kind: &str, private_root: &Path) -> Result<()> {
     let expected = format!("epoch-{epoch}.fallback-ready-status-{kind}.json");
     ensure!(
         path.is_absolute() && path.file_name() == Some(std::ffi::OsStr::new(&expected)),
@@ -160,14 +174,70 @@ fn destination(path: &Path, epoch: u64, kind: &str) -> Result<()> {
     );
     let parent = path.parent().context("deletion evidence lacks parent")?;
     ensure!(
-        parent.canonicalize()? == parent
-            && parent.starts_with("/home/ubuntu/.jetstreamer-private/"),
+        parent.canonicalize()? == parent && parent.starts_with(private_root),
         "deletion evidence parent is not canonical private state"
     );
     let metadata = fs::symlink_metadata(parent)?;
     ensure!(
         metadata.is_dir() && metadata.uid() == 0 && metadata.permissions().mode() & 0o077 == 0,
         "deletion evidence parent is not root-private"
+    );
+    Ok(())
+}
+
+fn validate_anza_completion(
+    completion: &AnzaCadenceCompletion,
+    epoch: u64,
+    raw_sha: &str,
+    status: &EpochStatus,
+) -> Result<String> {
+    let etag = quoted_etag(&completion.after_etag)?;
+    quoted_etag(&completion.before_etag)?;
+    validate_epoch_status(status, epoch)?;
+    ensure!(
+        completion.epoch == epoch
+            && completion.key == format!("epoch-{epoch}.epoch-status.json")
+            && completion.authenticated_readback
+            && completion.conditional_header == "If-Match"
+            && !completion.archive_publication_authorized
+            && completion.after_sha256 == raw_sha
+            && &completion.after_status == status,
+        "Anza cadence receipt does not bind the exact authenticated status"
+    );
+    Ok(etag.to_owned())
+}
+
+fn validate_anza_playback(archive: &Receipt) -> Result<()> {
+    let playback = archive
+        .current_reader_playback
+        .as_ref()
+        .context("Anza archive receipt lacks current-reader playback")?;
+    let bytes = bound_bytes(
+        &Bound {
+            path: playback.path.clone(),
+            sha256: playback.sha256.clone(),
+        },
+        MAX_STATUS_BYTES,
+        "current-reader playback acceptance",
+    )?;
+    let proof: serde_json::Value = serde_json::from_slice(&bytes)?;
+    let remote = &proof["remote_playback"];
+    let object = &remote["object"];
+    let local_report = &proof["local_playback"]["report"]["report"];
+    ensure!(
+        proof["schema"] == "horizon-r2-current-reader-playback-acceptance-v1"
+            && proof["epoch"] == archive.epoch
+            && proof["readiness_sidecar_committed"] == false
+            && object["bucket"] == archive.bucket
+            && object["key"] == archive.archive_key
+            && object["etag"] == archive.archive_etag
+            && object["length"] == archive.archive_length
+            && object["sha256"] == archive.archive_sha256
+            && proof["local_playback"]["process_exit_code"] == 0
+            && remote["playback"]["process_exit_code"] == 0
+            && local_report.is_object()
+            && local_report == &remote["playback"]["report"]["report"],
+        "Anza archive lacks matching local and pinned public playback"
     );
     Ok(())
 }
@@ -243,15 +313,33 @@ fn validate_operator_completion(
 }
 
 fn binding(plan: &Plan, plan_bound: &Bound) -> Result<(DeleteIntent, Receipt, Vec<u8>)> {
+    let anza = plan.schema == ANZA_PLAN_SCHEMA;
+    let private_root = if anza {
+        ensure!(
+            matches!(plan.epoch, 145 | 199)
+                && plan.operator_intent.is_none()
+                && plan.operator_before.is_none(),
+            "invalid Anza cadence status deletion plan"
+        );
+        Path::new("/home/sol/.jetstreamer-private")
+    } else {
+        ensure!(
+            plan.schema == PLAN_SCHEMA && (201..=300).contains(&plan.epoch),
+            "invalid Foundation fallback status deletion plan"
+        );
+        Path::new("/home/ubuntu/.jetstreamer-private")
+    };
     ensure!(
-        plan.schema == PLAN_SCHEMA
-            && (201..=300).contains(&plan.epoch)
-            && plan.status_delete_authorized
-            && !plan.archive_or_sidecar_mutations,
+        plan.status_delete_authorized && !plan.archive_or_sidecar_mutations,
         "invalid fallback ready deletion plan"
     );
-    destination(&plan.deletion_intent, plan.epoch, "delete-intent")?;
-    destination(&plan.deletion_receipt, plan.epoch, "deletion")?;
+    destination(
+        &plan.deletion_intent,
+        plan.epoch,
+        "delete-intent",
+        private_root,
+    )?;
+    destination(&plan.deletion_receipt, plan.epoch, "deletion", private_root)?;
     ensure!(
         plan.deletion_intent.parent() == plan.deletion_receipt.parent(),
         "fallback deletion evidence must share a private parent"
@@ -263,7 +351,10 @@ fn binding(plan: &Plan, plan_bound: &Bound) -> Result<(DeleteIntent, Receipt, Ve
     )?;
     let raw_status = bound_bytes(&plan.raw_status, MAX_STATUS_BYTES, "raw fallback status")?;
     let status: EpochStatus = serde_json::from_slice(&raw_status)?;
-    let object_etag = if plan.operator_intent.is_some() || plan.operator_before.is_some() {
+    let object_etag = if anza {
+        let completion = serde_json::from_slice(&completion_raw)?;
+        validate_anza_completion(&completion, plan.epoch, &sha(&raw_status), &status)?
+    } else if plan.operator_intent.is_some() || plan.operator_before.is_some() {
         let operator_intent = plan
             .operator_intent
             .as_ref()
@@ -308,6 +399,13 @@ fn binding(plan: &Plan, plan_bound: &Bound) -> Result<(DeleteIntent, Receipt, Ve
             && (archive.remote_sha256_readback || archive.r2_composite_sha256.is_some()),
         "archive receipt changed or lacks whole-object proof"
     );
+    if anza {
+        ensure!(
+            archive.remote_sha256_readback && status.jet_size_bytes == archive.archive_length,
+            "Anza archive lacks whole-object readback or differs from the status length"
+        );
+        validate_anza_playback(&archive)?;
+    }
     let intent = DeleteIntent {
         schema: INTENT_SCHEMA.into(),
         plan: plan_bound.clone(),
@@ -541,6 +639,38 @@ mod tests {
         assert!(validate_completion(&changed, 239, &"c".repeat(64), &status()).is_err());
         assert!(validate_completion(&completion(), 239, &"d".repeat(64), &status()).is_err());
     }
+
+    #[test]
+    fn binds_anza_cadence_receipt_to_expected_bytes_and_status() {
+        let status = EpochStatus {
+            epoch: 199,
+            phase: "verification".into(),
+            ..status()
+        };
+        let digest = "c".repeat(64);
+        let mut receipt = AnzaCadenceCompletion {
+            epoch: 199,
+            key: "epoch-199.epoch-status.json".into(),
+            before_etag: format!("\"{}\"", "a".repeat(32)),
+            after_etag: format!("\"{}\"", "b".repeat(32)),
+            after_sha256: digest.clone(),
+            after_status: status.clone(),
+            authenticated_readback: true,
+            conditional_header: "If-Match".into(),
+            archive_publication_authorized: false,
+        };
+        assert_eq!(
+            validate_anza_completion(&receipt, 199, &digest, &status).unwrap(),
+            "b".repeat(32)
+        );
+        assert!(validate_anza_completion(&receipt, 199, &"d".repeat(64), &status).is_err());
+        receipt.after_status.jet_size_bytes += 1;
+        assert!(validate_anza_completion(&receipt, 199, &digest, &status).is_err());
+        receipt.after_status = status.clone();
+        receipt.key = "epoch-199.jet.sha256".into();
+        assert!(validate_anza_completion(&receipt, 199, &digest, &status).is_err());
+    }
+
     #[test]
     fn binds_operator_fallback_and_rejects_changed_evidence() {
         let before = EpochStatus {

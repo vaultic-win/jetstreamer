@@ -23,13 +23,15 @@ FAILED_RUN = ROOT / 'failed-replay-20261124T123309Z'
 V13_PACKAGE = 'tools-cold168-retry5-failed166-v13-entry146'
 V14_PACKAGE = 'tools-cold168-retry5-failed166-v14-entry146'
 V15_PACKAGE = 'tools-cold168-retry5-failed166-v15-entry146'
+V16_PACKAGE = 'tools-cold168-retry5-failed166-v16-entry146'
 METERED_FULL = LOCAL.name in ('tools-cold168-retry4-failed166-v6-entry146',
                              'tools-cold168-retry4-failed166-v7-entry146',
-                             V13_PACKAGE, V14_PACKAGE, V15_PACKAGE)
+                             V13_PACKAGE, V14_PACKAGE, V15_PACKAGE, V16_PACKAGE)
 if METERED_FULL:
     import full170_status as full170
 
-RETRY5_168 = LOCAL.name in ('tools-cold168-retry5-failed166-v12-entry146', V13_PACKAGE, V14_PACKAGE, V15_PACKAGE)
+RETRY5_168 = LOCAL.name in ('tools-cold168-retry5-failed166-v12-entry146', V13_PACKAGE, V14_PACKAGE,
+                           V15_PACKAGE, V16_PACKAGE)
 FAILED166_CADENCE = RETRY5_168 or METERED_FULL or LOCAL.name in (
     'tools-cold168-retry4-failed166-v1', 'tools-cold168-retry4-failed166-v2',
     'tools-cold168-retry4-failed166-v3', 'tools-cold168-retry4-failed166-v4-entry146',
@@ -269,7 +271,7 @@ def reconcile(c, observed_lane):
     c.retained168 = (cold168_commit.guard_stop(c.fleet, c.cfg, successor=cold168) if RETRY5_168
                      else c.failed168)
     c.failed168_retry5 = (cold168_commit.retry5_scan_stop(c.fleet, c.cfg, cold168)
-                          if LOCAL.name in (V14_PACKAGE, V15_PACKAGE) else None)
+                          if LOCAL.name in (V14_PACKAGE, V15_PACKAGE, V16_PACKAGE) else None)
     terminal168 = (cold168_commit.current(c.fleet, c.cfg)
                    if cold168_commit and not (stopped168 or RETRY5_168) else None)
     c.failed170 = failed_route(c.fleet)

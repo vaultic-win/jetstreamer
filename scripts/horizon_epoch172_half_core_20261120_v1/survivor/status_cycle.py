@@ -24,7 +24,7 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
-RETRY5_CADENCE_VERSIONS = (12, 13, 14, 15)
+RETRY5_CADENCE_VERSIONS = (12, 13, 14, 15, 16)
 PUBLICATION_INVOCATIONS = {
     145: ('horizon-retained-publish-145-20261126-v1.service', '166133c4366c47cdad3caf1748404541'),
     199: ('horizon-retained-publish-199-20261126-v1.service', 'd12158c94a7a4e53af92671cb4a2a8b9'),
@@ -37,11 +37,11 @@ def failed166_package(version):
     return name + '-entry146' if version >= 4 else name
 
 
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16)
                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
 FAILED166 = bool(FAILED166_VERSION)
 RETRY5_168 = FAILED166_VERSION in RETRY5_CADENCE_VERSIONS
-METERED_FULL170 = FAILED166_VERSION in (6, 7, 13, 14, 15)
+METERED_FULL170 = FAILED166_VERSION in (6, 7, 13, 14, 15, 16)
 HOLDING185 = FAILED166_VERSION == 7
 HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
 FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
@@ -62,6 +62,9 @@ import status
 sys.path.insert(0,str(CURRENT.parent))
 import cold167_status
 import cold166_status
+
+if FAILED166_VERSION == 16:
+    import ready_delivery
 
 if HOURLY170:
     import hourly170_cadence
@@ -564,9 +567,18 @@ def staged_delivery_inventory(c, store):
     original = checked(c.prior['inventory'], root=False)
     pinned = {row['epoch'] for row in original['entries'] if row['state'] in ('ready-pair', 'archive-only')}
     extra = archives.keys() - pinned
-    need(extra <= PUBLICATION_INVOCATIONS.keys() and extra.isdisjoint(ready),
+    completed = set(map(int, getattr(c, 'completed_deliveries', {})))
+    need(extra <= PUBLICATION_INVOCATIONS.keys()
+         and (FAILED166_VERSION == 16 or extra.isdisjoint(ready)),
          'unexpected canonical publication requires authenticated reconciliation')
+    need(completed <= ready and completed.isdisjoint(statuses),
+         'accepted delivery lost readiness or has a new status claim')
     for epoch in sorted(extra):
+        if epoch in completed:
+            proof = checked(c.completed_deliveries[str(epoch)])
+            need(archives.pop(epoch) == (proof['etag'], proof['length']),
+                 'accepted delivery archive identity changed during status refresh')
+            continue
         unit, invocation = PUBLICATION_INVOCATIONS[epoch]
         etag, size = archives[epoch]
         entry, = (row for row in c.fleet['epochs'] if row['epoch'] == epoch)
@@ -591,6 +603,11 @@ def staged_delivery_inventory(c, store):
         prior = c.staged_deliveries.setdefault(epoch, proof)
         need(prior == proof, 'staged archive or publisher changed during the coordinated sample')
         del archives[epoch]
+    # The inherited inventory validator checks the frozen census. The additional
+    # archive identities and status removals are authenticated above.
+    if FAILED166_VERSION == 16:
+        statuses = statuses | completed
+        ready = ready - extra
     inventory = SimpleNamespace(inventory=lambda: (statuses, ready, archives))
     return status.inventory(c, inventory)
 
@@ -598,14 +615,21 @@ def staged_delivery_inventory(c, store):
 def publish_all(c,bridge,store,vs):
     target=names(c.cfg['not_before_utc'])['statuses'];ensure_dir(target)
     refs=baselines(c.fleet_ref,c.fleet,bridge)
-    initial=set(int(k) for k in refs)
-    need(initial==set(status.EPOCHS)|{140},'different status population')
-    if FAILED166_VERSION == 15:
+    previous_completions = set(map(int, c.fleet.get('retained_publication_completions', {})))
+    need(set(map(int, refs)) == (set(status.EPOCHS) | {140}) - previous_completions,
+         'different status population')
+    if FAILED166_VERSION == 16:
+        c.completed_deliveries = ready_delivery.reconcile(
+            c, store, store.inventory(), refs, PUBLICATION_INVOCATIONS,
+            ready_delivery.selected_tool(checked(entry())), external_event)
+        for epoch in c.completed_deliveries:
+            refs.pop(epoch, None)
+    if FAILED166_VERSION >= 15:
         c.staged_deliveries = {}
-    inventory = staged_delivery_inventory if FAILED166_VERSION == 15 else status.inventory
+    inventory = staged_delivery_inventory if FAILED166_VERSION >= 15 else status.inventory
     ready=inventory(c,store)
     read_statuses(store,refs,target)
-    for e in sorted(initial):
+    for e in sorted(map(int, refs)):
         publish(c,store,refs,target,e,vs['archive172'] if e==172 else None)
     for e,r in refs.items(): authenticated(store,int(e),r)
     need(ready==inventory(c,store),'archive inventory changed during status refresh')
@@ -624,7 +648,7 @@ def publish_all(c,bridge,store,vs):
     complete=target/'COMPLETE_ACTIVE_STATUSES.json'
     durable(complete,dict(schema='horizon-all-current-authenticated-statuses-v1',observer=c.sample_ref,
          fleet_predecessor=c.fleet_ref,sampled_at_utc=c.stamp,authenticated_readback=True,
-         authenticated_status_count=len(refs),status_epochs=sorted(initial),receipts=refs,original_nineteen=bound(p),
+         authenticated_status_count=len(refs),status_epochs=sorted(map(int, refs)),receipts=refs,original_nineteen=bound(p),
          private140=refs['140'],archives_or_sidecars_changed=False))
     return bound(p),bound(complete)
 
@@ -693,7 +717,7 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
         new=checked(ref)['after_status'];entry=lookup[int(e)]
         entry.update(status=new,current_status=new,status_publication=ref,current_authenticated_status_receipt=ref,
                      current_coordinated_observer=c.sample_ref)
-    if FAILED166_VERSION == 15:
+    if FAILED166_VERSION >= 15:
         proof = base/'STAGED_DELIVERY_INVENTORY.json'
         durable(proof, dict(observer=c.sample_ref, staged=c.staged_deliveries))
         fleet['current_staged_delivery_inventory'] = bound(proof)
@@ -716,7 +740,7 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
           bootstrap_count=0,guarded_bootstrap_owner_count=0,actual_active_private_diagnostics=[],active_private_diagnostic_count=0,
           useful_replay_count=int(c.advancing[172]),live_replay_count=1,active_producer_count=1,canonical_producer_count=1,
           authenticated_status_audit=statusref,effective_status_receipts=checked(statusref)['receipts'],
-          complete_active_status_audit=allref,complete_active_status_count=20,complete_active_status_receipts=a['receipts'],
+          complete_active_status_audit=allref,complete_active_status_count=len(a['receipts']),complete_active_status_receipts=a['receipts'],
           current_private140_status_receipt=a['receipts']['140'],current_home_cycle_capacity=hr,current_four_homefloor_stops=bridge['corrected_stop_events'],
           historical_focused169_worker=diag,focused169_terminal=observed['focused169']['terminal'],
           current_private_169_observer_result=observed['focused169'],current_audit_progress=dict(observation=ar,field='progress'),
@@ -747,9 +771,34 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
     if c.new_rows:
         active=', '.join(map(str,sorted([172,*c.new_rows])))
         pending=', '.join(map(str,sorted(set(CLOSED)-set(c.new_rows)-set(c.commits))))
-        fleet['cycle_reconciliation_scope']=f'Guarded epochs {active}. Four original HOME closures and twenty authenticated status keys.'
+        fleet['cycle_reconciliation_scope']=f'Guarded epochs {active}. Four original HOME closures and {len(a["receipts"])} authenticated status keys.'
         fleet['current_replay_lane_recovery']=f'Maintain epochs {active} and reprice {pending}.'
         fleet['next_lane_recovery']=fleet['current_replay_lane_recovery']
+    if FAILED166_VERSION == 16 and c.completed_deliveries:
+        inventory = copy.deepcopy(checked(c.prior['inventory'], root=False))
+        for row in inventory['entries']:
+            epoch = row['epoch']
+            completion = c.completed_deliveries.get(str(epoch))
+            staged = c.staged_deliveries.get(epoch)
+            if completion:
+                done = checked(completion)
+                row.update(done['inventory_entry'])
+                entry = lookup[epoch]
+                for key in ('current_authenticated_status_receipt', 'current_coordinated_observer',
+                            'current_status', 'status', 'status_publication', 'staged_delivery_readback'):
+                    entry.pop(key, None)
+                entry.update(inventory_state='ready-pair', state='remote-ready', current_repair_owner=None,
+                             repair_open=False, publication_completion=completion)
+            elif staged:
+                row.update(state='archive-only', archive_length=staged['size_bytes'], archive_etag=staged['etag'])
+        for state, key in (('ready-pair', 'ready_pairs'), ('archive-only', 'archive_only'), ('missing', 'missing')):
+            inventory[key] = sum(row['state'] == state for row in inventory['entries'])
+        inventory_path = base / 'AUTHENTICATED_DELIVERY_INVENTORY.json'
+        durable(inventory_path, inventory)
+        fleet.update(authenticated_inventory=bound(inventory_path), ready_pairs=inventory['ready_pairs'],
+                     remaining_epochs=len(inventory['entries']) - inventory['ready_pairs'],
+                     authenticated_status_count=len(a['receipts']) - 1,
+                     retained_publication_completions=c.completed_deliveries)
     return fleet
 
 def track_timer(ref):
@@ -851,7 +900,7 @@ def one_cycle(head,ref,bridge,completed_sample=None):
         nextref=read_ref(altref)['config'];timer=schedule(nextref)
     result=fleet_successor(c,bridge,observed,legacy,whole,nextref,timer)
     target=out/'ROOT_COMPLETE_OPERATIONAL_FLEET.json';durable(target,result)
-    print(json.dumps(dict(fleet=bound(target),timer=timer,status_count=20,**cold167_status.counts(c))),
+    print(json.dumps(dict(fleet=bound(target),timer=timer,status_count=result['complete_active_status_count'],**cold167_status.counts(c))),
           flush=True)
     return bound(target)
 
@@ -886,6 +935,11 @@ def entry():
         need(Path(hourly170_cadence.__file__) == CURRENT.with_name(member['name'])
              and bound(CURRENT.with_name(member['name']))['sha256']==member['sha256'],
              'unsealed epoch 170 private cadence observer')
+    if FAILED166_VERSION == 16:
+        path = CURRENT.with_name('ready_delivery.py')
+        member, = (row for row in seal['members'] if row['name'] == path.name)
+        need(Path(ready_delivery.__file__) == path and member['mode'] == '0444'
+             and bound(path)['sha256'] == member['sha256'], 'unsealed ready delivery receiver')
     if FAILED166_VERSION >= 4:
         need(cold_workers.FAILED166_CADENCE, 'cold worker census omits the drained epoch 166')
         validate_epoch146_modules(seal)
@@ -1184,6 +1238,13 @@ def rejoin_failed166_cadence(state, receipt, fd):
                  and ready['retry5_scan_stop'] == previous_ready['retry5_scan_stop']
                  == cold_workers.cold168_commit.retry5_scan_stop(fleet, cfg, route),
                  'different prior writer, metered receiver or retry5 stop')
+        if FAILED166_VERSION == 16:
+            previous_ready = checked(incumbent['ready'])
+            need(ready['full170_receiver'] == bound(CURRENT.with_name('full170_status.py'))
+                 and ready['retry5_scan_stop'] == previous_ready['retry5_scan_stop']
+                 == cold_workers.cold168_commit.retry5_scan_stop(fleet, cfg, route),
+                 'ready delivery receiver changed the retry5 stop or metered 170 route')
+            ready_delivery.selected_tool(checked(receipt))
         route.generation()
         cold_workers.cold168_commit.guard_stop(fleet, cfg, successor=route)
     pid = os.getpid()
