@@ -24,6 +24,10 @@ archive verification.
 - `static-guard-plan` emits a synthetic invocation for the deployed guard's
   `--validate-plan-only` mode. Production uses its actual producer invocation
   and the floor from the freshly accepted capacity quote.
+- `repair-tail-index INDEX NATIVE_REPORT OUTPUT` stages a digest-bound epoch 187
+  index for the epoch 186 verification tail through slot 80,791,699. It fills
+  the two missing rows proven by native CAR decoding. The original index stays
+  intact, and the receipt identifies the exact verified range.
 - `check-guard held|adopted PLAN PLAN_SHA SAMPLE SAMPLE_SHA QUOTE_SHA`
   checks the stop-enabled guard sample against the selected plan, the exact
   systemd producer, guard service and timer, and the fixed
