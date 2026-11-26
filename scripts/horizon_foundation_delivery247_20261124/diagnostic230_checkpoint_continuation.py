@@ -26,6 +26,10 @@ TAIL_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch230-final-tail-tmpfs-v1
 MIDDLE_UNIT = "horizon-qualify-230-middle-v1.service"
 MIDDLE_PACKAGE = V / "horizon230-middle-fit-v1"
 MIDDLE_ROOT = Path("/home/ubuntu/.jetstreamer-private/qualification-230-middle-v1")
+MISMATCH_UNIT = "horizon-perf-epoch230-bounded-mismatch@v2.service"
+MISMATCH_PACKAGE = V / "horizon230-bounded-mismatch-v2"
+MISMATCH_ROOT = Path("/home/ubuntu/.jetstreamer-private/epoch230-mismatch-tmpfs-v2/run")
+MISMATCH_GUARD = "horizon-230-bounded-mismatch-protective-v2.service"
 TAIL_INPUTS = {
     "path": str(V / "horizon230-final-tail-static-v1/inputs.json"),
     "sha256": "91faca00759d243930050e2fa824e890953f9b329606675cba573d0f103fefc3",
@@ -121,7 +125,8 @@ def live230(unit, root, registered):
 
 def configuration230():
     rows = (live230(UNIT, RUN_ROOT, receipt()) + live230(TAIL_UNIT, TAIL_ROOT, tail_receipt())
-            + live230(MIDDLE_UNIT, MIDDLE_ROOT, middle_receipt()))
+            + live230(MIDDLE_UNIT, MIDDLE_ROOT, middle_receipt())
+            + live230(MISMATCH_UNIT, MISMATCH_ROOT, mismatch_receipt()))
     assert len(rows) <= 1
     return rows
 
@@ -153,6 +158,38 @@ def middle_receipt():
     assert sample["producer_invocation_id"] == row["invocation_id"] and sample["producer"]["pid"] == row["main_pid"]
     assert sample["producer_stop_enabled"] and sample["trip_reason"] is None
     assert sample["plan_sha256"] == row["guard_plan"]["sha256"]
+    return source, row
+
+
+def mismatch_receipt():
+    path = MISMATCH_PACKAGE / "cadence-registration.json"
+    if not path.is_file():
+        return None
+    metadata = path.lstat()
+    assert path.resolve() == path and metadata.st_uid == 0 and metadata.st_nlink == 1
+    assert not metadata.st_mode & 0o222
+    source = ref(path)
+    row = bound(source)
+    assert row["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+    assert (row["epoch"], row["unit"], row["kind"], row["run_root"]) == (
+        230, MISMATCH_UNIT, "epoch230-bounded-mismatch-trace", str(MISMATCH_ROOT))
+    assert (row["bootstrap_slot"], row["first_slot"], row["target_slot"], row["last_slot"]) == (
+        99_430_284, 99_430_285, 99_435_890, 99_437_433)
+    iid = row["invocation_id"]
+    assert re.fullmatch("[0-9a-f]{32}", iid) and row["main_pid"] > 0
+    assert row["worker_sha256"] == WORKER_SHA and row["entry_replay_requested"] and row["launched"]
+    assert all(row[key] is False for key in ("canonical_epoch_publication_authorized",
+                                            "remote_mutations", "r2_mutations", "full_continuation_peak_qualified"))
+    admission = bound(row["admission"])
+    assert admission["schema"] == "foundation-epoch230-bounded-mismatch-admission-v2"
+    assert admission["admitted"] and admission["profile"] == ref(MISMATCH_PACKAGE / "profile.json")
+    profile = bound(admission["profile"])
+    assert profile["node"]["path"] == row["node_path"] and profile["worker"]["sha256"] == WORKER_SHA
+    assert profile["memory_max_bytes"] == 200 << 30 and profile["ram_scratch_cap_bytes"] == 150_000_000_000
+    guard = bound(row["active_guard"])
+    assert guard["producer_invocation_id"] == iid and guard["producer"]["pid"] == row["main_pid"]
+    assert guard["producer_stop_enabled"] and guard["trip_reason"] is None
+    assert guard["plan_sha256"] == row["guard_plan"]["sha256"] and guard["guard_sha256"] == profile["guard"]["sha256"]
     return source, row
 
 
@@ -221,6 +258,7 @@ def register(plan):
     if registered is None:
         register_tail(plan)
         register_middle(plan)
+        register_mismatch(plan)
         return None
     source, row = registered
     if UNIT not in plan["tracked_units"]:
@@ -260,6 +298,7 @@ def register(plan):
     assert deployment["schema"] == "foundation-epoch230-checkpoint-continuation-fleet-tool-v1"
     register_tail(plan)
     register_middle(plan)
+    register_mismatch(plan)
     return deployment["artifact"]
 
 
@@ -326,6 +365,40 @@ def register_middle(plan):
         if not previous:
             diagnostics.append(claim)
         gate["next_action"] = "Replay the middle span through the pinned AccountsDb root at slot 99,791,404."
+
+
+def register_mismatch(plan):
+    registered = mismatch_receipt()
+    if registered is None:
+        return
+    source, row = registered
+    if MISMATCH_UNIT not in plan["tracked_units"]:
+        plan["tracked_units"].append(MISMATCH_UNIT)
+    diagnostics = plan.setdefault("diagnostics", [])
+    claim = dict(epoch=230, unit=MISMATCH_UNIT, invocation_id=row["invocation_id"],
+                 scratch_path=str(MISMATCH_ROOT), launch_receipt=source)
+    previous = [owner for owner in diagnostics if owner["unit"] == MISMATCH_UNIT]
+    assert not previous or previous == [claim]
+    gate = plan["gates"]["230"]
+    for evidence in (source, row["admission"], row["active_guard"]):
+        if evidence not in gate["evidence"]:
+            gate["evidence"].append(evidence)
+    terminal = MISMATCH_PACKAGE / "terminal.json"
+    if terminal.is_file():
+        terminal_ref = ref(terminal)
+        result = bound(terminal_ref)
+        assert result["registration"] == source and result["epoch"] == 230
+        assert result["publication_authorized"] is False and not live230(MISMATCH_UNIT, MISMATCH_ROOT, registered)
+        for unit in (MISMATCH_GUARD, MISMATCH_GUARD.replace(".service", ".timer")):
+            assert props(unit, ["ActiveState", "Job"]) == {"ActiveState": "inactive", "Job": ""}
+        if terminal_ref not in gate["evidence"]:
+            gate["evidence"].append(terminal_ref)
+        diagnostics[:] = [owner for owner in diagnostics if owner["unit"] != MISMATCH_UNIT]
+        gate["next_action"] = result["next_action"]
+    else:
+        if not previous:
+            diagnostics.append(claim)
+        gate["next_action"] = "Compare the historical worker's SlotHashes with the signed vote at slot 99,435,890."
 
 
 def register_successor_inputs(plan):
@@ -408,7 +481,8 @@ def owns(row):
         assert producer["InvocationID"] == registration["invocation_id"] and row["scratch_path"] == registration["run_root"]
         assert row["ordinary_replay_claim"] is False and row["current_sidecar_eta_valid"] is False
         return True
-    readers = {UNIT: receipt, TAIL_UNIT: tail_receipt, MIDDLE_UNIT: middle_receipt}
+    readers = {UNIT: receipt, TAIL_UNIT: tail_receipt, MIDDLE_UNIT: middle_receipt,
+               MISMATCH_UNIT: mismatch_receipt}
     if unit not in readers:
         return False
     _, registration = readers[unit]()
