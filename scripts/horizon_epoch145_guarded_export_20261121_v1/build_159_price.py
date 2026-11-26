@@ -102,12 +102,12 @@ def retry5_admission_lock(provider, token, rows):
     locks = [row.split()[1:] for row in rows if token in row.split()]
     if not locks:
         return None
-    launcher = RUNTIME / "epoch168-retry5-rebook-20261125-v1/fit-launcher-v8/recover168"
+    launcher = RUNTIME / "epoch168-retry5-rebook-20261125-v1/fit-launcher-v9/recover168"
     receipt, _ = bound(launcher.parent / "deployment-seal-receipt.json")
     member, = [row for row in receipt["members"] if row["name"] == launcher.name]
     need(receipt["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
          and receipt["destination"] == str(launcher.parent)
-         and receipt["sealer_sha256"] == "e0d565f4450b25b527ffd4455a52e1868548b826e86a6894a1ae127e811f3"
+         and receipt["sealer_sha256"] == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
          and member["mode"] == "0555" and launcher.resolve(strict=True) == launcher,
          "unsealed epoch 168 admission lock owner")
     with launcher.open("rb") as image:
