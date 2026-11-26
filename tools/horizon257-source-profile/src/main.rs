@@ -4,6 +4,7 @@ mod manifest;
 mod ranges;
 mod repair;
 mod repair261;
+mod repair262;
 mod tables;
 mod transport;
 use anyhow::{Context, Result, ensure};
@@ -222,12 +223,15 @@ fn main() -> Result<()> {
     if args.len() == 2 && args[0] == "repair-261" {
         return repair261::run(Path::new(&args[1]));
     }
+    if args.len() == 2 && args[0] == "repair-262" {
+        return repair262::run(Path::new(&args[1]));
+    }
     if args.len() == 2 && args[0] == "repair" {
         return repair::run(Path::new(&args[1]));
     }
     ensure!(
         args.is_empty(),
-        "usage: horizon257-source-profile [measure-bootstrap-inputs|compact-tables|repair NEW_OUTPUT|repair-261 NEW_OUTPUT]"
+        "usage: horizon257-source-profile [measure-bootstrap-inputs|compact-tables|repair NEW_OUTPUT|repair-261 NEW_OUTPUT|repair-262 NEW_OUTPUT]"
     );
     println!("{}", serde_json::to_string_pretty(&inspect()?)?);
     Ok(())
