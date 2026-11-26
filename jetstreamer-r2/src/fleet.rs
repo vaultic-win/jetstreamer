@@ -21,6 +21,7 @@ mod continuation144_prepare;
 mod continuation144_protection;
 mod continuation203;
 pub(super) mod extract226;
+pub(super) mod focused_foundation;
 mod continuation203_admission;
 mod continuation203_ops;
 mod continuation203_runtime;
@@ -750,6 +751,9 @@ fn validate_private_225_terminal(value: &Value) -> Result<()> {
 fn checked_diagnostic_launch(claim: &DiagnosticClaim) -> Result<Value> {
     let launch = bound_json(&claim.launch_receipt)?;
     validate_diagnostic_launch(&launch, claim)?;
+    if focused_foundation::contains(&claim.unit) {
+        focused_foundation::check_bindings(claim, &launch)?;
+    }
     if private_225_verification(claim) {
         let evidence: BoundFile = serde_json::from_value(launch["terminal_evidence"].clone())?;
         validate_private_225_terminal(&bound_json(&evidence)?)?;
@@ -1781,7 +1785,9 @@ fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Resul
             && receipt["r2_mutations"] == false,
         "invalid diagnostic launch receipt"
     );
-    let scope_valid = if singleton_209 {
+    let scope_valid = if let Some(matches) = focused_foundation::launch_matches(claim, receipt) {
+        matches
+    } else if singleton_209 {
         singleton209::launch_matches(claim, receipt)
     } else if singleton_227 {
         singleton227::launch_matches(claim, receipt)
@@ -3805,6 +3811,9 @@ pub(super) async fn run() -> Result<()> {
                 current["InvocationID"] == claim.invocation_id && current["NRestarts"] == "0",
                 "diagnostic live invocation changed"
             );
+            if focused_foundation::contains(&claim.unit) {
+                focused_foundation::check_live(claim, current)?;
+            }
             if private_225_verification(claim)
                 || native_restore_140(claim)
                 || private157::namespace(claim)

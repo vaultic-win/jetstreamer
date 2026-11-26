@@ -132,11 +132,6 @@ def register_attempt(plan, version, ordinary_replay):
             assert terminal_path.is_file() and not active_configuration(version)
             if existing:
                 plan["diagnostics"].remove(claim)
-        elif version in FOCUSED:
-            # The deployed fleet image accepts the historical @instance scope.
-            # Keep this invocation in the observer and unit census until a
-            # fleet image recognizes its exact systemd unit.
-            assert not existing
         elif not existing:
             plan["diagnostics"].append(claim)
     elif not ordinary_replay:
