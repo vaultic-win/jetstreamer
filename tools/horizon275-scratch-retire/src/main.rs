@@ -2,6 +2,7 @@
 mod appendvec229;
 mod appendvec288;
 mod appendvec292;
+mod appendvec292_bundle;
 mod ext4_228;
 mod parked_accounts;
 #[path = "../../../scripts/horizon_standard_backfill_scratch_retirement_20261110_v1/source/process_references.rs"]
@@ -415,11 +416,13 @@ fn main() -> Result<()> {
                 | "--retire-parked-288"
                 | "--check-288-stage-bundle"
                 | "--retire-288-stage-bundle"
+                | "--check-292-stage-bundle"
+                | "--retire-292-stage-bundle"
         )
     ) {
         ensure!(
             unsafe { libc::geteuid() } == 0 && args.len() == 5,
-            "usage: horizon275-scratch-retire --check-parked-EPOCH|--retire-parked-EPOCH|--check-failed-stage-292|--retire-failed-stage-292|--check-288-stage-bundle|--retire-288-stage-bundle SELF_SHA256 EVIDENCE EVIDENCE_SHA256"
+            "usage: horizon275-scratch-retire --check-parked-EPOCH|--retire-parked-EPOCH|--check-failed-stage-292|--retire-failed-stage-292|--check-EPOCH-stage-bundle|--retire-EPOCH-stage-bundle SELF_SHA256 EVIDENCE EVIDENCE_SHA256"
         );
         let binary = File::open("/proc/self/exe")?;
         let metadata = binary.metadata()?;
@@ -434,6 +437,9 @@ fn main() -> Result<()> {
         };
         if args[1].ends_with("-288-stage-bundle") {
             return appendvec288::retire_bundle(apply, &args[2], comparison);
+        }
+        if args[1].ends_with("-292-stage-bundle") {
+            return appendvec292_bundle::run(apply, &args[2], comparison);
         }
         if args[1].ends_with("-229") {
             return appendvec229::run(apply, &args[2], comparison);
