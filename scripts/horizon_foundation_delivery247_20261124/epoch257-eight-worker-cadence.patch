@@ -1,0 +1,128 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -168,6 +168,10 @@
+ import diagnostic226_suffix
+ import diagnostic296_meter
+ import publication_handoff
++import delivery257_retry
++retry_257 = delivery257_retry.registered()
++if retry_257 is not None and 257 in statuses:
++    statuses[257] = delivery257_retry.initial_status(statuses[257], retry_257)
+ import staged211
+ import staged211retry
+ import staged247
+@@ -219,6 +223,8 @@
+     return f'delivery{epoch}_claim'
+
+ def delivery257_rss_image(kind, name):
++    if cfg["delivery257_claim"].get("retry_unit") == delivery257_retry.UNIT:
++        return delivery257_retry.image(kind, name)
+     root = V / 'horizon257-delivery-rss-v2'
+     release = bound(sealed_226_file(root / 'acceptance.json'))
+     assert release['schema'] == 'foundation-epoch257-delivery-rss-release-v1'
+@@ -301,6 +307,10 @@
+     # The original terminal watcher may be finishing its authenticated prefix read.
+     global closed
+     closed = publication_handoff.collect(all_claims, statuses, out, record, definitions)
++    if retry_257 is not None:
++        completion = delivery257_retry.collect(retry_257, statuses, record)
++        if completion is not None:
++            closed[257] = completion
+     for e in closed:
+         roster.pop(e, None)
+         statuses.pop(e, None)
+@@ -389,6 +399,11 @@
+             assert launch257['MainPID'] == current257['MainPID'] and int(current257['MainPID']) > 1
+             cfg['delivery257_claim'] = dict(invocation_id=current257['InvocationID'],
+                                            pid=int(current257['MainPID']), claim_sha256=reference257['sha256'])
++    if retry_257 is not None and 257 not in closed:
++        assert "delivery257_claim" not in cfg
++        config257 = delivery257_retry.configuration(retry_257)
++        if config257 is not None:
++            cfg["delivery257_claim"] = config257
+ config=record(config_path,cfg)
+ def check_roster():
+     for e in failed:
+@@ -430,10 +445,16 @@
+     assert set(ranges) == {f'{e}-{e}' for e in expected} and len(rows)==len(expected)
+     assert set(roster) <= expected
+     for e in expected & set(closed):
+-        c = bound(all_claims[e])
+-        row, = [r for r in rows if r['range'] == f'{e}-{e}']
++        c = retry_257[1] if e == 257 else bound(all_claims[e])
++        row, = [r for r in rows if r["range"] == f"{e}-{e}"]
+         assert row['producer_unit'] == c['unit'] and row['expected_producer_invocation_id'] == c['invocation_id']
+-    guarded_replays.validate_observation(sample['replays'],cfg['replays'])
++    if cfg.get("delivery257_claim", {}).get("retry_unit") == delivery257_retry.UNIT:
++        row, = [r for r in rows if r["range"] == "257-257"]
++        assert row["producer_unit"] == delivery257_retry.UNIT
++        assert row["expected_producer_invocation_id"] == retry_257[1]["invocation_id"]
++        if 257 not in closed and delivery257_retry.configuration(retry_257) is not None:
++            assert row["status"] == "observed" and row["observation"]["invocation_binding_stable"]
++    guarded_replays.validate_observation(sample["replays"], cfg["replays"])
+     for n,r in roster.items():
+         claim=bound(r)
+         row,=[x for x in rows if x['producer_unit']==claim['unit']]
+@@ -887,6 +908,8 @@
+             add(plan["gates"]["257"], timeout_ref)
+             plan["gates"]["257"]["next_action"] = (
+                 "Qualify a fresh current-reader delivery bound to the preserved archive after local playback timed out.")
++    if retry_257 is not None:
++        delivery257_retry.register_fleet(plan, retry_257, bool(cfg.get("delivery257_claim")), add)
+     if n == 332 and preserved296_cutoff is not None:
+         root = V / 'horizon296-observer-recovery-fleet-v1'
+         release = bound(sealed_226_file(root / 'acceptance.json'))
+@@ -920,7 +943,7 @@
+                 and not diagnostic296_meter.owns(r)]
+     ordinary = [row for row in ordinary
+                 if not (row['epoch'] == 257 and row['phase'] == 'upload-readback'
+-                        and row['unit']['Id'] == 'horizon-upload-257-current-reader-v1.service')]
++                        and row["unit"]["Id"] in (delivery257_retry.PREVIOUS_UNIT, delivery257_retry.UNIT))]
+     assert sorted(r['epoch'] for r in ordinary) == sorted([*roster,*guarded_replays.by_epoch(cfg['replays'])])
+     guarded_replays.validate_fleet([r for r in ordinary if r['epoch'] not in roster], bound(ref(obs))['replays'])
+     reported={r['epoch']:r['status'] for r in f['epochs'] if r['status']}
+@@ -977,6 +1000,8 @@
+                  observer=ref(obs), previous_native_fleet=prevfleet, statuses=published,
+                  active_claims=dict(roster), inventory=inventory, ready_pair_count=inventory['ready_pairs'],
+                  independently_verified_count=None)
++    if retry_257 is not None:
++        state["retry_257_claim"] = retry_257[0]
+     if successor_211:
+         state['staged_211_registration'] = successor_211['registration']
+     if successor_247:
+--- a/native_binding_replays.py
++++ b/native_binding_replays.py
+@@ -7,6 +7,7 @@
+ states=bound(ref(root/'status-audit.json'));fleet=ref(root/'fleet.json');f=bound(fleet)
+ obs=states['observer'];assert f['observer_sha256']==obs['sha256']
+ import publication_handoff
++import delivery257_retry
+ sample_publishers=[r for r in f['active'] if str(r['epoch']) in states['active_claims']]
+ import staged211
+ import staged247
+@@ -46,12 +47,14 @@
+ diagnostic_handlers = (diagnostic229, diagnostic229_bounded, diagnostic229_bounded_retry, diagnostic271_trace, diagnostic271_europe, diagnostic271_boundary, diagnostic271_reward_tuples, diagnostic271_stake_inputs, diagnostic230_slot_hashes, diagnostic230_bank_trace, diagnostic288_shrink_debt, diagnostic229_slot_hash_ram, diagnostic230_program_demotion_ram, diagnostic230_checkpoint_continuation, diagnostic229_bank_delta, diagnostic226_suffix, diagnostic296_meter)
+ ordinary = [r for r in f['active'] if r not in sample_publishers and r not in extract226
+             and not (r['epoch'] == 257 and r['phase'] == 'upload-readback'
+-                     and r['unit']['Id'] == 'horizon-upload-257-current-reader-v1.service')
++                     and r["unit"]["Id"] in (delivery257_retry.PREVIOUS_UNIT, delivery257_retry.UNIT))
+             and not any(handler.owns(r) for handler in diagnostic_handlers)]
+ guarded_replays.validate_fleet(ordinary, bound(obs)['replays'])
+ live = {int(k): v for k, v in states['active_claims'].items()}
+ previously_closed = {int(k): bound(v)['claim'] for k, v in states['completed_publications'].items()}
+-failed = {int(k): v['claim'] for k,v in states.get('failed_publications',{}).items()}
++if 257 in previously_closed:
++    assert previously_closed.pop(257) == states["retry_257_claim"]
++failed = {int(k): v["claim"] for k,v in states.get('failed_publications',{}).items()}
+ assert len(set(live) | set(failed) | set(previously_closed)) == len(live) + len(failed) + len(previously_closed)
+ assert {**live, **failed, **previously_closed} == original
+ def record(p,v):
+@@ -63,6 +66,8 @@
+ if successor_247 and 247 in statuses:
+     statuses[247] = staged247.adopt_status(statuses[247], successor_247)
+ closed=publication_handoff.collect(original,statuses,root,record,definitions)
++if "257" in states["completed_publications"]:
++    closed[257] = states["completed_publications"]["257"]
+ publishers=[r for r in sample_publishers if r['epoch'] not in closed]
+
+ def status_directory(epoch):
