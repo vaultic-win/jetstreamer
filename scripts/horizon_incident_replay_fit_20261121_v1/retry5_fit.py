@@ -317,7 +317,13 @@ def price170(s, native, cold168):
     required = native['complete_required_HOME_bytes']
     joint_zero = (max(zero + donor_home - base + retry5['outside_cap_stop_allowance_bytes'],
                       retry5['retained_guard_floor_bytes']) + current['remaining_bytes'])
-    remaining = donor['remaining_home_bytes'] - (required - donor_home)
+    if stopped is None:
+        remaining = donor['remaining_home_bytes'] - (required - donor_home)
+    else:
+        # This stop preserved an independently admitted booking. Charge its
+        # remaining growth to actual free HOME and keep the donor's original
+        # allowance as a separate ceiling on new funding.
+        remaining = min(donor['remaining_home_bytes'], donor['native_home_available'] - required)
     native.update(full170_zero_remaining_native_HOME_bytes=joint_zero,
                   epoch159_donor_cover=dict(donor, native_home_required=required,
                                            remaining_home_bytes=max(0, remaining)),
