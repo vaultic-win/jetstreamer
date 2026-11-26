@@ -29,6 +29,22 @@ struct Cohort {
     checkpoint_hash: &'static str,
 }
 
+const EPOCH_252: Cohort = Cohort {
+    epoch: 252,
+    unit: "horizon-qualify-252-regional-singleton-v1.service",
+    invocation: "8a7f9d325707485f9dac1d56c2403e52",
+    pid: 500_006,
+    node: "/var/lib/jetstreamer/horizon252-regional-node-v268/jetstreamer-node",
+    run: "/home/ubuntu/.jetstreamer-private/qualification-252-regional-singleton-v1",
+    handoff: None,
+    fingerprint: "e4705888ac93a44cf696c4c9ca94e5244c49591f225680d500022c1856aed788",
+    bootstrap: 108_863_367,
+    checkpoint: 109_295_460,
+    epoch_end: 109_295_999,
+    bootstrap_hash: "4hcGVnD196WHfscx9En2f4axXyUzW59ZKRZF5MZv8AAa",
+    checkpoint_hash: "3VfnFx5Si2VsoCYfsBKVFVpiHDdqg3X1JWpyduakmDL3",
+};
+
 const EPOCH_257: Cohort = Cohort {
     epoch: 257,
     unit: "horizon-qualify-257-singleton-v1.service",
@@ -412,12 +428,13 @@ fn main() -> Result<()> {
     let mut args = std::env::args_os().skip(1);
     let cohort = match args.next().as_deref() {
         None => &EPOCH_257,
+        Some(flag) if flag == "--epoch252" => &EPOCH_252,
         Some(flag) if flag == "--epoch261" => &EPOCH_261,
-        _ => anyhow::bail!("usage: horizon-epoch257-commit-source [--epoch261]"),
+        _ => anyhow::bail!("usage: horizon-epoch257-commit-source [--epoch252 | --epoch261]"),
     };
     ensure!(
         args.next().is_none(),
-        "usage: horizon-epoch257-commit-source [--epoch261]"
+        "usage: horizon-epoch257-commit-source [--epoch252 | --epoch261]"
     );
     let report = collect(cohort)?;
     println!("{}", serde_json::to_string_pretty(&report)?);
@@ -430,7 +447,7 @@ mod tests {
 
     #[test]
     fn commit_event_requires_complete_native_message() {
-        for cohort in [&EPOCH_257, &EPOCH_261] {
+        for cohort in [&EPOCH_252, &EPOCH_257, &EPOCH_261] {
             let epoch = cohort.epoch;
             let transaction = "a".repeat(64);
             let marker = commit_marker(epoch);
