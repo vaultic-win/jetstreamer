@@ -98,7 +98,44 @@ def donor_users(exclusive136, token, rows):
     return allowed
 
 
-def snapshot(exclusive136=None):
+def retry5_admission_lock(provider, token, rows):
+    locks = [row.split()[1:] for row in rows if token in row.split()]
+    if not locks:
+        return None
+    launcher = RUNTIME / "epoch168-retry5-rebook-20261125-v1/fit-launcher-v8/recover168"
+    receipt, _ = bound(launcher.parent / "deployment-seal-receipt.json")
+    member, = [row for row in receipt["members"] if row["name"] == launcher.name]
+    need(receipt["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+         and receipt["destination"] == str(launcher.parent)
+         and receipt["sealer_sha256"] == "e0d565f4450b25b527ffd4455a52e1868548b826e86a6894a1ae127e811f3"
+         and member["mode"] == "0555" and launcher.resolve(strict=True) == launcher,
+         "unsealed epoch 168 admission lock owner")
+    with launcher.open("rb") as image:
+        st = os.fstat(image.fileno())
+        need(stat.S_ISREG(st.st_mode) and st.st_uid == 0 and not st.st_mode & 0o222
+             and hashlib.file_digest(image, "sha256").hexdigest() == member["sha256"],
+             "changed epoch 168 admission lock owner")
+    row, = locks
+    pid = int(row[3])
+    need(pid > 1 and row == ["FLOCK", "ADVISORY", "WRITE", str(pid), token, "0", "EOF"],
+         "the epoch 168 launcher does not hold the exact admission lock")
+    proc = Path("/proc") / str(pid)
+    invocation = (proc / "cmdline").read_bytes().rstrip(b"\0").decode().split("\0")
+    _, provider_sha = bound(provider / "deployment-seal-receipt.json")
+    need(len(invocation) == 5 and invocation[:2] == [str(launcher), "start"]
+         and invocation[4] == provider_sha and (proc / "exe").readlink() == launcher,
+         "the lock holder is not starting epoch 168 with this provider")
+    immediate = os.getppid()
+    if immediate != pid:
+        timeout = Path("/proc") / str(immediate)
+        parent = (timeout / "stat").read_text().rsplit(")", 1)[1].split()
+        need((timeout / "exe").readlink() == Path("/usr/bin/timeout") and int(parent[1]) == pid,
+             "the epoch 168 price was not requested by the lock holder")
+    return {"pid": pid, "start_ticks": int((proc / "stat").read_text().rsplit(")", 1)[1].split()[19]),
+            "launcher_sha256": member["sha256"], "provider_seal_sha256": provider_sha}
+
+
+def snapshot(exclusive136=None, retry5_provider=None):
     g, _ = bound(ROOT / "ADMISSION.json", GRANT)
     price, _ = bound(g["price"]["path"], PRICE)
     need(g["price"]["sha256"] == PRICE and price["fleet"] == g["fleet"] and g["actual_grant"] is True,
@@ -130,7 +167,10 @@ def snapshot(exclusive136=None):
     ls = Path(lock["path"]).lstat()
     need((ls.st_dev, ls.st_ino) == (lock["dev"], lock["ino"]) and stat.S_ISREG(ls.st_mode), "donor lock replaced")
     token = f"{os.major(ls.st_dev):02x}:{os.minor(ls.st_dev):02x}:{ls.st_ino}"
-    permitted = donor_users(exclusive136, token, Path("/proc/locks").read_text().splitlines())
+    locks = Path("/proc/locks").read_text().splitlines()
+    need(retry5_provider is None or exclusive136 is None, "mixed donor ownership")
+    launch = retry5_admission_lock(retry5_provider, token, locks) if retry5_provider else None
+    permitted = {} if launch else donor_users(exclusive136, token, locks)
     need(permitted.keys() <= set(g["donor_idle_units"]), "original donor does not name 136 users")
     for unit in g["donor_idle_units"]:
         grp = CG.parent / unit / "cgroup.procs"
@@ -142,6 +182,10 @@ def snapshot(exclusive136=None):
                 evidence=image("evidence", 8 * MIB, 101263647, terminal), donor_lock=lock)
     if exclusive136 is not None:
         proof["exclusive136"] = exclusive136
+    if launch:
+        need(retry5_admission_lock(retry5_provider, token, Path("/proc/locks").read_text().splitlines()) == launch,
+             "epoch 168 admission lock changed during donor pricing")
+        proof["admission_lock"] = launch
     return proof
 
 

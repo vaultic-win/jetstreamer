@@ -119,9 +119,10 @@ def protected_owner(s, cold168, fleet, actor):
 
 
 def donor_cover(s, donor, before, native, fleet, *, registered_writer=None,
-                independent_entry146=False, independent_retry5=False):
+                independent_entry146=False, retry5_provider=None):
     """Price the paid donor with the V12 roster while retaining all old claims."""
-    after = donor['snapshot']()
+    donor_args = {'retry5_provider': retry5_provider} if retry5_provider else {}
+    after = donor['snapshot'](**donor_args)
     fits = (native['fits'] and native['schema'] == 'horizon-incident-replay-fit-v1' and
             native['resource_credit_bytes'] == 0 and not native['replay_launch_authorized'] and
             native['complete_cpu_quota_micros'] == 64_000_000 and
@@ -166,7 +167,7 @@ def donor_cover(s, donor, before, native, fleet, *, registered_writer=None,
             s.need(entry is not None and entry['registration'] == fleet['epoch146_bounded_entry_lease'],
                    'independent 145 handoff lost the accepted epoch 146 lease')
             phases = {'independent-semantic-complete-v10-drained'}
-    if independent_retry5:
+    if retry5_provider:
         s.need(native['epoch'] == 168 and native['bounded_qualification'] is None,
                'independent 145 handoff requires the epoch 168 replay booking')
         phases = {'independent-semantic-complete-v10-drained'}

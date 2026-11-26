@@ -84,7 +84,7 @@ V12_RECOVERY_145 = V8_145 or V9_145 or V10_145
 STOP_RECOVERY_145 = V7_145 or V12_RECOVERY_145
 V13_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v5"
 V10_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v6"
-INDEPENDENT_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-independent-v2"
+INDEPENDENT_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-independent-v3"
 V9_RETRY5_FIT = V13_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v4"
 V8_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v3"
 RETRY5_FIT_ROUTE = INDEPENDENT_RETRY5_FIT or V10_RETRY5_FIT or V9_RETRY5_FIT or V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
@@ -1634,7 +1634,9 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
     terminal168 = None
     retained_retry5 = retry5_fit["retained"](s, fit, f, cold168) if RETRY5_168 else None
     stopped168 = retained_retry5[0] if RETRY5_168 else cold168_guard_stop(f, rows) if STOPPED168_PRICE else None
-    retry5_donor_before = retry5_donor["snapshot"]() if RETRY5_168 and not FULL170_RETRY5 else None
+    retry5_provider = HERE if INDEPENDENT_RETRY5_FIT else None
+    donor_args = {"retry5_provider": retry5_provider} if retry5_provider else {}
+    retry5_donor_before = retry5_donor["snapshot"](**donor_args) if RETRY5_168 and not FULL170_RETRY5 else None
     if PUBLISH168:
         s.need(epoch == 145 and prestart136 is None, "cold168 provider only prices terminal publication")
         terminal168 = publication168["current"](s, loader["load_package"], f)
@@ -2039,7 +2041,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         if INDEPENDENT_ENTRY146:
             writer["independent_entry146"] = True
         if INDEPENDENT_RETRY5_FIT:
-            writer["independent_retry5"] = True
+            writer["retry5_provider"] = retry5_provider
         donor = retry5_fit["donor_cover"](s, retry5_donor, retry5_donor_before, native, f, **writer)
         price = "price166" if REPRO166_POST_V12 else "price"
         return retry5_fit[price](s, native, retry5_current, books["168"], donor, cold168)
