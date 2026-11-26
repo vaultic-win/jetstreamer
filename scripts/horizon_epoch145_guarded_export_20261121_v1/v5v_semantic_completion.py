@@ -14,7 +14,8 @@ import sys
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FAMILY = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
 GENERATION = Path(__file__).resolve().parent.name
-CENSUS_RETRY = GENERATION in ("tools-v9-census-recovery", "tools-homefloor-145-v8-census-build-v1")
+PREFLIGHT_RETRY = GENERATION in ("tools-v10-census-recovery", "tools-homefloor-145-v9-census-build-v1")
+CENSUS_RETRY = PREFLIGHT_RETRY or GENERATION in ("tools-v9-census-recovery", "tools-homefloor-145-v8-census-build-v1")
 TIMEOUT_RETRY = CENSUS_RETRY or GENERATION in ("tools-v8-pid1-timeout", "tools-homefloor-145-v7-timeout-build-v2")
 STOP_RETRY = TIMEOUT_RETRY or GENERATION in ("tools-v7-168-stop-v2", "tools-homefloor-145-v6-stop-recovery-v2")
 WALK_RETRY = STOP_RETRY or GENERATION in ("tools-v6-guard-walk", "tools-homefloor-145-v5z-guard-walk-build-v2")
@@ -78,10 +79,14 @@ V9_PREFLIGHT_FAILURE = "06a40561caf40e7d7e5e37d618fb068c98e44377f4fa457b8472500e
 V9_RESULT = "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973"
 V9_SEAL = "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd"
 V9_EXIT_CURSOR = "s=7f76387dd96140468b39dcf01e726fea;i=398814f;b=763ea84ca81f4dddad364b1ea2ba36dd;m=3a7ad9e9bd3;t=661277a71f90b;x=9337fae3be91b4da"
-PACKAGE = (FAMILY / "tools-v9-census-recovery" if CENSUS_RETRY else
+V10_HANDOFF = FAMILY / "v10-census-name-handoff"
+V10_START_INTENT = "horizon-epoch145-v9-census-successor-start-intent-v1"
+PACKAGE = (FAMILY / "tools-v10-census-recovery" if PREFLIGHT_RETRY else
+           FAMILY / "tools-v9-census-recovery" if CENSUS_RETRY else
            FAMILY / "tools-v8-pid1-timeout" if TIMEOUT_RETRY else FAMILY / "tools-v7-168-stop-v2" if STOP_RETRY else FAMILY / "tools-v6-guard-walk" if WALK_RETRY else FAMILY / "tools-v5z" if MODE_RETRY else
            FAMILY / "tools-v5y" if SCHEMA_RETRY else FAMILY / GENERATION if RETRY else V5V_PACKAGE)
-PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v8-census-recovery-v1") if CENSUS_RETRY else
+PROVIDER = (V5V_PROVIDER.with_name("tools-homefloor-145-v9-census-recovery-v1") if PREFLIGHT_RETRY else
+            V5V_PROVIDER.with_name("tools-homefloor-145-v8-census-recovery-v1") if CENSUS_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v7-timeout-recovery-v1") if TIMEOUT_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v6-stop-recovery-v2") if STOP_RETRY else
             V5V_PROVIDER.with_name("tools-homefloor-145-v5z-guard-walk-recovery-v1") if WALK_RETRY else
@@ -492,6 +497,9 @@ def receipt_mode_failure(terminal_ref):
 
 
 def failed_predecessor(terminal_ref):
+    if PREFLIGHT_RETRY:
+        terminal, failed = v9_preflight_failure(terminal_ref)
+        return terminal["candidate"], failed
     if CENSUS_RETRY:
         terminal, failed = v8_census_failure(terminal_ref)
         return terminal["candidate"], failed
@@ -911,7 +919,7 @@ def successor_manager(result, intent, *, retry=None):
     retry = RETRY if retry is None else retry
     manager = result["manager"]
     iid = manager["InvocationID"]
-    schema = V9_START_INTENT if CENSUS_RETRY else V8_START_INTENT if TIMEOUT_RETRY else V7_START_INTENT if STOP_RETRY else V6_START_INTENT if WALK_RETRY else V5Z_START_INTENT if MODE_RETRY else V5Y_START_INTENT if SCHEMA_RETRY else "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
+    schema = V10_START_INTENT if PREFLIGHT_RETRY else V9_START_INTENT if CENSUS_RETRY else V8_START_INTENT if TIMEOUT_RETRY else V7_START_INTENT if STOP_RETRY else V6_START_INTENT if WALK_RETRY else V5Z_START_INTENT if MODE_RETRY else V5Y_START_INTENT if SCHEMA_RETRY else "horizon-epoch145-v5v-custody-successor-start-intent-v1" if retry else (
         "horizon-epoch145-v5u-semantic-successor-start-intent-v1"
     )
     predecessor_invocations = (V5U, V5V, V5W) if retry and DONOR_RETRY else (V5U, V5V) if retry else (V5U,)
@@ -927,6 +935,8 @@ def successor_manager(result, intent, *, retry=None):
         predecessor_invocations += (V7,)
     if CENSUS_RETRY:
         predecessor_invocations += (V8,)
+    if PREFLIGHT_RETRY:
+        predecessor_invocations += (V9,)
     require(result["status"] == 0 and manager["Id"] == intent["unit"] == UNIT
             and re.fullmatch(r"[a-f0-9]{32}", iid) and iid not in predecessor_invocations
             and manager["ActiveState"] == "active" and manager["SubState"] == "running"
@@ -938,7 +948,7 @@ def successor_manager(result, intent, *, retry=None):
 
 
 def startup(result_ref):
-    submission = (V9_HANDOFF if CENSUS_RETRY else V8_HANDOFF if TIMEOUT_RETRY else V7_HANDOFF if STOP_RETRY else V6_HANDOFF if WALK_RETRY else V5Z_HANDOFF if MODE_RETRY else V5Y_HANDOFF if SCHEMA_RETRY
+    submission = (V10_HANDOFF if PREFLIGHT_RETRY else V9_HANDOFF if CENSUS_RETRY else V8_HANDOFF if TIMEOUT_RETRY else V7_HANDOFF if STOP_RETRY else V6_HANDOFF if WALK_RETRY else V5Z_HANDOFF if MODE_RETRY else V5Y_HANDOFF if SCHEMA_RETRY
                   else V5X_HANDOFF if DONOR_RETRY else FAMILY / "v5w-name-handoff" if RETRY else V5V_HANDOFF)
     result = pinned_json(result_ref, submission / "START_RESULT.json")
     intent_ref = result["intent"]
@@ -955,7 +965,7 @@ def startup(result_ref):
     require(launch_quote["fleet"] == bounds and launch_quote["fits"] is True
             and launch_quote["epoch"] == 145 and launch_quote["candidate"] is None
             and launch_quote["phase145"]["InvocationID"] ==
-                (V8 if CENSUS_RETRY else V7 if TIMEOUT_RETRY else V6 if STOP_RETRY else V5Z if WALK_RETRY else V5Y if MODE_RETRY else V5X if SCHEMA_RETRY else V5W if DONOR_RETRY else V5V if RETRY else V5U)
+                (V9 if PREFLIGHT_RETRY else V8 if CENSUS_RETRY else V7 if TIMEOUT_RETRY else V6 if STOP_RETRY else V5Z if WALK_RETRY else V5Y if MODE_RETRY else V5X if SCHEMA_RETRY else V5W if DONOR_RETRY else V5V if RETRY else V5U)
             and launch_quote["phase145"]["guard_terminal"] == intent["terminal"]
             and launch_quote["resource_credit_bytes"] == 0
             and launch_quote["replay_launch_authorized"] is False,
@@ -977,7 +987,8 @@ def startup(result_ref):
         require(launch_quote["status_registration"] == fresh["status_registration"],
                 "different V5x startup cadence owner")
     if TIMEOUT_RETRY:
-        stage = "v8-drained-census-failure" if CENSUS_RETRY else "v7-drained-pid1-timeout"
+        stage = ("v9-drained-census-failure" if PREFLIGHT_RETRY else
+                 "v8-drained-census-failure" if CENSUS_RETRY else "v7-drained-pid1-timeout")
         require(launch_quote["phase145"]["stage"] == stage
                 and fresh["status_registration"] == V8_STATUS_REGISTRATION,
                 "different V8 predecessor price or V12 cadence owner")
@@ -1096,7 +1107,8 @@ def completion(anchors, started, success):
             "foreign promoted inode")
     require(not (state / "failed.json").exists() and file_stamp(info) == file_stamp(PROMOTED.lstat()),
             "promoted archive or terminal state changed")
-    schema = ("horizon-epoch145-v8-census-successor-semantic-completion-v1" if CENSUS_RETRY else
+    schema = ("horizon-epoch145-v9-census-successor-semantic-completion-v1" if PREFLIGHT_RETRY else
+              "horizon-epoch145-v8-census-successor-semantic-completion-v1" if CENSUS_RETRY else
               "horizon-epoch145-v7-timeout-successor-semantic-completion-v1" if TIMEOUT_RETRY else
               "horizon-epoch145-v5z-custody-successor-semantic-completion-v1" if MODE_RETRY else
               "horizon-epoch145-v5y-schema-successor-semantic-completion-v1" if SCHEMA_RETRY else
@@ -1132,7 +1144,7 @@ def main():
             print(json.dumps(predecessor_preflight(ref, v9=True), indent=2, sort_keys=True))
             return 0
         if args.inspect_predecessor:
-            print(json.dumps(predecessor_preflight(ref), indent=2, sort_keys=True))
+            print(json.dumps(predecessor_preflight(ref, v9=PREFLIGHT_RETRY), indent=2, sort_keys=True))
             return 0
         anchors = startup(ref)
         iid = anchors["invocation_id"]

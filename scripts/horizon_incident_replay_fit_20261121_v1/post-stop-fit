@@ -72,7 +72,10 @@ V9_RUNTIME_145 = HERE == D / "tools-homefloor-145-v8-census-recovery-v1"
 V9_BUILD_145 = HERE == D / "tools-homefloor-145-v8-census-build-v1"
 V9_145 = V9_RUNTIME_145 or V9_BUILD_145
 V8_145 = V8_RUNTIME_145 or V8_BUILD_145
-V12_RECOVERY_145 = V8_145 or V9_145
+V10_RUNTIME_145 = HERE == D / "tools-homefloor-145-v9-census-recovery-v1"
+V10_BUILD_145 = HERE == D / "tools-homefloor-145-v9-census-build-v1"
+V10_145 = V10_RUNTIME_145 or V10_BUILD_145
+V12_RECOVERY_145 = V8_145 or V9_145 or V10_145
 STOP_RECOVERY_145 = V7_145 or V12_RECOVERY_145
 V13_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v5"
 V9_RETRY5_FIT = V13_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v4"
@@ -668,6 +671,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     if focused is not None:
         post_directory = fixture_post_directory(here)
         lease_directory = next(directory for enabled, directory in (
+            (V10_RUNTIME_145, "tools-v10-census-recovery"),
             (V9_RUNTIME_145, "tools-v9-census-recovery"),
             (V8_RUNTIME_145, "tools-v8-pid1-timeout"),
             (V7_145, "tools-v7-168-stop-v2"),
@@ -733,9 +737,14 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def v12_stopped145(fleet):
-    version = "tools-v9-census-recovery" if V9_145 else "tools-v8-pid1-timeout"
-    build = V8_BUILD_145 or V9_BUILD_145
-    package = HERE if build else R / "epoch145-semantic-continuity-20261121-v1" / version
+    version, stage, build = next(row[1:] for row in (
+        (V10_145, "v10", "v9-drained-census-failure", V10_BUILD_145),
+        (V9_145, "v9", "v8-drained-census-failure", V9_BUILD_145),
+        (V8_145, "v8", "v7-drained-pid1-timeout", V8_BUILD_145),
+    ) if row[0])
+    directory = {"v10": "tools-v10-census-recovery", "v9": "tools-v9-census-recovery",
+                 "v8": "tools-v8-pid1-timeout"}[version]
+    package = HERE if build else R / "epoch145-semantic-continuity-20261121-v1" / directory
     expected_seal = None if build else s.read(HERE / "profile145-lease-semantic.json")[0]["seal_sha256"]
     seal, _ = s.read(package / "deployment-seal-receipt.json", expected_seal)
     checker = package / "v5v_semantic_completion.py"
@@ -743,11 +752,10 @@ def v12_stopped145(fleet):
     meta = checker.lstat()
     s.need(seal["destination"] == str(package) and member["mode"] == "0444"
            and (meta.st_uid, meta.st_gid, meta.st_nlink, meta.st_mode) == (0, 0, 1, stat.S_IFREG | 0o444)
-           and checker.resolve(strict=True) == checker, "unsealed V8 journal reader")
+           and checker.resolve(strict=True) == checker, "unsealed epoch 145 predecessor checker")
     fit.binary(checker, member["sha256"])
-    observed = runpy.run_path(str(checker))["predecessor_preflight"](fleet)
-    version = "v9" if V9_145 else "v8"
-    stage = "v8-drained-census-failure" if V9_145 else "v7-drained-pid1-timeout"
+    options = {"v9": True} if V10_145 else {}
+    observed = runpy.run_path(str(checker))["predecessor_preflight"](fleet, **options)
     s.need(observed["schema"] == f"horizon-epoch145-{version}-predecessor-preflight-v1",
            "wrong stopped epoch 145 generation")
     return dict(observed["manager"], stage=stage, guard_terminal=observed["failure"],
@@ -769,7 +777,8 @@ def phase145(epoch, fleet=None):
     if STOP_RECOVERY_145:
         members = fit.members(fit.A145)
         if members:
-            s.need(epoch == 145 and not (V8_BUILD_145 or V9_BUILD_145), "live epoch 145 requires its own capacity probe")
+            s.need(epoch == 145 and not (V8_BUILD_145 or V9_BUILD_145 or V10_BUILD_145),
+                   "live epoch 145 requires its own capacity probe")
             profile, adapter, _ = profile145(HERE, focused="lease-semantic")
             manager = s.show(fit.A145)
             phase = runpy.run_path(str(adapter))["inspect"](
