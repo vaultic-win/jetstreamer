@@ -44,6 +44,13 @@ const AUDIT_148_TERMINAL: (&str, &str) = (
     "/var/lib/jetstreamer/horizon-foundation-public-audit-148-accepted-v1/acceptance.json",
     "f91e7a158ce64ab2f0d6be6c8f29499d086660a07831d1775299c5eebe0336f7",
 );
+const REPLAY_261: &str = "horizon-qualify-261-singleton-v1.service";
+const GUARD_261: &str = "horizon-261-singleton-protective-v1.service";
+const TIMER_261: &str = "horizon-261-singleton-protective-v1.timer";
+const TERMINAL_261_COLLECTOR: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon261-cohort-commit-source-v1/horizon-epoch257-commit-source",
+    "805646f57ba9b5262e17541e3f940390a5996138b4b4ddee4887915df0605499",
+);
 
 struct FullReplayQuote {
     reference: Bound,
@@ -68,7 +75,7 @@ fn full_replay_quote() -> Result<FullReplayQuote> {
             && plan["full_replay_admitted"] == false
             && terminal["epoch"] == EPOCH
             && terminal["native_input_qualified"] == true
-            && profile["unit"] == "horizon-qualify-261-singleton-v1.service"
+            && profile["unit"] == REPLAY_261
             && audit["schema"] == "foundation-epoch148-pinned-public-audit-acceptance-v1"
             && audit["epoch"] == 148
             && audit["unit"] == AUXILIARY[1]
@@ -109,7 +116,49 @@ fn latest_completion() -> Result<Bound> {
     Ok(Bound::new(&path, hash(&path)?))
 }
 
-fn fleet_roster<'a>(fleet: &'a Value, booking: &Value) -> Result<BTreeMap<u64, &'a Value>> {
+fn replay_261_guard_drained(n: &mut Native) -> Result<()> {
+    let timer = n.show_fields(TIMER_261, "ActiveState,Job")?;
+    let service = n.show_fields(GUARD_261, "ActiveState,MainPID,ControlGroup,Job")?;
+    ensure!(
+        timer["ActiveState"] == "inactive"
+            && timer["Job"] == ""
+            && matches!(service["ActiveState"].as_str(), Some("inactive" | "failed"))
+            && service["MainPID"] == "0"
+            && service["ControlGroup"] == ""
+            && service["Job"] == "",
+        "epoch 261 protective timer and service have not drained"
+    );
+    Ok(())
+}
+
+fn terminal_replay_261(n: &mut Native, booking: &Value) -> Result<Option<Value>> {
+    let current = n.show_fields(REPLAY_261, "ActiveState")?;
+    if current["ActiveState"] == "active" {
+        return Ok(None);
+    }
+    let collector = Bound::new(TERMINAL_261_COLLECTOR.0, TERMINAL_261_COLLECTOR.1);
+    collector.artifact()?;
+    let terminal: Value =
+        serde_json::from_slice(&n.run(TERMINAL_261_COLLECTOR.0, &["--epoch261"])?)?;
+    collector.artifact()?;
+    ensure!(
+        terminal["schema"] == "foundation-epoch261-committed-cohort-source-v1"
+            && terminal["state"] == "local-cohort-committed"
+            && terminal["epoch"] == 261
+            && terminal["unit"] == REPLAY_261
+            && terminal["invocation_id"] == booking["owners"][REPLAY_261]["InvocationID"]
+            && terminal["publication_authorized"] == false,
+        "epoch 261 terminal does not match the booked replay"
+    );
+    replay_261_guard_drained(n)?;
+    Ok(Some(json!({"collector":collector,"terminal":terminal})))
+}
+
+fn fleet_roster<'a>(
+    fleet: &'a Value,
+    booking: &Value,
+    released_261: bool,
+) -> Result<BTreeMap<u64, &'a Value>> {
     let rows = fleet["active"]
         .as_array()
         .context("Foundation active roster")?;
@@ -138,8 +187,11 @@ fn fleet_roster<'a>(fleet: &'a Value, booking: &Value) -> Result<BTreeMap<u64, &
             "Foundation owner changed or duplicated for epoch {epoch}"
         );
     }
+    let missing_261 = released_261 && !roster.contains_key(&261);
     ensure!(
-        roster.keys().copied().eq([226, 230, 252, 257, 261, 288]),
+        roster.keys().copied().eq([226, 230, 252, 257, 261, 288]
+            .into_iter()
+            .filter(|&epoch| epoch != 261 || !missing_261)),
         "incomplete Foundation live roster"
     );
     let selected: BTreeSet<_> = roster
@@ -149,10 +201,58 @@ fn fleet_roster<'a>(fleet: &'a Value, booking: &Value) -> Result<BTreeMap<u64, &
     ensure!(
         selected.len() == roster.len()
             && booked.keys().map(String::as_str).collect::<BTreeSet<_>>()
-                == selected.into_iter().chain(AUXILIARY).collect(),
+                == selected
+                    .into_iter()
+                    .chain(AUXILIARY)
+                    .chain(missing_261.then_some(REPLAY_261))
+                    .collect(),
         "missing or duplicate Foundation capacity booking"
     );
     Ok(roster)
+}
+
+#[cfg(test)]
+mod roster_tests {
+    use super::*;
+
+    #[test]
+    fn funded_replay_can_leave_the_observer_only_after_validated_terminal() {
+        let mut owners = serde_json::Map::new();
+        let mut rows = Vec::new();
+        for (epoch, phase) in [
+            (226, "private-held-extraction"),
+            (230, "diagnostic-qualification"),
+            (252, "replay"),
+            (257, "upload-readback"),
+            (261, "replay"),
+            (288, "replay"),
+        ] {
+            let unit = if epoch == 261 {
+                REPLAY_261.to_owned()
+            } else {
+                format!("test-{epoch}.service")
+            };
+            let owner = json!({"Id":unit,"InvocationID":format!("invocation-{epoch}"),
+                "MainPID":epoch.to_string(),"ControlGroup":format!("/test/{epoch}")});
+            owners.insert(unit, owner.clone());
+            rows.push(json!({"epoch":epoch,"phase":phase,"producer":owner,"unit":owner}));
+        }
+        for unit in AUXILIARY {
+            owners.insert(unit.to_owned(), Value::Null);
+        }
+        let booking = json!({"owners": owners});
+        let before = json!({"active":rows});
+        assert!(fleet_roster(&before, &booking, false).is_ok());
+        assert!(fleet_roster(&before, &booking, true).is_ok());
+
+        rows.retain(|row| row["epoch"] != 261);
+        let after = json!({"active":rows});
+        assert!(fleet_roster(&after, &booking, false).is_err());
+        assert!(fleet_roster(&after, &booking, true).is_ok());
+
+        rows.retain(|row| row["epoch"] != 252);
+        assert!(fleet_roster(&json!({"active":rows}), &booking, true).is_err());
+    }
 }
 
 fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
@@ -378,7 +478,12 @@ fn measure(
     );
     let booking_ref = Bound::new(REPLAY_BOOKING.0, REPLAY_BOOKING.1);
     let booking = booking_ref.sealed()?;
-    let roster = fleet_roster(&fleet, &booking)?;
+    let closed_replay = if quote.is_some() {
+        terminal_replay_261(n, &booking)?
+    } else {
+        None
+    };
+    let roster = fleet_roster(&fleet, &booking, closed_replay.is_some())?;
     let missing: Vec<_> = fleet["inventory"]["entries"]
         .as_array()
         .context("Foundation inventory")?
@@ -413,6 +518,15 @@ fn measure(
         text(reservation, "MemoryMax")?.parse()?
     } else {
         0
+    };
+    if closed_replay.is_some() {
+        ensure!(
+            expected.remove(REPLAY_261),
+            "epoch 261 reservation is missing"
+        );
+    }
+    let released = |unit: &str| {
+        (quote.is_some() && unit == AUXILIARY[1]) || (closed_replay.is_some() && unit == REPLAY_261)
     };
     let controller_owner = controller.as_ref().map(|c| c.check(n)).transpose()?;
     let held = if controller.as_ref().is_some_and(|c| c.held) {
@@ -456,7 +570,7 @@ fn measure(
     let cpus = units::affinity(&json!({"cpu_affinity":(40..48).collect::<Vec<_>>() }))?;
     let selected = units::parse_cpu_list("40-47")?;
     let mut recorded = BTreeMap::new();
-    for unit in booked.iter().filter(|unit| quote.is_none() || unit.as_str() != AUXILIARY[1]) {
+    for unit in booked.iter().filter(|unit| !released(unit)) {
         let owner = n.show_fields(unit, OWNER_FIELDS)?;
         let recorded_owner = &booking["owners"][unit];
         for field in [
@@ -485,6 +599,9 @@ fn measure(
     }
     let mut guards = BTreeMap::new();
     for (epoch, guard) in KNOWN_GUARDS {
+        if epoch == 261 && closed_replay.is_some() {
+            continue;
+        }
         let unit = text(roster[&epoch], "Id")?;
         guards.insert(
             epoch,
@@ -519,6 +636,12 @@ fn measure(
         listed_owners(n)? == before && latest_completion()? == completion,
         "Foundation cohort changed during roster binding"
     );
+    if closed_replay.is_some() {
+        ensure!(
+            terminal_replay_261(n, &booking)? == closed_replay,
+            "epoch 261 terminal changed during roster binding"
+        );
+    }
     for guard in guards.values() {
         let timer = n.show_fields(text(guard, "timer")?, "ActiveState,InvocationID,Unit")?;
         ensure!(
@@ -580,10 +703,16 @@ fn measure(
     let (candidate_disk, candidate) = if let Some(quote) = &quote {
         (
             capacity::add(quote.working_disk, DISK_RECEIPTS)?,
-            capacity::add(quote.producer_memory, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
+            capacity::add(
+                quote.producer_memory,
+                capacity::add(CONTROLLER_MEMORY, 1 << 30)?,
+            )?,
         )
     } else {
-        (DISK_RECEIPTS, capacity::add(MEMORY, capacity::add(CONTROLLER_MEMORY, GUARD_MEMORY)?)?)
+        (
+            DISK_RECEIPTS,
+            capacity::add(MEMORY, capacity::add(CONTROLLER_MEMORY, GUARD_MEMORY)?)?,
+        )
     };
     let required = capacity::add(protected, candidate_disk)?;
     let free = num(&allocation, "conservative_available_bytes")?
@@ -638,7 +767,7 @@ fn measure(
             "whole_tree_bytes":quote.working_disk,"producer_memory_bytes":quote.producer_memory,
             "receipt_disk_bytes":DISK_RECEIPTS,"control_memory_bytes":CONTROLLER_MEMORY,
             "guard_memory_bytes":1u64 << 30,"closed_audit":quote.closed_audit,
-            "reserved_audit_memory_bytes":reserved_audit_memory});
+            "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay});
     }
     deny_authority(&mut evidence);
     Ok(evidence)
