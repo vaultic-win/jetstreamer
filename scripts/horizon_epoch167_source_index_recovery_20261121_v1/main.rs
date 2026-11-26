@@ -20,10 +20,15 @@ use support::*;
 const COLD168_LAUNCHER: &str = "tools-v2/recover168";
 #[cfg(all(epoch168_cold_retry3, not(epoch168_cold_retry5)))]
 const COLD168_LAUNCHER: &str = "tools/recover168";
-#[cfg(all(epoch168_cold_retry5, not(epoch168_cold_retry5_v13)))]
+#[cfg(all(
+    epoch168_cold_retry5,
+    not(any(epoch168_cold_retry5_v13, epoch168_cold_retry5_v10))
+))]
 const COLD168_LAUNCHER: &str = "fit-launcher-v3/recover168";
 #[cfg(all(epoch168_cold_retry5, epoch168_cold_retry5_v13))]
 const COLD168_LAUNCHER: &str = "fit-launcher-v4/recover168";
+#[cfg(all(epoch168_cold_retry5, epoch168_cold_retry5_v10))]
+const COLD168_LAUNCHER: &str = "fit-launcher-v5/recover168";
 mod actor;
 #[cfg(epoch166_after168)]
 #[path = "../horizon_epoch166_guard_recovery_20261121_v1/after168.rs"]
@@ -177,6 +182,12 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
         150,
     )?;
     let mut v: Value = serde_json::from_slice(&b)?;
+    #[cfg(all(epoch168_cold_retry5, epoch168_cold_retry5_v10))]
+    ensure!(
+        v["phase145"]["stage"] == "v10-semantic-complete-drained"
+            && v["phase145"]["completed_invocation_id"] == "104f023c5cd24a55b6585ef525b80067",
+        "epoch 168 capacity requires the drained V10 verifier"
+    );
     ensure!(
         v["schema"] == "horizon-incident-replay-fit-v1"
             && v["fits"] == true

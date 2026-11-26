@@ -8,7 +8,7 @@ scratch=$work
 cfg=epoch166_recovery
 epoch=166
 extra_cfg=()
-if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch166-after168 || $1 == epoch166-after168-retry3 || $1 == epoch166-after168-closed || $1 == epoch166-after168-retry4 || $1 == epoch168-cold-rebook || $1 == epoch168-cold-retry3 || $1 == epoch168-cold-retry4 || $1 == epoch168-cold-retry5 || $1 == epoch168-cold-retry5-v13 ) ]]; then
+if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch166-after168 || $1 == epoch166-after168-retry3 || $1 == epoch166-after168-closed || $1 == epoch166-after168-retry4 || $1 == epoch168-cold-rebook || $1 == epoch168-cold-retry3 || $1 == epoch168-cold-retry4 || $1 == epoch168-cold-retry5 || $1 == epoch168-cold-retry5-v13 || $1 == epoch168-cold-retry5-v10 ) ]]; then
     if [[ $1 == epoch170-* ]]; then epoch=170; fi
     retry=${1#*-}
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
@@ -29,11 +29,12 @@ if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epo
         extra_cfg=(--cfg epoch166_after170)
     fi
     date=20261122
-    if [[ $retry == cold-retry5 || $retry == cold-retry5-v13 ]]; then
+    if [[ $retry == cold-retry5 || $retry == cold-retry5-v13 || $retry == cold-retry5-v10 ]]; then
         epoch=168
         date=20261125
         extra_cfg=(--cfg epoch168_cold_retry3 --cfg epoch168_cold_retry4 --cfg epoch168_cold_retry5)
         if [[ $retry == cold-retry5-v13 ]]; then extra_cfg+=(--cfg epoch168_cold_retry5_v13); fi
+        if [[ $retry == cold-retry5-v10 ]]; then extra_cfg+=(--cfg epoch168_cold_retry5_v10); fi
         retry=retry5
     elif [[ $retry == cold-retry4 ]]; then
         epoch=168
@@ -116,7 +117,7 @@ if [[ ${1:-} == epoch166-after168* ]]; then
     rustc "${args[@]}" --cfg epoch166_retry11 --cfg epoch166_after170 --test "$shared/main.rs" -o "$out/tests166-after170"
     "$out/tests166-after170" --test-threads=1
 fi
-if [[ ${1:-} == epoch168-cold-retry5 || ${1:-} == epoch168-cold-retry5-v13 ]]; then
+if [[ ${1:-} == epoch168-cold-retry5 || ${1:-} == epoch168-cold-retry5-v13 || ${1:-} == epoch168-cold-retry5-v10 ]]; then
     rustc "${args[@]}" --cfg epoch168_cold_rebook --cfg epoch168_cold_retry3 --cfg epoch168_cold_retry4 --test "$shared/main.rs" -o "$out/tests168-prior"
     "$out/tests168-prior" --test-threads=1
 elif [[ ${1:-} == epoch168-cold-retry4 ]]; then

@@ -47,7 +47,7 @@ class Retry5Completion(unittest.TestCase):
         return proof, status
 
     def test_requires_both_startup_receipts_for_each_generation(self):
-        for owner in (retry5_fit.V7, retry5_fit.V8, retry5_fit.V9):
+        for owner in (retry5_fit.V7, retry5_fit.V8, retry5_fit.V9, retry5_fit.V10):
             with self.subTest(generation=owner["generation"]), patch.object(Path, "exists", return_value=False):
                 proof, status = self.fixture(owner)
                 with patch.object(retry5_fit.subprocess, "check_output", return_value=json.dumps(proof)) as check:
@@ -71,15 +71,18 @@ class Retry5Completion(unittest.TestCase):
                         with self.assertRaisesRegex(ValueError, "terminal or native owner"):
                             retry5_fit.drained145(status, self.fit, self.load, owner=owner)
 
-    def test_rejects_live_and_failed_v9_manager_before_reading_completion(self):
-        _, status = self.fixture(retry5_fit.V9)
-        for active, substate in (("active", "running"), ("failed", "failed")):
-            with self.subTest(active=active):
-                status.show.return_value.update(ActiveState=active, SubState=substate)
-                with self.assertRaisesRegex(ValueError, "v9 verifier has not drained"):
-                    retry5_fit.drained145(status, self.fit, self.load, owner=retry5_fit.V9)
+    def test_rejects_live_failed_and_foreign_manager_before_reading_completion(self):
+        for owner, foreign in ((retry5_fit.V9, retry5_fit.V10), (retry5_fit.V10, retry5_fit.V9)):
+            _, status = self.fixture(owner)
+            for active, substate, invocation in (("active", "running", owner["invocation"]),
+                                                ("failed", "failed", owner["invocation"]),
+                                                ("inactive", "dead", foreign["invocation"])):
+                with self.subTest(generation=owner["generation"], active=active):
+                    status.show.return_value.update(ActiveState=active, SubState=substate, InvocationID=invocation)
+                    with self.assertRaisesRegex(ValueError, "verifier has not drained"):
+                        retry5_fit.drained145(status, self.fit, self.load, owner=owner)
+            status.read.assert_not_called()
         self.load.assert_not_called()
-        status.read.assert_not_called()
 
     def test_full170_keeps_each_ownership_mode_under_the_exact_v12_charge(self):
         provider = retry5_fit.R / "survivor172-cadence-20261122-v1"

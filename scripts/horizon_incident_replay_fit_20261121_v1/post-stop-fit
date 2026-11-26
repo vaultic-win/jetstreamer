@@ -56,7 +56,8 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v2",
     D / "tools-homefloor-170-metered-hourly-v3",
 )
-FULL170_RETRY5 = HERE == D / "tools-homefloor-170-full-metered-v6"
+FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
+FULL170_RETRY5 = FULL170_RETRY5_V10 or HERE == D / "tools-homefloor-170-full-metered-v6"
 FULL170_V13 = FULL170_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-v5"
 FULL170_V9 = FULL170_V13 or HERE == D / "tools-homefloor-170-full-metered-v3"
 FULL170 = FULL170_V9 or HERE == D / "tools-homefloor-170-full-metered-v1"
@@ -79,9 +80,10 @@ V10_145 = V10_RUNTIME_145 or V10_BUILD_145
 V12_RECOVERY_145 = V8_145 or V9_145 or V10_145
 STOP_RECOVERY_145 = V7_145 or V12_RECOVERY_145
 V13_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v5"
+V10_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v6"
 V9_RETRY5_FIT = V13_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v4"
 V8_RETRY5_FIT = HERE == D / "tools-homefloor-cold168-retry5-v3"
-RETRY5_FIT_ROUTE = V9_RETRY5_FIT or V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
+RETRY5_FIT_ROUTE = V10_RETRY5_FIT or V9_RETRY5_FIT or V8_RETRY5_FIT or HERE == D / "tools-homefloor-cold168-retry5-v2"
 V7_POST_145 = HERE == D / "tools-homefloor-145-post-v7-current-v1"
 V9_POST_145 = HERE == D / "tools-homefloor-145-post-v9-current-v1"
 V10_POST_145 = HERE == D / "tools-homefloor-145-post-v10-current-v1"
@@ -768,9 +770,10 @@ def v12_stopped145(fleet):
 
 def phase145(epoch, fleet=None):
     if FULL170_V9:
-        return retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit["V9"])
+        generation = "V10" if FULL170_RETRY5_V10 else "V9"
+        return retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit[generation])
     if RETRY5_FIT_ROUTE or RETRY5_POST_BUILD_145 or REPRO166_POST_V9:
-        generation = ("V10" if V10_POST_BUILD_145 else
+        generation = ("V10" if V10_RETRY5_FIT or V10_POST_BUILD_145 else
                       "V9" if V9_RETRY5_FIT or V9_POST_BUILD_145 or REPRO166_POST_V9 else
                       "V8" if V8_RETRY5_FIT else "V7")
         phase = retry5_fit["drained145"](s, fit, loader["load_package"], owner=retry5_fit[generation])

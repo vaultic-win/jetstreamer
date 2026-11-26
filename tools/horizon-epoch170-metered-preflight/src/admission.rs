@@ -10,11 +10,10 @@ const FULL170: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-
 const FULL170_V9: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v3";
 const FULL170_V13: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v5";
 const FULL170_RETRY5: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v6";
+const FULL170_RETRY5_V10: &str =
+    "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v7";
 const RETRY5_UNIT: &str = "horizon-qualify-168-full-metered-cold-v5-20261125.service";
 const RETRY5_TIMER: &str = "horizon-guard-168-full-metered-cold-v5-20261125.timer";
-const V9_IID: &str = "ebdfc34db47c4e7699ea5ccbada5d604";
-const V9_HANDOFF: &str = "epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff";
-const V9_CHECKER: &str = "epoch145-semantic-continuity-20261121-v1/tools-v9-census-recovery";
 const V12_REGISTRATION: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json";
 const V12_ACTIVE_SHA: &str = "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54";
 pub(super) const V13_REGISTRATION: &str =
@@ -27,61 +26,99 @@ const V13_WRITER_SHA: &str = "3d2401bb1bfe9a65f68503c2feca30c0630ea876ad04fa01d1
 const RETRY5_SHA: &str = "906eabc8de4ead288fcae3b514daff4a18786fd9e7200ff8fbbac6a96e933716";
 const RETRY4_STOP_SHA: &str = "b0538a4dee05df924a8d04f8562866df701c03996498963552a932059826cdab";
 const V9_PHASE: &str = "v9-semantic-complete-drained";
+const V10_PHASE: &str = "v10-semantic-complete-drained";
 
 const HOST_MEMORY_WITH_RESERVE: u64 = 810_658_050_048;
 const HOST_CPU_MICROS: u64 = 64_000_000;
 const MAX_QUOTE_AGE: u64 = 120;
 
-fn check_v9_completion(phase: &Value, completion: &Value) -> Result<()> {
-    let handoff = rt(V9_HANDOFF);
+struct VerifierCompletion {
+    phase: &'static str,
+    invocation: &'static str,
+    handoff: &'static str,
+    checker: &'static str,
+    checker_sha: &'static str,
+    submission_sha: &'static str,
+    start_sha: &'static str,
+    schema: &'static str,
+}
+
+const V9_COMPLETION: VerifierCompletion = VerifierCompletion {
+    phase: V9_PHASE,
+    invocation: "ebdfc34db47c4e7699ea5ccbada5d604",
+    handoff: "epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff",
+    checker: "epoch145-semantic-continuity-20261121-v1/tools-v9-census-recovery",
+    checker_sha: "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd",
+    submission_sha: "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973",
+    start_sha: "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4",
+    schema: "horizon-epoch145-v8-census-successor-semantic-completion-v1",
+};
+
+// These identities match retry5_fit.py's V10 owner used by the sealed pricing provider.
+const V10_COMPLETION: VerifierCompletion = VerifierCompletion {
+    phase: V10_PHASE,
+    invocation: "104f023c5cd24a55b6585ef525b80067",
+    handoff: "epoch145-semantic-continuity-20261121-v1/v10-census-name-handoff",
+    checker: "epoch145-semantic-continuity-20261121-v1/tools-v10-census-recovery",
+    checker_sha: "29aac4e0527dcea47f4e9bcb14c5e071b67b8d749669873cc04d7cd1cc5d4e75",
+    submission_sha: "63afb9ef8ffa492e2fe12b05b9eccd6bd2e1c533d024f59ebeb21460e43da8cf",
+    start_sha: "ed1dd13fb7803f31e90b7040b09359a484f0fef2608bce74a0c65bd2c37fa605",
+    schema: "horizon-epoch145-v9-census-successor-semantic-completion-v1",
+};
+
+fn check_verifier_completion(
+    owner: &VerifierCompletion,
+    phase: &Value,
+    completion: &Value,
+) -> Result<()> {
+    let handoff = rt(owner.handoff);
+    let invocation = owner.invocation;
     let recovery = reference(
         &rt(&format!(
-            "epoch145-guarded-export-20261121-v1/state/{V9_IID}/recovery-started.json"
+            "epoch145-guarded-export-20261121-v1/state/{invocation}/recovery-started.json"
         )),
-        "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4",
+        owner.start_sha,
     );
-    let submission = reference(
-        &handoff.join("START_RESULT.json"),
-        "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973",
-    );
+    let submission = reference(&handoff.join("START_RESULT.json"), owner.submission_sha);
     let checker = reference(
-        &rt(V9_CHECKER).join("deployment-seal-receipt.json"),
-        "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd",
+        &rt(owner.checker).join("deployment-seal-receipt.json"),
+        owner.checker_sha,
     );
     let startup = &completion["startup_evidence"];
     let success = &completion["native_success"];
     ensure!(
-        phase["stage"] == V9_PHASE
-            && phase["completed_invocation_id"] == V9_IID
+        phase["stage"] == owner.phase
+            && phase["completed_invocation_id"] == invocation
             && phase["Id"] == "horizon-holding-export145-20261121-v1.service"
             && phase["MainPID"] == "0"
             && phase["completion"]["path"] == json!(handoff.join("SEMANTIC_COMPLETION.json"))
             && phase["checker_seal"] == checker
-            && completion["schema"]
-                == "horizon-epoch145-v8-census-successor-semantic-completion-v1"
-            && completion["invocation_id"] == V9_IID
-            && startup["invocation_id"] == V9_IID
+            && completion["schema"] == owner.schema
+            && completion["invocation_id"] == invocation
+            && startup["invocation_id"] == invocation
             && startup["start"] == recovery
             && completion["start"] == recovery
             && startup["submission_result"] == submission
             && startup["worker_seal"] == checker
-            && success["INVOCATION_ID"] == V9_IID
+            && success["INVOCATION_ID"] == invocation
             && success["UNIT"] == "horizon-holding-export145-20261121-v1.service"
             && success["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
             && success["_PID"] == "1"
             && completion["publication_authorized"] == false
             && completion["r2_mutations"] == false,
-        "different epoch 145 V9 completion, checker, or startup custody"
+        "different epoch 145 {} completion, checker, or startup custody",
+        owner.phase
     );
     Ok(())
 }
 
-fn validate_v9_phase(phase: &Value) -> Result<()> {
+fn validate_verifier_phase(owner: &VerifierCompletion, phase: &Value) -> Result<()> {
     ensure!(
-        phase["completion"]["path"] == json!(rt(V9_HANDOFF).join("SEMANTIC_COMPLETION.json")),
-        "different epoch 145 V9 completion path"
+        phase["completion"]["path"] == json!(rt(owner.handoff).join("SEMANTIC_COMPLETION.json")),
+        "different epoch 145 {} completion path",
+        owner.phase
     );
-    check_v9_completion(phase, &bound(&phase["completion"], 0)?)
+    check_verifier_completion(owner, phase, &bound(&phase["completion"], 0)?)
 }
 
 fn validate_v13_actor(active: &Value, previous: &Value) -> Result<()> {
@@ -148,15 +185,17 @@ pub(super) fn check_v13_cadence(active: &Value, ready: &Value, seal: &Value) -> 
     validate_v13_actor(active, &bound(&previous_ref, 0)?)
 }
 
-fn v9_provider(price: &Value, enrollment: &Value) -> Result<Option<PathBuf>> {
+fn drained_provider(price: &Value, enrollment: &Value) -> Result<Option<PathBuf>> {
     let phase = &price["phase145"];
     let capture = &price["epoch170_metered_full"]["native_capture_receipt"];
     let incumbent = &enrollment["incumbent_registration"];
     let v13 = incumbent["path"] == json!(rt(V13_REGISTRATION));
     let retry5 = !price["full170_retry5_owner"].is_null();
-    let package = rt(match (v13, retry5) {
-        (true, true) => FULL170_RETRY5,
-        (true, false) => FULL170_V13,
+    let v10 = phase["stage"] == V10_PHASE;
+    let package = rt(match (v13, retry5, v10) {
+        (true, true, true) => FULL170_RETRY5_V10,
+        (true, true, false) => FULL170_RETRY5,
+        (true, false, _) => FULL170_V13,
         _ => FULL170_V9,
     });
     let receipt = package.join("deployment-seal-receipt.json");
@@ -164,20 +203,22 @@ fn v9_provider(price: &Value, enrollment: &Value) -> Result<Option<PathBuf>> {
     if !v13
         && incumbent["path"] != json!(rt(V12_REGISTRATION))
         && phase["stage"] != V9_PHASE
+        && !v10
         && !retry5
-        && ![FULL170_V9, FULL170_V13, FULL170_RETRY5]
+        && ![FULL170_V9, FULL170_V13, FULL170_RETRY5, FULL170_RETRY5_V10]
             .iter()
             .any(|route| capture["program"]["path"] == json!(rt(route).join("post-stop-fit")))
     {
         return Ok(None);
     }
     ensure!(
-        (v13 || !retry5 && *incumbent == reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA))
+        (!v10 || v13 && retry5)
+            && (v13 || !retry5 && *incumbent == reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA))
             && capture["program"]["path"] == json!(program)
             && capture["deployment"]["path"] == json!(receipt)
             && capture["source_epoch"] == 145
             && capture["recorded_unix_seconds"] == price["recorded_unix_seconds"],
-        "epoch 170 V9 quote requires the registered cadence and its matching provider"
+        "epoch 170 quote requires the registered cadence and its matching provider"
     );
     Ok(Some(package))
 }
@@ -279,8 +320,8 @@ fn check_retry5_price(price: &Value, fleet: &Value) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()> {
-    let Some(package) = v9_provider(price, enrollment)? else {
+pub(super) fn validate_drained_price(price: &Value, enrollment: &Value) -> Result<()> {
+    let Some(package) = drained_provider(price, enrollment)? else {
         return Ok(());
     };
     let phase = &price["phase145"];
@@ -289,7 +330,7 @@ pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()>
     ensure!(
         now.checked_sub(number(price, "recorded_unix_seconds")?)
             .is_some_and(|age| age <= MAX_QUOTE_AGE),
-        "stale or future epoch 170 V9 quote"
+        "stale or future epoch 170 quote"
     );
     let seal = bound(&capture["deployment"], 0)?;
     ensure!(
@@ -301,7 +342,7 @@ pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()>
                 .any(|row| row["name"] == "post-stop-fit"
                     && row["mode"] == "0555"
                     && row["sha256"] == capture["program"]["sha256"])),
-        "epoch 170 V9 quote provider differs from its sealed member"
+        "epoch 170 quote provider differs from its sealed member"
     );
     image(&capture["program"])?;
     if package != rt(FULL170_V9) {
@@ -314,10 +355,10 @@ pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()>
                 && ["invocation_id", "pid", "start_ticks"]
                     .iter()
                     .all(|key| quoted[*key] == actor[*key]),
-            "epoch 170 V9 quote belongs to a different V13 writer"
+            "epoch 170 quote belongs to a different V13 writer"
         );
         check_retry5_price(price, &bound(&price["fleet"], 0)?)?;
-        if package == rt(FULL170_RETRY5) {
+        if !price["full170_retry5_owner"].is_null() {
             let owner = &price["full170_retry5_owner"];
             let producer = properties(RETRY5_UNIT)?;
             let timer = properties(RETRY5_TIMER)?;
@@ -330,7 +371,12 @@ pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()>
             );
         }
     }
-    validate_v9_phase(phase)
+    let owner = if package == rt(FULL170_RETRY5_V10) {
+        &V10_COMPLETION
+    } else {
+        &V9_COMPLETION
+    };
+    validate_verifier_phase(owner, phase)
 }
 
 pub(super) fn enrollment_path(fleet_sha: &str) -> PathBuf {
@@ -590,6 +636,7 @@ pub(super) fn quote(
         "full170-v9" => rt(FULL170_V9),
         "full170-v9-v13" => rt(FULL170_V13),
         "full170-v9-v13-retry5" => rt(FULL170_RETRY5),
+        "full170-v10-v13-retry5" => rt(FULL170_RETRY5_V10),
         _ => bail!("unknown epoch 170 capacity provider deployment"),
     };
     let sealed = reference(
@@ -621,7 +668,11 @@ pub(super) fn quote(
         "v10" => {
             command.arg("--hourly170=prestart");
         }
-        "full170" | "full170-v9" | "full170-v9-v13" | "full170-v9-v13-retry5" => {
+        "full170"
+        | "full170-v9"
+        | "full170-v9-v13"
+        | "full170-v9-v13-retry5"
+        | "full170-v10-v13-retry5" => {
             command.arg("--full170=prestart");
         }
         _ => {}
@@ -646,7 +697,7 @@ pub(super) fn quote(
     unused_route(active)?;
     result["epoch170_metered_full"]["native_capture_receipt"] = json!({"program":program,"deployment":sealed,
         "source_json_sha256":sha(&output.stdout),"source_epoch":145,"recorded_unix_seconds":native["recorded_unix_seconds"]});
-    validate_v9_price(&result, &candidate)?;
+    validate_drained_price(&result, &candidate)?;
     Ok(result)
 }
 
@@ -654,44 +705,52 @@ pub(super) fn quote(
 mod tests {
     use super::*;
 
-    #[test]
-    fn v9_phase_binds_the_actual_owner_and_separate_startup_receipts() {
-        let handoff = rt(V9_HANDOFF);
+    fn completion_fixture(owner: &VerifierCompletion) -> (Value, Value) {
+        let handoff = rt(owner.handoff);
+        let invocation = owner.invocation;
         let recovery = reference(
             &rt(&format!(
-                "epoch145-guarded-export-20261121-v1/state/{V9_IID}/recovery-started.json"
+                "epoch145-guarded-export-20261121-v1/state/{invocation}/recovery-started.json"
             )),
-            "eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4",
+            owner.start_sha,
         );
-        let submission = reference(
-            &handoff.join("START_RESULT.json"),
-            "33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973",
-        );
+        let submission = reference(&handoff.join("START_RESULT.json"), owner.submission_sha);
         let checker = reference(
-            &rt(V9_CHECKER).join("deployment-seal-receipt.json"),
-            "8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd",
+            &rt(owner.checker).join("deployment-seal-receipt.json"),
+            owner.checker_sha,
         );
-        let phase = json!({"stage": V9_PHASE, "completed_invocation_id": V9_IID,
+        let phase = json!({"stage": owner.phase, "completed_invocation_id": invocation,
             "Id": "horizon-holding-export145-20261121-v1.service", "MainPID": "0",
             "completion": {"path": handoff.join("SEMANTIC_COMPLETION.json"), "sha256": "fixture"},
             "checker_seal": checker});
-        let completion = json!({"schema": "horizon-epoch145-v8-census-successor-semantic-completion-v1",
-            "invocation_id": V9_IID, "start": recovery,
-            "startup_evidence": {"invocation_id": V9_IID, "start": recovery,
+        let completion = json!({"schema": owner.schema,
+            "invocation_id": invocation, "start": recovery,
+            "startup_evidence": {"invocation_id": invocation, "start": recovery,
                 "submission_result": submission, "worker_seal": checker},
-            "native_success": {"INVOCATION_ID": V9_IID, "UNIT": "horizon-holding-export145-20261121-v1.service",
+            "native_success": {"INVOCATION_ID": invocation, "UNIT": "horizon-holding-export145-20261121-v1.service",
                 "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448", "_PID": "1"},
             "publication_authorized": false, "r2_mutations": false});
-        check_v9_completion(&phase, &completion).unwrap();
+        (phase, completion)
+    }
 
-        let mut other_owner = phase.clone();
-        other_owner["completed_invocation_id"] = json!("a71285e56d674de3bf793692f93dfbb3");
-        assert!(check_v9_completion(&other_owner, &completion).is_err());
+    #[test]
+    fn each_phase_binds_its_owner_and_separate_startup_receipts() {
+        for (owner, previous) in [
+            (&V9_COMPLETION, &V10_COMPLETION),
+            (&V10_COMPLETION, &V9_COMPLETION),
+        ] {
+            let (phase, completion) = completion_fixture(owner);
+            check_verifier_completion(owner, &phase, &completion).unwrap();
+            let (foreign_phase, foreign_completion) = completion_fixture(previous);
+            assert!(check_verifier_completion(owner, &phase, &foreign_completion).is_err());
+            assert!(check_verifier_completion(owner, &foreign_phase, &completion).is_err());
 
-        let mut crossed = completion.clone();
-        crossed["startup_evidence"]["start"] = submission;
-        crossed["startup_evidence"]["submission_result"] = recovery;
-        assert!(check_v9_completion(&phase, &crossed).is_err());
+            let startup = &completion["startup_evidence"];
+            let mut crossed = completion.clone();
+            crossed["startup_evidence"]["start"] = startup["submission_result"].clone();
+            crossed["startup_evidence"]["submission_result"] = startup["start"].clone();
+            assert!(check_verifier_completion(owner, &phase, &crossed).is_err());
+        }
     }
 
     #[test]
@@ -699,12 +758,12 @@ mod tests {
         let enrollment = json!({"incumbent_registration": {"path": rt(V12_REGISTRATION)}});
         let historic = json!({"phase145": {"stage": "v6-semantic-complete-drained"}});
         assert!(
-            validate_v9_price(&historic, &enrollment)
+            validate_drained_price(&historic, &enrollment)
                 .unwrap_err()
                 .to_string()
                 .contains("requires the registered cadence and its matching provider")
         );
-        assert!(validate_v9_price(&historic, &Value::Null).is_ok());
+        assert!(validate_drained_price(&historic, &Value::Null).is_ok());
     }
 
     #[test]
@@ -712,23 +771,30 @@ mod tests {
         let v12 =
             json!({"incumbent_registration":reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA)});
         let v13 = json!({"incumbent_registration":reference(&rt(V13_REGISTRATION), "fixture")});
-        for (package, exact, foreign) in [
-            (FULL170_V9, &v12, &v13),
-            (FULL170_V13, &v13, &v12),
-            (FULL170_RETRY5, &v13, &v12),
+        for (package, phase, exact, foreign) in [
+            (FULL170_V9, V9_PHASE, &v12, &v13),
+            (FULL170_V13, V9_PHASE, &v13, &v12),
+            (FULL170_RETRY5, V9_PHASE, &v13, &v12),
+            (FULL170_RETRY5_V10, V10_PHASE, &v13, &v12),
         ] {
             let dir = rt(package);
-            let mut native = json!({"phase145":{"stage":V9_PHASE}, "recorded_unix_seconds":1,
+            let mut native = json!({"phase145":{"stage":phase}, "recorded_unix_seconds":1,
                 "epoch170_metered_full":{"native_capture_receipt":{
                     "program":{"path":dir.join("post-stop-fit")},
                     "deployment":{"path":dir.join("deployment-seal-receipt.json")},
                     "source_epoch":145,"recorded_unix_seconds":1}}});
-            if package == FULL170_RETRY5 {
+            if matches!(package, FULL170_RETRY5 | FULL170_RETRY5_V10) {
                 native["full170_retry5_owner"] = json!({"fixture": true});
             }
-            assert_eq!(v9_provider(&native, exact).unwrap(), Some(dir));
-            assert!(v9_provider(&native, foreign).is_err());
-            assert!(v9_provider(&native, &Value::Null).is_err());
+            assert_eq!(drained_provider(&native, exact).unwrap(), Some(dir));
+            assert!(drained_provider(&native, foreign).is_err());
+            assert!(drained_provider(&native, &Value::Null).is_err());
+            native["phase145"]["stage"] = json!(if phase == V10_PHASE {
+                V9_PHASE
+            } else {
+                V10_PHASE
+            });
+            assert!(drained_provider(&native, exact).is_err());
         }
     }
 

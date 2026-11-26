@@ -28,6 +28,7 @@ OWNER_FIELDS = ("Id", "MainPID", "InvocationID", "ControlGroup", "ActiveState", 
                 "NRestarts", "MemoryMax", "CPUQuotaPerSecUSec", "MemorySwapMax")
 TIMER_FIELDS = ("Id", "InvocationID", "ActiveState", "SubState", "Triggers", "Job",
                 "Requisite", "After", "StopPropagatedFrom")
+V13_DRAINED_PHASES = ("v9-semantic-complete-drained", "v10-semantic-complete-drained")
 
 sys.path.insert(0, str(EVIDENCE))
 from evidence import bound, checked, need
@@ -132,7 +133,7 @@ def start_intent(route, review_ref):
          and review["observer"]["path"] == str(ROOT / f"OBSERVER_ENROLLMENT-{fleet_ref['sha256']}.json")
          and profile["actor"]["unit"] == route["UNIT"]
          and not os.path.lexists(route["PERMIT"]), "epoch 170 start basis differs")
-    if price.get("phase145", {}).get("stage") == "v9-semantic-complete-drained":
+    if price.get("phase145", {}).get("stage") in V13_DRAINED_PHASES:
         v13_writer(price, enrollment)
     protected_retry5(price, time.time())
     predecessor = bound(PREDECESSOR)
@@ -243,7 +244,7 @@ def release_record(route, actor, intent, plan_ref, first_ref, post_ref, boot, no
          and post["available_HOME_bytes"] >= post["complete_required_HOME_bytes"] == floor + book["remaining_bytes"]
          and post["available_memory_bytes"] >= post["required_available_memory_bytes"],
          "epoch 170 release lacks a fresh positive post-guard quote for this hold")
-    if pre["phase145"].get("stage") == "v9-semantic-complete-drained":
+    if pre["phase145"].get("stage") in V13_DRAINED_PHASES:
         enrollment_ref = pre["epoch170_metered_full"]["observer_enrollment"]
         need(post["status_registration"] == pre["status_registration"]
              and stage["observer_enrollment"] == enrollment_ref,
