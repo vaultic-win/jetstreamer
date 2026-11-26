@@ -32,7 +32,7 @@ class Joint168(TestCase):
         self.assertEqual(q['joint168']['whole_tree_cap_bytes'],314*G)
         self.assertEqual(q['joint168']['remaining_home_bytes'],64*G)
         self.assertEqual(q['fit']['extra_cpu_quota_micros'],0)
-        self.assertEqual(q['fit']['extra_memory_bytes'],56*G)
+        self.assertEqual(q['fit']['extra_memory_bytes'],52*G)
         self.assertEqual(q['fit']['required_home_bytes'],
                          self.base['fit']['projected_home_floor_bytes']+72*G)
         self.assertEqual(q['full146'],self.old)
@@ -44,7 +44,7 @@ class Joint168(TestCase):
         self.assertFalse(q['fit']['fits'])
         self.assertEqual(q['fit']['available_home_bytes'],self.base['fit']['available_home_bytes'])
         self.assertEqual(q['fit']['available_memory_bytes'],self.base['fit']['available_memory_bytes'])
-        self.assertEqual(q['fit']['memory_shortfall_bytes'],2_408_521_728)
+        self.assertEqual(q['fit']['memory_shortfall_bytes'],0)
 
     def test_held_to_active_same_cap_and_single_advance_charge(self):
         first = lane.project(self.s,self.base,self.candidate,self.proposal)
@@ -87,12 +87,12 @@ class Joint168(TestCase):
     def test_tight_native_cgroup_limits(self):
         with TemporaryDirectory() as d:
             d = Path(d)
-            for name,value in {'cpu.max':'175000 100000','memory.max':str(63*G),'memory.swap.max':'0'}.items():
+            for name,value in {'cpu.max':'175000 100000','memory.max':str(59*G),'memory.swap.max':'0'}.items():
                 (d/name).write_text(value)
-            self.assertTrue(lane.cgroup_limits(d,1_750_000,63*G))
-            self.assertFalse(lane.cgroup_limits(d,2_000_000,63*G))
+            self.assertTrue(lane.cgroup_limits(d,1_750_000,59*G))
+            self.assertFalse(lane.cgroup_limits(d,2_000_000,59*G))
             (d/'memory.swap.max').write_text('max')
-            self.assertFalse(lane.cgroup_limits(d,1_750_000,63*G))
+            self.assertFalse(lane.cgroup_limits(d,1_750_000,59*G))
 
     def test_unloaded_pid1_timer_omits_service_pid_fields(self):
         def show(name, fields):
@@ -139,6 +139,30 @@ class Joint168(TestCase):
         fleet['actual_executing_replays'][1]['unit']['InvocationID'] = 'c' * 32
         with self.assertRaisesRegex(ValueError, 'different epoch 146'):
             legacy(fleet,native,owner)
+
+    def test_only_unobserved_checked_retirement_advances_coordinated_disk_bound(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            check = root/'CHECK.json'
+            done = root/'COMPLETE.json'
+            check.touch()
+            done.touch()
+            ref = {'path': str(done), 'sha256': 'a' * 64}
+            record = {'retired_tree_before_bytes': 88971591680,
+                      'scope_root_remaining_bytes': 4096,
+                      'check_sha256': 'b' * 64}
+            verified = {'schema': 'horizon168-retry4-stopped-accounts-check-v1',
+                        'allocated_bytes': 88971591680}
+            fleet = {'complete_cycle_conservative_available_DATA_bytes': 10**12,
+                     'recorded_unix_seconds': int(check.stat().st_mtime)-1}
+            with mock.patch.object(lane, 'retirement', return_value=ref), mock.patch.object(
+                lane, 'read', side_effect=lambda _, item: record if item == ref else verified
+            ):
+                fresh = lane.fleet_storage_bound(self.s, fleet, ref)
+                self.assertEqual(fresh['post_fleet_retirement_bytes'], 88971587584)
+                fleet['recorded_unix_seconds'] += 1
+                later = lane.fleet_storage_bound(self.s, fleet, ref)
+                self.assertEqual(later['fleet_available_upper_bound'], 10**12)
 
     def test_only_exact_private_roster_is_accepted(self):
         prior = {'epoch':172}

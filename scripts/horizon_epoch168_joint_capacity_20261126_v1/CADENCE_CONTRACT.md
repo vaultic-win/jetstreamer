@@ -23,3 +23,5 @@ The provider source supports this V26 contract. The consumer itself still needs 
 ## Reconstruct the sealed sources
 
 Apply `V19_TO_JOINT_V20.patch`, `V20_PID1_AND_GUARD.patch`, and `V20_EPOCH146_DONOR.patch` in that order to the provider source inputs. Apply `V25_TO_V26.patch` to the V25 cadence source, then apply only `source/joint168_capacity.py` from `V20_PID1_AND_GUARD.patch`. Compare that reader byte for byte across the resulting packages before sealing them. Run `test_joint168_capacity.py` and `test_v26.py` beside their respective reconstructed source trees.
+
+Apply `V20_RETRY4_STORAGE_EVENT.patch` after the provider patches above. For the cadence, apply only its shared reader and scope template files. The native holding price must be rebuilt from the patched Rust sources. The checked reduced lane uses 59 GiB for the producer and 1 GiB for the guard. Its closest sealed predecessor peaked at 55 GiB of producer memory.

@@ -7,7 +7,7 @@ from pathlib import Path
 PACKAGE_ROOT = Path(__file__).resolve().parent
 DEST = '/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v20-joint168'
 CHANGED = {'post-stop-fit', 'full146_capacity.py', 'retry4_status.py',
-           'full170_capacity.py', 'focused168_capacity.py', 'build_159_price.py'}
+           'full170_capacity.py', 'focused168_capacity.py', 'build_159_price.py', 'retry5_fit.py'}
 NEW = {'joint168_capacity.py', 'joint168-scope-template.json'}
 parser = argparse.ArgumentParser()
 parser.add_argument('--holding-image', type=Path)
@@ -37,5 +37,5 @@ for name in sorted(NEW):
     members.append(member(name,source/name,'0444'))
 if args.observer_binding:
     members.append(member('v26-joint168-cadence.json',args.observer_binding,'0444'))
-destination = DEST if args.observer_binding else DEST + '-prestart-v3'
+destination = DEST if args.observer_binding else DEST + '-prestart-v6'
 print(json.dumps(dict(schema='jetstreamer-sealed-deployment-plan-v1',destination=destination,members=members),indent=2))
