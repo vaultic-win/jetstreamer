@@ -26,6 +26,19 @@ class Full146Capacity(TestCase):
                       epoch168_followup_additive_home_bytes=0)
         self.pre = dict(mode='prestart', proposal=self.p, processes=[], footprint=0)
 
+    def test_firing_timer_retains_its_invocation_across_accounting(self):
+        timer = dict(Id='horizon-guard-146.timer', InvocationID='a'*32, ActiveState='active',
+                     Triggers='horizon-guard-146.service', Job='', SubState='waiting')
+        before = dict(actor='fixed', footprint=1234, timers=timer)
+        running = dict(before, timers=dict(timer, SubState='running'))
+        lane.check_same(self.s, before, running)
+        with self.assertRaisesRegex(ValueError, 'timers'):
+            lane.check_same(self.s, before, dict(running, timers=dict(timer, InvocationID='b'*32)))
+        with self.assertRaisesRegex(ValueError, 'footprint'):
+            lane.check_same(self.s, before, dict(running, footprint=1235))
+        with self.assertRaisesRegex(ValueError, 'timer is inactive'):
+            lane.check_same(self.s, before, dict(before, timers=dict(timer, SubState='dead')))
+
     def test_prestart_preserves_v17_charges_and_exact_donor(self):
         result = lane.project(self.s, self.native, self.pre, self.request)
         self.assertTrue(result['fit']['fits'])
@@ -61,7 +74,7 @@ class Full146Capacity(TestCase):
         with self.assertRaisesRegex(ValueError, 'incumbent population'):
             lane.project(self.s, self.native, self.pre, self.request)
         with self.assertRaisesRegex(ValueError, 'changed during quote'):
-            lane.check_same(self.s, {'pid': 30}, {'pid': 31})
+            lane.check_same(self.s, {'pid': 30, 'timers': None}, {'pid': 31, 'timers': None})
 
     def test_rejects_lost_holding_or_duplicate_booking(self):
         self.native['bookings']['146'] = dict(cap_bytes=lane.CAP)
