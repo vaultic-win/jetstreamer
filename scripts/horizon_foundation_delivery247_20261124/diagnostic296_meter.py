@@ -94,7 +94,7 @@ def configuration():
     return active
 
 
-def register_attempt(plan, version, ordinary_replay):
+def register_attempt(plan, version, ordinary_replay, include_focused):
     unit, state, root = attempt_paths(version)
     profile = profile_path(state, version)
     if not profile.is_file():
@@ -132,6 +132,8 @@ def register_attempt(plan, version, ordinary_replay):
             assert terminal_path.is_file() and not active_configuration(version)
             if existing:
                 plan["diagnostics"].remove(claim)
+        elif version in FOCUSED and not include_focused:
+            assert not existing
         elif not existing:
             plan["diagnostics"].append(claim)
     elif not ordinary_replay:
@@ -146,9 +148,9 @@ def register_attempt(plan, version, ordinary_replay):
             gate["evidence"].append(item)
 
 
-def register(plan, ordinary_replay=False):
+def register(plan, ordinary_replay=False, include_focused=True):
     for version in ATTEMPTS:
-        register_attempt(plan, version, ordinary_replay)
+        register_attempt(plan, version, ordinary_replay, include_focused)
 
 
 def owns(row):
