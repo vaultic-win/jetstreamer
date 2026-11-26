@@ -63,6 +63,10 @@ const TERMINAL_261_COLLECTOR: (&str, &str) = (
     "/var/lib/jetstreamer/horizon261-cohort-commit-source-v1/horizon-epoch257-commit-source",
     "805646f57ba9b5262e17541e3f940390a5996138b4b4ddee4887915df0605499",
 );
+const DELIVERY_261_PREPARATION: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon261-current-reader-preparation-v1/preparation.json",
+    "1d20967729c44e166611dd9df86e919b5ae0df4af337ed2d3cc0b5b4268d6a61",
+);
 
 struct FullReplayQuote {
     reference: Bound,
@@ -74,6 +78,7 @@ struct FullReplayQuote {
 enum Quote {
     FullReplay(FullReplayQuote),
     Suffix226(Bound),
+    Delivery261(Bound),
 }
 
 fn full_replay_quote() -> Result<FullReplayQuote> {
@@ -111,6 +116,23 @@ fn closed_audit() -> Result<(Bound, String)> {
         "epoch 148 terminal audit receipt changed"
     );
     Ok((reference, text(&audit, "invocation_id")?.to_owned()))
+}
+
+fn delivery_261_preparation() -> Result<Bound> {
+    let reference = Bound::new(DELIVERY_261_PREPARATION.0, DELIVERY_261_PREPARATION.1);
+    let preparation = reference.sealed()?;
+    let reader_plan = binding(&preparation["reader_plan"])?.sealed()?;
+    ensure!(
+        preparation["schema"] == "foundation-epoch261-current-reader-preparation-v1"
+            && preparation["epoch"] == 261
+            && preparation["publication_authorized"] == false
+            && reader_plan["schema"] == "horizon-current-reader-plan-v1"
+            && reader_plan["threads"] == 8
+            && preparation["independent_boundary"] == reader_plan["epoch_expectations"]["261"],
+        "epoch 261 delivery preparation changed"
+    );
+    binding(&preparation["uploader"])?.artifact()?;
+    Ok(reference)
 }
 
 fn latest_completion() -> Result<Bound> {
@@ -575,11 +597,20 @@ fn measure(
     } else {
         None
     };
+    let delivery_261 = matches!(&quote, Some(Quote::Delivery261(_)));
+    ensure!(
+        !delivery_261 || closed_replay.is_some(),
+        "epoch 261 delivery requires a committed archive and drained replay guard"
+    );
     if closed_replay.is_some() {
         released_replays.insert(261, REPLAY_261);
     }
     let roster = fleet_roster(&fleet, &booking, &released_replays)?;
-    let epoch = if suffix.is_some() { 226 } else { EPOCH };
+    let epoch = match &quote {
+        Some(Quote::Suffix226(_)) => 226,
+        Some(Quote::Delivery261(_)) => 261,
+        _ => EPOCH,
+    };
     let missing: Vec<_> = fleet["inventory"]["entries"]
         .as_array()
         .context("Foundation inventory")?
@@ -665,7 +696,11 @@ fn measure(
         pristine(device)?
     };
     let resources_before = live::resources_at(Path::new(FILESYSTEM))?;
-    let selected = units::parse_cpu_list(if suffix.is_some() { "16-23" } else { "40-47" })?;
+    let selected = units::parse_cpu_list(match epoch {
+        226 => "16-23",
+        261 => "24-31",
+        _ => "40-47",
+    })?;
     let cpus = units::affinity(&json!({"cpu_affinity":selected}))?;
     let mut recorded = BTreeMap::new();
     for unit in booked
@@ -818,6 +853,13 @@ fn measure(
             capacity::add(SUFFIX_226_CAP, DISK_RECEIPTS)?,
             capacity::add(SUFFIX_226_CAP, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
         ),
+        Some(Quote::Delivery261(_)) => (
+            num(&delivery, "receipt_scratch_maximum_bytes")?,
+            capacity::add(
+                num(&delivery, "memory_max_bytes")?,
+                capacity::add(CONTROLLER_MEMORY, num(&delivery, "guard_memory_allowance")?)?,
+            )?,
+        ),
         None => (
             DISK_RECEIPTS,
             capacity::add(MEMORY, capacity::add(CONTROLLER_MEMORY, GUARD_MEMORY)?)?,
@@ -866,10 +908,10 @@ fn measure(
             )
         })
         .collect();
-    let schema = if suffix.is_some() {
-        "foundation-epoch226-suffix-roster-binding-v1"
-    } else {
-        "foundation-epoch262-roster-binding-v1"
+    let schema = match epoch {
+        226 => "foundation-epoch226-suffix-roster-binding-v1",
+        261 => "foundation-epoch261-delivery-roster-binding-v1",
+        _ => "foundation-epoch262-roster-binding-v1",
     };
     let mut evidence = json!({"schema":schema,"epoch":epoch,
         "recorded_unix_seconds":now()?,"fleet":fleet_ref,"observer":observer_ref,
@@ -887,6 +929,14 @@ fn measure(
         evidence["suffix_quote"] = json!({
             "completion":proof,"candidate_cap_bytes":SUFFIX_226_CAP,
             "candidate_memory_max_bytes":SUFFIX_226_CAP,"candidate_cpus":selected,
+            "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
+            "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
+        });
+    }
+    if let Some(Quote::Delivery261(preparation)) = &quote {
+        evidence["delivery_quote"] = json!({
+            "preparation":preparation,"delivery_memory_max_bytes":num(&delivery, "memory_max_bytes")?,
+            "receipt_scratch_maximum_bytes":candidate_disk,"candidate_cpus":selected,
             "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
             "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
         });
@@ -960,20 +1010,17 @@ pub fn run() -> Result<()> {
         args.next()
             .context("provide a new Foundation roster evidence directory")?,
     );
-    let mut quote = false;
-    let controller_unit = match args.next() {
+    let command = args.next();
+    let controller_unit = match command.as_deref() {
         None => None,
-        Some(flag) if flag == "--full-replay-quote" => {
-            quote = true;
-            None
-        }
+        Some(flag) if flag == "--full-replay-quote" || flag == "--delivery261-quote" => None,
         Some(flag) if flag == "--as-controller" => Some(
             args.next()
                 .context("controller unit")?
                 .into_string()
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
-        Some(_) => bail!("use --as-controller UNIT or --full-replay-quote"),
+        Some(_) => bail!("use --as-controller UNIT, --full-replay-quote or --delivery261-quote"),
     };
     let synchronize = match args.next() {
         None => false,
@@ -1011,11 +1058,12 @@ pub fn run() -> Result<()> {
                 invocation,
                 held: false,
             });
-    let result = if quote {
-        full_replay_quote()
-            .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote))))
-    } else {
-        receipt(&mut native, controller)
+    let result = match command.as_deref() {
+        Some(flag) if flag == "--full-replay-quote" => full_replay_quote()
+            .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),
+        Some(flag) if flag == "--delivery261-quote" => delivery_261_preparation()
+            .and_then(|prep| measure(&mut native, None, Some(Quote::Delivery261(prep)))),
+        _ => receipt(&mut native, controller),
     };
     match result {
         Ok(evidence) => {
