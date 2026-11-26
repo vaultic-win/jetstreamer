@@ -1,0 +1,43 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -92,6 +92,23 @@
+         statuses[257] = update257
+     else:
+         assert bound(prior257['readback'])['sampled_at_utc'] >= bound(forward257['readback'])['sampled_at_utc']
++repair257 = V / "horizon257-current-reader-delivery-v1/verification-timeout-v2/completion.json"
++if 257 in statuses and repair257.is_file():
++    repair257_ref = ref(repair257)
++    repair257_status = bound(repair257_ref)
++    old257_status = bound(statuses[257])
++    repair257_intent = bound(repair257_status["intent"])
++    repair257_terminal = bound(repair257_status["terminal"])
++    assert repair257_terminal["schema"] == "foundation-epoch257-local-plugin-timeout-v1"
++    assert repair257_terminal["manager"]["Result"] == "timeout"
++    assert repair257_intent["terminal"] == repair257_status["terminal"]
++    assert repair257_status["authenticated_exact_byte_readback"]
++    assert repair257_status["key"] == "epoch-257.epoch-status.json"
++    assert bound(repair257_status["readback"])["phase"] == "verification"
++    if old257_status == bound(repair257_intent["previous"]):
++        statuses[257] = repair257_ref
++    else:
++        assert bound(old257_status["readback"])["sampled_at_utc"] >= bound(repair257_status["readback"])["sampled_at_utc"]
+ correction=D/'horizon257-full-capacity-status-v222-a1/completion.json'
+ if n==223 and correction.is_file():
+     r=ref(correction)
+@@ -860,6 +877,16 @@
+         plan['gates']['257']['state'] = 'post-replay-pipeline'
+         plan['gates']['257']['next_action'] = (
+             'Track the verified local archive through authenticated upload, public playback, and sidecar readback.')
++        timeout_path = delivery.parent / "verification-timeout-v2/terminal.json"
++        if timeout_path.is_file():
++            timeout_ref = sealed_226_file(timeout_path)
++            timeout = bound(timeout_ref)
++            assert timeout["epoch"] == 257 and timeout["producer_terminal"] == producer_ref
++            assert timeout["manager"]["Id"] == claim["unit"] and timeout["manager"]["Result"] == "timeout"
++            assert timeout["archive"] == producer["archive"] and timeout["local_archive_preserved"]
++            add(plan["gates"]["257"], timeout_ref)
++            plan["gates"]["257"]["next_action"] = (
++                "Qualify a fresh current-reader delivery bound to the preserved archive after local playback timed out.")
+     if n == 332 and preserved296_cutoff is not None:
+         root = V / 'horizon296-observer-recovery-fleet-v1'
+         release = bound(sealed_226_file(root / 'acceptance.json'))
