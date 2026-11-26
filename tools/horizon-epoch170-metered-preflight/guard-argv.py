@@ -202,6 +202,13 @@ def guard_argv(route, plan_ref, qualification):
     ]
 
 
+def same_guard_timer(previous, current):
+    # A timer is running while its recurring service is sampling.
+    return (previous["SubState"] in ("waiting", "running")
+            and current["SubState"] in ("waiting", "running")
+            and all(previous[key] == current[key] for key in TIMER_FIELDS if key != "SubState"))
+
+
 def guard_proof(route, native, actor, plan_ref, sample_path):
     sample_ref = bound(sample_path)
     sample = checked(sample_ref)
@@ -212,7 +219,7 @@ def guard_proof(route, native, actor, plan_ref, sample_path):
     timer = native["properties"](route["TIMER"], *TIMER_FIELDS)
     service = route["TIMER"].removesuffix(".timer") + ".service"
     need(timer["Id"] == route["TIMER"] and timer["ActiveState"] == "active"
-         and timer["SubState"] == "waiting" and not timer["Job"]
+         and timer["SubState"] in ("waiting", "running") and not timer["Job"]
          and re.fullmatch(r"[0-9a-f]{32}", timer["InvocationID"]) and timer["Triggers"] == service
          and all(route["UNIT"] in timer[key].split() for key in ("Requisite", "After", "StopPropagatedFrom")),
          "epoch 170 guard timer is outside its producer scope")
@@ -224,7 +231,8 @@ def guard_proof(route, native, actor, plan_ref, sample_path):
     need(len(events) == 1 and events[0]["MESSAGE_ID"] == native["SUCCESS"]
          and int(events[0]["__REALTIME_TIMESTAMP"]) // 1_000_000 >= validated["recorded_unix_seconds"],
          "epoch 170 guard lacks exact PID 1 success")
-    need(native["properties"](route["TIMER"], *TIMER_FIELDS) == timer, "epoch 170 guard timer changed")
+    need(same_guard_timer(timer, native["properties"](route["TIMER"], *TIMER_FIELDS)),
+         "epoch 170 guard timer changed")
     return proof, validated
 
 
@@ -382,7 +390,10 @@ def main():
                     else:
                         first_ref = bound(ROOT / "FIRST_GUARD.json")
                         first = checked(first_ref)
-                        need(first == first_proof(route, native, actor, plan_ref, Path(first["receipt"]["path"])),
+                        current = first_proof(route, native, actor, plan_ref, Path(first["receipt"]["path"]))
+                        need(same_guard_timer(first["timer"], current["timer"])
+                             and first["receipt"] == current["receipt"]
+                             and first["guard_invocation"] == current["guard_invocation"],
                              "epoch 170 first guard changed before release")
                         post_ref = bound(ROOT / "POST_GUARD_CAPACITY.json")
                         boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()

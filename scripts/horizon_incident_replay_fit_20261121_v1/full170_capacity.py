@@ -166,7 +166,7 @@ def first_guard(s, route, hourly, actor):
     s.need(current['Id'] == proof['timer']['Id'] == timer
            and current['ActiveState'] == proof['timer']['ActiveState'] == 'active'
            and current['InvocationID'] == proof['timer']['InvocationID']
-           and current['SubState'] == 'waiting' and not current['Job'] and current['Triggers'] == service,
+           and current['SubState'] in ('waiting', 'running') and not current['Job'] and current['Triggers'] == service,
            'full epoch 170 first guard timer changed')
     s.need(plan['unit'] == route['UNIT'] and plan['invocation_id'] == actor['invocation_id']
            and plan['filesystem'] == '/home/sol' and plan['worker_root'] == str(route['LANE'])
@@ -215,7 +215,7 @@ def current_guard(s, route, hourly, actor, record, first):
     current = hourly['properties'](timer, *TIMER)
     expected = actor['post_guard']['epoch170_metered_full']['first_guard']
     s.need(current['Id'] == timer and current['ActiveState'] == 'active'
-           and current['SubState'] == 'waiting' and not current['Job'] and current['Triggers'] == service
+           and current['SubState'] in ('waiting', 'running') and not current['Job'] and current['Triggers'] == service
            and current['InvocationID'] == expected['timer_invocation_id']
            and expected['actual_guard_plan'] == plan_ref
            and (record['admission'] is None or route['checked'](record['admission'])['timer_invocation_id']

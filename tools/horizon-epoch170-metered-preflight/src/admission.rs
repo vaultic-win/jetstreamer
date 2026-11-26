@@ -15,7 +15,7 @@ const FULL170_RETRY5_V10: &str =
 const FULL170_INDEPENDENT: &str =
     "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v1";
 const FULL170_AFTER_STOP: &str =
-    "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v5";
+    "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v6";
 const RETRY5_UNIT: &str = "horizon-qualify-168-full-metered-cold-v5-20261125.service";
 const RETRY5_TIMER: &str = "horizon-guard-168-full-metered-cold-v5-20261125.timer";
 const V12_REGISTRATION: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json";
