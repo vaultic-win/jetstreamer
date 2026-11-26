@@ -27,7 +27,7 @@ use jetstreamer_node::{
     },
     segment_manifest::{
         HistoricalSegmentManifest, SegmentCheckpointSummary, SegmentRuntimeAdmission,
-        read_and_validate_segment_manifest_from, sha256_hex_string,
+        read_and_validate_segment_manifest_from, segment_manifest_path, sha256_hex_string,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -52,6 +52,7 @@ const EPOCH: u64 = 186;
 const FIRST: u64 = 80_352_000;
 const FIRST_PARENT: u64 = 80_351_995;
 const PREFIX_UNIT: &str = "horizon-qualify-186-bounded-source-20261125-v1.service";
+const PREFIX_ARCHIVE: &str = "/home/sol/.jetstreamer-private/epoch186-bounded-source-20261125-v1/private/epoch-186-bounded.jet";
 const PREFIX_SNAPSHOT: &str = "2b128e27dce19d7df54cbcdba52e9fc6e6897fcdce288d05369c41e9382b5112";
 const RESTART: u64 = 80_783_539;
 const LAST: u64 = 80_783_999;
@@ -60,6 +61,11 @@ const SELECTED_SLOTS: u64 = LAST - RESTART;
 const CHECKPOINT_HASH: &str = "EWu2G86akFM3CKJ8D4YZzi8ASZeaPKm2WXLG239Zjnj9";
 const TERMINAL_HASH: &str = "GWUc3stuKEJrz77BfMxZ1Ma9wYwwqH2AF8e9Amo98vwC";
 const RESTART_SNAPSHOT: &str = "ae0762718ea638c1a9a94c6bec4bef0d341fe7272346a80cb3c72e8016589cf3";
+const TAIL_ARCHIVE: &str = "/home/sol/.jetstreamer-private/epoch186-verification-tail-20261126-v1/private/epoch-186-verification-tail.jet";
+const TAIL_SOURCE_ENTRY: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch186-verification-tail-source-entry-20261126-v1/TAIL_SOURCE_ENTRY.json";
+const TAIL_SOURCE_ENTRY_SHA256: &str =
+    "99b57cbf03c5156db0c28d1f72a9f4e5c7407956744ed841618664efc774e295";
+const TAIL_SNAPSHOT_TARGET: &str = "/run/horizon-epoch186-verification-tail/snapshot-80783539-EWu2G86akFM3CKJ8D4YZzi8ASZeaPKm2WXLG239Zjnj9.tar.zst";
 const WORKER: &str = "9339aa0ee5c39e91ec446bfa561c0e81280a0ddc474a03cf5bb0ce07a3674893";
 const REVISION: &str = "5c2dab8055e8162386fcac313b6547f223fd386c";
 
@@ -76,6 +82,16 @@ struct ReplayInput {
     archive: PathBuf,
     manifest: ReceiptRef,
     terminal_receipt: ReceiptRef,
+}
+
+impl ReplayInput {
+    fn require_producer_output(&self, archive: &Path) -> Result<()> {
+        ensure!(
+            self.archive == archive && self.manifest.path == segment_manifest_path(archive)?,
+            "assembly input is outside the producer's prepared output route"
+        );
+        Ok(())
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -132,18 +148,66 @@ impl ReplayCompletion {
     }
 }
 
+#[derive(Deserialize)]
+struct PreparedTailSource {
+    schema: String,
+    bootstrap: TailSnapshot,
+    argv: Vec<String>,
+    read_only_inputs: Vec<InputProjection>,
+}
+
+#[derive(Deserialize)]
+struct TailSnapshot {
+    path: PathBuf,
+    slot: u64,
+    generation: u64,
+    bytes: u64,
+    sha256: String,
+}
+
+#[derive(Deserialize)]
+struct InputProjection {
+    source: PathBuf,
+    target: PathBuf,
+}
+
+impl PreparedTailSource {
+    fn verify(&self) -> Result<()> {
+        let snapshot = &self.bootstrap;
+        let projection = self
+            .read_only_inputs
+            .iter()
+            .filter(|input| input.target == Path::new(TAIL_SNAPSHOT_TARGET));
+        ensure!(
+            self.schema == "horizon-epoch186-verification-tail-source-entry-v1"
+                && snapshot.slot == RESTART
+                && snapshot.generation == 1_634_788_585_189_220
+                && snapshot.bytes == 6_838_562_806
+                && snapshot.sha256 == RESTART_SNAPSHOT
+                && projection
+                    .map(|input| input.source.as_path())
+                    .eq([snapshot.path.as_path()])
+                && self
+                    .argv
+                    .iter()
+                    .any(|arg| arg == &format!("--snapshot-archive={TAIL_SNAPSHOT_TARGET}"))
+                && self
+                    .argv
+                    .iter()
+                    .any(|arg| arg == &format!("--horizon-output={TAIL_ARCHIVE}")),
+            "restart snapshot custody differs from the prepared producer projection"
+        );
+        Ok(())
+    }
+}
+
 fn verify_restart_custody(custody: &ReceiptRef) -> Result<()> {
-    let source: serde_json::Value = serde_json::from_slice(&authenticate(custody, true)?)?;
-    let bootstrap = &source["bootstrap"];
     ensure!(
-        source["schema"] == "horizon-epoch186-verification-tail-source-entry-v1"
-            && bootstrap["slot"] == RESTART
-            && bootstrap["generation"] == 1_634_788_585_189_220u64
-            && bootstrap["bytes"] == 6_838_562_806u64
-            && bootstrap["sha256"] == RESTART_SNAPSHOT,
-        "restart snapshot custody differs from the trusted generation"
+        custody.path == Path::new(TAIL_SOURCE_ENTRY) && custody.sha256 == TAIL_SOURCE_ENTRY_SHA256,
+        "assembly plan must bind the sealed tail source entry"
     );
-    Ok(())
+    let source: PreparedTailSource = serde_json::from_slice(&authenticate(custody, true)?)?;
+    source.verify()
 }
 
 fn digest(value: &str) -> Result<[u8; 32]> {
@@ -633,6 +697,9 @@ fn run(plan_ref: ReceiptRef) -> Result<()> {
         "unexpected plan schema or empty allocation"
     );
     verify_restart_custody(&plan.restart_snapshot_custody)?;
+    plan.prefix
+        .require_producer_output(Path::new(PREFIX_ARCHIVE))?;
+    plan.tail.require_producer_output(Path::new(TAIL_ARCHIVE))?;
     let root = &plan.output_directory;
     let directory = OpenOptions::new()
         .read(true)
@@ -831,6 +898,56 @@ mod tests {
         archive::{ArchiveProvenanceV1, ArchiveProvenanceV2, ArchiveWriter, Compression},
         block_metas::BlockMeta,
     };
+
+    #[test]
+    fn custody_and_archive_paths_match_the_prepared_producer() -> Result<()> {
+        let mut custody: PreparedTailSource = serde_json::from_value(json!({
+            "schema": "horizon-epoch186-verification-tail-source-entry-v1",
+            "bootstrap": {
+                "path": "/private/pinned-bootstrap.tar.zst",
+                "slot": RESTART,
+                "generation": 1_634_788_585_189_220u64,
+                "bytes": 6_838_562_806u64,
+                "sha256": RESTART_SNAPSHOT,
+            },
+            "argv": [
+                format!("--snapshot-archive={TAIL_SNAPSHOT_TARGET}"),
+                format!("--horizon-output={TAIL_ARCHIVE}"),
+            ],
+            "read_only_inputs": [{
+                "source": "/private/pinned-bootstrap.tar.zst",
+                "target": TAIL_SNAPSHOT_TARGET,
+            }],
+        }))?;
+        custody.verify()?;
+        custody.read_only_inputs[0].source = "/private/different-bootstrap.tar.zst".into();
+        assert!(custody.verify().is_err());
+
+        let mut input = ReplayInput {
+            archive: TAIL_ARCHIVE.into(),
+            manifest: ReceiptRef {
+                path: segment_manifest_path(TAIL_ARCHIVE)?,
+                sha256: "01".repeat(32),
+            },
+            terminal_receipt: ReceiptRef {
+                path: "/private/terminal.json".into(),
+                sha256: "02".repeat(32),
+            },
+        };
+        input.require_producer_output(Path::new(TAIL_ARCHIVE))?;
+        assert!(
+            input
+                .require_producer_output(Path::new(PREFIX_ARCHIVE))
+                .is_err()
+        );
+        input.manifest.path = "/private/different-manifest.json".into();
+        assert!(
+            input
+                .require_producer_output(Path::new(TAIL_ARCHIVE))
+                .is_err()
+        );
+        Ok(())
+    }
 
     fn hash(value: u8) -> Hash {
         Hash::new_from_array([value; 32])
