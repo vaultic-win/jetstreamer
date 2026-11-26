@@ -35,22 +35,29 @@ def selected_tool(seal):
 
 def terminal(unit, invocation):
     manager = subprocess.check_output([
-        '/usr/bin/systemctl', 'show', unit, '-p', 'ActiveState,InvocationID,MainPID,ControlPID,Job',
+        '/usr/bin/systemctl', 'show', unit, '-p',
+        'ActiveState,SubState,InvocationID,MainPID,ControlPID,Job,ControlGroup,Restart,NRestarts,'
+        'RemainAfterExit,Result,ExecMainCode,ExecMainStatus,ExecMainStartTimestampMonotonic,'
+        'ExecMainExitTimestampMonotonic',
     ], text=True, timeout=10)
     state = dict(line.split('=', 1) for line in manager.splitlines())
-    if state['ActiveState'] != 'inactive':
+    if (state['ActiveState'], state['SubState']) != ('active', 'exited'):
         return None
-    need(state['InvocationID'] in ('', invocation) and not state['Job']
-         and state['MainPID'] == state['ControlPID'] == '0', 'publisher still has an owner')
-    result = subprocess.check_output([
-        '/usr/bin/journalctl', '-b', '--no-pager', '-o', 'json', '_PID=1', '_UID=0',
-        f'UNIT={unit}', f'INVOCATION_ID={invocation}',
-        'MESSAGE_ID=7ad2d189f7e94e70a38c781354912448',
-    ], text=True, timeout=10)
-    event, = map(json.loads, result.splitlines())
-    need(event['UNIT'] == unit and event['INVOCATION_ID'] == invocation,
-         'publisher terminal journal names another invocation')
-    return dict(unit=unit, invocation_id=invocation, journal_cursor=event['__CURSOR'])
+    start = int(state['ExecMainStartTimestampMonotonic'])
+    finish = int(state['ExecMainExitTimestampMonotonic'])
+    expected_group = f'/system.slice/{unit}'
+    need(state['InvocationID'] == invocation and not state['Job']
+         and state['RemainAfterExit'] == 'yes' and state['Restart'] == 'no'
+         and state['MainPID'] == state['ControlPID'] == state['NRestarts'] == state['ExecMainStatus'] == '0'
+         and state['Result'] == 'success' and state['ExecMainCode'] == '1' and 0 < start < finish
+         and state['ControlGroup'] in ('', expected_group), 'publisher did not cleanly drain its exact invocation')
+    processes = Path('/sys/fs/cgroup' + expected_group) / 'cgroup.procs'
+    try:
+        remaining = processes.read_text().split()
+    except FileNotFoundError:
+        remaining = []
+    need(not remaining, 'publisher cgroup still contains processes')
+    return dict(unit=unit, invocation_id=invocation, terminal=state)
 
 
 def raw_receipt(path, payload):

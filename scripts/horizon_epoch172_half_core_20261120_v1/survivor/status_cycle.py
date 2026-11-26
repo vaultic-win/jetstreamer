@@ -24,7 +24,7 @@ ENTRY146_FIELD = 'epoch146_bounded_entry_lease'
 CURRENT = Path(__file__).resolve()
 PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
-RETRY5_CADENCE_VERSIONS = (12, 13, 14, 15, 16)
+RETRY5_CADENCE_VERSIONS = (12, 13, 14, 15, 16, 17)
 PUBLICATION_INVOCATIONS = {
     145: ('horizon-retained-publish-145-20261126-v1.service', '166133c4366c47cdad3caf1748404541'),
     199: ('horizon-retained-publish-199-20261126-v1.service', 'd12158c94a7a4e53af92671cb4a2a8b9'),
@@ -37,11 +37,11 @@ def failed166_package(version):
     return name + '-entry146' if version >= 4 else name
 
 
-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16)
+FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17)
                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
 FAILED166 = bool(FAILED166_VERSION)
 RETRY5_168 = FAILED166_VERSION in RETRY5_CADENCE_VERSIONS
-METERED_FULL170 = FAILED166_VERSION in (6, 7, 13, 14, 15, 16)
+METERED_FULL170 = FAILED166_VERSION in (6, 7, 13, 14, 15, 16, 17)
 HOLDING185 = FAILED166_VERSION == 7
 HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
 FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
@@ -63,7 +63,7 @@ sys.path.insert(0,str(CURRENT.parent))
 import cold167_status
 import cold166_status
 
-if FAILED166_VERSION == 16:
+if FAILED166_VERSION >= 16:
     import ready_delivery
 
 if HOURLY170:
@@ -569,7 +569,7 @@ def staged_delivery_inventory(c, store):
     extra = archives.keys() - pinned
     completed = set(map(int, getattr(c, 'completed_deliveries', {})))
     need(extra <= PUBLICATION_INVOCATIONS.keys()
-         and (FAILED166_VERSION == 16 or extra.isdisjoint(ready)),
+         and (FAILED166_VERSION >= 16 or extra.isdisjoint(ready)),
          'unexpected canonical publication requires authenticated reconciliation')
     need(completed <= ready and completed.isdisjoint(statuses),
          'accepted delivery lost readiness or has a new status claim')
@@ -605,7 +605,7 @@ def staged_delivery_inventory(c, store):
         del archives[epoch]
     # The inherited inventory validator checks the frozen census. The additional
     # archive identities and status removals are authenticated above.
-    if FAILED166_VERSION == 16:
+    if FAILED166_VERSION >= 16:
         statuses = statuses | completed
         ready = ready - extra
     inventory = SimpleNamespace(inventory=lambda: (statuses, ready, archives))
@@ -618,7 +618,7 @@ def publish_all(c,bridge,store,vs):
     previous_completions = set(map(int, c.fleet.get('retained_publication_completions', {})))
     need(set(map(int, refs)) == (set(status.EPOCHS) | {140}) - previous_completions,
          'different status population')
-    if FAILED166_VERSION == 16:
+    if FAILED166_VERSION >= 16:
         c.completed_deliveries = ready_delivery.reconcile(
             c, store, store.inventory(), refs, PUBLICATION_INVOCATIONS,
             ready_delivery.selected_tool(checked(entry())), external_event)
@@ -774,7 +774,7 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
         fleet['cycle_reconciliation_scope']=f'Guarded epochs {active}. Four original HOME closures and {len(a["receipts"])} authenticated status keys.'
         fleet['current_replay_lane_recovery']=f'Maintain epochs {active} and reprice {pending}.'
         fleet['next_lane_recovery']=fleet['current_replay_lane_recovery']
-    if FAILED166_VERSION == 16 and c.completed_deliveries:
+    if FAILED166_VERSION >= 16 and c.completed_deliveries:
         inventory = copy.deepcopy(checked(c.prior['inventory'], root=False))
         for row in inventory['entries']:
             epoch = row['epoch']
@@ -935,7 +935,7 @@ def entry():
         need(Path(hourly170_cadence.__file__) == CURRENT.with_name(member['name'])
              and bound(CURRENT.with_name(member['name']))['sha256']==member['sha256'],
              'unsealed epoch 170 private cadence observer')
-    if FAILED166_VERSION == 16:
+    if FAILED166_VERSION >= 16:
         path = CURRENT.with_name('ready_delivery.py')
         member, = (row for row in seal['members'] if row['name'] == path.name)
         need(Path(ready_delivery.__file__) == path and member['mode'] == '0444'
@@ -1238,7 +1238,7 @@ def rejoin_failed166_cadence(state, receipt, fd):
                  and ready['retry5_scan_stop'] == previous_ready['retry5_scan_stop']
                  == cold_workers.cold168_commit.retry5_scan_stop(fleet, cfg, route),
                  'different prior writer, metered receiver or retry5 stop')
-        if FAILED166_VERSION == 16:
+        if FAILED166_VERSION >= 16:
             previous_ready = checked(incumbent['ready'])
             need(ready['full170_receiver'] == bound(CURRENT.with_name('full170_status.py'))
                  and ready['retry5_scan_stop'] == previous_ready['retry5_scan_stop']

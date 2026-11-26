@@ -14,7 +14,8 @@ if Path(__file__).resolve().parent.name in ('tools-cold168-retry4-failed166-v7-e
                                            'tools-cold168-retry5-failed166-v13-entry146',
                                            'tools-cold168-retry5-failed166-v14-entry146',
                                            'tools-cold168-retry5-failed166-v15-entry146',
-                                           'tools-cold168-retry5-failed166-v16-entry146'):
+                                           'tools-cold168-retry5-failed166-v16-entry146',
+                                           'tools-cold168-retry5-failed166-v17-entry146'):
     PACKAGE = Path(__file__).resolve().parent.name
 ROOT = BASE / 'epoch170-full-metered-rebook-20261124-v1'
 QUAL = BASE / 'epoch170-full-metered-guard-20261124-v1/GUARD_QUALIFIED.json'
