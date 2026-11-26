@@ -99,6 +99,14 @@ name when it exercises the same guard behavior. If the guard requires the
 production prefix, run that case under an isolated systemd manager or after
 the verifier finishes.
 
+Epoch 145's Anza guard also lists `jetstreamer-node` processes across the host
+before matching them to admitted owners. The epoch 147 worker-copy preflight
+triggered this check while its parent node was still validating inputs. The
+same census applies to worker-copy preflights in every slice. Before invoking a
+native node alongside this verifier, confirm that the active capacity provider
+accepts that exact probe and its reservation. Use manifest and input-custody
+checks while waiting for the verifier to exit.
+
 On a busy host, a global systemd reload can block read-only manager queries long enough
 to terminate a guarded verifier. On dev-samjohnson, an eight-second `systemctl show`
 timed out during watcher installation and epoch 145 lost its in-memory verification progress.
