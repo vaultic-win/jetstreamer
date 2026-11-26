@@ -214,6 +214,9 @@ pub struct SnapshotHardForkMetadata {
     pub slot: Slot,
     pub bank_hash: Hash,
     pub parent_slot: Slot,
+    pub capitalization: u64,
+    pub transaction_count: u64,
+    pub tick_height: u64,
     pub hard_forks: Vec<(Slot, usize)>,
 }
 
@@ -226,6 +229,9 @@ pub fn snapshot_hard_fork_metadata<R: Read>(
         slot: fields.slot,
         bank_hash: fields.hash,
         parent_slot: fields.parent_slot,
+        capitalization: fields.capitalization,
+        transaction_count: fields.transaction_count,
+        tick_height: fields.tick_height,
         hard_forks: fields.hard_forks.iter().copied().collect(),
     })
 }

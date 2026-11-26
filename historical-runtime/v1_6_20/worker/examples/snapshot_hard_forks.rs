@@ -83,13 +83,16 @@ fn run() -> Result<(), String> {
         .open(path)
         .map_err(|e| e.to_string())?;
     let before = f.metadata().map_err(|e| e.to_string())?;
+    let staged_epoch230_bootstrap = before.uid() == 1000
+        && before.mode() & 0o777 == 0o600
+        && before.len() == 10_243_100_016
+        && a[2] == "4b0b16de74ba067d18eeec76326390c767d5fa0389083e5e837c27d5c37befeb";
     if !before.is_file()
-        || before.uid() != 0
         || before.nlink() != 1
-        || before.mode() & 0o222 != 0
+        || !(staged_epoch230_bootstrap || (before.uid() == 0 && before.mode() & 0o222 == 0))
         || before.len() > 20 * 1024 * 1024 * 1024
     {
-        return Err("unsafe immutable snapshot".into());
+        return Err("unsafe snapshot evidence".into());
     }
     if hash(&mut f)? != a[2] {
         return Err("snapshot SHA256 mismatch".into());
@@ -104,8 +107,15 @@ fn run() -> Result<(), String> {
         return Err("wrong snapshot filename".into());
     }
     let slot: u64 = parts[1].parse().map_err(|_| "invalid snapshot slot")?;
-    let decoder = zstd::stream::read::Decoder::new(BufReader::new(f)).map_err(|e| e.to_string())?;
+    let decoder =
+        zstd::stream::read::Decoder::new(BufReader::new(&mut f)).map_err(|e| e.to_string())?;
     let metadata = snapshot::snapshot_hard_forks(decoder, slot)?;
+    if staged_epoch230_bootstrap {
+        f.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+        if hash(&mut f)? != a[2] {
+            return Err("staged snapshot SHA256 changed during metadata read".into());
+        }
+    }
     if identity(&before) != identity(&fs::symlink_metadata(path).map_err(|e| e.to_string())?) {
         return Err("snapshot changed during metadata read".into());
     }
@@ -120,7 +130,26 @@ fn run() -> Result<(), String> {
     {
         return Err("output parent must be root-private".into());
     }
-    let value = serde_json::json!({"schema":"jetstreamer-private-v1620-snapshot-hard-fork-metadata-v1","snapshot":a[1],"snapshot_sha256":a[2],"snapshot_bytes":before.len(),"slot":metadata.slot,"bank_hash":metadata.bank_hash.to_string(),"parent_slot":metadata.parent_slot,"hard_forks":metadata.hard_forks,"self_sha256":a[5],"accounts_restored":false,"bank_frozen":false,"snapshot_verified":false,"replay_authorized":false,"publication_authorized":false,"remote_mutations":false});
+    let value = serde_json::json!({
+        "schema": "jetstreamer-private-v1620-snapshot-hard-fork-metadata-v1",
+        "snapshot": a[1],
+        "snapshot_sha256": a[2],
+        "snapshot_bytes": before.len(),
+        "slot": metadata.slot,
+        "bank_hash": metadata.bank_hash.to_string(),
+        "parent_slot": metadata.parent_slot,
+        "capitalization": metadata.capitalization,
+        "transaction_count": metadata.transaction_count,
+        "tick_height": metadata.tick_height,
+        "hard_forks": metadata.hard_forks,
+        "self_sha256": a[5],
+        "accounts_restored": false,
+        "bank_frozen": false,
+        "snapshot_verified": false,
+        "replay_authorized": false,
+        "publication_authorized": false,
+        "remote_mutations": false,
+    });
     let mut out = OpenOptions::new()
         .write(true)
         .create_new(true)
