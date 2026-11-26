@@ -1,5 +1,6 @@
 //! Collect the local archive committed by an admitted Foundation singleton cohort.
 //! The uploader still performs its own exact archive, reader, and R2 checks.
+mod handoff252;
 
 use anyhow::{Context, Result, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -426,16 +427,21 @@ fn collect(cohort: &Cohort) -> Result<Value> {
 
 fn main() -> Result<()> {
     let mut args = std::env::args_os().skip(1);
-    let cohort = match args.next().as_deref() {
+    let mode = args.next();
+    ensure!(
+        args.next().is_none(),
+        "usage: horizon-epoch257-commit-source [--epoch252 | --epoch261 | --reconcile-epoch252]"
+    );
+    if mode.as_deref() == Some(std::ffi::OsStr::new("--reconcile-epoch252")) {
+        println!("{}", serde_json::to_string_pretty(&handoff252::run()?)?);
+        return Ok(());
+    }
+    let cohort = match mode.as_deref() {
         None => &EPOCH_257,
         Some(flag) if flag == "--epoch252" => &EPOCH_252,
         Some(flag) if flag == "--epoch261" => &EPOCH_261,
         _ => anyhow::bail!("usage: horizon-epoch257-commit-source [--epoch252 | --epoch261]"),
     };
-    ensure!(
-        args.next().is_none(),
-        "usage: horizon-epoch257-commit-source [--epoch252 | --epoch261]"
-    );
     let report = collect(cohort)?;
     println!("{}", serde_json::to_string_pretty(&report)?);
     Ok(())
@@ -468,7 +474,11 @@ mod tests {
 
     #[test]
     fn published_checkpoint_must_match_embedded_transaction_context() {
-        for (cohort, other) in [(&EPOCH_257, &EPOCH_261), (&EPOCH_261, &EPOCH_257)] {
+        for (cohort, other) in [
+            (&EPOCH_252, &EPOCH_257),
+            (&EPOCH_257, &EPOCH_261),
+            (&EPOCH_261, &EPOCH_257),
+        ] {
             let gate = json!({
                 "kind": "sealed-root-checkpoint-cohort", "version": 1,
                 "verified_manifest_checkpoints": [{"slot": cohort.checkpoint, "accounts_hash": base58_bytes(cohort.checkpoint_hash).unwrap()}],
