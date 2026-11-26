@@ -57,12 +57,15 @@ HOURLY170 = HOURLY170_CADENCE or HERE in (
     D / "tools-homefloor-170-metered-hourly-v3",
 )
 FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
-FULL170_STOPPED_RETRY5 = HERE == D / "tools-homefloor-170-full-metered-independent-v6"
+FULL170_DELIVERY_CADENCE = HERE == D / "tools-homefloor-170-full-metered-independent-v7"
+FULL170_STOPPED_RETRY5 = FULL170_DELIVERY_CADENCE or HERE == D / "tools-homefloor-170-full-metered-independent-v6"
 FULL170_INDEPENDENT = FULL170_STOPPED_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-independent-v1"
 FULL170_RETRY5 = FULL170_RETRY5_V10 or FULL170_INDEPENDENT or HERE == D / "tools-homefloor-170-full-metered-v6"
 FULL170_V13 = FULL170_RETRY5 or HERE == D / "tools-homefloor-170-full-metered-v5"
 FULL170_V9 = FULL170_V13 or HERE == D / "tools-homefloor-170-full-metered-v3"
 FULL170 = FULL170_V9 or HERE == D / "tools-homefloor-170-full-metered-v1"
+FULL170_OWNER_OPTIONS = dict(v9=FULL170_V9, v13=FULL170_V13, v14=FULL170_STOPPED_RETRY5,
+                             delivery_cadence=FULL170_DELIVERY_CADENCE)
 REPRO166_LIVE = HERE == D / "tools-homefloor-166-write-version-v5w-v1"
 REPRO166_POST_V5Z = HERE == D / "tools-homefloor-166-write-version-post145-v5z-v1"
 REPRO166_POST_V6 = HERE == D / "tools-homefloor-166-write-version-post145-v6-v1"
@@ -1352,6 +1355,10 @@ def registered_status():
                             version = 14 if FULL170_STOPPED_RETRY5 else 13
                             adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, version,
                                                                                 binary=fit.binary)
+                        if FULL170_DELIVERY_CADENCE:
+                            for version in (15, 16, 17):
+                                adopted = writer168v4["registered_failed166_rejoin"](scope, adopted, version,
+                                                                                    binary=fit.binary)
                         return publication168["registered_writer"](scope, adopted) if PUBLISH168 else adopted
                     if HOURLY170_CADENCE and (
                         R / "survivor172-cadence-20261122-v1/HOURLY170_CADENCE_ACTIVE.json"
@@ -1668,7 +1675,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
                    "held or active full epoch 170 requires authenticated drained V5w")
         hourly170_owner, full170_guard = full170_capacity["ownership"](s, fit, full170, hourly170,
                                                                        full170_mode, ref, status, f,
-                                                                       v9=FULL170_V9, v13=FULL170_V13, v14=FULL170_STOPPED_RETRY5)
+                                                                       **FULL170_OWNER_OPTIONS)
     if HOURLY170:
         s.need(epoch == 145 and prestart136 is None and hourly170_mode in ("prestart", "post-guard", "active")
                and failed170, "hourly 170 requires the positive retry 13 terminal")
@@ -2038,7 +2045,7 @@ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=Non
         native["active_full170_guard"] = full170_guard
     if FULL170:
         final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, f,
-                                              v9=FULL170_V9, v13=FULL170_V13, v14=FULL170_STOPPED_RETRY5)
+                                              **FULL170_OWNER_OPTIONS)
         full170_capacity["unchanged"](s, full170_mode, (hourly170_owner, full170_guard), final)
     if REPRO166:
         s.need(reproduction166_owner(repro166_mode, ref) == repro166, "epoch 166 gate or first guard changed during capture")
@@ -2180,7 +2187,7 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
         fleet, _ = fleet_head(ref)
         status = registered_status()
         actor, guard = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet,
-                                                     v9=FULL170_V9, v13=FULL170_V13, v14=FULL170_STOPPED_RETRY5)
+                                                     **FULL170_OWNER_OPTIONS)
     if STOPPED_GUARD_145 or STOPPED_V5P or STOPPED_V5O or STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or LATE_HANDOFF_145:
         s.need(epoch == 145 and (prestart136 is None or POST_136), "unexpected missed-census pricing scope")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
@@ -2243,7 +2250,7 @@ def capture(epoch, ref, prestart136=None, hourly170_mode=None, full170_mode=None
             s.need(registered_status() == status and fleet_head(ref)[0] == fleet,
                    "full epoch 170 fleet ownership changed after donor proof")
             final = full170_capacity["ownership"](s, fit, full170, hourly170, full170_mode, ref, status, fleet,
-                                                  v9=FULL170_V9, v13=FULL170_V13, v14=FULL170_STOPPED_RETRY5)
+                                                  **FULL170_OWNER_OPTIONS)
             full170_capacity["unchanged"](s, full170_mode, (actor, guard), final)
             if FULL170_RETRY5:
                 stopped_retry5 = fleet["cold168_retry5_physical_scan_stop"] if FULL170_STOPPED_RETRY5 else None

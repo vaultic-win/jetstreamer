@@ -429,10 +429,11 @@ def require_v13(s, status, *, version=13):
     return ready
 
 
-def ownership(s, fit, route, hourly, mode, ref, status, fleet, *, v9=False, v13=False, v14=False):
+def ownership(s, fit, route, hourly, mode, ref, status, fleet, *, v9=False, v13=False, v14=False,
+              delivery_cadence=False):
     if v13:
         s.need(v9, 'metered receiver requires the drained pricing route')
-        ready = require_v13(s, status, version=14 if v14 else 13)
+        ready = require_v13(s, status, version=17 if delivery_cadence else (14 if v14 else 13))
         if v14:
             s.need(fleet['cold168_retry5_physical_scan_stop'] == ready['retry5_scan_stop'],
                    'fleet lost the retry5 filesystem scan stop')

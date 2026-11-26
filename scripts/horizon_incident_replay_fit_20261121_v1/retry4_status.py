@@ -24,6 +24,12 @@ V12_SEAL_SHA = '6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac
 V13_PACKAGE = STATUS/'tools-cold168-retry5-failed166-v13-entry146'
 V14_PACKAGE = STATUS/'tools-cold168-retry5-failed166-v14-entry146'
 V14_SEAL_SHA = '1b9f179d7ad7802c637f2203f0d1151b0a244b328fabc872936dcb11c54ec2fd'
+DELIVERY_CADENCE_SEALS = {
+    14: V14_SEAL_SHA,
+    15: 'b4f7072b52c448840ee618e0eb700e211d9da14c0431349675014988b5f949c9',
+    16: 'dae8fdc3bcf7ffc741a0b4f27dc28eb9d6bfb3ff70ea8437b0855da04a15e848',
+    17: '649f2ae75ead8c7af83eeb46ce8a46db6b6c0e37d257b73b93212c0196c68c5f',
+}
 V14_MEMBERS = {
     'cold168_commit.py': '286345f06a211903a547733e53649fde4def75773590e6f9d84f8a394d2a22e6',
     'cold170_status.py': 'e122f2b3e11ca30c6b68e8792416ff22e3f5c995498d3671fb678dc3076b73af',
@@ -244,9 +250,10 @@ def check_v13_receiver(s, binary, old_package, old_seal, previous, ready, packag
 
 def registered_failed166_rejoin(s, prior, version=2, *, binary=None):
     old_package, old_seal, old_iid, old = prior
-    s.need(version in (2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14), 'unknown epoch 166 cadence rejoin')
+    s.need(version in (2, 3, 4, 5, 6, 7, 8, 11, 12, 13, *DELIVERY_CADENCE_SEALS),
+           'unknown epoch 166 cadence rejoin')
     def package_for(generation):
-        attempt = 5 if generation in (12, 13, 14) else 4
+        attempt = 5 if generation >= 12 else 4
         name = f'tools-cold168-retry{attempt}-failed166-v{generation}'
         return STATUS / (name + '-entry146' if generation >= 4 else name)
 
@@ -307,7 +314,20 @@ def registered_failed166_rejoin(s, prior, version=2, *, binary=None):
                'different retry5 cadence pair')
     if version in (13, 14):
         check_v13_receiver(s, binary, old_package, old_seal, previous, ready, package, seal)
-    if version in (12, 13, 14):
+    if version > 14:
+        prior_ready = s.bound(previous['ready'], STATUS / f'FAILED166_CADENCE_V{predecessor}_READY.json')
+        receiver = package / 'full170_status.py'
+        member, = (m for m in seal['members'] if m['name'] == receiver.name and m['mode'] == '0444')
+        s.need(binary is not None and old_seal['sha256'] == DELIVERY_CADENCE_SEALS[predecessor]
+               and ready['package']['sha256'] == DELIVERY_CADENCE_SEALS[version]
+               and ready['full170_receiver'] == s.ref(receiver, member['sha256'])
+               and ready['retry5_generation']['sha256'] == prior_ready['retry5_generation']['sha256']
+               and ready['retained_retry4_stop'] == prior_ready['retained_retry4_stop']
+               and ready['retry5_scan_stop'] == prior_ready['retry5_scan_stop']
+               == fleet['cold168_retry5_physical_scan_stop'],
+               'different delivery cadence receiver or retained replay authority')
+        binary(receiver, member['sha256'])
+    if version >= 12:
         binding = package / 'retry5-168-generation.json'
         member, = [m for m in seal['members'] if m['name'] == binding.name and m['mode'] == '0444']
         s.need(ready['retry5_generation'] == s.ref(binding, member['sha256']),
