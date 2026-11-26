@@ -12,6 +12,13 @@ pub(crate) const EARLY_SINGLETON_SHA: &str =
     "e2f0469eee9498186094183b367c17b3e5c04571e6220191745eb19fe81f1a91";
 pub(crate) const EARLY_SINGLETON_SCHEMA: &str =
     "horizon-completed-singleton-130-134-car-index-review-v1";
+pub(crate) const EPOCH149_REVIEW: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch149-closed-index-retirement-20261126-v1/REVIEW.json";
+pub(crate) const EPOCH149_SHA: &str =
+    "72077441003ba8edacdaff0f081911c25af1e0102373b43bdb2d62ba5c89007b";
+pub(crate) const EPOCH149_SCHEMA: &str = "horizon-completed-lane-b-149-car-index-review-v1";
+const EPOCH149_CACHE: &str =
+    "/home/sol/.jetstreamer-private/epochs148-149-20260923-v1/lane-b/output/compact-indexes";
+const EPOCH149_CID: &str = "bafyreih5mftinnahth3zenvhn725doa7mkdhiiq6igclxx4d6voyxj3mae";
 const CACHE: &str =
     "/home/sol/.jetstreamer-private/epochs-191-194-v4-20261009-v1/lane-a/output/compact-indexes";
 const CIDS: [(u64, &str); 4] = [
@@ -47,6 +54,13 @@ pub(crate) fn is_index(t: &Target) -> bool {
                 .iter()
                 .any(|suffix| index_path(Path::new(CACHE), epoch, cid, suffix) == t.path)
     })
+}
+
+pub(crate) fn is_epoch149_index(t: &Target) -> bool {
+    t.epoch == 149
+        && SUFFIXES.iter().any(|suffix| {
+            t.path == index_path(Path::new(EPOCH149_CACHE), 149, EPOCH149_CID, suffix)
+        })
 }
 
 fn singleton_cache(owner: u64) -> PathBuf {
@@ -150,6 +164,23 @@ pub(crate) fn lock_singleton_controllers() -> Result<[File; 2]> {
     ])
 }
 
+pub(crate) fn lock_epoch149_controllers() -> Result<[File; 3]> {
+    Ok([
+        controller_lock(
+            "/var/lib/jetstreamer-root-sweep-epochs148-149-20260923-v81/controller.lock",
+            3276956,
+        )?,
+        controller_lock(
+            "/var/lib/jetstreamer-root-sweep-epoch149-20260923-v90/controller.lock",
+            3276980,
+        )?,
+        controller_lock(
+            "/var/lib/jetstreamer-root-sweep-epoch149-20261004-v92-r2/controller.lock",
+            3802712,
+        )?,
+    ])
+}
+
 pub(crate) fn lock_early_singleton_controllers() -> Result<Vec<File>> {
     [
         ("/var/lib/jetstreamer-root-sweep-epoch130-v1417-production-20260930-v4/controller.lock", 3801199),
@@ -238,7 +269,7 @@ fn check_marker(unit: &str, condition: &Value, loaded: bool) -> Result<()> {
 pub(super) fn check_owners(review: &Value) -> Result<()> {
     let screens: &[&str] = if matches!(
         review["schema"].as_str(),
-        Some(SINGLETON_SCHEMA | EARLY_SINGLETON_SCHEMA)
+        Some(SINGLETON_SCHEMA | EARLY_SINGLETON_SCHEMA | EPOCH149_SCHEMA)
     ) {
         for key in ["controller_evidence", "consumer_programs"] {
             for entry in review[key]
@@ -412,6 +443,26 @@ mod tests {
         assert!(!is_singleton_index(&target(
             196,
             Path::new(files[0].1).with_file_name("epoch-196.jet")
+        )));
+    }
+
+    #[test]
+    fn epoch149_requires_both_indexes_from_the_original_lane() {
+        let cache = Path::new(EPOCH149_CACHE);
+        let mut targets =
+            SUFFIXES.map(|suffix| target(149, index_path(cache, 149, EPOCH149_CID, suffix)));
+        assert!(complete_selection(&targets, 2, is_epoch149_index));
+        assert!(!complete_selection(&targets[..1], 2, is_epoch149_index));
+        targets[0].path = targets[1].path.clone();
+        assert!(!complete_selection(&targets, 2, is_epoch149_index));
+        let other_lane = cache
+            .ancestors()
+            .nth(3)
+            .unwrap()
+            .join("lane-a/output/compact-indexes");
+        assert!(!is_epoch149_index(&target(
+            149,
+            index_path(&other_lane, 149, EPOCH149_CID, SUFFIXES[0])
         )));
     }
 
