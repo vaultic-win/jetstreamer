@@ -491,6 +491,9 @@ fn cadence_registration(active: &Value) -> Result<Value> {
     );
     let ready = bound(&registered["ready"], 0)?;
     let package = bound(&ready["package"], 0)?;
+    if active_path == rt(admission::V13_REGISTRATION) {
+        admission::check_v13_cadence(&registered, &ready, &package)?;
+    }
     let mut incumbent = registered["new"].clone();
     let program = PathBuf::from(string(&incumbent, "program")?);
     ensure!(

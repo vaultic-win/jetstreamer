@@ -167,7 +167,7 @@ class Hourly170Tests(unittest.TestCase):
 
         fit = types.SimpleNamespace(units=lambda: {route.UNIT}, members=lambda _u: (pid,))
         status = types.SimpleNamespace(need=route.need, process=lambda _pid: (1, ticks, "0::" + route.CGROUP))
-        namespace = dict(fit=fit, s=status, Path=FakePath, HOURLY170=True)
+        namespace = dict(fit=fit, s=status, Path=FakePath, HOURLY170=True, FULL170=False)
         exec(compile(m, str(provider), "exec"), namespace)
         census = namespace["census"]
         args = ({}, {}, None, {"occupied": False}, 145, {})

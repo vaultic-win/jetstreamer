@@ -175,7 +175,8 @@ def stopped168_writer(status, *, v8):
             and all(status[key] == actor[key] for key in ("invocation_id", "pid", "start_ticks")))
 
 
-def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=None, full170=None, v8=False):
+def cover(before, native, after, build_bytes=0, build_ram=0, *,
+          exclusive136=None, full170=None, v8=False, registered_writer=None):
     need(before == after and before["invocation_id"] == IID and before["grant_sha256"] == GRANT and
          before["driver_exit"] == EXIT and 0 <= build_bytes <= 104 * MIB and 0 <= build_ram <= 768 * MIB,
          "transition during pricing or unqualified build bound")
@@ -202,6 +203,9 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
         running = {167, 168, 172}
         stopped168 = native.get("stopped_cold168")
         if stopped168:
+            writer = native["status_registration"]
+            valid_writer = (writer == registered_writer if registered_writer is not None else
+                            stopped168_writer(writer, v8=v8))
             book = native["bookings"]["168"]
             capacity_ref = fleet["current_home_cycle_capacity"]
             capacity, _ = bound(capacity_ref["path"], capacity_ref["sha256"])
@@ -213,7 +217,7 @@ def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=Non
                  and book["measurement"] == "two complete stopped-tree walks"
                  and book["unreconciled_stop_bytes"] ==
                  max(0, stopped168["measured_physical_bytes"] - max(book["cap_bytes"], book["physical_bytes"]))
-                 and stopped168_writer(native["status_registration"], v8=v8),
+                 and valid_writer,
                  "changed retained epoch 168 booking or cadence")
             running.remove(168)
         if failed166:

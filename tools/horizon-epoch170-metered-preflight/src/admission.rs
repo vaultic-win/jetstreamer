@@ -8,10 +8,21 @@ const V10_SEAL_SHA: &str = "dd7b7dea1f90c170e6942b329980964b238fc5e539194e66519a
 const V5W: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-v5v-custody-recovery-v1";
 const FULL170: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v1";
 const FULL170_V9: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v3";
+const FULL170_V13: &str = "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v5";
 const V9_IID: &str = "ebdfc34db47c4e7699ea5ccbada5d604";
 const V9_HANDOFF: &str = "epoch145-semantic-continuity-20261121-v1/v9-census-name-handoff";
 const V9_CHECKER: &str = "epoch145-semantic-continuity-20261121-v1/tools-v9-census-recovery";
 const V12_REGISTRATION: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json";
+const V12_ACTIVE_SHA: &str = "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54";
+pub(super) const V13_REGISTRATION: &str =
+    "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V13_ACTIVE.json";
+const V13_READY: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V13_READY.json";
+const V13_PACKAGE: &str =
+    "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v13-entry146";
+const V13_RECEIVER_SHA: &str = "4ec9ca4476a6e8ed21090e9dfeb58582916b00610f5145a9181a8cadc0dbb695";
+const V13_WRITER_SHA: &str = "3d2401bb1bfe9a65f68503c2feca30c0630ea876ad04fa01d1a6a5eda374e8ab";
+const RETRY5_SHA: &str = "906eabc8de4ead288fcae3b514daff4a18786fd9e7200ff8fbbac6a96e933716";
+const RETRY4_STOP_SHA: &str = "b0538a4dee05df924a8d04f8562866df701c03996498963552a932059826cdab";
 const V9_PHASE: &str = "v9-semantic-complete-drained";
 
 const HOST_MEMORY_WITH_RESERVE: u64 = 810_658_050_048;
@@ -70,30 +81,104 @@ fn validate_v9_phase(phase: &Value) -> Result<()> {
     check_v9_completion(phase, &bound(&phase["completion"], 0)?)
 }
 
-pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()> {
+fn validate_v13_actor(active: &Value, previous: &Value) -> Result<()> {
+    let old = &previous["new"];
+    let actor = &active["new"];
+    ensure!(
+        active["schema"] == "horizon-epoch166-cadence-rejoin-active-v1"
+            && active["old"] == *old
+            && actor["unit"] == old["unit"]
+            && actor["invocation_id"] != old["invocation_id"]
+            && number(actor, "start_ticks")? > number(old, "start_ticks")?
+            && ["path", "device", "inode"]
+                .iter()
+                .all(|key| actor["lock"][*key] == old["lock"][*key]),
+        "different V13 cadence actor or V12 predecessor"
+    );
+    Ok(())
+}
+
+pub(super) fn check_v13_cadence(active: &Value, ready: &Value, seal: &Value) -> Result<()> {
+    let package = rt(V13_PACKAGE);
+    let previous_ref = reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA);
+    let receiver = reference(&package.join("full170_status.py"), V13_RECEIVER_SHA);
+    ensure!(
+        active["ready"]["path"] == json!(rt(V13_READY))
+            && ready["schema"] == "horizon-epoch166-cadence-rejoin-ready-v1"
+            && ready["package"]["path"] == json!(package.join("deployment-seal-receipt.json"))
+            && seal["destination"] == json!(package)
+            && seal["remote_mutations"] == false
+            && ready["old_owner"] == previous_ref
+            && ready["full170_receiver"] == receiver
+            && ready["retry5_generation"]
+                == reference(&package.join("retry5-168-generation.json"), RETRY5_SHA)
+            && ready["retained_retry4_stop"]
+                == reference(
+                    &rt("epoch168-retry4-rebook-20261123-v1/guard-receipts/stop-completion.json"),
+                    RETRY4_STOP_SHA,
+                )
+            && active["new"]["program"] == json!(package.join("status_cycle.py")),
+        "different V13 cadence receiver or V12 predecessor"
+    );
+    let members = seal["members"].as_array().context("missing V13 members")?;
+    for (name, hash) in [
+        ("full170_status.py", V13_RECEIVER_SHA),
+        ("status_cycle.py", V13_WRITER_SHA),
+        ("retry5-168-generation.json", RETRY5_SHA),
+    ] {
+        let mut selected = members.iter().filter(|row| row["name"] == name);
+        let member = selected
+            .next()
+            .context("missing sealed V13 cadence member")?;
+        ensure!(
+            member["mode"] == "0444" && member["sha256"] == hash && selected.next().is_none(),
+            "different sealed V13 cadence member {name}"
+        );
+        image(&reference(&package.join(name), hash))?;
+    }
+    let fleet = bound(&ready["fleet"], 0)?;
+    ensure!(
+        ready["config"] == fleet["sole_next_observer"]
+            && ready["timer"] == fleet["sole_next_timer"],
+        "V13 changed the inherited observer clock"
+    );
+    validate_v13_actor(active, &bound(&previous_ref, 0)?)
+}
+
+fn v9_provider(price: &Value, enrollment: &Value) -> Result<Option<PathBuf>> {
     let phase = &price["phase145"];
     let capture = &price["epoch170_metered_full"]["native_capture_receipt"];
-    let package = rt(FULL170_V9);
+    let incumbent = &enrollment["incumbent_registration"];
+    let v13 = incumbent["path"] == json!(rt(V13_REGISTRATION));
+    let package = rt(if v13 { FULL170_V13 } else { FULL170_V9 });
     let receipt = package.join("deployment-seal-receipt.json");
     let program = package.join("post-stop-fit");
-    if enrollment["incumbent_registration"]["path"] != json!(rt(V12_REGISTRATION))
+    if !v13
+        && incumbent["path"] != json!(rt(V12_REGISTRATION))
         && phase["stage"] != V9_PHASE
-        && capture["program"]["path"] != json!(program)
+        && ![FULL170_V9, FULL170_V13]
+            .iter()
+            .any(|route| capture["program"]["path"] == json!(rt(route).join("post-stop-fit")))
     {
-        return Ok(());
+        return Ok(None);
     }
     ensure!(
-        enrollment["incumbent_registration"]
-            == reference(
-                &rt(V12_REGISTRATION),
-                "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54",
-            )
+        (v13 || *incumbent == reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA))
             && capture["program"]["path"] == json!(program)
             && capture["deployment"]["path"] == json!(receipt)
             && capture["source_epoch"] == 145
             && capture["recorded_unix_seconds"] == price["recorded_unix_seconds"],
-        "epoch 170 V9 quote requires the V12 incumbent and its successor provider"
+        "epoch 170 V9 quote requires the registered cadence and its matching provider"
     );
+    Ok(Some(package))
+}
+
+pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()> {
+    let Some(package) = v9_provider(price, enrollment)? else {
+        return Ok(());
+    };
+    let phase = &price["phase145"];
+    let capture = &price["epoch170_metered_full"]["native_capture_receipt"];
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     ensure!(
         now.checked_sub(number(price, "recorded_unix_seconds")?)
@@ -104,6 +189,7 @@ pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()>
     ensure!(
         seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
             && seal["destination"] == json!(package)
+            && (package != rt(FULL170_V13) || seal["remote_mutations"] == false)
             && seal["members"].as_array().is_some_and(|rows| rows
                 .iter()
                 .any(|row| row["name"] == "post-stop-fit"
@@ -112,6 +198,19 @@ pub(super) fn validate_v9_price(price: &Value, enrollment: &Value) -> Result<()>
         "epoch 170 V9 quote provider differs from its sealed member"
     );
     image(&capture["program"])?;
+    if package == rt(FULL170_V13) {
+        let registration = cadence_registration(&enrollment["incumbent_registration"])?;
+        let actor = &registration["incumbent"];
+        let quoted = &price["status_registration"];
+        ensure!(
+            *actor == enrollment["incumbent"]
+                && quoted["consumer_seal"] == registration["package"]
+                && ["invocation_id", "pid", "start_ticks"]
+                    .iter()
+                    .all(|key| quoted[*key] == actor[*key]),
+            "epoch 170 V9 quote belongs to a different V13 writer"
+        );
+    }
     validate_v9_phase(phase)
 }
 
@@ -370,6 +469,7 @@ pub(super) fn quote(
         "v5w" => rt(V5W),
         "full170" => rt(FULL170),
         "full170-v9" => rt(FULL170_V9),
+        "full170-v9-v13" => rt(FULL170_V13),
         _ => bail!("unknown epoch 170 capacity provider deployment"),
     };
     let sealed = reference(
@@ -401,7 +501,7 @@ pub(super) fn quote(
         "v10" => {
             command.arg("--hourly170=prestart");
         }
-        "full170" | "full170-v9" => {
+        "full170" | "full170-v9" | "full170-v9-v13" => {
             command.arg("--full170=prestart");
         }
         _ => {}
@@ -482,9 +582,51 @@ mod tests {
             validate_v9_price(&historic, &enrollment)
                 .unwrap_err()
                 .to_string()
-                .contains("requires the V12 incumbent and its successor provider")
+                .contains("requires the registered cadence and its matching provider")
         );
         assert!(validate_v9_price(&historic, &Value::Null).is_ok());
+    }
+
+    #[test]
+    fn v13_and_v12_quotes_require_their_matching_provider() {
+        let v12 =
+            json!({"incumbent_registration":reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA)});
+        let v13 = json!({"incumbent_registration":reference(&rt(V13_REGISTRATION), "fixture")});
+        for (package, exact, foreign) in [(FULL170_V9, &v12, &v13), (FULL170_V13, &v13, &v12)] {
+            let dir = rt(package);
+            let native = json!({"phase145":{"stage":V9_PHASE}, "recorded_unix_seconds":1,
+                "epoch170_metered_full":{"native_capture_receipt":{
+                    "program":{"path":dir.join("post-stop-fit")},
+                    "deployment":{"path":dir.join("deployment-seal-receipt.json")},
+                    "source_epoch":145,"recorded_unix_seconds":1}}});
+            assert_eq!(v9_provider(&native, exact).unwrap(), Some(dir));
+            assert!(v9_provider(&native, foreign).is_err());
+            assert!(v9_provider(&native, &Value::Null).is_err());
+        }
+    }
+
+    #[test]
+    fn v13_cadence_rejects_a_different_predecessor_or_lock_owner() {
+        let old = json!({"unit":OBSERVER_UNIT,"invocation_id":"old","start_ticks":1,
+            "lock":{"path":"/consumer","inode":1,"device":2,"fd":3}});
+        let previous = json!({"new":old});
+        let mut next = old.clone();
+        next["invocation_id"] = json!("new");
+        next["start_ticks"] = json!(2);
+        next["lock"]["fd"] = json!(6);
+        let handoff = json!({"schema":"horizon-epoch166-cadence-rejoin-active-v1",
+            "new":next,"old":old});
+        validate_v13_actor(&handoff, &previous).unwrap();
+        for (pointer, value) in [
+            ("/new/lock/inode", json!(3)),
+            ("/new/start_ticks", json!(1)),
+            ("/new/invocation_id", json!("old")),
+            ("/old/invocation_id", json!("foreign")),
+        ] {
+            let mut wrong = handoff.clone();
+            *wrong.pointer_mut(pointer).unwrap() = value;
+            assert!(validate_v13_actor(&wrong, &previous).is_err(), "{pointer}");
+        }
     }
 
     fn case() -> (Value, Value, Value, Value) {

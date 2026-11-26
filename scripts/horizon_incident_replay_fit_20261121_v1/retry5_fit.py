@@ -80,7 +80,7 @@ def retained(s, fit, fleet, cold168):
     return stop, source
 
 
-def donor_cover(s, donor, before, native, fleet):
+def donor_cover(s, donor, before, native, fleet, *, registered_writer=None):
     """Price the paid donor with the V12 roster while retaining all old claims."""
     after = donor['snapshot']()
     fits = (native['fits'] and native['schema'] == 'horizon-incident-replay-fit-v1' and
@@ -96,9 +96,12 @@ def donor_cover(s, donor, before, native, fleet):
     retry4 = native['stopped_cold168']
     fail166, fail170 = native['failed_cold166'], native['failed_cold170']
     old = native['bookings']['168']
+    writer = native['status_registration']
+    valid_writer = (writer == registered_writer if registered_writer is not None else
+                    writer['consumer_seal']['sha256'] ==
+                    '6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac')
     s.need(not loan['occupied'] and not loan['loan_micros'] and
-           native['status_registration']['consumer_seal']['sha256'] ==
-           '6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac' and
+           valid_writer and
            retry4['resource_credit_bytes'] == retry4['reservation_ending_bytes'] == 0 and
            old['cap_bytes'] == retry4['retained_cap_bytes'] == 288 * g and
            old['remaining_bytes'] == max(0, old['cap_bytes'] - old['physical_bytes']) and
@@ -108,7 +111,7 @@ def donor_cover(s, donor, before, native, fleet):
            fail166 == fleet['cold166_retry11_write_version_failure'] and
            fail170 == fleet['cold170_retry13_execution_failure'] and
            fail166['reservation_ending_bytes'] == fail170['reservation_ending_bytes'] == 0,
-           'changed stopped replay booking or V12 cadence')
+           'changed stopped replay booking or registered cadence')
     for epoch, cap in (('166', 288*g), ('170', 384*g)):
         booking = native['bookings'][epoch]
         s.need(booking['cap_bytes'] == booking['physical_bytes'] + booking['remaining_bytes'] == cap and

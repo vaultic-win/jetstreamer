@@ -121,7 +121,7 @@ def admission_basis(s, route):
     return intent, review, price
 
 
-def held(s, fit, route, ref, status):
+def held(s, fit, route, ref, status, *, v13=False):
     route['hold_image']()
     current = route['native'](ACTOR)
     s.need(current is not None, 'full epoch 170 is not held')
@@ -140,6 +140,10 @@ def held(s, fit, route, ref, status):
            and price['status_registration']['invocation_id'] == enroll['incumbent']['invocation_id']
            and status['invocation_id'] == enroll['incumbent']['invocation_id'],
            'full epoch 170 prestart and native capture use different fleet or cadence')
+    if v13:
+        s.need(price['status_registration'] == status
+               and all(status[key] == enroll['incumbent'][key] for key in ('pid', 'start_ticks')),
+               'full epoch 170 prestart belongs to a different V13 actor')
     exe = (proc / 'exe').stat()
     boot = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
     intent_ref = route['bound'](route['ROOT'] / 'START_INTENT.json')
@@ -411,8 +415,24 @@ def require_v12(s, status):
            'full epoch 170 V9 pricing requires the registered V12 receiver')
 
 
-def ownership(s, fit, route, hourly, mode, ref, status, fleet, *, v9=False):
-    if v9:
+def require_v13(s, status):
+    cadence = Path('/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1')
+    active, _ = s.read(cadence/'FAILED166_CADENCE_V13_ACTIVE.json')
+    ready = s.bound(active['ready'], cadence/'FAILED166_CADENCE_V13_READY.json')
+    actor = active['new']
+    package = cadence/'tools-cold168-retry5-failed166-v13-entry146'
+    s.need(ready['package'] == status['consumer_seal']
+           and ready['package']['path'] == str(package/'deployment-seal-receipt.json')
+           and actor['program'] == str(package/'status_cycle.py')
+           and all(status[key] == actor[key] for key in ('invocation_id', 'pid', 'start_ticks')),
+           'full epoch 170 pricing requires the registered V13 receiver and actor')
+
+
+def ownership(s, fit, route, hourly, mode, ref, status, fleet, *, v9=False, v13=False):
+    if v13:
+        s.need(v9, 'V13 requires the drained V9 pricing route')
+        require_v13(s, status)
+    elif v9:
         require_v12(s, status)
     if mode == 'prestart':
         prestart(s, fit, route, hourly)
@@ -421,7 +441,7 @@ def ownership(s, fit, route, hourly, mode, ref, status, fleet, *, v9=False):
         return active(s, fit, route, hourly, ref, status, fleet, v9=v9)
     if not v9:
         require_v6(s, status)
-    actor = held(s, fit, route, ref, status)
+    actor = held(s, fit, route, ref, status, v13=v13)
     if mode == 'held':
         idle(s, fit, hourly, route['TIMER'])
         idle(s, fit, hourly, route['TIMER'].removesuffix('.timer') + '.service')
