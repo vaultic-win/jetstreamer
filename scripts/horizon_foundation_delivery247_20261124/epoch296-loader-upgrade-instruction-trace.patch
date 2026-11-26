@@ -1,0 +1,53 @@
+--- a/historical-runtime/v1_8_11/worker/Cargo.toml
++++ b/historical-runtime/v1_8_11/worker/Cargo.toml
+@@ -7,6 +7,7 @@
+ build = "build.rs"
+
+ [features]
++epoch296-loader-upgrade-trace = []
+ epoch271-boundary-trace = ["solana-runtime/epoch271-boundary-trace"]
+ # Test-only escape hatch used to exercise sha2 0.9.9's portable backend on
+ # SHA-NI hosts. Production builds leave this disabled and runtime-dispatch.
+--- a/historical-runtime/v1_8_11/worker/src/runtime.rs
++++ b/historical-runtime/v1_8_11/worker/src/runtime.rs
+@@ -330,6 +330,20 @@
+                     wave_transactions,
+                     self.bank.demote_program_write_locks(),
+                 )?;
++                #[cfg(feature = "epoch296-loader-upgrade-trace")]
++                let trace_index = if request.slot == 127_955_673 && request.entry_index == 609 {
++                    wave_transactions.iter().position(|transaction| {
++                        transaction.signatures.first().map(|signature| signature.to_string()).as_deref()
++                            == Some("4kd1YU99ranANLfpQfhCkMWKacBAFKMTicfNe4qz1udeMLbUpFArXpMrCDRK46RXzQRNTns8u9RfZ9oKGVHxACvd")
++                    })
++                } else {
++                    None
++                };
++                #[cfg(feature = "epoch296-loader-upgrade-trace")]
++                let record_logs = trace_index.is_some();
++                #[cfg(not(feature = "epoch296-loader-upgrade-trace"))]
++                let record_logs = false;
++
+                 let batch = self.bank.prepare_batch(wave_transactions.iter());
+                 let (results, _balances, _inner_instructions, _log_messages) =
+                     self.bank.load_execute_and_commit_transactions(
+@@ -337,10 +351,18 @@
+                         max_age,
+                         false,
+                         false,
+-                        false,
++                        record_logs,
+                         &mut ExecuteTimings::default(),
+                     );
+                 drop(batch);
++                #[cfg(feature = "epoch296-loader-upgrade-trace")]
++                if let Some(index) = trace_index {
++                    eprintln!(
++                        "epoch296 loader upgrade trace: slot={} entry={} signature={} result={:?} logs={:?}",
++                        request.slot, request.entry_index, wave_transactions[index].signatures[0],
++                        results.execution_results[index].0, _log_messages.get(index),
++                    );
++                }
+                 if env::var_os("JETSTREAMER_HISTORICAL_TRACE").is_some() {
+                     for (transaction, result) in
+                         wave_transactions.iter().zip(&results.execution_results)
