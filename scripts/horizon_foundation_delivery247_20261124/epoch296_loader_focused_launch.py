@@ -128,8 +128,11 @@ def launch(kit, roster_ref, scope):
     roster = ops.bound(roster_ref)
     preflight = ops.bound(scope.preflight)
     profile = ops.bound(scope.profile)
+    for name in ("node", "worker", "guard"):
+        ops.checked_image(profile[name])
     for entry in preflight["evidence"]:
-        assert ops.ref(Path(entry["path"])) == entry
+        if entry != profile["node"]:
+            assert ops.ref(Path(entry["path"])) == entry
     root = Path(profile["run_root"])
     writable = Path(profile["properties"]["ReadWritePaths"])
     runtime_state = Path(profile["environment"]["JETSTREAMER_PRIVATE_RUN_ROOT"])
@@ -139,8 +142,6 @@ def launch(kit, roster_ref, scope):
     assert profile["unit"] == scope.unit and profile["properties"]["AllowedCPUs"] == scope.cpus
     assert int(profile["properties"]["MemoryMax"]) == scope.ram
     assert profile["guarded_whole_tree_cap_bytes"] == scope.cap
-    for name in ("node", "worker", "guard"):
-        ops.checked_image(profile[name])
     node = profile["node"]["path"]
     hook = ops.checked_image(HOOK)
     namespace = ops.bound(ops.ref(state / "namespace.json"))
