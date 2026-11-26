@@ -87,6 +87,26 @@ fn record(p: &Path, value: &Value) -> Result<Value> {
     write(p, &encode(value)?, 0o400)
 }
 
+fn registered_suffix_handler(source: &str) -> bool {
+    let mut assignments = source
+        .lines()
+        .filter_map(|line| line.strip_prefix("diagnostic_handlers = "));
+    let Some(handlers) = assignments.next() else {
+        return false;
+    };
+    assignments.next().is_none()
+        && handlers
+            .strip_prefix('(')
+            .and_then(|handlers| handlers.strip_suffix(')'))
+            .is_some_and(|handlers| {
+                handlers
+                    .split(',')
+                    .filter(|handler| handler.trim() == "diagnostic226_suffix")
+                    .count()
+                    == 1
+            })
+}
+
 fn installed() -> Result<(Value, String)> {
     let static_path = path("static-prestart-qualification.json");
     let proof = sealed_json(
@@ -126,7 +146,7 @@ fn installed() -> Result<(Value, String)> {
             "native_binding_replays.py",
             &[
                 "import diagnostic226_suffix",
-                "diagnostic229_bank_delta, diagnostic226_suffix)",
+                "any(handler.owns(r) for handler in diagnostic_handlers)",
             ][..],
         ),
     ] {
@@ -138,7 +158,8 @@ fn installed() -> Result<(Value, String)> {
         );
         let text = fs::read_to_string(&p)?;
         ensure!(
-            hooks.iter().all(|hook| text.matches(hook).count() == 1),
+            hooks.iter().all(|hook| text.matches(hook).count() == 1)
+                && (name != "native_binding_replays.py" || registered_suffix_handler(&text)),
             "suffix cadence hook changed in {name}"
         );
     }
@@ -795,6 +816,26 @@ fn suffix_launch_returns_to_the_controller_before_prestart_releases_the_node() -
         &format!("--checkpoint-continuation-plan-sha256={hash}")
     );
     Ok(())
+}
+
+#[cfg(test)]
+#[test]
+fn epoch226_suffix_handler_stays_registered_when_later_handlers_are_added() {
+    assert!(registered_suffix_handler(
+        "diagnostic_handlers = (diagnostic229_bank_delta, diagnostic226_suffix)"
+    ));
+    assert!(registered_suffix_handler(
+        "diagnostic_handlers = (diagnostic229_bank_delta, diagnostic226_suffix, diagnostic296_meter)"
+    ));
+    assert!(!registered_suffix_handler(
+        "diagnostic_handlers = (diagnostic229_bank_delta, diagnostic226_suffix_other)"
+    ));
+    assert!(!registered_suffix_handler(
+        "diagnostic_handlers = (diagnostic226_suffix, diagnostic226_suffix)"
+    ));
+    assert!(!registered_suffix_handler(
+        "diagnostic_handlers = (diagnostic226_suffix,)\ndiagnostic_handlers = ()"
+    ));
 }
 
 #[cfg(test)]
