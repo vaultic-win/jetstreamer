@@ -52,10 +52,12 @@ fn hex_prefix(bytes: &[u8], take: usize) -> String {
 
 fn main() {
     const EPOCH229: &str = "CARGO_FEATURE_EPOCH229_CHECKPOINT_CONTINUATION_DIAGNOSTIC";
+    const EPOCH231: &str = "CARGO_FEATURE_EPOCH231_CHECKPOINT_CONTINUATION_DIAGNOSTIC";
     const EPOCH230_VOTE_BOUNDARY: &str =
         "CARGO_FEATURE_EPOCH230_VOTE_BOUNDARY_DEMOTION_QUALIFICATION";
     for (feature, scope) in [
         (EPOCH229, "epoch 229 continuation"),
+        (EPOCH231, "epoch 231–232 continuation"),
         (EPOCH230_VOTE_BOUNDARY, "epoch 230 vote boundary"),
     ] {
         if env::var_os(feature).is_some() {

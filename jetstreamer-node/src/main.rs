@@ -68,6 +68,8 @@ mod checkpoint_continuation203;
 mod checkpoint_continuation226;
 #[cfg(feature = "epoch229-checkpoint-continuation-diagnostic")]
 mod checkpoint_continuation229;
+#[cfg(feature = "epoch231-checkpoint-continuation-diagnostic")]
+mod checkpoint_continuation231;
 #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
 mod epoch226_interior;
 #[cfg(all(
@@ -8011,6 +8013,10 @@ fn build_multi_runtime_provenance(
 fn historical_worker_profile(
     descriptor: &compatibility::RuntimeDescriptor,
 ) -> Result<historical::WorkerProfile, String> {
+    #[cfg(feature = "epoch231-checkpoint-continuation-diagnostic")]
+    if descriptor.identity.name == checkpoint_continuation231::BACKEND {
+        return checkpoint_continuation231::worker_profile(descriptor);
+    }
     #[cfg(feature = "epoch228-called-program-demotion-qualification")]
     if descriptor.identity.name == epoch228_demotion::BACKEND {
         return epoch228_demotion::worker_profile(descriptor);
@@ -12414,20 +12420,41 @@ async fn run_geyser_replay(
             (epoch_start, replay_start, epoch_end_inclusive)
         }
     };
-    let replay_end = end_inclusive.saturating_add(1);
-    let execution = if carried_state.is_none() && bootstrap.snapshot_archive().is_some() {
-        select_runtime_with_snapshot_warmup_for_invocation(
+    #[cfg(feature = "epoch231-checkpoint-continuation-diagnostic")]
+    let execution =
+        checkpoint_continuation231::select_execution(checkpoint_continuation231::ExecutionScope {
+            epoch,
+            bootstrap_slot,
             replay_start,
-            output_slot_start..replay_end,
-            allow_candidate_runtime,
-            qualification.is_some(),
-        )?
-    } else {
-        select_runtime_for_invocation(
-            replay_start..replay_end,
-            allow_candidate_runtime,
-            qualification.is_some(),
-        )?
+            output_slot_start,
+            end_inclusive,
+            verification_end_inclusive,
+            qualification,
+            has_restart_proof: checkpoint_restart.is_some(),
+            carried: carried_state.is_some(),
+            retain: retain_runtime_state,
+            private_mode: allow_candidate_runtime
+                && audited_cohort_bootstrap.is_none()
+                && snapshot_export.is_none()
+                && epoch223_tail_mode == epoch223_qualification::TailMode::Disabled,
+        })?;
+    #[cfg(not(feature = "epoch231-checkpoint-continuation-diagnostic"))]
+    let execution = {
+        let replay_end = end_inclusive.saturating_add(1);
+        if carried_state.is_none() && bootstrap.snapshot_archive().is_some() {
+            select_runtime_with_snapshot_warmup_for_invocation(
+                replay_start,
+                output_slot_start..replay_end,
+                allow_candidate_runtime,
+                qualification.is_some(),
+            )?
+        } else {
+            select_runtime_for_invocation(
+                replay_start..replay_end,
+                allow_candidate_runtime,
+                qualification.is_some(),
+            )?
+        }
     };
     if tail_comparison {
         epoch223_qualification::validate_tail_runtime(&execution)?;
@@ -20030,6 +20057,11 @@ async fn run_epoch_range_supervisor_serial(
 #[tokio::main]
 async fn main() {
     let probe_args: Vec<_> = env::args().skip(1).collect();
+    #[cfg(feature = "epoch231-checkpoint-continuation-diagnostic")]
+    let continuation231 = checkpoint_continuation231::parse(&probe_args).unwrap_or_else(|error| {
+        eprintln!("{error}");
+        exit(2);
+    });
     #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
     if let Err(error) = checkpoint_continuation226::validate_entrypoint(&probe_args) {
         eprintln!("{error}");
@@ -20178,6 +20210,17 @@ async fn main() {
         }) {
             eprintln!("failed to set CTRL+C handler: {err}");
         }
+    }
+    #[cfg(feature = "epoch231-checkpoint-continuation-diagnostic")]
+    if cfg!(feature = "epoch231-checkpoint-continuation-diagnostic") {
+        if let Err(error) =
+            checkpoint_continuation231::run(continuation231, shutdown, cursor, restart_tracker)
+                .await
+        {
+            eprintln!("private epoch 231–232 continuation failed: {error}");
+            exit(1);
+        }
+        return;
     }
     #[cfg(feature = "epoch140-suffix-recording")]
     if cfg!(feature = "epoch140-suffix-recording") {
