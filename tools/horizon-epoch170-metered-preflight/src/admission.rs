@@ -805,19 +805,10 @@ pub(super) fn quote(
     image(&program)?;
     let mut command = Command::new("/usr/bin/timeout");
     command.args(["150", "/usr/bin/python3", "-IB", string(&program, "path")?]);
-    match route {
-        "v10" => {
-            command.arg("--hourly170=prestart");
-        }
-        "full170"
-        | "full170-v9"
-        | "full170-v9-v13"
-        | "full170-v9-v13-retry5"
-        | "full170-v10-v13-retry5"
-        | "full170-independent-v13-retry5" => {
-            command.arg("--full170=prestart");
-        }
-        _ => {}
+    if route == "v10" {
+        command.arg("--hourly170=prestart");
+    } else if route.starts_with("full170") {
+        command.arg("--full170=prestart");
     }
     let output = command
         .args(["145", string(fleet, "path")?, string(fleet, "sha256")?])
