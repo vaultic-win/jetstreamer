@@ -47,6 +47,9 @@ pub struct Endpoint<'a> {
     pub image_sha: &'a str,
     pub cap: u64,
 }
+pub const CURRENT261_UNIT: &str = "horizon-upload-261-current-reader-v1.service";
+pub const CURRENT261_DIRECTORY: &str = "/var/lib/jetstreamer/horizon261-current-reader-delivery-v1";
+pub const CURRENT261_MEMORY_CAP: u64 = 64 << 30;
 pub fn validate(row: &Value) -> Result<()> {
     for (key, (path, sha)) in [
         ("booking", BOOKING),

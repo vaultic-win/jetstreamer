@@ -5,6 +5,7 @@
 mod fourth;
 use anyhow::{Context, Result, ensure};
 use jetstreamer_horizon_observe::staged247_rss::{
+    CURRENT261_DIRECTORY, CURRENT261_MEMORY_CAP, CURRENT261_UNIT,
     CURRENT257_DIRECTORY, CURRENT257_IMAGE, CURRENT257_IMAGE_SHA, CURRENT257_MEMORY_CAP,
     CURRENT257_START_TICKS, CURRENT257_UNIT, RETRY257_DIRECTORY, RETRY257_MEMORY_CAP, RETRY257_UNIT,
 };
@@ -134,6 +135,7 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
         (250, STAGED_250_UNIT) => Some(STAGED_250_MEMORY_CAP),
         (257, CURRENT257_UNIT) => Some(CURRENT257_MEMORY_CAP),
         (257, RETRY257_UNIT) => Some(RETRY257_MEMORY_CAP),
+        (261, CURRENT261_UNIT) => Some(CURRENT261_MEMORY_CAP),
         (265, STAGED_265_UNIT) => Some(10 << 30),
         _ => None,
     };
@@ -145,6 +147,7 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
     let root = match name {
         CURRENT257_UNIT => Path::new(CURRENT257_DIRECTORY).to_owned(),
         RETRY257_UNIT => Path::new(RETRY257_DIRECTORY).to_owned(),
+        CURRENT261_UNIT => Path::new(CURRENT261_DIRECTORY).to_owned(),
         _ => Path::new("/home/ubuntu/.codex/diagnostics").join(stem),
     };
     let claim = fourth::read(&row["delivery_claim"], &root.join("pipeline-claim.json"))?;
@@ -164,11 +167,11 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
         .parse::<u32>()?;
     let (launch_unit, ticks) = match name {
         CURRENT257_UNIT => (&launch["owner"], CURRENT257_START_TICKS),
-        RETRY257_UNIT => (
+        RETRY257_UNIT | CURRENT261_UNIT => (
             &launch["owner"],
             launch["process_start_ticks"]
                 .as_u64()
-                .context("epoch 257 retry start ticks")?,
+                .context("ordinary delivery start ticks")?,
         ),
         _ => {
             let micros = launch["unit"]["ExecMainStartTimestampMonotonic"]
@@ -234,8 +237,8 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
                 == 1,
         "ordinary delivery claim, endpoints or sample clock changed"
     );
-    let (image, image_sha, cap) = if matches!(name, CURRENT257_UNIT | RETRY257_UNIT) {
-        (CURRENT257_IMAGE, CURRENT257_IMAGE_SHA, pinned_cap.context("epoch 257 memory cap")?)
+    let (image, image_sha, cap) = if matches!(name, CURRENT257_UNIT | RETRY257_UNIT | CURRENT261_UNIT) {
+        (CURRENT257_IMAGE, CURRENT257_IMAGE_SHA, pinned_cap.context("ordinary delivery memory cap")?)
     } else if let Some(cap) = pinned_cap {
         (PINNED_247_IMAGE, PINNED_247_IMAGE_SHA, cap)
     } else {
@@ -370,6 +373,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                 | STAGED_250_UNIT
                 | CURRENT257_UNIT
                 | RETRY257_UNIT
+                | CURRENT261_UNIT
                 | STAGED_265_UNIT
         ) || (owners.contains_key(fourth::V221_UNIT)
             && name.starts_with("horizon-upload-")
