@@ -17,6 +17,10 @@ const TERMINAL_UPLOAD_257: (&str, &str) = (
     "/var/lib/jetstreamer/horizon257-current-reader-delivery-v2/publication/completion.json",
     "ac5480340fabbafd8b80244ef95b7d3ad4a0ee1bbc51ad9bf5abb6de8bd29775",
 );
+const HANDOFF_UPLOAD_257: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon257-current-reader-delivery-v2/publication/handoff-intent.json",
+    "be7f556c4871522139f33c1c16b678e34a3b2871d1e098c20300e52b311c3e2e",
+);
 const OWNER_FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemorySwapMax,ExecStart,AllowedCPUs";
 const GUARD_FIELDS: &str =
     "Id,LoadState,ActiveState,SubState,InvocationID,Unit,MemoryMax,ExecStart";
@@ -543,7 +547,7 @@ fn terminal_delivery_257(n: &mut Native, booking: &Value, fleet: &Value) -> Resu
     }
     let completion = terminal.sealed()?;
     let claim = binding(&completion["claim"])?.sealed()?;
-    let handoff = binding(&completion["intent"])?.sealed()?;
+    let handoff = Bound::new(HANDOFF_UPLOAD_257.0, HANDOFF_UPLOAD_257.1).sealed()?;
     let finished = &handoff["terminal"]["finished"];
     let archive = binding(&completion["archive"])?.sealed()?;
     let deletion = binding(&completion["deletion"])?.sealed()?;
