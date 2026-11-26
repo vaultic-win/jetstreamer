@@ -1,6 +1,7 @@
 //! Bind the live Foundation cohort for replay funding and guard qualification.
 use super::*;
 mod allocation;
+mod delivery252;
 mod focused;
 use focused::{FEATURE_296, GAP_230, LOADER_296, RESTORE_258, SCOPES, TRACE_296};
 mod vote_boundary;
@@ -136,6 +137,7 @@ enum Quote {
     FullReplay(FullReplayQuote),
     Suffix226(Bound),
     Suffix226Preview,
+    Delivery252,
     Delivery261(Bound),
     Replay296(Replay296Quote),
     Focused(&'static focused::Focused, Bound),
@@ -265,39 +267,51 @@ fn delivery_261_preparation() -> Result<Bound> {
     Ok(reference)
 }
 
-fn live_delivery_261(n: &mut Native) -> Result<(Bound, Value, u64, u64)> {
-    let reference = Bound::new(CLAIM_261.0, CLAIM_261.1);
+fn live_delivery(n: &mut Native, epoch: u64) -> Result<(Bound, Value, u64, u64)> {
+    let (unit, reference) = match epoch {
+        252 => (
+            delivery252::UPLOADER,
+            Bound::new(delivery252::CLAIM, hash(Path::new(delivery252::CLAIM))?),
+        ),
+        261 => (UPLOAD_261, Bound::new(CLAIM_261.0, CLAIM_261.1)),
+        _ => bail!("unsupported current-reader delivery epoch {epoch}"),
+    };
     let claim = reference.sealed()?;
     let evidence = claim["evidence"]
         .as_array()
-        .context("epoch 261 delivery evidence")?;
-    ensure!(evidence.len() == 2, "epoch 261 delivery evidence count");
+        .context("current-reader delivery evidence")?;
+    ensure!(evidence.len() == 2, "epoch {epoch} delivery evidence count");
     let booking_ref = binding(&evidence[0])?;
     let booking = booking_ref.sealed()?;
-    let launch = binding(&evidence[1])?.sealed()?;
+    let launch_ref = binding(&evidence[1])?;
+    let launch = launch_ref.sealed()?;
     let booked_fit = binding(&booking["storage_quote"])?.sealed()?;
-    let owner = n.show_fields(UPLOAD_261, OWNER_FIELDS)?;
+    let owner = n.show_fields(unit, OWNER_FIELDS)?;
     let launched = &launch["owner"];
     let invocation = text(&claim, "invocation_id")?;
     let pid = text(&owner, "MainPID")?.parse()?;
     let ticks = process_ticks(pid)?;
     ensure!(
-        claim["epoch"] == 261
-            && claim["unit"] == UPLOAD_261
+        claim["epoch"] == epoch
+            && claim["unit"] == unit
             && claim["phase"] == "upload-readback"
-            && booking["schema"] == "foundation-epoch261-delivery-booking-v1"
-            && booking["epoch"] == 261
-            && booking["unit"] == UPLOAD_261
+            && booking["schema"] == format!("foundation-epoch{epoch}-delivery-booking-v1")
+            && booking["epoch"] == epoch
+            && booking["unit"] == unit
             && booking["staging_copy_required"] == false
             && booked_fit["capacity"]["fits"] == true
             && booked_fit["capacity"]["candidate_disk_bytes"] == UPLOAD_261_DISK
             && booked_fit["delivery_quote"]["delivery_memory_max_bytes"] == UPLOAD_261_MEMORY
-            && launch["schema"] == "foundation-epoch261-current-reader-delivery-launch-v1"
+            && launch["schema"]
+                == format!("foundation-epoch{epoch}-current-reader-delivery-launch-v1")
+            && (epoch == 261
+                || (booking_ref.path == reference.path.with_file_name("booking.json")
+                    && launch_ref.path == reference.path.with_file_name("launch.json")))
             && binding(&launch["booking"])? == booking_ref
             && launch["process_start_ticks"] == ticks
             && owner["AllowedCPUs"] == "24-31"
             && owner["ExecStart"] == claim["expected_exec_start"],
-        "epoch 261 delivery booking or live invocation changed"
+        "epoch {epoch} delivery booking or live invocation changed"
     );
     for field in [
         "Id",
@@ -310,10 +324,10 @@ fn live_delivery_261(n: &mut Native) -> Result<(Bound, Value, u64, u64)> {
     ] {
         ensure!(
             owner[field] == launched[field],
-            "epoch 261 delivery changed {field}"
+            "epoch {epoch} delivery changed {field}"
         );
     }
-    let memory = live::finite_owner(&owner, UPLOAD_261, invocation, UPLOAD_261_MEMORY)?;
+    let memory = live::finite_owner(&owner, unit, invocation, UPLOAD_261_MEMORY)?;
     Ok((reference, owner, memory, ticks))
 }
 
@@ -611,7 +625,7 @@ fn fleet_roster<'a>(
     fleet: &'a Value,
     booking: &Value,
     released: &BTreeMap<u64, &str>,
-    delivery_261: Option<&Value>,
+    deliveries: &BTreeMap<u64, (Bound, Value, u64, u64)>,
     live_replays: &BTreeMap<u64, LiveReplay>,
 ) -> Result<BTreeMap<u64, &'a Value>> {
     let rows = fleet["active"]
@@ -621,15 +635,17 @@ fn fleet_roster<'a>(
         .as_object()
         .context("Foundation booked owners")?;
     let mut roster = BTreeMap::new();
-    let mut observed_delivery = None;
+    let mut observed_deliveries = BTreeSet::new();
     let mut observed_replays = BTreeSet::new();
     for row in rows {
         let epoch = num(row, "epoch")?;
-        if epoch == 261 && row["phase"] == "upload-readback" {
-            let owner = delivery_261.context("unbooked epoch 261 delivery in fleet")?;
+        if matches!(epoch, 252 | 261) && row["phase"] == "upload-readback" {
+            let (_, owner, _, _) = deliveries
+                .get(&epoch)
+                .with_context(|| format!("unbooked epoch {epoch} delivery in fleet"))?;
             ensure!(
-                observed_delivery.replace(&row["unit"]).is_none(),
-                "duplicate epoch 261 delivery in fleet"
+                observed_deliveries.insert(epoch),
+                "duplicate epoch {epoch} delivery in fleet"
             );
             live::same_owner(&row["unit"], owner)?;
             continue;
@@ -667,8 +683,10 @@ fn fleet_roster<'a>(
         );
     }
     ensure!(
-        observed_delivery.is_none() || !roster.contains_key(&261),
-        "duplicate epoch 261 phases in fleet"
+        observed_deliveries
+            .iter()
+            .all(|epoch| !roster.contains_key(epoch)),
+        "duplicate current-reader delivery phases in fleet"
     );
     ensure!(
         !live_replays
@@ -722,6 +740,7 @@ mod roster_tests {
         ] {
             let unit = match epoch {
                 226 => EXTRACT_226.to_owned(),
+                252 => delivery252::REPLAY.to_owned(),
                 257 => UPLOAD_257.to_owned(),
                 261 => REPLAY_261.to_owned(),
                 _ => format!("test-{epoch}.service"),
@@ -740,37 +759,51 @@ mod roster_tests {
         let first = BTreeMap::from([(261, REPLAY_261)]);
         let both = BTreeMap::from([(226, EXTRACT_226), (261, REPLAY_261)]);
         let live_replays = BTreeMap::new();
-        assert!(fleet_roster(&before, &booking, &none, None, &live_replays).is_ok());
-        assert!(fleet_roster(&before, &booking, &both, None, &live_replays).is_ok());
+        let deliveries = BTreeMap::new();
+        assert!(fleet_roster(&before, &booking, &none, &deliveries, &live_replays).is_ok());
+        assert!(fleet_roster(&before, &booking, &both, &deliveries, &live_replays).is_ok());
 
         rows.retain(|row| row["epoch"] != 261);
         let after = json!({"active":rows});
-        assert!(fleet_roster(&after, &booking, &none, None, &live_replays).is_err());
-        assert!(fleet_roster(&after, &booking, &first, None, &live_replays).is_ok());
+        assert!(fleet_roster(&after, &booking, &none, &deliveries, &live_replays).is_err());
+        assert!(fleet_roster(&after, &booking, &first, &deliveries, &live_replays).is_ok());
 
         rows.retain(|row| row["epoch"] != 226);
         let after = json!({"active":rows});
-        assert!(fleet_roster(&after, &booking, &first, None, &live_replays).is_err());
-        assert!(fleet_roster(&after, &booking, &both, None, &live_replays).is_ok());
+        assert!(fleet_roster(&after, &booking, &first, &deliveries, &live_replays).is_err());
+        assert!(fleet_roster(&after, &booking, &both, &deliveries, &live_replays).is_ok());
 
         rows.retain(|row| row["epoch"] != 257);
         let after = json!({"active":rows});
-        assert!(fleet_roster(&after, &booking, &both, None, &live_replays).is_err());
+        assert!(fleet_roster(&after, &booking, &both, &deliveries, &live_replays).is_err());
         let after_delivery =
             BTreeMap::from([(226, EXTRACT_226), (257, UPLOAD_257), (261, REPLAY_261)]);
-        assert!(fleet_roster(&after, &booking, &after_delivery, None, &live_replays).is_ok());
-
-        rows.retain(|row| row["epoch"] != 252);
         assert!(
             fleet_roster(
-                &json!({"active":rows}),
+                &after,
                 &booking,
                 &after_delivery,
-                None,
+                &deliveries,
+                &live_replays
+            )
+            .is_ok()
+        );
+
+        rows.retain(|row| row["epoch"] != 252);
+        let after = json!({"active":rows});
+        assert!(
+            fleet_roster(
+                &after,
+                &booking,
+                &after_delivery,
+                &deliveries,
                 &live_replays
             )
             .is_err()
         );
+        let mut all_released = after_delivery;
+        all_released.insert(252, delivery252::REPLAY);
+        assert!(fleet_roster(&after, &booking, &all_released, &deliveries, &live_replays).is_ok());
     }
 }
 
@@ -1030,6 +1063,19 @@ fn measure(
         }
         _ => None,
     };
+    let closed_replay252 = if quote.is_some() {
+        delivery252::terminal(n, &booking)?
+    } else {
+        None
+    };
+    let delivery_252 = matches!(&quote, Some(Quote::Delivery252));
+    ensure!(
+        !delivery_252 || closed_replay252.is_some(),
+        "epoch 252 delivery requires a committed archive and drained replay guard"
+    );
+    if closed_replay252.is_some() {
+        released_replays.insert(252, delivery252::REPLAY);
+    }
     let closed_replay = if quote.is_some() {
         terminal_replay_261(n, &booking)?
     } else {
@@ -1060,17 +1106,27 @@ fn measure(
         released_replays.insert(257, UPLOAD_257);
     }
     let before = listed_owners(n)?;
-    let active_delivery = if quote.is_some() && before.contains(UPLOAD_261) {
-        ensure!(
-            !delivery_261 && closed_replay.is_some(),
-            "epoch 261 delivery overlaps its candidate or replay"
-        );
-        Some(live_delivery_261(n)?)
-    } else {
-        None
-    };
+    let mut active_deliveries = BTreeMap::new();
+    for (epoch, unit, candidate, closed) in [
+        (
+            252,
+            delivery252::UPLOADER,
+            delivery_252,
+            closed_replay252.is_some(),
+        ),
+        (261, UPLOAD_261, delivery_261, closed_replay.is_some()),
+    ] {
+        if quote.is_some() && before.contains(unit) {
+            ensure!(
+                !candidate && closed,
+                "epoch {epoch} delivery overlaps its candidate or replay"
+            );
+            active_deliveries.insert(epoch, live_delivery(n, epoch)?);
+        }
+    }
     let epoch = match &quote {
         Some(Quote::Suffix226(_) | Quote::Suffix226Preview) => 226,
+        Some(Quote::Delivery252) => 252,
         Some(Quote::Delivery261(_)) => 261,
         Some(Quote::Replay296(_)) => 296,
         Some(Quote::Focused(spec, _)) => spec.epoch,
@@ -1108,7 +1164,7 @@ fn measure(
         &fleet,
         &booking,
         &released_replays,
-        active_delivery.as_ref().map(|(_, owner, _, _)| owner),
+        &active_deliveries,
         &live_replays,
     )?;
     let missing: Vec<_> = fleet["inventory"]["entries"]
@@ -1175,10 +1231,11 @@ fn measure(
             "epoch 262 held owner already booked as a peer"
         );
     }
-    if active_delivery.is_some() {
+    for (_, owner, _, _) in active_deliveries.values() {
+        let unit = text(owner, "Id")?;
         ensure!(
-            expected.insert(UPLOAD_261.to_owned()),
-            "epoch 261 delivery booked twice"
+            expected.insert(unit.to_owned()),
+            "delivery {unit} booked twice"
         );
     }
     for replay in live_replays.values() {
@@ -1212,7 +1269,7 @@ fn measure(
         226 => "16-23",
         230 => GAP_230.cpus,
         258 => RESTORE_258.cpus,
-        261 => "24-31",
+        252 | 261 => "24-31",
         296 => "56-63",
         _ => "40-47",
     })?;
@@ -1248,12 +1305,13 @@ fn measure(
         let process_start_ticks = process_ticks(text(&owner, "MainPID")?.parse()?)?;
         recorded.insert(unit.clone(), (owner, memory, process_start_ticks));
     }
-    if let Some((_, owner, memory, ticks)) = &active_delivery {
+    for (_, owner, memory, ticks) in active_deliveries.values() {
+        let unit = text(owner, "Id")?;
         ensure!(
             selected.is_disjoint(&units::parse_cpu_list(text(owner, "AllowedCPUs")?)?),
-            "epoch {epoch} CPUs overlap the epoch 261 delivery"
+            "epoch {epoch} CPUs overlap delivery {unit}"
         );
-        recorded.insert(UPLOAD_261.to_owned(), (owner.clone(), *memory, *ticks));
+        recorded.insert(unit.to_owned(), (owner.clone(), *memory, *ticks));
     }
     for replay in live_replays.values() {
         ensure!(
@@ -1275,6 +1333,7 @@ fn measure(
         });
         if (guard_epoch == 226 && suffix.is_some())
             || (guard_epoch == 230 && closed_230.is_some() && focused.is_none())
+            || (guard_epoch == 252 && closed_replay252.is_some())
             || (guard_epoch == 261 && closed_replay.is_some())
         {
             continue;
@@ -1400,14 +1459,18 @@ fn measure(
         .try_fold(0, |sum, row| {
             capacity::add(sum, num(row, "remaining_upper_bound_bytes")?)
         })?;
-    let delivery_261_disk = active_delivery.as_ref().map_or(0, |_| UPLOAD_261_DISK);
+    let delivery_252_disk = active_deliveries.get(&252).map_or(0, |_| UPLOAD_261_DISK);
+    let delivery_261_disk = active_deliveries.get(&261).map_or(0, |_| UPLOAD_261_DISK);
     let replay_disk = live_replays
         .values()
         .try_fold(0, |total, replay| capacity::add(total, replay.receipt_disk))?;
     let protected = capacity::add(
         capacity::add(
             capacity::add(disk_floor, non_guard_disk)?,
-            capacity::add(delivery_261_disk, replay_disk)?,
+            capacity::add(
+                capacity::add(delivery_252_disk, delivery_261_disk)?,
+                replay_disk,
+            )?,
         )?,
         growth,
     )?;
@@ -1422,6 +1485,10 @@ fn measure(
         Some(Quote::Suffix226(_) | Quote::Suffix226Preview) => (
             capacity::add(SUFFIX_226_CAP, DISK_RECEIPTS)?,
             capacity::add(SUFFIX_226_CAP, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
+        ),
+        Some(Quote::Delivery252) => (
+            UPLOAD_261_DISK,
+            capacity::add(UPLOAD_261_MEMORY, CONTROLLER_MEMORY)?,
         ),
         Some(Quote::Delivery261(_)) => (
             num(&delivery, "receipt_scratch_maximum_bytes")?,
@@ -1478,7 +1545,7 @@ fn measure(
     )?;
     let available_memory = resources_before.1.min(resources_after.1);
     let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
-        "active_delivery_261_disk_bytes":delivery_261_disk,
+        "active_delivery_252_disk_bytes":delivery_252_disk,"active_delivery_261_disk_bytes":delivery_261_disk,
         "active_diagnostic_230_receipt_disk_bytes":live_replays.get(&230).map_or(0, |lane| lane.receipt_disk),
         "active_replay_262_receipt_disk_bytes":live_replays.get(&262).map_or(0, |lane| lane.receipt_disk),
         "active_replay_296_receipt_disk_bytes":live_replays.get(&296).map_or(0, |lane| lane.receipt_disk),
@@ -1503,6 +1570,7 @@ fn measure(
     let schema = match epoch {
         226 => "foundation-epoch226-suffix-roster-binding-v1",
         230 => "foundation-epoch230-short-gap-roster-binding-v1",
+        252 => "foundation-epoch252-delivery-roster-binding-v1",
         258 => "foundation-epoch258-native-restore-roster-binding-v1",
         261 => "foundation-epoch261-delivery-roster-binding-v1",
         296 => "foundation-epoch296-replay-roster-binding-v1",
@@ -1517,7 +1585,8 @@ fn measure(
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
         "active_restore_258_registration":live_replays.get(&258).map(|replay| &replay.reference),
         "closed_delivery_257":closed_257,
-        "active_delivery_261_claim":active_delivery.as_ref().map(|(claim, _, _, _)| claim),
+        "active_delivery_252_claim":active_deliveries.get(&252).map(|(claim, _, _, _)| claim),
+        "active_delivery_261_claim":active_deliveries.get(&261).map(|(claim, _, _, _)| claim),
         "active_replay_262_registration":live_replays.get(&262).map(|replay| &replay.reference),
         "active_replay_296_registration":live_replays.get(&296).map(|replay| &replay.reference)});
     if let Some(Quote::FullReplay(quote)) = &quote {
@@ -1553,6 +1622,11 @@ fn measure(
             "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
             "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
         });
+    }
+    if delivery_252 {
+        evidence["delivery_quote"] = json!({"handoff":closed_replay252,
+            "delivery_memory_max_bytes":UPLOAD_261_MEMORY,"receipt_scratch_maximum_bytes":candidate_disk,
+            "candidate_cpus":selected,"closed_replay":closed_replay252});
     }
     if let Some(Quote::Replay296(quote)) = &quote {
         evidence["replay_296_quote"] = json!({
@@ -1645,6 +1719,7 @@ pub fn run() -> Result<()> {
                 flag.to_str(),
                 Some(
                     "--full-replay-quote"
+                        | "--delivery252-quote"
                         | "--delivery261-quote"
                         | "--replay296-quote"
                         | "--focused230-quote"
@@ -1665,7 +1740,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
+            "use --as-controller UNIT, --full-replay-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
         ),
     };
     let synchronize = match args.next() {
@@ -1707,6 +1782,9 @@ pub fn run() -> Result<()> {
     let result = match command.as_deref() {
         Some(flag) if flag == "--full-replay-quote" => full_replay_quote()
             .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),
+        Some(flag) if flag == "--delivery252-quote" => {
+            measure(&mut native, None, Some(Quote::Delivery252))
+        }
         Some(flag) if flag == "--delivery261-quote" => delivery_261_preparation()
             .and_then(|prep| measure(&mut native, None, Some(Quote::Delivery261(prep)))),
         Some(flag) if flag == "--replay296-quote" => replay_296_quote()

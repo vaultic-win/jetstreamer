@@ -1,0 +1,180 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -174,4 +174,6 @@
+ import delivery261
+ delivery_261 = delivery261.registered()
++delivery_252 = delivery261.registered(252)
++current_reader_deliveries = {252: delivery_252, 261: delivery_261}
+ import delivery257_retry
+ retry_257 = delivery257_retry.registered()
+@@ -239,4 +241,6 @@
+
+ def observe_image():
++    if delivery_252 is not None:
++        return Path(delivery261.image('observer', 'jetstreamer-horizon-observe', 252))
+     if delivery_261 is not None:
+         return Path(delivery261.image('observer', 'jetstreamer-horizon-observe'))
+@@ -321,8 +325,9 @@
+         if completion is not None:
+             closed[257] = completion
+-    if delivery_261 is not None:
+-        completion261 = delivery261.collect(delivery_261, statuses, record)
+-        if completion261 is not None:
+-            closed[261] = completion261
++    for e, registration in current_reader_deliveries.items():
++        if registration is not None:
++            completion = delivery261.collect(registration, statuses, record, e)
++            if completion is not None:
++                closed[e] = completion
+     for e in closed:
+         roster.pop(e, None)
+@@ -380,6 +385,7 @@
+ for e in staged_retries:
+     suffix += f'-staged{e}'
+-if delivery_261 is not None:
+-    suffix += '-delivery261'
++for epoch, registration in current_reader_deliveries.items():
++    if registration is not None:
++        suffix += f'-delivery{epoch}'
+ config_path = out/f'config{suffix}.json'
+ preflight_path = out/f'preflight{suffix}.json'
+@@ -395,6 +401,8 @@
+     if 'delivery257_claim' in saved:
+         cfg['delivery257_claim'] = saved['delivery257_claim']
+-    if 'delivery261_claim' in saved:
+-        cfg['delivery261_claim'] = saved['delivery261_claim']
++    for epoch in current_reader_deliveries:
++        key = claim_key(epoch)
++        if key in saved:
++            cfg[key] = saved[key]
+     for e in closed:
+         key = claim_key(e)
+@@ -426,8 +434,9 @@
+     if native262_origin is not None:
+         native262_cadence.configure(cfg, native262_origin)
+-    if delivery_261 is not None and 261 not in closed:
+-        current261 = delivery261.configuration(delivery_261)
+-        if current261 is not None:
+-            cfg['delivery261_claim'] = current261
++    for epoch, registration in current_reader_deliveries.items():
++        if registration is not None and epoch not in closed:
++            current = delivery261.configuration(registration, epoch)
++            if current is not None:
++                cfg[claim_key(epoch)] = current
+ config=record(config_path,cfg)
+ def check_roster():
+@@ -457,6 +466,5 @@
+     if cfg.get('delivery257_claim'):
+         expected.add(257)
+-    if cfg.get('delivery261_claim'):
+-        expected.add(261)
++    expected.update(e for e in current_reader_deliveries if cfg.get(claim_key(e)))
+     # This sealed observation has the old default display label. The native
+     # memory join still requires its actual publisher, cgroup and mapped binary.
+@@ -473,6 +481,6 @@
+     assert set(roster) <= expected
+     for e in expected & set(closed):
+-        if e == 261:
+-            c = delivery_261[1]
++        if e in current_reader_deliveries:
++            c = current_reader_deliveries[e][1]
+         else:
+             c = retry_257[1] if e == 257 else bound(all_claims[e])
+@@ -485,10 +493,11 @@
+         if 257 not in closed and delivery257_retry.configuration(retry_257) is not None:
+             assert row["status"] == "observed" and row["observation"]["invocation_binding_stable"]
+-    if cfg.get('delivery261_claim'):
+-        row, = [r for r in rows if r['range'] == '261-261']
+-        assert row['producer_unit'] == delivery261.UNIT
+-        assert row['expected_producer_invocation_id'] == delivery_261[1]['invocation_id']
+-        if 261 not in closed and delivery261.configuration(delivery_261) is not None:
+-            assert row['status'] == 'observed' and row['observation']['invocation_binding_stable']
++    for e, registration in current_reader_deliveries.items():
++        if cfg.get(claim_key(e)):
++            row, = [r for r in rows if r['range'] == f'{e}-{e}']
++            assert row['producer_unit'] == delivery261.scope(e)[2]
++            assert row['expected_producer_invocation_id'] == registration[1]['invocation_id']
++            if e not in closed and delivery261.configuration(registration, e) is not None:
++                assert row['status'] == 'observed' and row['observation']['invocation_binding_stable']
+     guarded_replays.validate_observation(sample["replays"], cfg["replays"])
+     for n,r in roster.items():
+@@ -988,4 +997,7 @@
+             fleet_image = Path(publication_handoff.checked_image(release["image"]))
+             diagnostic296_meter.register(plan, ordinary_replay=ordinary_296)
++    if delivery_252 is not None:
++        delivery261.register_fleet(plan, delivery_252, bool(cfg.get(claim_key(252))) and 252 not in closed, add, 252)
++        fleet_image = Path(delivery261.image('fleet', 'jetstreamer-r2', 252))
+     rotation223 = V / "horizon223-bootstrap-rotation-settled-v342/completion.json"
+     if rotation223.is_file():
+@@ -1059,5 +1071,5 @@
+                 if not (row['epoch'] == 257 and row['phase'] == 'upload-readback'
+                         and row["unit"]["Id"] in (delivery257_retry.PREVIOUS_UNIT, delivery257_retry.UNIT))]
+-    ordinary = [r for r in ordinary if not delivery261.owns(r)]
++    ordinary = [r for r in ordinary if not any(delivery261.owns(r, e) for e in current_reader_deliveries)]
+     assert sorted(r['epoch'] for r in ordinary) == sorted([*roster,*guarded_replays.by_epoch(cfg['replays'])])
+     guarded_replays.validate_fleet([r for r in ordinary if r['epoch'] not in roster], bound(ref(obs))['replays'])
+@@ -1116,6 +1128,7 @@
+                  active_claims=dict(roster), inventory=inventory, ready_pair_count=inventory['ready_pairs'],
+                  independently_verified_count=None)
+-    if delivery_261 is not None:
+-        state['delivery_261_claim'] = delivery_261[0]
++    for epoch, registration in current_reader_deliveries.items():
++        if registration is not None:
++            state[f'delivery_{epoch}_claim'] = registration[0]
+     if retry_257 is not None:
+         state["retry_257_claim"] = retry_257[0]
+@@ -1136,7 +1149,7 @@
+     for e,previous in list(statuses.items()):
+         if e in closed: continue
+-        if e == 261 and delivery_261 is not None and cfg.get('delivery261_claim'):
++        if e in current_reader_deliveries and current_reader_deliveries[e] is not None and cfg.get(claim_key(e)):
+             try:
+-                delivery261.refresh(previous, sample, globals(), delivery_261)
++                delivery261.refresh(previous, sample, globals(), current_reader_deliveries[e], e)
+             except (AssertionError, sp.CalledProcessError):
+                 if not await_finished(e): raise
+--- a/native_binding_replays.py
++++ b/native_binding_replays.py
+@@ -51,5 +51,5 @@
+             and not (r['epoch'] == 257 and r['phase'] == 'upload-readback'
+                      and r["unit"]["Id"] in (delivery257_retry.PREVIOUS_UNIT, delivery257_retry.UNIT))
+-            and not delivery261.owns(r)
++            and not any(delivery261.owns(r, e) for e in (252, 261))
+             and not native262_cadence.owns(r)
+             and not any(handler.owns(r) for handler in diagnostic_handlers)]
+@@ -59,6 +59,7 @@
+ if 257 in previously_closed:
+     assert previously_closed.pop(257) == states["retry_257_claim"]
+-if 261 in previously_closed:
+-    assert previously_closed.pop(261) == states['delivery_261_claim']
++for epoch in (252, 261):
++    if epoch in previously_closed:
++        assert previously_closed.pop(epoch) == states[f'delivery_{epoch}_claim']
+ failed = {int(k): v["claim"] for k,v in states.get('failed_publications',{}).items()}
+ assert len(set(live) | set(failed) | set(previously_closed)) == len(live) + len(failed) + len(previously_closed)
+@@ -75,6 +76,7 @@
+ if "257" in states["completed_publications"]:
+     closed[257] = states["completed_publications"]["257"]
+-if '261' in states['completed_publications']:
+-    closed[261] = states['completed_publications']['261']
++for epoch in (252, 261):
++    if str(epoch) in states['completed_publications']:
++        closed[epoch] = states['completed_publications'][str(epoch)]
+ publishers=[r for r in sample_publishers if r['epoch'] not in closed]
+
+--- a/publication_handoff.py
++++ b/publication_handoff.py
+@@ -124 +124 @@
+-def status_cleanup(epoch, claim_ref, spec, proof, completion, wd, record):
++def status_cleanup(epoch, claim_ref, spec, proof, completion, wd, record, prior_owner=None):
+@@ -131,2 +131,5 @@
+-    assert intent["payload"] == payload and intent["owner"]["claim"] == claim_ref
+-    assert intent["owner"]["invocation_id"] == claim["invocation_id"]
++    assert intent["payload"] == payload
++    owner = intent["owner"]
++    current_owner = (owner.get("claim") == claim_ref
++                     and owner["invocation_id"] == claim["invocation_id"])
++    assert current_owner or (prior_owner is not None and owner == prior_owner)
+@@ -136 +139 @@
+-    if latest.is_file():
++    if current_owner and latest.is_file():

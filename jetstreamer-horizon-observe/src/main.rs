@@ -139,6 +139,8 @@ struct Config {
     #[serde(default)]
     delivery251_claim: Option<delivery247_resource::DeliveryClaim>,
     #[serde(default)]
+    delivery252_claim: Option<delivery247_resource::DeliveryClaim>,
+    #[serde(default)]
     delivery257_claim: Option<delivery247_resource::DeliveryClaim>,
     #[serde(default)]
     delivery261_claim: Option<delivery247_resource::DeliveryClaim>,
@@ -367,6 +369,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
             || config.delivery249_claim.is_some()
             || config.delivery250_claim.is_some()
             || config.delivery251_claim.is_some()
+            || config.delivery252_claim.is_some()
             || config.delivery257_claim.is_some()
             || config.delivery261_claim.is_some()
             || config.delivery265_claim.is_some()
@@ -423,6 +426,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "delivery249_claim":config.delivery249_claim,
             "delivery250_claim":config.delivery250_claim,
             "delivery251_claim":config.delivery251_claim,
+            "delivery252_claim":config.delivery252_claim,
             "delivery257_claim":config.delivery257_claim,
             "delivery261_claim":config.delivery261_claim,
             "delivery265_claim":config.delivery265_claim,
@@ -2030,6 +2034,7 @@ fn run(config: Config) -> Result<()> {
         (Epoch249, &config.delivery249_claim),
         (Epoch250, &config.delivery250_claim),
         (Epoch251, &config.delivery251_claim),
+        (Current252, &config.delivery252_claim),
         (Current257, &config.delivery257_claim),
         (Current261, &config.delivery261_claim),
         (Epoch265, &config.delivery265_claim),
@@ -2570,6 +2575,7 @@ mod tests {
             delivery249_claim: None,
             delivery250_claim: None,
             delivery251_claim: None,
+            delivery252_claim: None,
             delivery257_claim: None,
             delivery261_claim: None,
             delivery265_claim: None,

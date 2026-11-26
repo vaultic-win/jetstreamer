@@ -1,5 +1,6 @@
 //! Reconcile the booked epoch 252 replay into a durable local delivery input.
 use super::*;
+pub(super) mod delivery;
 use std::{
     fs::File,
     io::{ErrorKind, Write},

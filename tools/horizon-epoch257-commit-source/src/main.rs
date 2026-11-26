@@ -428,9 +428,25 @@ fn collect(cohort: &Cohort) -> Result<Value> {
 fn main() -> Result<()> {
     let mut args = std::env::args_os().skip(1);
     let mode = args.next();
+    if mode.as_deref() == Some(std::ffi::OsStr::new("--launch-epoch252-delivery")) {
+        let quote = args
+            .next()
+            .context("provide the epoch 252 delivery quote")?;
+        let digest = args.next().context("provide the delivery quote SHA-256")?;
+        ensure!(
+            args.next().is_none(),
+            "unexpected epoch 252 delivery argument"
+        );
+        let report = handoff252::delivery::launch(
+            Path::new(&quote),
+            digest.to_str().context("quote digest")?,
+        )?;
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
     ensure!(
         args.next().is_none(),
-        "usage: horizon-epoch257-commit-source [--epoch252 | --epoch261 | --reconcile-epoch252]"
+        "usage: horizon-epoch257-commit-source [--epoch252 | --epoch261 | --reconcile-epoch252 | --launch-epoch252-delivery QUOTE SHA256]"
     );
     if mode.as_deref() == Some(std::ffi::OsStr::new("--reconcile-epoch252")) {
         println!("{}", serde_json::to_string_pretty(&handoff252::run()?)?);

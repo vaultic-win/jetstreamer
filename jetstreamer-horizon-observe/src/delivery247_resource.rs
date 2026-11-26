@@ -29,6 +29,7 @@ impl Owner<'_> {
             UNIT249 => "249-249",
             UNIT250 | STAGED250 => "250-250",
             UNIT251 => "251-251",
+            staged::CURRENT252_UNIT => "252-252",
             staged::CURRENT257_UNIT | staged::RETRY257_UNIT => "257-257",
             staged::CURRENT261_UNIT => "261-261",
             UNIT265 | RETRY265 | STAGED265 => "265-265",
@@ -140,6 +141,7 @@ pub(super) fn validate(c: &Config) -> Result<()> {
         (Epoch249, &c.delivery249_claim),
         (Epoch250, &c.delivery250_claim),
         (Epoch251, &c.delivery251_claim),
+        (Current252, &c.delivery252_claim),
         (Current257, &c.delivery257_claim),
         (Current261, &c.delivery261_claim),
         (Epoch265, &c.delivery265_claim),
@@ -500,6 +502,7 @@ pub(super) enum OrdinaryEpoch {
     Epoch250,
     Staged250,
     Epoch251,
+    Current252,
     Current257,
     Retry257,
     Current261,
@@ -516,6 +519,7 @@ impl OrdinaryEpoch {
             Self::Epoch249 => 249,
             Self::Epoch250 | Self::Staged250 => 250,
             Self::Epoch251 => 251,
+            Self::Current252 => 252,
             Self::Current257 | Self::Retry257 => 257,
             Self::Current261 => 261,
             Self::Epoch265 | Self::Retry265 | Self::Staged265 => 265,
@@ -533,6 +537,7 @@ impl OrdinaryEpoch {
             Self::Epoch250 => UNIT250,
             Self::Staged250 => STAGED250,
             Self::Epoch251 => UNIT251,
+            Self::Current252 => staged::CURRENT252_UNIT,
             Self::Current257 => staged::CURRENT257_UNIT,
             Self::Retry257 => staged::RETRY257_UNIT,
             Self::Current261 => staged::CURRENT261_UNIT,
@@ -543,7 +548,7 @@ impl OrdinaryEpoch {
     }
     fn image(self) -> (&'static str, &'static str) {
         match self {
-            Self::Current257 | Self::Retry257 | Self::Current261 => {
+            Self::Current252 | Self::Current257 | Self::Retry257 | Self::Current261 => {
                 (staged::CURRENT257_IMAGE, staged::CURRENT257_IMAGE_SHA)
             }
             Self::Staged211
@@ -566,6 +571,7 @@ impl OrdinaryEpoch {
             Self::Epoch250 => "12e68ddf9b6d2505b6090688b5a3cfa4e720242b264cf2a6e7993b9b02f910c2",
             Self::Staged250 => "e96999d456f560fcdc1e1c2c29d11bb4fac9adde7d127542112fe77451c49aa0",
             Self::Epoch251 => "1c815780661e8b502634caff4a2b0d783e831fccc27c612d6a94c3480d00e318",
+            Self::Current252 => "6ba28009779196b5e3cfa7d899c9a671df20c79f1230770b98e90a000a3de7e7",
             Self::Current257 => "a4a86f9d1a571c15f89e76be632c5dd69509d412cd0d46414699e82ba64abf07",
             Self::Retry257 => "8f880f488d6732da513716d1dda8073451afe773906fc761f525223567b4dc49",
             Self::Current261 => "e0b08c8ffdd57dba7d3e24cb4bb24990aae95d88d9ec2e577a4962899c5736f1",
@@ -591,6 +597,7 @@ impl OrdinaryEpoch {
     }
     fn claim_path(self) -> PathBuf {
         match self {
+            Self::Current252 => Path::new(staged::CURRENT252_DIRECTORY).join("pipeline-claim.json"),
             Self::Current257 => Path::new(staged::CURRENT257_DIRECTORY).join("pipeline-claim.json"),
             Self::Retry257 => Path::new(staged::RETRY257_DIRECTORY).join("pipeline-claim.json"),
             Self::Current261 => Path::new(staged::CURRENT261_DIRECTORY).join("pipeline-claim.json"),
@@ -602,8 +609,13 @@ impl OrdinaryEpoch {
     fn argv(self) -> Vec<String> {
         let epoch = self.number();
         let (source, receipts, plan) = match self {
-            Self::Current257 | Self::Retry257 | Self::Current261 => {
+            Self::Current252 | Self::Current257 | Self::Retry257 | Self::Current261 => {
                 let (source, receipts, plan) = match self {
+                    Self::Current252 => (
+                        "/home/ubuntu/.jetstreamer-private/qualification-252-regional-singleton-v1/output",
+                        "/var/lib/jetstreamer/horizon252-current-reader-preparation-v1/receipts",
+                        "/var/lib/jetstreamer/horizon252-current-reader-plan-v1/epoch-252-plan.json",
+                    ),
                     Self::Current261 => (
                         "/home/ubuntu/.jetstreamer-private/qualification-261-singleton-v1/output",
                         "/var/lib/jetstreamer/horizon261-current-reader-preparation-v1/receipts",
@@ -779,6 +791,7 @@ impl DeliveryClaim {
                         | OrdinaryEpoch::Pinned247
                         | OrdinaryEpoch::Staged248
                         | OrdinaryEpoch::Staged250
+                        | OrdinaryEpoch::Current252
                         | OrdinaryEpoch::Current257
                         | OrdinaryEpoch::Retry257
                         | OrdinaryEpoch::Current261
@@ -855,6 +868,7 @@ pub(super) fn sample_ordinary(epoch: OrdinaryEpoch, claim: &DeliveryClaim, clock
         sha,
         cap: match epoch {
             OrdinaryEpoch::Pinned247 => 24 << 30,
+            OrdinaryEpoch::Current252 => staged::CURRENT252_MEMORY_CAP,
             OrdinaryEpoch::Current257 => staged::CURRENT257_MEMORY_CAP,
             OrdinaryEpoch::Retry257 => staged::RETRY257_MEMORY_CAP,
             OrdinaryEpoch::Current261 => staged::CURRENT261_MEMORY_CAP,
@@ -948,17 +962,18 @@ mod tests {
     }
 
     #[test]
-    fn current_261_uses_its_own_delivery_plan_and_claim() {
-        let epoch = OrdinaryEpoch::Current261;
-        let args = epoch.argv();
-        assert_eq!(Owner { unit: epoch.unit(), ..ORIGINAL }.range(), "261-261");
-        assert_eq!(args[4..7], ["261-261", "--concurrency", "1"]);
-        assert!(args[10].ends_with("/epoch-261-plan.json"));
-        assert_eq!(args[12], epoch.digest());
-        assert_eq!(
-            epoch.claim_path(),
-            Path::new(staged::CURRENT261_DIRECTORY).join("pipeline-claim.json")
-        );
+    fn each_current_reader_delivery_uses_its_own_plan_and_claim() {
+        for (epoch, range, directory) in [
+            (OrdinaryEpoch::Current252, "252-252", staged::CURRENT252_DIRECTORY),
+            (OrdinaryEpoch::Current261, "261-261", staged::CURRENT261_DIRECTORY),
+        ] {
+            let args = epoch.argv();
+            assert_eq!(Owner { unit: epoch.unit(), ..ORIGINAL }.range(), range);
+            assert_eq!(args[4..7], [range, "--concurrency", "1"]);
+            assert!(args[10].ends_with(&format!("/epoch-{}-plan.json", epoch.number())));
+            assert_eq!(args[12], epoch.digest());
+            assert_eq!(epoch.claim_path(), Path::new(directory).join("pipeline-claim.json"));
+        }
     }
 
     #[test]
