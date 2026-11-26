@@ -23,6 +23,7 @@ const STAGED_248_UNIT: &str = "horizon-upload-248-staged-public-v259.service";
 const STAGED_250_UNIT: &str = "horizon-upload-250-staged-public-v257.service";
 const STAGED_265_UNIT: &str = "horizon-upload-265-staged-public-v260.service";
 const STAGED_250_MEMORY_CAP: u64 = 10 << 30;
+const EPOCH230_BOUNDED_MISMATCH_UNIT: &str = "horizon-perf-epoch230-bounded-mismatch@v2.service";
 
 fn registered_upload(fleet: &Value, owner: &successor::Owner) -> Result<()> {
     let belongs = |r: &&Value| {
@@ -304,15 +305,25 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                 "unregistered epoch 247 uploader"
             );
         }
-        let comparable = matches!(
-            active["phase"].as_str(),
-            Some(
-                "replay"
-                    | "qualification"
-                    | "private-known-root-prefix"
-                    | "diagnostic-qualification"
-            )
-        );
+        let bounded_mismatch_trace = name == EPOCH230_BOUNDED_MISMATCH_UNIT;
+        if bounded_mismatch_trace {
+            ensure!(
+                active["epoch"] == 230
+                    && active["phase"] == "diagnostic-qualification"
+                    && active["ordinary_replay_claim"] == false,
+                "epoch 230 bounded mismatch trace has a foreign scope"
+            );
+        }
+        let comparable = !bounded_mismatch_trace
+            && matches!(
+                active["phase"].as_str(),
+                Some(
+                    "replay"
+                        | "qualification"
+                        | "private-known-root-prefix"
+                        | "diagnostic-qualification"
+                )
+            );
         if let Some(old) = owners.insert(name.to_string(), (iid.to_string(), comparable)) {
             ensure!(
                 old == (iid.to_string(), comparable),
@@ -1003,6 +1014,30 @@ mod tests {
                 .unwrap()
                 .contains("missing from coordinated RSS")
         );
+    }
+    #[test]
+    fn bounded_vote_trace_charges_rss_without_changing_the_marginal_replay_cost() {
+        let (mut observer, mut ledger) = fixture();
+        for role in [
+            "controller_before",
+            "controller_after",
+            "producer_before",
+            "producer_after",
+        ] {
+            observer["diagnostic_replays"][0]["observation"][role]["unit"] =
+                json!(EPOCH230_BOUNDED_MISMATCH_UNIT);
+        }
+        ledger["active"][0]["producer"]["Id"] = json!(EPOCH230_BOUNDED_MISMATCH_UNIT);
+        ledger["active"][0]["epoch"] = json!(230);
+        ledger["active"][0]["ordinary_replay_claim"] = json!(false);
+        let result = report(&observer, &ledger);
+        assert_eq!(result["valid"], true, "{result}");
+        assert_eq!(result["executing_production_lanes"], 2);
+        assert_eq!(result["non_replay_owner_count"], 1);
+        assert_eq!(result["non_replay_resident_bytes"], 142_216_388_608u64);
+        assert_eq!(result["marginal_lane_rss_bytes"], 131_034_574_848u64);
+        ledger["active"][0]["ordinary_replay_claim"] = json!(true);
+        assert_eq!(report(&observer, &ledger)["valid"], false);
     }
     #[test]
     fn finalization_owner_retains_rss_without_counting_as_replay() {
