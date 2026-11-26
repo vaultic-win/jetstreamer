@@ -8,6 +8,8 @@ use std::{env, fs::OpenOptions, io::Read, os::unix::fs::OpenOptionsExt};
 // Every listed legacy false positive lies strictly between CID-rooted, consecutive
 // physical parent and child blocks in the qualified CAR windows.
 const MANIFEST_SHA: &str = "cc4250c62eee9136933a87909891041c40bf5f2bc28fde36906e071a1b7156d0";
+const COHORT_261_262_MANIFEST_SHA: &str =
+    "03cf5ee3c3a92e9e167dbf0728388fa7169c09cd1b104c3fe87608a01fcd2be4";
 const COHORT_267_268_MANIFEST_SHA: &str =
     "80245e30eb7dbe2ccfdac4b17110799100f6ffd2356b455751735cd93a3f4802";
 const COHORT_267_270_SHA: &str = "3e0bfe7153bb17f13dc75caac88b8e4f6ff06760520d48b7f92b5d66e6c5027d";
@@ -112,6 +114,17 @@ const EPOCH_261: Profile = Profile {
         112752259, 112754475, 112760466, 112770767, 112794584, 112795207,
         112830589, 112846318, 112880356, 112895677, 112947842, 112960930,
         112961016, 113075171, 113078372, 113094128,
+    ],
+};
+
+const EPOCH_262: Profile = Profile {
+    epoch: 262,
+    raw_sha: "df134d946b6b92d6944f82b3eed9bff7f60d23d57466a22e59af5946e22332ea",
+    compact_sha: "6b444cbc84ee2e411f749b576bda17fa1672f2dc1b3138ecb2d2079752573263",
+    proven_skips: &[
+        113186300, 113240852, 113259940, 113312724, 113432489, 113502214, 113514549,
+        113532168, 113535052, 113545077, 113553812, 113567795, 113572235, 113577358,
+        113583018, 113590552, 113601617, 113602276,
     ],
 };
 
@@ -283,6 +296,7 @@ impl RootedSlotPresence {
             200 => (&EPOCH_200, MANIFEST_SHA),
             257 => (&EPOCH_257, "8ee8ed720d8c7e96ebc9ada87817896b8be8ed1d7703d8ff112aec7f8d4087e7"),
             261 => (&EPOCH_261, "3bd36d83a86989c8db03fcdb2c5c41950182ae99b4f16202f5bc115d4357e8f9"),
+            262 => (&EPOCH_262, COHORT_261_262_MANIFEST_SHA),
             267 => (
                 &EPOCH_267,
                 "e6f765e4fdca3f5e2c7c8bb1cda38b8ad9ff0e801dcb6df75799f74ce9e47f6f",
@@ -364,6 +378,7 @@ impl RootedSlotPresence {
         };
         let configured = env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").ok();
         let in_cohort = match configured.as_deref() {
+            Some(COHORT_261_262_MANIFEST_SHA) => (261..=262).contains(&epoch),
             Some(COHORT_267_268_MANIFEST_SHA) => (267..=268).contains(&epoch),
             Some(COHORT_267_270_SHA) => (267..=270).contains(&epoch),
             Some(COHORT_270_274_SHA) => (270..=274).contains(&epoch),
