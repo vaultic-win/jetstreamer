@@ -14,6 +14,8 @@ const FULL170_RETRY5_V10: &str =
     "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-v7";
 const FULL170_INDEPENDENT: &str =
     "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v1";
+const FULL170_AFTER_STOP: &str =
+    "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v4";
 const RETRY5_UNIT: &str = "horizon-qualify-168-full-metered-cold-v5-20261125.service";
 const RETRY5_TIMER: &str = "horizon-guard-168-full-metered-cold-v5-20261125.timer";
 const V12_REGISTRATION: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V12_ACTIVE.json";
@@ -25,6 +27,14 @@ const V13_PACKAGE: &str =
     "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v13-entry146";
 const V13_RECEIVER_SHA: &str = "4ec9ca4476a6e8ed21090e9dfeb58582916b00610f5145a9181a8cadc0dbb695";
 const V13_WRITER_SHA: &str = "3d2401bb1bfe9a65f68503c2feca30c0630ea876ad04fa01d1a6a5eda374e8ab";
+pub(super) const V14_REGISTRATION: &str =
+    "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V14_ACTIVE.json";
+const V14_READY: &str = "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V14_READY.json";
+const V14_PACKAGE: &str =
+    "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v14-entry146";
+const V14_RECEIVER_SHA: &str = "30e9b44288e02b17dccf4517ef0b03ed8088ac80d6e0a0313e8c8c0195ccdf82";
+const V14_WRITER_SHA: &str = "960088fc35cf205c67a52c755810f8deb3518225695e366afd4216a794aed4b6";
+const V14_SEAL_SHA: &str = "1b9f179d7ad7802c637f2203f0d1151b0a244b328fabc872936dcb11c54ec2fd";
 const RETRY5_SHA: &str = "906eabc8de4ead288fcae3b514daff4a18786fd9e7200ff8fbbac6a96e933716";
 const RETRY4_STOP_SHA: &str = "b0538a4dee05df924a8d04f8562866df701c03996498963552a932059826cdab";
 const V9_PHASE: &str = "v9-semantic-complete-drained";
@@ -193,12 +203,22 @@ fn validate_v13_actor(active: &Value, previous: &Value) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn check_v13_cadence(active: &Value, ready: &Value, seal: &Value) -> Result<()> {
-    let package = rt(V13_PACKAGE);
+pub(super) fn check_metered_cadence(
+    active: &Value,
+    ready: &Value,
+    seal: &Value,
+    after_stop: bool,
+) -> Result<()> {
+    let (ready_path, package_path, receiver_sha, writer_sha) = if after_stop {
+        (V14_READY, V14_PACKAGE, V14_RECEIVER_SHA, V14_WRITER_SHA)
+    } else {
+        (V13_READY, V13_PACKAGE, V13_RECEIVER_SHA, V13_WRITER_SHA)
+    };
+    let package = rt(package_path);
     let previous_ref = reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA);
-    let receiver = reference(&package.join("full170_status.py"), V13_RECEIVER_SHA);
+    let receiver = reference(&package.join("full170_status.py"), receiver_sha);
     ensure!(
-        active["ready"]["path"] == json!(rt(V13_READY))
+        active["ready"]["path"] == json!(rt(ready_path))
             && ready["schema"] == "horizon-epoch166-cadence-rejoin-ready-v1"
             && ready["package"]["path"] == json!(package.join("deployment-seal-receipt.json"))
             && seal["destination"] == json!(package)
@@ -215,10 +235,12 @@ pub(super) fn check_v13_cadence(active: &Value, ready: &Value, seal: &Value) -> 
             && active["new"]["program"] == json!(package.join("status_cycle.py")),
         "different V13 cadence receiver or V12 predecessor"
     );
-    let members = seal["members"].as_array().context("missing V13 members")?;
+    let members = seal["members"]
+        .as_array()
+        .context("missing metered cadence members")?;
     for (name, hash) in [
-        ("full170_status.py", V13_RECEIVER_SHA),
-        ("status_cycle.py", V13_WRITER_SHA),
+        ("full170_status.py", receiver_sha),
+        ("status_cycle.py", writer_sha),
         ("retry5-168-generation.json", RETRY5_SHA),
     ] {
         let mut selected = members.iter().filter(|row| row["name"] == name);
@@ -237,6 +259,17 @@ pub(super) fn check_v13_cadence(active: &Value, ready: &Value, seal: &Value) -> 
             && ready["timer"] == fleet["sole_next_timer"],
         "V13 changed the inherited observer clock"
     );
+    if after_stop {
+        let stop = &ready["retry5_scan_stop"];
+        let terminal = bound(&stop["terminal"], 0)?;
+        ensure!(
+            ready["package"]["sha256"] == V14_SEAL_SHA
+                && stop["producer_invocation_id"] == terminal["producer_invocation_id"]
+                && stop["resource_credit_bytes"] == 0
+                && stop["reservation_ending_bytes"] == 0,
+            "different V14 stop or receiver"
+        );
+    }
     validate_v13_actor(active, &bound(&previous_ref, 0)?)
 }
 
@@ -245,10 +278,13 @@ fn drained_provider(price: &Value, enrollment: &Value) -> Result<Option<PathBuf>
     let capture = &price["epoch170_metered_full"]["native_capture_receipt"];
     let incumbent = &enrollment["incumbent_registration"];
     let v13 = incumbent["path"] == json!(rt(V13_REGISTRATION));
+    let v14 = incumbent["path"] == json!(rt(V14_REGISTRATION));
     let retry5 = !price["full170_retry5_owner"].is_null();
     let v10 = phase["stage"] == V10_PHASE;
     let independent = phase["stage"] == INDEPENDENT_PHASE;
-    let package = rt(if independent {
+    let package = rt(if v14 {
+        FULL170_AFTER_STOP
+    } else if independent {
         FULL170_INDEPENDENT
     } else {
         match (v13, retry5, v10) {
@@ -275,12 +311,18 @@ fn drained_provider(price: &Value, enrollment: &Value) -> Result<Option<PathBuf>
         ]
         .iter()
         .any(|route| capture["program"]["path"] == json!(rt(route).join("post-stop-fit")))
+        && !v14
     {
         return Ok(None);
     }
-    ensure!(
+    let matching_cadence = if v14 {
+        independent && !retry5 && !price["full170_retry5_stopped"].is_null()
+    } else {
         (!(v10 || independent) || v13 && retry5)
             && (v13 || !retry5 && *incumbent == reference(&rt(V12_REGISTRATION), V12_ACTIVE_SHA))
+    };
+    ensure!(
+        matching_cadence
             && capture["program"]["path"] == json!(program)
             && capture["deployment"]["path"] == json!(receipt)
             && capture["source_epoch"] == 145
@@ -303,6 +345,26 @@ fn check_retry5_price(price: &Value, fleet: &Value) -> Result<()> {
             rows.is_empty(),
             "epoch 170 price omitted the live retry5 owner"
         );
+        let stopped = &price["full170_retry5_stopped"];
+        if !stopped.is_null() {
+            let stop = &stopped["stop"];
+            let terminal = bound(&stop["terminal"], 0)?;
+            let producer = properties(RETRY5_UNIT)?;
+            let timer = properties(RETRY5_TIMER)?;
+            let floor = number(stopped, "floor")?;
+            ensure!(
+                *stop == fleet["cold168_retry5_physical_scan_stop"]
+                    && stop["producer_invocation_id"] == terminal["producer_invocation_id"]
+                    && floor > 0
+                    && number(price, "active168_guard_floor")? == 0
+                    && producer["ActiveState"] == "inactive"
+                    && timer["ActiveState"] == "inactive"
+                    && producer["MainPID"] == "0"
+                    && timer["InvocationID"] == "",
+                "epoch 170 lost the stopped retry5 budget"
+            );
+            check_retry5_budget(price, floor)?;
+        }
         return Ok(());
     }
     let [row] = rows.as_slice() else {
@@ -338,13 +400,21 @@ fn check_retry5_price(price: &Value, fleet: &Value) -> Result<()> {
             && !peer["guard"].is_null(),
         "different retry5 claimant, admission or guard in epoch 170 price"
     );
+    let floor = number(owner, "floor")?;
+    ensure!(
+        number(price, "active168_guard_floor")? == floor,
+        "different live retry5 floor"
+    );
+    check_retry5_budget(price, floor)
+}
+
+fn check_retry5_budget(price: &Value, floor: u64) -> Result<()> {
     let projection = &price["full170_retry5_projection"];
     let booking = &price["bookings"]["168"];
     let retry5 = &price["retry5_complete_booking"];
     let base = number(projection, "native_current_HOME_bytes")?;
     let zero = number(projection, "native_zero_remaining_HOME_bytes")?;
     let donor = number(projection, "donor_HOME_bytes")?;
-    let floor = number(owner, "floor")?;
     let growth = number(booking, "remaining_bytes")?;
     let lag = number(retry5, "outside_cap_stop_allowance_bytes")?;
     ensure!(
@@ -352,7 +422,6 @@ fn check_retry5_price(price: &Value, fleet: &Value) -> Result<()> {
             && zero <= base
             && base <= donor
             && floor > 0
-            && number(price, "active168_guard_floor")? == floor
             && number(retry5, "retained_guard_floor_bytes")? == floor
             && number(retry5, "retained_base_HOME_bytes")? == donor
             && number(retry5, "candidate_remaining_bytes")? == growth
@@ -438,7 +507,7 @@ pub(super) fn validate_drained_price(price: &Value, enrollment: &Value) -> Resul
             );
         }
     }
-    if package == rt(FULL170_INDEPENDENT) {
+    if package == rt(FULL170_INDEPENDENT) || package == rt(FULL170_AFTER_STOP) {
         return validate_independent_phase(&package, phase);
     }
     let owner = if package == rt(FULL170_RETRY5_V10) {
@@ -708,6 +777,7 @@ pub(super) fn quote(
         "full170-v9-v13-retry5" => rt(FULL170_RETRY5),
         "full170-v10-v13-retry5" => rt(FULL170_RETRY5_V10),
         "full170-independent-v13-retry5" => rt(FULL170_INDEPENDENT),
+        "full170-independent-v14-after-stop" => rt(FULL170_AFTER_STOP),
         _ => bail!("unknown epoch 170 capacity provider deployment"),
     };
     let sealed = reference(
@@ -877,6 +947,26 @@ mod tests {
             });
             assert!(drained_provider(&native, exact).is_err());
         }
+    }
+
+    #[test]
+    fn v14_quote_requires_the_exact_stopped_route_and_no_live_retry5_owner() {
+        let v14 = json!({"incumbent_registration":reference(&rt(V14_REGISTRATION), "fixture")});
+        let v13 = json!({"incumbent_registration":reference(&rt(V13_REGISTRATION), "fixture")});
+        let dir = rt(FULL170_AFTER_STOP);
+        let mut quote = json!({"phase145":{"stage":INDEPENDENT_PHASE}, "recorded_unix_seconds":1,
+            "full170_retry5_stopped":{"floor":512},
+            "epoch170_metered_full":{"native_capture_receipt":{
+                "program":{"path":dir.join("post-stop-fit")},
+                "deployment":{"path":dir.join("deployment-seal-receipt.json")},
+                "source_epoch":145,"recorded_unix_seconds":1}}});
+        assert_eq!(drained_provider(&quote, &v14).unwrap(), Some(dir));
+        assert!(drained_provider(&quote, &v13).is_err());
+        quote["full170_retry5_owner"] = json!({"fixture":true});
+        assert!(drained_provider(&quote, &v14).is_err());
+        quote["full170_retry5_owner"] = Value::Null;
+        quote["full170_retry5_stopped"] = Value::Null;
+        assert!(drained_provider(&quote, &v14).is_err());
     }
 
     #[test]

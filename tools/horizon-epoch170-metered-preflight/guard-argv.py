@@ -17,9 +17,13 @@ EVIDENCE = RUNTIME / "prefix140-status-cadence-20261122-v1/cadence-tools"
 RECEIVER = RUNTIME / "survivor172-cadence-20261122-v1/tools-cold168-retry4-failed166-v7-entry146"
 CADENCE = RECEIVER.parent
 V13 = CADENCE / "tools-cold168-retry5-failed166-v13-entry146"
+V14 = CADENCE / "tools-cold168-retry5-failed166-v14-entry146"
 V12_OWNER_SHA = "b42e7b3c5327438cd355357f73f2574c05ffbd67fd9597aa7d05c17f8324cc54"
 V13_RECEIVER_SHA = "4ec9ca4476a6e8ed21090e9dfeb58582916b00610f5145a9181a8cadc0dbb695"
 V13_WRITER_SHA = "3d2401bb1bfe9a65f68503c2feca30c0630ea876ad04fa01d1a6a5eda374e8ab"
+V14_RECEIVER_SHA = "30e9b44288e02b17dccf4517ef0b03ed8088ac80d6e0a0313e8c8c0195ccdf82"
+V14_WRITER_SHA = "960088fc35cf205c67a52c755810f8deb3518225695e366afd4216a794aed4b6"
+V14_SEAL_SHA = "1b9f179d7ad7802c637f2203f0d1151b0a244b328fabc872936dcb11c54ec2fd"
 POST_BUILD = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5z-build-v1"
 PREDECESSOR = RUNTIME / "epoch170-retry10-recovery-20261121-v1/guard-receipts/stop-completion.json"
 PREDECESSOR_SHA = "d670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a"
@@ -56,38 +60,46 @@ def v13_writer(price, enrollment):
     status = price["status_registration"]
     incumbent = enrollment["incumbent"]
     active_ref = enrollment["incumbent_registration"]
-    need(active_ref["path"] == str(CADENCE / "FAILED166_CADENCE_V13_ACTIVE.json")
-         and status["consumer_seal"]["path"] == str(V13 / "deployment-seal-receipt.json"),
+    after_stop = active_ref["path"] == str(CADENCE / "FAILED166_CADENCE_V14_ACTIVE.json")
+    version, package = (14, V14) if after_stop else (13, V13)
+    receiver_sha, writer_sha = (V14_RECEIVER_SHA, V14_WRITER_SHA) if after_stop else (V13_RECEIVER_SHA, V13_WRITER_SHA)
+    need(active_ref["path"] == str(CADENCE / f"FAILED166_CADENCE_V{version}_ACTIVE.json")
+         and status["consumer_seal"]["path"] == str(package / "deployment-seal-receipt.json"),
          "current cadence cannot adopt the held full epoch 170 worker")
     active = checked(active_ref)
     ready = checked(active["ready"])
+    if after_stop:
+        stopped = price["full170_retry5_stopped"]["stop"]
+        need(status["consumer_seal"]["sha256"] == V14_SEAL_SHA
+             and ready["retry5_scan_stop"] == stopped == checked(price["fleet"])["cold168_retry5_physical_scan_stop"],
+             "different retained retry5 filesystem scan stop")
     seal = checked(status["consumer_seal"])
     actor = active["new"]
     previous_ref = reference(CADENCE / "FAILED166_CADENCE_V12_ACTIVE.json", V12_OWNER_SHA)
     previous = checked(previous_ref)["new"]
-    receiver = reference(V13 / "full170_status.py", V13_RECEIVER_SHA)
-    program = reference(V13 / "status_cycle.py", V13_WRITER_SHA)
+    receiver = reference(package / "full170_status.py", receiver_sha)
+    program = reference(package / "status_cycle.py", writer_sha)
     member, = (row for row in seal["members"] if row["name"] == "full170_status.py")
     need(active["schema"] == "horizon-epoch166-cadence-rejoin-active-v1"
          and active["producer_mutations"] is False
-         and active["ready"]["path"] == str(CADENCE / "FAILED166_CADENCE_V13_READY.json")
+         and active["ready"]["path"] == str(CADENCE / f"FAILED166_CADENCE_V{version}_READY.json")
          and ready["package"] == status["consumer_seal"]
          and ready["old_owner"] == previous_ref and active["old"] == previous
          and actor["invocation_id"] != previous["invocation_id"] and actor["start_ticks"] > previous["start_ticks"]
          and all(actor["lock"][key] == previous["lock"][key] for key in ("path", "device", "inode"))
-         and ready["full170_receiver"] == bound(V13 / "full170_status.py") == receiver
-         and seal["destination"] == str(V13)
-         and member["mode"] == "0444" and member["sha256"] == V13_RECEIVER_SHA
-         and incumbent["program"] == bound(V13 / "status_cycle.py") == program
+         and ready["full170_receiver"] == bound(package / "full170_status.py") == receiver
+         and seal["destination"] == str(package)
+         and member["mode"] == "0444" and member["sha256"] == receiver_sha
+         and incumbent["program"] == bound(package / "status_cycle.py") == program
          and actor["program"] == program["path"]
          and all(status[key] == incumbent[key] == actor[key] for key in ("invocation_id", "pid", "start_ticks")),
-         "different V13 receiver or enrolled writer")
+         f"different V{version} receiver or enrolled writer")
     unit = "horizon-archive-status-cadence-after172-20261120-v1.service"
     manager = show(unit, ("Id", "InvocationID", "MainPID", "ActiveState", "NRestarts", "Job"))
     need(actor["unit"] == unit and manager == dict(
         Id=unit, InvocationID=actor["invocation_id"], MainPID=str(actor["pid"]),
         ActiveState="active", NRestarts="0", Job="") and ticks(actor["pid"]) == actor["start_ticks"],
-         "V13 writer changed before the epoch 170 transition")
+         f"V{version} writer changed before the epoch 170 transition")
 
 
 def protected_retry5(price, now):
@@ -254,8 +266,9 @@ def release_record(route, actor, intent, plan_ref, first_ref, post_ref, boot, no
              and stage["observer_enrollment"] == enrollment_ref,
              "epoch 170 post-guard quote changed the enrolled V13 writer")
         v13_writer(post, checked(enrollment_ref))
-    need(post.get("full170_retry5_owner") == pre.get("full170_retry5_owner"),
-         "retry5 ownership differs between epoch 170 prestart and post-guard prices")
+    need(all(post.get(field) == pre.get(field)
+             for field in ("full170_retry5_owner", "full170_retry5_stopped")),
+         "retry5 authority differs between epoch 170 prestart and post-guard prices")
     protected_retry5(post, now)
     return dict(actor, intent=intent_ref, actual_guard_plan=plan_ref, first_guard=first_ref,
                 post_guard_capacity=post_ref, transaction_replay_claimed=False)
