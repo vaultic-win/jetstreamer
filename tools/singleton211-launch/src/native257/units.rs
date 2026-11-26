@@ -12,7 +12,7 @@ pub(super) const GUARD_ARG: Argument = Argument {
     env: "guard.env",
     plan: "guard-plan.json",
 };
-fn parse_cpu_list(raw: &str) -> Result<BTreeSet<u64>> {
+pub(super) fn parse_cpu_list(raw: &str) -> Result<BTreeSet<u64>> {
     let mut values = BTreeSet::new();
     for token in raw.trim().split(',') {
         let (left, right) = token.split_once('-').unwrap_or((token, token));

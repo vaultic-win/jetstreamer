@@ -378,15 +378,15 @@ fn exclusive(rows: &[Extent], cap: u64) -> Result<u64> {
     ensure!(total <= cap, "allocation exceeds charged image");
     Ok(total)
 }
-fn retained(first: &[Extent], second: &[Extent]) -> u64 {
-    let (mut i, mut j, mut bytes) = (0, 0, 0);
+fn visit_retained(first: &[Extent], second: &[Extent], mut visit: impl FnMut(u64, u64)) {
+    let (mut i, mut j) = (0, 0);
     while i < first.len() && j < second.len() {
         let (a, b) = (first[i], second[j]);
         let lo = a.start.max(b.start);
         let hi = a.end.min(b.end);
         // Both physical ranges were checked for overflow on ingestion.
         if hi > lo && a.physical + (lo - a.start) == b.physical + (lo - b.start) {
-            bytes += hi - lo;
+            visit(a.physical + (lo - a.start), hi - lo);
         }
         if a.end <= b.end {
             i += 1;
@@ -395,7 +395,33 @@ fn retained(first: &[Extent], second: &[Extent]) -> u64 {
             j += 1;
         }
     }
+}
+fn retained(first: &[Extent], second: &[Extent]) -> u64 {
+    let mut bytes = 0;
+    visit_retained(first, second, |_, length| bytes += length);
     bytes
+}
+
+/// Physical ranges are data only. Callers must bind the filesystem, file identity and
+/// complete scope and reject duplicate allocation before applying any credit.
+pub(crate) fn stable_file_ranges(file: &File) -> Result<Vec<(u64, u64)>> {
+    let before = file.metadata()?;
+    ensure!(before.is_file(), "physical range scan requires a regular file");
+    let cap = before.len() / BLOCK * BLOCK;
+    let first = scan(file, cap)?;
+    let second = scan(file, cap)?;
+    let after = file.metadata()?;
+    if metadata_identity(&before) != metadata_identity(&after) || before.nlink() != after.nlink() {
+        return Ok(Vec::new());
+    }
+    let allocated = after.blocks().checked_mul(512).context("allocation count wraps")?;
+    ensure!(
+        exclusive(&first, cap)? <= allocated && exclusive(&second, cap)? <= allocated,
+        "extent map exceeds kernel allocation count"
+    );
+    let mut matched = Vec::new();
+    visit_retained(&first, &second, |start, length| matched.push((start, length)));
+    Ok(matched)
 }
 struct Sample {
     id: Value,

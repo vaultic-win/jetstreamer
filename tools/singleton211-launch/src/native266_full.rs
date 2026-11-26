@@ -10,7 +10,7 @@ mod epoch228_peer;
 mod epoch228_storage;
 mod funding;
 mod gate;
-mod peer228_extents;
+pub(crate) mod peer228_extents;
 pub(crate) mod peer261;
 mod start;
 mod stopped;

@@ -1,11 +1,16 @@
 //! Bind the current Foundation cohort for epoch 262 funding. This command is read-only.
 use super::*;
+mod allocation;
 
 const FLEET_ROOT: &str = "/home/ubuntu/.codex/diagnostics";
 const FLEET_PREFIX: &str = "horizon-foundation-seven-lane-v";
 const REPLAY_BOOKING: (&str, &str) = (
     "/var/lib/jetstreamer/horizon262-native-bootstrap-build-v1/cold-fit-v342.json",
     "9ff35b7b5902e65b23bf2e862692cce959948183fefd42537e2a9fa63107f36c",
+);
+const DELIVERY_BOOKING: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon257-current-reader-delivery-v2/booking.json",
+    "fe90d6ab3c352bf4f6f903457b16edb48c8a10d1a836941df5c8aa9544f51d13",
 );
 const OWNER_FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemorySwapMax,ExecStart,AllowedCPUs";
 const GUARD_FIELDS: &str =
@@ -274,6 +279,16 @@ fn receipt(n: &mut Native) -> Result<Value> {
     let booking_ref = Bound::new(REPLAY_BOOKING.0, REPLAY_BOOKING.1);
     let booking = booking_ref.sealed()?;
     let roster = fleet_roster(&fleet, &booking)?;
+    let missing: Vec<_> = fleet["inventory"]["entries"]
+        .as_array()
+        .context("Foundation inventory")?
+        .iter()
+        .filter(|row| row["epoch"] == EPOCH)
+        .collect();
+    ensure!(
+        missing.len() == 1 && missing[0]["state"] == "missing",
+        "epoch 262 inventory no longer missing"
+    );
     let expected: BTreeSet<String> = booking["owners"]
         .as_object()
         .context("booked owners")?
@@ -291,6 +306,10 @@ fn receipt(n: &mut Native) -> Result<Value> {
         fs::metadata(text(&observer["filesystem"], "path")?)?.dev() == device,
         "Foundation filesystem changed"
     );
+    let mount = pristine(device)?;
+    let resources_before = live::resources_at(Path::new(FILESYSTEM))?;
+    let cpus = units::affinity(&json!({"cpu_affinity":(40..48).collect::<Vec<_>>() }))?;
+    let selected = units::parse_cpu_list("40-47")?;
     let mut recorded = BTreeMap::new();
     for unit in &before {
         let owner = n.show_fields(unit, OWNER_FIELDS)?;
@@ -311,6 +330,10 @@ fn receipt(n: &mut Native) -> Result<Value> {
             live::same_owner(prior, &owner)?;
         }
         let cap = text(&owner, "MemoryMax")?.parse()?;
+        ensure!(
+            selected.is_disjoint(&units::parse_cpu_list(text(&owner, "AllowedCPUs")?)?),
+            "epoch 262 CPUs overlap {unit}"
+        );
         let memory = live::finite_owner(&owner, unit, text(&owner, "InvocationID")?, cap)?;
         let process_start_ticks = process_ticks(text(&owner, "MainPID")?.parse()?)?;
         recorded.insert(unit.clone(), (owner, memory, process_start_ticks));
@@ -330,7 +353,8 @@ fn receipt(n: &mut Native) -> Result<Value> {
             )?,
         );
     }
-    for (unit, (owner, _, start_ticks)) in &recorded {
+    let allocation = allocation::measure(n, &guards, device)?;
+    for (unit, (owner, memory, start_ticks)) in &mut recorded {
         let after = n.show_fields(unit, OWNER_FIELDS)?;
         live::same_owner(owner, &after)?;
         ensure!(
@@ -339,6 +363,12 @@ fn receipt(n: &mut Native) -> Result<Value> {
                 && *start_ticks == process_ticks(text(&after, "MainPID")?.parse()?)?,
             "owner cap, CPUs or process changed for {unit}"
         );
+        *memory = (*memory).min(live::finite_owner(
+            &after,
+            unit,
+            text(owner, "InvocationID")?,
+            text(owner, "MemoryMax")?.parse()?,
+        )?);
     }
     ensure!(
         listed_owners(n)? == before && latest_completion()? == completion,
@@ -353,6 +383,77 @@ fn receipt(n: &mut Native) -> Result<Value> {
             "Foundation guard timer changed during roster binding"
         );
     }
+    let resources_after = live::resources_at(Path::new(FILESYSTEM))?;
+    ensure!(
+        resources_before.0 == resources_after.0 && mount == pristine(device)?,
+        "epoch 262 resources or scratch mount changed"
+    );
+    let delivery_ref = Bound::new(DELIVERY_BOOKING.0, DELIVERY_BOOKING.1);
+    let delivery = delivery_ref.sealed()?;
+    let disk_floor = guards
+        .values()
+        .map(|g| num(g, "minimum_free_bytes"))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .max()
+        .context("missing Foundation guard floor")?;
+    let prior_growth = booking["guard_growth"]
+        .as_object()
+        .context("prior growth reservations")?
+        .values()
+        .try_fold(0, |sum, row| {
+            capacity::add(sum, num(row, "remaining_growth_bytes")?)
+        })?;
+    let non_guard_disk = num(&booking, "full_protection_bytes")?
+        .checked_sub(capacity::add(disk_floor, prior_growth)?)
+        .context("prior protection arithmetic changed")?;
+    ensure!(
+        non_guard_disk >= num(&delivery, "receipt_scratch_maximum_bytes")?,
+        "epoch 257 retained disk reserve missing"
+    );
+    let growth = allocation["roots"]
+        .as_object()
+        .context("allocation roots")?
+        .values()
+        .try_fold(0, |sum, row| {
+            capacity::add(sum, num(row, "remaining_upper_bound_bytes")?)
+        })?;
+    let protected = capacity::add(capacity::add(disk_floor, non_guard_disk)?, growth)?;
+    let required = capacity::add(protected, DISK_RECEIPTS)?;
+    let free = num(&allocation, "conservative_available_bytes")?
+        .min(resources_before.2)
+        .min(resources_after.2);
+    let reserve = capacity::add(
+        resources_before.0 / 10,
+        num(&delivery, "guard_memory_allowance")?,
+    )?;
+    let candidate = capacity::add(MEMORY, capacity::add(CONTROLLER_MEMORY, GUARD_MEMORY)?)?;
+    let base_memory = capacity::add(reserve, candidate)?;
+    let (hard, growth_memory) = recorded.values().try_fold(
+        (base_memory, base_memory),
+        |(hard, growth), (owner, current, _)| {
+            let cap: u64 = text(owner, "MemoryMax")?.parse()?;
+            Ok::<_, anyhow::Error>((
+                capacity::add(hard, cap)?,
+                capacity::add(
+                    growth,
+                    cap.checked_sub(*current)
+                        .context("owner current exceeds cap")?,
+                )?,
+            ))
+        },
+    )?;
+    let available_memory = resources_before.1.min(resources_after.1);
+    let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
+        "remaining_guard_growth_bytes":growth,"protected_existing_disk_bytes":protected,
+        "candidate_disk_bytes":DISK_RECEIPTS,"required_disk_bytes":required,"available_disk_bytes":free,
+        "disk_shortfall_bytes":required.saturating_sub(free),"disk_margin_bytes":free.saturating_sub(required),
+        "combined_host_and_periodic_memory_reserve_bytes":reserve,"candidate_total_memory_bytes":candidate,
+        "required_hard_memory_bytes":hard,"host_total_memory_bytes":resources_before.0,
+        "required_remaining_memory_bytes":growth_memory,"available_memory_bytes":available_memory,
+        "memory_shortfall_bytes":hard.saturating_sub(resources_before.0).max(growth_memory.saturating_sub(available_memory)),
+        "fits":required<=free && hard<=resources_before.0 && growth_memory<=available_memory,
+        "cpus":cpus,"candidate_mount":mount,"delivery_booking":delivery_ref});
     let on_host_owners: BTreeMap<_, _> = recorded
         .into_iter()
         .map(|(unit, (owner, memory, ticks))| {
@@ -365,7 +466,7 @@ fn receipt(n: &mut Native) -> Result<Value> {
     let mut evidence = json!({"schema":"foundation-epoch262-roster-binding-v1","epoch":EPOCH,
         "recorded_unix_seconds":now()?,"fleet":fleet_ref,"observer":observer_ref,
         "completion":completion,"booking":booking_ref,"filesystem_device":device,
-        "owners":on_host_owners,"periodic_guards":guards,"admission_issued":false});
+        "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,"admission_issued":false});
     deny_authority(&mut evidence);
     Ok(evidence)
 }
