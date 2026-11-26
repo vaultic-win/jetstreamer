@@ -229,6 +229,40 @@ compile_error!("the V9 post verifier requires the qualified HTTP retry reader");
 compile_error!("the V5z post verifier requires the sealed successor reader");
 
 #[cfg(incident_v5x_post145_only)]
+fn semantic_handoff_receipt(path: &Path, v9: bool) -> Result<(Bound, Value)> {
+    if !v9 {
+        return publication::frozen_json(path);
+    }
+    let receipt = custody::binding(path)?;
+    let value = custody::json(&receipt, false)?;
+    Ok((receipt, value))
+}
+
+#[cfg(all(test, incident_v9_post145_only))]
+#[test]
+fn v9_handoff_receipts_accept_private_root_custody() -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().canonicalize()?.join("SEMANTIC_COMPLETION.json");
+    let contents = br#"{"archive_publication_authorized":false}"#;
+    fs::write(&path, contents)?;
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
+    assert!(semantic_handoff_receipt(&path, false).is_err());
+    if unsafe { libc::geteuid() } == 0 {
+        let (receipt, value) = semantic_handoff_receipt(&path, true)?;
+        assert_eq!(receipt.sha256, custody::sha(contents));
+        assert_eq!(value, serde_json::from_slice::<Value>(contents)?);
+    } else {
+        assert!(semantic_handoff_receipt(&path, true).is_err());
+    }
+
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o640))?;
+    assert!(semantic_handoff_receipt(&path, true).is_err());
+    Ok(())
+}
+
+#[cfg(incident_v5x_post145_only)]
 fn v5x_semantic_owner(export: &str) -> Result<()> {
     ensure!(
         custody::hex(export, 32) && export != "97bd2045ebe449e3ae77330c7e4ec7b4",
@@ -302,7 +336,7 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
     } else {
         family.join(format!("{generation}-name-handoff"))
     };
-    let (start, _) = publication::frozen_json(&handoff.join("START_RESULT.json"))?;
+    let (start, _) = semantic_handoff_receipt(&handoff.join("START_RESULT.json"), v9)?;
     if v7 {
         ensure!(
             seal_ref.sha256 == V7_SEAL && start.sha256 == V7_START,
@@ -326,7 +360,7 @@ fn v5x_semantic_owner(export: &str) -> Result<()> {
         "45",
     )?;
     let result: Value = serde_json::from_str(&report)?;
-    let (_, captured) = publication::frozen_json(&handoff.join("SEMANTIC_COMPLETION.json"))?;
+    let (_, captured) = semantic_handoff_receipt(&handoff.join("SEMANTIC_COMPLETION.json"), v9)?;
     if v9 {
         let recovery = Bound {
             path: Path::new(RUNTIME)
