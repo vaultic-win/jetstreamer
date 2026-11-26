@@ -30,7 +30,11 @@ mod data_fulfillment;
 mod handoff;
 #[path = "../../horizon_retry8_166_20261119_v1/guard/external/horizon_standalone_guard_native227.rs"]
 mod native227;
-#[path = "../../horizon_retry8_166_20261119_v1/guard/external/horizon_standalone_guard_root.rs"]
+#[cfg_attr(feature = "root-budget-fd", path = "root_budget_fd.rs")]
+#[cfg_attr(
+    not(feature = "root-budget-fd"),
+    path = "../../horizon_retry8_166_20261119_v1/guard/external/horizon_standalone_guard_root.rs"
+)]
 mod root_budget;
 
 #[derive(Debug, Deserialize)]
