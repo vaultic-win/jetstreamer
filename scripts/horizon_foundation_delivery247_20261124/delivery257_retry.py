@@ -64,18 +64,20 @@ def image(kind, name):
 
 
 def initial_status(current, registration):
-    path = STATE / "active-status/completion.json"
-    if not path.is_file():
-        return current
-    reference = ref(path)
-    done = bound(reference)
-    intent = bound(done["intent"])
-    assert done["key"] == "epoch-257.epoch-status.json" and done["authenticated_exact_byte_readback"]
-    assert intent["owner"]["claim"] == registration[0]
-    assert bound(done["readback"]) == intent["payload"]
-    if bound(current) == bound(intent["previous"]):
-        return reference
-    assert bound(bound(current)["readback"])["sampled_at_utc"] >= intent["payload"]["sampled_at_utc"]
+    for directory, phase in (("active-status", "verification"), ("upload-status", "upload")):
+        path = STATE / directory / "completion.json"
+        if not path.is_file():
+            continue
+        reference = ref(path)
+        done = bound(reference)
+        intent = bound(done["intent"])
+        assert done["key"] == "epoch-257.epoch-status.json" and done["authenticated_exact_byte_readback"]
+        assert intent["owner"]["claim"] == registration[0]
+        assert intent["payload"]["phase"] == phase and bound(done["readback"]) == intent["payload"]
+        if bound(current) == bound(intent["previous"]):
+            current = reference
+        else:
+            assert bound(bound(current)["readback"])["sampled_at_utc"] >= intent["payload"]["sampled_at_utc"]
     return current
 
 
