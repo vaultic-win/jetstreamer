@@ -117,6 +117,102 @@ pub(super) const SCOPES: [&Focused; 5] = [
     &FEATURE_296,
 ];
 
+pub(super) fn feature_296_terminal(n: &mut Native) -> Result<(Bound, Bound)> {
+    let scope = &FEATURE_296;
+    let state = Path::new(scope.state);
+    let terminal_path = state.join("terminal.json");
+    ensure!(
+        terminal_path.try_exists()?,
+        "epoch 296 full replay requires the corrected worker's verified checkpoint and drained guard"
+    );
+    let checkpoint = Bound::new(&terminal_path, hash(&terminal_path)?);
+    let terminal = checkpoint.sealed()?;
+    let launch_path = state.join("cadence-registration.json");
+    let launch_ref = Bound::new(&launch_path, hash(&launch_path)?);
+    let launch = launch_ref.sealed()?;
+    let profile_ref = Bound::new(state.join("profile.json"), scope.profile_sha);
+    let profile = profile_ref.sealed()?;
+    let worker = binding(&profile["worker"])?;
+    let worker_directory = worker
+        .path
+        .parent()
+        .context("epoch 296 sealed worker directory")?;
+    let build = binding(&profile["worker_build"])?.sealed()?;
+    let deployment = binding(&profile["worker_deployment"])?.sealed()?;
+    let invocation = text(&launch, "invocation_id")?;
+    ensure!(
+        terminal["schema"] == "foundation-epoch296-feature-account-terminal-v1"
+            && terminal["epoch"] == scope.epoch
+            && terminal["state"] == "checkpoint-verified"
+            && terminal["invocation_id"] == invocation
+            && terminal["guard_drained"] == true
+            && terminal["canonical_epoch_publication_authorized"] == false
+            && terminal["checkpoint"] == profile["terminal_checkpoint"]
+            && terminal["checkpoint"]["slot"] == scope.last
+            && terminal["launch"] == json!(launch_ref)
+            && terminal["worker"] == json!(worker)
+            && launch["profile"] == json!(profile_ref)
+            && launch["worker"] == json!(worker)
+            && launch["kind"] == scope.kind
+            && launch["unit"] == scope.unit
+            && build["exit_status"] == 0
+            && build["canonical_feature_accounts_regression_passed"] == true
+            && build["artifact"]["sha256"] == worker.sha256
+            && deployment["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && worker
+                .path
+                .file_name()
+                .is_some_and(|name| name == "jetstreamer-historical-worker-v1-8-11")
+            && deployment["destination"] == json!(worker_directory)
+            && deployment["members"]
+                .as_array()
+                .is_some_and(|members| members.iter().any(|member| {
+                    member["name"] == "jetstreamer-historical-worker-v1-8-11"
+                        && member["sha256"] == worker.sha256
+                        && member["mode"] == "0555"
+                })),
+        "epoch 296 terminal qualification differs from the sealed corrected worker"
+    );
+    worker.artifact()?;
+    feature_296_drained(n, invocation)?;
+    Ok((worker, checkpoint))
+}
+
+pub(super) fn feature_296_drained(n: &mut Native, invocation: &str) -> Result<()> {
+    let scope = &FEATURE_296;
+    let timer = n.show_fields(&format!("{}.timer", scope.guard), "ActiveState,Job")?;
+    ensure!(
+        timer["ActiveState"] == "inactive" && timer["Job"] == "",
+        "epoch 296 feature guard timer is still active"
+    );
+    for unit in [scope.unit.to_owned(), format!("{}.service", scope.guard)] {
+        let row = n.show_fields(
+            &unit,
+            "ActiveState,InvocationID,MainPID,ControlPID,ControlGroup,Job,Result",
+        )?;
+        ensure!(
+            matches!(row["ActiveState"].as_str(), Some("inactive" | "failed"))
+                && row["MainPID"] == "0"
+                && row["ControlPID"] == "0"
+                && row["ControlGroup"] == ""
+                && row["Job"] == ""
+                && !Path::new("/sys/fs/cgroup/system.slice")
+                    .join(&unit)
+                    .exists(),
+            "epoch 296 feature owner {unit} has not drained"
+        );
+        if unit == scope.unit {
+            ensure!(
+                row["ActiveState"] == "inactive"
+                    && row["Result"] == "success"
+                    && (row["InvocationID"] == "" || row["InvocationID"] == invocation),
+                "epoch 296 feature terminal invocation changed"
+            );
+        }
+    }
+    Ok(())
+}
+
 impl Focused {
     pub(super) fn quote_key(&self) -> String {
         format!("focused_{}_quote", self.epoch)

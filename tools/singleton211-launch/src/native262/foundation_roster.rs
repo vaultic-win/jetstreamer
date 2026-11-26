@@ -147,6 +147,7 @@ enum Quote {
 struct Replay296Quote {
     prior_fit: Bound,
     worker: Bound,
+    checkpoint: Bound,
     disk: u64,
     memory: u64,
 }
@@ -194,29 +195,17 @@ fn full_replay_quote() -> Result<FullReplayQuote> {
     })
 }
 
-fn replay_296_quote() -> Result<Replay296Quote> {
+fn replay_296_quote(n: &mut Native) -> Result<Replay296Quote> {
+    let (worker, checkpoint) = focused::feature_296_terminal(n)?;
     let prior_fit = Bound::new(RECOVERY_296.0, RECOVERY_296.1);
     let prior = prior_fit.sealed()?;
     let sizing = binding(&prior["earlier_full_booking"])?.sealed()?;
-    let deployment = binding(&prior["sealed_worker"])?.sealed()?;
-    let member = deployment["members"]
-        .as_array()
-        .context("epoch 296 sealed worker members")?
-        .iter()
-        .find(|row| row["name"] == "jetstreamer-historical-worker-v1-8-11")
-        .context("epoch 296 repaired worker missing")?;
-    let worker = Bound::new(
-        Path::new(text(&deployment, "destination")?).join(text(member, "name")?),
-        text(member, "sha256")?,
-    );
     let sizing = &sizing["quote"];
     let disk = num(&prior, "required_disk_bytes")?;
     let memory = num(&prior, "required_memory_bytes")?;
     ensure!(
         prior["epoch"] == 296
             && prior["replay_admitted"] == false
-            && deployment["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
-            && member["mode"] == "0555"
             && disk
                 == capacity::add(
                     num(sizing, "maximum_whole_tree_bytes")?,
@@ -229,10 +218,10 @@ fn replay_296_quote() -> Result<Replay296Quote> {
                 )?,
         "epoch 296 replay sizing or worker evidence changed"
     );
-    worker.artifact()?;
     Ok(Replay296Quote {
         prior_fit,
         worker,
+        checkpoint,
         disk,
         memory,
     })
@@ -1472,6 +1461,10 @@ fn measure(
     if let Some(proof) = &extraction_drain {
         terminal_extract_226(n, &booking, proof)?;
     }
+    if let Some(Quote::Replay296(full)) = &quote {
+        let checkpoint = full.checkpoint.sealed()?;
+        focused::feature_296_drained(n, text(&checkpoint, "invocation_id")?)?;
+    }
     for guard in guards.values() {
         let timer = n.show_fields(text(guard, "timer")?, "ActiveState,InvocationID,Unit")?;
         ensure!(
@@ -1696,6 +1689,7 @@ fn measure(
     if let Some(Quote::Replay296(quote)) = &quote {
         evidence["replay_296_quote"] = json!({
             "prior_fit":quote.prior_fit,"repaired_worker":quote.worker,
+            "checkpoint_qualification":quote.checkpoint,
             "candidate_disk_bytes":quote.disk,"candidate_memory_bytes":candidate,
             "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
             "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
@@ -1852,7 +1846,7 @@ pub fn run() -> Result<()> {
         }
         Some(flag) if flag == "--delivery261-quote" => delivery_261_preparation()
             .and_then(|prep| measure(&mut native, None, Some(Quote::Delivery261(prep)))),
-        Some(flag) if flag == "--replay296-quote" => replay_296_quote()
+        Some(flag) if flag == "--replay296-quote" => replay_296_quote(&mut native)
             .and_then(|quote| measure(&mut native, None, Some(Quote::Replay296(quote)))),
         Some(flag)
             if matches!(
