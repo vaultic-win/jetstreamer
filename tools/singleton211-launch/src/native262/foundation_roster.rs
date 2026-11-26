@@ -72,6 +72,13 @@ const DELIVERY_261_PREPARATION: (&str, &str) = (
     "/var/lib/jetstreamer/horizon261-current-reader-preparation-v1/preparation.json",
     "1d20967729c44e166611dd9df86e919b5ae0df4af337ed2d3cc0b5b4268d6a61",
 );
+const UPLOAD_261: &str = "horizon-upload-261-current-reader-v1.service";
+const CLAIM_261: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon261-current-reader-delivery-v1/pipeline-claim.json",
+    "c7082008cc50a19a622ac49de4f47f6fcf6d9f936625aca5b22a2b1d4337273a",
+);
+const UPLOAD_261_MEMORY: u64 = 64 << 30;
+const UPLOAD_261_DISK: u64 = 1 << 30;
 
 struct FullReplayQuote {
     reference: Bound,
@@ -138,6 +145,58 @@ fn delivery_261_preparation() -> Result<Bound> {
     );
     binding(&preparation["uploader"])?.artifact()?;
     Ok(reference)
+}
+
+fn live_delivery_261(n: &mut Native) -> Result<(Bound, Value, u64, u64)> {
+    let reference = Bound::new(CLAIM_261.0, CLAIM_261.1);
+    let claim = reference.sealed()?;
+    let evidence = claim["evidence"]
+        .as_array()
+        .context("epoch 261 delivery evidence")?;
+    ensure!(evidence.len() == 2, "epoch 261 delivery evidence count");
+    let booking_ref = binding(&evidence[0])?;
+    let booking = booking_ref.sealed()?;
+    let launch = binding(&evidence[1])?.sealed()?;
+    let booked_fit = binding(&booking["storage_quote"])?.sealed()?;
+    let owner = n.show_fields(UPLOAD_261, OWNER_FIELDS)?;
+    let launched = &launch["owner"];
+    let invocation = text(&claim, "invocation_id")?;
+    let pid = text(&owner, "MainPID")?.parse()?;
+    let ticks = process_ticks(pid)?;
+    ensure!(
+        claim["epoch"] == 261
+            && claim["unit"] == UPLOAD_261
+            && claim["phase"] == "upload-readback"
+            && booking["schema"] == "foundation-epoch261-delivery-booking-v1"
+            && booking["epoch"] == 261
+            && booking["unit"] == UPLOAD_261
+            && booking["staging_copy_required"] == false
+            && booked_fit["capacity"]["fits"] == true
+            && booked_fit["capacity"]["candidate_disk_bytes"] == UPLOAD_261_DISK
+            && booked_fit["delivery_quote"]["delivery_memory_max_bytes"] == UPLOAD_261_MEMORY
+            && launch["schema"] == "foundation-epoch261-current-reader-delivery-launch-v1"
+            && binding(&launch["booking"])? == booking_ref
+            && launch["process_start_ticks"] == ticks
+            && owner["AllowedCPUs"] == "24-31"
+            && owner["ExecStart"] == claim["expected_exec_start"],
+        "epoch 261 delivery booking or live invocation changed"
+    );
+    for field in [
+        "Id",
+        "InvocationID",
+        "MainPID",
+        "ControlGroup",
+        "AllowedCPUs",
+        "MemoryMax",
+        "ExecStart",
+    ] {
+        ensure!(
+            owner[field] == launched[field],
+            "epoch 261 delivery changed {field}"
+        );
+    }
+    let memory = live::finite_owner(&owner, UPLOAD_261, invocation, UPLOAD_261_MEMORY)?;
+    Ok((reference, owner, memory, ticks))
 }
 
 fn latest_completion() -> Result<Bound> {
@@ -300,6 +359,7 @@ fn fleet_roster<'a>(
     fleet: &'a Value,
     booking: &Value,
     released: &BTreeMap<u64, &str>,
+    delivery_261: Option<&Value>,
 ) -> Result<BTreeMap<u64, &'a Value>> {
     let rows = fleet["active"]
         .as_array()
@@ -308,8 +368,18 @@ fn fleet_roster<'a>(
         .as_object()
         .context("Foundation booked owners")?;
     let mut roster = BTreeMap::new();
+    let mut observed_delivery = None;
     for row in rows {
         let epoch = num(row, "epoch")?;
+        if epoch == 261 && row["phase"] == "upload-readback" {
+            let owner = delivery_261.context("unbooked epoch 261 delivery in fleet")?;
+            ensure!(
+                observed_delivery.replace(&row["unit"]).is_none(),
+                "duplicate epoch 261 delivery in fleet"
+            );
+            live::same_owner(&row["unit"], owner)?;
+            continue;
+        }
         let owner = match (epoch, text(row, "phase")?) {
             (226, "private-held-extraction")
             | (230, "diagnostic-qualification")
@@ -329,6 +399,10 @@ fn fleet_roster<'a>(
             "Foundation owner changed or duplicated for epoch {epoch}"
         );
     }
+    ensure!(
+        observed_delivery.is_none() || !roster.contains_key(&261),
+        "duplicate epoch 261 phases in fleet"
+    );
     let missing: BTreeMap<_, _> = released
         .iter()
         .filter_map(|(&epoch, &unit)| (!roster.contains_key(&epoch)).then_some((epoch, unit)))
@@ -390,21 +464,21 @@ mod roster_tests {
         let none = BTreeMap::new();
         let first = BTreeMap::from([(261, REPLAY_261)]);
         let both = BTreeMap::from([(226, EXTRACT_226), (261, REPLAY_261)]);
-        assert!(fleet_roster(&before, &booking, &none).is_ok());
-        assert!(fleet_roster(&before, &booking, &both).is_ok());
+        assert!(fleet_roster(&before, &booking, &none, None).is_ok());
+        assert!(fleet_roster(&before, &booking, &both, None).is_ok());
 
         rows.retain(|row| row["epoch"] != 261);
         let after = json!({"active":rows});
-        assert!(fleet_roster(&after, &booking, &none).is_err());
-        assert!(fleet_roster(&after, &booking, &first).is_ok());
+        assert!(fleet_roster(&after, &booking, &none, None).is_err());
+        assert!(fleet_roster(&after, &booking, &first, None).is_ok());
 
         rows.retain(|row| row["epoch"] != 226);
         let after = json!({"active":rows});
-        assert!(fleet_roster(&after, &booking, &first).is_err());
-        assert!(fleet_roster(&after, &booking, &both).is_ok());
+        assert!(fleet_roster(&after, &booking, &first, None).is_err());
+        assert!(fleet_roster(&after, &booking, &both, None).is_ok());
 
         rows.retain(|row| row["epoch"] != 252);
-        assert!(fleet_roster(&json!({"active":rows}), &booking, &both).is_err());
+        assert!(fleet_roster(&json!({"active":rows}), &booking, &both, None).is_err());
     }
 }
 
@@ -661,7 +735,22 @@ fn measure(
     if closed_230.is_some() {
         released_replays.insert(230, REPLAY_230);
     }
-    let roster = fleet_roster(&fleet, &booking, &released_replays)?;
+    let before = listed_owners(n)?;
+    let active_delivery = if quote.is_some() && before.contains(UPLOAD_261) {
+        ensure!(
+            !delivery_261 && closed_replay.is_some(),
+            "epoch 261 delivery overlaps its candidate or replay"
+        );
+        Some(live_delivery_261(n)?)
+    } else {
+        None
+    };
+    let roster = fleet_roster(
+        &fleet,
+        &booking,
+        &released_replays,
+        active_delivery.as_ref().map(|(_, owner, _, _)| owner),
+    )?;
     let epoch = match &quote {
         Some(Quote::Suffix226(_)) => 226,
         Some(Quote::Delivery261(_)) => 261,
@@ -731,7 +820,12 @@ fn measure(
             "epoch 262 held owner already booked as a peer"
         );
     }
-    let before = listed_owners(n)?;
+    if active_delivery.is_some() {
+        ensure!(
+            expected.insert(UPLOAD_261.to_owned()),
+            "epoch 261 delivery booked twice"
+        );
+    }
     ensure!(
         before == expected,
         "unaccounted or missing Foundation owners: {:?}",
@@ -788,6 +882,13 @@ fn measure(
         let memory = live::finite_owner(&owner, unit, text(&owner, "InvocationID")?, cap)?;
         let process_start_ticks = process_ticks(text(&owner, "MainPID")?.parse()?)?;
         recorded.insert(unit.clone(), (owner, memory, process_start_ticks));
+    }
+    if let Some((_, owner, memory, ticks)) = &active_delivery {
+        ensure!(
+            selected.is_disjoint(&units::parse_cpu_list(text(owner, "AllowedCPUs")?)?),
+            "epoch {epoch} CPUs overlap the epoch 261 delivery"
+        );
+        recorded.insert(UPLOAD_261.to_owned(), (owner.clone(), *memory, *ticks));
     }
     let mut guards = BTreeMap::new();
     for (guard_epoch, guard) in KNOWN_GUARDS {
@@ -903,7 +1004,14 @@ fn measure(
         .try_fold(0, |sum, row| {
             capacity::add(sum, num(row, "remaining_upper_bound_bytes")?)
         })?;
-    let protected = capacity::add(capacity::add(disk_floor, non_guard_disk)?, growth)?;
+    let delivery_261_disk = active_delivery.as_ref().map_or(0, |_| UPLOAD_261_DISK);
+    let protected = capacity::add(
+        capacity::add(
+            capacity::add(disk_floor, non_guard_disk)?,
+            delivery_261_disk,
+        )?,
+        growth,
+    )?;
     let (candidate_disk, candidate) = match &quote {
         Some(Quote::FullReplay(quote)) => (
             capacity::add(quote.working_disk, DISK_RECEIPTS)?,
@@ -953,6 +1061,7 @@ fn measure(
     )?;
     let available_memory = resources_before.1.min(resources_after.1);
     let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
+        "active_delivery_261_disk_bytes":delivery_261_disk,
         "remaining_guard_growth_bytes":growth,"protected_existing_disk_bytes":protected,
         "candidate_disk_bytes":candidate_disk,"required_disk_bytes":required,"available_disk_bytes":free,
         "disk_shortfall_bytes":required.saturating_sub(free),"disk_margin_bytes":free.saturating_sub(required),
@@ -981,7 +1090,8 @@ fn measure(
         "completion":completion,"booking":booking_ref,"filesystem_device":device,
         "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
-        "closed_middle_replay":closed_230});
+        "closed_middle_replay":closed_230,
+        "active_delivery_261_claim":active_delivery.as_ref().map(|(claim, _, _, _)| claim)});
     if let Some(Quote::FullReplay(quote)) = &quote {
         evidence["full_replay_quote"] = json!({"sizing_reference":quote.reference,"inputs":quote.inputs,
             "whole_tree_bytes":quote.working_disk,"producer_memory_bytes":quote.producer_memory,
