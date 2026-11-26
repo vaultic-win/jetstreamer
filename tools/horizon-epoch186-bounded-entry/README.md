@@ -24,6 +24,11 @@ archive verification.
 - `static-guard-plan` emits a synthetic invocation for the deployed guard's
   `--validate-plan-only` mode. Production uses its actual producer invocation
   and the floor from the freshly accepted capacity quote.
+- `tail-source` verifies the sealed tail package and bootstrap inode and emits a
+  private invocation for slots 80,783,540 through 80,791,699. Only slots
+  through 80,783,999 belong to epoch 186. The remaining 7,700 slots establish
+  the post-epoch checkpoint privately. The report grants no launch or
+  publication authority.
 - `repair-tail-index INDEX NATIVE_REPORT OUTPUT` stages a digest-bound epoch 187
   index for the epoch 186 verification tail through slot 80,791,699. It fills
   the two missing rows proven by native CAR decoding. The original index stays

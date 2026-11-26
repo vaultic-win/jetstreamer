@@ -3,6 +3,7 @@ mod guard;
 mod price;
 mod source;
 mod tail_index;
+mod tail_source;
 
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
@@ -185,6 +186,7 @@ fn run() -> Result<Value> {
     match args.as_slice() {
         [mode] if mode == "source" => source::inspect(false),
         [mode] if mode == "rehash-source" => source::inspect(true),
+        [mode] if mode == "tail-source" => tail_source::inspect(),
         [mode, fleet, sha] if mode == "quote" => price::inspect(Path::new(fleet), sha),
         [mode, index, report, output] if mode == "repair-tail-index" => {
             tail_index::repair(Path::new(index), Path::new(report), Path::new(output))
@@ -204,7 +206,7 @@ fn run() -> Result<Value> {
             )
         }
         _ => bail!(
-            "usage: horizon-epoch186-bounded-entry source | rehash-source | quote FLEET SHA256 | repair-tail-index INDEX NATIVE_REPORT OUTPUT | static-guard-plan | check-guard held|adopted PLAN PLAN_SHA256 SAMPLE SAMPLE_SHA256 QUOTE_SHA256"
+            "usage: horizon-epoch186-bounded-entry source | rehash-source | tail-source | quote FLEET SHA256 | repair-tail-index INDEX NATIVE_REPORT OUTPUT | static-guard-plan | check-guard held|adopted PLAN PLAN_SHA256 SAMPLE SAMPLE_SHA256 QUOTE_SHA256"
         ),
     }
 }
