@@ -144,6 +144,10 @@ pub const SECONDS_PER_YEAR: f64 = 365.25 * 24.0 * 60.0 * 60.0;
 
 pub const MAX_LEADER_SCHEDULE_STAKES: Epoch = 5;
 
+mod mainnet_sol_log_data_feature {
+    solana_sdk::declare_id!("6uaHcKPGUy4J7emLBgUTeufhJdiwhngW6a1R9B7c2ob9");
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct RentDebit {
     rent_collected: u64,
@@ -5957,8 +5961,18 @@ impl Bank {
         let slot = self.slot();
 
         for feature_id in &self.feature_set.inactive {
+            // Mainnet activated sol_log_data under the ID shipped after v1.8.11.
+            // Read and update that feature account while retaining the SDK's
+            // internal feature key for both loader syscall checks.
+            let account_id = if self.cluster_type == Some(ClusterType::MainnetBeta)
+                && *feature_id == feature_set::sol_log_data_syscall_enabled::id()
+            {
+                mainnet_sol_log_data_feature::id()
+            } else {
+                *feature_id
+            };
             let mut activated = None;
-            if let Some(mut account) = self.get_account_with_fixed_root(feature_id) {
+            if let Some(mut account) = self.get_account_with_fixed_root(&account_id) {
                 if let Some(mut feature) = feature::from_account(&account) {
                     match feature.activated_at {
                         None => {
@@ -5966,11 +5980,11 @@ impl Bank {
                                 // Feature has been requested, activate it now
                                 feature.activated_at = Some(slot);
                                 if feature::to_account(&feature, &mut account).is_some() {
-                                    self.store_account(feature_id, &account);
+                                    self.store_account(&account_id, &account);
                                 }
                                 newly_activated.insert(*feature_id);
                                 activated = Some(slot);
-                                info!("Feature {} activated at slot {}", feature_id, slot);
+                                info!("Feature {} activated at slot {}", account_id, slot);
                             }
                         }
                         Some(activation_slot) => {
@@ -12545,6 +12559,42 @@ pub(crate) mod tests {
         let new_activations = bank.compute_active_feature_set(true);
         assert!(new_activations.is_empty());
         assert!(bank.feature_set.is_active(&test_feature));
+    }
+
+    #[test]
+    fn mainnet_log_data_uses_the_canonical_feature_account() {
+        let (genesis_config, _mint_keypair) = create_genesis_config(100_000);
+        let parent = Arc::new(Bank::new(&genesis_config));
+        let mut bank = Bank::new_from_parent(&parent, &Pubkey::default(), 1);
+        bank.cluster_type = Some(ClusterType::MainnetBeta);
+        let legacy = feature_set::sol_log_data_syscall_enabled::id();
+        let canonical = mainnet_sol_log_data_feature::id();
+        let mut features = FeatureSet::default();
+        features.inactive.insert(legacy);
+        bank.feature_set = Arc::new(features.clone());
+
+        let future = Feature { activated_at: Some(2) };
+        bank.store_account(&canonical, &feature::create_account(&future, 42));
+        assert!(bank.compute_active_feature_set(false).is_empty());
+        assert!(!bank.feature_set.is_active(&legacy));
+
+        bank.store_account(&canonical, &feature::create_account(&Feature::default(), 42));
+        assert!(bank.compute_active_feature_set(false).is_empty());
+        assert!(!bank.feature_set.is_active(&legacy));
+        assert!(bank.compute_active_feature_set(true).contains(&legacy));
+        assert_eq!(bank.feature_set.active.get(&legacy), Some(&1));
+        let account = bank.get_account(&canonical).unwrap();
+        assert_eq!(feature::from_account(&account).unwrap().activated_at, Some(1));
+        assert!(bank.get_account(&legacy).is_none());
+
+        bank.feature_set = Arc::new(features.clone());
+        assert!(bank.compute_active_feature_set(false).is_empty());
+        assert_eq!(bank.feature_set.active.get(&legacy), Some(&1));
+
+        bank.cluster_type = Some(ClusterType::Development);
+        bank.feature_set = Arc::new(features);
+        assert!(bank.compute_active_feature_set(false).is_empty());
+        assert!(!bank.feature_set.is_active(&legacy));
     }
 
     #[test]
