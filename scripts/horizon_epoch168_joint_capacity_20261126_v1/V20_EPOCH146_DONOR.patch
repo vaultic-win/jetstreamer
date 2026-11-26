@@ -1,0 +1,75 @@
+diff --git a/source/build_159_price.py b/source/build_159_price.py
+--- a/source/build_159_price.py
++++ b/source/build_159_price.py
+@@ -175,8 +175,30 @@
+             and all(status[key] == actor[key] for key in ("invocation_id", "pid", "start_ticks")))
+
+
++def incumbent_146_roster(fleet, native, owner):
++    rows = fleet["actual_executing_replays"]
++    count = fleet["canonical_producer_count"]
++    if owner is None:
++        return rows, count
++    need(owner == native["full146_census"], "unverified epoch 146 in the donor census")
++    peers = [row for row in rows if row["epoch"] == 146]
++    need(not any(row["epoch"] == 146 for key in ("actual_active_bootstraps",
++                                                  "actual_active_private_diagnostics")
++                 for row in fleet[key]), "overlapping epoch 146 claim in the donor census")
++    if not peers:
++        return rows, count
++    entry = fleet["current_full146"]
++    need(peers == [entry] and owner["mode"] == "active"
++         and entry["phase"] in ("bootstrap", "worker")
++         and entry["actor"] == owner["actor"] and entry["enrollment"] == owner["enrollment"]
++         and entry["unit"]["Id"] == owner["unit"] == owner["actor"]["producer_unit"]
++         and entry["unit"]["InvocationID"] == owner["actor"]["producer_invocation_id"],
++         "different epoch 146 claim in the donor census")
++    return [row for row in rows if row != entry], count - 1
++
++
+ def cover(before, native, after, build_bytes=0, build_ram=0, *,
+-          exclusive136=None, full170=None, v8=False, registered_writer=None, retry5_owner=None):
++          exclusive136=None, full170=None, v8=False, registered_writer=None, retry5_owner=None, full146=None):
+     need(before == after and before["invocation_id"] == IID and before["grant_sha256"] == GRANT and
+          before["driver_exit"] == EXIT and 0 <= build_bytes <= 104 * MIB and 0 <= build_ram <= 768 * MIB,
+          "transition during pricing or unqualified build bound")
+@@ -246,7 +268,7 @@
+                         == diagnostic["additive_cpu_quota_micros"] == 0
+                         and diagnostic["receipt"] is not None and diagnostic["intent"] is not None)
+         active_count = 0
+-        replay_rows = fleet["actual_executing_replays"]
++        replay_rows, canonical_count = incumbent_146_roster(fleet, native, full146)
+         if full170 is not None:
+             rows = [row for key in ("actual_executing_replays", "actual_active_bootstraps")
+                     for row in fleet[key] if row["epoch"] == 170]
+@@ -272,7 +294,7 @@
+                  "different protected retry5 claimant in the donor census")
+         need(exclusive136 is None and failed170 == fleet["cold170_retry13_execution_failure"]
+              and failed170["reservation_ending_bytes"] == 0
+-             and fleet["canonical_producer_count"] == len(replay_rows) + active_count == len(running) + active_count
++             and canonical_count == len(replay_rows) + active_count == len(running) + active_count
+              and {row["epoch"] for row in replay_rows} == running
+              and set(native["replacements"]) == {str(epoch) for epoch in running - {172}}
+              and set(native["survivors"]) == {"172"}
+diff --git a/source/post-stop-fit b/source/post-stop-fit
+--- a/source/post-stop-fit
++++ b/source/post-stop-fit
+@@ -59,7 +59,8 @@
+ FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
+ JOINT168 = HERE in (D / "tools-homefloor-170-full-metered-independent-v20-joint168",
+                     D / "tools-homefloor-170-full-metered-independent-v20-joint168-prestart",
+-                    D / "tools-homefloor-170-full-metered-independent-v20-joint168-prestart-v2")
++                    D / "tools-homefloor-170-full-metered-independent-v20-joint168-prestart-v2",
++                    D / "tools-homefloor-170-full-metered-independent-v20-joint168-prestart-v3")
+ JOINT168_REQUEST = None
+ joint168_cadence_seal = None
+ FULL146 = JOINT168 or HERE in (
+@@ -2479,6 +2480,8 @@
+                 options["full170"] = native["active_full170"]
+             if FULL170_RETRY5:
+                 options["retry5_owner"] = native["full170_retry5_owner"]
++            if JOINT168:
++                options["full146"] = native["full146_census"]
+             native["epoch159_donor_cover"] = donor["cover"](before,donor_price,donor["snapshot"](), **options)
+         if (REPRO166 or FULL170) and not FULL170_HOLDING185:
+             lane = "166" if REPRO166 else "170"

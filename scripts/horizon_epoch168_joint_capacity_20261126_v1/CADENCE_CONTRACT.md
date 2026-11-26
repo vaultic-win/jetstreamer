@@ -19,3 +19,7 @@ Use the V25 consumer as the exact base and the same controller unit, lock inode 
 7. Preserve all R2 receipt populations and behavior. The joint scope is a private evidence run and creates no status key or canonical publishing authority.
 
 The provider source supports this V26 contract. The consumer itself still needs source qualification and its live handoff.
+
+## Reconstruct the sealed sources
+
+Apply `V19_TO_JOINT_V20.patch`, `V20_PID1_AND_GUARD.patch`, and `V20_EPOCH146_DONOR.patch` in that order to the provider source inputs. Apply `V25_TO_V26.patch` to the V25 cadence source, then apply only `source/joint168_capacity.py` from `V20_PID1_AND_GUARD.patch`. Compare that reader byte for byte across the resulting packages before sealing them. Run `test_joint168_capacity.py` and `test_v26.py` beside their respective reconstructed source trees.

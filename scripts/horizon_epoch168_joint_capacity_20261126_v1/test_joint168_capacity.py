@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from unittest import TestCase, main
+from unittest import TestCase, main, mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE/'source'))
@@ -93,6 +93,52 @@ class Joint168(TestCase):
             self.assertFalse(lane.cgroup_limits(d,2_000_000,63*G))
             (d/'memory.swap.max').write_text('max')
             self.assertFalse(lane.cgroup_limits(d,1_750_000,63*G))
+
+    def test_unloaded_pid1_timer_omits_service_pid_fields(self):
+        def show(name, fields):
+            row = dict(Id=name, ActiveState='inactive', Job='')
+            if name == lane.SERVICE:
+                row.update(MainPID='0', ControlPID='0')
+            elif name == lane.UNIT:
+                row.update(MainPID='0')
+            return row
+
+        with mock.patch.object(lane, 'props', side_effect=show), mock.patch.object(
+            lane, 'process_members', return_value=set()
+        ):
+            with self.assertRaisesRegex(ValueError, 'already occupied'):
+                lane.require_idle(self.s)
+
+        def drained(name, fields):
+            row = show(name, fields)
+            if name == lane.UNIT:
+                row['ControlPID'] = '0'
+            return row
+
+        with mock.patch.object(lane, 'props', side_effect=drained), mock.patch.object(
+            lane, 'process_members', return_value=set()
+        ):
+            lane.require_idle(self.s)
+
+    def test_donor_filters_only_the_enrolled_canonical_146(self):
+        from runpy import run_path
+        legacy = run_path(str(HERE/'source/build_159_price.py'))['incumbent_146_roster']
+        first = {'epoch': 167}
+        unit = 'horizon-qualify-146-full-local-20261126-v1.service'
+        actor = {'producer_unit': unit, 'producer_invocation_id': 'a' * 32}
+        enrollment = {'path': '/fixture/full146', 'sha256': 'b' * 64}
+        row = dict(epoch=146, phase='worker', actor=actor, enrollment=enrollment,
+                   unit={'Id': unit, 'InvocationID': actor['producer_invocation_id']})
+        owner = dict(mode='active', unit=unit, actor=actor, enrollment=enrollment)
+        native = {'full146_census': owner}
+        fleet = dict(actual_executing_replays=[first, copy.deepcopy(row)],
+                     actual_active_bootstraps=[], actual_active_private_diagnostics=[],
+                     current_full146=row, canonical_producer_count=2)
+        self.assertEqual(legacy(fleet,native,None), ([first,row],2))
+        self.assertEqual(legacy(fleet,native,owner), ([first],1))
+        fleet['actual_executing_replays'][1]['unit']['InvocationID'] = 'c' * 32
+        with self.assertRaisesRegex(ValueError, 'different epoch 146'):
+            legacy(fleet,native,owner)
 
     def test_only_exact_private_roster_is_accepted(self):
         prior = {'epoch':172}
