@@ -274,14 +274,19 @@ fn fourth_evidence(state: &Path, fit: &Value) -> Result<()> {
     let assignment = assignment.sealed()?;
     let source = inputs.sealed()?;
     let packet = binding(&source["source_packet"])?;
+    let execution = binding(&source["execution_packet"])?;
     let boot = binding(&source["bootstrap_intake"])?;
     ensure!(
         packet.path == state.join("inputs/FOURTH_INTERVAL_SOURCES.json")
             && packet.sha256 == FOURTH_PACKET
-            && boot.path == state.join("bootstrap-intake.json"),
+            && boot.path == state.join("bootstrap-intake.json")
+            && execution.path == state.join("inputs/141-fourth-execution-inputs.json")
+            && execution.sha256
+                == "6cbe8287993a9970d181fe500e8ae5c245a922e86414d09ece59ff7d9eddf501",
         "unregistered fourth-interval source or bootstrap"
     );
     packet.sealed()?;
+    let execution = execution.sealed()?;
     let boot = boot.sealed()?;
     let installed = state.join("payloads").join(BOOT);
     let metadata = fs::symlink_metadata(&installed)?;
@@ -290,6 +295,7 @@ fn fourth_evidence(state: &Path, fit: &Value) -> Result<()> {
             && assignment["canonical_publication_authorized"] == false
             && source["schema"] == "foundation-epoch141-interval4-static-inputs-v1"
             && source["interval"] == assignment["interval"]
+            && source["interval"] == execution["interval"]
             && source["original_target_count"] == 340
             && source["reused_files"]["jetstreamer-node"]["sha256"] == NODE_SHA
             && source["reused_files"]["jetstreamer-historical-worker-v1-4-25"]["sha256"]
