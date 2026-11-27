@@ -1,0 +1,18 @@
+[package]
+name = "horizon-epoch168-joint-compare"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "horizon-epoch168-joint-compare"
+path = "prefix_index.rs"
+
+[dependencies]
+jetstreamer-horizon = { path = "../../../jetstreamer-horizon" }
+libc = "0.2"
+lencode = "2.0.0"
+sha2 = "0.10"
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
