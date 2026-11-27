@@ -51,16 +51,20 @@ def guard(core, unit, timer, authority, receipt_directory, native, producer_ram)
         and (Path(f"/proc/{pid}/cgroup").read_text().strip() == f"0::{cgroup}"),
         f"unprotected producer identity {unit}",
     )
-    clock = core.state(timer, "Id,ActiveState,BindsTo,InvocationID,Job")
-    sibling = core.state(timer.replace(".timer", ".service"),
-                         "Id,CPUQuotaPerSecUSec,MemoryMax,MemorySwapMax")
-    core.need(
-        clock["ActiveState"] == "active" and clock["BindsTo"] == unit and not clock["Job"]
-        and sibling["CPUQuotaPerSecUSec"] == "1s" and sibling["MemoryMax"] == str(1 << 30)
-        and sibling["MemorySwapMax"] == "0",
-        f"guard limits changed for {unit}",
-    )
+    guard_unit = timer.replace(".timer", ".service")
+    clock = core.state(timer, "Id,ActiveState,BindsTo,InvocationID,Job,Unit")
+    sibling = core.state(guard_unit, "Id,CPUQuotaPerSecUSec,MemoryMax,MemorySwapMax,ExecStart")
     plan, plan_ref = core.read(authority / "ACTUAL_GUARD_PLAN.json")
+    # The existing 170 managed timer names its concrete guard service. That
+    # service binds the invocation through its sealed guard plan, without BindsTo.
+    core.need(
+        clock["ActiveState"] == "active" and clock["Unit"] == guard_unit and not clock["Job"]
+        and (clock["BindsTo"] == unit or (unit == core.UNIT and not clock["BindsTo"]))
+        and sibling["CPUQuotaPerSecUSec"] == "1s" and sibling["MemoryMax"] == str(1 << 30)
+        and sibling["MemorySwapMax"] == "0"
+        and f"{plan_ref['path']} --plan-sha256 {plan_ref['sha256']}" in sibling["ExecStart"],
+        f"guard binding or limits changed for {unit}",
+    )
     samples = Path(plan["receipt_directory"])
     core.need(
         plan["unit"] == unit and plan["invocation_id"] == iid and plan["filesystem"] == "/home/sol"
@@ -165,7 +169,8 @@ def price(fleet, fleet_sha, held):
     growth = joint["candidate_growth"]
     raw_home = joint["required_home"] - HOME - growth
     remaining_170 = successor_evidence.get("unallocated_HOME_bytes", growth)
-    retained_home = max(raw_home, *floors.values()) + remaining_170
+    raw_floor = max(raw_home, *floors.values())
+    retained_home = raw_floor + remaining_170
     retained_ram = joint["required_ram"] - RAM
     required_home = retained_home + HOME
     required_ram = retained_ram + RAM
@@ -183,7 +188,7 @@ def price(fleet, fleet_sha, held):
         "home_margin_bytes": home - required_home, "ram_margin_bytes": ram - required_ram,
         "disk_fits": disk_fits, "memory_fits": ram >= required_ram,
         "guard_floors_bytes": floors, "protected_170": successor_evidence,
-        "unallocated_170_home_bytes": remaining_170,
+        "unallocated_170_home_bytes": remaining_170, "raw_filesystem_guard_floor_bytes": raw_floor,
         "joint_funding": joint, "resource_credit_bytes": 0, "archive_publication_authorized": False,
     }
 
