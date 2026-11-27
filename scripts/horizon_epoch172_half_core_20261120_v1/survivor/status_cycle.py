@@ -652,7 +652,7 @@ def publish_all(c,bridge,store,vs):
          private140=refs['140'],archives_or_sidecars_changed=False))
     return bound(p),bound(complete)
 
-def install_holding185(c, fleet, lane_k_tool=None):
+def install_holding185(c, fleet):
     package = BASE / 'epoch185-lanel-holding-20261125-v1/observer-v1/tools'
     seal = checked(dict(path=str(package/'deployment-seal-receipt.json'),
                         sha256='65062d37abf03585caabe61438b3bc4e87dba3e94bf9e55167e31b09c42d8e8d'))
@@ -662,11 +662,6 @@ def install_holding185(c, fleet, lane_k_tool=None):
          and bound(tool)['sha256'] == member['sha256'], 'different epoch 185 holding observer')
     result = json.loads(run(tool, 'reconcile'))
     install_holding185_result(c, fleet, result)
-    if lane_k_tool is not None:
-        need(result['observation']['stage'] == 'custody-recorded'
-             and result['active_transfer'] is None, 'lane-l still owns serial holding')
-        lane_k = json.loads(run(lane_k_tool, 'reconcile-k'))
-        install_holding185_result(c, fleet, lane_k, lane='k')
 
 
 def install_holding185_result(c, fleet, result, lane='l'):
