@@ -21,9 +21,72 @@ const UNITS: [&str; 3] = [
     "horizon-296-feature-account-protective-v4.service",
     "horizon-296-feature-account-protective-v4.timer",
 ];
+const HISTORICAL: [(&str, &str, &str); 3] = [
+    (
+        "horizon-qualify-296-loader-log-v3.service",
+        "4b82bb087bc448cb815c5c0490aa7820",
+        "cbe33f24624904a79c91851b71f5b5d950c1c9539a306d521b106768e04d40c1",
+    ),
+    (
+        "horizon-qualify-296-loader-upgrade-focused-v2.service",
+        "3332ad36b0c747cfaa7ec854fea20b07",
+        "4818b9006d7944e04a53f0ef6aad15e2b059dd6c4d68e83a6457121142845cb8",
+    ),
+    (
+        "horizon-qualify-296-loader-upgrade-focused-v1.service",
+        "295f2a0c164246098113342445d0b8f4",
+        "e84b9ebf65d5340748e7eb1031ac118bd803d41cf5967fbd1bef01a11616cb7f",
+    ),
+];
 
 fn stamp(m: &Metadata) -> Value {
     json!({"identity":identity(m),"physical_bytes":m.blocks()*512,"mode":m.mode(),"uid":m.uid(),"links":m.nlink()})
+}
+
+fn reviewed_schedule(target: &Path) -> Result<Value> {
+    let report = scheduled_census(Path::new(CACHE), target)?;
+    let mut closed = Vec::new();
+    for row in report["remaining"]
+        .as_array()
+        .context("missing staged reference census")?
+    {
+        let (unit, invocation, sha) = HISTORICAL
+            .iter()
+            .find(|(unit, _, _)| row["origin"] == format!("/run/systemd/transient/{unit}"))
+            .context("unexpected staged reader of the epoch 296 cache")?;
+        let origin = Path::new(row["origin"].as_str().context("missing staged unit path")?);
+        ensure!(
+            row["sha256"] == *sha
+                && row["chain"] == json!([])
+                && row["targets"] == json!([target])
+                && digest(&mut open_regular(origin)?)? == *sha,
+            "changed reference from the historical diagnostic {unit}"
+        );
+        let output = Command::new("/usr/bin/systemctl").args([
+            "show", unit, "-p", "Id,LoadState,ActiveState,SubState,MainPID,ControlPID,ControlGroup,Job,InvocationID,Result,Restart,UnitFileState,Transient,TriggeredBy,Triggers,WantedBy,RequiredBy",
+        ]).output()?;
+        ensure!(
+            output.status.success(),
+            "could not inspect historical diagnostic {unit}"
+        );
+        let model = String::from_utf8(output.stdout)?;
+        let fields = model
+            .lines()
+            .map(|line| line.split_once('=').context("invalid systemd row"))
+            .collect::<Result<BTreeMap<_, _>>>()?;
+        ensure!(
+            json!(fields)
+                == json!({"Id":unit,"LoadState":"loaded","ActiveState":"failed","SubState":"failed",
+            "MainPID":"0","ControlPID":"0","ControlGroup":"","Job":"","InvocationID":invocation,"Result":"exit-code",
+            "Restart":"no","UnitFileState":"transient","Transient":"yes","TriggeredBy":"","Triggers":"","WantedBy":"","RequiredBy":""})
+                && !Path::new("/sys/fs/cgroup/system.slice").join(unit).exists(),
+            "historical diagnostic {unit} is executable or replaced"
+        );
+        closed.push(
+            json!({"reference":row,"manager":fields,"restore_required_before_any_retry":true}),
+        );
+    }
+    Ok(json!({"census":report,"closed_historical_references":closed}))
 }
 
 fn observe(target: &Path, guard: &Value) -> Result<(Value, process_references::Scan)> {
@@ -64,7 +127,7 @@ fn observe(target: &Path, guard: &Value) -> Result<(Value, process_references::S
         );
     }
     assert_no_nested_mount(target)?;
-    let schedule = scheduled(Path::new(CACHE), target)?;
+    let schedule = reviewed_schedule(target)?;
     let consumers = process_references::scan(Path::new("/proc"), target)?;
     ensure!(
         consumers.inspected_processes > 0 && consumers.references.is_empty(),
