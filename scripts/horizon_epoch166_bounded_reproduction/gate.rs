@@ -78,7 +78,7 @@ mod route {
     pub(super) const TERMINAL_SLOT: u64 = 60_921_282;
 }
 
-#[cfg(epoch170_continuation)]
+#[cfg(all(epoch170_continuation, not(epoch170_from_73746882)))]
 mod route {
     pub(super) const EPOCH: u64 = 170;
     pub(super) const UNIT: &str = "horizon-qualify-170-from-73726716-20261127-v1.service";
@@ -94,6 +94,22 @@ mod route {
     #[cfg(not(epoch170_continuation_short))]
     pub(super) const TERMINAL_SLOT: u64 = 73_879_004;
 }
+
+#[cfg(all(epoch170_continuation, epoch170_from_73746882))]
+mod route {
+    pub(super) const EPOCH: u64 = 170;
+    pub(super) const UNIT: &str = "horizon-qualify-170-from-73746882-20261127-v1.service";
+    pub(super) const ALIAS: &str = "/run/horizon-170-from-73746882-v1";
+    pub(super) const SNAPSHOT: &str =
+        "snapshot-73746882-UjWmG6TowgFrbT6Ntd1vcH9m4E6LXX9AsaVG8727mW6.tar.zst";
+    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73746882-to-73766969-v1";
+    pub(super) const TERMINAL_SLOT: u64 = 73_766_969;
+}
+#[cfg(all(
+    epoch170_from_73746882,
+    any(not(epoch170_continuation), epoch170_continuation_short)
+))]
+compile_error!("the 73746882 checkpoint requires its dedicated epoch 170 continuation profile");
 use route::*;
 #[cfg(not(any(epoch170_suffix, epoch170_continuation)))]
 const RELEASE_TIMEOUT: Duration = Duration::from_secs(180);
@@ -358,7 +374,22 @@ mod tests {
             (EPOCH, args[7].as_str()),
             (170, "--qualification-end-slot=73879004")
         );
-        #[cfg(epoch170_continuation)]
+        #[cfg(epoch170_from_73746882)]
+        {
+            assert_eq!(EPOCH, 170);
+            assert!(args[3].starts_with(
+                "--snapshot-archive=/run/horizon-170-from-73746882-v1/snapshot-73746882-"
+            ));
+            assert_eq!(
+                args[4],
+                "--epoch-hashes=/run/horizon-170-from-73746882-v1/canonical-hashes.txt"
+            );
+            assert!(
+                args[5].ends_with("/from-73746882-to-73766969-v1/ledger/epoch-170.diagnostic.jet")
+            );
+            assert_eq!(args[7], "--qualification-end-slot=73766969");
+        }
+        #[cfg(all(epoch170_continuation, not(epoch170_from_73746882)))]
         {
             assert_eq!(EPOCH, 170);
             assert!(SNAPSHOT.starts_with("snapshot-73726716-"));
