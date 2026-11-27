@@ -34,6 +34,9 @@ mod epoch168_metered_retire;
 mod epoch169_retire;
 #[path = "holding_epoch185.rs"]
 mod epoch185;
+#[cfg(feature = "epoch185-lanek-retirement")]
+#[path = "holding_epoch185_lanek_retire.rs"]
+mod epoch185_lanek_retire;
 
 const HOST: &str = "dev-samjohnson";
 const STATE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1";
@@ -1283,12 +1286,7 @@ async fn restore_blob_guarded(
     Ok(destination)
 }
 
-pub(super) async fn run() -> Result<()> {
-    let args: Vec<_> = env::args().collect();
-    ensure!(
-        args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
-        "usage: holding-foundation-private-inspect|holding-foundation-private-inspect-old-v2-237|holding-foundation-private-inspect-partial223|holding-foundation-private-park|holding-foundation-private-admit-restore|holding-foundation-private-restore|holding-foundation-private-check-retire|holding-foundation-private-retire|holding-plan185-guard-handoff|holding-capture185-survivor-guards|holding-check185-attempt-growth|holding-close185-attempt-growth|holding-read185-attempt-growth|holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry|holding-check-retire136|holding-retire136|holding-check-retire141|holding-retire141|holding-census157-laned-consumers|holding-check-retire157-laned|holding-retire157-laned|holding-check-retire169|holding-retire169|holding-diagnose185-references|holding-reconcile185-staged|holding-inspect185|holding-check-retire185|holding-retire185 SPEC --spec-sha256 HEX --self-sha256 HEX"
-    );
+fn sealed_spec(args: &[String]) -> Result<Bound> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
         "holding requires sealed root orchestration"
@@ -1302,29 +1300,16 @@ pub(super) async fn run() -> Result<()> {
             && hex_lower(&Sha256::digest(fs::read("/proc/self/exe")?)) == args[6],
         "holding executable not sealed/bound"
     );
-    let spec = Bound {
+    Ok(Bound {
         path: args[2].clone().into(),
         sha256: args[4].clone(),
-    };
-    let v = bound(&spec)?;
-    if foundation_private_command(&args[1]) {
-        return foundation_private::run(&args[1], v, &spec).await;
-    }
-    let map: Bound = serde_json::from_value(v["mapping"].clone())?;
-    let m: Mapping = serde_json::from_value(bound(&map)?)?;
-    mapping(&m)?; // Must pass before credentials, listing or first remote write.
-    if args[1] == "holding-plan185-guard-handoff" {
-        return epoch185::plan_guard_handoff(&m, v, &spec);
-    }
-    if args[1] == "holding-capture185-survivor-guards" {
-        return epoch185::capture_growth_guards(&m, v, &spec);
-    }
-    if args[1] == "holding-read185-attempt-growth" {
-        return epoch185::growth_read(&m, v);
-    }
+    })
+}
+
+fn transition_lock() -> Result<File> {
     private(Path::new(STATE))?;
     private(&Path::new(STATE).join("receipts"))?;
-    let mut lock = OpenOptions::new()
+    let lock = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -1341,6 +1326,64 @@ pub(super) async fn run() -> Result<()> {
             && unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "holding transition is occupied"
     );
+    Ok(lock)
+}
+
+#[cfg(feature = "epoch185-lanek-retirement")]
+pub(super) async fn run_lanek_retirement() -> Result<()> {
+    let args: Vec<_> = env::args().collect();
+    ensure!(
+        args.len() == 7
+            && matches!(args[1].as_str(), "holding-inspect-retire185-lanek" | "holding-check-retire185-lanek" | "holding-retire185-lanek")
+            && args[3] == "--spec-sha256"
+            && args[5] == "--self-sha256",
+        "usage: holding-inspect-retire185-lanek|holding-check-retire185-lanek|holding-retire185-lanek SPEC --spec-sha256 HEX --self-sha256 HEX"
+    );
+    let spec = sealed_spec(&args)?;
+    let plan = bound(&spec)?;
+    let map: Bound = serde_json::from_value(plan["mapping"].clone())?;
+    let m: Mapping = serde_json::from_value(bound(&map)?)?;
+    mapping(&m)?;
+    let lock = transition_lock()?;
+    check_primary_transition_lock(&lock)?;
+    if args[1] == "holding-inspect-retire185-lanek" {
+        return epoch185_lanek_retire::inspect(&spec);
+    }
+    let r2 = r2_config_from_env()?;
+    ensure!(r2.bucket == BUCKET, "foreign holding bucket");
+    epoch185_lanek_retire::run(
+        &s3_client(&r2),
+        &m,
+        &serde_json::from_value(plan)?,
+        args[1] == "holding-check-retire185-lanek",
+    )
+    .await
+}
+
+pub(super) async fn run() -> Result<()> {
+    let args: Vec<_> = env::args().collect();
+    ensure!(
+        args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
+        "usage: holding-foundation-private-inspect|holding-foundation-private-inspect-old-v2-237|holding-foundation-private-inspect-partial223|holding-foundation-private-park|holding-foundation-private-admit-restore|holding-foundation-private-restore|holding-foundation-private-check-retire|holding-foundation-private-retire|holding-plan185-guard-handoff|holding-capture185-survivor-guards|holding-check185-attempt-growth|holding-close185-attempt-growth|holding-read185-attempt-growth|holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry|holding-check-retire136|holding-retire136|holding-check-retire141|holding-retire141|holding-census157-laned-consumers|holding-check-retire157-laned|holding-retire157-laned|holding-check-retire169|holding-retire169|holding-diagnose185-references|holding-reconcile185-staged|holding-inspect185|holding-check-retire185|holding-retire185 SPEC --spec-sha256 HEX --self-sha256 HEX"
+    );
+    let spec = sealed_spec(&args)?;
+    let v = bound(&spec)?;
+    if foundation_private_command(&args[1]) {
+        return foundation_private::run(&args[1], v, &spec).await;
+    }
+    let map: Bound = serde_json::from_value(v["mapping"].clone())?;
+    let m: Mapping = serde_json::from_value(bound(&map)?)?;
+    mapping(&m)?; // Must pass before credentials, listing or first remote write.
+    if args[1] == "holding-plan185-guard-handoff" {
+        return epoch185::plan_guard_handoff(&m, v, &spec);
+    }
+    if args[1] == "holding-capture185-survivor-guards" {
+        return epoch185::capture_growth_guards(&m, v, &spec);
+    }
+    if args[1] == "holding-read185-attempt-growth" {
+        return epoch185::growth_read(&m, v);
+    }
+    let mut lock = transition_lock()?;
     if matches!(
         args[1].as_str(),
         "holding-check-retire166-retry10" | "holding-retire166-retry10"
