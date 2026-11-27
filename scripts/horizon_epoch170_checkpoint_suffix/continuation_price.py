@@ -10,7 +10,9 @@ prior = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prior)
 RT, TREE, B140 = prior.RT, prior.TREE, prior.B140
 state, read, bound, inactive, need, cmd = prior.state, prior.read, prior.bound, prior.inactive, prior.need, prior.cmd
-DEP = ATTEMPT = RT / "epoch170-from-73746882-20261127-v1"
+FIRST = RT / "epoch170-from-73746882-20261127-v1"
+RETRY = Path(__file__).resolve().parent == FIRST/"attempt-2/operator-v1"
+DEP = ATTEMPT = FIRST/"attempt-2" if RETRY else FIRST
 OLD = prior.DEP / "attempt-2"
 BRIDGE = prior.UNIT
 ORIG = "04b0750aead84a83914d18edea9c8736"
@@ -21,8 +23,18 @@ READ_UNIT = "horizon-170-73746882-closed-read-20261127-v1.service"
 
 
 def scope():
-    interface, ref = read(DEP/"BOUNDED_SUCCESSOR_WRITER_INTERFACE.json",
-                          "6e7eed43d0593e9ffe6d5df59cb27f92da518af40c96fb7d09fadb63a5990255")
+    original_sha = "6e7eed43d0593e9ffe6d5df59cb27f92da518af40c96fb7d09fadb63a5990255"
+    expected = "f5da8a618bfb147d98d2db1ec91526d9b711df014189c4e6485503f003e63dcd" if RETRY else original_sha
+    interface, ref = read(DEP/"BOUNDED_SUCCESSOR_WRITER_INTERFACE.json", expected)
+    if RETRY:
+        original, parent_ref = read(FIRST/"BOUNDED_SUCCESSOR_WRITER_INTERFACE.json", original_sha)
+        failed = bound(interface["unreleased_failed_attempt"])
+        need(parent_ref == interface["previous_interface"] and failed["no_permit"] and failed["no_worker_or_archive"]
+             and failed["guard_samples"] == 0 and bound(failed["actor"])["producer_invocation_id"] == failed["terminal"]["InvocationID"]
+             and interface["closed_comparison"] == original["closed_comparison"] and interface["profile"] == original["profile"]
+             and interface["run"] == original["run"] and interface["log"] == str(Path(original["run"])/"producer-attempt2.log")
+             and interface["barrier"] == original["barrier"] and interface["guard_receipts"] == original["guard_receipts"],
+             "unconfirmed unreleased predecessor or changed retry layout")
     native = bound(interface["source_preflight"])
     need(native["route_accepted"] and not native["worker_executed"] and native["scope"] == [73746883,73766969]
          and interface["profile"]["positions"] == 20087 and interface["expected_producer_unit"] == UNIT,
@@ -34,7 +46,7 @@ def predecessor_exit():
     interface, _ = scope()
     release = bound(interface["old_release"])
     actor = bound(interface["old_actor"])
-    terminal, ref = read(DEP/"predecessor-exit/PID1_EXIT.json")
+    terminal, ref = read(FIRST/"predecessor-exit/PID1_EXIT.json")
     prop = terminal["properties"]
     need(release["actor"] == interface["old_actor"] and terminal["actor"] == actor
          and terminal["release"] == interface["old_release"] and prop["Id"] == BRIDGE
@@ -118,6 +130,37 @@ def hourly_owner():
     return sample, plan["minimum_free_bytes"], max(0,44*G-lower), ram
 
 
+def guarded_hourly143(rollover, current):
+    closed = rollover.first_closed(prior)
+    permit = rollover.ROOT/"barrier/allow"
+    mode = "released" if os.path.lexists(permit) else "gate"
+    guarded = rollover.guard(prior, rollover.ROOT, rollover.UNIT, rollover.ROOT/"guard-receipts",
+                             current["InvocationID"], mode)
+    if mode == "gate":
+        # A retried gate has a new immutable writer booking. Select it by
+        # kernel start time, so an earlier failed attempt cannot back it.
+        pid, ticks = guarded["roster"][0]
+        boot = next(int(line.split()[1]) for line in Path("/proc/stat").read_text().splitlines()
+                    if line.startswith("btime "))
+        started = boot + ticks / os.sysconf("SC_CLK_TCK")
+        bookings = []
+        for path in rollover.ROOT.glob("WRITER_BOOKING_FIRST_HOURLY*.json"):
+            booking, ref = read(path)
+            if booking["recorded_unix_seconds"] - 1 <= started <= booking["latest_start_unix_seconds"] + 1:
+                bookings.append((booking, ref))
+        need(len(bookings) == 1, "unreleased 143 has no unique writer booking at its kernel start")
+        booking, ref = bookings[0]
+        need(guarded["roster"] == [(int(current["MainPID"]),ticks)] and booking["unit"] == rollover.UNIT
+             and booking["schema"] == "horizon-epoch143-first-hourly-booking-v1"
+             and booking["closed_141"] == closed and booking["contract"] == read(rollover.ROOT/"contract-v1/LAUNCH_PROFILE.json",rollover.SHA)[1]
+             and booking["HOME_bytes"] == 64*G+64*M and booking["RAM_bytes"] == 41*G
+             and booking["cpu_quota_micros"] == 3000000 and not booking["archive_publication_authorized"],
+             "unfunded hourly gate")
+        guarded["booking"] = ref
+    guarded["mode"] = mode
+    return guarded
+
+
 def price(phase):
     need(phase in ("read","start","held"),"unknown continuation phase")
     prior_receipt = predecessor_exit()
@@ -140,9 +183,7 @@ def price(phase):
         shared_spec.loader.exec_module(rollover)
         rs = state(rollover.UNIT)
         if rs["ActiveState"] == "active":
-            rollover.first_closed(prior)
-            replacement = rollover.guard(prior,rollover.ROOT,rollover.UNIT,rollover.ROOT/"guard-receipts",
-                                         rs["InvocationID"],"released")
+            replacement = guarded_hourly143(rollover, rs)
     joint = prior.price("held" if held else "start",attempt=OLD,held_replacement=UNIT if held else None,
                         hourly_replacement=replacement["iid"] if replacement else None)
     need(joint["candidate_growth"] == 36*G and joint["producer_allowance"] == 48*G
@@ -195,7 +236,7 @@ def price(phase):
     historical -= aux_home + (20*G if hourly_ram_delta else 0)
     margin = min(historical,home-required)
     fits = margin >= 0 and ram >= ram_required and (phase=="read" or high+growth <= 384*G)
-    return dict(phase=phase,fleet=joint["fleet"],joint=joint,observed=int(time.time()),fits=fits,
+    result = dict(phase=phase,priced_170_invocation=s["InvocationID"] if held else None,fleet=joint["fleet"],joint=joint,observed=int(time.time()),fits=fits,
                 old_terminal=prior_receipt,hourly_guard=hourly,hourly_ram_resident=hourly_resident,
                 tail_ram_resident=tail_resident,terminal_tree_bounds=[low,high],guard_floor=floor,
                 guard_cap=min(384*G,high+growth),available_home=home,available_ram=ram,required_home=required,
@@ -205,3 +246,12 @@ def price(phase):
                 replacement143=replacement,auxiliary=aux,
                 dispatch_cpu_micros=500000,dispatch_memory_bytes=512*M,dispatch_home_bytes=128*M,
                 resource_credit_bytes=0,archive_publication_authorized=False)
+
+    # Historical standalone read deployments predate the assembly reservation.
+    overlay_path = Path(__file__).with_name("assembly_reservation.py")
+    if phase == "read" or (not RETRY and not overlay_path.exists()):
+        return result
+    overlay_spec = importlib.util.spec_from_file_location("assembly_reservation", overlay_path)
+    overlay = importlib.util.module_from_spec(overlay_spec)
+    overlay_spec.loader.exec_module(overlay)
+    return overlay.apply_170(result, overlay.reservation())
