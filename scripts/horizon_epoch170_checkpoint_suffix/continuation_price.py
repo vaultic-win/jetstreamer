@@ -11,7 +11,7 @@ spec.loader.exec_module(prior)
 RT, TREE, B140 = prior.RT, prior.TREE, prior.B140
 state, read, bound, inactive, need, cmd = prior.state, prior.read, prior.bound, prior.inactive, prior.need, prior.cmd
 FIRST = RT / "epoch170-from-73746882-20261127-v1"
-RETRY = Path(__file__).resolve().parent == FIRST/"attempt-2/operator-v1"
+RETRY = Path(__file__).resolve().parent in (FIRST/"attempt-2/operator-v1", FIRST/"attempt-2/operator-v2")
 DEP = ATTEMPT = FIRST/"attempt-2" if RETRY else FIRST
 OLD = prior.DEP / "attempt-2"
 BRIDGE = prior.UNIT

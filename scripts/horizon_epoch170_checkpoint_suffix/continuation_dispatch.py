@@ -156,12 +156,15 @@ def retry_writer(interface, ref):
     writer = active["new"]
     state = q.state(writer["unit"])
     ready = q.bound(active["ready"])
-    program = base/"tools-cold168-retry5-failed166-v46-entry146/status_cycle.py"
+    program = Path(writer["program"])
     seal = q.bound(ready["package"])
     member, = (m for m in seal["members"] if m["name"] == program.name)
     q.need(active["schema"] == "horizon-epoch166-cadence-rejoin-active-v1" and not active["producer_mutations"]
            and ready["successor170_interface"] == ref and ready["prior_successor170_interface"] == interface["previous_interface"]
-           and writer["program"] == str(program) and seal["destination"] == str(program.parent)
+           and program.name == "status_cycle.py" and program.parent.parent == base
+           and re.fullmatch(r"tools-cold168-retry5-failed166-v46-entry146(?:-r[1-9][0-9]*)?", program.parent.name)
+           and program.resolve(strict=True) == program and seal["destination"] == str(program.parent)
+           and ready["package"]["path"] == str(program.parent/"deployment-seal-receipt.json")
            and operator.digest(program) == member["sha256"] and state["ActiveState"] == "active"
            and state["InvocationID"] == writer["invocation_id"] and state["MainPID"] == str(writer["pid"])
            and int((Path("/proc")/str(writer["pid"])/"stat").read_text().rsplit(") ",1)[1].split()[19]) == writer["start_ticks"],
@@ -172,7 +175,7 @@ def retry_writer(interface, ref):
 def dispatch(stage):
     i, ir = q.scope()
     q.need(operator.q.UNIT == q.UNIT and operator.D == q.DEP, "operator is outside its sealed deployment")
-    q.need(Path(__file__).resolve().parent in (q.DEP/"operator",q.DEP/"operator-with143-v1",q.DEP/"operator-with143-v2",q.DEP/"operator-v1" if q.RETRY else q.DEP/"operator"),"wrong dispatch executable directory")
+    q.need(Path(__file__).resolve().parent in (q.DEP/"operator",q.DEP/"operator-with143-v1",q.DEP/"operator-with143-v2",q.DEP/"operator-v1" if q.RETRY else q.DEP/"operator", q.DEP/"operator-v2" if q.RETRY else q.DEP/"operator"),"wrong dispatch executable directory")
     if stage == "check":
         operator.static()
         return {"interface":ir,"predecessor_exit":q.predecessor_exit()}
