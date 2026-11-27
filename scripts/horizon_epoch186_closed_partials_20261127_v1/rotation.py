@@ -28,6 +28,8 @@ SIX = RT / "epoch141-foundation-sixth-bootstrap-20261127-v1"
 SEVEN = RT / "epoch141-foundation-seventh-bootstrap-20261127-v1"
 PREVIOUS = RT / "epoch185-lanem-main-holding-20261127-v1"
 OPLOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
+TOOLS = Path(__file__).resolve().parent
+FOLLOWON = OUT / "n-tools-v2"
 MAPPING = Path(
     "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json"
 )
@@ -264,7 +266,21 @@ def locked(p, identity=None):
     return f
 
 
+def deployment(phase, lane):
+    if TOOLS == FOLLOWON:
+        need(
+            lane == "n" and phase in ("park", "retire", "restore"),
+            "this follow-on holds only the lane N serial rotation",
+        )
+    else:
+        need(TOOLS == OUT / "tools", "use the deployed rotation operator")
+
+
 def recent_price():
+    if TOOLS == FOLLOWON:
+        import n_admission
+
+        return n_admission.price()
     fixed(PROVIDER, "a8d2139c524f06d38329cb9c7ab00ab036f26f1adbba3b3b501b365511fed471")
     q = runpy.run_path(str(PROVIDER))["price"]()
     live = q["live_quote"]
@@ -314,6 +330,10 @@ def recent_price():
 
 
 def owners(quote):
+    if TOOLS == FOLLOWON:
+        import n_admission
+
+        return n_admission.owners(quote)
     fleet = bound(quote["fleet"])
     rows = list(fleet["actual_executing_replays"])
     for key, v in fleet.items():
@@ -526,10 +546,15 @@ def serial_handoff():
         == handoff["local_occupied_bytes"],
         "seventh serial has not returned",
     )
-    return [
+    receipts = [
         ref(PREVIOUS / "SERIAL_RETURN.json"),
         ref(SEVEN / "ANZA_SERIAL_HANDBACK.json"),
     ]
+    if TOOLS == FOLLOWON:
+        import n_admission
+
+        receipts.append(n_admission.m_return())
+    return receipts
 
 
 def census(row, cgroup):
@@ -712,6 +737,7 @@ def execute(phase, lane):
         os.geteuid() == 0 and not sys.flags.optimize,
         "run in the bounded root service without Python optimize",
     )
+    deployment(phase, lane)
     unit, iid = native_scope(phase, lane)
     stamp_id = os.environ["HORIZON186_RUN_ID"]
     hard = {
@@ -731,9 +757,9 @@ def execute(phase, lane):
         "foreign expected",
     )
     original = Path(row["source"])
-    members = read(OUT / "tools/deployment-seal-receipt.json")["members"]
+    members = read(TOOLS / "deployment-seal-receipt.json")["members"]
     for member in members:
-        fixed(OUT / "tools" / member["name"], member["sha256"])
+        fixed(TOOLS / member["name"], member["sha256"])
     if phase == "fixture":
         return fixture()
     if phase == "precheck":
@@ -751,19 +777,19 @@ def execute(phase, lane):
         current = census(row, "/system.slice/" + unit)
         proof = ref(OUT / "RESTORE_FIXTURE_ACCEPTED.json")
         bound(proof)
-        fleet_price = recent_price()
-        owners(fleet_price)
-        disk = (
-            expected["single_copy_peak"]
-            if phase == "restore" and not original.exists()
-            else 16 * M
-        )
-        need(
-            fleet_price["remaining_home"] >= disk
-            and fleet_price["remaining_ram"] >= hard,
-            "fresh complete fleet cannot fit phase",
-        )
         with locked(OPLOCK):
+            fleet_price = recent_price()
+            owners(fleet_price)
+            disk = (
+                expected["single_copy_peak"]
+                if phase == "restore" and not original.exists()
+                else 16 * M
+            )
+            need(
+                fleet_price["remaining_home"] >= disk
+                and fleet_price["remaining_ram"] >= hard,
+                "fresh complete fleet cannot fit phase",
+            )
             now = time.time()
             need(now - fleet_price["utc"] <= 15, "quote exceeded admission window")
             a = save(

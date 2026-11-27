@@ -8,10 +8,8 @@ import rotation as op
 
 
 def dispatch(phase, lane):
-    op.need(
-        os.getuid() == 0 and Path(__file__).resolve().parent == op.OUT / "tools",
-        "use the deployed native operator",
-    )
+    op.need(os.getuid() == 0, "the native dispatch requires root")
+    op.deployment(phase, lane)
     d = op.OUT / lane
     row = op.source(lane)
     runid = str(time.time_ns())
@@ -68,7 +66,7 @@ def dispatch(phase, lane):
         "Environment=HORIZON186_RUN_ID=" + runid,
         "EnvironmentFile=/etc/jetstreamer/horizon-r2.env",
         "ReadWritePaths=" + str(d),
-        "ReadOnlyPaths=" + str(op.OUT / "tools"),
+        "ReadOnlyPaths=" + str(op.TOOLS),
         "StandardOutput=file:" + str(evidence),
         "StandardError=file:" + str(err),
     ]
@@ -84,10 +82,13 @@ def dispatch(phase, lane):
         "--",
         "/usr/bin/python3",
         "-IB",
-        str(op.OUT / "tools/rotation.py"),
+        str(op.TOOLS / "rotation.py"),
         phase,
         lane,
     ]
+    op.fixed(
+        op.PROVIDER, "a8d2139c524f06d38329cb9c7ab00ab036f26f1adbba3b3b501b365511fed471"
+    )
     ops = __import__("runpy").run_path(str(op.PROVIDER))
     with op.locked(op.OPLOCK):
         q = op.recent_price()
