@@ -8,6 +8,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[path = "../../../../horizon_epoch145_guarded_export_20261121_v1/guard_walk.rs"]
+mod guard_walk;
+
 const GIB: u64 = 1 << 30;
 const MIB: u64 = 1 << 20;
 const UNIT: &str = "horizon-143-full-local-qualification-20261126-v1.service";
@@ -243,8 +246,93 @@ fn protected(
     Ok((sample_ref, physical, resident))
 }
 
+fn closed_167(anchor: &Value, guard: &Value, processes: &Value) -> Result<Option<(Value, u64)>> {
+    let actor = &anchor["producer"];
+    let cgroup = string(&actor["cgroup"])?;
+    let unit = cgroup.rsplit('/').next().context("167 unit")?;
+    let props = state(unit)?;
+    if property(&props, "ActiveState")? == "active" {
+        return Ok(None);
+    }
+    let invocation = string(&actor["invocation_id"])?;
+    ensure!(
+        matches!(property(&props, "ActiveState")?, "inactive" | "failed")
+            && property(&props, "InvocationID")? == invocation
+            && property(&props, "MainPID")? == "0"
+            && property(&props, "ControlPID")? == "0"
+            && property(&props, "Job")?.is_empty(),
+        "167 producer is neither the live owner nor its drained invocation"
+    );
+    for process in processes.as_array().context("missing 167 roster")? {
+        ensure!(
+            !Path::new(&format!("/proc/{}", number(&process[0])?)).exists(),
+            "retained 167 process is still present"
+        );
+    }
+    match fs::read_to_string(format!("/sys/fs/cgroup{cgroup}/cgroup.procs")) {
+        Ok(members) => ensure!(members.trim().is_empty(), "167 cgroup is not empty"),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    let output = Command::new("/usr/bin/journalctl")
+        .args([
+            "--no-pager",
+            "-q",
+            "-o",
+            "json",
+            "_PID=1",
+            "_UID=0",
+            &format!("UNIT={unit}"),
+            &format!("INVOCATION_ID={invocation}"),
+        ])
+        .output()?;
+    ensure!(
+        output.status.success() && output.stderr.is_empty(),
+        "167 PID1 journal read failed"
+    );
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    let mut matching = Vec::new();
+    for line in std::str::from_utf8(&output.stdout)?.lines() {
+        let event: Value = serde_json::from_str(line)?;
+        if event["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+            || event["MESSAGE_ID"] == "98e322203f7a4ed290d09fe03c09fe15"
+                && event["COMMAND"] == "ExecStart"
+        {
+            ensure!(
+                event["_BOOT_ID"] == boot
+                    && event["_PID"] == "1"
+                    && event["_UID"] == "0"
+                    && event["UNIT"] == unit
+                    && event["INVOCATION_ID"] == invocation,
+                "foreign 167 terminal"
+            );
+            matching.push(event);
+        }
+    }
+    ensure!(matching.len() == 1, "167 lacks one PID1 terminal event");
+    let plan = read(&guard["plan"])?;
+    let cap = number(&guard["run_guard_cap_bytes"])?;
+    ensure!(
+        plan["invocation_id"] == invocation
+            && plan["unit"] == unit
+            && plan["filesystem"] == "/home/sol"
+            && plan["maximum_root_physical_bytes"] == cap,
+        "foreign stopped 167 tree or cap"
+    );
+    let root = Path::new(string(&plan["worker_root"])?);
+    let physical =
+        guard_walk::lower_bound(root, cap)?.context("torn stopped 167 allocation walk")?;
+    ensure!(
+        state(unit)? == props,
+        "167 unit changed during the stopped tree walk"
+    );
+    Ok(Some((matching.remove(0), physical)))
+}
+
 fn follows_observation(mut current: Value, anchor: &Value) -> Result<bool> {
-    for _ in 0..2 {
+    for _ in 0..3 {
         let cadence = &current["cadence"];
         ensure!(
             cadence["minimum_interval_seconds"] == 1800
@@ -326,23 +414,47 @@ fn main() -> Result<()> {
         "different 170 bridge"
     );
     rosters.insert(bridge_unit.into(), first["actor"]["processes"].clone());
+    let guard167 = &release["incumbent_guard"];
+    let anchor167 = read(&guard167["sample"])?;
+    let unit167 = string(&anchor167["producer"]["cgroup"])?
+        .rsplit('/')
+        .next()
+        .context("167 unit")?;
+    let settled167 = closed_167(&anchor167, guard167, &rosters[unit167])?;
     if !same_fleet {
         let diagnostics = fleet["actual_active_private_diagnostics"]
             .as_array()
             .context("missing accepted private replay roster")?;
         ensure!(
-            diagnostics.len() == 2
-                && diagnostics.iter().all(|row| {
-                    matches!(row["epoch"].as_u64(), Some(167 | 170))
-                        && row["phase"] == "worker"
-                        && row["unit"]["Id"]
-                            .as_str()
-                            .and_then(|unit| rosters.get(unit))
-                            == Some(&row["processes"])
-                })
-                && diagnostics[0]["epoch"] != diagnostics[1]["epoch"],
+            diagnostics.iter().all(|row| {
+                matches!(row["epoch"].as_u64(), Some(167 | 170))
+                    && row["phase"] == "worker"
+                    && row["unit"]["Id"]
+                        .as_str()
+                        .and_then(|unit| rosters.get(unit))
+                        == Some(&row["processes"])
+            }) && diagnostics.iter().filter(|row| row["epoch"] == 170).count() == 1
+                && diagnostics.iter().filter(|row| row["epoch"] == 167).count() <= 1,
             "accepted private replay roster changed"
         );
+        let bound167 = &fleet["current_bounded167_checkpoint_v2"];
+        match &settled167 {
+            Some((terminal, _)) if held || bound167["phase"] == "terminal" => ensure!(
+                bound167["phase"] == "terminal"
+                    && bound167["native_terminal"] == *terminal
+                    && bound167["resource_credit_bytes"] == 0
+                    && bound167["reservation_ending_bytes"] == 0
+                    && diagnostics.len() == 1,
+                "167 drain lacks the exact accepted terminal"
+            ),
+            _ => ensure!(
+                diagnostics.len() == 2,
+                "accepted live roster lacks epoch 167"
+            ),
+        }
+    }
+    if settled167.is_some() {
+        rosters.remove(unit167);
     }
     let listing = command(&[
         "list-units",
@@ -396,22 +508,21 @@ fn main() -> Result<()> {
         resident += credit;
         guards.insert(unit, reference);
     }
-    let guard167 = &release["incumbent_guard"];
-    let anchor167 = read(&guard167["sample"])?;
-    let unit167 = string(&anchor167["producer"]["cgroup"])?
-        .rsplit('/')
-        .next()
-        .context("167 unit")?;
-    let (reference, physical, _) = protected(
-        &guard167["sample"],
-        &rosters[unit167],
-        &guard167["timer_invocation_id"],
-        now,
-    )?;
+    let physical167 = if let Some((_, physical)) = &settled167 {
+        *physical
+    } else {
+        let (reference, physical, _) = protected(
+            &guard167["sample"],
+            &rosters[unit167],
+            &guard167["timer_invocation_id"],
+            now,
+        )?;
+        guards.insert(unit167, reference);
+        physical
+    };
     let growth167 = number(&guard167["run_guard_cap_bytes"])?
-        .checked_sub(physical)
+        .checked_sub(physical167)
         .context("167 over cap")?;
-    guards.insert(unit167, reference);
     let guard170 = &quote["first_guard"];
     let (reference, physical, _) = protected(
         &guard170["sample"],
@@ -480,6 +591,7 @@ fn main() -> Result<()> {
         "available_memory_bytes":available_memory,"required_available_memory_bytes":required_ram,
         "prior_fit":quote_ref,"live_guards":guards,"resident_lower_bound_bytes":resident,
         "incumbent_disk_growth_bytes":additional,"remaining_167_bytes":growth167,"remaining_170_bytes":growth170,
+        "epoch167_stopped_tree":settled167.map(|(terminal, physical)| json!({"terminal":terminal,"physical_lower_bound_bytes":physical})),
         "reserved_new_selector_HOME_bytes":16*MIB,"reserved_new_selector_RAM_bytes":4*GIB,
         "archive_publication_authorized":false,"full_replay_authorized":false})
     );
