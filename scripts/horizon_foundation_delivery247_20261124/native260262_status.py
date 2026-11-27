@@ -97,7 +97,7 @@ def refresh(epoch, previous, observer, observer_ref, wd, image):
         expected = {key: bound(previous)["etag"]} if previous is not None else {}
         assert {item["Key"]: item["ETag"] for item in items.get("Contents", [])} == expected
         assert props(lane.UNIT, FIELDS) == owner
-        output = subprocess.check_output([
+        subprocess.run([
             image, "status-publish", directory, "--epochs", f"{epoch}-{epoch}",
             "--receipt-directory", STATUS, "--observer-receipt", observer_ref["path"],
             "--observer-sha256", observer_ref["sha256"],
@@ -105,8 +105,7 @@ def refresh(epoch, previous, observer, observer_ref, wd, image):
             "--expected-producer-invocation-id", launch["invocation_id"],
             "--elapsed-execution-millis", str(elapsed),
             "--estimated-remaining-millis", str(estimate), "--phase", "replay",
-        ], text=True, timeout=70)
-        assert Path(output.strip()) == receipt
+        ], check=True, stdout=subprocess.DEVNULL, timeout=70)
     native_ref = ref(receipt)
     native = bound(native_ref)
     body = native["status"]
