@@ -628,6 +628,9 @@ fn supported_unit(plan: &Plan) -> bool {
             && plan.bounded_measurement.is_none()
             && plan.bounded_canary.is_none();
     }
+    if plan.unit == "horizon-epoch140-suffix-recording.service" {
+        return cfg!(feature = "epoch140-suffix-recording");
+    }
     if plan.unit.starts_with("horizon-qualify-") {
         return true;
     }
@@ -684,10 +687,18 @@ fn validate_plan(plan: &Plan) -> Result<()> {
 #[cfg(any(
     feature = "epoch168-joint-reduced",
     feature = "epoch167-checkpoint-bounded",
-    feature = "epoch170-checkpoint-suffix"
+    feature = "epoch170-checkpoint-suffix",
+    feature = "epoch140-suffix-recording"
 ))]
 fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
     let (worker_root, receipts, minimum_floor, maximum_tree_bytes) = match plan.unit.as_str() {
+        #[cfg(feature = "epoch140-suffix-recording")]
+        "horizon-epoch140-suffix-recording.service" => (
+            "/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-v1",
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-v1/guard-receipts",
+            9_470_567_509_909,
+            24_u64 << 30,
+        ),
         #[cfg(feature = "epoch168-joint-reduced")]
         "horizon-qualify-168-joint-checkpoint-reduced-20261126-v1.service" => (
             "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1",
@@ -844,6 +855,34 @@ fn suffix_170_preserves_original_cap_and_floor() {
     }
 }
 
+#[cfg(all(test, feature = "epoch140-suffix-recording"))]
+#[test]
+fn suffix_140_meters_only_the_new_private_recording_tree() {
+    let plan = json!({
+        "schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+        "unit":"horizon-epoch140-suffix-recording.service",
+        "filesystem":"/home/sol",
+        "worker_root":"/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-v1",
+        "receipt_directory":"/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-v1/guard-receipts",
+        "invocation_id":"1234567890abcdef1234567890abcdef",
+        "minimum_free_bytes":9_470_567_509_909u64,
+        "maximum_root_physical_bytes":24u64 << 30,
+        "maximum_worker_vmas":3_500_000
+    });
+    let parse = |value| serde_json::from_value::<Plan>(value).unwrap();
+    assert!(validate_plan(&parse(plan.clone())).is_ok());
+    assert!(validate_checkpoint_scope(&parse(plan.clone())).is_ok());
+    for (key, value) in [
+        ("worker_root", json!("/home/sol/.jetstreamer-private")),
+        ("minimum_free_bytes", json!(9_470_567_509_908u64)),
+        ("maximum_root_physical_bytes", json!((24u64 << 30) + 1)),
+    ] {
+        let mut foreign = plan.clone();
+        foreign[key] = value;
+        assert!(validate_checkpoint_scope(&parse(foreign)).is_err());
+    }
+}
+
 fn data_proof_trip(error: Option<&str>) -> Option<&'static str> {
     error.map(|_| "DATA-fulfillment-observation-failed")
 }
@@ -896,14 +935,16 @@ fn run() -> Result<()> {
     #[cfg(any(
         feature = "epoch168-joint-reduced",
         feature = "epoch167-checkpoint-bounded",
-        feature = "epoch170-checkpoint-suffix"
+        feature = "epoch170-checkpoint-suffix",
+        feature = "epoch140-suffix-recording"
     ))]
     validate_checkpoint_scope(&plan)?;
     #[cfg(not(any(
         feature = "incident-recovery",
         feature = "epoch168-joint-reduced",
         feature = "epoch167-checkpoint-bounded",
-        feature = "epoch170-checkpoint-suffix"
+        feature = "epoch170-checkpoint-suffix",
+        feature = "epoch140-suffix-recording"
     )))]
     ensure!(
         plan.unit == data_fulfillment::COLD_UNIT

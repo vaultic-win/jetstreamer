@@ -3,6 +3,7 @@ use super::*;
 mod allocation;
 mod delivery252;
 mod focused;
+mod replay256;
 mod replay258;
 mod replay260;
 mod replay296;
@@ -1440,6 +1441,7 @@ fn measure(
             Some(Quote::Focused(spec, _)) => spec.cpus,
             _ => GAP_230.cpus,
         },
+        256 => replay256::CPUS,
         258 if matches!(&quote, Some(Quote::FullReplay(_))) => replay258::CPUS,
         258 => RESTORE_258.cpus,
         260 => RESTORE_260.cpus,
@@ -1775,6 +1777,7 @@ fn measure(
         }
         230 => "foundation-epoch230-short-gap-roster-binding-v1",
         252 => "foundation-epoch252-delivery-roster-binding-v1",
+        256 => replay256::ROSTER_SCHEMA,
         258 if matches!(&quote, Some(Quote::FullReplay(_))) => replay258::ROSTER_SCHEMA,
         258 => "foundation-epoch258-native-restore-roster-binding-v1",
         260 if matches!(&quote, Some(Quote::FullReplay(_))) => replay260::ROSTER_SCHEMA,
@@ -1933,6 +1936,7 @@ pub fn run() -> Result<()> {
                 flag.to_str(),
                 Some(
                     "--full-replay-quote"
+                        | "--full256-quote"
                         | "--full258-quote"
                         | "--full260-quote"
                         | "--delivery252-quote"
@@ -1958,7 +1962,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
+            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
         ),
     };
     let synchronize = match args.next() {
@@ -1999,6 +2003,8 @@ pub fn run() -> Result<()> {
             });
     let result = match command.as_deref() {
         Some(flag) if flag == "--full-replay-quote" => full_replay_quote()
+            .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),
+        Some(flag) if flag == "--full256-quote" => replay256::quote()
             .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),
         Some(flag) if flag == "--full258-quote" => replay258::quote()
             .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),

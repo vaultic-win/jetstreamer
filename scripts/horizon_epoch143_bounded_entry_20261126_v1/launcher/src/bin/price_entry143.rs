@@ -18,15 +18,15 @@ const SELECTOR: &str = "horizon-167-retained-prefix-selection-20261127-v1.servic
 const AUTHORITY: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 const LEASE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch143-bounded-entry-20261126-v1/BOUNDED_ENTRY_LEASE.json";
 
-fn number(value: &Value) -> Result<u64> {
+pub(crate) fn number(value: &Value) -> Result<u64> {
     value.as_u64().context("missing numeric evidence")
 }
 
-fn string(value: &Value) -> Result<&str> {
+pub(crate) fn string(value: &Value) -> Result<&str> {
     value.as_str().context("missing string evidence")
 }
 
-fn read(reference: &Value) -> Result<Value> {
+pub(crate) fn read(reference: &Value) -> Result<Value> {
     let path = Path::new(string(&reference["path"])?);
     let meta = path.symlink_metadata()?;
     ensure!(
@@ -48,26 +48,26 @@ fn read(reference: &Value) -> Result<Value> {
     Ok(serde_json::from_slice(&raw)?)
 }
 
-fn command(args: &[&str]) -> Result<String> {
+pub(crate) fn command(args: &[&str]) -> Result<String> {
     let output = Command::new("/usr/bin/systemctl").args(args).output()?;
     ensure!(output.status.success(), "systemctl failed for {args:?}");
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn state(unit: &str) -> Result<BTreeMap<String, String>> {
+pub(crate) fn state(unit: &str) -> Result<BTreeMap<String, String>> {
     Ok(command(&["show", "--all", "-p", "Id,InvocationID,ActiveState,MainPID,ControlPID,Job,ControlGroup,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec", "--", unit])?
         .lines().filter_map(|line| line.split_once('='))
         .map(|(k, v)| (k.into(), v.into())).collect())
 }
 
-fn property<'a>(state: &'a BTreeMap<String, String>, name: &str) -> Result<&'a str> {
+pub(crate) fn property<'a>(state: &'a BTreeMap<String, String>, name: &str) -> Result<&'a str> {
     state
         .get(name)
         .map(String::as_str)
         .with_context(|| format!("missing PID1 property {name}"))
 }
 
-fn usage() -> Result<(u64, u64)> {
+pub(crate) fn usage() -> Result<(u64, u64)> {
     let output = Command::new("/usr/bin/stat")
         .args(["-f", "-c", "%a %S", "/home/sol"])
         .output()?;
@@ -108,7 +108,7 @@ fn ticks(pid: u64) -> Result<u64> {
         .parse()?)
 }
 
-fn protected(
+pub(crate) fn protected(
     anchor_ref: &Value,
     roster: &Value,
     timer_iid: &Value,
@@ -124,6 +124,7 @@ fn protected(
         "horizon-qualify-146-full-local-20261126-v1.service" => (68, "6.250000s", true),
         "horizon-qualify-172-full-half-core-20261120-v1.service" => (68, "500ms", true),
         "horizon-qualify-167-checkpoint-bounded-20261127-v2.service" => (42, "3s", false),
+        "horizon-qualify-167-checkpoint-tail-20261127-v1.service" => (42, "3s", false),
         "horizon-qualify-170-checkpoint-suffix-20261127-v1.service" => (48, "6s", false),
         _ => anyhow::bail!("foreign protected producer {unit}"),
     };
