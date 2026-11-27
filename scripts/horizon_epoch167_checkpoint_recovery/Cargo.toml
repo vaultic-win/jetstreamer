@@ -14,3 +14,9 @@ path = "retained_overlap.rs"
 jetstreamer-horizon = { path = "../../jetstreamer-horizon" }
 lencode = "2.0.0"
 libc = "0.2"
+serde_json = "1"
+sha2 = "0.10"
+
+[[bin]]
+name = "horizon-167-signed-trace"
+path = "signed_trace.rs"
