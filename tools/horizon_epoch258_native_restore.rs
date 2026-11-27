@@ -105,11 +105,16 @@ fn prepare_ram_work(work: &Path, capacity: u64) -> Result<()> {
     let vfs = vfs.context("missing RAM work VFS options")?;
     let options = source.next().context("missing tmpfs options")?;
     ensure!(
-        ["rw", "nosuid", "nodev", "noexec"]
+        ["rw", "nosuid", "nodev"]
             .iter()
             .all(|flag| vfs.split(',').any(|option| option == *flag))
             && options.split(',').any(|option| option == "noswap"),
         "RAM work mount protections differ"
+    );
+    // The historical client executes a digest-bound worker copy from its private scratch.
+    ensure!(
+        !vfs.split(',').any(|option| option == "noexec"),
+        "RAM work mount cannot execute the bound worker"
     );
     let path = std::ffi::CString::new(work_path)?;
     let mut info = std::mem::MaybeUninit::<libc::statvfs>::uninit();
