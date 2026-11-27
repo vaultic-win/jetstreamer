@@ -1528,6 +1528,16 @@ fn measure(
     } else {
         None
     };
+    let mut closed_overlap_266 = None;
+    let rows = admission_fleet["active"].as_array_mut().context("Foundation active roster")?;
+    if quote.is_some() && !live_replays.contains_key(&266)
+        && let Some(index) = rows.iter().position(|row| {
+            row["epoch"] == 266 && row["producer"]["Id"] == OVERLAP_266.unit
+        })
+        && let Some(proof) = focused::overlap_266_drained(n, &rows[index])?
+    {
+        closed_overlap_266 = Some((rows.remove(index), proof));
+    }
     let roster = fleet_roster(
         &admission_fleet,
         &booking,
@@ -1857,6 +1867,12 @@ fn measure(
             "epoch 230 terminal changed during roster binding"
         );
     }
+    if let Some((row, proof)) = &closed_overlap_266 {
+        ensure!(
+            focused::overlap_266_drained(n, row)?.as_ref() == Some(proof),
+            "epoch 266 terminal changed during roster binding"
+        );
+    }
     if let Some(proof) = &extraction_drain {
         terminal_extract_226(n, &booking, proof)?;
     }
@@ -2091,6 +2107,7 @@ fn measure(
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
         "closed_middle_replay":closed_230,
         "closed_first_7871_replay":closed_first_7871,
+        "closed_overlap_266_replay":closed_overlap_266.map(|(_, proof)| proof),
         "closed_extraction_226":extraction_drain,
         "active_suffix_226_registration":live_replays.get(&226).map(|replay| &replay.reference),
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),

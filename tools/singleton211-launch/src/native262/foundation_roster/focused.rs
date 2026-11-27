@@ -431,6 +431,54 @@ pub(super) fn first_7871_drained(n: &mut Native) -> Result<Bound> {
     Ok(reference)
 }
 
+pub(super) fn overlap_266_drained(n: &mut Native, row: &Value) -> Result<Option<Bound>> {
+    const INVOCATION: &str = "08c5881b215e45c8b0c257a6a417535a";
+    const LAUNCH_SHA: &str = "0c7965332b7f1fe9be70eca870d15f6d6a33eaa683f72eb449b22578ea839404";
+    const NATIVE_TERMINAL: &str =
+        "/var/lib/jetstreamer/horizon266-hourly-overlap-114929697-terminal-v1/terminal-evidence.json";
+    let state = Path::new(OVERLAP_266.state);
+    let path = state.join("terminal.json");
+    if !path.try_exists()? {
+        return Ok(None);
+    }
+    let reference = Bound::new(&path, hash(&path)?);
+    let receipt = reference.sealed()?;
+    let launch = Bound::new(state.join("cadence-registration.json"), LAUNCH_SHA);
+    let terminal_ref: Bound = serde_json::from_value(receipt["native_terminal"].clone())?;
+    ensure!(terminal_ref.path == Path::new(NATIVE_TERMINAL), "foreign epoch 266 terminal evidence");
+    let terminal = terminal_ref.sealed()?;
+    let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    let original_pid = text(&row["producer"], "MainPID")?.parse::<u64>()?;
+    ensure!(
+        row["phase"] == "diagnostic-qualification"
+            && row["producer"]["InvocationID"] == INVOCATION
+            && row["launch_receipt"] == json!(launch.path)
+            && row["launch_receipt_sha256"] == LAUNCH_SHA
+            && receipt["schema"] == "foundation-epoch266-private-overlap-drain-v1"
+            && receipt["unit"] == OVERLAP_266.unit
+            && receipt["invocation_id"] == INVOCATION
+            && receipt["launch"] == json!(launch)
+            && receipt["guard_drained"] == true
+            && terminal["schema"] == "foundation-epoch266-private-overlap-terminal-evidence-v1"
+            && terminal["unit"] == OVERLAP_266.unit
+            && terminal["launch"] == json!(launch)
+            && terminal["producer_invocation"] == INVOCATION
+            && terminal["producer_pid"] == original_pid
+            && terminal["boot_id"] == boot_id
+            && terminal["producer_drained"] == true
+            && terminal["producer_exit_status"] == 0
+            && terminal["native_manifest_complete_verified"] == true
+            && terminal["first_slot"] == OVERLAP_266.first
+            && terminal["last_slot"] == OVERLAP_266.last
+            && terminal["publication_authorized"] == false,
+        "closed epoch 266 evidence does not bind the sampled overlap"
+    );
+    drained(n, OVERLAP_266.unit, OVERLAP_266.guard, INVOCATION)?;
+    Ok(Some(reference))
+}
+
 impl Focused {
     pub(super) fn control_memory(&self) -> u64 {
         if self.unit == OVERLAP_266.unit {
