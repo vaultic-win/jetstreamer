@@ -1,0 +1,31 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -1079,18 +1079,23 @@
+         plan["gates"]["296"]["next_action"] = (
+             "Reassess full replay after a measured disk reservation release. "
+             "The repaired production worker is sealed and the bounded failure transaction matched canonical execution.")
+-    interval141_launch = V / "horizon141-foundation-interval2-runtime-v1/replay-launch.json"
+-    if interval141_launch.is_file():
++    active_private_intervals = 0
++    for ordinal, cohort_label in ((2, "-private141"), (3, "-private141-third")):
++        interval141_launch = V / f"horizon141-foundation-interval{ordinal}-runtime-v1/replay-launch.json"
++        if not interval141_launch.is_file():
++            continue
+         registration = bound(sealed_226_file(interval141_launch))
+-        private_unit = "horizon-qualify-141-foundation-interval2-v1.service"
+-        assert registration["schema"] == "foundation-epoch141-interval2-replay-launch-v1"
++        private_unit = f"horizon-qualify-141-foundation-interval{ordinal}-v1.service"
++        assert registration["schema"] == f"foundation-epoch141-interval{ordinal}-replay-launch-v1"
+         assert registration["unit"] == private_unit and not registration["canonical_publication_authorized"]
+         current = props(private_unit, ["ActiveState", "InvocationID", "MainPID"])
+         if current["ActiveState"] == "active":
+             assert current["InvocationID"] == registration["invocation_id"] and int(current["MainPID"]) > 0
++            active_private_intervals += 1
+         assert private_unit not in plan["tracked_units"]
+         plan["tracked_units"].append(private_unit)
+-        cohort += "-private141"
++        cohort += cohort_label
++    assert active_private_intervals <= 1
+     binding=record(out/f'seven-owner-plan-{cohort}.json',plan)
+     target=Path(plan['output'])
+     if not target.exists():

@@ -7,6 +7,7 @@ mod appendvec292_bundle;
 mod ext4_228;
 mod failed296_bundle;
 mod index230;
+mod interval141;
 mod parked_accounts;
 #[path = "../../../scripts/horizon_standard_backfill_scratch_retirement_20261110_v1/source/process_references.rs"]
 mod process_references;
@@ -387,6 +388,19 @@ fn retire_bootstrap(
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
+    if args.get(1).is_some_and(|mode| mode == "--drain-interval2-141") {
+        ensure!(
+            unsafe { libc::geteuid() } == 0 && args.len() == 4,
+            "usage: horizon275-scratch-retire --drain-interval2-141 SELF_SHA256 TERMINAL_SHA256"
+        );
+        let mut binary = File::open("/proc/self/exe")?;
+        let metadata = binary.metadata()?;
+        ensure!(
+            metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut binary)? == args[2],
+            "unsealed retirement image"
+        );
+        return interval141::drain(&args[3]);
+    }
     if matches!(
         args.get(1).map(String::as_str),
         Some("--check-duplicate-index-230" | "--retire-duplicate-index-230")

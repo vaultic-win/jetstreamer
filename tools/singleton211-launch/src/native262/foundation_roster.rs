@@ -978,7 +978,7 @@ fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
                 && unit != vote_boundary::GUARD_SERVICE
                 && unit != suffix226::GUARD_SERVICE
                 && unit != replay296::GUARD_SERVICE
-                && unit != interval141::GUARD
+                && !interval141::is_guard(unit)
                 && !SCOPES
                     .iter()
                     .any(|spec| unit == format!("{}.service", spec.guard))
@@ -1271,10 +1271,7 @@ fn measure(
         .contains(holding296::UNIT)
         .then(|| holding296::active(n))
         .transpose()?;
-    let active_interval_141 = before
-        .contains(interval141::UNIT)
-        .then(|| interval141::active(n))
-        .transpose()?;
+    let active_interval_141 = interval141::enrolled(n, &before)?;
     let mut active_deliveries = BTreeMap::new();
     for (epoch, unit, candidate, closed) in [
         (
@@ -1416,8 +1413,8 @@ fn measure(
     if active_holding_296.is_some() {
         ensure!(expected.insert(holding296::UNIT.to_owned()), "epoch 296 custody booked twice");
     }
-    if active_interval_141.is_some() {
-        ensure!(expected.insert(interval141::UNIT.to_owned()), "epoch 141 replay booked twice");
+    if let Some(interval) = &active_interval_141 {
+        ensure!(expected.insert(interval.unit.to_owned()), "epoch 141 replay booked twice");
     }
     for (_, owner, _, _) in active_deliveries.values() {
         let unit = text(owner, "Id")?;
@@ -1511,7 +1508,7 @@ fn measure(
     if let Some(interval) = &active_interval_141 {
         interval141::require_disjoint(exclusive)?;
         recorded.insert(
-            interval141::UNIT.to_owned(),
+            interval.unit.to_owned(),
             (interval.owner.clone(), interval.memory, interval.ticks),
         );
     }
