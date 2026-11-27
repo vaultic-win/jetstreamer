@@ -3,6 +3,7 @@ use super::*;
 mod allocation;
 mod delivery252;
 mod focused;
+mod holding296;
 mod replay256;
 mod replay258;
 mod replay260;
@@ -1264,6 +1265,10 @@ fn measure(
         released_replays.insert(257, UPLOAD_257);
     }
     let before = listed_owners(n)?;
+    let active_holding_296 = before
+        .contains(holding296::UNIT)
+        .then(|| holding296::active(n))
+        .transpose()?;
     let mut active_deliveries = BTreeMap::new();
     for (epoch, unit, candidate, closed) in [
         (
@@ -1402,6 +1407,9 @@ fn measure(
             "epoch 262 held owner already booked as a peer"
         );
     }
+    if active_holding_296.is_some() {
+        ensure!(expected.insert(holding296::UNIT.to_owned()), "epoch 296 custody booked twice");
+    }
     for (_, owner, _, _) in active_deliveries.values() {
         let unit = text(owner, "Id")?;
         ensure!(
@@ -1483,6 +1491,13 @@ fn measure(
         let memory = live::finite_owner(&owner, unit, text(&owner, "InvocationID")?, cap)?;
         let process_start_ticks = process_ticks(text(&owner, "MainPID")?.parse()?)?;
         recorded.insert(unit.clone(), (owner, memory, process_start_ticks));
+    }
+    if let Some(holding) = &active_holding_296 {
+        require_disjoint_cpus(epoch, exclusive, holding296::UNIT, &holding.owner)?;
+        recorded.insert(
+            holding296::UNIT.to_owned(),
+            (holding.owner.clone(), holding.memory, holding.ticks),
+        );
     }
     for (_, owner, memory, ticks) in active_deliveries.values() {
         let unit = text(owner, "Id")?;
@@ -1668,12 +1683,13 @@ fn measure(
     let replay_disk = live_replays
         .values()
         .try_fold(0, |total, replay| capacity::add(total, replay.receipt_disk))?;
+    let holding_296_disk = active_holding_296.as_ref().map_or(0, |_| holding296::RECEIPT_DISK);
     let protected = capacity::add(
         capacity::add(
             capacity::add(disk_floor, non_guard_disk)?,
             capacity::add(
                 capacity::add(delivery_252_disk, delivery_261_disk)?,
-                replay_disk,
+                capacity::add(replay_disk, holding_296_disk)?,
             )?,
         )?,
         growth,
@@ -1750,6 +1766,7 @@ fn measure(
     let available_memory = resources_before.1.min(resources_after.1);
     let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
         "active_delivery_252_disk_bytes":delivery_252_disk,"active_delivery_261_disk_bytes":delivery_261_disk,
+        "active_holding_296_disk_bytes":holding_296_disk,
         "active_diagnostic_230_receipt_disk_bytes":live_replays.get(&230).map_or(0, |lane| lane.receipt_disk),
         "active_replay_262_receipt_disk_bytes":live_replays.get(&262).map_or(0, |lane| lane.receipt_disk),
         "active_replay_296_receipt_disk_bytes":live_replays.get(&296).map_or(0, |lane| lane.receipt_disk),
@@ -1804,6 +1821,7 @@ fn measure(
         "active_restore_260_registration":live_replays.get(&260).filter(|r| r.unit == RESTORE_260.unit).map(|r| &r.reference),
         "active_replay_260_registration":live_replays.get(&260).filter(|r| r.unit == replay260::UNIT).map(|r| &r.reference),
         "closed_delivery_257":closed_257,
+        "active_holding_296_launch":active_holding_296.as_ref().map(|holding| &holding.launch),
         "active_delivery_252_claim":active_deliveries.get(&252).map(|(claim, _, _, _)| claim),
         "active_delivery_261_claim":active_deliveries.get(&261).map(|(claim, _, _, _)| claim),
         "active_replay_262_registration":live_replays.get(&262).map(|replay| &replay.reference),
