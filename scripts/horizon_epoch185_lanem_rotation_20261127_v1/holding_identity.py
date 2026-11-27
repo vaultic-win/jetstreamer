@@ -71,8 +71,17 @@ def small_body(r2, info):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("phase", choices=["precheck", "accepted"])
-    phase = parser.parse_args().phase
-    expected = json.loads((STATE / "package/EXPECTED.json").read_bytes())
+    parser.add_argument("--main-partial", action="store_true")
+    args = parser.parse_args()
+    phase = args.phase
+    state = STATE.with_name("epoch185-lanem-main-holding-20261127-v1") if args.main_partial else STATE
+    expected = json.loads((state / "package/EXPECTED.json").read_bytes())
+    if args.main_partial:
+        assert expected["source"].endswith("/run-722680-1790806113840176891/archives/epoch-185.jet")
+        assert expected["sha256"] == "40dd56a324dc5e3abb3766a95c8189a02c7b7ace61cf2c9bc0f665c4dbc2415d"
+        assert expected["length"] == 54_996_291_524
+        assert expected["object_key"] == f"node_02/objects/{expected['sha256']}.blob"
+        assert expected["manifest_key"] == f"node_02/manifests/{expected['manifest_sha256']}.json"
     r2 = client()
     owner = head(r2, OWNER)
     assert json.loads(small_body(r2, owner)) == {
