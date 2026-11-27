@@ -5,6 +5,6 @@
 +        if memory_release_path.is_file():
 +            memory_release = bound(sealed_226_file(memory_release_path))
 +            assert memory_release["schema"] == "foundation-epoch252-delivery-memory-release-v1"
-+            assert memory_release["predecessor"] == sealed_226_file(fleet_image)
++            assert publication_handoff.checked_image(memory_release["predecessor"]) == str(fleet_image)
 +            assert memory_release["fleet_reconcile_only"] and not memory_release["admission_authorized"]
 +            fleet_image = Path(publication_handoff.checked_image(memory_release["fleet"]))
