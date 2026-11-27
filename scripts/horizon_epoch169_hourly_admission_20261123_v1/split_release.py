@@ -2,6 +2,9 @@
 import argparse
 import hashlib
 import json
+import os
+import runpy
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -33,5 +36,32 @@ def operator():
     return dict(schema="jetstreamer-sealed-deployment-plan-v1",destination=str(SEALED.with_name("issued-split-v1")),members=members)
 
 
+def receiver_plans(parent):
+    if os.geteuid() != 0 or not parent.is_dir() or parent.resolve() != parent or parent.stat().st_dev != Path("/home/sol").stat().st_dev:
+        raise ValueError("stage V48 receivers in an existing home-backed private directory as root")
+    staging = Path(tempfile.mkdtemp(prefix="v48-receivers-",dir=parent))
+    program = runpy.run_path(str(HERE / "derive48.py"))
+    sealed = program["OPERATOR"] / "deployment-seal-receipt.json"
+    spec = dict(path=str(sealed), sha256=sha(sealed))
+    roots = {"writer": ROOT / "survivor172-cadence-20261122-v1" / program["OLD"],
+             "booker": ROOT / "epoch143-first-hourly-20261127-v1/booking-price-v47"}
+    plans = {}
+    for name, old in roots.items():
+        plan = program["stage"](old,staging / name,spec)
+        target = staging / (name + "-plan.json")
+        with target.open("x") as output:
+            json.dump(plan,output,indent=2,sort_keys=True)
+            output.write("\n")
+            output.flush()
+            os.fchmod(output.fileno(),0o400)
+            os.fsync(output.fileno())
+        plans[name] = dict(path=str(target),sha256=sha(target))
+    return dict(operator=spec, **plans)
+
+
 if __name__ == "__main__":
-    print(json.dumps(operator(),sort_keys=True,indent=2))
+    parser = argparse.ArgumentParser(__doc__)
+    parser.add_argument("--stage-receivers", type=Path, metavar="DIRECTORY")
+    args = parser.parse_args()
+    plan = receiver_plans(args.stage_receivers) if args.stage_receivers else operator()
+    print(json.dumps(plan,sort_keys=True,indent=2))
