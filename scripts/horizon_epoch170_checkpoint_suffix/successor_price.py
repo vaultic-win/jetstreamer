@@ -1,0 +1,288 @@
+"""Reprice the bounded epoch 170 successor using the accepted epoch 167 fleet projection."""
+import argparse
+import datetime as dt
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+import subprocess
+import time
+
+G = 1 << 30
+M = 1 << 20
+RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
+DEP = RT / "epoch170-from-73726716-20261127-v1"
+OLD = RT / "epoch170-storage-witness-recovery-20261127-v1/suffix-run-v1"
+B140 = RT / "epoch140-suffix-recording-20261127-retry2"
+B185 = RT / "epoch185-lanek-holding-20261125-v1"
+BRIDGE = "horizon-qualify-170-checkpoint-suffix-20261127-v1.service"
+UNIT = "horizon-qualify-170-from-73726716-20261127-v1.service"
+TREE = Path("/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1")
+ORIG = "3a5e311489834552ab5fda89379f9481"
+FLEET_SHA = "bdcebe2758f2191c7b6e82392626de3b25a52400d69618302873274c73254872"
+PROGRESS = "753ade79e4e3873c18eb0cec83d17f879d8e0e08fa45b97c740e8f6c3a6a5fe6"
+FIELDS = "Id,ActiveState,InvocationID,MainPID,ControlPID,Job,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,ControlGroup"
+
+
+def need(condition, reason):
+    if not condition:
+        raise ValueError(reason)
+
+
+def cmd(*argv, timeout=120):
+    return subprocess.check_output(argv, text=True, timeout=timeout)
+
+
+def state(unit, fields=FIELDS):
+    p = subprocess.run(["/usr/bin/systemctl", "show", "--all", "-p", fields, "--", unit],
+                       text=True, capture_output=True, timeout=10)
+    record = dict(line.split("=", 1) for line in p.stdout.splitlines())
+    need(p.returncode in (0, 4) and record["Id"] == unit and set(fields.split(",")) <= record.keys(),
+         "cannot identify " + unit)
+    return record
+
+
+def read(path, sha=None):
+    path = Path(path)
+    need(path.is_relative_to(RT) and path.resolve(strict=True) == path, "foreign evidence " + str(path))
+    s = path.stat()
+    need(stat.S_ISREG(s.st_mode) and not s.st_mode & 0o022 and s.st_uid == 0 and s.st_size <= 32*M,
+         "untrusted evidence " + str(path))
+    b = path.read_bytes()
+    h = hashlib.sha256(b).hexdigest()
+    need(sha is None or sha == h, "changed evidence " + str(path))
+    return json.loads(b), {"path": str(path), "sha256": h}
+
+
+def bound(ref):
+    return read(ref["path"], ref["sha256"])[0]
+
+
+def current_fleet():
+    path = max(RT.glob("root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json"), key=lambda f: f.stat().st_mtime_ns)
+    fleet, ref = read(path)
+    previous = fleet
+    cursor = ref
+    for _ in range(12):
+        if cursor["sha256"] == FLEET_SHA:
+            break
+        cursor = previous["previous_Root_operational_review"]
+        previous = bound(cursor)
+    need(cursor["sha256"] == FLEET_SHA and fleet["resource_credit_bytes"] == fleet["all_reservation_ending_bytes"] == 0
+         and fleet["all_active_status_reports_authenticated_readback"], "different fleet authority")
+    when = dt.datetime.fromisoformat(fleet["sampled_at_utc"]).timestamp()
+    need(0 <= time.time()-when <= 1900, "cadence needs its current accepted fleet")
+    return fleet, ref
+
+
+def availability():
+    v = os.statvfs("/home/sol")
+    ram = next(int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith("MemAvailable:"))
+    return v.f_bavail*v.f_frsize, ram
+
+
+def physical(s):
+    walk = s["root_physical_observation"]
+    return min(walk["first"]["physical_bytes"], walk["second"]["physical_bytes"])
+
+
+def peak(s):
+    walk = s["root_physical_observation"]
+    return max(walk["first"]["physical_bytes"], walk["second"]["physical_bytes"])
+
+
+def protected(unit, procs, timer_iid, anchor, mem, quota, resident, guard_timer=None):
+    o = bound(anchor)
+    row = state(unit)
+    need(row["ActiveState"] == "active" and row["InvocationID"] == o["producer_invocation_id"] and not row["Job"]
+         and int(row["MainPID"]) == procs[0][0] and row["ControlGroup"] == "/system.slice/"+unit
+         and row["MemoryMax"] == str(mem) and row["MemorySwapMax"] == "0" and row["CPUQuotaPerSecUSec"] == quota,
+         "incumbent identity or limits changed "+unit)
+    timer = guard_timer or unit.replace("-qualify-", "-guard-").replace(".service", ".timer")
+    tm = state(timer,"Id,ActiveState,InvocationID,Job")
+    need(tm["ActiveState"] == "active" and tm["InvocationID"] == timer_iid and not tm["Job"], "guard changed "+unit)
+    group = Path("/sys/fs/cgroup"+row["ControlGroup"])
+    need(set(map(int,(group/"cgroup.procs").read_text().split())) == {p[0] for p in procs}, "process roster "+unit)
+    pss = 0
+    for pid, ticks, dev, ino in procs:
+        proc = Path("/proc")/str(pid)
+        exe = (proc/"exe").stat()
+        need((int((proc/"stat").read_text().rsplit(") ",1)[1].split()[19]), exe.st_dev, exe.st_ino) == (ticks,dev,ino)
+             and (proc/"cgroup").read_text().strip() == "0::/system.slice/"+unit, "changed native row "+str(pid))
+        if resident:
+            pss += next(int(line.split()[1])*1024 for line in (proc/"smaps_rollup").read_text().splitlines()
+                        if line.startswith("Pss:"))
+    memstat = dict(line.split() for line in (group/"memory.stat").read_text().splitlines())
+    directory = Path(anchor["path"]).parent
+    need(not (directory/"stop-intent.json").exists(), "guard trip "+unit)
+    sample, ref = read(max(directory.glob("sample-*.json"), key=lambda f: f.stat().st_mtime_ns))
+    need(sample["producer"] == o["producer"] and sample["plan_sha256"] == o["plan_sha256"]
+         and sample["producer_stop_enabled"] and sample["trip_reason"] is None
+         and 0 <= time.time()-sample["recorded_unix_seconds"] <= 120
+         and sample["worker_observation_error"] is sample["root_physical_observation_error"] is None
+         and not sample["root_physical_observation"]["exceeds_budget"] and len(sample["workers"]) == 1
+         and sample["workers"][0][0] == procs[1][0] and sample["available_bytes"] >= sample["minimum_free_bytes"],
+         "no fresh guarded owner "+unit)
+    return ref, physical(sample), min(pss, int(memstat["anon"])+int(memstat["file_mapped"]), mem)
+
+
+def tree_bytes():
+    vals = [int(cmd("/usr/bin/du", "-sx", "-B1", str(TREE)).split()[0]) for _ in range(2)]
+    return min(vals), max(vals)
+
+
+def inactive(unit):
+    s = state(unit)
+    need(s["ActiveState"] in ("inactive","failed") and s["MainPID"] == s["ControlPID"] == "0" and not s["Job"],
+         "still occupied "+unit)
+    return s
+
+
+def scope():
+    interface, ref = read(DEP/"BOUNDED_SUCCESSOR_WRITER_INTERFACE.json",
+                          "30ba2b754885f8ba7cf9abc04d9453bb1b8a030b0534b31d1801543ea8c4906a")
+    return interface, ref
+
+
+def price(phase):
+    interface, iref = scope()
+    fleet, fref = current_fleet()
+    progress, progress_ref = read(RT/"epoch167-checkpoint-tail-20261127-v1/FIRST_PROTECTED_PROGRESS.json", PROGRESS)
+    release = bound(progress["release"])
+    post = bound(release["post_guard_capacity"])
+    intent = bound(release["intent"])
+    base = intent["quote"]["exact_native_fit"]
+    rosters = bound(base["prior_fit"])["native"]["released_167"]["tracked_processes"]
+    tail = progress["actor"]["unit"]
+    anchors = base["live_guards"]
+    peer_rows = fleet["actual_executing_replays"]
+    need({x["epoch"] for x in peer_rows} == {146,172} and len(peer_rows) == 2, "changed incumbent fleet")
+    before = availability()
+    residents = loss = 0
+    samples = {}
+    for peer in peer_rows:
+        u = peer["unit"]["Id"]
+        samples[u], lower, memory = protected(u,rosters[u],peer["guard_timer"]["InvocationID"],anchors[u],68*G,
+                                              "6.250000s" if peer["epoch"]==146 else "500ms",True)
+        loss += max(0, peak(bound(anchors[u])) - lower)
+        residents += memory
+    samples[tail], tail_lower, _ = protected(tail,progress["processes"],progress["guard"]["timer_invocation_id"],
+                                               progress["guard"]["sample"],42*G,"3s",False)
+    old = bound(interface["old_actor"])
+    if phase == "live":
+        old_progress, _ = read(OLD/"FIRST_PROTECTED_WORKER.json")
+        samples[BRIDGE], old_lower, _ = protected(BRIDGE, old_progress["actor"]["processes"],old_progress["guard"]["timer_invocation_id"],
+                                                   anchors[BRIDGE],48*G,"6s",False)
+        old_upper = old_lower
+        terminal = None
+    else:
+        exit_event, terminal = read(DEP/"bridge-exit-capture-v1/PID1_EXIT.json")
+        s = exit_event["properties"]
+        need(exit_event["actor"] == old and s["InvocationID"] == ORIG and s["Id"] == BRIDGE
+             and s["Result"] == "success" and s["ExecMainCode"] == "1" and s["ExecMainStatus"] == "0"
+             and s["MainPID"] == s["ControlPID"] == "0", "bridge exit did not accept exact producer")
+        inactive(BRIDGE)
+        old_lower, old_upper = tree_bytes()
+    loss += max(0,peak(bound(anchors[BRIDGE]))-old_lower)
+    # The 167 price covers the original 170 RAM independently of its current RSS.
+    # Reuse the six-core/48 GiB payload slot and the separate one-core/1 GiB guard.
+    # Keep the complete historical disk charge and separately reserve the new 40 GiB.
+    incumbent_home = post["required_home_bytes"] - tail_lower + loss
+    incumbent_ram = post["required_ram_bytes"] + base["resident_lower_bound_bytes"] - residents
+    booking, booking_ref = read(B140/"WRITER_BOOKING_111808_CROSS_CADENCE.json",
+                                "e687eddf9e2b48b39e2a39ba6059a92a0f18c71178c8733d2636cfb07fccbac6")
+    held, held_ref = read(B140/"HELD_OWNER.json")
+    loan, loan_ref = read(B140/"CPU_LOAN_ACTIVE.json")
+    need(held["invocation_id"] == loan["candidate_invocation"] and loan["booking"] == booking_ref
+         and loan["live_bridge_invocation"] == ORIG and loan["bridge_cpu_quota_micros"] == 6000000
+         and loan["producer_cpu_quota_micros"] + loan["guard_cpu_quota_micros"] == 3000000, "wrong 140 loan")
+    s140 = state(held["unit"])
+    charged140_home = booking["HOME_bytes"]
+    charged140_ram = booking["RAM_bytes"]
+    end140 = None
+    if s140["ActiveState"] == "active":
+        need(s140["InvocationID"]==held["invocation_id"] and s140["MemoryMax"]==str(26*G)
+             and s140["CPUQuotaPerSecUSec"]=="2s" and not s140["Job"], "changed 140")
+        work, _ = read(B140/"FIRST_PROTECTED_PROGRESS.json")
+        need(work["held_owner"]==held_ref and work["producer_invocation_id"]==held["invocation_id"]
+             and work["producer_pid"]==held["pid"],"different 140 worker")
+        procs = []
+        for pid,ticks in [(held["pid"],held["start_ticks"]),(work["worker_pid"],work["worker_start_ticks"])]:
+            ex = (Path("/proc")/str(pid)/"exe").stat()
+            procs.append([pid,ticks,ex.st_dev,ex.st_ino])
+        sample, lower, memory = protected(held["unit"],procs,held["guard_timer_invocation_id"],
+                                          work["guard_after"]["receipt"],26*G,"2s",True,held["guard_timer"])
+        # Realized bytes are already absent from MemAvailable and statvfs.
+        charged140_home -= min(lower,44*G)
+        charged140_ram -= memory
+        samples[held["unit"]] = sample
+    else:
+        inactive(held["unit"])
+        returned = B140/"CPU_LOAN_RETURN.json"
+        if returned.exists():
+            end,end140=read(returned)
+            need(end["candidate_invocation"]==held["invocation_id"] and end["loan"]==loan_ref
+                 and end["producer_and_guard_drained"],"foreign loan return")
+            inactive(end["guard_unit"])
+            timer=state(end["guard_timer"],"Id,ActiveState,Job")
+            need(timer["ActiveState"]=="inactive" and not timer["Job"],"140 guard still owns resources")
+            charged140_ram = 0
+            charged140_home = 64*M
+
+    k = state("horizon-exact-185-lanek-retirement.service")
+    if k["ActiveState"] == "active":
+        need(k["InvocationID"]=="4a19c7b07b924bd78ebb32f56b896d07" and k["MemoryMax"]==str(G)
+             and k["CPUQuotaPerSecUSec"]=="1s", "changed lane K")
+    else:
+        inactive(k["Id"])
+    rr = {"lane_k": read(B185/"RETIREMENT_READY_AFTER_PARK.json",
+                         "779130ebc83c44edb4f97e66bff8779b66ac8a7b2f1ee0e3cbd3b1e2031a130a")[1]}
+    # Keep independent holding, retirement, exit capture, and parent hourly-build budgets.
+    # Preserve the full 140 booking throughout the comparison and the successor.
+    rr["141_build"] = read(RT/"root111808-live166167170-20261127-v1/ROOT_HOURLY_141_BUILD_FIT.json")[1]
+    build=bound(rr["141_build"])
+    extra_home = 4*M + build["candidate_home_bytes"] + charged140_home + 2*M
+    extra_ram = 3*G + 32*M + build["candidate_ram_bytes"] + charged140_ram
+    units={line.split()[0] for line in cmd("/usr/bin/systemctl","list-units","--plain","--no-legend",
+         "--type=service","--state=running,activating,deactivating","horizon-qualify-*").splitlines()}
+    expected={r["unit"]["Id"] for r in peer_rows}|{tail}
+    if phase=="live": expected.add(BRIDGE)
+    if phase=="held": expected.add(UNIT)
+    need(units == expected, "replay owner changed: "+repr(units ^ expected))
+    bound(iref)
+    after = availability()
+    freed = 0
+    retired = B185/"MEASURED_LOCAL_RECLAMATION.json"
+    if retired.exists():
+        result, rr["measured_185"] = read(retired)
+        need(result["execution_invocation"]=="4a19c7b07b924bd78ebb32f56b896d07" and result["host_source_absent"]
+             and result["host_quarantine_absent"], "wrong local reclamation")
+        if dt.datetime.fromisoformat(result["observed_utc"]) > dt.datetime.fromisoformat(fleet["sampled_at_utc"]):
+            freed = max(0,min(result["allocated_bytes_removed"],result["measured_net_free_bytes"]))
+    home = min(before[0],after[0],fleet["complete_cycle_conservative_available_DATA_bytes"]+freed)
+    ram = min(before[1],after[1])
+    candidate = 40*G if phase in ("start","held") else 0
+    required_ram = incumbent_ram+extra_ram
+    floor = incumbent_home+extra_home
+    full_cap = 384*G
+    need(old_upper <= full_cap, "original whole-tree cap exceeded")
+    cap = min(full_cap,old_upper+candidate)
+    required_home = floor+candidate
+    _, final_ref=current_fleet()
+    need(final_ref==fref,"accepted fleet changed during price")
+    return dict(schema="horizon-170-successor-complete-fleet-fit-v1",phase=phase,observed=int(time.time()),
+        interface=iref,fleet=fref,closed_bridge=terminal,charged_167=progress_ref,guard_samples=samples,
+        active_140=s140,charged140_home=charged140_home,charged140_ram=charged140_ram,return140=end140,booking140=booking_ref,held140=held_ref,loan140=loan_ref,extra=rr,active185=k,
+        guard_sibling_allowance=G,producer_allowance=48*G,producer_quota_micros=6000000,guard_quota_micros=1000000,
+        required_home=required_home,required_ram=required_ram,available_home=home,available_ram=ram,
+        resident_lower_bytes=residents,terminal_tree_bounds=[old_lower,old_upper],candidate_growth=candidate,
+        guard_floor=floor,guard_cap=cap,home_margin=home-required_home,ram_margin=ram-required_ram,
+        fits=home>=required_home and ram>=required_ram and cap>=old_upper+candidate,
+        archive_publication_authorized=False,resource_credit_bytes=0)
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser()
+    p.add_argument("phase", choices=["live","closed","start","held"])
+    print(json.dumps(price(p.parse_args().phase), sort_keys=True))
