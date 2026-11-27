@@ -1334,16 +1334,19 @@ pub(super) async fn run_lanek_retirement() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 7
-            && matches!(args[1].as_str(), "holding-inspect-retire185-lanek" | "holding-check-retire185-lanek" | "holding-retire185-lanek")
+            && matches!(args[1].as_str(), "holding-namespace-retire185-lanek" | "holding-inspect-retire185-lanek" | "holding-check-retire185-lanek" | "holding-retire185-lanek")
             && args[3] == "--spec-sha256"
             && args[5] == "--self-sha256",
-        "usage: holding-inspect-retire185-lanek|holding-check-retire185-lanek|holding-retire185-lanek SPEC --spec-sha256 HEX --self-sha256 HEX"
+        "usage: holding-namespace-retire185-lanek|holding-inspect-retire185-lanek|holding-check-retire185-lanek|holding-retire185-lanek SPEC --spec-sha256 HEX --self-sha256 HEX"
     );
     let spec = sealed_spec(&args)?;
     let plan = bound(&spec)?;
     let map: Bound = serde_json::from_value(plan["mapping"].clone())?;
     let m: Mapping = serde_json::from_value(bound(&map)?)?;
     mapping(&m)?;
+    if args[1] == "holding-namespace-retire185-lanek" {
+        return epoch185_lanek_retire::check_namespace(&spec);
+    }
     let lock = transition_lock()?;
     check_primary_transition_lock(&lock)?;
     if args[1] == "holding-inspect-retire185-lanek" {

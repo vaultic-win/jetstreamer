@@ -88,9 +88,9 @@ fn source_identity(path: &Path, original: bool) -> Result<FileIdentity> {
     Ok(id)
 }
 
-fn manager(unit: &str) -> Result<Value> {
+fn manager_fields(unit: &str) -> Result<Value> {
     let output = std::process::Command::new("/usr/bin/systemctl")
-        .args(["show", unit, "-pId,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,Job,Result,ExecMainStatus,ExecMainPID,ExecMainStartTimestampMonotonic,Restart,TriggeredBy,ExecStart,FragmentPath,DropInPaths,NRestarts,RemainAfterExit,Type,ControlGroup"])
+        .args(["show", unit, "-pId,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,Job,Result,ExecMainStatus,ExecMainPID,ExecMainStartTimestampMonotonic,Restart,TriggeredBy,ExecStart,FragmentPath,DropInPaths,NRestarts,RemainAfterExit,Type,ControlGroup,Transient,User,NoNewPrivileges,ReadWritePaths,ProtectHome,ProtectSystem,ExecCondition,ExecStartPre,ExecStartPost,ExecReload,ExecStop,ExecStopPost,OnSuccess,OnFailure"])
         .output()?;
     ensure!(
         output.status.success() || output.status.code() == Some(4),
@@ -105,6 +105,12 @@ fn manager(unit: &str) -> Result<Value> {
         );
     }
     let row = Value::Object(fields);
+    ensure!(row["Id"] == unit, "foreign native unit");
+    Ok(row)
+}
+
+fn manager(unit: &str) -> Result<Value> {
+    let row = manager_fields(unit)?;
     ensure!(
         row["Id"] == unit
             && row["MainPID"] == "0"
@@ -179,6 +185,97 @@ fn nonoverlapping(a: &Path, b: &Path) -> bool {
     a.is_absolute() && b.is_absolute() && !a.starts_with(b) && !b.starts_with(a)
 }
 
+/// A systemd service with an exact writable archive-parent mount necessarily
+/// appears in the staged census. Account solely for this running process and
+/// its transient fragment, with an empty stop/restart/follow-up command set.
+fn current_writer_fragment() -> Result<Option<PathBuf>> {
+    const UNIT: &str = "horizon-exact-185-lanek-retirement.service";
+    let cgroup = format!("/system.slice/{UNIT}");
+    if fs::read_to_string("/proc/self/cgroup")?.trim() != format!("0::{cgroup}") {
+        return Ok(None);
+    }
+    let iid = env::var("INVOCATION_ID")?;
+    let n = manager_fields(UNIT)?;
+    let fragment = Path::new("/run/systemd/transient").join(UNIT);
+    let expected_paths = BTreeSet::from([
+        Path::new(SOURCE)
+            .parent()
+            .context("selected archive parent")?
+            .to_path_buf(),
+        Path::new(STATE).join("retirements"),
+        Path::new(STATE).join("transition.lock"),
+        PathBuf::from("/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock"),
+    ]);
+    let writable: BTreeSet<_> = n["ReadWritePaths"]
+        .as_str()
+        .context("write paths")?
+        .split_ascii_whitespace()
+        .map(PathBuf::from)
+        .collect();
+    ensure!(
+        valid_invocation(&iid)
+            && n["InvocationID"] == iid
+            && n["Type"] == "exec"
+            && n["ActiveState"] == "active"
+            && n["SubState"] == "running"
+            && n["User"] == "root"
+            && n["MainPID"] == std::process::id().to_string()
+            && n["ExecMainPID"] == n["MainPID"]
+            && n["ControlGroup"] == cgroup
+            && n["FragmentPath"] == fragment.to_str().unwrap_or_default()
+            && n["DropInPaths"] == ""
+            && n["ControlPID"] == "0"
+            && n["Job"] == ""
+            && n["RemainAfterExit"] == "no"
+            && n["Restart"] == "no"
+            && n["Transient"] == "yes"
+            && n["NoNewPrivileges"] == "yes"
+            && n["ProtectHome"] == "read-only"
+            && n["ProtectSystem"] == "strict"
+            && [
+                "TriggeredBy",
+                "OnSuccess",
+                "OnFailure",
+                "ExecCondition",
+                "ExecStartPre",
+                "ExecStartPost",
+                "ExecReload",
+                "ExecStop",
+                "ExecStopPost"
+            ]
+            .iter()
+            .all(|key| n[*key] == "")
+            && writable == expected_paths,
+        "unexpected current retirement unit or writable scope"
+    );
+    Ok(Some(fragment))
+}
+
+/// This probe has no holding-state, custody or source operations. It can
+/// qualify the exact execution namespace while the serial transfer owns its lock.
+pub(super) fn check_namespace(spec: &Bound) -> Result<()> {
+    ensure!(
+        spec.path == Path::new(PARK_PLAN) && spec.sha256 == PARK_PLAN_SHA,
+        "foreign namespace plan"
+    );
+    let own = current_writer_fragment()?.context("requires exact running transient unit")?;
+    let run = Path::new(SOURCE)
+        .parent()
+        .and_then(Path::parent)
+        .context("run")?;
+    let staged = jetstreamer_horizon_observe::dev_cache_check::sol_staged_path_references(run)?;
+    ensure!(
+        staged["references"] == json!([own]),
+        "foreign exact-run owner during namespace qualification"
+    );
+    println!(
+        "{}",
+        json!({"fragment":own,"native_pid":std::process::id(),"invocation":env::var("INVOCATION_ID")?,
+        "checked_writable_scope":true,"data_removed":false,"custody_or_admission_proved":false})
+    );
+    Ok(())
+}
+
 fn scoped_staged(run: &Path) -> Result<()> {
     let inspect = jetstreamer_horizon_observe::dev_cache_check::sol_staged_path_references;
     let review = bound(&Bound {
@@ -236,6 +333,10 @@ fn scoped_staged(run: &Path) -> Result<()> {
             "historical ownership changed: {unit}"
         );
     }
+    let own = current_writer_fragment()?;
+    if let Some(fragment) = &own {
+        siblings.insert(fragment.clone());
+    }
     let lane = run
         .ancestors()
         .find(|p| p.file_name().is_some_and(|part| part == "lane-k"))
@@ -249,9 +350,11 @@ fn scoped_staged(run: &Path) -> Result<()> {
             .all(|v| v.as_str().is_some_and(|p| siblings.contains(Path::new(p)))),
         "unknown staged lane-k owner"
     );
+    let run_owners = inspect(run)?;
+    let expected: Vec<_> = own.into_iter().collect();
     ensure!(
-        inspect(run)?["references"] == json!([]),
-        "old run has staged consumers"
+        run_owners["references"] == json!(expected),
+        "old run has foreign staged consumers"
     );
     Ok(())
 }
