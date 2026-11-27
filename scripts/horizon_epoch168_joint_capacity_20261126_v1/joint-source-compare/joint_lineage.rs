@@ -318,7 +318,8 @@ fn bind_selected(
     let joint_terminal = &closed_joint["terminal"];
     let selected_start = selected["raw_start"].as_u64().unwrap_or_default();
     let selected_end = selected["raw_end_exclusive"].as_u64().unwrap_or_default();
-    let retry4_end = RETRY6_CURSOR + RETRY4_DELTA;
+    // The retained overlap reports retry6's raw cursor minus retry4's.
+    let retry4_end = RETRY6_CURSOR - RETRY4_DELTA;
     require(
         lines.next().is_none()
             && epoch == "168"
@@ -350,8 +351,8 @@ fn bind_selected(
             && pre.joint.end == JOINT_CURSOR
             && pre.joint.start == 53_555_937_580
             && pre.joint.start == closed_joint["emitted_raw_write_versions"]["start"]
-            && pre.source.start.checked_sub(pre.joint.start)
-                == selected_end.checked_sub(JOINT_CURSOR),
+            && i128::from(pre.source.start) - i128::from(pre.joint.start)
+                == i128::from(selected_end) - i128::from(JOINT_CURSOR),
         "retry4 selection does not agree with the joint predecessor comparison",
     )?;
     require(
@@ -387,7 +388,7 @@ fn bind_selected(
         "joint_archive_sha256":archive, "joint_native_seam_checkpoint":joint_checkpoint,
         "retry6_source_sha256":RETRY6_SHA, "retry6_native_bootstrap":retry6["bootstrap"],
         "translated_v4_predecessor":predecessor,
-        "joint_to_retry4_cursor_offset":selected_end - JOINT_CURSOR,
+        "joint_to_retry4_cursor_offset":i128::from(selected_end) - i128::from(JOINT_CURSOR),
         "joint_to_retry6_cursor_offset":RETRY6_CURSOR - JOINT_CURSOR,
         "predecessor_normalized_sha256":pre.digest, "successor_normalized_sha256":post.digest,
         "ordinary_root_checkpoint":joint_terminal,

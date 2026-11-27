@@ -1,8 +1,8 @@
 use super::*;
 
 const JOINT_RAW_START: u64 = 53_555_937_580;
-const RETRY4_END: u64 = 53_665_783_877;
-const RETRY4_START: u64 = JOINT_RAW_START + (RETRY4_END - JOINT_CURSOR);
+const RETRY4_END: u64 = 53_481_719_395;
+const RETRY4_START: u64 = RETRY4_END - (JOINT_CURSOR - JOINT_RAW_START);
 const AFTER_COUNT: u64 = 14_450_000;
 const ARCHIVE: &str = "aaaa000000000000000000000000000000000000000000000000000000000000";
 const PRE_DIGEST: &str = "bbbb000000000000000000000000000000000000000000000000000000000000";
@@ -270,7 +270,7 @@ fn translates_only_against_the_retry4_selection_and_both_closed_comparisons() {
     for key in CONSENSUS {
         assert_eq!(translated[key], checkpoint[key]);
     }
-    assert_eq!(binding["joint_to_retry4_cursor_offset"], 105_050_392);
+    assert_eq!(binding["joint_to_retry4_cursor_offset"], -79_014_090);
     assert_eq!(binding["joint_to_retry6_cursor_offset"], 13_018_151);
     assert_eq!(binding["assembly_authorized"], false);
     assert_eq!(binding["publication_authorized"], false);
