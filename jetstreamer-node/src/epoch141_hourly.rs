@@ -69,7 +69,11 @@ const CHECKPOINTS: &[Checkpoint] = &[
 const WARMUP_TERMINAL: u64 = 60_911_999;
 const VOTED_CHILD: u64 = 60_912_004;
 const FIRST_HOURLY: u64 = 60_921_282;
-const WORKER: &str = "c536dcf360b7866b3aa99e0ff6d7d927dcf5db27bfbbb8f73887eb4bb7d87344";
+const STRICT_WORKER: &str = "c536dcf360b7866b3aa99e0ff6d7d927dcf5db27bfbbb8f73887eb4bb7d87344";
+
+// The capped v1.4.25 worker bounds AccountsDb shrink debt after each root.
+// Both release images passed the Bank and wire-protocol qualification in 2d39915c.
+const CAPPED_WORKER: &str = "fce05d551d8154ebda6ff6b3791d02f60b0e0a1e3a69982ea06fa7c31c34b759";
 
 // The journal binds the last epoch 140 Bank. Finalized signed votes bind
 // its first child and the downstream root independently of the snapshot hashes.
@@ -78,7 +82,9 @@ pub(super) fn checkpoint_slots(
     bootstrap: u64,
     worker: [u8; 32],
 ) -> Result<BTreeSet<u64>, String> {
-    if worker != crate::parse_lower_sha256(WORKER, "epoch 141 hourly worker")? {
+    if worker != crate::parse_lower_sha256(STRICT_WORKER, "epoch 141 hourly strict worker")?
+        && worker != crate::parse_lower_sha256(CAPPED_WORKER, "epoch 141 hourly capped worker")?
+    {
         return Err("epoch 141 hourly replay initialized a different historical worker".into());
     }
     if bootstrap == CHECKPOINTS[0].0 {
@@ -217,10 +223,15 @@ mod tests {
 
     #[test]
     fn first_interval_requires_the_original_parent_and_its_voted_child() {
-        let worker = crate::parse_lower_sha256(WORKER, "worker").unwrap();
+        let worker = crate::parse_lower_sha256(STRICT_WORKER, "worker").unwrap();
         let roots = BTreeSet::from([CHECKPOINTS[0].0, FIRST_HOURLY]);
         assert!(checkpoint_slots(roots.clone(), CHECKPOINTS[0].0, [0; 32]).is_err());
-        let mut pending = checkpoint_slots(roots, CHECKPOINTS[0].0, worker).unwrap();
+        let capped = crate::parse_lower_sha256(CAPPED_WORKER, "capped worker").unwrap();
+        let mut pending = checkpoint_slots(roots.clone(), CHECKPOINTS[0].0, worker).unwrap();
+        assert_eq!(
+            checkpoint_slots(roots, CHECKPOINTS[0].0, capped).unwrap(),
+            pending
+        );
         let mut checkpoint = HistoricalCheckpoint {
             slot: VOTED_CHILD,
             bank_hash: "GtE6AijvzVgK1UKQ5HyVEZMGisDddVWRQkBnM74sjABf"
