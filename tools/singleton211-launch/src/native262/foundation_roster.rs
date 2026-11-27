@@ -94,10 +94,11 @@ const SIZING_REFERENCE: (&str, &str) = (
     "/var/lib/jetstreamer/horizon261-full-profile-v226-a1/profile.json",
     "6b27a27ff1596fe6688f207d460566c51d5c9552cef47817358d2008b484f281",
 );
-const AUDIT_148_TERMINAL: (&str, &str) = (
-    "/var/lib/jetstreamer/horizon-foundation-public-audit-148-accepted-v1/acceptance.json",
-    "f91e7a158ce64ab2f0d6be6c8f29499d086660a07831d1775299c5eebe0336f7",
+const FOUNDATION_RANGE_HANDOFF: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon262-foundation-roster-range-boundary-v399/roster.json",
+    "5a8d5ec38bed4757a509eaca413b42de3c60c5144213a7b7e48ce8dadb6f2bd5",
 );
+const WITHDRAWN_AUDIT_INVOCATION: &str = "3375be6466ee4a8090e8e82e0fff5bcc";
 const REPLAY_261: &str = "horizon-qualify-261-singleton-v1.service";
 const GUARD_261: &str = "horizon-261-singleton-protective-v1.service";
 const TIMER_261: &str = "horizon-261-singleton-protective-v1.timer";
@@ -255,17 +256,51 @@ fn replay_296_quote(n: &mut Native) -> Result<Replay296Quote> {
     })
 }
 
-fn closed_audit() -> Result<(Bound, String)> {
-    let reference = Bound::new(AUDIT_148_TERMINAL.0, AUDIT_148_TERMINAL.1);
-    let audit = reference.sealed()?;
+fn withdrawn_audit(n: &mut Native, booking: &Value) -> Result<Bound> {
+    let reference = Bound::new(FOUNDATION_RANGE_HANDOFF.0, FOUNDATION_RANGE_HANDOFF.1);
+    let handoff = reference.sealed()?;
+    let unit = AUXILIARY[1];
+    let reservation = &booking["owners"][unit];
+    let owners = handoff["owners"].as_object().context("range handoff owners")?;
+    let guards = handoff["periodic_guards"].as_object().context("range handoff guards")?;
     ensure!(
-        audit["schema"] == "foundation-epoch148-pinned-public-audit-acceptance-v1"
-            && audit["epoch"] == 148
-            && audit["unit"] == AUXILIARY[1]
-            && audit["authenticated_readiness_rechecked"] == true,
-        "epoch 148 terminal audit receipt changed"
+        handoff["schema"] == "foundation-epoch226-suffix-roster-binding-v1"
+            && handoff["booking"] == json!(Bound::new(REPLAY_BOOKING.0, REPLAY_BOOKING.1))
+            && !owners.contains_key(unit)
+            && !guards.contains_key("148")
+            && reservation["Id"] == unit
+            && reservation["InvocationID"] == WITHDRAWN_AUDIT_INVOCATION
+            && reservation["ControlGroup"] == format!("/system.slice/{unit}")
+            && reservation["MemoryMax"] == "17179869184",
+        "withdrawn auxiliary differs from the original booking or Foundation range handoff"
     );
-    Ok((reference, text(&audit, "invocation_id")?.to_owned()))
+    let current = n.show_fields(
+        unit,
+        "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ControlGroup,Job,NRestarts,Triggers,TriggeredBy",
+    )?;
+    let cgroup = Path::new("/sys/fs/cgroup/system.slice").join(unit);
+    check_withdrawn_audit(&current, cgroup.try_exists()?)?;
+    Ok(reference)
+}
+
+fn check_withdrawn_audit(current: &Value, cgroup_present: bool) -> Result<()> {
+    ensure!(
+        current["Id"] == AUXILIARY[1]
+            && matches!(current["LoadState"].as_str(), Some("loaded" | "not-found"))
+            && current["ActiveState"] == "inactive"
+            && current["SubState"] == "dead"
+            && matches!(current["InvocationID"].as_str(), Some("" | WITHDRAWN_AUDIT_INVOCATION))
+            && current["MainPID"] == "0"
+            && current["ControlPID"] == "0"
+            && current["NRestarts"] == "0"
+            && current["Job"] == ""
+            && current["ControlGroup"] == ""
+            && current["Triggers"] == ""
+            && current["TriggeredBy"] == ""
+            && !cgroup_present,
+        "withdrawn auxiliary still has a process, cgroup, trigger, job, or changed identity"
+    );
+    Ok(())
 }
 
 fn delivery_261_preparation() -> Result<Bound> {
@@ -821,6 +856,49 @@ fn fleet_roster<'a>(
 #[cfg(test)]
 mod roster_tests {
     use super::*;
+
+    #[test]
+    fn withdrawn_audit_requires_the_booked_unit_fully_drained() {
+        let mut terminal = json!({
+            "Id": AUXILIARY[1], "LoadState": "not-found", "ActiveState": "inactive",
+            "SubState": "dead", "InvocationID": "", "ControlGroup": "", "Job": "",
+            "ControlPID": "0", "MainPID": "0", "NRestarts": "0", "Triggers": "", "TriggeredBy": "",
+        });
+        assert!(check_withdrawn_audit(&terminal, false).is_ok());
+        terminal["LoadState"] = json!("loaded");
+        terminal["InvocationID"] = json!(WITHDRAWN_AUDIT_INVOCATION);
+        assert!(check_withdrawn_audit(&terminal, false).is_ok());
+        assert!(check_withdrawn_audit(&terminal, true).is_err());
+        for (field, value) in [
+            ("Id", "another.service"),
+            ("InvocationID", "another-invocation"),
+            ("MainPID", "123"),
+            ("ControlPID", "234"),
+            ("ControlGroup", "/system.slice/stale"),
+            ("Job", "12"),
+            ("NRestarts", "1"),
+            ("ActiveState", "activating"),
+            ("TriggeredBy", "handoff.timer"),
+            ("Triggers", "guard.service"),
+        ] {
+            let mut changed = terminal.clone();
+            changed[field] = json!(value);
+            assert!(check_withdrawn_audit(&changed, false).is_err(), "{field}");
+        }
+    }
+
+    #[test]
+    #[ignore = "requires the Foundation range handoff and local systemd"]
+    fn withdrawn_audit_uses_the_pinned_foundation_handoff() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let mut native = Native { root: root.path().to_owned(), counter: 0, deadline: None };
+        let booking = Bound::new(REPLAY_BOOKING.0, REPLAY_BOOKING.1).sealed()?;
+        assert_eq!(
+            withdrawn_audit(&mut native, &booking)?,
+            Bound::new(FOUNDATION_RANGE_HANDOFF.0, FOUNDATION_RANGE_HANDOFF.1),
+        );
+        Ok(())
+    }
 
     #[test]
     fn epoch258_cpu_selection_respects_booked_replay_and_delivery_owners() {
@@ -1390,25 +1468,13 @@ fn measure(
     if extraction_drain.is_some() {
         released_units.insert(BROKER_226);
     }
-    let closed_audit = quote.as_ref().map(|_| closed_audit()).transpose()?;
-    let reserved_audit_memory = if let Some((_, invocation)) = &closed_audit {
-        let audit = AUXILIARY[1];
-        let reservation = &booking["owners"][audit];
-        let current = n.show_fields(audit, "ActiveState,MainPID,InvocationID,ControlGroup,Job")?;
-        ensure!(
-            reservation["InvocationID"] == *invocation
-                && current["ActiveState"] == "inactive"
-                && current["MainPID"] == "0"
-                && matches!(current["InvocationID"].as_str(), Some(id) if id.is_empty() || id == invocation)
-                && current["ControlGroup"] == ""
-                && current["Job"] == "",
-            "epoch 148 audit closure no longer matches the booked auxiliary"
-        );
-        released_units.insert(audit);
-        text(reservation, "MemoryMax")?.parse()?
-    } else {
-        0
-    };
+    let closed_audit = quote
+        .as_ref()
+        .map(|_| withdrawn_audit(n, &booking))
+        .transpose()?;
+    if closed_audit.is_some() {
+        released_units.insert(AUXILIARY[1]);
+    }
     let mut expected = booked.clone();
     for unit in &released_units {
         ensure!(
@@ -1657,6 +1723,12 @@ fn measure(
         listed_owners(n)? == before && latest_completion()? == completion,
         "Foundation cohort changed during roster binding"
     );
+    if let Some(reference) = &closed_audit {
+        ensure!(
+            &withdrawn_audit(n, &booking)? == reference,
+            "Foundation range handoff changed"
+        );
+    }
     if closed_replay.is_some() {
         ensure!(
             terminal_replay_261(n, &booking)? == closed_replay,
@@ -1801,7 +1873,7 @@ fn measure(
     let guard_141_memory = active_interval_141.len() as u64 * interval141::GUARD_MEMORY;
     let restore_allowance = active_restore_266.as_ref().map_or(0, |_| restore266::ADDITIONAL_MEMORY);
     let reserve = capacity::add(resources_before.0 / 10, capacity::add(periodic_reserve, capacity::add(guard_141_memory, restore_allowance)?)?)?;
-    let base_memory = capacity::add(capacity::add(reserve, candidate)?, reserved_audit_memory)?;
+    let base_memory = capacity::add(reserve, candidate)?;
     let (hard, growth_memory) = recorded.values().try_fold(
         (base_memory, base_memory),
         |(hard, growth), (owner, current, _)| {
@@ -1897,15 +1969,14 @@ fn measure(
         evidence["full_replay_quote"] = json!({"sizing_reference":quote.reference,"inputs":quote.inputs,
             "whole_tree_bytes":quote.working_disk,"producer_memory_bytes":quote.producer_memory,
             "receipt_disk_bytes":DISK_RECEIPTS,"control_memory_bytes":CONTROLLER_MEMORY,
-            "guard_memory_bytes":1u64 << 30,"closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
-            "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay});
+            "guard_memory_bytes":1u64 << 30,"closed_audit":closed_audit,
+            "reserved_audit_memory_bytes":0,"closed_replay":closed_replay});
     }
     if let Some(proof) = suffix {
         evidence["suffix_quote"] = json!({
             "completion":proof,"candidate_cap_bytes":SUFFIX_226_CAP,
             "candidate_memory_max_bytes":SUFFIX_226_CAP,"candidate_cpus":selected,
-            "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
-            "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
+            "closed_audit":closed_audit,"reserved_audit_memory_bytes":0,"closed_replay":closed_replay,
         });
     }
     if matches!(&quote, Some(Quote::Suffix226Preview)) {
@@ -1923,8 +1994,7 @@ fn measure(
         evidence["delivery_quote"] = json!({
             "preparation":preparation,"delivery_memory_max_bytes":num(&delivery, "memory_max_bytes")?,
             "receipt_scratch_maximum_bytes":candidate_disk,"candidate_cpus":selected,
-            "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
-            "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
+            "closed_audit":closed_audit,"reserved_audit_memory_bytes":0,"closed_replay":closed_replay,
         });
     }
     if delivery_252 {
@@ -1938,8 +2008,7 @@ fn measure(
             "checkpoint_qualification":quote.checkpoint,"placement":quote.placement.reference,
             "candidate_cpus":selected,"exclusive_online_cpus":quote.placement.exclusive_cpus,
             "candidate_disk_bytes":quote.disk,"candidate_memory_bytes":candidate,
-            "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
-            "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
+            "closed_audit":closed_audit,"reserved_audit_memory_bytes":0,"closed_replay":closed_replay,
         });
     }
     if let Some(Quote::Focused(spec, preflight)) = &quote {
