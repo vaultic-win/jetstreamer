@@ -1,0 +1,299 @@
+"""Control the single private 73,726,716 to 73,746,882 epoch 170 segment."""
+import fcntl
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+import time
+
+
+def load(name):
+    spec = importlib.util.spec_from_file_location(name,Path(__file__).with_name(name+".py"))
+    mod=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+q=load("successor_price")
+persist=load("closed_successor").persist
+D=q.DEP
+UNIT=q.UNIT
+ALIAS="/run/horizon-170-from-73726716-v1"
+GUARD=UNIT.replace("-qualify-","-guard-")
+TIMER=GUARD.replace(".service",".timer")
+need=q.need
+G=1<<30
+
+
+def save(name,v):
+    p=D/name
+    persist(p,(json.dumps(v,indent=2)+"\n").encode())
+    return q.read(p)[1]
+
+
+def current(name):
+    return q.read(D/name)
+
+
+def digest(path):
+    with Path(path).open("rb") as f:
+        return hashlib.file_digest(f,"sha256").hexdigest()
+
+
+def static():
+    i,ir=q.scope()
+    profile=i["profile"]
+    ns=q.bound(i["namespace"])
+    layout=q.bound(i["layout"])
+    package=D/"bounded-v2"
+    seal=q.bound(profile["sealed_package"])
+    for member in seal["members"]:
+        src=package/member["name"]
+        need(src.resolve()==src and src.stat().st_size==member["bytes"] and digest(src)==member["sha256"],
+             "changed deployment "+str(src))
+    spec=Path(layout["service"]["path"])
+    need(ns["unit"]==layout["service"] and ns["layout"]==i["layout"] and digest(spec)==layout["service"]["sha256"]
+         and ns["seal"]==profile["sealed_package"] and layout["run"]==i["run"],"namespace differs")
+    # Verify complete preflight inode/time bindings before deciding to start.
+    bindings=ns["report"]["readonly_bindings"]
+    for line in spec.read_text().splitlines():
+        if line.startswith("BindReadOnlyPaths="):
+            src,dst=line.split("=",1)[1].split(":")
+            m=Path(src).stat()
+            ref=bindings[dst]
+            need([m.st_dev,m.st_ino,m.st_size,m.st_mtime_ns,m.st_ctime_ns][:len(ref)]==ref,"changed input "+src)
+    return i,ir
+
+
+def compare():
+    v,ref=current("CLOSED_BRIDGE_COMPARISON.json")
+    need(v["release"]==q.scope()[0]["old_release"] and v["pid1_exit"]["native"]["InvocationID"]==q.ORIG
+         and v["pid1_exit"]["native"]["Result"]=="success" and v["checkpoints"][-1]["slot"]==73726716
+         and len(v["closed_segment"]["sha256"])==64 and v["mode"]=="closed" and not v["publication_authorized"],
+         "missing closed predecessor")
+    return ref
+
+
+def checked_price(phase):
+    v=q.price(phase)
+    need(v["fits"],f'{phase} fit failed: disk {v["home_margin"]}, RAM {v["ram_margin"]}, cap {v["guard_cap"]}')
+    need(time.time()-v["observed"]<30,"expired price")
+    return v
+
+
+def actor(held=True):
+    i,ir=q.scope()
+    s=q.state(UNIT)
+    iid=s["InvocationID"];pid=int(s["MainPID"]);proc=Path("/proc")/str(pid)
+    need(re.fullmatch("[0-9a-f]{32}",iid) and iid!="0"*32 and s["ActiveState"]=="active"
+         and not s["Job"] and s["ControlPID"]=="0" and s["MemoryMax"]==str(48*G) and s["MemorySwapMax"]=="0"
+         and s["CPUQuotaPerSecUSec"]=="6s" and s["ControlGroup"]=="/system.slice/"+UNIT,"foreign producer")
+    cg=Path("/sys/fs/cgroup"+s["ControlGroup"])
+    members={int(p) for p in (cg/"cgroup.procs").read_text().split()}
+    need((members=={pid} if held else pid in members) and (cg/"cpu.max").read_text().split()==["600000","100000"]
+         and int((cg/"memory.max").read_text())==48*G and (cg/"memory.swap.max").read_text().strip()=="0",
+         "actual scheduling limits or members changed")
+    target=D/"bounded-v2/gate" if held else Path(i["profile"]["node"]["path"])
+    need((proc/"exe").samefile(target) and (proc/"cgroup").read_text().strip()=="0::"+s["ControlGroup"],
+         "producer is not the expected gate/node")
+    ticks=int((proc/"stat").read_text().rsplit(") ",1)[1].split()[19])
+    ns=q.bound(i["namespace"])["report"]
+    root=proc/"root"
+    for dst,identity in ns["readonly_bindings"].items():
+        f=root/dst.lstrip("/")
+        m=f.stat()
+        need([m.st_dev,m.st_ino,m.st_size,m.st_mtime_ns,m.st_ctime_ns][:len(identity)]==identity
+             and os.statvfs(f).f_flag & os.ST_RDONLY, "foreign or writable projection "+dst)
+    run=Path(i["run"])
+    dev=run.stat().st_dev
+    major_minor=f"{os.major(dev)}:{os.minor(dev)}"
+    mtab=[l.split(" - ",1)[0].split() for l in (proc/"mountinfo").read_text().splitlines()]
+    w=set()
+    for m in mtab:
+        if m[2]!=major_minor or "rw" not in m[5].split(","):
+            continue
+        visible=root/m[4].lstrip("/")
+        try:
+            writable=visible.stat().st_dev==dev and not os.statvfs(visible).f_flag & os.ST_RDONLY
+        except FileNotFoundError:
+            continue
+        if writable:
+            w.add(m[4])
+    need(w=={str(run)}, "unexpected visible writable HOME mounts "+repr(w))
+    need(not any(t.startswith(("shared:","master:")) for v in mtab
+                 if v[4]=="/" or v[4].startswith(("/home/sol","/var/lib/jetstreamer",ALIAS)) for t in v[6:]),
+         "producer mounts have shared propagation")
+    for fd in [1,2]:
+        need((proc/"fd"/str(fd)).samefile(i["log"]), "unbound output stream")
+    need(q.state(UNIT)==s, "producer changed during validation")
+    return dict(schema="horizon-epoch170-bounded-successor-actor-v1",unit=UNIT,
+                boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),producer_invocation_id=iid,
+                producer_pid=pid,start_ticks=ticks,interface=ir)
+
+
+def start():
+    i,ir=static()
+    closed=compare()
+    old_guard=q.bound(i["handoff"])["live_guard"]
+    old_timer=q.BRIDGE.replace("-qualify-","-guard-").replace(".service",".timer")
+    st=q.state(old_timer,"Id,ActiveState,InvocationID,Job")
+    if st["ActiveState"]=="active":
+        loan=q.B140/"CPU_LOAN_RETURN.json"
+        need(loan.exists() and q.read(loan)[0]["producer_and_guard_drained"]
+             and st["InvocationID"]==old_guard["timer_invocation_id"],"old guard still protects active CPU loan")
+        q.inactive(q.BRIDGE)
+        subprocess.run(["/usr/bin/systemctl","stop",old_timer],check=True)
+    q.inactive(q.BRIDGE)
+    q.inactive(old_timer.replace(".timer",".service"))
+    q.inactive(UNIT)
+    q.inactive(GUARD)
+    need(q.state(TIMER,"Id,ActiveState,Job")["ActiveState"]=="inactive","successor guard already active")
+    run=Path(i["run"])
+    need(not os.path.lexists(i["barrier"]) and not (D/"SUCCESSOR_ACTOR.json").exists()
+         and not any((run/n).exists() and any((run/n).iterdir()) for n in ("scratch","private","tmp"))
+         and (not Path(i["log"]).exists() or Path(i["log"]).stat().st_size==0),"occupied successor")
+    directory=Path(i["guard_receipts"])
+    directory.mkdir(0o700,exist_ok=True)
+    need(directory.stat().st_uid==0 and not any(directory.iterdir()),"occupied guard scope")
+    fit=checked_price("start")
+    fref=save("SUCCESSOR_START_FIT.json",fit)
+    save("SUCCESSOR_START_INTENT.json",dict(interface=ir,closed_comparison=closed,price=fref,
+        producer_unit=UNIT,guard_unit=GUARD,guard_floor=fit["guard_floor"],guard_cap=fit["guard_cap"],
+        resource_credit_bytes=0,archive_publication_authorized=False))
+    unit=Path(q.bound(i["layout"])["service"]["path"])
+    props=[]
+    for line in unit.read_text().splitlines():
+        if "=" not in line:
+            continue
+        key,value=line.split("=",1)
+        if key in ("ExecStart","Description","Type"):
+            continue
+        props+=["--property",line]
+    props+=["--property","InaccessiblePaths=-/run/jetstreamer-ready-bounds-20261121-v1"]
+    need(time.time()-fit["observed"]<60, "priced start expired")
+    subprocess.run(["/usr/bin/systemd-run","--quiet","--service-type=exec","--unit="+UNIT,*props,"--",
+                    "/usr/bin/env",ALIAS+"/gate"],check=True)
+    for _ in range(100):
+        try:
+            a=actor()
+            break
+        except (FileNotFoundError,ValueError):
+            time.sleep(.05)
+    else:
+        a=actor()
+    return save("SUCCESSOR_ACTOR.json",a)
+
+
+def same_actor():
+    a,ar=current("SUCCESSOR_ACTOR.json")
+    need(actor()==a,"held actor changed")
+    return a,ar
+
+
+def arm():
+    i,_=static()
+    a,ar=same_actor()
+    intent,_=current("SUCCESSOR_START_INTENT.json")
+    fit=checked_price("held")
+    # A new held tree with a higher aggregate floor may require a stronger guard before release.
+    floor=max(intent["guard_floor"],fit["guard_floor"])+min(G,max(0,fit["home_margin"])//2)
+    cap=intent["guard_cap"]
+    need(cap>=fit["terminal_tree_bounds"][1] and fit["available_home"]>=floor+cap-fit["terminal_tree_bounds"][0],
+         "held floor/cap cannot cover remaining growth")
+    held=save("SUCCESSOR_HELD_FIT.json",fit)
+    plan=dict(schema="jetstreamer-horizon-standalone-guard-plan-v1",unit=UNIT,invocation_id=a["producer_invocation_id"],
+              filesystem="/home/sol",worker_root=str(q.TREE),receipt_directory=i["guard_receipts"],
+              maximum_worker_vmas=3500000,minimum_free_bytes=floor,maximum_root_physical_bytes=cap)
+    pr=save("ACTUAL_GUARD_PLAN.json",plan)
+    exe=D/"guard-v1/guard";argv=[str(exe),pr["path"],"--plan-sha256",pr["sha256"],"--self-sha256",i["guard_sha"]]
+    validate=json.loads(q.cmd(*argv,"--validate-plan-only"))
+    need(validate["validated"] and validate["resource_samples_taken"]==0 and digest(exe)==i["guard_sha"],"invalid guard")
+    args=["/usr/bin/systemd-run","--quiet","--unit="+GUARD,"--on-active=1s","--on-unit-inactive=5s",
+          "--timer-property=AccuracySec=1s","--service-type=oneshot"]
+    for prop in ["User=root","Group=root","UMask=0077","MemoryMax=1G","MemorySwapMax=0","CPUQuota=100%",
+                 "TasksMax=256","TimeoutStartSec=120","TimeoutStopSec=15","PrivateNetwork=yes","ProtectSystem=strict",
+                 "ProtectHome=read-only","PrivateTmp=yes","NoNewPrivileges=yes",
+                 "CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE CAP_KILL",
+                 "AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE CAP_KILL","ReadWritePaths="+i["guard_receipts"]]:
+        args.extend(["--property",prop])
+    same_actor()
+    subprocess.run([*args,"--",*argv],check=True)
+    return dict(actor=ar,plan=pr,held_price=held)
+
+
+def guard():
+    a,_=same_actor()
+    plan,pref=current("ACTUAL_GUARD_PLAN.json")
+    samples=Path(plan["receipt_directory"])
+    need(not (samples/"stop-intent.json").exists(),"guard stop")
+    candidates=list(samples.glob("sample-*.json"))
+    need(candidates,"guard has not sampled")
+    s,sref=q.read(max(candidates,key=lambda f:f.stat().st_mtime_ns))
+    ts=q.state(TIMER,"Id,ActiveState,InvocationID,Job,Triggers")
+    need(ts["ActiveState"]=="active" and ts["Triggers"]==GUARD and not ts["Job"] and len(ts["InvocationID"])==32
+         and s["plan_sha256"]==pref["sha256"] and s["producer_invocation_id"]==a["producer_invocation_id"]
+         and s["producer"]["pid"]==a["producer_pid"] and s["producer_stop_enabled"] and s["trip_reason"] is None
+         and s["workers"]==[] and s["worker_observation_error"] is s["root_physical_observation_error"] is None
+         and not s["root_physical_observation"]["exceeds_budget"] and s["available_bytes"]>=plan["minimum_free_bytes"]
+         and time.time()-s["recorded_unix_seconds"]<=75,"invalid protective held guard")
+    return sref,ts["InvocationID"],plan,pref
+
+
+def release():
+    i,ir=static()
+    closed=compare()
+    a,ar=same_actor()
+    e,er=current("WRITER_ENROLLMENT.json")
+    need(e["enrolled"] and not e["publication_authorized"] and e["actor"]==ar and e["closed_comparison"]==closed
+         and e["interface"]==ir,"different writer enrollment")
+    writer=q.bound(e["writer_active"])["new"]
+    ws=q.state(writer["unit"])
+    need(ws["ActiveState"]=="active" and ws["InvocationID"]==writer["invocation_id"] and int(ws["MainPID"])==writer["pid"]
+         and int((Path("/proc")/str(writer["pid"])/"stat").read_text().rsplit(") ",1)[1].split()[19])==writer["start_ticks"],
+         "writer replaced")
+    sample,ti,plan,pr=guard()
+    fit=checked_price("held")
+    need(plan["minimum_free_bytes"]>=fit["guard_floor"] and fit["available_home"]>=plan["minimum_free_bytes"]+
+         max(0,plan["maximum_root_physical_bytes"]-fit["terminal_tree_bounds"][0]),
+         "joint postguard HOME coverage failed")
+    fp=save("SUCCESSOR_POST_GUARD_FIT.json",fit)
+    admission=save("SUCCESSOR_AUTHORIZED_RELEASE.json",dict(actor=ar,interface=ir,closed_comparison=closed,
+                   writer_enrollment=er,guard_plan=pr,post_guard_capacity=fp,first_guard_sample=sample,
+                   producer_invocation_id=a["producer_invocation_id"],archive_publication_authorized=False))
+    sr=save("SUCCESSOR_RELEASE.json",dict(schema="horizon-epoch170-bounded-successor-release-v1",actor=ar,
+               interface=ir,producer_invocation_id=a["producer_invocation_id"],guard_plan=pr,first_guard_sample=sample,
+               guard_timer_invocation_id=ti,admission=admission,resource_credit_bytes=0,archive_publication_authorized=False,
+               closed_comparison=closed,writer_enrollment=er,post_guard_capacity=fp))
+    current_guard,again,_,_=guard()
+    need(again==ti and q.state(writer["unit"])==ws and time.time()-fit["observed"]<=90,"release bindings expired")
+    # The stage helper creates ordinary receipts at 0400. The unprivileged native gate needs 0444 at first visibility.
+    path=Path(i["barrier"])
+    tmp=path.parent/(".permit-"+a["producer_invocation_id"])
+    fd=os.open(tmp,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o400)
+    try:
+        os.write(fd,a["producer_invocation_id"].encode())
+        os.fchmod(fd,0o444)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    import ctypes
+    libc=ctypes.CDLL(None,use_errno=True)
+    if libc.renameat2(-100,os.fsencode(tmp),-100,os.fsencode(path),1)!=0:
+        raise OSError(ctypes.get_errno(),"exclusive permit publication")
+    fd=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY)
+    try: os.fsync(fd)
+    finally: os.close(fd)
+    return dict(released=sr,guard_at_commit=current_guard)
+
+
+if __name__=="__main__":
+    stages={"start":start,"arm":arm,"release":release}
+    need(len(sys.argv)==2 and sys.argv[1] in stages,"select start, arm, or release")
+    lock=os.open(D/"bounded-operator.lock",os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
+    fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    print(json.dumps(stages[sys.argv[1]](),sort_keys=True),flush=True)
