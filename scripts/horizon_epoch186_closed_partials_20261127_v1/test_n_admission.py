@@ -63,6 +63,17 @@ class FollowonTest(TestCase):
         with self.assertRaisesRegex(ValueError, "fixed cap"):
             n.margins(budget, self.funded, 5 * n.op.G)
 
+    def test_distinct_slots_survive_duplicate_holding_correction(self):
+        raw = dict(self.price, required_ram=101 * n.op.G, ram_margin=-n.op.G)
+        result = n.margins(raw, self.funded, 4 * n.op.G, 2 * n.op.G)
+        self.assertEqual(
+            result["post_reservation_ram_margin"], n.op.G - n.DASHBOARD_RAM
+        )
+        self.assertEqual(result["holding_ram_available_from_serial"], 2 * n.op.G)
+        self.assertEqual(result["build_ram"], 2 * n.op.G)
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            n.margins(raw, self.funded, 4 * n.op.G, 3 * n.op.G)
+
     def test_both_slots_refuse_if_dashboard_exhausts_ram(self):
         r = n.margins(
             dict(self.price, required_ram=100 * n.op.G, ram_margin=0), self.funded

@@ -8,6 +8,7 @@ import os
 import re
 import runpy
 import stat
+import subprocess
 import sys
 import time
 
@@ -174,6 +175,53 @@ def serial_owner():
             )
 
 
+def compiler_terminal(directory, launch_ref, unit, iid, now):
+    path = directory / "PAIR_BUILD_TERMINAL.json"
+    terminal_ref = op.fixed(
+        path, "16b0e10e77dbf48c442ca59e3bb993aab9c9cc7c38bf35a3b5ab8fc533981b20"
+    )
+    terminal = op.bound(terminal_ref)
+    recorded = terminal["native"]
+    op.need(
+        terminal["launch_sha256"] == launch_ref["sha256"]
+        and terminal["unit"] == unit
+        and terminal["invocation"] == recorded["InvocationID"] == iid
+        and recorded["Result"] == "oom-kill"
+        and recorded["MainPID"] == recorded["ControlPID"] == "0"
+        and not recorded["ControlGroup"]
+        and terminal["image"]["path"] == str(directory / "compiler.ext4")
+        and terminal["image"]["inode"] == 97854169
+        and terminal["image"]["length"] == 4 * op.G
+        and not terminal["remote_writes"],
+        "different compiler exit",
+    )
+    events = subprocess.check_output(
+        [
+            "/usr/bin/journalctl",
+            "-b",
+            "-q",
+            "--no-pager",
+            "-o",
+            "json",
+            "_PID=1",
+            "_UID=0",
+            "UNIT=" + unit,
+            "INVOCATION_ID=" + iid,
+            "MESSAGE_ID=d9b373ed55a64feb8242e02dbe79a49c",
+        ],
+        text=True,
+        timeout=15,
+    )
+    matched = [json.loads(line) for line in events.splitlines()]
+    op.need(
+        len(matched) == 1
+        and matched[0]["UNIT_RESULT"] == recorded["Result"]
+        and now["InvocationID"] in ("", iid),
+        "missing exact PID-1 compiler terminal",
+    )
+    return terminal_ref
+
+
 def compiler_reservation():
     directory = op.BASE / "epoch168-anza-reader-build-20261127.jMydZnTw"
     launch_ref = op.fixed(
@@ -234,11 +282,7 @@ def compiler_reservation():
             and not now["ControlGroup"],
             "compiler did not drain",
         )
-        terminal = provider["terminal"](unit, iid)
-        op.need(
-            terminal["invocation_id"] == iid and terminal["unit"] == unit,
-            "different compiler terminal",
-        )
+        terminal = compiler_terminal(directory, launch_ref, unit, iid, now)
     image = directory / "compiler.ext4"
     allocated = 0
     if os.path.lexists(image):
@@ -271,7 +315,143 @@ def compiler_reservation():
     )
 
 
-def margins(base, funded, image_allocated=0):
+def recovery_reservation(compiler):
+    # A check-only 3 GiB proposal cannot consume a second compiler slot. Once its
+    # launch is issued, retain any incremental GiB even if the process has exited.
+    base = Path(compiler["image_path"]).parent
+    dest = base / "v2-20261127"
+    unit = "horizon-168-anza-reader-recovery-v2-20261127.service"
+    active = active_units("horizon-168-anza-reader-recovery-*")
+    op.need(active <= {unit}, "unknown compiler recovery")
+    path = dest / "BUILD_INTENT.json"
+    if not path.exists():
+        op.need(
+            not active and not (dest / "BUILD_LAUNCH.json").exists(),
+            "unregistered compiler recovery",
+        )
+        return dict(intent=None, native=None, maximum_memory=2 * op.G)
+    intent_ref = op.ref(path)
+    intent = op.bound(intent_ref)
+    fit = op.bound(intent["receipt"])
+    limit = fit["ram_limit"]
+    op.need(
+        compiler["terminal"] == intent["original"] == fit["prior"]
+        and fit["phase"] == "launch"
+        and fit["fits"]
+        and fit["existing_fixed_image"]["inode"] == compiler["image_inode"]
+        and fit["existing_fixed_image"]["length"] == 4 * op.G
+        and fit["budgeted_evidence_and_holding"] == 2 * op.META
+        and not fit["publication_authorized"]
+        and limit in (2 * op.G, 3 * op.G, 4 * op.G)
+        and intent["command"] == fit["argv"]
+        and "--unit=" + unit in fit["argv"],
+        "different compiler recovery reservation",
+    )
+    launch_path = dest / "BUILD_LAUNCH.json"
+    launch_ref = op.ref(launch_path) if launch_path.exists() else None
+    if active:
+        op.need(launch_ref, "active compiler recovery without PID-1 launch binding")
+        launch = op.bound(launch_ref)
+        row = launch["native"]
+        props = op.consumers.system(
+            "show",
+            "--all",
+            "-p",
+            "Id,InvocationID,MainPID,ControlGroup,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec",
+            unit,
+        )
+        now = dict(line.split("=", 1) for line in props.splitlines())
+        op.need(
+            launch["intent"] == intent_ref
+            and launch["fit"] == intent["receipt"]
+            and now["Id"] == row["Id"] == unit
+            and now["InvocationID"] == row["InvocationID"]
+            and now["MainPID"] == row["MainPID"]
+            and now["ControlGroup"] == row["ControlGroup"]
+            and now["MemoryMax"] == str(limit)
+            and now["MemorySwapMax"] == "0"
+            and now["CPUQuotaPerSecUSec"] == "1s",
+            "compiler recovery exceeds its secured reservation",
+        )
+    return dict(intent=intent_ref, native=launch_ref, maximum_memory=limit)
+
+
+def repeated_serial_slot(raw, funded):
+    # Recover the actual native peak inherited by 167. Its auxiliary phase peak
+    # already contains the same 2 GiB holding reservation charged again by 170.
+    ledger_ref = op.fixed(
+        op.RT / "epoch172-full-half-core-20261120-v1/POST_GUARD_CAPACITY.json",
+        "e94d1b2cb8eed6c1df6ffa4e5958a24e660ef25fbd7e9a80e99a1cf914afc9eb",
+    )
+    ledger = op.bound(ledger_ref)
+    aux = ledger["native_inputs"]["auxiliary"]
+    older = aux["retained_bookings"]
+    original = op.bound(ledger["fleet"])
+    serial = funded["receipt_bindings"]["PARK_SERIAL_ADMISSION"]
+    op.need(
+        older == original["retry9_auxiliary_commitments"]
+        and older["holding_serial"]
+        and older["holding_and_build_may_overlap"]
+        and older["holding_memory_bytes"] == older["build_memory_bytes"] == 2 * op.G
+        and older["receipt_bindings"]["PARK_SERIAL_ADMISSION"] == serial
+        and serial == op.ref(op.SCOPE)
+        and op.bound(serial)["additional_memory_bytes"] == 2 * op.G
+        and aux["memory_bytes"] == 6576668672
+        and ledger["native_inputs"]["temporary_memory"] == 0
+        and original["complete_projected_memory_bytes"]
+        + 16 * op.G
+        + aux["memory_bytes"]
+        + 24 * op.G
+        == ledger["complete_memory_plus_reserve_bytes"]
+        == 810658050048,
+        "original native memory peak does not contain this serial reservation",
+    )
+    joint = raw["joint"]
+    progress = op.bound(joint["charged_167"])
+    release = op.bound(progress["release"])
+    intent = op.bound(release["intent"])
+    post = op.bound(release["post_guard_capacity"])
+    prior = intent["quote"]["exact_native_fit"]
+    inherited = post["required_ram_bytes"] + prior["resident_lower_bound_bytes"]
+    builder = op.bound(joint["extra"]["141_build"])
+    op.need(
+        release["intent"] == progress["actor"]["intent"]
+        and post["required_ram_bytes"] == prior["required_available_memory_bytes"]
+        and intent["quote"]["producer_memory_bytes"] == 42 * op.G
+        and prior["reserved_new_selector_RAM_bytes"] == 4 * op.G
+        and inherited
+        == ledger["complete_memory_plus_reserve_bytes"]
+        - 68 * op.G
+        + 42 * op.G
+        + 6 * op.G
+        + 4 * op.G
+        + 200 * op.M
+        and builder["candidate_ram_bytes"] == 2 * op.G
+        and joint["required_ram"]
+        == inherited
+        - joint["resident_lower_bytes"]
+        + 2 * op.G
+        + op.G
+        + 32 * op.M
+        + builder["candidate_ram_bytes"]
+        + joint["charged140_ram"]
+        + 31 * op.G
+        and raw["auxiliary"]["park"] == op.ref(op.PAID)
+        and op.bound(raw["auxiliary"]["park"])["serial_slot"] == serial,
+        "170 follow-on no longer repeats the inherited holding slot",
+    )
+    return dict(
+        same_slot=serial,
+        inherited_ledger=ledger_ref,
+        basis167=release["post_guard_capacity"],
+        charged_by_170=raw["auxiliary"]["park"],
+        old_auxiliary_memory=aux["memory_bytes"],
+        inherited_pre_residency_ram=inherited,
+        repeated_serial_bytes=2 * op.G,
+    )
+
+
+def margins(base, funded, image_allocated=0, repeated=0):
     op.need(
         funded["build_and_native_qualification_serial"]
         and funded["holding_and_build_may_overlap"]
@@ -298,7 +478,10 @@ def margins(base, funded, image_allocated=0):
     extra_home = (
         funded["build_fixed_image_bytes"] + funded["build_outside_allowance_bytes"]
     )
-    ram_margin = base["ram_margin"] - DASHBOARD_RAM
+    op.need(
+        repeated in (0, funded["holding_memory_bytes"]), "invalid duplicate serial term"
+    )
+    ram_margin = base["ram_margin"] + repeated - DASHBOARD_RAM
     op.need(
         0 <= image_allocated <= funded["build_fixed_image_bytes"],
         "compiler image outside its fixed cap",
@@ -363,11 +546,23 @@ def price():
     )
     serial_owner()
     compiler = compiler_reservation()
+    funded = fleet["retry9_auxiliary_commitments"]
+    repeated = repeated_serial_slot(raw, funded)
     rooms = margins(
         base,
-        fleet["retry9_auxiliary_commitments"],
+        funded,
         compiler["image_physically_funded_bytes"],
+        repeated["repeated_serial_bytes"],
     )
+    recovery = recovery_reservation(compiler)
+    extra = recovery["maximum_memory"] - funded["build_memory_bytes"]
+    rooms["post_reservation_ram_margin"] -= extra
+    rooms["remaining_ram"] = (
+        0
+        if rooms["post_reservation_ram_margin"] < 0
+        else funded["holding_memory_bytes"] + rooms["post_reservation_ram_margin"]
+    )
+    rooms["build_ram"] += extra
     return dict(
         basis=base,
         utc=time.time(),
@@ -377,6 +572,8 @@ def price():
         serial_slot=op.SLOT,
         qualified_price=qualified,
         compiler=compiler,
+        compiler_recovery=recovery,
+        one_serial_slot=repeated,
         resource_credit_bytes=0,
         **rooms,
     )
