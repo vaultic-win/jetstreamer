@@ -64,7 +64,7 @@ struct Preserved {
     identity: Stamp,
 }
 
-fn lock(path: &Path, dev: u64, ino: u64, uid: u32, gid: u32) -> Result<File> {
+pub(super) fn lock(path: &Path, dev: u64, ino: u64, uid: u32, gid: u32) -> Result<File> {
     let file = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
@@ -92,7 +92,7 @@ fn lock(path: &Path, dev: u64, ino: u64, uid: u32, gid: u32) -> Result<File> {
     Ok(file)
 }
 
-fn properties(unit: &str, names: &str) -> Result<BTreeMap<String, String>> {
+pub(super) fn properties(unit: &str, names: &str) -> Result<BTreeMap<String, String>> {
     let output = Command::new(MANAGER)
         .args(["show", unit, "-p", names])
         .output()?;
@@ -224,7 +224,7 @@ fn check_preserved(plan: &Retirement) -> Result<()> {
     Ok(())
 }
 
-fn definitions(plan: &Retirement, tokens: &[String]) -> Result<()> {
+pub(super) fn definitions(expected: &[Bound], tokens: &[String]) -> Result<()> {
     let mut scan = Command::new("/usr/bin/rg");
     scan.args([
         "--threads",
@@ -255,11 +255,11 @@ fn definitions(plan: &Retirement, tokens: &[String]) -> Result<()> {
     );
     for path in std::str::from_utf8(&output.stdout)?.lines() {
         ensure!(
-            plan.definitions.iter().any(|b| b.path == Path::new(path)),
+            expected.iter().any(|b| b.path == Path::new(path)),
             "new installed consumer {path}"
         );
     }
-    for definition in &plan.definitions {
+    for definition in expected {
         checked_hash(definition)?;
     }
     Ok(())
@@ -277,7 +277,7 @@ fn exited(proc: &Path) -> Result<bool> {
     }
 }
 
-fn scan_run_references(strong: &[String]) -> Result<()> {
+pub(super) fn scan_run_references(strong: &[String]) -> Result<()> {
     let me = std::process::id().to_string();
     for entry in fs::read_dir("/proc")? {
         let entry = entry?;
@@ -402,7 +402,7 @@ pub(super) fn run(bytes: &[u8], sha: &str, image: &str, check_only: bool) -> Res
         !strong.is_empty() && strong.iter().all(|s| !s.is_empty() && tokens.contains(s)),
         "incomplete historical consumer paths"
     );
-    definitions(&plan, &tokens)?;
+    definitions(&plan.definitions, &tokens)?;
     check_preserved(&plan)?;
     manager_states(&plan)?;
     scan_run_references(&strong)?;
@@ -428,7 +428,7 @@ pub(super) fn run(bytes: &[u8], sha: &str, image: &str, check_only: bool) -> Res
     for p in &plan.targets {
         let t = &p.target;
         manager_states(&plan)?;
-        definitions(&plan, &tokens)?;
+        definitions(&plan.definitions, &tokens)?;
         scan_run_references(&strong)?;
         scan_consumers(std::slice::from_ref(t))?;
         file_stamp(t)?;
