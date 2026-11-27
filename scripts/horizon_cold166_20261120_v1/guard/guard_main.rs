@@ -681,19 +681,31 @@ fn validate_plan(plan: &Plan) -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "epoch168-joint-reduced")]
-fn validate_joint168_scope(plan: &Plan) -> Result<()> {
+#[cfg(any(
+    feature = "epoch168-joint-reduced",
+    feature = "epoch167-checkpoint-bounded"
+))]
+fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
+    let (worker_root, receipts, minimum_floor) = match plan.unit.as_str() {
+        #[cfg(feature = "epoch168-joint-reduced")]
+        "horizon-qualify-168-joint-checkpoint-reduced-20261126-v1.service" => (
+            "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1",
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch168-joint-checkpoint-reduced-run-20261126-v1/guard-receipts",
+            8_297_502_499_408,
+        ),
+        #[cfg(feature = "epoch167-checkpoint-bounded")]
+        "horizon-qualify-167-checkpoint-bounded-20261127-v1.service" => (
+            "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1",
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch167-checkpoint-bounded-20261127-v1/guard-receipts",
+            8_594_041_336_400,
+        ),
+        _ => anyhow::bail!("unexpected checkpoint replay unit"),
+    };
     ensure!(
-        plan.unit == "horizon-qualify-168-joint-checkpoint-reduced-20261126-v1.service"
-            && plan.filesystem == Path::new("/home/sol")
-            && plan.worker_root
-                == Path::new("/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1")
-            && plan.receipt_directory
-                == Path::new(concat!(
-                    "/var/lib/jetstreamer/horizon_runtime_data/",
-                    "epoch168-joint-checkpoint-reduced-run-20261126-v1/guard-receipts"
-                ))
-            && plan.minimum_free_bytes >= 8_297_502_499_408
+        plan.filesystem == Path::new("/home/sol")
+            && plan.worker_root == Path::new(worker_root)
+            && plan.receipt_directory == Path::new(receipts)
+            && plan.minimum_free_bytes >= minimum_floor
             && plan
                 .maximum_root_physical_bytes
                 .is_some_and(|bytes| bytes > 0 && bytes <= 512 << 30)
@@ -702,9 +714,39 @@ fn validate_joint168_scope(plan: &Plan) -> Result<()> {
             && plan.native_main.is_none()
             && plan.bounded_canary.is_none()
             && plan.bounded_measurement.is_none(),
-        "invalid reduced epoch 168 checkpoint guard scope"
+        "invalid bounded checkpoint guard scope"
     );
     Ok(())
+}
+
+#[cfg(all(test, feature = "epoch167-checkpoint-bounded"))]
+#[test]
+fn bounded_167_guard_requires_its_own_tree_receipts_and_booking() {
+    let plan = json!({
+        "schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+        "unit":"horizon-qualify-167-checkpoint-bounded-20261127-v1.service",
+        "filesystem":"/home/sol",
+        "worker_root":"/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1",
+        "receipt_directory":"/var/lib/jetstreamer/horizon_runtime_data/epoch167-checkpoint-bounded-20261127-v1/guard-receipts",
+        "invocation_id":"1234567890abcdef1234567890abcdef",
+        "minimum_free_bytes":8_594_041_336_400u64,"maximum_root_physical_bytes":512u64 << 30,
+        "maximum_worker_vmas":3_500_000
+    });
+    validate_checkpoint_scope(&serde_json::from_value(plan.clone()).unwrap()).unwrap();
+    for (key, value) in [
+        (
+            "unit",
+            json!("horizon-qualify-167-source-index-v3-20261122.service"),
+        ),
+        ("worker_root", json!("/home/sol/.jetstreamer-private")),
+        ("receipt_directory", json!("/var/lib/jetstreamer")),
+        ("minimum_free_bytes", json!(8_594_041_336_399u64)),
+        ("maximum_root_physical_bytes", json!((512u64 << 30) + 1)),
+    ] {
+        let mut changed = plan.clone();
+        changed[key] = value;
+        assert!(validate_checkpoint_scope(&serde_json::from_value(changed).unwrap()).is_err());
+    }
 }
 
 fn data_proof_trip(error: Option<&str>) -> Option<&'static str> {
@@ -756,9 +798,16 @@ fn run() -> Result<()> {
         feature = "epoch166-write-version-reproduction"
     ))]
     data_fulfillment::incident::validate_cold_contract(&plan, &args[5])?;
-    #[cfg(feature = "epoch168-joint-reduced")]
-    validate_joint168_scope(&plan)?;
-    #[cfg(not(any(feature = "incident-recovery", feature = "epoch168-joint-reduced")))]
+    #[cfg(any(
+        feature = "epoch168-joint-reduced",
+        feature = "epoch167-checkpoint-bounded"
+    ))]
+    validate_checkpoint_scope(&plan)?;
+    #[cfg(not(any(
+        feature = "incident-recovery",
+        feature = "epoch168-joint-reduced",
+        feature = "epoch167-checkpoint-bounded"
+    )))]
     ensure!(
         plan.unit == data_fulfillment::COLD_UNIT
             && plan.worker_root == Path::new(data_fulfillment::COLD_ROOT)
