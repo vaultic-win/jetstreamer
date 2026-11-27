@@ -832,8 +832,8 @@ def intent_data(reference, *, live=False):
 def native_owner(intent_ref):
     intent, payload, gate_ref, payload_ref, checkpoints = intent_data(intent_ref, live=True)
     need(not permit_exists(), "permit already exists")
-    fields = STATE + ("NRestarts", "Restart", "User", "Group", "KillMode")
-    state = props(UNIT, fields)
+    manager_properties = STATE + ("NRestarts", "Restart", "User", "Group", "KillMode")
+    state = props(UNIT, manager_properties)
     pid = int(state["MainPID"])
     iid = state["InvocationID"]
     need(state["ActiveState"] == "active" and state["SubState"] == "running" and pid > 1
@@ -867,11 +867,11 @@ def native_owner(intent_ref):
         need(identity(path.stat()) == item["source"]["identity"], f"input crossed gate: {item['target']}")
     barrier = process/"root"/(ALIAS/"barrier").relative_to("/")
     need(os.path.samestat(barrier.stat(), (ROOT/"barrier").stat()), "gate bound a different permit directory")
-    mounts = (process/"mountinfo").read_text().splitlines()
+    mounts = [line.split() for line in (process/"mountinfo").read_text().splitlines()]
     for guest in (ALIAS/"barrier", *(guest for _, guest in proof_files),
                   *(Path(item["target"]) for item in payload["files"])):
-        need(any(fields[4] == str(guest) and "ro" in fields[5].split(",")
-                 for line in mounts if len(fields := line.split()) > 5), f"missing read-only bind {guest}")
+        need(any(len(mount) > 5 and mount[4] == str(guest) and "ro" in mount[5].split(",")
+                 for mount in mounts), f"missing read-only bind {guest}")
     for fd in ("1", "2"):
         meta = (process/"fd"/fd).stat()
         need([meta.st_dev, meta.st_ino] == [intent["append_log"]["device"], intent["append_log"]["inode"]],
@@ -885,7 +885,7 @@ def native_owner(intent_ref):
          and ready["producer_start_ticks"] == start_ticks
          and ready["payload_sha256"] == payload_ref["sha256"]
          and 0 <= int(time.time()) - ready["worker_ready_unix_seconds"] < 240, "foreign gate readiness")
-    need(ticks(pid) == start_ticks and props(UNIT, fields) == state
+    need(ticks(pid) == start_ticks and props(UNIT, manager_properties) == state
          and (group/"cgroup.procs").read_text().split() == [str(pid)] and not permit_exists(),
          "held native gate changed during capture")
     return dict(unit=UNIT, producer_unit=UNIT, producer_invocation_id=iid, producer_pid=pid,
