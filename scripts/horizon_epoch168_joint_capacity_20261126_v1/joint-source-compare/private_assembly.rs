@@ -23,7 +23,8 @@ use std::{
 use tempfile::NamedTempFile;
 
 const UNIT: &str = "horizon-assemble-168-private-20261127-v1.service";
-const SOURCE_UNIT: &str = "horizon-qualify-168-assembly-sources-20261127-v1.service";
+const SOURCE_UNIT: &str = "horizon-168-assembly-sources-20261127-v1.service";
+const ORIGINAL_SOURCE_UNIT: &str = "horizon-qualify-168-assembly-sources-20261127-v1.service";
 const SOURCE_TOOL_SHA: &str = "7569e2c958c4b478173af76c524d349c52198511d729affea4b980fbd6ccfb43";
 const SOURCE_SEAL_SHA: &str = "72e025e7ce4bba74f5d6d744c7dcacae84f6eeb309e29d276588f14e783e268f";
 const OUTPUT: &str = "/home/sol/.jetstreamer-private/epoch168-private-assembly-20261127-v1/output";
@@ -166,17 +167,23 @@ fn admission(plan: &Value) -> Result<Value> {
     Ok(fit)
 }
 
+fn source_unit_matches(native: &Value, event: &Value) -> bool {
+    matches!(
+        native["unit"].as_str(),
+        Some(SOURCE_UNIT | ORIGINAL_SOURCE_UNIT)
+    ) && event["UNIT"] == native["unit"]
+}
+
 fn source_qualification(plan: &Value) -> Result<Value> {
     let native = bound_doc(&plan["qualification_native"])?;
     let event = &native["pid1_terminal_event"];
     require(
         native["schema"] == "horizon-epoch168-assembly-source-native-acceptance-v1"
-            && native["unit"] == SOURCE_UNIT
+            && source_unit_matches(&native, event)
             && native["source_tool_sha256"] == SOURCE_TOOL_SHA
             && native["source_tool_deployment"]["sha256"] == SOURCE_SEAL_SHA
             && native["qualified_report"] == plan["qualification"]
             && native["lineage"] == plan["lineage"]
-            && event["UNIT"] == SOURCE_UNIT
             && event["INVOCATION_ID"] == native["invocation_id"]
             && event["_PID"] == "1"
             && event["_UID"] == "0"
@@ -389,6 +396,24 @@ pub(in super::super) fn assemble(path: &str, sha256: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn source_receipt_and_manager_event_must_name_the_same_qualified_unit() {
+        for unit in [SOURCE_UNIT, ORIGINAL_SOURCE_UNIT] {
+            assert!(source_unit_matches(
+                &json!({"unit":unit}),
+                &json!({"UNIT":unit})
+            ));
+        }
+        assert!(!source_unit_matches(
+            &json!({"unit":SOURCE_UNIT}),
+            &json!({"UNIT":ORIGINAL_SOURCE_UNIT})
+        ));
+        assert!(!source_unit_matches(
+            &json!({"unit":"unrelated.service"}),
+            &json!({"UNIT":"unrelated.service"})
+        ));
+    }
 
     #[test]
     fn output_checks_cap_and_floor_before_writing() {
