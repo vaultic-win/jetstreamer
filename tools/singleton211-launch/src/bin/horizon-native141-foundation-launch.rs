@@ -505,6 +505,20 @@ fn main() -> Result<()> {
     let release = state.join("release");
     let guard_reports = state.join("guard-samples");
     let terminal = state.join("terminal-evidence");
+    for source in scope["read_only_bindings"]
+        .as_object()
+        .context("missing read-only projections")?
+        .keys()
+        .map(Path::new)
+        .filter(|source| *source != release)
+    {
+        let metadata = fs::symlink_metadata(source)?;
+        ensure!(
+            metadata.is_file() && metadata.uid() == 0 && metadata.mode() & 0o004 != 0,
+            "projected input is unreadable by the replay UID: {}",
+            source.display()
+        );
+    }
     for mount in [tmpfs, alias, &release, &guard_reports, &terminal] {
         ensure!(
             !mount.try_exists()?,
