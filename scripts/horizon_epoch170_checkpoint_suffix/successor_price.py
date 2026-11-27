@@ -13,6 +13,7 @@ G = 1 << 30
 M = 1 << 20
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 DEP = RT / "epoch170-from-73726716-20261127-v1"
+ATTEMPT = DEP / "attempt-2" if Path(__file__).resolve().parent.parent == DEP / "attempt-2" else DEP
 OLD = RT / "epoch170-storage-witness-recovery-20261127-v1/suffix-run-v1"
 B140 = RT / "epoch140-suffix-recording-20261127-retry2"
 B185 = RT / "epoch185-lanek-holding-20261125-v1"
@@ -140,8 +141,16 @@ def inactive(unit):
 
 
 def scope():
-    interface, ref = read(DEP/"BOUNDED_SUCCESSOR_WRITER_INTERFACE.json",
-                          "30ba2b754885f8ba7cf9abc04d9453bb1b8a030b0534b31d1801543ea8c4906a")
+    sha = ("b1977d6a8b65b654349b98a66748b77439b3539869bf1f4e758d2d76ea0851d3"
+           if ATTEMPT != DEP else "30ba2b754885f8ba7cf9abc04d9453bb1b8a030b0534b31d1801543ea8c4906a")
+    interface, ref = read(ATTEMPT/"BOUNDED_SUCCESSOR_WRITER_INTERFACE.json", sha)
+    if ATTEMPT != DEP:
+        failed = bound(interface["failed_predecessor"])
+        preflight = bound(interface["private_state_native_preflight"])
+        need(failed["guard_drained"] and failed["node_exited_before_worker"] and failed["private_segment_absent"]
+             and preflight["old_failure"]==interface["failed_predecessor"] and preflight["original_run_unchanged"]
+             and preflight["native_checkpoint_route_accepted"] and not preflight["worker_executed"],
+             "retry is not bound to the startup correction")
     return interface, ref
 
 
@@ -274,7 +283,7 @@ def price(phase):
     if successor:
         budget, rr["new_170_budget"]=read(DEP/"BOUNDED_GROWTH_FROM_ORIGINAL_170.json",
                                           "04bb488a00b2cb853d6e21cb0b4ee3b12f4033fd9ff4fb7fbbe9ace1ad68a911")
-        need(budget["successor_interface"]==iref and budget["bounded_growth_limit"]==36*G
+        need(budget["successor_interface"]==interface.get("original_interface",iref) and budget["bounded_growth_limit"]==36*G
              and budget["margin_above_prior_peak"]>2*G and budget["original_slots"]>=budget["successor_slots"],
              "different bounded work set")
         profile141,rr["reserved_141"]=read(RT/"epoch141-first-hourly-20261127-v1/contract-v1/LAUNCH_PROFILE.json",

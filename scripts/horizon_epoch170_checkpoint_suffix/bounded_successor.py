@@ -21,7 +21,7 @@ def load(name):
 
 q=load("successor_price")
 persist=load("closed_successor").persist
-D=q.DEP
+D=q.ATTEMPT
 UNIT=q.UNIT
 ALIAS="/run/horizon-170-from-73726716-v1"
 GUARD=UNIT.replace("-qualify-","-guard-")
@@ -50,7 +50,7 @@ def static():
     profile=i["profile"]
     ns=q.bound(i["namespace"])
     layout=q.bound(i["layout"])
-    package=D/"bounded-v2"
+    package=Path(profile["sealed_package"]["path"]).parent
     seal=q.bound(profile["sealed_package"])
     for member in seal["members"]:
         src=package/member["name"]
@@ -71,7 +71,7 @@ def static():
 
 
 def compare():
-    v,ref=current("CLOSED_BRIDGE_COMPARISON.json")
+    v,ref=q.read(q.scope()[0]["closed_comparison"])
     need(v["release"]==q.scope()[0]["old_release"] and v["pid1_exit"]["native"]["InvocationID"]==q.ORIG
          and v["pid1_exit"]["native"]["Result"]=="success" and v["checkpoints"][-1]["slot"]==73726716
          and len(v["closed_segment"]["sha256"])==64 and v["mode"]=="closed" and not v["publication_authorized"],
@@ -98,7 +98,7 @@ def actor(held=True):
     need((members=={pid} if held else pid in members) and (cg/"cpu.max").read_text().split()==["600000","100000"]
          and int((cg/"memory.max").read_text())==48*G and (cg/"memory.swap.max").read_text().strip()=="0",
          "actual scheduling limits or members changed")
-    target=D/"bounded-v2/gate" if held else Path(i["profile"]["node"]["path"])
+    target=Path(i["profile"]["sealed_package"]["path"]).with_name("gate") if held else Path(i["profile"]["node"]["path"])
     need((proc/"exe").samefile(target) and (proc/"cgroup").read_text().strip()=="0::"+s["ControlGroup"],
          "producer is not the expected gate/node")
     ticks=int((proc/"stat").read_text().rsplit(") ",1)[1].split()[19])
@@ -159,7 +159,30 @@ def start():
          and (not Path(i["log"]).exists() or Path(i["log"]).stat().st_size==0),"occupied successor")
     directory=Path(i["guard_receipts"])
     directory.mkdir(0o700,exist_ok=True)
-    need(directory.stat().st_uid==0 and not any(directory.iterdir()),"occupied guard scope")
+    need(directory.stat().st_uid==0 and not (directory/"stop-intent.json").exists(),"occupied guard scope")
+    if D == q.DEP:
+        need(not any(directory.iterdir()), "foreign first-attempt guard samples")
+    else:
+        failed=q.bound(i["failed_predecessor"])
+        previous=q.bound(failed["actor"])
+        for item in directory.iterdir():
+            if re.fullmatch(r"sample-[a-f0-9]{32}\.json", item.name):
+                sample,_=q.read(item)
+                need(sample["plan_sha256"]==failed["guard_plan"]["sha256"]
+                     and sample["producer_invocation_id"]==previous["producer_invocation_id"],
+                     "unknown prior protective sample "+str(item))
+            else:
+                need(item.name.endswith(".lock") and item.is_file() and item.stat().st_uid==0,
+                     "unknown guard namespace entry "+str(item))
+        prior=q.state(UNIT)
+        if prior["ActiveState"]=="failed":
+            need(prior["InvocationID"]==previous["producer_invocation_id"] and prior["MainPID"]=="0",
+                 "foreign failed unit")
+            subprocess.run(["/usr/bin/systemctl","reset-failed",UNIT],check=True)
+        guard_state=q.state(GUARD)
+        if guard_state["ActiveState"]=="failed":
+            need(guard_state["MainPID"]=="0" and not guard_state["Job"], "old guard has an active owner")
+            subprocess.run(["/usr/bin/systemctl","reset-failed",GUARD],check=True)
     fit=checked_price("start")
     fref=save("SUCCESSOR_START_FIT.json",fit)
     save("SUCCESSOR_START_INTENT.json",dict(interface=ir,closed_comparison=closed,price=fref,
@@ -210,7 +233,7 @@ def arm():
               filesystem="/home/sol",worker_root=str(q.TREE),receipt_directory=i["guard_receipts"],
               maximum_worker_vmas=3500000,minimum_free_bytes=floor,maximum_root_physical_bytes=cap)
     pr=save("ACTUAL_GUARD_PLAN.json",plan)
-    exe=D/"guard-v1/guard";argv=[str(exe),pr["path"],"--plan-sha256",pr["sha256"],"--self-sha256",i["guard_sha"]]
+    exe=Path(i["guard_seal"]["path"]).with_name("guard");argv=[str(exe),pr["path"],"--plan-sha256",pr["sha256"],"--self-sha256",i["guard_sha"]]
     validate=json.loads(q.cmd(*argv,"--validate-plan-only"))
     need(validate["validated"] and validate["resource_samples_taken"]==0 and digest(exe)==i["guard_sha"],"invalid guard")
     args=["/usr/bin/systemd-run","--quiet","--unit="+GUARD,"--on-active=1s","--on-unit-inactive=5s",
