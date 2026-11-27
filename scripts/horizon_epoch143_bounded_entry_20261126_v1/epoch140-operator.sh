@@ -123,8 +123,12 @@ printf '[Unit]\nConditionPathExists=!%s\n' "$marker" | publish "$fence"
 printf '%s\n' "$bsha" | publish "$marker"
 systemctl daemon-reload
 verify_fence
-guard_floor=$(jq -er '.retained_required_home_bytes' "$a/PRESTART_SCREEN.json")
-node_floor=$(jq -er '.retained_required_home_bytes+.candidate_home_bytes' "$a/PRESTART_SCREEN.json")
+# The incumbent floor is live and can increase while the guard is being armed.
+# Use part of the verified surplus to fit a stricter guard without changing reservations.
+guard_floor=$(jq -er '
+  (.available_home_bytes-.retained_required_home_bytes-.candidate_home_bytes) as $surplus
+  | .retained_required_home_bytes+([4294967296,($surplus/2|floor)]|min)' "$a/PRESTART_SCREEN.json")
+node_floor=$((guard_floor + $(jq -er '.candidate_home_bytes' "$a/PRESTART_SCREEN.json")))
 install -d -m 0700 -o sol -g horizon "$run"
 install -d -m 0700 "$a/guard-receipts"
 install -d -m 0755 "$a/barrier"
