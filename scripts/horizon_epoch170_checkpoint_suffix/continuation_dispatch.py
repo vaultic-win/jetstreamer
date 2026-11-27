@@ -1,5 +1,5 @@
 """Dispatch the read-only comparison, protected actor and enrollment-dependent release."""
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import ctypes
 import fcntl
 import hashlib
@@ -32,40 +32,80 @@ def record(path, doc):
     return q.read(path)[1]
 
 
+def following_checker():
+    capture, _ = q.read(q.DEP / "PREDECESSOR_CAPTURE_ACTIVE.json",
+                        "1f84466d9ec0697cd1b2e4c367f557ec63370935af882ef5d4d5379fd5082920")
+    armed = q.bound(capture["armed"])
+    old = q.close_interface()
+    q.need(capture["predecessor"] == armed["release"] == old["old_release"]
+           and armed["actor"] == q.bound(old["old_actor"]) and armed["pidfd_bound"] and armed["unit_reference_held"],
+           "previous exit observer differs from the sealed actor")
+    return {"closure_seal":capture["capability"], "closed_argv":[str(q.DEP/"closure-tools"/q.CHECKER), "closed"]}
+
+
 def closed():
-    i,_ = q.scope()
+    i = q.close_interface()
     dest = Path(i["closed_comparison"])
     if dest.exists(): return q.compare_predecessor()
     q.predecessor_exit()
-    handoff = q.bound(i["closed_terminal_handoff"])
+    handoff = following_checker() if q.FOLLOWING else q.bound(i["closed_terminal_handoff"])
     native = Path(handoff["closed_argv"][0])
     seal = q.bound(handoff["closure_seal"])
-    expected = [m for m in seal["members"] if m["name"] == "bounded-checkpoints"]
+    expected = [m for m in seal["members"] if m["name"] == q.CHECKER]
     q.need(len(expected)==1 and native == Path(seal["destination"])/expected[0]["name"]
            and hashlib.sha256(native.read_bytes()).hexdigest()==expected[0]["sha256"],"changed native checker")
-    fit = q.price("read")
-    q.need(fit["fits"] and 0 <= time.time()-fit["observed"] < 30,
-           "readback capacity (HOME,RAM): "+str((fit["home_margin"],fit["ram_margin"])))
-    fit_ref = record(q.DEP/("READ_FIT_"+str(time.time_ns())+".json"),fit)
-    q.inactive(q.READ_UNIT)
-    start = int(time.time())
-    props = ["CPUQuota=100%","MemoryMax=512M","MemorySwapMax=0","TasksMax=16","Nice=8","RuntimeMaxSec=2h",
-             "User=root","Group=root","NoNewPrivileges=yes","PrivateNetwork=yes","ProtectSystem=strict",
-             "ProtectHome=read-only","PrivateTmp=yes","UMask=0077"]
-    args = ["/usr/bin/systemd-run","--quiet","--wait","--pipe","--collect","--service-type=exec","--unit="+q.READ_UNIT]
-    for prop in props: args.extend(["--property",prop])
-    result = subprocess.run(args+["--",*handoff["closed_argv"]],capture_output=True,timeout=7250)
-    q.need(result.returncode == 0, "native comparison failed: "+result.stderr.decode(errors="replace")[-1700:])
-    data = json.loads(result.stdout)
+    with admission_lock() if q.FOLLOWING else nullcontext():
+        fit = q.price("read")
+        q.need(fit["fits"] and 0 <= time.time()-fit["observed"] < 30,
+               "readback capacity (HOME,RAM): "+str((fit["home_margin"],fit["ram_margin"])))
+        fit_ref = record(q.DEP/("READ_FIT_"+str(time.time_ns())+".json"),fit)
+        q.inactive(q.READ_UNIT)
+        start = int(time.time())
+        props = ["CPUQuota=100%","MemoryMax=512M","MemorySwapMax=0","TasksMax=16","Nice=8","RuntimeMaxSec=2h",
+                 "User=root","Group=root","NoNewPrivileges=yes","PrivateNetwork=yes","ProtectSystem=strict",
+                 "ProtectHome=read-only","PrivateTmp=yes","UMask=0077"]
+        args = ["/usr/bin/systemd-run","--quiet","--wait","--pipe","--collect","--service-type=exec","--unit="+q.READ_UNIT]
+        for prop in props: args.extend(["--property",prop])
+        child = subprocess.Popen(args+["--",*handoff["closed_argv"]],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        reader_id = None
+        if q.FOLLOWING:
+            # Keep the admission lock through activation; release it for the
+            # complete segment readback once the native caps and PID are visible.
+            for _ in range(100):
+                row = q.state(q.READ_UNIT)
+                if row["ActiveState"] == "active":
+                    q.need(row["MemoryMax"] == str(512<<20) and row["MemorySwapMax"] == "0"
+                           and row["CPUQuotaPerSecUSec"] == "1s" and len(row["InvocationID"]) == 32
+                           and (Path("/proc")/row["MainPID"]/"exe").samefile(native),
+                           "foreign native closed reader")
+                    reader_id = row["InvocationID"]
+                    break
+                if child.poll() is not None:
+                    break
+                time.sleep(.05)
+            q.need(reader_id or child.poll() is not None, "native closed reader did not start")
+    try:
+        out, err = child.communicate(timeout=7250)
+    except subprocess.TimeoutExpired:
+        child.kill()
+        child.communicate()
+        raise
+    q.need(child.returncode == 0, "native comparison failed: "+err.decode(errors="replace")[-1700:])
+    data = json.loads(out)
     e = data["evidence"]
     q.need(data["release"]==i["old_release"] and data["actor"]==i["old_actor"] and
-           [r["slot"] for r in data["checkpoints"]]==[73726716,73746882] and
+           [r["slot"] for r in data["checkpoints"]]==q.PREVIOUS_SLOTS and
            e["comparison"]=="closed" and e["pid1_exit"]["native"]["InvocationID"]==q.ORIG
            and len(e["closed_segment"]["sha256"])==64 and not data["canonical_publication_authorized"],
            "different native close result")
     logs = [json.loads(l) for l in q.cmd("/usr/bin/journalctl","-q","--no-pager","-o","json","--since","@"+str(start),
             "_PID=1","_UID=0","UNIT="+q.READ_UNIT,"MESSAGE_ID=7ad2d189f7e94e70a38c781354912448").splitlines()]
     q.need(len(logs)==1 and len(logs[0]["INVOCATION_ID"])==32,"no unique successful native reader invocation")
+    q.need(not reader_id or reader_id == logs[0]["INVOCATION_ID"], "native reader invocation changed")
+    if q.FOLLOWING:
+        signatures = e["signed_checkpoints"]
+        q.need([q.bound(r)["slot"] for r in signatures] == q.PREVIOUS_SLOTS and e["signed_endpoint"] == signatures[-1],
+               "closed result lacks all four confirmed vote identities")
     comparison = record(dest,data)
     record(q.DEP/"CLOSED_READ_ACCEPTANCE.json",dict(comparison=comparison,reader_fit=fit_ref,
            reader_invocation=logs[0]["INVOCATION_ID"],ended=int(time.time()),publication_authorized=False))
@@ -173,6 +213,16 @@ def retry_writer(interface, ref):
 
 
 def dispatch(stage):
+    if stage == "check-capture":
+        q.need(q.FOLLOWING, "capture check requires its following-window reader")
+    if q.FOLLOWING and stage in ("check-capture", "close"):
+        deployment = Path(__file__).resolve().parent
+        q.need(deployment in {operator.FOLLOWING_READER, operator.FOLLOWING_DEPLOYMENT}
+               and q.DEP == operator.D and q.UNIT == operator.q.UNIT, "unbound following checker")
+        if stage == "check-capture":
+            return following_checker()
+        closed()
+        return q.compare_predecessor()
     i, ir = q.scope()
     q.need(operator.q.UNIT == q.UNIT and operator.D == q.DEP, "operator is outside its sealed deployment")
     deployment = Path(__file__).resolve().parent
@@ -220,7 +270,7 @@ def dispatch(stage):
 
 
 def main():
-    q.need(len(sys.argv)==2 and sys.argv[1] in ("check","close","advance","release"),"select an operational phase")
+    q.need(len(sys.argv)==2 and sys.argv[1] in ("check","check-capture","close","advance","release"),"select an operational phase")
     stage=sys.argv[1]
     fd=os.open(q.DEP/"bounded-operator.lock",os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
     fcntl.flock(fd,fcntl.LOCK_EX)
@@ -232,7 +282,7 @@ def main():
                 return
             except Exception as error:
                 message = str(error)
-                retry = stage in ("advance","release") and any(fragment in message for fragment in
+                retry = (stage in ("advance","release") or (q.FOLLOWING and stage == "close")) and any(fragment in message for fragment in
                     (" fit failed: disk ", "readback capacity (HOME,RAM)", "cadence needs its current accepted fleet",
                      "accepted fleet changed during price", "joint postguard HOME coverage failed"))
                 record(q.DEP/("DISPATCH_REFUSED_"+str(time.time_ns())+".json"),

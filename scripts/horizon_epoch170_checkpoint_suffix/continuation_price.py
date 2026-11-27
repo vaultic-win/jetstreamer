@@ -21,9 +21,52 @@ UNIT = "horizon-qualify-170-from-73746882-20261127-v1.service"
 ALIAS = "/run/horizon-170-from-73746882-v1"
 G, M = 1 << 30, 1 << 20
 READ_UNIT = "horizon-170-73746882-closed-read-20261127-v1.service"
+CHECKER = "bounded-checkpoints"
+PREVIOUS_SLOTS = [73726716, 73746882]
+NEXT_DIRECTORY = RT / "epoch170-from-73766969-20261127-v1"
+FOLLOWING = OPERATOR in (NEXT_DIRECTORY / "operator-v1", NEXT_DIRECTORY / "closed-reader-v1")
+if FOLLOWING:
+    BRIDGE = UNIT
+    ORIG = "c3ab30cfeb05428bb8f5c48a5a44822c"
+    DEP = ATTEMPT = FIRST = NEXT_DIRECTORY
+    UNIT = "horizon-qualify-170-from-73766969-20261127-v1.service"
+    ALIAS = "/run/horizon-170-from-73766969-v1"
+    READ_UNIT = "horizon-170-73766969-closed-read-20261127-v1.service"
+    CHECKER = "following-checkpoints"
+    PREVIOUS_SLOTS = [73746882, 73753554, 73760367, 73766969]
+
+
+def following_scope():
+    bindings, _ = read(OPERATOR / "binding.json")
+    interface, ref = read(DEP / "BOUNDED_SUCCESSOR_WRITER_INTERFACE.json")
+    package = DEP / "package"
+    source, packet_ref = read(package / "source-packet.json", "fd2a07ec1a136a57b7613168ff4e22931e575c6fc97a68d3c1c21921335c0e8a")
+    prior_dir = RT / "epoch170-from-73746882-20261127-v1/attempt-2"
+    release, release_ref = read(prior_dir / "SUCCESSOR_RELEASE.json", "a943145ddc01d4eaff76041eaf131818228e2cb484c32bc7753e84a8dc64bdef")
+    actor, actor_ref = read(prior_dir / "SUCCESSOR_ACTOR.json", "1812cb4ab3972c09ec5f97d6c3a45e2f5e92b25254edff4e683ef7a6305534b0")
+    handoff = bound(interface["handoff"])
+    profile = interface["profile"]
+    native = bound(interface["source_preflight"])
+    need(bindings["interface"] == ref and bindings["source_packet"] == packet_ref
+         and bindings["predecessor_capture"] == read(DEP / "PREDECESSOR_CAPTURE_ACTIVE.json", "1f84466d9ec0697cd1b2e4c367f557ec63370935af882ef5d4d5379fd5082920")[1]
+         and release["actor"] == interface["old_actor"] == actor_ref and interface["old_release"] == release_ref
+         and actor["unit"] == BRIDGE and actor["producer_invocation_id"] == ORIG
+         and handoff["source_packet"] == packet_ref and handoff["original_release"] == release_ref
+         and interface["handoff"] == interface["closed_terminal_handoff"]
+         and interface["closed_comparison"] == str(DEP / "CLOSED_PREDECESSOR_COMPARISON.json")
+         and interface["barrier"] == str(DEP / "barrier/allow")
+         and interface["expected_producer_unit"] == profile["host_unit"] == UNIT
+         and profile["bootstrap"] == interface["bootstrap"] == source["bootstrap_slot"] == 73766969
+         and source["range"] == native["scope"] == [interface["first_new_slot"],interface["last"]] == [73766970,73787145]
+         and profile["positions"] == 20176 and profile["first"] == 73766970 and profile["last"] == 73787145
+         and native["route_accepted"] and not native["worker_executed"]
+         and not interface["admission_or_release"], "unconfirmed fourth hourly route")
+    return interface, ref
 
 
 def scope():
+    if FOLLOWING:
+        return following_scope()
     original_sha = "6e7eed43d0593e9ffe6d5df59cb27f92da518af40c96fb7d09fadb63a5990255"
     expected = "f5da8a618bfb147d98d2db1ec91526d9b711df014189c4e6485503f003e63dcd" if RETRY else original_sha
     interface, ref = read(DEP/"BOUNDED_SUCCESSOR_WRITER_INTERFACE.json", expected)
@@ -43,8 +86,17 @@ def scope():
     return interface, ref
 
 
+def close_interface():
+    if not FOLLOWING:
+        return scope()[0]
+    previous = RT / "epoch170-from-73746882-20261127-v1/attempt-2"
+    _, actor = read(previous / "SUCCESSOR_ACTOR.json", "1812cb4ab3972c09ec5f97d6c3a45e2f5e92b25254edff4e683ef7a6305534b0")
+    _, release = read(previous / "SUCCESSOR_RELEASE.json", "a943145ddc01d4eaff76041eaf131818228e2cb484c32bc7753e84a8dc64bdef")
+    return {"old_actor":actor, "old_release":release, "closed_comparison":str(DEP / "CLOSED_PREDECESSOR_COMPARISON.json")}
+
+
 def predecessor_exit():
-    interface, _ = scope()
+    interface = close_interface()
     release = bound(interface["old_release"])
     actor = bound(interface["old_actor"])
     terminal, ref = read(FIRST/"predecessor-exit/PID1_EXIT.json")
@@ -61,14 +113,14 @@ def predecessor_exit():
 
 
 def compare_predecessor():
-    interface, _ = scope()
+    interface = close_interface()
     predecessor_exit()
     doc, ref = read(interface["closed_comparison"])
     e = doc["evidence"]
     need(doc["actor"] == interface["old_actor"] and doc["release"] == interface["old_release"]
          and e["comparison"] == "closed" and e["pid1_exit"]["native"]["InvocationID"] == ORIG
          and e["pid1_exit"]["native"]["Result"] == "success"
-         and [p["slot"] for p in doc["checkpoints"]] == [73726716,73746882]
+         and [p["slot"] for p in doc["checkpoints"]] == PREVIOUS_SLOTS
          and len(e["closed_segment"]["sha256"]) == 64 and not doc["canonical_publication_authorized"],
          "different closed archive")
     return ref
@@ -212,7 +264,7 @@ def price(phase):
     tail_resident = anonymous(tail["actor"]["unit"], tail["actor"]["producer_invocation_id"],
                               [p[:2] for p in tail["processes"]], 42*G)
     low, high = joint["terminal_tree_bounds"]
-    old_plan = bound(bound(scope()[0]["old_release"])["guard_plan"])
+    old_plan = bound(bound(close_interface()["old_release"])["guard_plan"])
     need(0 < low <= high <= old_plan["maximum_root_physical_bytes"] <= 384*G,
          "original subtree exceeds admitted cap")
     if hourly is not None: need(bound(hourly)["producer_stop_enabled"],"unprotected hourly producer")
@@ -250,12 +302,19 @@ def price(phase):
 
     # Historical standalone read deployments predate the assembly reservation.
     overlay_path = Path(__file__).with_name("assembly_reservation.py")
-    if phase == "read" or (not RETRY and not overlay_path.exists()):
+    if not FOLLOWING and (phase == "read" or (not RETRY and not overlay_path.exists())):
         return result
     overlay_spec = importlib.util.spec_from_file_location("assembly_reservation", overlay_path)
     overlay = importlib.util.module_from_spec(overlay_spec)
     overlay_spec.loader.exec_module(overlay)
     assembly = overlay.reservation()
+    if FOLLOWING:
+        module = Path(__file__).with_name("following_capacity.py")
+        spec = importlib.util.spec_from_file_location("following_capacity", module)
+        capacity = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(capacity)
+        scope_for_price = None if phase == "read" else scope()[0]
+        return capacity.charge(prior, result, assembly, scope_for_price)
     if OPERATOR == FIRST/"attempt-2/operator-v3":
         return overlay.apply_170(result, assembly, use_phase=True)
     return overlay.apply_170(result, assembly)
