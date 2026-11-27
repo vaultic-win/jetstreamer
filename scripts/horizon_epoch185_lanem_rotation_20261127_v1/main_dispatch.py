@@ -129,10 +129,22 @@ def fit():
     # This exact five-owner price must be rebound by the controller when the profile changes.
     latest=sorted(ROOT.glob("epoch141-foundation-*-bootstrap-20261127-v1/ANZA_SERIAL_HANDBACK.json"),key=lambda f:f.stat().st_mtime_ns)
     assert latest and latest[-1].parent==SIX,"update the serial/auxiliary roster for newer input custody"
-    current=q["home"]; floor=max(q["required_home"],q["max_guard_floor"])+sixth["local_occupied_bytes"]+(128<<20)+(32<<20)
-    home=min(q["home_margin"],current-floor)
-    ram=q["ram_margin"]-(2<<30)-(256<<20)-(512<<20)
-    return dict(recorded=time.time(),fleet=q["fleet"],source_price=ref(PRICE_PROGRAM),complete_price=q,serial_handback=ref(SIX/"ANZA_SERIAL_HANDBACK.json"),sixth_local_allocated=sixth["local_occupied_bytes"],home_margin=home,ram_margin=ram,floor_bytes=floor,single_copy_peak=LENGTH+RESTORE_META,two_copy_peak=2*LENGTH+RESTORE_META,serial_restore_reservation=SLOT,new_selected_source_credit=0)
+    sixth_admission=read(next(SIX.glob("PARK_ADMISSION_*.json")))
+    fifth=read(ROOT/"epoch141-foundation-fifth-bootstrap-20261127-v1/PARK_ADMISSION.json")
+    assert sixth_admission["prior_fifth_copy_bytes"]==fifth["retained_disk_source"]
+    assert sixth_admission["control_ram_bytes"]==fifth["parallel_controls_ram"]==2<<30
+    # The raw filesystem sample already includes occupied files. Debit new copies against
+    # the earlier complete-fleet projection only, and retain the stricter physical bound.
+    inherited=(q["inherited_complete_margin"]-sixth_admission["prior_fifth_copy_bytes"]
+               -sixth["local_occupied_bytes"]-sixth_admission["review_home_bytes"]
+               -sixth_admission["protected_extra_receipts"]-(128<<20))
+    home=min(inherited,q["live_all_guards_margin"])
+    floor=max(q["max_guard_floor"],q["home"]-home)
+    assert q["parent_compiler_ram"]==512<<20
+    # The five-owner price includes its compiler allowance already. The completed
+    # 185 read-only checker and sixth native upload have both returned their RAM.
+    ram=q["ram_margin"]-sixth_admission["control_ram_bytes"]
+    return dict(recorded=time.time(),fleet=q["fleet"],source_price=ref(PRICE_PROGRAM),complete_price=q,serial_handback=ref(SIX/"ANZA_SERIAL_HANDBACK.json"),sixth_local_allocated=sixth["local_occupied_bytes"],fifth_local_occupied=sixth_admission["prior_fifth_copy_bytes"],inherited_margin_after_charges=inherited,parallel_controls_ram=sixth_admission["control_ram_bytes"],home_margin=home,ram_margin=ram,floor_bytes=floor,single_copy_peak=LENGTH+RESTORE_META,two_copy_peak=2*LENGTH+RESTORE_META,serial_restore_reservation=SLOT,new_selected_source_credit=0)
 
 
 def review():
