@@ -25,7 +25,7 @@ sha() { sha256sum "$1" | cut -d ' ' -f1; }
 test "$(id -u)" = 0
 test "$(sha "$fleet")" = "$fsha"
 test "$(sha "$booking")" = "$bsha"
-test "$(stat -c %u:%g:%a:%h "$booking")" = 0:0:444:1
+[[ $(stat -c %u:%g:%a:%h "$booking") =~ ^0:0:4(00|44):1$ ]]
 jq -e --arg f "$fleet" --arg s "$fsha" --arg unit "$u" '
   .schema=="horizon-epoch140-private-recording-booking-v1" and .fleet=={path:$f,sha256:$s}
   and .unit==$unit and .cpu_quota_micros==3000000
