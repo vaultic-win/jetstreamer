@@ -16,7 +16,7 @@ HOME = Path("/home/sol")
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT = RT / "epoch167-checkpoint-bounded-20261127-v1"
 PACKAGE = ROOT / "package"
-CAPACITY_DEPLOYMENT = RT / "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v20-joint168-v31-replace167-reserve"
+CAPACITY_DEPLOYMENT = RT / "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v20-joint168-v31-replace167-reserve-v2"
 LANE = HOME / ".jetstreamer-private/epoch167-standard-lane-20261109-v1"
 RUN = LANE / "checkpoint-inputs-20261127-v1/bounded-72509256-72515090-v1"
 OUTPUT = RUN / "output"
@@ -764,7 +764,10 @@ def capture(request_ref, *, intent_ref=None, actor=None, first_guard_ref=None):
         args += ["--bounded167-first-guard", first_guard_ref["path"], first_guard_ref["sha256"]]
     args += ["145", fleet_ref["path"], fleet_ref["sha256"]]
     before = snapshot_stamp()
-    raw = command(args, timeout=100)
+    try:
+        raw = command(args, timeout=100)
+    except subprocess.CalledProcessError as error:
+        raise ValueError(f"capacity provider refused: {error.stderr.decode(errors='replace')[-2000:]}") from error
     after = snapshot_stamp()
     quote = json.loads(raw)
     need(fleet_authority(fleet_ref, request["writer"]) == (fleet, active) and read(request_ref) == request,
@@ -798,13 +801,19 @@ def prestart(prepared_ref, seal_ref, request_ref):
     for item in payload["files"]:
         need(file_identity(item["source"]["path"], executable=item["executable"]) == item["source"]["identity"],
              f"prepared input changed: {item['target']}")
+    request = read(request_ref)
+    operator = request["operator_deployment"]
+    controller = present_member(operator, "replay167.py", executable=True)
+    callback = present_member(request["capacity_deployment"], "bounded167-admission.py", executable=True)
+    need(Path(controller["path"]) == ROOT/"operator-terminal-v3/replay167.py" == Path(__file__).resolve()
+         and controller["sha256"] == callback["sha256"], "operator and provider disagree on the held census")
     price = capture(request_ref)
     cap = price["bounded_cap"]
     floor, _, required = physical_budget(price, cap, price["booking"]["physical_bytes"], price["available_home"])
     need(MEMORY <= 68 * GIB and GUARD_MEMORY == GIB and CPU <= 9_000_000,
          "candidate cap exceeds its stopped booking")
     return dict(schema="horizon-epoch167-bounded-start-intent-v1", epoch=167, terminal=TERMINAL,
-                prepared=prepared_ref, deployment=seal_ref, payload=payload_ref, request=request_ref,
+                prepared=prepared_ref, deployment=seal_ref, operator_deployment=operator, payload=payload_ref, request=request_ref,
                 prestart=price, producer_unit=UNIT, armed_floor=floor, bounded_cap_bytes=cap, required_home=required, append_log=append,
                 producer_memory_bytes=MEMORY, guard_memory_bytes=GUARD_MEMORY, resource_credit_bytes=0,
                 additional_cpu_quota_micros=0, additional_booked_memory_bytes=0,
