@@ -47,8 +47,14 @@ pub(super) fn quote() -> Result<FullReplayQuote> {
     let guard_plan = binding(&handoff["guard_plan"])?;
     let guard = guard_plan.sealed()?;
     let validation = binding(&handoff["guard_validation"])?.sealed()?;
-    let restore = binding(&source["restore"])?.sealed()?;
-    let restored = binding(&restore["native_result"])?.sealed()?;
+    // These durable invocation receipts are root-writable. Read them through
+    // their digest bindings, which also check ownership and file identity.
+    let restore_ref = binding(&source["restore"])?;
+    trusted_parents(&restore_ref.path)?;
+    let restore = restore_ref.json()?;
+    let restored_ref = binding(&restore["native_result"])?;
+    trusted_parents(&restored_ref.path)?;
+    let restored = restored_ref.json()?;
     let capacity = &handoff["capacity_model"];
     ensure!(
         handoff["schema"] == "foundation-epoch256-full-static-handoff-v1"
