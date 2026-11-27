@@ -2,31 +2,15 @@
 use crate::{
     BankHashExpectation, QualificationPlan, compatibility, require_existing_private_directory,
 };
-use std::{collections::BTreeMap, ops::Range, path::Path};
+use std::{collections::BTreeMap, path::Path};
 
-pub(crate) const BOOTSTRAP: u64 = 99_461_591;
-const TERMINAL: u64 = 99_468_089;
+use compatibility::{
+    EPOCH230_V1627_BOOTSTRAP as BOOTSTRAP, EPOCH230_V1627_TERMINAL as TERMINAL,
+    is_epoch230_v1627_range,
+};
 const BOOTSTRAP_HASH: &str = "9Hgyrxkc5h5mkAwPL7rUGASHZFMByNzE1TYmCPb4z4e7";
 const TERMINAL_HASH: &str = "5kWV3NT4f15DCB3XkmiYSLu9a1H88XK4GYGEV54nimcQ";
 const OUTPUT: &str = "epoch-230-v1-6-27-diagnostic.jet";
-
-pub(crate) fn selected(range: &Range<u64>) -> bool {
-    *range == (BOOTSTRAP + 1..TERMINAL + 1)
-}
-
-pub(crate) fn selection(allow_candidate: bool) -> Result<compatibility::RuntimeSelection, String> {
-    if !allow_candidate {
-        return Err(
-            "the private epoch 230 v1.6.27 diagnostic requires candidate runtime opt-in".into(),
-        );
-    }
-    let descriptor = &compatibility::SOLANA_V1_6_27_RUNTIME;
-    Ok(compatibility::RuntimeSelection {
-        backend: descriptor.backend,
-        descriptor,
-        admission: compatibility::AdmissionLevel::Candidate,
-    })
-}
 
 // Restrict the standalone build before it can dispatch an unrelated helper.
 pub(crate) fn validate_entrypoint(args: &[String]) -> Result<(), String> {
@@ -73,7 +57,9 @@ pub(crate) fn validate_launch(
     scratch: Option<&Path>,
 ) -> Result<(), String> {
     if !qualification.is_some_and(|p| {
-        p.epoch == 230 && p.bootstrap_slot == BOOTSTRAP && selected(&p.output_runtime_range())
+        p.epoch == 230
+            && p.bootstrap_slot == BOOTSTRAP
+            && is_epoch230_v1627_range(&p.output_runtime_range())
     }) {
         return Err(
             "the epoch 230 v1.6.27 diagnostic requires its exact bootstrap and replay span".into(),
@@ -120,11 +106,28 @@ mod tests {
 
     #[test]
     fn selects_only_the_exact_private_range() {
-        assert!(selected(&(BOOTSTRAP + 1..TERMINAL + 1)));
-        assert!(!selected(&(BOOTSTRAP..TERMINAL + 1)));
-        assert!(!selected(&(BOOTSTRAP + 1..TERMINAL)));
-        assert!(!selected(&(BOOTSTRAP + 1..TERMINAL + 2)));
-        assert!(selection(false).is_err());
+        let span = BOOTSTRAP + 1..TERMINAL + 1;
+        let selected =
+            compatibility::select_focused_qualification_runtime(span.clone(), true).unwrap();
+        assert_eq!(selected.descriptor.identity.name, "solana-v1.6.27");
+        let ordinary = compatibility::select_runtime(span.clone(), true).unwrap();
+        assert_ne!(ordinary.descriptor.identity.name, "solana-v1.6.27");
+        for other in [
+            BOOTSTRAP..TERMINAL + 1,
+            BOOTSTRAP + 1..TERMINAL,
+            BOOTSTRAP + 1..TERMINAL + 2,
+        ] {
+            let selected =
+                compatibility::select_focused_qualification_runtime(other, true).unwrap();
+            assert_ne!(selected.descriptor.identity.name, "solana-v1.6.27");
+        }
+        assert!(compatibility::select_focused_qualification_runtime(span.clone(), false).is_err());
+        assert!(
+            compatibility::select_focused_qualification_runtime_with_snapshot_warmup(
+                BOOTSTRAP, span, true
+            )
+            .is_err()
+        );
     }
 
     #[test]

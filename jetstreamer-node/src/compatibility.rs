@@ -1316,6 +1316,10 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
 };
 
 #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+pub(crate) const EPOCH230_V1627_BOOTSTRAP: Slot = 99_461_591;
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+pub(crate) const EPOCH230_V1627_TERMINAL: Slot = 99_468_089;
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
 pub static SOLANA_V1_6_27_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
     backend: RuntimeBackend::SolanaV1_6_20,
     identity: RuntimeIdentity {
@@ -1332,6 +1336,20 @@ pub static SOLANA_V1_6_27_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
         default_manifest_relative_path: "../historical-runtime/v1_6_27/target/release/jetstreamer-historical-worker-v1-6-27",
     }),
 };
+
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+static EPOCH230_V1627_ERA: RuntimeEra = RuntimeEra {
+    name: "solana-v1.6.27-epoch230-vote-diagnostic",
+    start_slot: EPOCH230_V1627_BOOTSTRAP + 1,
+    end_slot_exclusive: Some(EPOCH230_V1627_TERMINAL + 1),
+    backend: EraBackend::Available(&SOLANA_V1_6_27_RUNTIME),
+    admission: AdmissionLevel::Candidate,
+};
+
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+pub(crate) fn is_epoch230_v1627_range(range: &Range<Slot>) -> bool {
+    *range == (EPOCH230_V1627_BOOTSTRAP + 1..EPOCH230_V1627_TERMINAL + 1)
+}
 
 pub static SOLANA_V1_7_13_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
     backend: RuntimeBackend::SolanaV1_7_13,
@@ -2427,6 +2445,18 @@ pub fn plan_focused_qualification_runtime_spans(
     )
 }
 
+fn runtime_at_for_plan(
+    slot: Slot,
+    scope: RuntimePlanningScope,
+    _range: &Range<Slot>,
+) -> Result<&'static RuntimeEra, String> {
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    if matches!(scope, RuntimePlanningScope::FocusedQualification) && is_epoch230_v1627_range(_range) {
+        return Ok(&EPOCH230_V1627_ERA);
+    }
+    runtime_at_for_scope(slot, scope)
+}
+
 fn plan_runtime_spans_for_scope(
     range: Range<Slot>,
     allow_candidate_runtime: bool,
@@ -2443,7 +2473,7 @@ fn plan_runtime_spans_for_scope(
     let mut cursor = range.start;
     let mut spans = Vec::new();
     while cursor < range.end {
-        let execution = runtime_at_for_scope(cursor, scope)?;
+        let execution = runtime_at_for_plan(cursor, scope, &range)?;
         if execution.backend == EraBackend::Unsupported {
             return Err(format!(
                 "slot {} falls in unsupported runtime era {} ({}); refusing to guess consensus semantics",
@@ -2542,7 +2572,7 @@ fn plan_replay_for_scope(
     let mut cursor = range.start;
     let mut segments = Vec::new();
     while cursor < range.end {
-        let execution = runtime_at_for_scope(cursor, scope)?;
+        let execution = runtime_at_for_plan(cursor, scope, &range)?;
         if execution.backend == EraBackend::Unsupported {
             return Err(format!(
                 "slot {} falls in unsupported runtime era {} ({}); refusing to guess consensus semantics",
@@ -2684,6 +2714,10 @@ fn select_runtime_with_snapshot_warmup_for_scope(
     let output = select_runtime_for_scope(output_range.clone(), allow_candidate_runtime, scope)?;
     if replay_start == output_range.start {
         return Ok(output);
+    }
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    if std::ptr::eq(output.descriptor, &SOLANA_V1_6_27_RUNTIME) {
+        return Err("the epoch 230 v1.6.27 diagnostic requires the exact replay start".into());
     }
 
     if DESTINATION_SNAPSHOT_WARMUPS.iter().any(|warmup| {

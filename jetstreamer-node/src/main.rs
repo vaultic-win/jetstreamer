@@ -5855,10 +5855,6 @@ fn select_runtime_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
-    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
-    if focused_qualification && epoch230_v1627::selected(&range) {
-        return epoch230_v1627::selection(allow_candidate_runtime);
-    }
     #[cfg(feature = "epoch228-called-program-demotion-qualification")]
     if focused_qualification && epoch228_demotion::selected(&range) {
         return epoch228_demotion::select(range, focused_qualification, allow_candidate_runtime);
@@ -5883,13 +5879,6 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
-    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
-    if focused_qualification && epoch230_v1627::selected(&output_range) {
-        if replay_start != epoch230_v1627::BOOTSTRAP + 1 {
-            return Err("the epoch 230 v1.6.27 diagnostic requires the exact replay start".into());
-        }
-        return epoch230_v1627::selection(allow_candidate_runtime);
-    }
     #[cfg(feature = "epoch228-called-program-demotion-qualification")]
     if focused_qualification && epoch228_demotion::selected(&output_range) {
         if replay_start != epoch228_demotion::BOOTSTRAP + 1 {
@@ -5936,10 +5925,6 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
 fn runtime_span_selection(
     span: &compatibility::RuntimeSpan,
 ) -> Result<compatibility::RuntimeSelection, String> {
-    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
-    if epoch230_v1627::selected(&span.slots) {
-        return epoch230_v1627::selection(true);
-    }
     #[cfg(feature = "epoch228-called-program-demotion-qualification")]
     if epoch228_demotion::selected(&span.slots) {
         return epoch228_demotion::select(span.slots.clone(), true, true);
@@ -21400,6 +21385,17 @@ async fn main() {
             exit(2);
         }
     }
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    {
+        let checkpoints = epoch_hashes.as_deref().expect("v1.6.27 requires explicit checkpoints");
+        if let Err(error) =
+            read_epoch_hashes_file(checkpoints, compatibility::SOLANA_V1_6_27_RUNTIME.bootstrap)
+                .and_then(|expected| epoch230_v1627::validate_expectations(&expected))
+        {
+            eprintln!("error: {error}");
+            exit(2);
+        }
+    }
     if let Some(plan) = qualification {
         info!(
             "focused qualification requested: epoch {}, bootstrap {}, replay {}..={}, output {}",
@@ -21889,17 +21885,17 @@ async fn main() {
                         );
                         exit(1);
                     }
+                    let identity = selection.descriptor.identity;
                     info!(
                         "epoch {epoch}: selected execution profile {} ({:?}) from slots {}..{}",
-                        selection.backend, selection.admission, span.slots.start, span.slots.end
+                        identity.name, selection.admission, span.slots.start, span.slots.end
                     );
-                    if let Some(artifact) = selection.backend.historical_artifact() {
+                    if let Some(target) = identity.target
+                        && selection.descriptor.worker.is_some()
+                    {
                         info!(
                             "epoch {epoch}: historical artifact revision={} rust={} target={} genesis={}",
-                            artifact.upstream_revision,
-                            artifact.rust_toolchain,
-                            artifact.target,
-                            artifact.genesis_hash,
+                            identity.revision, identity.rust_toolchain, target, identity.genesis_hash,
                         );
                     }
                 }
