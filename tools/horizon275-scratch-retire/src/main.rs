@@ -1,4 +1,5 @@
 //! Retire individually qualified files and AccountsDb trees from stopped workers.
+mod accounts229_bundle;
 mod appendvec229;
 mod appendvec288;
 mod appendvec292;
@@ -384,6 +385,25 @@ fn retire_bootstrap(
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
+    if matches!(
+        args.get(1).map(String::as_str),
+        Some("--check-held-accounts-229" | "--retire-held-accounts-229")
+    ) {
+        ensure!(
+            unsafe { libc::geteuid() } == 0 && args.len() == 5,
+            "usage: horizon275-scratch-retire --check-held-accounts-229|--retire-held-accounts-229 SELF_SHA256 RECHECK RECHECK_SHA256"
+        );
+        let mut binary = File::open("/proc/self/exe")?;
+        let metadata = binary.metadata()?;
+        ensure!(
+            metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut binary)? == args[2],
+            "unsealed retirement image"
+        );
+        return accounts229_bundle::run(
+            args[1] == "--retire-held-accounts-229",
+            Binding { path: args[3].clone().into(), sha256: args[4].clone() },
+        );
+    }
     if matches!(
         args.get(1).map(String::as_str),
         Some("--check-bootstrap-296" | "--retire-bootstrap-296")
