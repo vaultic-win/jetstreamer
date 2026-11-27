@@ -31,6 +31,8 @@ Preserve the original journal fields, including `MESSAGE`, `_TRANSPORT`, `_SYSTE
 
 ## Retry4 selection evidence
 
+Run `horizon-168-joint-compare --select-retry4-prefix` on the pinned, closed retry4 source. The selection uses a seekable view of the compressed whole buckets, with a rewritten first bucket, a partial final bucket, and a rebuilt header and index. It hashes the full retained source and the exact selected bytes, compares both rewritten boundaries against independently decoded source events, and decodes the entire selected archive. The command prints one JSON evidence record and writes zero physical archive bytes.
+
 The selection evidence schema is `horizon-epoch168-private-selected-prefix-evidence-v1`. Record `source_archive_sha256`, `selected_archive_sha256`, `selected_semantic_sha256`, `first_slot`, `last_slot`, `terminal_blockhash`, `raw_start`, `raw_end_exclusive`, and `independently_decoded` from the verified selection ending at slot 72,994,766. The raw range comes from the selected output's account events. The comparator's predecessor range must end at the same exclusive raw cursor in the retained source.
 
 The resulting `translated_v4_predecessor` keeps the eight matched consensus fields from the joint checkpoint at slot 72,994,766, adds the legacy accounts-hash kind, and uses the verified retry4 selection's exclusive write cursor. The resulting receipt includes the independent joint and retry6 checkpoint records with their original raw cursors and write counts.

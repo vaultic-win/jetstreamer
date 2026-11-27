@@ -2,8 +2,9 @@
 use super::*;
 mod allocation;
 mod delivery252;
-mod replay260;
 mod focused;
+mod replay258;
+mod replay260;
 use focused::{FEATURE_296, GAP_230, LOADER_296, RESTORE_258, RESTORE_260, SCOPES, TRACE_296};
 mod suffix226;
 mod vote_boundary;
@@ -34,7 +35,7 @@ const KNOWN_GUARDS: [(u64, &str); 9] = [
     (226, "horizon-guard-226-checkpoint-continuation-extract-v3"),
     (230, "horizon-230-middle-protective-v1"),
     (252, "horizon-252-regional-singleton-protective-v1"),
-    (258, RESTORE_258.guard),
+    (258, replay258::GUARD),
     (260, replay260::GUARD),
     (261, "horizon-261-singleton-protective-v1"),
     (262, "horizon-262-singleton-protective-v1"),
@@ -100,7 +101,8 @@ const CLAIM_261: (&str, &str) = (
 );
 const UPLOAD_261_MEMORY: u64 = 64 << 30;
 const UPLOAD_261_DISK: u64 = 1 << 30;
-const REGISTERED_REPLAYS: [ReplayRegistration; 3] = [
+const REGISTERED_REPLAYS: [ReplayRegistration; 4] = [
+    replay258::REGISTRATION,
     replay260::REGISTRATION,
     ReplayRegistration {
         epoch: 262,
@@ -335,7 +337,7 @@ fn live_replay(n: &mut Native, spec: &ReplayRegistration) -> Result<LiveReplay> 
         node_key,
         receipt_disk,
     } = *spec;
-    let reference = if epoch == replay260::EPOCH {
+    let reference = if receipt.1.is_empty() {
         let path = Path::new(receipt.0);
         trusted_parents(path)?;
         Bound::new(path, hash(path)?)
@@ -348,11 +350,25 @@ fn live_replay(n: &mut Native, spec: &ReplayRegistration) -> Result<LiveReplay> 
     let handoff = binding(&registered["handoff"])?.sealed()?;
     let admitted_fit = binding(&admission["roster"])?.sealed()?;
     let inputs_ref = binding(&profile["inputs"])?;
-    if epoch == replay260::EPOCH {
-        replay260::check_live_binding(&registered, &admission, &admitted_fit, &inputs_ref)?;
+    match epoch {
+        replay258::EPOCH => replay258::check_live_binding(
+            &registered,
+            &profile,
+            &admission,
+            &admitted_fit,
+            &inputs_ref,
+        )?,
+        replay260::EPOCH => {
+            replay260::check_live_binding(&registered, &admission, &admitted_fit, &inputs_ref)?
+        }
+        _ => {}
     }
     let inputs = inputs_ref.sealed()?;
-    let node = binding(&inputs[node_key])?;
+    let node = binding(if epoch == replay258::EPOCH {
+        &inputs["inputs"][node_key]
+    } else {
+        &inputs[node_key]
+    })?;
     node.artifact()?;
     let owner = n.show_fields(unit, OWNER_FIELDS)?;
     let invocation = text(&registered, "invocation_id")?;
@@ -738,6 +754,29 @@ mod roster_tests {
     use super::*;
 
     #[test]
+    fn epoch258_cpu_selection_respects_booked_replay_and_delivery_owners() {
+        let cpus = units::parse_cpu_list(replay258::CPUS).unwrap();
+        assert_eq!(cpus.len(), 8);
+        let live260 = json!({"AllowedCPUs": "56-63"});
+        assert!(require_disjoint_cpus(258, &cpus, replay260::UNIT, &live260).is_ok());
+        let stale_template = units::parse_cpu_list("56-63").unwrap();
+        let overlap = require_disjoint_cpus(258, &stale_template, replay260::UNIT, &live260)
+            .unwrap_err()
+            .to_string();
+        assert!(overlap.contains(replay260::UNIT));
+        assert!(
+            require_disjoint_cpus(
+                258,
+                &cpus,
+                "another-owner",
+                &json!({"AllowedCPUs": "47-48"})
+            )
+            .is_err()
+        );
+        assert!(require_disjoint_cpus(258, &cpus, "unknown-owner", &json!({})).is_err());
+    }
+
+    #[test]
     fn funded_replay_can_leave_the_observer_only_after_validated_terminal() {
         let mut owners = serde_json::Map::new();
         let mut rows = Vec::new();
@@ -841,6 +880,19 @@ mod roster_tests {
             fleet_roster(&handoff, &booking, &all_released, &deliveries, &live_suffix).is_err()
         );
     }
+}
+
+fn require_disjoint_cpus(
+    epoch: u64,
+    selected: &BTreeSet<u64>,
+    unit: &str,
+    owner: &Value,
+) -> Result<()> {
+    ensure!(
+        selected.is_disjoint(&units::parse_cpu_list(text(owner, "AllowedCPUs")?)?),
+        "epoch {epoch} CPUs overlap {unit}"
+    );
+    Ok(())
 }
 
 fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
@@ -1321,6 +1373,7 @@ fn measure(
     let selected = units::parse_cpu_list(match epoch {
         226 => "16-23",
         230 => GAP_230.cpus,
+        258 if matches!(&quote, Some(Quote::FullReplay(_))) => replay258::CPUS,
         258 => RESTORE_258.cpus,
         260 => RESTORE_260.cpus,
         252 | 261 => "24-31",
@@ -1351,28 +1404,18 @@ fn measure(
             live::same_owner(prior, &owner)?;
         }
         let cap = text(&owner, "MemoryMax")?.parse()?;
-        ensure!(
-            selected.is_disjoint(&units::parse_cpu_list(text(&owner, "AllowedCPUs")?)?),
-            "epoch {epoch} CPUs overlap {unit}"
-        );
+        require_disjoint_cpus(epoch, &selected, unit, &owner)?;
         let memory = live::finite_owner(&owner, unit, text(&owner, "InvocationID")?, cap)?;
         let process_start_ticks = process_ticks(text(&owner, "MainPID")?.parse()?)?;
         recorded.insert(unit.clone(), (owner, memory, process_start_ticks));
     }
     for (_, owner, memory, ticks) in active_deliveries.values() {
         let unit = text(owner, "Id")?;
-        ensure!(
-            selected.is_disjoint(&units::parse_cpu_list(text(owner, "AllowedCPUs")?)?),
-            "epoch {epoch} CPUs overlap delivery {unit}"
-        );
+        require_disjoint_cpus(epoch, &selected, unit, owner)?;
         recorded.insert(unit.to_owned(), (owner.clone(), *memory, *ticks));
     }
     for replay in live_replays.values() {
-        ensure!(
-            selected.is_disjoint(&units::parse_cpu_list(text(&replay.owner, "AllowedCPUs")?)?),
-            "epoch {epoch} CPUs overlap {}",
-            replay.unit
-        );
+        require_disjoint_cpus(epoch, &selected, replay.unit, &replay.owner)?;
         recorded.insert(
             replay.unit.to_owned(),
             (replay.owner.clone(), replay.memory, replay.ticks),
@@ -1644,6 +1687,7 @@ fn measure(
         226 => "foundation-epoch226-suffix-roster-binding-v1",
         230 => "foundation-epoch230-short-gap-roster-binding-v1",
         252 => "foundation-epoch252-delivery-roster-binding-v1",
+        258 if matches!(&quote, Some(Quote::FullReplay(_))) => replay258::ROSTER_SCHEMA,
         258 => "foundation-epoch258-native-restore-roster-binding-v1",
         260 if matches!(&quote, Some(Quote::FullReplay(_))) => replay260::ROSTER_SCHEMA,
         260 => "foundation-epoch260-native-restore-roster-binding-v1",
@@ -1660,7 +1704,8 @@ fn measure(
         "closed_extraction_226":extraction_drain,
         "active_suffix_226_registration":live_replays.get(&226).map(|replay| &replay.reference),
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
-        "active_restore_258_registration":live_replays.get(&258).map(|replay| &replay.reference),
+        "active_restore_258_registration":live_replays.get(&258).filter(|r| r.unit == RESTORE_258.unit).map(|r| &r.reference),
+        "active_replay_258_registration":live_replays.get(&258).filter(|r| r.unit == replay258::UNIT).map(|r| &r.reference),
         "active_restore_260_registration":live_replays.get(&260).filter(|r| r.unit == RESTORE_260.unit).map(|r| &r.reference),
         "active_replay_260_registration":live_replays.get(&260).filter(|r| r.unit == replay260::UNIT).map(|r| &r.reference),
         "closed_delivery_257":closed_257,
@@ -1799,6 +1844,7 @@ pub fn run() -> Result<()> {
                 flag.to_str(),
                 Some(
                     "--full-replay-quote"
+                        | "--full258-quote"
                         | "--full260-quote"
                         | "--delivery252-quote"
                         | "--delivery261-quote"
@@ -1822,7 +1868,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
+            "use --as-controller UNIT, --full-replay-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
         ),
     };
     let synchronize = match args.next() {
@@ -1863,6 +1909,8 @@ pub fn run() -> Result<()> {
             });
     let result = match command.as_deref() {
         Some(flag) if flag == "--full-replay-quote" => full_replay_quote()
+            .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),
+        Some(flag) if flag == "--full258-quote" => replay258::quote()
             .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),
         Some(flag) if flag == "--full260-quote" => replay260::quote()
             .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),

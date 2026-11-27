@@ -12,6 +12,7 @@ use lencode::prelude::*;
 use xxhash_rust::xxh64::xxh64;
 
 mod joint_compare;
+mod selected_prefix;
 
 const FIRST: u64 = 72_576_000;
 const END: u64 = 72_998_912;
@@ -170,9 +171,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let argv: Vec<_> = std::env::args().skip(1).collect();
     match argv.as_slice() {
         [selector, sha256] if selector == "--compare-joint" => joint_compare::run(sha256),
+        [selector] if selector == "--select-retry4-prefix" => selected_prefix::run(),
         _ => Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "expected --compare-joint JOINT_ARCHIVE_SHA256",
+            "expected --compare-joint JOINT_ARCHIVE_SHA256 or --select-retry4-prefix",
         )
         .into()),
     }
