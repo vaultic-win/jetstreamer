@@ -117,6 +117,10 @@ fi
 
 exec 9<>/run/horizon-epoch171-to136-g1.operation.lock
 flock -n -x 9
+if [[ $(systemctl show "$u" -p LoadState --value) != not-found ]]; then
+    printf 'Epoch 140 recorder unit still has a loaded definition; clear the verified terminal before booking\n' >&2
+    exit 1
+fi
 test ! -e "$run"
 test ! -e "$a/barrier"
 test ! -e "$a/plan"
