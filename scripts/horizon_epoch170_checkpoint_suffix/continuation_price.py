@@ -154,11 +154,14 @@ def price(phase):
     # A successor gets its new 36 GiB only after native close and whole-file readback.
     growth = old_plan["maximum_root_physical_bytes"] - low if phase=="read" else 36*G
     floor = max(joint["required_home"] - 36*G - (44*G+64*M), highest) + hourly_growth + 64*M
+    # The retired compiler leaves one serial 0.5-core/512-MiB control slot.
+    # It can overlap the old-slot reader or the new producer only when freshly paid.
+    floor += 128*M
     required = floor+growth
-    ram_required = joint["required_ram"] - hourly_resident - tail_resident
+    ram_required = joint["required_ram"] - hourly_resident - tail_resident + 512*M
     after = prior.availability()
     home, ram = min(before[0],after[0]), min(before[1],after[1],joint["available_ram"])
-    historical = joint["available_home"] - (joint["required_home"] - 36*G + growth)
+    historical = joint["available_home"] - (joint["required_home"] - 36*G + growth + 128*M)
     margin = min(historical,home-required)
     fits = margin >= 0 and ram >= ram_required and (phase=="read" or high+growth <= 384*G)
     return dict(phase=phase,fleet=joint["fleet"],joint=joint,observed=int(time.time()),fits=fits,
@@ -167,4 +170,5 @@ def price(phase):
                 guard_cap=min(384*G,high+growth),available_home=home,available_ram=ram,required_home=required,
                 required_ram=ram_required,home_margin=margin,ram_margin=ram-ram_required,
                 historical_home_margin=historical,guarded_remaining_141=hourly_growth,
+                dispatch_cpu_micros=500000,dispatch_memory_bytes=512*M,dispatch_home_bytes=128*M,
                 resource_credit_bytes=0,archive_publication_authorized=False)
