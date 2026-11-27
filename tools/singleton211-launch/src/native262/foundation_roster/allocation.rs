@@ -18,6 +18,8 @@ struct OpenHow {
 // Charge small files at their full growth obligation. They contribute little disk credit
 // and would otherwise dominate the controller's file and extent accounting.
 const MIN_MEASURED_FILE_BYTES: u64 = 16 << 10;
+const EXTRACT_226_ROOT: &str =
+    "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-226-extract-v3";
 
 fn open_beneath(parent: &File, relative: &Path, flags: libc::c_int) -> std::io::Result<File> {
     let path = CString::new(relative.as_os_str().as_encoded_bytes())?;
@@ -84,13 +86,19 @@ impl FileStamp {
     }
 }
 
-fn growing_archive(directory: &Path, name: &OsStr) -> bool {
-    directory.file_name() == Some(OsStr::new("archives"))
-        && name
-            .to_str()
-            .and_then(|name| name.strip_prefix("epoch-"))
-            .and_then(|name| name.strip_suffix(".jet"))
-            .is_some_and(|epoch| epoch.parse::<u64>().is_ok())
+fn growing_archive(root: &Path, directory: &Path, name: &OsStr) -> bool {
+    // The guarded 726c38e5 extraction creates this output once and writes it
+    // directly until the final sync and independent reread.
+    let layered_prefix = root == Path::new(EXTRACT_226_ROOT)
+        && directory == Path::new("./output")
+        && name == OsStr::new("epoch-226-prefix.jet");
+    layered_prefix
+        || (directory.file_name() == Some(OsStr::new("archives"))
+            && name
+                .to_str()
+                .and_then(|name| name.strip_prefix("epoch-"))
+                .and_then(|name| name.strip_suffix(".jet"))
+                .is_some_and(|epoch| epoch.parse::<u64>().is_ok()))
 }
 
 // Every extent was checked for overflow and exclusive allocation at ingestion.
@@ -155,7 +163,7 @@ fn verify_ext4(file: &File) -> Result<()> {
     Ok(())
 }
 
-fn gather(n: &Native, root: &File) -> Result<Vec<Group>> {
+fn gather(n: &Native, root: &File, root_path: &Path) -> Result<Vec<Group>> {
     let mut pending = vec![PathBuf::from(".")];
     let mut groups = Vec::new();
     while let Some(relative) = pending.pop() {
@@ -201,7 +209,7 @@ fn gather(n: &Native, root: &File) -> Result<Vec<Group>> {
                         continue;
                     }
                     let stamp = FileStamp::of(&before);
-                    let growing = growing_archive(&group.parent, &name);
+                    let growing = growing_archive(root_path, &group.parent, &name);
                     let ranges =
                         native266_full::peer228_extents::stable_file_ranges(&file, growing);
                     let after = file.metadata()?;
@@ -249,7 +257,7 @@ fn sample(n: &Native, base: &File, guard: &Value, device: u64) -> Result<Tree> {
         "Foundation root device differs"
     );
     verify_ext4(&dir)?;
-    let groups = gather(n, &dir)?;
+    let groups = gather(n, &dir, &root)?;
     Ok(Tree {
         root,
         dir,
@@ -309,7 +317,7 @@ pub(super) fn measure(n: &Native, guards: &BTreeMap<u64, Value>, device: u64) ->
                 name_start = claim.names_end as usize;
                 extent_start = claim.ranges_end as usize;
                 let name = OsStr::from_bytes(name);
-                let growing = growing_archive(&group.parent, name);
+                let growing = growing_archive(&tree.root, &group.parent, name);
                 let flags = if growing {
                     libc::O_RDONLY | libc::O_NONBLOCK
                 } else {
@@ -374,7 +382,8 @@ pub(super) fn measure(n: &Native, guards: &BTreeMap<u64, Value>, device: u64) ->
 
 #[cfg(test)]
 mod tests {
-    use super::common_ranges;
+    use super::{EXTRACT_226_ROOT, common_ranges, growing_archive};
+    use std::{ffi::OsStr, path::Path};
 
     #[test]
     fn growing_archive_credits_only_the_physically_retained_range() {
@@ -382,5 +391,32 @@ mod tests {
             common_ranges(&[(64, 16), (0, 32)], vec![(32, 16), (56, 16), (8, 8)]),
             vec![(8, 8), (64, 8)]
         );
+    }
+
+    #[test]
+    fn recognizes_only_the_exact_layered_extraction_prefix() {
+        let root = Path::new(EXTRACT_226_ROOT);
+        let archive = OsStr::new("epoch-226-prefix.jet");
+        assert!(growing_archive(
+            root,
+            Path::new(".").join("output").as_path(),
+            archive
+        ));
+        assert!(!growing_archive(
+            Path::new("/tmp"),
+            Path::new("./output"),
+            archive
+        ));
+        assert!(!growing_archive(root, Path::new("./other/output"), archive));
+        assert!(!growing_archive(
+            root,
+            Path::new("./output"),
+            OsStr::new("epoch-226-prefix.jet.segment.json")
+        ));
+        assert!(growing_archive(
+            Path::new("/tmp"),
+            Path::new("./run/archives"),
+            OsStr::new("epoch-260.jet")
+        ));
     }
 }

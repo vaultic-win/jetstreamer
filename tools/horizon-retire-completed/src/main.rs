@@ -23,9 +23,9 @@ use std::{
 #[cfg(feature = "anza-closed-154")]
 mod anza_closed_154;
 #[cfg(feature = "anza-closed-canaries")]
-mod anza_closed_160174;
-#[cfg(feature = "anza-closed-canaries")]
 mod anza_closed_canaries;
+#[cfg(feature = "anza-closed-canaries")]
+mod anza_closed_owned_indexes;
 #[cfg(feature = "anza-closed-canaries")]
 use anza_closed_canaries::closed_bootstrap_cohort;
 #[cfg(feature = "anza-parked-183")]
@@ -363,7 +363,7 @@ fn check_target(t: &Target) -> Result<()> {
         #[cfg(feature = "anza-closed-canaries")]
         198 => closed_bootstrap_cohort::is_target(t),
         #[cfg(feature = "anza-closed-canaries")]
-        160 | 174 => anza_closed_160174::is_target(t),
+        160 | 174 | 183 | 184 if anza_closed_owned_indexes::is_target(t) => true,
         #[cfg(feature = "anza-closed-canaries")]
         154 if anza_closed_canaries::is_target(t) => true,
         #[cfg(feature = "anza-closed-154")]
@@ -782,15 +782,22 @@ fn run() -> Result<()> {
         .then(closed_bootstrap_cohort::lock_controllers)
         .transpose()?;
     #[cfg(feature = "anza-closed-canaries")]
-    let closed_160174 = epochs.contains(&160) || epochs.contains(&174);
+    let closed_owned_indexes = anza_closed_owned_indexes::profile(&epochs);
     #[cfg(feature = "anza-closed-canaries")]
-    let _closed_160174_locks = closed_160174
-        .then(anza_closed_160174::lock_controllers)
+    ensure!(
+        !p.targets.iter().any(anza_closed_owned_indexes::is_target)
+            || closed_owned_indexes.is_some(),
+        "unexpected or mixed closed index scope"
+    );
+    #[cfg(feature = "anza-closed-canaries")]
+    let _closed_index_locks = closed_owned_indexes
+        .map(anza_closed_owned_indexes::lock_controllers)
         .transpose()?;
     let receipts = Path::new(HOME_ROOT).join(".jetstreamer-private/r2-receipts");
     #[cfg(feature = "anza-parked-183")]
-    let _holding_locks = epochs
-        .contains(&183)
+    let parked_183 = p.targets.iter().any(anza_parked_183::is_target);
+    #[cfg(feature = "anza-parked-183")]
+    let _holding_locks = parked_183
         .then(anza_parked_183::lock_original_owners)
         .transpose()?;
     let lock = OpenOptions::new()
@@ -807,7 +814,7 @@ fn run() -> Result<()> {
         "mutation lock busy"
     );
     #[cfg(feature = "anza-parked-183")]
-    if epochs.contains(&183) {
+    if parked_183 {
         anza_parked_183::verify(&p, &lock)?;
     } else {
         ensure!(p.holding_custody.is_none(), "unexpected holding custody");
@@ -828,8 +835,10 @@ fn run() -> Result<()> {
     #[cfg(feature = "anza-closed-canaries")]
     let canary_review = anza_closed_canaries::verify_scope(&p, &epochs, &lock)?;
     #[cfg(feature = "anza-closed-canaries")]
-    let closed_160174_review = closed_160174
-        .then(|| anza_closed_160174::verify(&p))
+    let closed_index_review = closed_owned_indexes
+        .map(|profile| {
+            anza_closed_owned_indexes::verify(profile, &p).map(|review| (profile, review))
+        })
         .transpose()?;
     #[cfg(feature = "anza-closed-canaries")]
     if epochs.contains(&198) {
@@ -903,8 +912,8 @@ fn run() -> Result<()> {
         check_target(t)?;
     }
     #[cfg(feature = "anza-closed-canaries")]
-    if let Some(review) = &closed_160174_review {
-        anza_closed_160174::check_owners(review)?;
+    if let Some((profile, review)) = &closed_index_review {
+        anza_closed_owned_indexes::check_owners(profile, review)?;
     }
     if check_only {
         println!(
@@ -934,7 +943,7 @@ fn run() -> Result<()> {
     let mut bytes = 0;
     for t in &p.targets {
         #[cfg(feature = "anza-parked-183")]
-        if t.epoch == 183 {
+        if anza_parked_183::is_target(t) {
             anza_parked_183::check_owners()?;
         }
         #[cfg(feature = "anza-closed-154")]
@@ -946,8 +955,8 @@ fn run() -> Result<()> {
             anza_closed_canaries::check_owners(review)?;
         }
         #[cfg(feature = "anza-closed-canaries")]
-        if let Some(review) = &closed_160174_review {
-            anza_closed_160174::check_owners(review)?;
+        if let Some((profile, review)) = &closed_index_review {
+            anza_closed_owned_indexes::check_owners(profile, review)?;
         }
         inactive(&p.inactive_units)?;
         scan_consumers(std::slice::from_ref(t))?;
