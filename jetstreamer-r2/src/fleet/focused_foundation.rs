@@ -21,6 +21,13 @@ const SCOPES: &[Scope] = &[
         kind: "epoch230-private-short-gap",
     },
     Scope {
+        epoch: 230,
+        unit: "horizon-qualify-230-middle-hourly-first-v1.service",
+        attempt: "middle-hourly-first-v1",
+        state: "horizon230-middle-hourly-first-runtime-v1",
+        kind: "epoch230-private-first-hourly-window",
+    },
+    Scope {
         epoch: 258,
         unit: "horizon-qualify-258-native-restore-v1.service",
         attempt: "native-restore-v1",
