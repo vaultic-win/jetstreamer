@@ -26,6 +26,7 @@ const THIRD_SCOPE: &str = "d0007aef065d1bc9af56f14fc22c63edf1f87cdf9b35f3f9b702b
 const FOURTH_SCOPE: &str = "e418efbb8329dd5e05c08aa9d829d50c719fd4412981a019416301985bbdf3a6";
 const FIFTH_SCOPE: &str = "9188755bc441de30ed4e7c646c2c80889872b4d0cfb8a8f0c34c67847866337e";
 const SIXTH_SCOPE: &str = "f201ca9c60be597b88938be7ab92e13fd7413cf380910c5b81c9ceac12365ddd";
+const SEVENTH_SCOPE: &str = "c6acd7bd872f4bf53165c9be56cc67bf2b2affc8fa0bbead565c2271d2c2ca4e";
 const RAM: u64 = 74 << 30;
 const GUARD_RAM: u64 = 1 << 30;
 const TMPFS: u64 = 44 << 30;
@@ -273,6 +274,7 @@ fn peer_check(roster: &Value, home: &Path) -> Result<()> {
                 "horizon-141-foundation-interval4-guard-v1.service",
                 "horizon-141-foundation-interval5-guard-v1.service",
                 "horizon-141-foundation-interval6-guard-v1.service",
+                "horizon-141-foundation-interval7-guard-v1.service",
             ]
             .contains(&unit)
                 && expected_running.contains(
@@ -367,6 +369,7 @@ fn load_scope(path: &Path, ordinal: u8) -> Result<Value> {
         4 => FOURTH_SCOPE,
         5 => FIFTH_SCOPE,
         6 => SIXTH_SCOPE,
+        7 => SEVENTH_SCOPE,
         _ => anyhow::bail!("unknown private interval"),
     };
     let scope = load(path, scope_sha)?;
@@ -602,8 +605,12 @@ fn main() -> Result<()> {
             "private interval assignment changed"
         );
     }
-    if matches!(ordinal, 5 | 6) {
-        let predecessor = if ordinal == 5 { 4 } else { 3 };
+    if let Some(predecessor) = match ordinal {
+        5 => Some(4),
+        6 => Some(3),
+        7 => Some(5),
+        _ => None,
+    } {
         let drain = resolve(&inputs["predecessor_drain"])?;
         let terminal = resolve(&inputs["predecessor_terminal"])?;
         ensure!(
@@ -636,7 +643,7 @@ fn main() -> Result<()> {
         "producer_memory_bytes":RAM,"guard_memory_bytes":GUARD_RAM,"future_home_bytes":HOME,
         "canonical_publication_authorized":false
     });
-    if matches!(ordinal, 3 | 5 | 6) {
+    if matches!(ordinal, 3 | 5 | 6 | 7) {
         admission["predecessor_terminal"] = inputs["predecessor_terminal"].clone();
         admission["predecessor_drain"] = inputs["predecessor_drain"].clone();
     }

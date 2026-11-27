@@ -6,12 +6,19 @@ use std::ffi::CString;
 
 struct Interval {
     fixed_mounts: Option<FixedMounts>,
+    assignment: Option<Assignment>,
+    terminal_accounts_hash: &'static str,
     ram: &'static str,
     alias: &'static str,
     first: u64,
     last: u64,
     targets: u64,
     output: &'static str,
+}
+
+struct Assignment {
+    handoff_sha: &'static str,
+    scope_sha: &'static str,
 }
 
 struct FixedMounts {
@@ -30,6 +37,8 @@ struct Mounts<'a> {
 }
 
 const SECOND: Interval = Interval {
+    assignment: None,
+    terminal_accounts_hash: "7jmzVuomxUeE3WeR1XStbdiH1EDVR61Kz44km6J2jwv2",
     fixed_mounts: Some(FixedMounts {
         invocation: "94e2a4715b3a454eb3e7b0462863515e",
         launch_sha: "50d12a9f19b0532f2f5abc8c8381e6b52e8fcc4043e7c4d39cb0b850ca31d589",
@@ -46,6 +55,8 @@ const SECOND: Interval = Interval {
 };
 
 const FOURTH: Interval = Interval {
+    assignment: None,
+    terminal_accounts_hash: "EMsXJsestzPAfJtGfNdQdeji3JmuvaCKDAMPcD8hW3ZT",
     fixed_mounts: Some(FixedMounts {
         invocation: "e8ddd3cf18c64dba954e84604afc70b1",
         launch_sha: "0c45c79d402d137f058ba10486fecffa54dfd482f5413e935fa13c8da464579d",
@@ -62,6 +73,11 @@ const FOURTH: Interval = Interval {
 };
 
 const THIRD: Interval = Interval {
+    assignment: Some(Assignment {
+        handoff_sha: "dda2a0a0f919c7c277281f43d46d8ed2c2b6fab71ee4b08c466d1c6db4069e18",
+        scope_sha: "d0007aef065d1bc9af56f14fc22c63edf1f87cdf9b35f3f9b702b44f969acbfa",
+    }),
+    terminal_accounts_hash: "FU1VdL2RPr4Ubn2SGE727jU8TQscWYn1gWbBE6peiC6r",
     fixed_mounts: None,
     ram: "/run/horizon141-foundation-interval3-ram-v1",
     alias: "/home/sol/.jetstreamer-private/epoch141-third-hourly-20261127-v1",
@@ -71,16 +87,37 @@ const THIRD: Interval = Interval {
     output: "epoch-141-third-hourly",
 };
 
+const FIFTH: Interval = Interval {
+    assignment: Some(Assignment {
+        handoff_sha: "c024321f48da115b98ed2a25a91a81655aab4ca74728a4517aa4b8d4976a6455",
+        scope_sha: "9188755bc441de30ed4e7c646c2c80889872b4d0cfb8a8f0c34c67847866337e",
+    }),
+    terminal_accounts_hash: "2EsJDSWGzZUaPKtjefUMfFnE2TWAn8ba5hAvDZbGaFfa",
+    fixed_mounts: None,
+    ram: "/run/horizon141-foundation-interval5-ram-v1",
+    alias: "/home/sol/.jetstreamer-private/epoch141-fifth-hourly-20261127-v1",
+    first: 60_942_185,
+    last: 60_948_885,
+    targets: 307,
+    output: "epoch-141-fifth-hourly",
+};
+
 fn text_field<'a>(row: &'a Value, key: &str) -> Result<&'a str> {
     row[key].as_str().with_context(|| format!("missing {key}"))
 }
 
-fn bind_third_mounts<'a>(
+fn bind_recorded_mounts<'a>(
     held: &'a Value,
+    interval: &Interval,
+    ordinal: u8,
     state: &Path,
     unit: &str,
     invocation: &str,
 ) -> Result<Mounts<'a>> {
+    let expected = interval
+        .assignment
+        .as_ref()
+        .context("missing interval assignment")?;
     let scope: Binding = serde_json::from_value(held["runtime_scope"].clone())?;
     let mount = &held["host_mounts"];
     let ram = &mount["ram"];
@@ -91,18 +128,18 @@ fn bind_third_mounts<'a>(
     let ram_id = text_field(ram, "mount_id")?;
     let alias_id = text_field(alias, "mount_id")?;
     ensure!(
-        held["schema"] == "foundation-epoch141-interval3-held-namespace-v1"
+        held["schema"] == format!("foundation-epoch141-interval{ordinal}-held-namespace-v1")
             && held["unit"] == unit
             && held["producer"]["InvocationID"] == invocation
             && held["boot_id"] == boot.trim()
             && scope.path == state.join("runtime-scope.json")
-            && scope.sha256 == "d0007aef065d1bc9af56f14fc22c63edf1f87cdf9b35f3f9b702b44f969acbfa"
-            && ram["path"] == THIRD.ram
-            && alias["path"] == THIRD.alias
+            && scope.sha256 == expected.scope_sha
+            && ram["path"] == interval.ram
+            && alias["path"] == interval.alias
             && alias["device"] == device
             && alias["major_minor"] == major_minor
             && ram_id != alias_id,
-        "foreign third-interval held mount evidence"
+        "foreign interval held mount evidence"
     );
     let _: Value = read_bound(&scope.path, &scope.sha256, JSON_LIMIT)?;
     Ok(Mounts {
@@ -164,6 +201,7 @@ pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
         2 => &SECOND,
         3 => &THIRD,
         4 => &FOURTH,
+        5 => &FIFTH,
         _ => anyhow::bail!("unknown epoch 141 drain scope"),
     };
     let _issuer = lock_issuer()?;
@@ -208,22 +246,25 @@ pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
             alias_id: fixed.alias_id,
         }
     } else {
+        let expected = scope
+            .assignment
+            .as_ref()
+            .context("missing interval assignment")?;
         let admission: Binding = serde_json::from_value(launch["admission"].clone())?;
         let held_ref: Binding = serde_json::from_value(launch["held_namespace"].clone())?;
         ensure!(
             held_ref.path == state.join("held-namespace.json")
                 && admission.path == state.join("replay-admission.json"),
-            "foreign third-interval launch bindings"
+            "foreign interval launch bindings"
         );
         let admission: Value = read_bound(&admission.path, &admission.sha256, JSON_LIMIT)?;
         ensure!(
-            admission["handoff"]["sha256"]
-                == "dda2a0a0f919c7c277281f43d46d8ed2c2b6fab71ee4b08c466d1c6db4069e18"
+            admission["handoff"]["sha256"] == expected.handoff_sha
                 && admission["canonical_publication_authorized"] == false,
-            "foreign third-interval assignment"
+            "foreign interval assignment"
         );
         held = read_bound(&held_ref.path, &held_ref.sha256, JSON_LIMIT)?;
-        bind_third_mounts(&held, &state, &unit, invocation)?
+        bind_recorded_mounts(&held, scope, ordinal, &state, &unit, invocation)?
     };
     // Newer units capture the native exit before PID1 can unload the unit.
     let exit_ok = if ordinal >= 3 {
@@ -245,12 +286,7 @@ pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
             && exit["exit_code"] == "exited"
             && exit["exit_status"] == "0"
             && terminal["terminal_checkpoint"]["slot_complete"] == true
-            && terminal["terminal_checkpoint"]["accounts_hash"]
-                == if ordinal == 3 {
-                    "FU1VdL2RPr4Ubn2SGE727jU8TQscWYn1gWbBE6peiC6r"
-                } else {
-                    "EMsXJsestzPAfJtGfNdQdeji3JmuvaCKDAMPcD8hW3ZT"
-                }
+            && terminal["terminal_checkpoint"]["accounts_hash"] == scope.terminal_accounts_hash
             && terminal["guard_drained"] == true
     } else {
         native["InvocationID"] == invocation

@@ -388,7 +388,7 @@ fn retire_bootstrap(
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    if let Some(mode @ ("--drain-interval2-141" | "--drain-interval3-141" | "--drain-interval4-141")) =
+    if let Some(mode @ ("--drain-interval2-141" | "--drain-interval3-141" | "--drain-interval4-141" | "--drain-interval5-141")) =
         args.get(1).map(String::as_str)
     {
         ensure!(
@@ -404,7 +404,8 @@ fn main() -> Result<()> {
         let ordinal = match mode {
             "--drain-interval2-141" => 2,
             "--drain-interval3-141" => 3,
-            _ => 4,
+            "--drain-interval4-141" => 4,
+            _ => 5,
         };
         return interval141::drain(ordinal, &args[3]);
     }

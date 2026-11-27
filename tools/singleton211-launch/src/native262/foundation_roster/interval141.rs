@@ -77,6 +77,22 @@ const SIXTH: Scope = Scope {
     affinity: "24-25",
     guard_cpu: 26,
 };
+const SEVENTH: Scope = Scope {
+    ordinal: 7,
+    unit: "horizon-qualify-141-foundation-interval7-v1.service",
+    guard: "horizon-141-foundation-interval7-guard-v1.service",
+    timer: "horizon-141-foundation-interval7-guard-v1.timer",
+    state: "/var/lib/jetstreamer/horizon141-foundation-interval7-runtime-v1",
+    handoff: "c20773d1c9708ca00aa38aee4239c05255bb465d277934d7d714d28f2ee4aaee",
+    producer_cpus: [27, 28],
+    affinity: "27-28",
+    guard_cpu: 29,
+};
+const SCOPES: [&Scope; 6] = [&SECOND, &THIRD, &FOURTH, &FIFTH, &SIXTH, &SEVENTH];
+const SEVENTH_SOURCE: &str = "9a90d6fae54742f2451a78f7af78915895fde767d45df5f01491723e3578824b";
+const SEVENTH_EXECUTION: &str = "a350bdc8bfcd4abd22ac35c32bce2906581e11e8179d72915f0341f5fcc95ee1";
+const SEVENTH_SCOPE: &str = "c6acd7bd872f4bf53165c9be56cc67bf2b2affc8fa0bbead565c2271d2c2ca4e";
+const SEVENTH_VALIDATION: &str = "1842dc30d21be15094460dc8208612346aed7a0d55c57fcbdd007853d71ca334";
 const SIXTH_SOURCE: &str = "47fadfc2b7072a1ac74eed185a6dee7c37ad1535c58e4cd32f42cbe7da713509";
 const SIXTH_EXECUTION: &str = "3d76221e466bc27251740fc8319a96701eaeb0f895d41df392438384f29a63a1";
 const SIXTH_SCOPE: &str = "f201ca9c60be597b88938be7ab92e13fd7413cf380910c5b81c9ceac12365ddd";
@@ -112,31 +128,23 @@ impl Active {
 }
 
 pub(super) fn is_guard(unit: &str) -> bool {
-    [
-        SECOND.guard,
-        THIRD.guard,
-        FOURTH.guard,
-        FIFTH.guard,
-        SIXTH.guard,
-    ]
-    .contains(&unit)
+    SCOPES.iter().any(|scope| scope.guard == unit)
 }
 
 pub(super) fn enrolled(n: &mut Native, running: &BTreeSet<String>) -> Result<Vec<Active>> {
-    ensure!(
-        [SECOND.unit, THIRD.unit, SIXTH.unit]
-            .into_iter()
-            .filter(|unit| running.contains(*unit))
-            .count()
-            <= 1
-            && !(running.contains(FOURTH.unit) && running.contains(FIFTH.unit)),
-        "sequential epoch 141 intervals overlap"
-    );
-    [&SECOND, &THIRD, &FOURTH, &FIFTH, &SIXTH]
+    let mut occupied = BTreeSet::new();
+    let mut enrolled = Vec::new();
+    for scope in SCOPES
         .into_iter()
         .filter(|scope| running.contains(scope.unit))
-        .map(|scope| active(n, scope))
-        .collect()
+    {
+        ensure!(
+            occupied.insert(scope.affinity),
+            "sequential epoch 141 intervals overlap"
+        );
+        enrolled.push(active(n, scope)?);
+    }
+    Ok(enrolled)
 }
 
 fn placement(scope: &Scope) -> Result<BTreeSet<u64>> {
@@ -201,6 +209,9 @@ fn active(n: &mut Native, scope: &'static Scope) -> Result<Active> {
     }
     if scope.ordinal == 6 {
         sixth_evidence(state, &fit)?;
+    }
+    if scope.ordinal == 7 {
+        seventh_evidence(state, &fit)?;
     }
     let timer = n.show_fields(scope.timer, "Id,ActiveState,InvocationID,Unit")?;
     ensure!(
@@ -280,16 +291,18 @@ pub(super) fn candidate(ordinal: u8, before: &BTreeSet<String>) -> Result<Candid
         4 => &FOURTH,
         5 => &FIFTH,
         6 => &SIXTH,
+        7 => &SEVENTH,
         _ => anyhow::bail!("unknown epoch 141 candidate"),
     };
     let predecessor = match ordinal {
         3 => Some(&SECOND),
         5 => Some(&FOURTH),
         6 => Some(&THIRD),
+        7 => Some(&FIFTH),
         _ => None,
     };
     ensure!(
-        ![&SECOND, &THIRD, &FOURTH, &FIFTH, &SIXTH]
+        !SCOPES
             .into_iter()
             .any(|peer| peer.affinity == scope.affinity && before.contains(peer.unit)),
         "epoch 141 candidate overlaps a live owner"
@@ -310,6 +323,7 @@ pub(super) fn candidate(ordinal: u8, before: &BTreeSet<String>) -> Result<Candid
         4 => fourth_evidence(state, &proof)?,
         5 => fifth_evidence(state, &proof)?,
         6 => sixth_evidence(state, &proof)?,
+        7 => seventh_evidence(state, &proof)?,
         _ => unreachable!(),
     }
     Ok(Candidate {
@@ -534,46 +548,13 @@ fn sixth_evidence(state: &Path, fit: &Value) -> Result<()> {
     const PAYLOAD: &str = "1024b6cce42b2a8e16c553056821d43f812dde0984481a4d1ad2d7fc1061c96f";
     const MANIFEST: &str = "cbbec3909a24cf2afa31c2fdd9e3991abd16a6f3e52ebb103ce7dfd91f9dd01d";
     const ETAG: &str = "c4b2d61a7b2271db50533414942fd208-38";
-    let prior = Path::new(THIRD.state);
-    let terminal = binding(&fit["predecessor_terminal"])?;
-    let drain = binding(&fit["predecessor_drain"])?;
-    ensure!(
-        terminal.path == prior.join("replay-terminal.json")
-            && drain.path == prior.join("post-custody-drain.json"),
-        "foreign third predecessor evidence"
-    );
-    let terminal = terminal.sealed()?;
-    let drain = drain.sealed()?;
-    let launch = binding(&terminal["launch"])?;
-    ensure!(
-        launch.path == prior.join("replay-launch.json"),
-        "foreign third launch"
-    );
-    let launch = launch.sealed()?;
-    let admission = binding(&launch["admission"])?;
-    ensure!(
-        admission.path == prior.join("replay-admission.json"),
-        "foreign third admission"
-    );
-    let third = admission.sealed()?;
-    ensure!(
-        third["handoff"]["sha256"] == THIRD.handoff
-            && launch["unit"] == THIRD.unit
-            && terminal["schema"] == "foundation-epoch141-interval3-terminal-v1"
-            && terminal["invocation_id"] == launch["invocation_id"]
-            && terminal["terminal_checkpoint"]["slot"] == 60_935_310
-            && terminal["terminal_checkpoint"]["accounts_hash"]
-                == "FU1VdL2RPr4Ubn2SGE727jU8TQscWYn1gWbBE6peiC6r"
-            && terminal["original_entry_slots_verified"] == 330
-            && terminal["private_custody"]["no_clobber"] == true
-            && drain["schema"] == "foundation-epoch141-interval3-post-custody-drain-v1"
-            && drain["invocation_id"] == launch["invocation_id"]
-            && drain["terminal"] == fit["predecessor_terminal"]
-            && drain["container"] == terminal["private_custody"]["container"]
-            && drain["guard_drained"] == true
-            && drain["tmpfs_drained"] == true,
-        "the assigned third invocation has no verified output custody and drain"
-    );
+    turnover_after(
+        fit,
+        &THIRD,
+        60_935_310,
+        "FU1VdL2RPr4Ubn2SGE727jU8TQscWYn1gWbBE6peiC6r",
+        330,
+    )?;
 
     let inputs = binding(&fit["static_inputs"])?;
     let assignment = binding(&fit["handoff"])?;
@@ -641,6 +622,149 @@ fn sixth_evidence(state: &Path, fit: &Value) -> Result<()> {
             && metadata.mode() & 0o222 == 0
             && metadata.nlink() == 1,
         "sixth interval lacks its exact verified bootstrap or execution scope"
+    );
+    Ok(())
+}
+
+fn turnover_after(
+    fit: &Value,
+    predecessor: &Scope,
+    checkpoint_slot: u64,
+    checkpoint_hash: &str,
+    targets: u64,
+) -> Result<()> {
+    let prior = Path::new(predecessor.state);
+    let terminal = binding(&fit["predecessor_terminal"])?;
+    let drain = binding(&fit["predecessor_drain"])?;
+    ensure!(
+        terminal.path == prior.join("replay-terminal.json")
+            && drain.path == prior.join("post-custody-drain.json"),
+        "foreign predecessor predecessor evidence"
+    );
+    let terminal = terminal.sealed()?;
+    let drain = drain.sealed()?;
+    let launch = binding(&terminal["launch"])?;
+    ensure!(
+        launch.path == prior.join("replay-launch.json"),
+        "foreign predecessor launch"
+    );
+    let launch = launch.sealed()?;
+    let admission = binding(&launch["admission"])?;
+    ensure!(
+        admission.path == prior.join("replay-admission.json"),
+        "foreign predecessor admission"
+    );
+    let third = admission.sealed()?;
+    ensure!(
+        third["handoff"]["sha256"] == predecessor.handoff
+            && launch["unit"] == predecessor.unit
+            && terminal["schema"]
+                == format!(
+                    "foundation-epoch141-interval{}-terminal-v1",
+                    predecessor.ordinal
+                )
+            && terminal["invocation_id"] == launch["invocation_id"]
+            && terminal["terminal_checkpoint"]["slot"] == checkpoint_slot
+            && terminal["terminal_checkpoint"]["accounts_hash"] == checkpoint_hash
+            && terminal["original_entry_slots_verified"] == targets
+            && terminal["private_custody"]["no_clobber"] == true
+            && drain["schema"]
+                == format!(
+                    "foundation-epoch141-interval{}-post-custody-drain-v1",
+                    predecessor.ordinal
+                )
+            && drain["invocation_id"] == launch["invocation_id"]
+            && drain["terminal"] == fit["predecessor_terminal"]
+            && drain["container"] == terminal["private_custody"]["container"]
+            && drain["guard_drained"] == true
+            && drain["tmpfs_drained"] == true,
+        "the assigned predecessor invocation has no verified output custody and drain"
+    );
+
+    Ok(())
+}
+
+fn seventh_evidence(state: &Path, fit: &Value) -> Result<()> {
+    const BOOT: &str = "snapshot-60955832-B6F9ztw7sVcNeY2Sa1nKh9c2EpC5SjuVSLgoLTi4Zxo2.tar.zst";
+    turnover_after(
+        fit,
+        &FIFTH,
+        60_948_885,
+        "2EsJDSWGzZUaPKtjefUMfFnE2TWAn8ba5hAvDZbGaFfa",
+        307,
+    )?;
+    let inputs = binding(&fit["static_inputs"])?;
+    let assignment = binding(&fit["handoff"])?;
+    ensure!(
+        inputs.path == state.join("static-inputs.json")
+            && assignment.path == state.join("inputs/foundation-assignment.json")
+            && assignment.sha256 == SEVENTH.handoff,
+        "foreign seventh inputs or assignment"
+    );
+    let inputs = inputs.sealed()?;
+    let assignment = assignment.sealed()?;
+    let validation = binding(&inputs["source_validation"])?;
+    let boot = binding(&inputs["bootstrap_intake"])?;
+    let transfer = binding(&inputs["transfer_completion"])?;
+    ensure!(
+        validation.path == state.join("source-validation.json")
+            && validation.sha256 == SEVENTH_VALIDATION
+            && boot.path == state.join("bootstrap-intake.json")
+            && transfer.path == state.join("transfer-completion.json"),
+        "foreign seventh source validation or intake path"
+    );
+    let validation = validation.sealed()?;
+    let boot = boot.sealed()?;
+    let transfer = transfer.sealed()?;
+    let custody = binding(&boot["custody"])?;
+    ensure!(
+        custody.path == state.join("inputs/bootstrap-r2-custody.json"),
+        "foreign seventh custody path"
+    );
+    let custody = custody.sealed()?;
+    let installed = state.join("payloads").join(BOOT);
+    let metadata = fs::symlink_metadata(&installed)?;
+    let payload = text(&boot, "sha256")?;
+    let manifest = text(&boot, "remote_manifest_sha256")?;
+    ensure!(
+        assignment["schema"] == "foundation-epoch141-seventh-assignment-v1"
+            && assignment["predecessor_handoff_sha256"] == FIFTH.handoff
+            && assignment["canonical_publication_authorized"] == false
+            && inputs["schema"] == "foundation-epoch141-interval7-static-inputs-v1"
+            && inputs["interval"] == assignment["interval"]
+            && validation["interval"] == inputs["interval"]
+            && validation["scope"]["sha256"] == SEVENTH_SCOPE
+            && validation["source_packet"]["sha256"] == SEVENTH_SOURCE
+            && validation["execution_packet"]["sha256"] == SEVENTH_EXECUTION
+            && validation["original_target_count"] == 304
+            && transfer["schema"] == "foundation-epoch141-interval7-intake-completion-v1"
+            && transfer["bootstrap"] == inputs["bootstrap_intake"]
+            && transfer["handoff"] == fit["handoff"]
+            && transfer["replay_launched"] == false
+            && boot["schema"] == "foundation-epoch141-interval7-private-object-intake-v1"
+            && boot["pinned_authenticated_get"] == true
+            && boot["single_physical_copy"] == true
+            && boot["gcs_generation_checksums_match"] == true
+            && boot["generation"] == 1_634_786_592_035_540u64
+            && boot["installed_path"] == json!(installed)
+            && boot["bytes"] == 2_588_354_467u64
+            && custody["bytes"] == boot["bytes"]
+            && custody["sha256"] == payload
+            && custody["manifest_sha256"] == manifest
+            && custody["object_etag"] == boot["etag"]
+            && custody["source_packet"]["sha256"] == SEVENTH_SOURCE
+            && custody["object_key"] == format!("node_02/objects/{payload}.blob")
+            && custody["manifest_key"] == format!("node_02/manifests/{manifest}.json")
+            && custody["authenticated_post_readback"]["authenticated"] == true
+            && custody["authenticated_post_readback"]["conditional_final_identity"] == true
+            && boot["inode"] == metadata.ino()
+            && boot["device"] == metadata.dev()
+            && metadata.is_file()
+            && metadata.len() == 2_588_354_467
+            && metadata.uid() == 0
+            && metadata.mode() & 0o222 == 0
+            && metadata.nlink() == 1,
+        "seventh interval lacks its exact verified bootstrap or execution scope"
     );
     Ok(())
 }
