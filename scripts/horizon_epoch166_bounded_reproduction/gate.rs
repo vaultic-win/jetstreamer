@@ -54,11 +54,11 @@ mod route {
     pub(super) const SNAPSHOT: &str =
         "snapshot-73726716-FWdNzr1DnDLqiWmKfNtUbuBqmSz5gqJ3XE55d98LCw3M.tar.zst";
     #[cfg(epoch170_continuation_short)]
-    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/from-73726716-to-73746882-v1";
+    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73726716-to-73746882-v1";
     #[cfg(epoch170_continuation_short)]
     pub(super) const TERMINAL_SLOT: u64 = 73_746_882;
     #[cfg(not(epoch170_continuation_short))]
-    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/from-73726716-to-73879004-v1";
+    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73726716-to-73879004-v1";
     #[cfg(not(epoch170_continuation_short))]
     pub(super) const TERMINAL_SLOT: u64 = 73_879_004;
 }
