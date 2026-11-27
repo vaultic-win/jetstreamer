@@ -1,34 +1,98 @@
-//! Collect local terminal evidence for the admitted 39,349-slot epoch 230 window.
+//! Collect local terminal evidence for admitted epoch 230 hourly windows.
 use super::{command, identity, one_event, read_bound, sha256};
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, os::unix::fs::MetadataExt, path::Path};
 
-const UNIT: &str = "horizon-qualify-230-middle-hourly-first-v1.service";
-const INVOCATION: &str = "763d461014f042f7bc4591a3b8ec9ac5";
+type BoundFile = (&'static str, &'static str);
+
+enum Bootstrap {
+    AdjacentSegment(BoundFile),
+    Snapshot {
+        restore: BoundFile,
+        uri: &'static str,
+        accounts: &'static str,
+        sha256: &'static str,
+    },
+}
+
+struct Window {
+    schema: &'static str,
+    unit: &'static str,
+    invocation: &'static str,
+    archive: &'static str,
+    first: u64,
+    last: u64,
+    launch: BoundFile,
+    edges: BoundFile,
+    terminal_gcs: BoundFile,
+    terminal_generation: &'static str,
+    terminal_accounts: &'static str,
+    bootstrap: Bootstrap,
+}
+
 const NODE: &str =
     "/var/lib/jetstreamer/horizon230-continuation-stock-10eaffb0-v1/jetstreamer-node";
-const ARCHIVE: &str = "/home/ubuntu/.jetstreamer-private/qualification-230-middle-hourly-first-v1/work/output/epoch-230-slots-99437434-99476782.jet";
-const START: u64 = 99_437_434;
-const END: u64 = 99_476_782;
 const WORKER: &str = "f39140b9a9659e7c6e8207076a2d0c560a6b69df42cc92e19a421cf46c2b761c";
-const LAUNCH: (&str, &str) = (
-    "/var/lib/jetstreamer/horizon230-middle-hourly-first-runtime-v1/cadence-registration.json",
-    "42cada1d0f0e983922c93aeadac872fb00585b04ac43964568c1c115fb3b4dfd",
-);
-const PREDECESSOR: (&str, &str) = (
-    "/var/lib/jetstreamer/horizon230-vote-boundary-sealed-segment-v1/epoch-230-vote-boundary-demotion-diagnostic.jet.segment.json",
-    "8351f40f31fd5b2ddae0b0b924e226c52094d00dd0e66eacd6ad0856ec376de3",
-);
-const EDGES: (&str, &str) = (
-    "/var/lib/jetstreamer/horizon230-hourly-first-finalized-edges-v1/edges.json",
-    "374c2320b38985f518545054fe6aa51fffc87c85d5ee2a408af89f77e978ec52",
-);
-const GCS: (&str, &str) = (
-    "/var/lib/jetstreamer/horizon230-middle-hourly-first-runtime-v1/terminal-gcs-metadata.json",
-    "69b26aab7fa68435f857e9c0285804efec538f75cebd0a1d68ba637c52c33570",
-);
-const ACCOUNTS: &str = "26wibqVauVjaet3eM6o8hssvaXi4awt7ndjwCaYJZyPK";
+
+const FIRST: Window = Window {
+    schema: "foundation-epoch230-hourly-first-terminal-source-v1",
+    unit: "horizon-qualify-230-middle-hourly-first-v1.service",
+    invocation: "763d461014f042f7bc4591a3b8ec9ac5",
+    archive: "/home/ubuntu/.jetstreamer-private/qualification-230-middle-hourly-first-v1/work/output/epoch-230-slots-99437434-99476782.jet",
+    first: 99_437_434,
+    last: 99_476_782,
+    launch: (
+        "/var/lib/jetstreamer/horizon230-middle-hourly-first-runtime-v1/cadence-registration.json",
+        "42cada1d0f0e983922c93aeadac872fb00585b04ac43964568c1c115fb3b4dfd",
+    ),
+    edges: (
+        "/var/lib/jetstreamer/horizon230-hourly-first-finalized-edges-v1/edges.json",
+        "374c2320b38985f518545054fe6aa51fffc87c85d5ee2a408af89f77e978ec52",
+    ),
+    terminal_gcs: (
+        "/var/lib/jetstreamer/horizon230-middle-hourly-first-runtime-v1/terminal-gcs-metadata.json",
+        "69b26aab7fa68435f857e9c0285804efec538f75cebd0a1d68ba637c52c33570",
+    ),
+    terminal_generation: "1633495975351467",
+    terminal_accounts: "26wibqVauVjaet3eM6o8hssvaXi4awt7ndjwCaYJZyPK",
+    bootstrap: Bootstrap::AdjacentSegment((
+        "/var/lib/jetstreamer/horizon230-vote-boundary-sealed-segment-v1/epoch-230-vote-boundary-demotion-diagnostic.jet.segment.json",
+        "8351f40f31fd5b2ddae0b0b924e226c52094d00dd0e66eacd6ad0856ec376de3",
+    )),
+};
+
+const SECOND: Window = Window {
+    schema: "foundation-epoch230-hourly-second-terminal-source-v1",
+    unit: "horizon-qualify-230-middle-hourly-second-v1.service",
+    invocation: "a0a94d2d42984804877c1a80fc934585",
+    archive: "/home/ubuntu/.jetstreamer-private/qualification-230-middle-hourly-second-v1/work/output/epoch-230-slots-99476783-99516304.jet",
+    first: 99_476_783,
+    last: 99_516_304,
+    launch: (
+        "/var/lib/jetstreamer/horizon230-middle-hourly-second-runtime-v1/cadence-registration.json",
+        "c2aea886494f66ed6e2077422894abf68f644a346181da989ac869d9aba43cac",
+    ),
+    edges: (
+        "/var/lib/jetstreamer/horizon230-hourly-second-finalized-edges-v1/edges.json",
+        "3988f80b818e5c2c04d4f73b18fffaf6c18fff35d74570f6408154f0dac2a7ef",
+    ),
+    terminal_gcs: (
+        "/var/lib/jetstreamer/horizon230-next-hourly-inputs-v1/terminal.json",
+        "7028279c348d8dc9cfeb082d9788f2e874b1b59bf166c8c027039ce8171c5ea2",
+    ),
+    terminal_generation: "1633495975217451",
+    terminal_accounts: "CCpNXjpMvVkXW2xNzBHSfNSRc8efttNr3bB3ejex4Q8u",
+    bootstrap: Bootstrap::Snapshot {
+        restore: (
+            "/var/lib/jetstreamer/horizon230-next-hourly-input-stage-v1/stage.log",
+            "732d0c0e12fdcf021926fa1c73f41bc7a55ee8aa5655861035fb5dcd76988d7b",
+        ),
+        uri: "gs://mainnet-beta-ledger-europe-fr2/99359376/hourly/snapshot-99476782-26wibqVauVjaet3eM6o8hssvaXi4awt7ndjwCaYJZyPK.tar.zst#1633495975351467",
+        accounts: "26wibqVauVjaet3eM6o8hssvaXi4awt7ndjwCaYJZyPK",
+        sha256: "82e04448803996e9d2924d177acd6c66998bfaf183f29aaf43af3026669b8114",
+    },
+};
 
 fn pinned((path, digest): (&str, &str)) -> Result<Value> {
     let (raw, _) = read_bound(Path::new(path), 1 << 20, 0)?;
@@ -40,12 +104,12 @@ fn reference((path, sha256): (&str, &str)) -> Value {
     json!({"path": path, "sha256": sha256})
 }
 
-fn state() -> Result<BTreeMap<String, String>> {
+fn state(unit: &str) -> Result<BTreeMap<String, String>> {
     let output = command(
         "/usr/bin/systemctl",
         &[
             "show",
-            UNIT,
+            unit,
             "-p",
             "ActiveState",
             "-p",
@@ -82,15 +146,15 @@ fn timestamp(event: &Value) -> Result<u64> {
         .parse()?)
 }
 
-fn native(pid: &str, marker: &str, manager: &Value) -> Result<Value> {
+fn native(window: &Window, pid: &str, marker: &str, manager: &Value) -> Result<Value> {
     let event = one_event(&[
         &format!("_PID={pid}"),
-        &format!("_SYSTEMD_INVOCATION_ID={INVOCATION}"),
+        &format!("_SYSTEMD_INVOCATION_ID={}", window.invocation),
         &format!("--grep={marker}"),
     ])?;
     ensure!(
         event["_EXE"] == NODE
-            && event["_SYSTEMD_UNIT"] == UNIT
+            && event["_SYSTEMD_UNIT"] == window.unit
             && event["_BOOT_ID"] == manager["_BOOT_ID"]
             && timestamp(&event)? <= timestamp(manager)?,
         "epoch 230 journal event is outside the admitted invocation"
@@ -98,11 +162,11 @@ fn native(pid: &str, marker: &str, manager: &Value) -> Result<Value> {
     Ok(event)
 }
 
-fn checkpoint_message(terminal: &Value) -> Result<String> {
+fn checkpoint_message(slot: u64, terminal: &Value) -> Result<String> {
     let text = |key: &str| terminal[key].as_str().context("missing checkpoint hash");
     let number = |key: &str| terminal[key].as_u64().context("missing checkpoint counter");
     Ok(format!(
-        "historical checkpoint slot={END} bank_hash={} accounts_hash={} last_blockhash={} capitalization={} transactions={} tick_height={} complete=true writes={} next_write_version={}",
+        "historical checkpoint slot={slot} bank_hash={} accounts_hash={} last_blockhash={} capitalization={} transactions={} tick_height={} complete=true writes={} next_write_version={}",
         text("bank_hash")?,
         text("accounts_hash")?,
         text("last_blockhash")?,
@@ -115,14 +179,63 @@ fn checkpoint_message(terminal: &Value) -> Result<String> {
 }
 
 fn validate_segment(
+    window: &Window,
     manifest: &Value,
-    prior: &Value,
     edges: &Value,
     metadata: &Value,
     checkpoint: &Value,
 ) -> Result<()> {
     let bootstrap = &manifest["bootstrap"];
     let terminal = &manifest["terminal"];
+    let terminal_name = format!(
+        "snapshot-{}-{}.tar.zst",
+        window.last, window.terminal_accounts
+    );
+    let terminal_metadata_matches = match window.bootstrap {
+        Bootstrap::AdjacentSegment(_) => {
+            metadata["slot"] == window.last
+                && metadata["metadata"]["generation"] == window.terminal_generation
+                && metadata["uri"].as_str().is_some_and(|uri| {
+                    uri.ends_with(&format!("/{terminal_name}#{}", window.terminal_generation))
+                })
+        }
+        Bootstrap::Snapshot { .. } => {
+            metadata["generation"] == window.terminal_generation
+                && metadata["name"]
+                    .as_str()
+                    .is_some_and(|name| name.ends_with(&format!("/{terminal_name}")))
+        }
+    };
+    ensure!(
+        manifest["schema_version"] == 1
+            && manifest["epoch"] == 230
+            && manifest["output_slot_start"] == window.first
+            && manifest["output_slot_count"] == window.last - window.first + 1
+            && manifest["worker_executable_sha256"] == WORKER
+            && manifest["runtime"]["runtime_profile"] == "solana-v1.6.20"
+            && bootstrap["slot"] == window.first - 1
+            && bootstrap["slot_complete"] == true
+            && edges["bootstrap"]["slot"] == window.first - 1
+            && edges["bootstrap"]["blockhash"] == bootstrap["last_blockhash"]
+            && terminal["slot"] == window.last
+            && terminal["slot_complete"] == true
+            && edges["terminal"]["slot"] == window.last
+            && edges["terminal"]["blockhash"] == terminal["last_blockhash"]
+            && terminal_metadata_matches
+            && terminal["accounts_hash"] == window.terminal_accounts,
+        "hourly segment differs from its pinned range, worker, finalized edges or accounts checkpoint"
+    );
+    ensure!(
+        checkpoint["MESSAGE"]
+            .as_str()
+            .context("checkpoint message")?
+            .ends_with(&checkpoint_message(window.last, terminal)?),
+        "hourly journal differs from the checkpoint manifest"
+    );
+    Ok(())
+}
+
+fn validate_predecessor(bootstrap: &Value, predecessor: &Value) -> Result<()> {
     for name in [
         "slot",
         "bank_hash",
@@ -134,41 +247,35 @@ fn validate_segment(
         "slot_complete",
     ] {
         ensure!(
-            !bootstrap[name].is_null() && bootstrap[name] == prior["terminal"][name],
+            !bootstrap[name].is_null() && bootstrap[name] == predecessor["terminal"][name],
             "hourly bootstrap differs from the verified predecessor at {name}"
         );
     }
+    Ok(())
+}
+
+fn validate_bootstrap_checkpoint(
+    window: &Window,
+    bootstrap: &Value,
+    digest: &str,
+    checkpoint: &Value,
+) -> Result<()> {
+    let Bootstrap::Snapshot {
+        accounts, sha256, ..
+    } = window.bootstrap
+    else {
+        anyhow::bail!("hourly window has no bootstrap snapshot proof");
+    };
     ensure!(
-        manifest["schema_version"] == 1
-            && manifest["epoch"] == 230
-            && manifest["output_slot_start"] == START
-            && manifest["output_slot_count"] == END - START + 1
-            && manifest["worker_executable_sha256"] == WORKER
-            && manifest["runtime"]["runtime_profile"] == "solana-v1.6.20"
-            && bootstrap["slot"] == START - 1
-            && bootstrap["slot_complete"] == true
-            && edges["bootstrap"]["slot"] == START - 1
-            && edges["bootstrap"]["blockhash"] == bootstrap["last_blockhash"]
-            && terminal["slot"] == END
-            && terminal["slot_complete"] == true
-            && edges["terminal"]["slot"] == END
-            && edges["terminal"]["blockhash"] == terminal["last_blockhash"]
-            && metadata["slot"] == END
-            && metadata["metadata"]["generation"] == "1633495975351467"
-            && metadata["uri"]
-                .as_str()
-                .is_some_and(|uri| uri.ends_with(&format!(
-                    "snapshot-{END}-{ACCOUNTS}.tar.zst#1633495975351467"
-                )))
-            && terminal["accounts_hash"] == ACCOUNTS,
-        "hourly segment differs from its pinned range, worker, finalized edges or accounts checkpoint"
+        digest == sha256 && bootstrap["accounts_hash"] == accounts,
+        "hourly bootstrap does not match the generation-pinned snapshot"
     );
     ensure!(
         checkpoint["MESSAGE"]
             .as_str()
-            .context("checkpoint message")?
-            .ends_with(&checkpoint_message(terminal)?),
-        "hourly journal differs from the checkpoint manifest"
+            .context("bootstrap checkpoint message")?
+            .ends_with(&checkpoint_message(window.first - 1, bootstrap)?),
+        "hourly bootstrap journal differs from the checkpoint manifest"
     );
     Ok(())
 }
@@ -179,72 +286,98 @@ mod tests {
 
     #[test]
     fn terminal_evidence_binds_the_predecessor_and_both_canonical_identities() -> Result<()> {
-        let bootstrap = json!({"slot":START-1,"bank_hash":"left bank","accounts_hash":"left accounts",
+        let (first, last, accounts) = (FIRST.first, FIRST.last, FIRST.terminal_accounts);
+        let bootstrap = json!({"slot":first-1,"bank_hash":"left bank","accounts_hash":"left accounts",
             "last_blockhash":"left block","capitalization":5,"transaction_count":3,
             "tick_height":12,"slot_complete":true});
-        let terminal = json!({"slot":END,"bank_hash":"right-bank","accounts_hash":ACCOUNTS,
+        let terminal = json!({"slot":last,"bank_hash":"right-bank","accounts_hash":accounts,
             "last_blockhash":"right-block","capitalization":5,"transaction_count":23,
             "tick_height":35,"slot_complete":true,"write_count":6,"next_write_version":13});
-        let manifest = json!({"schema_version":1,"epoch":230,"output_slot_start":START,
-            "output_slot_count":END-START+1,"runtime":{"runtime_profile":"solana-v1.6.20"},
+        let manifest = json!({"schema_version":1,"epoch":230,"output_slot_start":first,
+            "output_slot_count":last-first+1,"runtime":{"runtime_profile":"solana-v1.6.20"},
             "worker_executable_sha256":WORKER,"bootstrap":bootstrap,"terminal":terminal});
         let prior = json!({"terminal":bootstrap});
-        let edges = json!({"bootstrap":{"slot":START-1,"blockhash":"left block"},
-            "terminal":{"slot":END,"blockhash":"right-block"}});
-        let metadata = json!({"slot":END,"metadata":{"generation":"1633495975351467"},
-            "uri":format!("gs://bucket/snapshot-{END}-{ACCOUNTS}.tar.zst#1633495975351467")});
-        let message = json!({"MESSAGE":format!("[node] {}", checkpoint_message(&terminal)?)});
-        validate_segment(&manifest, &prior, &edges, &metadata, &message)?;
+        let edges = json!({"bootstrap":{"slot":first-1,"blockhash":"left block"},
+            "terminal":{"slot":last,"blockhash":"right-block"}});
+        let metadata = json!({"slot":last,"metadata":{"generation":"1633495975351467"},
+            "uri":format!("gs://bucket/snapshot-{last}-{accounts}.tar.zst#1633495975351467")});
+        let message = json!({"MESSAGE":format!("[node] {}", checkpoint_message(last, &terminal)?)});
+        validate_predecessor(&manifest["bootstrap"], &prior)?;
+        validate_segment(&FIRST, &manifest, &edges, &metadata, &message)?;
+        let mut changed = manifest["bootstrap"].clone();
+        changed["bank_hash"] = json!("other bank");
+        assert!(validate_predecessor(&changed, &prior).is_err());
         for (path, value) in [
-            ("/bootstrap/bank_hash", json!("other bank")),
-            ("/output_slot_count", json!(END - START)),
+            ("/output_slot_count", json!(last - first)),
             ("/terminal/last_blockhash", json!("other block")),
             ("/terminal/transaction_count", json!(24)),
         ] {
             let mut changed = manifest.clone();
             *changed.pointer_mut(path).unwrap() = value;
             assert!(
-                validate_segment(&changed, &prior, &edges, &metadata, &message).is_err(),
+                validate_segment(&FIRST, &changed, &edges, &metadata, &message).is_err(),
                 "{path}"
             );
         }
         let mut changed_metadata = metadata.clone();
         changed_metadata["metadata"]["generation"] = json!("123");
-        assert!(validate_segment(&manifest, &prior, &edges, &changed_metadata, &message).is_err());
+        assert!(validate_segment(&FIRST, &manifest, &edges, &changed_metadata, &message).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn second_window_binds_the_bootstrap_snapshot_to_its_worker_checkpoint() -> Result<()> {
+        let Bootstrap::Snapshot {
+            accounts, sha256, ..
+        } = SECOND.bootstrap
+        else {
+            panic!("missing second bootstrap snapshot");
+        };
+        let slot = SECOND.first - 1;
+        let bootstrap = json!({"slot":slot,"bank_hash":"left bank","accounts_hash":accounts,
+            "last_blockhash":"left block","capitalization":5,"transaction_count":3,
+            "tick_height":12,"slot_complete":true,"write_count":0,"next_write_version":42});
+        let event = json!({"MESSAGE":checkpoint_message(slot, &bootstrap)?});
+        validate_bootstrap_checkpoint(&SECOND, &bootstrap, sha256, &event)?;
+        assert!(validate_bootstrap_checkpoint(&SECOND, &bootstrap, "different", &event).is_err());
+        let mut changed = bootstrap;
+        changed["bank_hash"] = json!("other bank");
+        assert!(validate_bootstrap_checkpoint(&SECOND, &changed, sha256, &event).is_err());
         Ok(())
     }
 }
 
-pub(super) fn collect() -> Result<Value> {
-    let launch = pinned(LAUNCH)?;
+pub(super) fn collect(second: bool) -> Result<Value> {
+    let window = if second { &SECOND } else { &FIRST };
+    let launch = pinned(window.launch)?;
     let pid = launch["main_pid"]
         .as_u64()
         .context("missing admitted producer PID")?
         .to_string();
     ensure!(
-        launch["unit"] == UNIT
-            && launch["invocation_id"] == INVOCATION
+        launch["unit"] == window.unit
+            && launch["invocation_id"] == window.invocation
             && launch["node_path"] == NODE
             && launch["worker"]["sha256"] == WORKER
             && launch["launched"] == true
             && launch["canonical_epoch_publication_authorized"] == false,
         "hourly launch claim changed"
     );
-    let edges = pinned(EDGES)?;
-    let metadata = pinned(GCS)?;
-    let before = state()?;
+    let edges = pinned(window.edges)?;
+    let metadata = pinned(window.terminal_gcs)?;
+    let before = state(window.unit)?;
     let field = |key: &str| before.get(key).map(String::as_str);
     if field("ActiveState") == Some("active") {
         ensure!(
-            field("InvocationID") == Some(INVOCATION)
+            field("InvocationID") == Some(window.invocation)
                 && field("MainPID") == Some(&pid)
                 && field("SubState") == Some("running")
                 && field("NRestarts") == Some("0"),
             "hourly producer changed"
         );
         return Ok(
-            json!({"epoch":230,"state":"replay-active","unit":UNIT,"invocation_id":INVOCATION,
-            "launch":reference(LAUNCH),"finalized_edges":reference(EDGES),"terminal_gcs":reference(GCS),
+            json!({"epoch":230,"state":"replay-active","unit":window.unit,"invocation_id":window.invocation,
+            "launch":reference(window.launch),"finalized_edges":reference(window.edges),"terminal_gcs":reference(window.terminal_gcs),
             "publication_authorized":false}),
         );
     }
@@ -267,32 +400,36 @@ pub(super) fn collect() -> Result<Value> {
             Some(""),
             Some("0"),
             Some("0")
-        ) && matches!(field("InvocationID"), Some("" | INVOCATION))
-            && !Path::new("/sys/fs/cgroup/system.slice").join(UNIT).exists(),
+        ) && matches!(field("InvocationID"), Some(invocation) if invocation.is_empty() || invocation == window.invocation)
+            && !Path::new("/sys/fs/cgroup/system.slice")
+                .join(window.unit)
+                .exists(),
         "hourly producer has not drained cleanly"
     );
     let manager = one_event(&[
         "_PID=1",
-        &format!("UNIT={UNIT}"),
-        &format!("INVOCATION_ID={INVOCATION}"),
+        &format!("UNIT={}", window.unit),
+        &format!("INVOCATION_ID={}", window.invocation),
         r"--grep=Deactivated successfully\.",
     ])?;
     ensure!(
-        manager["MESSAGE"] == format!("{UNIT}: Deactivated successfully."),
+        manager["MESSAGE"] == format!("{}: Deactivated successfully.", window.unit),
         "foreign manager terminal"
     );
     let checkpoint = native(
+        window,
         &pid,
-        &format!("historical checkpoint slot={END} "),
+        &format!("historical checkpoint slot={} ", window.last),
         &manager,
     )?;
-    let snapshot = native(&pid, "snapshot verification complete", &manager)?;
+    let snapshot = native(window, &pid, "snapshot verification complete", &manager)?;
     let reported = native(
+        window,
         &pid,
         "published verified historical segment evidence ",
         &manager,
     )?;
-    let segment_path = format!("{ARCHIVE}.segment.json");
+    let segment_path = format!("{}.segment.json", window.archive);
     ensure!(
         timestamp(&checkpoint)? <= timestamp(&snapshot)?
             && timestamp(&snapshot)? <= timestamp(&reported)?
@@ -306,14 +443,8 @@ pub(super) fn collect() -> Result<Value> {
     let segment = Path::new(&segment_path);
     let (raw, segment_identity) = read_bound(segment, 1 << 20, 1000)?;
     let manifest: Value = serde_json::from_slice(&raw)?;
-    validate_segment(
-        &manifest,
-        &pinned(PREDECESSOR)?,
-        &edges,
-        &metadata,
-        &checkpoint,
-    )?;
-    let archive = Path::new(ARCHIVE);
+    validate_segment(window, &manifest, &edges, &metadata, &checkpoint)?;
+    let archive = Path::new(window.archive);
     let meta = fs::symlink_metadata(archive)?;
     let digest = manifest["archive_sha256"]
         .as_str()
@@ -331,20 +462,55 @@ pub(super) fn collect() -> Result<Value> {
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
         "unsafe hourly archive identity"
     );
+    let mut receipt = json!({"schema":window.schema,"epoch":230,
+        "state":"local-segment-committed","unit":window.unit,"invocation_id":window.invocation,"launch":reference(window.launch),
+        "archive":{"path":archive,"native_sha256":digest,"identity":identity(&meta)},
+        "segment_manifest":{"path":segment,"sha256":sha256(&raw)},"finalized_edges":reference(window.edges),
+        "terminal_gcs":reference(window.terminal_gcs),"producer":before,
+        "checkpoint_event":checkpoint,"snapshot_event":snapshot,"segment_event":reported,"manager_event":manager,
+        "first_slot":window.first,"last_slot":window.last,"independent_archive_playback_complete":false,
+        "guard_drained":false,"publication_authorized":false});
+    match window.bootstrap {
+        Bootstrap::AdjacentSegment(predecessor) => {
+            validate_predecessor(&manifest["bootstrap"], &pinned(predecessor)?)?;
+            receipt["predecessor"] = reference(predecessor);
+        }
+        Bootstrap::Snapshot { restore, uri, .. } => {
+            let staged = pinned(restore)?;
+            ensure!(
+                staged["snapshot_slot"] == window.first - 1
+                    && staged["source"] == "generation-pinned-download"
+                    && staged["versioned_uri"] == uri
+                    && staged["remote_object"]["versioned_uri"] == uri,
+                "hourly bootstrap restore receipt changed"
+            );
+            let bootstrap = native(
+                window,
+                &pid,
+                &format!("historical checkpoint slot={} ", window.first - 1),
+                &manager,
+            )?;
+            ensure!(
+                timestamp(&bootstrap)? < timestamp(&checkpoint)?,
+                "hourly bootstrap checkpoint follows the terminal checkpoint"
+            );
+            validate_bootstrap_checkpoint(
+                window,
+                &manifest["bootstrap"],
+                staged["file"]["sha256"]
+                    .as_str()
+                    .context("bootstrap snapshot digest")?,
+                &bootstrap,
+            )?;
+            receipt["bootstrap_snapshot_restore"] = reference(restore);
+            receipt["bootstrap_checkpoint_event"] = bootstrap;
+        }
+    }
     ensure!(
-        before == state()?
+        before == state(window.unit)?
             && segment_identity == identity(&fs::symlink_metadata(segment)?)
             && identity(&meta) == identity(&fs::symlink_metadata(archive)?),
         "hourly terminal evidence changed"
     );
-    Ok(
-        json!({"schema":"foundation-epoch230-hourly-first-terminal-source-v1","epoch":230,
-        "state":"local-segment-committed","unit":UNIT,"invocation_id":INVOCATION,"launch":reference(LAUNCH),
-        "archive":{"path":archive,"native_sha256":digest,"identity":identity(&meta)},
-        "segment_manifest":{"path":segment,"sha256":sha256(&raw)},"finalized_edges":reference(EDGES),
-        "terminal_gcs":reference(GCS),"predecessor":reference(PREDECESSOR),"producer":before,
-        "checkpoint_event":checkpoint,"snapshot_event":snapshot,"segment_event":reported,"manager_event":manager,
-        "first_slot":START,"last_slot":END,"independent_archive_playback_complete":false,
-        "guard_drained":false,"publication_authorized":false}),
-    )
+    Ok(receipt)
 }
