@@ -35,6 +35,8 @@ FIRST_7871_REGISTRATION = V / "horizon230-first-7871-runtime-v1/cadence-registra
 FIRST_7871_UNIT = "horizon-qualify-230-first-7871-v1.service"
 V1627_REGISTRATION = V / "horizon230-v1627-replay-runtime-v1/cadence-registration.json"
 V1627_UNIT = "horizon-qualify-230-v1627-window-v1.service"
+ADJACENT_REGISTRATION = V / "horizon230-adjacent-99445304-runtime-v1/cadence-registration.json"
+ADJACENT_UNIT = "horizon-qualify-230-adjacent-99445304-v1.service"
 
 FIRST_7871_STATUS = FIRST_7871_REGISTRATION.parent / "repair-status-after-checkpoint-v1/completion.json"
 if FIRST_7871_STATUS.is_file():
@@ -45,6 +47,9 @@ def registration_for_sample(epoch, sample):
     if epoch != 230:
         return REGISTRATIONS[epoch]
     units = {row["producer_unit"] for row in sample["diagnostic_replays"]}
+    if ADJACENT_UNIT in units:
+        assert ADJACENT_REGISTRATION.is_file() and units.isdisjoint((V1627_UNIT, FIRST_7871_UNIT))
+        return ADJACENT_REGISTRATION
     if V1627_UNIT in units:
         assert V1627_REGISTRATION.is_file() and FIRST_7871_UNIT not in units
         return V1627_REGISTRATION
@@ -101,7 +106,8 @@ def placement(epoch, sample):
                  "sha256": "52d1e4fb7ab373cebba7994a7a0b4cdb2f0b27570b00a32d081833131bc3d9ff"}
     first, last = bound(remaining)["remaining_replay"]
     profile = bound(launch["profile"])
-    window_start, window_end = (profile["replay_bounds"][key] for key in ("first_slot", "last_slot"))
+    window = profile if registration == ADJACENT_REGISTRATION else profile["replay_bounds"]
+    window_start, window_end = window["first_slot"], window["last_slot"]
     retained = 0
     if registration == FIRST_7871_REGISTRATION:
         assert launch["unit"] == FIRST_7871_UNIT and (window_start, window_end) == (99437434, 99445304)
@@ -113,13 +119,18 @@ def placement(epoch, sample):
         retained = closed["last_slot"] - closed["first_slot"] + 1
         assert retained == closed["slot_count"] == 39522
         evidence.append(closed_ref)
-    elif registration == V1627_REGISTRATION:
-        assert launch["unit"] == V1627_UNIT and (window_start, window_end) == (99461592, 99468089)
-        prior_ref = profile["prior_drained_window"]
+    elif registration in (V1627_REGISTRATION, ADJACENT_REGISTRATION):
+        if registration == ADJACENT_REGISTRATION:
+            assert launch["unit"] == ADJACENT_UNIT and (window_start, window_end) == (99445305, 99461591)
+            prior_ref = profile["prior_terminal"]
+            earlier = bound(profile["prior_profile"])["prior_drained_window"]
+        else:
+            assert launch["unit"] == V1627_UNIT and (window_start, window_end) == (99461592, 99468089)
+            prior_ref = profile["prior_drained_window"]
+            earlier = bound(profile["sizing_predecessor"])["prior_drained_window"]
         assert prior_ref["sha256"] == "16d546332a37fccd20a7b2609908288b426276a01908c6e255db886aba6ea8d2"
         prior = bound(prior_ref)
         assert prior["guard_drained"] and prior["state"] == "local-segment-committed"
-        earlier = bound(profile["sizing_predecessor"])["prior_drained_window"]
         assert earlier["sha256"] == "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56"
         later = bound(earlier)
         assert later["guard_drained"] and later["state"] == "local-segment-committed"
@@ -137,7 +148,7 @@ def placement(epoch, sample):
             phase = "replay"
     rate = 1.6
     allowance = 12 * 3600
-    canonical_credit = 0 if registration == V1627_REGISTRATION else accepted
+    canonical_credit = 0 if registration in (V1627_REGISTRATION, ADJACENT_REGISTRATION) else accepted
     seconds = math.ceil((last - first + 1 - retained - canonical_credit) / rate) + allowance + DELIVERY_SECONDS
     path = Path(next(arg.split("=", 1)[1] for arg in profile["argv"] if arg.startswith("--horizon-output=")))
     assert path.is_relative_to(root / "work/output")

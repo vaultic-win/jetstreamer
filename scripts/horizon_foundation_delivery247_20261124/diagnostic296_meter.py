@@ -11,6 +11,7 @@ HOURLY_230 = "middle-hourly-first-v1"
 SECOND_HOURLY_230 = "middle-hourly-second-v1"
 FIRST_7871_230 = "first-7871-v1"
 V1627_230 = "v1627-window-v1"
+ADJACENT_230 = "adjacent-99445304-v1"
 RESTORE = "native-restore-v1"
 RESTORE_260 = "native-restore-260-v1"
 OVERLAP_266 = "hourly-overlap-114929697-v1"
@@ -30,6 +31,7 @@ FOCUSED = {
                         "epoch230-private-second-hourly-window"),
     FIRST_7871_230: (230, "horizon230-first-7871-runtime-v1", "epoch230-private-first-7871-window"),
     V1627_230: (230, "horizon230-v1627-replay-runtime-v1", "epoch230-private-v1627-window"),
+    ADJACENT_230: (230, "horizon230-adjacent-99445304-runtime-v1", "epoch230-private-adjacent-99445304-window"),
     RESTORE: (258, "horizon258-native-restore-runtime-v1", "epoch258-private-native-restore"),
     RESTORE_260: (260, "horizon260-native-restore-runtime-v1", "epoch260-private-native-restore"),
     OVERLAP_266: (266, "horizon266-hourly-overlap-114929697-runtime-v1", "epoch266-private-hourly-overlap"),
@@ -213,7 +215,7 @@ def register(plan, ordinary_replay=False, include_focused=True):
                for row in sample["replays"])
     }
     for version in ATTEMPTS:
-        if version == PREDECESSOR_266:
+        if version in (PREDECESSOR_266, ADJACENT_230):
             continue
         epoch = FOCUSED.get(version, (296,))[0]
         ordinary = (epoch == 296 and ordinary_replay) or epoch in ordinary_singletons
@@ -223,6 +225,10 @@ def register(plan, ordinary_replay=False, include_focused=True):
 def register_predecessor_266(plan):
     # The caller binds the matching native fleet image before adding the claim.
     register_attempt(plan, PREDECESSOR_266, ordinary_replay=False, include_focused=True)
+
+
+def register_adjacent_230(plan):
+    register_attempt(plan, ADJACENT_230, ordinary_replay=False, include_focused=True)
 
 
 def owns(row):

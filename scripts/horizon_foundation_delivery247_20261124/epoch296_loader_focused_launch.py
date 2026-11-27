@@ -107,6 +107,14 @@ V1627_230 = Scope(
     "8301ba667e1f440365cc40dcdbe4b5f69fa6d224e2e754734738908345b35cca",
     225_000_000_000, 90 << 30, 256 << 20, "48-55",
 )
+ADJACENT_230 = Scope(
+    230, V / "horizon230-adjacent-99445304-runtime-v1",
+    "horizon-qualify-230-adjacent-99445304-v1.service", "horizon-230-adjacent-99445304-protective-v1.service",
+    "epoch230-private-adjacent-99445304-window", "foundation-epoch230-adjacent-replay-roster-binding-v1",
+    "d01cf1c1a583c41e885ea74f57aea21a5e5178554e94bca16d01674a5bff1d1b",
+    "e2482b9f1a94143620adae00bc4aef749b7004fa32fd2e7671643d62f7d9470a",
+    225_000_000_000, 96 << 30, 256 << 20, "48-55",
+)
 RESTORE_258 = Scope(
     258, V / "horizon258-native-restore-runtime-v1",
     "horizon-qualify-258-native-restore-v1.service", "horizon-258-native-restore-protective-v1.service",
@@ -165,6 +173,7 @@ SCOPED_ARGS = {
     "--hourly230": HOURLY_230, "--hourly230-second": SECOND_HOURLY_230,
     "--overlap266": OVERLAP_266,
     "--predecessor266": PREDECESSOR_266,
+    "--adjacent230": ADJACENT_230,
     "--first7871-230": FIRST_7871_230, "--v1627-230": V1627_230, "--trace296": TRACE_296, "--feature296": FEATURE_296,
 }
 
@@ -219,12 +228,12 @@ def current_fit(kit, roster, root, scope, *, held=False):
     selected = cpus(scope.cpus)
     assert cpus(fit["cpus"]) == selected
     protected_cpus = selected
-    if scope in (SECOND_HOURLY_230, FIRST_7871_230, V1627_230):
+    if scope in (SECOND_HOURLY_230, FIRST_7871_230, V1627_230, ADJACENT_230):
         protected_cpus = set().union(*(cpus(Path(
             f"/sys/devices/system/cpu/cpu{cpu}/topology/thread_siblings_list"
         ).read_text().replace(",", " ")) for cpu in selected))
         assert selected <= protected_cpus
-    if scope in (FIRST_7871_230, V1627_230):
+    if scope in (FIRST_7871_230, V1627_230, ADJACENT_230):
         proof = roster["focused_230_quote"]
         assert sorted(protected_cpus) == proof["exclusive_online_cpus"] == [*range(48, 56), *range(112, 120)]
         protected_226_fit(fit)
@@ -278,7 +287,7 @@ def current_fit(kit, roster, root, scope, *, held=False):
     return {"available_disk_bytes": disk, "available_memory_bytes": available,
             "required_remaining_memory_bytes": growth, "sampled_unix_seconds": time.time(),
             **({"protected_cpus": sorted(protected_cpus)} if scope in
-               (SECOND_HOURLY_230, FIRST_7871_230, V1627_230, OVERLAP_266, PREDECESSOR_266) else {})}
+               (SECOND_HOURLY_230, FIRST_7871_230, V1627_230, ADJACENT_230, OVERLAP_266, PREDECESSOR_266) else {})}
 
 
 def prepare_hourly_tokens(ops, attempt, tokens, template, guard, hook, probe_unit):
@@ -393,13 +402,15 @@ def launch(kit, roster_ref, scope):
         tokens = V / "horizon230-first-7871-tokens-v1"
     if scope is V1627_230:
         tokens = V / "horizon230-v1627-tokens-v1"
+    if scope is ADJACENT_230:
+        tokens = V / "horizon230-adjacent-99445304-tokens-v1"
     assert not (state / "cadence-registration.json").exists()
     assert not (attempt / "admission.json").exists()
     if scope is OVERLAP_266:
         tokens = epoch266_overlap.TOKENS
     if scope is PREDECESSOR_266:
         tokens = V / "horizon266-original-predecessor-tokens-v1"
-    qualify_tokens = failed_start is not None or scope in (SECOND_HOURLY_230, FIRST_7871_230, V1627_230,
+    qualify_tokens = failed_start is not None or scope in (SECOND_HOURLY_230, FIRST_7871_230, V1627_230, ADJACENT_230,
                                                            OVERLAP_266, PREDECESSOR_266)
     assert qualify_tokens or not tokens.exists()
     roster = ops.bound(roster_ref)
@@ -430,7 +441,17 @@ def launch(kit, roster_ref, scope):
     else:
         namespace = ops.bound(ops.ref(state / "namespace.json"))
         bootstrap = ops.bound(ops.ref(state / "bootstrap-recheck.json"))["bootstrap"]
-        assert preflight["writable_private_state_validated"]
+        if scope is ADJACENT_230:
+            assert preflight["profile"] == scope.profile
+            assert namespace["mounted_device_inode_size"] == preflight["readonly_mounted_device_inode_size"]
+            assert preflight["host_guard_sees_empty_placeholders"] and not preflight["worker_execution"]
+            assert preflight["bootstrap_custody"] == profile["bootstrap_custody"]
+            custody = ops.bound(profile["bootstrap_custody"])
+            assert all(bootstrap[key] == custody["snapshot"][key] for key in ("path", "sha256"))
+            assert ops.ref(Path(profile["epoch_hashes"]["path"])) == profile["epoch_hashes"]
+            assert ops.bound(preflight["guard_validation"])["plan_sha256"] == profile["static_guard_plan"]["sha256"]
+        else:
+            assert preflight["writable_private_state_validated"]
         assert namespace["profile"] == scope.profile and namespace["host_guard_sees_empty_placeholders"]
     bindings = []
     for binding, measured in zip(profile["readonly_bindings"],
@@ -441,7 +462,7 @@ def launch(kit, roster_ref, scope):
         assert source.resolve() == source and destination.resolve() == destination
         assert destination.is_relative_to(root) and destination.stat().st_size == 0
         assert f"{info.st_dev}:{info.st_ino}:{info.st_size}" == measured
-        if scope in (FIRST_7871_230, V1627_230):
+        if scope in (FIRST_7871_230, V1627_230, ADJACENT_230):
             assert (info.st_mtime_ns, info.st_ctime_ns) == (binding["mtime_ns"], binding["ctime_ns"])
             assert info.st_nlink == 1 and not source.is_symlink()
         bindings.append(f"{source}:{destination}")
@@ -479,6 +500,8 @@ def launch(kit, roster_ref, scope):
             probe_unit = "foundation-230-first-7871-token-probe-v1"
         elif scope is V1627_230:
             probe_unit = "foundation-230-v1627-token-probe-v1"
+        elif scope is ADJACENT_230:
+            probe_unit = "foundation-230-adjacent-99445304-token-probe-v1"
         elif scope is OVERLAP_266:
             probe_unit = "foundation-266-overlap-token-probe-v1"
         elif scope is PREDECESSOR_266:
