@@ -10215,6 +10215,11 @@ fn cohort_archive_provenance(recorded: &ArchiveProvenance) -> CohortArchiveProve
             bootstrap_slot: restarted.base.bootstrap_state.slot,
             bootstrap_state_hash: restarted.base.bootstrap_state.hash,
         },
+        ArchiveProvenance::V5(restarted) => CohortArchiveProvenance {
+            bootstrap_state_kind: restarted.base.bootstrap_state_kind,
+            bootstrap_slot: restarted.base.bootstrap_state.slot,
+            bootstrap_state_hash: restarted.base.bootstrap_state.hash,
+        },
     }
 }
 

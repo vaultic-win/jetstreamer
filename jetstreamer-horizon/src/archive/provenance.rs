@@ -30,6 +30,10 @@ pub const ARCHIVE_PROVENANCE_VERSION_V3: u16 = 3;
 /// raw-write continuity or a registered cross-runtime V3 handoff.
 pub const ARCHIVE_PROVENANCE_VERSION_V4: u16 = 4;
 
+/// Snapshot-bound segments containing both a change of worker identity and
+/// an independent restart of an identical producer.
+pub const ARCHIVE_PROVENANCE_VERSION_V5: u16 = 5;
+
 /// Upper bound for a structured provenance envelope.
 pub const MAX_ARCHIVE_PROVENANCE_BYTES: usize = 16 << 10;
 
@@ -464,8 +468,41 @@ pub struct ArchiveProvenanceV4 {
 
 impl ArchiveProvenanceV4 {
     pub fn validate(&self) -> Result<(), ArchiveProvenanceError> {
-        self.base.validate_segments(true)
+        self.base
+            .validate_segments(SegmentPolicy::SameRuntimeRestarts)
     }
+}
+
+/// Mixed historical workers with an independently loaded snapshot at each handoff.
+/// Each original worker digest, generation, checkpoint tuple, snapshot digest,
+/// and raw cursor mapping is recorded by the shared segment layout.
+#[derive(Encode, Decode, Debug, Clone, PartialEq, Eq)]
+pub struct ArchiveProvenanceV5 {
+    pub base: ArchiveProvenanceV3,
+}
+
+impl ArchiveProvenanceV5 {
+    pub fn validate(&self) -> Result<(), ArchiveProvenanceError> {
+        self.base.validate_segments(SegmentPolicy::MixedRestarts)?;
+        let segments = &self.base.runtime_segments;
+        let changes_runtime = segments
+            .windows(2)
+            .any(|pair| !pair[0].has_same_runtime_identity(&pair[1]));
+        let repeats_producer = segments
+            .windows(2)
+            .any(|pair| pair[0].has_same_producer_identity(&pair[1]));
+        if !changes_runtime || !repeats_producer {
+            return Err(ArchiveProvenanceError::MissingMixedRestartBoundaries);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SegmentPolicy {
+    RuntimeTransitions,
+    SameRuntimeRestarts,
+    MixedRestarts,
 }
 
 impl ArchiveProvenanceV1 {
@@ -502,10 +539,10 @@ impl ArchiveProvenanceV3 {
     /// segments. Producers must establish those facts before constructing the
     /// envelope; consumers still need an authenticated archive source.
     pub fn validate(&self) -> Result<(), ArchiveProvenanceError> {
-        self.validate_segments(false)
+        self.validate_segments(SegmentPolicy::RuntimeTransitions)
     }
 
-    fn validate_segments(&self, checkpoint_restarts: bool) -> Result<(), ArchiveProvenanceError> {
+    fn validate_segments(&self, policy: SegmentPolicy) -> Result<(), ArchiveProvenanceError> {
         validate_text("assembly_profile", &self.assembly_profile)?;
         let requested_end = self.requested_slot_end()?;
 
@@ -530,13 +567,15 @@ impl ArchiveProvenanceV3 {
         let mut expected_archive_write_start = None;
         for (index, segment) in self.runtime_segments.iter().enumerate() {
             let segment_end = segment.validate(index)?;
-            if checkpoint_restarts {
+            if policy != SegmentPolicy::RuntimeTransitions {
                 if segment.worker_executable_sha256.is_none()
                     || segment.worker_executable_sha256 == Some([0; 32])
                 {
                     return Err(ArchiveProvenanceError::CheckpointRestartWorkerUnbound { index });
                 }
-                if index > 0 && !self.runtime_segments[index - 1].has_same_runtime_identity(segment)
+                if policy == SegmentPolicy::SameRuntimeRestarts
+                    && index > 0
+                    && !self.runtime_segments[index - 1].has_same_runtime_identity(segment)
                 {
                     return Err(ArchiveProvenanceError::CheckpointRestartRuntimeMismatch { index });
                 }
@@ -548,7 +587,7 @@ impl ArchiveProvenanceV3 {
                     actual_start: segment.slot_start,
                 });
             }
-            if !checkpoint_restarts
+            if policy == SegmentPolicy::RuntimeTransitions
                 && index > 0
                 && self.runtime_segments[index - 1].has_same_producer_identity(segment)
             {
@@ -598,7 +637,7 @@ impl ArchiveProvenanceV3 {
         }
 
         for (index, handoff) in self.handoffs.iter().enumerate() {
-            if checkpoint_restarts
+            if policy != SegmentPolicy::RuntimeTransitions
                 && handoff.successor_bootstrap_kind != BootstrapStateKind::SnapshotArchive
             {
                 return Err(ArchiveProvenanceError::CheckpointRestartRequiresSnapshot { index });
@@ -687,6 +726,8 @@ pub enum ArchiveProvenance {
     V3(ArchiveProvenanceV3),
     /// Provenance envelope version 4, recording same-runtime snapshot restarts.
     V4(ArchiveProvenanceV4),
+    /// Snapshot restarts combining an exact repeated producer with a worker transition.
+    V5(ArchiveProvenanceV5),
 }
 
 impl ArchiveProvenance {
@@ -697,25 +738,26 @@ impl ArchiveProvenance {
             Self::V2(_) => ARCHIVE_PROVENANCE_VERSION_V2,
             Self::V3(_) => ARCHIVE_PROVENANCE_VERSION_V3,
             Self::V4(_) => ARCHIVE_PROVENANCE_VERSION_V4,
+            Self::V5(_) => ARCHIVE_PROVENANCE_VERSION_V5,
         }
     }
 
     /// Returns common v1 fields for one uninterrupted producer.
     ///
-    /// Multi-runtime V3 and checkpoint-restarted V4 cannot be projected into
+    /// Multi-segment V3, V4 and V5 cannot be projected into
     /// V1 without losing material generation and checkpoint evidence.
     pub const fn single_runtime_v1(&self) -> Option<&ArchiveProvenanceV1> {
         match self {
             Self::V1(value) => Some(value),
             Self::V2(value) => Some(&value.base),
-            Self::V3(_) | Self::V4(_) => None,
+            Self::V3(_) | Self::V4(_) | Self::V5(_) => None,
         }
     }
 
     /// SHA-256 of the out-of-process historical worker for a single-runtime
     /// archive.
     ///
-    /// The outer `Option` is `None` for V3 and V4: callers must inspect the
+    /// The outer `Option` is `None` for V3, V4 and V5: callers must inspect the
     /// complete segment/checkpoint policy, not silently admit them as V2.
     /// For one uninterrupted producer, the inner value is absent only for
     /// V1, which predates executable binding.
@@ -723,7 +765,7 @@ impl ArchiveProvenance {
         match self {
             Self::V1(_) => Some(None),
             Self::V2(value) => Some(Some(value.worker_executable_sha256)),
-            Self::V3(_) | Self::V4(_) => None,
+            Self::V3(_) | Self::V4(_) | Self::V5(_) => None,
         }
     }
 
@@ -737,6 +779,10 @@ impl ArchiveProvenance {
             ),
             Self::V3(value) => (value.requested_slot_start, value.requested_slot_count),
             Self::V4(value) => (
+                value.base.requested_slot_start,
+                value.base.requested_slot_count,
+            ),
+            Self::V5(value) => (
                 value.base.requested_slot_start,
                 value.base.requested_slot_count,
             ),
@@ -754,6 +800,7 @@ impl ArchiveProvenance {
             Self::V2(value) => value.base.validate(),
             Self::V3(value) => value.validate(),
             Self::V4(value) => value.validate(),
+            Self::V5(value) => value.validate(),
         }
     }
 
@@ -803,12 +850,22 @@ impl From<ArchiveProvenanceV4> for ArchiveProvenance {
     }
 }
 
+impl From<ArchiveProvenanceV5> for ArchiveProvenance {
+    fn from(value: ArchiveProvenanceV5) -> Self {
+        Self::V5(value)
+    }
+}
+
 /// Errors returned only when structured provenance is explicitly encoded or
 /// parsed.
 #[derive(Debug, thiserror::Error)]
 pub enum ArchiveProvenanceError {
     #[error("non-empty archive provenance has an unknown magic prefix")]
     BadMagic,
+    #[error(
+        "mixed checkpoint provenance requires both a changed runtime and an identical producer restart"
+    )]
+    MissingMixedRestartBoundaries,
     #[error("archive provenance envelope is truncated")]
     Truncated,
     #[error("unsupported archive provenance version {0}")]
@@ -825,7 +882,7 @@ pub enum ArchiveProvenanceError {
     },
     #[error("archive provenance requested slot range overflows u64")]
     SlotRangeOverflow,
-    #[error("archive provenance has {actual} runtime segments; expected {min}..={max} for V3/V4")]
+    #[error("archive provenance has {actual} runtime segments; expected {min}..={max} for multi-segment provenance")]
     InvalidRuntimeSegmentCount {
         actual: usize,
         min: usize,
@@ -978,6 +1035,9 @@ pub fn encode_archive_provenance(
         ArchiveProvenance::V4(value) => value
             .encode_ext(&mut encoded, None)
             .map_err(ArchiveProvenanceError::Encode)?,
+        ArchiveProvenance::V5(value) => value
+            .encode_ext(&mut encoded, None)
+            .map_err(ArchiveProvenanceError::Encode)?,
     };
     if encoded.len() > MAX_ARCHIVE_PROVENANCE_BYTES {
         return Err(ArchiveProvenanceError::TooLarge {
@@ -1076,6 +1136,20 @@ pub fn decode_archive_provenance(
             .map_err(ArchiveProvenanceError::Decode)?;
             value.validate()?;
             ArchiveProvenance::V4(value)
+        }
+        ARCHIVE_PROVENANCE_VERSION_V5 => {
+            let value: ArchiveProvenanceV5 = decode_exact_with_limits(
+                payload,
+                None,
+                DecodeLimits::new(
+                    payload.len(),
+                    MAX_ARCHIVE_PROVENANCE_TEXT_BYTES,
+                    MAX_ARCHIVE_PROVENANCE_BYTES,
+                ),
+            )
+            .map_err(ArchiveProvenanceError::Decode)?;
+            value.validate()?;
+            ArchiveProvenance::V5(value)
         }
         other => return Err(ArchiveProvenanceError::UnsupportedVersion(other)),
     };

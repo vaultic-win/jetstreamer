@@ -3,8 +3,8 @@
 //! Sources are decoded and re-encoded in event order. This is intentionally
 //! not a bucket concatenation operation: runtime-local account write versions
 //! are checked and rebased, and PoH continuity is checked across every bucket
-//! and source boundary before an explicit V3 (cross-runtime) or V4
-//! (same-runtime checkpoint-restart) provenance envelope is attached.
+//! and source boundary before a V3 (cross-runtime), V4 (same-runtime restart),
+//! or V5 (mixed-worker restart) provenance envelope is attached.
 
 use std::io::{Read, Seek, SeekFrom, Write};
 
@@ -15,10 +15,10 @@ use crate::{account_updates::AccountUpdateView, transactions::Transaction};
 
 use super::{
     ARCHIVE_PROVENANCE_VERSION_V1, ArchiveFormatError, ArchiveProvenance, ArchiveProvenanceError,
-    ArchiveProvenanceV2, ArchiveProvenanceV3, ArchiveProvenanceV4, ArchiveReader, ArchiveStats,
-    ArchiveWriter, ArchiveWriterConfig, BlockNotification, BucketHeader, ChainMismatchPolicy,
-    Consumption, EntryRecord, EpochMeta, FORMAT_VERSION_V2, RuntimeSegmentProvenance,
-    SemanticDigest, SlotKind, SlotVisitor, WriteVersionNormalization,
+    ArchiveProvenanceV2, ArchiveProvenanceV3, ArchiveProvenanceV4, ArchiveProvenanceV5,
+    ArchiveReader, ArchiveStats, ArchiveWriter, ArchiveWriterConfig, BlockNotification,
+    BucketHeader, ChainMismatchPolicy, Consumption, EntryRecord, EpochMeta, FORMAT_VERSION_V2,
+    RuntimeSegmentProvenance, SemanticDigest, SlotKind, SlotVisitor, WriteVersionNormalization,
 };
 
 /// Counters from one verified multi-segment assembly.
@@ -84,7 +84,7 @@ impl<R> RuntimeSegmentSource<R> {
     /// Binds a selected prefix without copying or relabeling the larger source.
     /// `selected_terminal_last_blockhash` is the selected checkpoint, NOT the
     /// original container's final block. Only the separate retained-prefix V4
-    /// entry point accepts this source; ordinary V3/V4 assembly rejects it.
+    /// entry point accepts this source; ordinary complete-source assembly rejects it.
     pub fn retained_prefix(
         reader: R,
         whole_source_sha256: [u8; 32],
@@ -320,6 +320,33 @@ where
         writer_config,
         &provenance.base,
         ArchiveProvenance::V4(provenance.clone()),
+        false,
+    )
+}
+
+/// Assembles independently verified single-runtime sources across mixed-worker
+/// snapshot boundaries. Every input must be a complete V2 stream for exactly
+/// its declared segment. A separately qualified virtual stream can supply a
+/// clipped boundary without writing an intermediate archive.
+pub fn merge_mixed_checkpoint_segments<R, W>(
+    sources: Vec<RuntimeSegmentSource<R>>,
+    sink: W,
+    writer_config: ArchiveWriterConfig,
+    provenance: &ArchiveProvenanceV5,
+) -> Result<(W, MultiSegmentMergeStats), MultiSegmentMergeError>
+where
+    R: Read + Seek,
+    W: Write,
+{
+    provenance
+        .validate()
+        .map_err(MultiSegmentMergeError::InvalidDestinationProvenance)?;
+    merge_validated_segments(
+        sources,
+        sink,
+        writer_config,
+        &provenance.base,
+        ArchiveProvenance::V5(provenance.clone()),
         false,
     )
 }
@@ -649,7 +676,8 @@ fn prepare_source<R: Read + Seek>(
                 actual: ARCHIVE_PROVENANCE_VERSION_V1,
             });
         }
-        value @ (ArchiveProvenance::V3(_) | ArchiveProvenance::V4(_)) => {
+        value
+        @ (ArchiveProvenance::V3(_) | ArchiveProvenance::V4(_) | ArchiveProvenance::V5(_)) => {
             return Err(MultiSegmentMergeError::SourceProvenanceVersion {
                 index,
                 actual: value.version(),
@@ -1660,6 +1688,110 @@ mod tests {
             ..first
         };
         ArchiveProvenanceV4 { base }
+    }
+
+    #[test]
+    fn mixed_snapshot_restarts_keep_three_worker_cursors_and_both_checkpoints() {
+        let mut base = fixture_provenance();
+        base.requested_slot_count = 3;
+        let second = base.runtime_segments[1].clone();
+        let normalized = second.write_versions.archive_end_exclusive().unwrap();
+        base.runtime_segments.push(RuntimeSegmentProvenance {
+            slot_start: FIRST_SLOT + 2,
+            write_versions: WriteVersionNormalization {
+                worker_start: 600,
+                worker_end_exclusive: 601,
+                archive_start: normalized,
+            },
+            ..second
+        });
+        let predecessor = RuntimeStateCheckpoint {
+            slot: FIRST_SLOT + 1,
+            next_write_version: base.runtime_segments[1].write_versions.worker_end_exclusive,
+            last_blockhash: hash(0x30),
+            ..base.handoffs[0].successor
+        };
+        base.handoffs.push(RuntimeHandoffProvenance {
+            boundary_slot: FIRST_SLOT + 2,
+            predecessor,
+            successor: RuntimeStateCheckpoint {
+                next_write_version: 600,
+                ..predecessor
+            },
+            successor_bootstrap_archive_sha256: [0xc7; 32],
+            ..base.handoffs[0]
+        });
+        assert!(base.validate().is_err());
+        assert!(
+            ArchiveProvenanceV4 { base: base.clone() }
+                .validate()
+                .is_err()
+        );
+        assert!(
+            ArchiveProvenanceV5 {
+                base: fixture_provenance()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            ArchiveProvenanceV5 {
+                base: fixture_restart_provenance().base
+            }
+            .validate()
+            .is_err()
+        );
+
+        let mut pieces = fixture_sources(&base);
+        pieces.push(write_source(
+            &base,
+            2,
+            &[600],
+            hash(0x30),
+            hash(0x40),
+            Some(source_provenance(&base, 2).into()),
+        ));
+        let sources = pieces
+            .into_iter()
+            .zip([0x20, 0x30, 0x40])
+            .map(|(bytes, terminal)| {
+                let sha = Sha256::digest(&bytes).into();
+                RuntimeSegmentSource::new(Cursor::new(bytes), sha, hash(terminal))
+            })
+            .collect();
+        let provenance = ArchiveProvenanceV5 { base };
+        let (bytes, stats) = merge_mixed_checkpoint_segments(
+            sources,
+            Vec::new(),
+            ArchiveWriterConfig::default(),
+            &provenance,
+        )
+        .unwrap();
+        assert_eq!(stats.slots_merged, 3);
+        let mut reader = ArchiveReader::open(Cursor::new(bytes)).unwrap();
+        assert_eq!(
+            reader.provenance().unwrap(),
+            Some(ArchiveProvenance::V5(provenance.clone()))
+        );
+        reader.verify_chain = true;
+        reader.chain_mismatch_policy = ChainMismatchPolicy::Reject;
+        let mut observed = WriteVersionCollector::default();
+        assert_eq!(reader.read_slots(FIRST_SLOT, 3, &mut observed).unwrap(), 3);
+        assert_eq!(observed.versions, [1000, 1001, 1002, 1003, 1004, 1005]);
+        assert_eq!(observed.epochs, [(EPOCH, FIRST_SLOT, 3, FIRST_SLOT)]);
+
+        let mut wrong = provenance.clone();
+        wrong.base.handoffs[1].successor.next_write_version += 1;
+        assert!(wrong.validate().is_err());
+        let mut wrong = provenance.clone();
+        wrong.base.handoffs[0].successor_bootstrap_kind = BootstrapStateKind::CarriedBank;
+        assert!(wrong.validate().is_err());
+        let mut wrong = provenance.clone();
+        wrong.base.handoffs[1].successor_bootstrap_archive_sha256 = [0; 32];
+        assert!(wrong.validate().is_err());
+        let mut wrong = provenance;
+        wrong.base.runtime_segments[0].worker_executable_sha256 = None;
+        assert!(wrong.validate().is_err());
     }
 
     fn retained_prefix_fixture(
