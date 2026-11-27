@@ -29,7 +29,8 @@ const STATE: &str =
 const SOURCE: &str = "/home/sol/.jetstreamer-private/epochs175-200-20260922-v1/lane-m/private/destination-1046bb4e16672cd81d120ecccbaaa9e559f9fcdaffc50e978ee4ce228c77732e/work/root-cohort-185-185/run-722680-1790806113840176891/archives/epoch-185.jet";
 const HASH: &str = "40dd56a324dc5e3abb3766a95c8189a02c7b7ace61cf2c9bc0f665c4dbc2415d";
 const LENGTH: u64 = 54_996_291_524;
-const PEAK: u64 = 110_009_360_264;
+const TWO_COPY_PEAK: u64 = 110_009_360_264;
+const SINGLE_COPY_PEAK: u64 = LENGTH + (16 << 20);
 const SLOT: u64 = 123_350_028_052;
 const UNIT: &str = "horizon-closed185-lanem-main-restore-20261127-v1.service";
 
@@ -423,7 +424,10 @@ async fn qualify(self_sha: &str) -> Result<()> {
     .await?;
     f.sync_all()?;
     valid_checksum(&mut f, LENGTH, GENESIS)?;
-    let destination = dir.join("qualified-genesis.data");
+    let destination = dir.join(format!(
+        "qualified-genesis-{}.data",
+        env::var("INVOCATION_ID")?
+    ));
     link_noreplace(&f, &destination)?;
     ensure!(
         link_noreplace(&f, &destination).is_err(),
@@ -485,7 +489,8 @@ async fn run() -> Result<()> {
             && plan["sha256"] == HASH
             && plan["length"] == LENGTH
             && plan["serial_restore_reservation"] == SLOT
-            && plan["two_copy_peak"] == PEAK
+            && plan["two_copy_peak"] == TWO_COPY_PEAK
+            && plan["single_copy_peak"] == SINGLE_COPY_PEAK
             && plan["restore_before_consumer"] == true
             && issued <= now
             && now - issued <= 120,
@@ -661,12 +666,12 @@ async fn run() -> Result<()> {
             "restored destination changed"
         );
     } else {
-        storage_guard(&plan, &fleet, dir, PEAK)?;
+        storage_guard(&plan, &fleet, dir, SINGLE_COPY_PEAK)?;
         let mut f = scratch(dir)?;
         let mut checked = Instant::now();
         receive(&client, &key, etag, LENGTH, HASH, &mut f, |bytes, next| {
             if checked.elapsed() >= Duration::from_secs(8) {
-                storage_guard(&plan, &fleet, dir, PEAK - bytes)?;
+                storage_guard(&plan, &fleet, dir, SINGLE_COPY_PEAK - bytes)?;
                 checked = Instant::now();
             }
             require_space(
@@ -677,7 +682,7 @@ async fn run() -> Result<()> {
         })
         .await?;
         f.sync_all()?;
-        storage_guard(&plan, &fleet, dir, PEAK - LENGTH)?;
+        storage_guard(&plan, &fleet, dir, SINGLE_COPY_PEAK - LENGTH)?;
         check_head(&head().await?)?;
         install(dir, src, f)?;
     }
