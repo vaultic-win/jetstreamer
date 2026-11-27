@@ -33,7 +33,7 @@ REPO = HOME / "workspace/jetstreamer"
 OUTPUT = PRIVATE / "epoch168-private-assembly-20261127-v1/output"
 LOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 UNIT = "horizon-assemble-168-private-20261127-v1.service"
-EVENT_UNIT = "horizon-168-assembly-on-reclamation-20261127-v2"
+EVENT_UNIT = "horizon-168-assembly-on-reclamation-20261127-v3"
 RELEASES = {
     "185": MAIN185 / "MEASURED_LOCAL_RECLAMATION.json",
     "186m": ROTATION / "M_SERIAL_HANDBACK.json",
@@ -236,26 +236,37 @@ def source_head(build, launch):
 
     inherited = os.environ.get("SSH_AUTH_SOCK")
     candidates = ([Path(inherited)] if inherited else []) + sorted(Path("/tmp").glob("ssh-*/agent.*"))
-    agent = None
-    for candidate in candidates:
+    remote_args = ("ls-remote", "--exit-code", "origin", "refs/heads/account-updates")
+    remote = None
+    for candidate in dict.fromkeys(candidates):
         try:
             st = candidate.lstat()
         except FileNotFoundError:
             continue
         if not stat.S_ISSOCK(st.st_mode) or st.st_uid != HOME.stat().st_uid:
             continue
-        probe = subprocess.run(
-            ["/usr/sbin/runuser", "-u", "sol", "--", "/usr/bin/env", f"SSH_AUTH_SOCK={candidate}",
-             "/usr/bin/ssh-add", "-l"], capture_output=True, timeout=5,
-        )
-        if probe.returncode == 0:
-            agent = candidate
+        prefix = ["/usr/sbin/runuser", "-u", "sol", "--", "/usr/bin/env",
+                  f"SSH_AUTH_SOCK={candidate}"]
+        probe = subprocess.run([*prefix, "/usr/bin/ssh-add", "-l"], capture_output=True, timeout=5)
+        if probe.returncode != 0:
+            continue
+        try:
+            probe = subprocess.run(
+                [*prefix, "/usr/bin/git", "-C", str(REPO), *remote_args],
+                capture_output=True, text=True, timeout=8,
+            )
+        except subprocess.TimeoutExpired:
+            continue
+        fields = probe.stdout.split()
+        if (probe.returncode == 0 and len(fields) == 2
+                and fields[1] == "refs/heads/account-updates" and re.fullmatch(r"[0-9a-f]{40}", fields[0])):
+            os.environ["SSH_AUTH_SOCK"] = str(candidate)
+            remote = fields[0]
             break
-    need(agent is not None, "no live repository SSH agent for sol")
-    os.environ["SSH_AUTH_SOCK"] = str(agent)
+    need(remote is not None, "no live sol SSH agent can read origin/account-updates")
     if launch:
         git("fetch", "--quiet", "origin", "refs/heads/account-updates")
-    remote = git("ls-remote", "--exit-code", "origin", "refs/heads/account-updates", text=True).split()[0]
+        remote = git(*remote_args, text=True).split()[0]
     git("merge-base", "--is-ancestor", COMMIT, remote)
     for name, expected in build["source_files"].items():
         need(hashlib.sha256(git("show", f"{COMMIT}:{name}")).hexdigest() == expected,
