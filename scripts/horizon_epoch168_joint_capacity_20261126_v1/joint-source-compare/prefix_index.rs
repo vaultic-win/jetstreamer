@@ -12,6 +12,8 @@ use lencode::prelude::*;
 use xxhash_rust::xxh64::xxh64;
 
 mod assembly_sources;
+#[path = "../../horizon_epoch167_checkpoint_recovery/selected_prefix.rs"]
+mod epoch167;
 mod joint_compare;
 mod selected_prefix;
 
@@ -172,6 +174,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let argv: Vec<_> = std::env::args().skip(1).collect();
     match argv.as_slice() {
         [selector, sha256] if selector == "--compare-joint" => joint_compare::run(sha256),
+        [selector] if selector == "--select-epoch167-prefix" => epoch167::run(),
         [selector] if selector == "--select-retry4-prefix" => selected_prefix::run(),
         [selector] if selector == "--inspect-assembly-layout" => assembly_sources::inspect_layout(),
         [selector, path, sha256] if selector == "--check-assembly-sources" => {
@@ -188,7 +191,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "expected --compare-joint SHA, --select-retry4-prefix, or --check-assembly-sources/--qualify-assembly-sources LINEAGE SHA, or --check-private-assembly-plan/--assemble-private PLAN SHA",
+            "expected --compare-joint SHA, --select-retry4-prefix, --select-epoch167-prefix, or --check-assembly-sources/--qualify-assembly-sources LINEAGE SHA, or --check-private-assembly-plan/--assemble-private PLAN SHA",
         )
         .into()),
     }

@@ -1,6 +1,6 @@
-//! Select and verify the contiguous retry4 prefix with no archive-sized writes.
+//! Select and verify a contiguous retained V2 prefix with no archive-sized writes.
 use std::{
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     io::{self, Read, Seek, SeekFrom},
     ops::Range,
     os::unix::fs::OpenOptionsExt,
@@ -639,8 +639,38 @@ pub(super) fn hex(digest: &[u8]) -> String {
     out
 }
 
+pub(super) struct PrefixScope {
+    pub(super) schema: &'static str,
+    pub(super) path: &'static str,
+    pub(super) epoch: u64,
+    pub(super) first: u64,
+    pub(super) physical_end: u64,
+    pub(super) bytes: u64,
+    pub(super) source_sha: &'static str,
+    pub(super) seam: u64,
+    pub(super) seam_hash: &'static str,
+    pub(super) next_raw: Option<u64>,
+    pub(super) check_identity: fn(&File) -> io::Result<()>,
+}
+
 pub(super) fn run() -> Result<()> {
-    let path = Path::new(INPUT);
+    verify(&PrefixScope {
+        schema: "horizon-epoch168-private-selected-prefix-evidence-v1",
+        path: INPUT,
+        epoch: 168,
+        first: FIRST,
+        physical_end: END,
+        bytes: BYTES,
+        source_sha: SOURCE_SHA,
+        seam: SEAM,
+        seam_hash: SEAM_HASH,
+        next_raw: None,
+        check_identity: original_identity,
+    })
+}
+
+pub(super) fn verify(scope: &PrefixScope) -> Result<()> {
+    let path = Path::new(scope.path);
     check(
         path.canonicalize()? == path,
         "source archive path crosses a link",
@@ -649,54 +679,65 @@ pub(super) fn run() -> Result<()> {
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(path)?;
-    original_identity(&input)?;
+    (scope.check_identity)(&input)?;
     let (original, metadata, entries) = {
-        let reader = ArchiveReader::open(PrefixView::open(&mut input, 168, FIRST, END)?)?;
+        let reader = ArchiveReader::open(PrefixView::open(
+            &mut input,
+            scope.epoch,
+            scope.first,
+            scope.physical_end,
+        )?)?;
         let header = reader.header().clone();
         let p = reader
             .provenance()?
             .ok_or_else(|| invalid("source provenance missing"))?;
         let ranges = reader.bucket_index();
-        let n = ranges.partition_point(|x| x.first_slot <= SEAM);
+        let n = ranges.partition_point(|x| x.first_slot <= scope.seam);
         (header, p, ranges[..n].to_vec())
     };
-    let layout = cut(&mut input, &original, metadata, &entries, SEAM + 1)?;
-    boundaries(&mut input, &original, &entries, &layout, SEAM + 1)?;
+    let layout = cut(&mut input, &original, metadata, &entries, scope.seam + 1)?;
+    boundaries(&mut input, &original, &entries, &layout, scope.seam + 1)?;
     let (source_hash, selected_hash, bytes) = hashes(&mut input, &layout)?;
     check(
-        bytes == BYTES && hex(&source_hash) == SOURCE_SHA,
+        bytes == scope.bytes && hex(&source_hash) == scope.source_sha,
         "source archive digest changed",
     )?;
-    original_identity(&input)?;
-    eprintln!("retry4 source SHA-256 verified; independently decoding the selected prefix");
+    (scope.check_identity)(&input)?;
+    eprintln!(
+        "epoch {} source SHA-256 verified; independently decoding the selected prefix",
+        scope.epoch
+    );
     let selected = Selected {
         source: &mut input,
         bytes: &layout,
         at: 0,
     };
-    let verified = semantic_read(selected, SEAM + 1)?;
+    let verified = semantic_read(selected, scope.seam + 1)?;
     let terminal = bs58::encode(verified.last_hash).into_string();
     check(
-        verified.last_block == Some(SEAM)
-            && terminal == SEAM_HASH
+        verified.last_block == Some(scope.seam)
+            && terminal == scope.seam_hash
+            && scope
+                .next_raw
+                .is_none_or(|expected| verified.next_raw == Some(expected))
             && verified
                 .first_raw
                 .zip(verified.next_raw)
                 .is_some_and(|(start, end)| start < end),
         "selected archive missed its write cursor or checkpoint",
     )?;
-    original_identity(&input)?;
+    (scope.check_identity)(&input)?;
     let reopened = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(path)?;
-    original_identity(&reopened)?;
+    (scope.check_identity)(&reopened)?;
     println!(
         "{}",
         json!({
-            "schema":"horizon-epoch168-private-selected-prefix-evidence-v1",
-            "source_archive_sha256":SOURCE_SHA,"selected_archive_sha256":hex(&selected_hash),
-            "selected_semantic_sha256":hex(&verified.semantic),"first_slot":FIRST,"last_slot":SEAM,
+            "schema":scope.schema,
+            "source_archive_sha256":scope.source_sha,"selected_archive_sha256":hex(&selected_hash),
+            "selected_semantic_sha256":hex(&verified.semantic),"first_slot":scope.first,"last_slot":scope.seam,
             "terminal_blockhash":terminal,"raw_start":verified.first_raw,"raw_end_exclusive":verified.next_raw,
             "independently_decoded":true,"selected_archive_bytes":layout.len(),
             "unchanged_source_extent":{"offset":layout.middle.start,"length":layout.middle_len()},

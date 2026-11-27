@@ -24,3 +24,4 @@ xxhash-rust = { version = "0.8", features = ["xxh64"] }
 
 zstd = "0.13"
 bs58 = "0.5"
+tempfile = "3"
