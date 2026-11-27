@@ -1,0 +1,76 @@
+{
+  "terminal": {
+    "schema": "horizon-epoch170-full-metered-guard-stop-v1",
+    "epoch": 170,
+    "producer_unit": "horizon-qualify-170-full-metered-20261124-v1.service",
+    "producer_pid": 3667208,
+    "producer_start_ticks": 404163368,
+    "resource_credit_bytes": 0,
+    "reservation_ending_bytes": 0,
+    "private_output_preserved": true,
+    "archive_ready": false,
+    "all_twelve_witness_file_identities_preserved": true,
+    "producer_invocation_id": "34e13d0e054d48d88337d3673f241695",
+    "admission": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-full-metered-rebook-20261124-v1/ACTUAL_ADMISSION_AND_PROTECTION.json",
+      "sha256": "0ba6cb1ae54b235c75464875b5bc741df55f7751deb20a45ef8624c91d540b51"
+    },
+    "plan": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-raised-guard-qualification-20261126-v1/RAISED_PLAN.json",
+      "sha256": "c1fbed457d58edd6c5c7815e12a2f44086d47cbfaff92717033314b19fd12cd8"
+    },
+    "pid1_terminal_event": {
+      "_PID": "1",
+      "UNIT": "horizon-qualify-170-full-metered-20261124-v1.service",
+      "INVOCATION_ID": "34e13d0e054d48d88337d3673f241695",
+      "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448"
+    }
+  },
+  "worker": {
+    "producer_invocation_id": "34e13d0e054d48d88337d3673f241695",
+    "admission": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-full-metered-rebook-20261124-v1/ACTUAL_ADMISSION_AND_PROTECTION.json",
+      "sha256": "0ba6cb1ae54b235c75464875b5bc741df55f7751deb20a45ef8624c91d540b51"
+    },
+    "worker_pid": 3667695,
+    "worker_start_ticks": 404169190,
+    "worker_sha256": "b0219574172b54b251b4f2feda6285ca3b6bee5f2830a0d46e69ee8ea2275541",
+    "producer_unit": "horizon-qualify-170-full-metered-20261124-v1.service",
+    "producer_pid": 3667208
+  },
+  "admission": {
+    "producer_invocation_id": "34e13d0e054d48d88337d3673f241695",
+    "producer_unit": "horizon-qualify-170-full-metered-20261124-v1.service",
+    "start_ticks": 404163368
+  },
+  "intent": {
+    "producer_invocation_id": "34e13d0e054d48d88337d3673f241695",
+    "reason": "DATA-fulfillment-observation-failed",
+    "plan_sha256": "c1fbed457d58edd6c5c7815e12a2f44086d47cbfaff92717033314b19fd12cd8",
+    "sample": {
+      "trip_reason": "DATA-fulfillment-observation-failed",
+      "producer": {
+        "pid": 3667208
+      }
+    }
+  },
+  "stop": {
+    "producer_invocation_id": "34e13d0e054d48d88337d3673f241695",
+    "plan_sha256": "c1fbed457d58edd6c5c7815e12a2f44086d47cbfaff92717033314b19fd12cd8",
+    "terminal": {
+      "active": "inactive",
+      "cgroup": "",
+      "delegated": false,
+      "invocation_id": "34e13d0e054d48d88337d3673f241695",
+      "kill_mode": "control-group",
+      "load_state": "loaded",
+      "pid": 0,
+      "restart_policy": "no",
+      "restarts": 0,
+      "result": "success",
+      "sub": "dead"
+    },
+    "scratch_deleted": false,
+    "remote_mutations": false
+  }
+}
