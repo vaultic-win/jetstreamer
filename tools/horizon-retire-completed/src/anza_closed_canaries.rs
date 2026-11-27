@@ -662,7 +662,7 @@ pub(super) fn lock_first_sweep_controller() -> Result<File> {
     )
 }
 
-fn controller_lock(path: &str, inode: u64) -> Result<File> {
+pub(super) fn controller_lock(path: &str, inode: u64) -> Result<File> {
     let lock = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)

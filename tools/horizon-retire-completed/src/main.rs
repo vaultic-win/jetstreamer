@@ -23,6 +23,8 @@ use std::{
 #[cfg(feature = "anza-closed-154")]
 mod anza_closed_154;
 #[cfg(feature = "anza-closed-canaries")]
+mod anza_closed_160174;
+#[cfg(feature = "anza-closed-canaries")]
 mod anza_closed_canaries;
 #[cfg(feature = "anza-closed-canaries")]
 use anza_closed_canaries::closed_bootstrap_cohort;
@@ -360,6 +362,8 @@ fn check_target(t: &Target) -> Result<()> {
         119 | 121 | 129 | 130 | 133 | 134 | 149 | 191..=197 => anza_closed_canaries::is_target(t),
         #[cfg(feature = "anza-closed-canaries")]
         198 => closed_bootstrap_cohort::is_target(t),
+        #[cfg(feature = "anza-closed-canaries")]
+        160 | 174 => anza_closed_160174::is_target(t),
         #[cfg(feature = "anza-closed-canaries")]
         154 if anza_closed_canaries::is_target(t) => true,
         #[cfg(feature = "anza-closed-154")]
@@ -777,6 +781,12 @@ fn run() -> Result<()> {
         .contains(&198)
         .then(closed_bootstrap_cohort::lock_controllers)
         .transpose()?;
+    #[cfg(feature = "anza-closed-canaries")]
+    let closed_160174 = epochs.contains(&160) || epochs.contains(&174);
+    #[cfg(feature = "anza-closed-canaries")]
+    let _closed_160174_locks = closed_160174
+        .then(anza_closed_160174::lock_controllers)
+        .transpose()?;
     let receipts = Path::new(HOME_ROOT).join(".jetstreamer-private/r2-receipts");
     #[cfg(feature = "anza-parked-183")]
     let _holding_locks = epochs
@@ -818,6 +828,10 @@ fn run() -> Result<()> {
     #[cfg(feature = "anza-closed-canaries")]
     let canary_review = anza_closed_canaries::verify_scope(&p, &epochs, &lock)?;
     #[cfg(feature = "anza-closed-canaries")]
+    let closed_160174_review = closed_160174
+        .then(|| anza_closed_160174::verify(&p))
+        .transpose()?;
+    #[cfg(feature = "anza-closed-canaries")]
     if epochs.contains(&198) {
         closed_bootstrap_cohort::verify_scope(&p, &lock)?;
     }
@@ -845,7 +859,11 @@ fn run() -> Result<()> {
         range
     };
     #[cfg(feature = "anza-closed-canaries")]
-    let range = if epochs.contains(&198) { (195, 198) } else { range };
+    let range = if epochs.contains(&198) {
+        (195, 198)
+    } else {
+        range
+    };
     let output = Command::new(&p.inventory_binary.path)
         .env("TOKIO_WORKER_THREADS", "2")
         .arg("inventory")
@@ -883,6 +901,10 @@ fn run() -> Result<()> {
     scan_consumers(&p.targets)?;
     for t in &p.targets {
         check_target(t)?;
+    }
+    #[cfg(feature = "anza-closed-canaries")]
+    if let Some(review) = &closed_160174_review {
+        anza_closed_160174::check_owners(review)?;
     }
     if check_only {
         println!(
@@ -922,6 +944,10 @@ fn run() -> Result<()> {
         #[cfg(feature = "anza-closed-canaries")]
         if let Some(review) = &canary_review {
             anza_closed_canaries::check_owners(review)?;
+        }
+        #[cfg(feature = "anza-closed-canaries")]
+        if let Some(review) = &closed_160174_review {
+            anza_closed_160174::check_owners(review)?;
         }
         inactive(&p.inactive_units)?;
         scan_consumers(std::slice::from_ref(t))?;
