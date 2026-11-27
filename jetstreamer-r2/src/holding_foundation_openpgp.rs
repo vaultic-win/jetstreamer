@@ -13,13 +13,17 @@ pub(super) fn key_file(root: &Path, name: &str, create: bool) -> Result<PathBuf>
         pending
             .as_file()
             .set_permissions(fs::Permissions::from_mode(0o400))?;
-        persist_noclobber(pending, &path)?;
+        pending.as_file().sync_all()?;
+        pending
+            .persist_noclobber(&path)
+            .context("publish owner-only OpenPGP key")?;
+        File::open(root)?.sync_all()?;
     }
     let meta = fs::symlink_metadata(&path)?;
     ensure!(
         path.canonicalize()? == path
             && meta.is_file()
-            && meta.uid() == 0
+            && meta.uid() == unsafe { libc::geteuid() }
             && meta.nlink() == 1
             && meta.mode() & 0o7777 == 0o400
             && meta.len() == 65,
@@ -149,4 +153,26 @@ pub(super) async fn read_decrypted(
     ensure!(status?.success(), "OpenPGP remote authentication failed");
     restored??;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::DirBuilderExt;
+
+    #[test]
+    fn published_key_is_owner_only_and_reused() -> Result<()> {
+        let parent = tempfile::tempdir()?;
+        let private_root = parent.path().join("keys");
+        fs::DirBuilder::new().mode(0o700).create(&private_root)?;
+
+        let path = key_file(&private_root, "test.key", true)?;
+        let original = fs::read(&path)?;
+        assert_eq!(original.len(), 65);
+        assert_eq!(fs::metadata(&path)?.mode() & 0o7777, 0o400);
+        assert_eq!(key_file(&private_root, "test.key", true)?, path);
+        assert_eq!(key_file(&private_root, "test.key", false)?, path);
+        assert_eq!(fs::read(&path)?, original);
+        Ok(())
+    }
 }
