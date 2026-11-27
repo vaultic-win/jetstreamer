@@ -180,9 +180,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         [selector, path, sha256] if selector == "--qualify-assembly-sources" => {
             assembly_sources::run(path, sha256, true)
         }
+        [selector, path, sha256] if selector == "--check-private-assembly-plan" => {
+            assembly_sources::check_plan(path, sha256)
+        }
+        [selector, path, sha256] if selector == "--assemble-private" => {
+            assembly_sources::assemble(path, sha256)
+        }
         _ => Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "expected --compare-joint SHA, --select-retry4-prefix, or --check-assembly-sources/--qualify-assembly-sources LINEAGE SHA",
+            "expected --compare-joint SHA, --select-retry4-prefix, or --check-assembly-sources/--qualify-assembly-sources LINEAGE SHA, or --check-private-assembly-plan/--assemble-private PLAN SHA",
         )
         .into()),
     }

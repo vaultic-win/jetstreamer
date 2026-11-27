@@ -22,6 +22,10 @@ use super::{
     selected_prefix::{self as selection, Selected, hex},
 };
 
+#[path = "private_assembly.rs"]
+mod private_assembly;
+pub(super) use private_assembly::{assemble, check_plan};
+
 const EPOCH_END: u64 = 73_008_000;
 const SEAM: u64 = 72_994_766;
 const TAIL_END: u64 = 73_015_142;

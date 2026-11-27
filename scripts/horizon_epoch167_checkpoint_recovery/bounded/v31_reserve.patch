@@ -29,7 +29,7 @@
 +                        replacement167_capacity = runpy.run_path(str(HERE/"replacement167_capacity.py"))
 +                        terminal_joint168 = runpy.run_path(str(HERE/"terminal_joint168_capacity.py"))
 +                        predecessor = v31_cadence
-+                        for version in (32, 33):
++                        for version in (32, 33, 34):
 +                            successor = latest.with_name(f"tools-cold168-retry5-failed166-v{version}-entry146")
 +                            active = successor.parent/f"FAILED166_CADENCE_V{version}_ACTIVE.json"
 +                            if not active.exists():
@@ -413,25 +413,27 @@
      cost = native['epoch185_serial_cost']
 --- a/focused168_capacity.py
 +++ b/focused168_capacity.py
-@@ -15,7 +15,9 @@
+@@ -15,7 +15,10 @@
              "tools-cold168-retry5-failed166-v28-entry146",
              "tools-cold168-retry5-failed166-v29-entry146",
              "tools-cold168-retry5-failed166-v30-entry146",
 -            "tools-cold168-retry5-failed166-v31-entry146"}
 +            "tools-cold168-retry5-failed166-v31-entry146",
 +            "tools-cold168-retry5-failed166-v32-entry146",
-+            "tools-cold168-retry5-failed166-v33-entry146"}
++            "tools-cold168-retry5-failed166-v33-entry146",
++            "tools-cold168-retry5-failed166-v34-entry146"}
  FLEET_FIELD = "current_cold168_retry6_focused"
  TERMINAL_FIELD = "current_cold168_retry6_terminal"
  TERMINAL_SHA = "5e67a984da9df5350bfce86060557a18603dbac5a18a06747c272922d14b7b71"
-@@ -42,7 +44,9 @@
+@@ -42,7 +45,10 @@
                                                         "tools-cold168-retry5-failed166-v28-entry146",
                                                         "tools-cold168-retry5-failed166-v29-entry146",
                                                         "tools-cold168-retry5-failed166-v30-entry146",
 -                                                       "tools-cold168-retry5-failed166-v31-entry146")
 +                                                       "tools-cold168-retry5-failed166-v31-entry146",
 +                                                       "tools-cold168-retry5-failed166-v32-entry146",
-+                                                       "tools-cold168-retry5-failed166-v33-entry146")
++                                                       "tools-cold168-retry5-failed166-v33-entry146",
++                                                       "tools-cold168-retry5-failed166-v34-entry146")
                 and not fleet.get(FLEET_FIELD), "foreign or overlapping focused epoch 168 terminal transition")
          return inspect_terminal(s, script, fleet, authority)
      code = (
@@ -785,7 +787,7 @@
 +                resource_credit_bytes=0,reservation_ending_bytes=0)
 --- /dev/null
 +++ b/terminal_joint168_capacity.py
-@@ -0,0 +1,199 @@
+@@ -0,0 +1,268 @@
 +"""Bind the accepted joint-168 terminal to its existing full reservation."""
 +import json
 +from pathlib import Path
@@ -891,6 +893,66 @@
 +                terminal_event=exits[0],memory_bytes=2*GIB,cpu_quota_micros=1_000_000)
 +
 +
++def observe_selector(s, lane, witness):
++    from owners import ticks
++
++    root = lane['ROOT'].parent/'epoch168-retry4-selected-prefix-20261127-v1'
++    unit = 'horizon-168-retry4-selected-prefix-20261127-v1.service'
++    group = '/system.slice/'+unit
++    cgroup = Path('/sys/fs/cgroup')/group.lstrip('/')
++    fields = ('Id','InvocationID','ActiveState','SubState','MainPID','ControlPID','ControlGroup',
++              'Job','Restart','NRestarts','MemoryMax','MemorySwapMax','CPUQuotaPerSecUSec',
++              'ProtectHome','ProtectSystem','PrivateNetwork')
++    status = lane['props'](unit, fields)
++    if status['ActiveState'] in ('inactive', 'failed'):
++        s.need(status['Id'] == unit and not status['Job'] and not lane['process_members'](cgroup)
++               and all(status.get(key, '0') in ('','0') for key in ('MainPID','ControlPID'))
++               and lane['props'](unit, fields) == status, 'epoch 168 selector is not drained')
++        return None
++
++    active_ref = s.ref(root/'ACTIVE.json','f32a20461b7e4c524ffbb6d7de86288516114c2bea6020c710ca0642e2ba1b26')
++    active = s.bound(active_ref, root/'ACTIVE.json')
++    intent = s.bound(active['intent'], root/'START_INTENT.json')
++    fit = s.bound(active['fit'], root/'FIT.json')
++    program = root/'tools/horizon-168-retry4-select'
++    seal_path = program.with_name('deployment-seal-receipt.json')
++    seal = s.bound(intent['deployment'], seal_path)
++    expected_sha = intent['executable']['sha256']
++    s.need(seal['destination'] == str(program.parent)
++           and intent['executable']['path'] == str(program) and intent['fit'] == active['fit']
++           and any(row['name'] == program.name and row['mode'] == '0555'
++                   and row['sha256'] == expected_sha for row in seal['members'])
++           and witness is not None and witness['phase'] == 'complete'
++           and fit['comparator_terminal'] == witness['terminal_event']
++           and fit['overlapping_comparator'] is fit['publishes'] is False
++           and fit['archive_bytes_written'] == fit['swap_bytes'] == 0
++           and fit['memory_reserved_bytes'] == fit['independently_charged_additional_memory_bytes'] == 4*GIB
++           and fit['preserved_epoch168_comparator_cpu_quota_micros'] == 1_000_000
++           and fit['evidence_disk_allowance'] == 16 << 20,
++           'epoch 168 selector lacks its exact separate charge and drained comparator evidence')
++    pid = int(status['MainPID'])
++    proc = Path('/proc')/str(pid)
++    s.need(pid > 1 and active['pid'] == pid and ticks(pid) == active['start_ticks']
++           and active['unit'] == status['Id'] == unit
++           and active['invocation_id'] == status['InvocationID']
++           and status['ActiveState'] == 'active' and status['SubState'] == 'running'
++           and status['ControlPID'] == '0' and not status['Job'] and status['ControlGroup'] == group
++           and status['Restart'] == 'no' and status['NRestarts'] == '0'
++           and status['MemoryMax'] == str(4*GIB) and status['MemorySwapMax'] == '0'
++           and status['CPUQuotaPerSecUSec'] == '1s'
++           and status['ProtectHome'] == 'read-only' and status['ProtectSystem'] == 'strict'
++           and status['PrivateNetwork'] == 'yes' and lane['cgroup_limits'](cgroup,1_000_000,4*GIB)
++           and lane['process_members'](cgroup) == {pid}
++           and (proc/'cgroup').read_text().strip() == '0::'+group
++           and (proc/'exe').samefile(program) and lane['sha'](proc/'exe') == expected_sha
++           and lane['proc_argv'](proc) == [str(program),'--select-retry4-prefix']
++           and ticks(pid) == active['start_ticks'] and lane['props'](unit,fields) == status,
++           'epoch 168 selector crossed its native invocation, executable, or admitted limits')
++    return dict(unit=unit, invocation_id=active['invocation_id'], pid=pid,
++                start_ticks=active['start_ticks'], active=active_ref, memory_bytes=4*GIB,
++                cpu_quota_micros=1_000_000, evidence_disk_bytes=fit['evidence_disk_allowance'])
++
++
 +def settle_compute(s, combined, candidate):
 +    witness = candidate['settled_compute']
 +    if witness is None:
@@ -909,11 +971,19 @@
 +           and fit['required_available_memory_bytes'] == incumbent['existing_required_memory_bytes']+stopped_memory
 +           and fit['extra_memory_bytes'] == 52*GIB,
 +           'different paid epoch 168 compute at terminal')
++    selector = candidate['active_selector']
++    if selector is not None:
++        released_memory -= selector['memory_bytes']
++        released_cpu -= selector['cpu_quota_micros']
++        required_home = fit['required_home_bytes']+selector['evidence_disk_bytes']
++        fit.update(required_home_bytes=required_home,
++                   home_shortfall_bytes=max(0,required_home-fit['available_home_bytes']))
 +    required = fit['required_available_memory_bytes']-released_memory
 +    available = fit['available_memory_bytes']
 +    fit.update(required_available_memory_bytes=required,memory_shortfall_bytes=max(0,required-available))
 +    combined['terminal168_compute_settlement'] = dict(
-+        terminal=terminal, comparator=witness, replaced_168_memory_bytes=stopped_memory,
++        terminal=terminal, comparator=witness, active_selector=selector,
++        replaced_168_memory_bytes=stopped_memory,
 +        replaced_168_cpu_quota_micros=stopped_cpu, released_memory_bytes=released_memory,
 +        released_cpu_quota_micros=released_cpu, preserved_comparator_memory_bytes=witness['memory_bytes'],
 +        preserved_comparator_cpu_quota_micros=witness['cpu_quota_micros'],
@@ -978,10 +1048,11 @@
 +        s.need(measured == tree_size(root, cap), 'terminal joint 168 paid tree changed between complete scans')
 +    s.need(0 < measured <= quote['joint168']['whole_tree_cap_bytes'], 'terminal joint 168 exceeds paid whole-tree cap')
 +    witness = None if request['compute_release'] is None else comparator(s, lane, terminal)
++    selector = observe_selector(s, lane, witness)
 +    lane['require_idle'](s)
 +    return dict(mode='terminal', retirement=rr, physical=measured, processes=[], worker=None,
 +                unit=row['unit'], release=None, actor=actor, terminal=ref, fleet_phase=row['phase'],
-+                settled_compute=witness,
++                settled_compute=witness, active_selector=selector,
 +                enrollment=request['enrollment'], prestart=enrollment['prestart_quote'],
 +                first_fit=quote['joint168'], guard=None, reservation_ending_bytes=0,
 +                resource_credit_bytes=0, **lane['availability']())
