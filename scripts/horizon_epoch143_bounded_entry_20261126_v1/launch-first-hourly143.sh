@@ -258,7 +258,7 @@ writer_live
 screen "$a/PRESTART_SCREEN.json"
 floor=$(jq -er '
     (.available_home_bytes-.retained_required_home_bytes-.candidate_home_bytes) as $surplus
-    | .retained_required_home_bytes+([4294967296,($surplus/2|floor)]|min)' "$a/PRESTART_SCREEN.json")
+    | (.guard_floor_bytes // .retained_required_home_bytes)+([4294967296,($surplus/2|floor)]|min)' "$a/PRESTART_SCREEN.json")
 test "$floor" -ge 9470567509909
 
 released=0
@@ -365,8 +365,8 @@ else
     screen "$a/POST_GUARD_SCREEN.json" "$iid"
 fi
 jq -e --argjson floor "$floor" '
-    .retained_required_home_bytes<=$floor
-    and .available_home_bytes>=($floor+.candidate_home_bytes)' "$a/POST_GUARD_SCREEN.json" >/dev/null
+    (.guard_floor_bytes // .retained_required_home_bytes)<=$floor
+    and .available_home_bytes>=($floor+.candidate_home_bytes+(.assembly168.incremental_home // 0))' "$a/POST_GUARD_SCREEN.json" >/dev/null
 writer_live
 if [[ $epoch == 143 ]]; then
     if (( joint_assembly )); then
