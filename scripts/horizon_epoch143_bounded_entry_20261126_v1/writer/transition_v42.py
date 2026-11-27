@@ -42,6 +42,7 @@ def ready(api, head, seal):
         "full170_receiver": "full170_status.py", "focused168_receiver": "focused168_status.py",
         "joint168_receiver": "joint168_status.py", "joint168_native_reader": "joint168_capacity.py",
         "bridge170_status": "bridge170_status.py", "successor170_receiver": "successor170_status.py",
+        "retry5_generation": "retry5-168-generation.json",
     }
     receivers = {key: bound(current.with_name(name)) for key, name in bindings.items()}
     return dict(earlier, package=seal, old_owner=old_ref, fleet=head, config=reference, timer=timer,

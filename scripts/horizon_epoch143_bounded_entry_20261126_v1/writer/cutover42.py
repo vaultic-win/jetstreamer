@@ -9,9 +9,11 @@ import time
 from cutover41 import BASE, BOOKING_LOCK, OLD as V40, WRITER, clock, command, need, private_write, state
 
 OLD = V40.with_name(V40.name.replace("v40", "v41"))
-NEW = OLD.with_name(OLD.name.replace("v41", "v42") + "-r2")
-READY = BASE / "FAILED166_CADENCE_V42_READY.json"
+REJECTED = OLD.with_name(OLD.name.replace("v41", "v42") + "-r2")
+NEW = OLD.with_name(OLD.name.replace("v41", "v42") + "-r3")
+READY = BASE / "FAILED166_CADENCE_V42_R3_READY.json"
 ACTIVE = BASE / "FAILED166_CADENCE_V42_ACTIVE.json"
+REJECTED_IID = "f456729b078041bb8d12c6381cc9c73f"
 LOAN = Path("/run/horizon-epoch140-epoch170-cpu-loan.active")
 RECORDER = "horizon-epoch140-suffix-recording.service"
 PROTECTED = (
@@ -40,10 +42,11 @@ def main(path):
         recorder = state(RECORDER, "MainPID", "ActiveState", "Job")
         need(recorder["MainPID"] == "0" and recorder["ActiveState"] in ("inactive", "failed")
              and not recorder["Job"] and not LOAN.exists(), "epoch 140 still owns the recording loan")
-        incumbent = state(WRITER, "MainPID", "InvocationID", "ActiveState", "ExecStart")
-        need(incumbent["MainPID"] == str(old["pid"]) and incumbent["InvocationID"] == old["invocation_id"]
-             and incumbent["ActiveState"] == "active" and str(OLD / "status_cycle.py") in incumbent["ExecStart"],
-             "V41 is no longer the current writer")
+        incumbent = state(WRITER, "MainPID", "InvocationID", "ActiveState", "ExecStart", "Job", "Result")
+        need(incumbent["MainPID"] == "0" and incumbent["InvocationID"] == REJECTED_IID
+             and incumbent["ActiveState"] == "failed" and incumbent["Result"] == "exit-code"
+             and not incumbent["Job"] and str(REJECTED / "status_cycle.py") in incumbent["ExecStart"],
+             "V42 recovery requires the exact rejected invocation")
         observed_clock = clock(timer)
         due = int(command("/usr/bin/date", "-u", "-d", observed_clock["NextElapseUSecRealtime"], "+%s"))
         need(due - time.time() > 90, "the incumbent observer is too close to writer transfer")
@@ -51,17 +54,14 @@ def main(path):
         directory = Path("/run/systemd/system") / f"{WRITER}.d"
         predecessor = max(directory.glob("*.conf"), key=lambda value: value.name)
         previous = predecessor.read_text()
-        need("-v41-entry146.conf" in predecessor.name and previous.count(str(OLD)) == 1,
-             "unexpected V41 service definition")
+        need("-v42-entry146.conf" in predecessor.name and previous.count(str(REJECTED)) == 1,
+             "unexpected rejected V42 service definition")
         private_write(READY, raw, 0o400)
-        successor = directory / ("z" + predecessor.name.replace("-v41-", "-v42-"))
-        private_write(successor, previous.replace(str(OLD), str(NEW)).encode(), 0o644)
+        successor = directory / ("z" + predecessor.name.replace("-v42-", "-v42-r3-"))
+        private_write(successor, previous.replace(str(REJECTED), str(NEW)).encode(), 0o644)
         command("/usr/bin/systemctl", "daemon-reload")
         need(str(NEW / "status_cycle.py") in state(WRITER, "ExecStart")["ExecStart"]
              and clock(timer) == observed_clock, "V42 changed the incumbent observer")
-        command("/usr/bin/systemctl", "stop", WRITER)
-        need(state(WRITER, "MainPID")["MainPID"] == "0" and clock(timer) == observed_clock,
-             "V41 did not release the writer service")
         command("/usr/bin/systemctl", "start", WRITER)
         cutoff = time.monotonic() + 12
         while not ACTIVE.is_file() and time.monotonic() < cutoff:
