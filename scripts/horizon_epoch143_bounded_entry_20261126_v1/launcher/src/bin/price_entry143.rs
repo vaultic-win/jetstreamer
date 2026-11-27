@@ -234,6 +234,26 @@ fn protected(
     Ok((sample_ref, physical, resident))
 }
 
+fn follows_observation(mut current: Value, anchor: &Value) -> Result<bool> {
+    for _ in 0..2 {
+        let cadence = &current["cadence"];
+        ensure!(
+            cadence["minimum_interval_seconds"] == 1800
+                && cadence["routine_minimum_interval_enforced"] == true,
+            "observation changed its routine cadence"
+        );
+        let predecessor = json!({
+            "path": cadence["previous_sample"],
+            "sha256": cadence["previous_sample_sha256"]
+        });
+        if &predecessor == anchor {
+            return Ok(true);
+        }
+        current = read(&predecessor)?;
+    }
+    Ok(false)
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     ensure!(
@@ -263,10 +283,7 @@ fn main() -> Result<()> {
             && fleet["actual_active_holding_transfers"] == json!([])
             && fleet["actual_active_retirements"] == json!([])
             && fleet["actual_active_retirement_checks"] == json!([])
-            && (same_fleet && !held
-                || sample["cadence"]["previous_sample"] == accepted["observer"]["path"]
-                    && sample["cadence"]["previous_sample_sha256"]
-                        == accepted["observer"]["sha256"]),
+            && (same_fleet && !held || follows_observation(sample, &accepted["observer"])?),
         "future fleet or changed reservations"
     );
     let stable = |f: &Value| -> Result<Vec<Value>> {
@@ -300,6 +317,24 @@ fn main() -> Result<()> {
         "different 170 bridge"
     );
     rosters.insert(bridge_unit.into(), first["actor"]["processes"].clone());
+    if !same_fleet {
+        let diagnostics = fleet["actual_active_private_diagnostics"]
+            .as_array()
+            .context("missing accepted private replay roster")?;
+        ensure!(
+            diagnostics.len() == 2
+                && diagnostics.iter().all(|row| {
+                    matches!(row["epoch"].as_u64(), Some(167 | 170))
+                        && row["phase"] == "worker"
+                        && row["unit"]["Id"]
+                            .as_str()
+                            .and_then(|unit| rosters.get(unit))
+                            == Some(&row["processes"])
+                })
+                && diagnostics[0]["epoch"] != diagnostics[1]["epoch"],
+            "accepted private replay roster changed"
+        );
+    }
     let listing = command(&[
         "list-units",
         "--type=service",
