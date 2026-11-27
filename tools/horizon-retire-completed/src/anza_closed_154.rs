@@ -1,4 +1,5 @@
 use super::*;
+pub(super) mod continuation;
 
 const CANARY: &str =
     "/home/sol/.jetstreamer-private/epoch154-rayon10-growth-measurement-20261019-v1";
@@ -35,15 +36,19 @@ const GATES: [(&str, &str); 4] = [
 
 pub(super) fn is_target(t: &Target) -> bool {
     let s = &t.identity;
-    t.epoch == 154
-        && t.path == Path::new(TARGET)
-        && (s.dev, s.ino, s.len, s.blocks) == (64512, 98369591, 23039249688, 44998600)
-        && (s.mode, s.uid, s.gid, s.nlink) == (0o100600, 1001, 1003, 1)
-        && (s.mtime, s.mtime_ns, s.ctime, s.ctime_ns)
-            == (1792523498, 224188714, 1792523498, 224188714)
+    continuation::is_index(t)
+        || (t.epoch == 154
+            && t.path == Path::new(TARGET)
+            && (s.dev, s.ino, s.len, s.blocks) == (64512, 98369591, 23039249688, 44998600)
+            && (s.mode, s.uid, s.gid, s.nlink) == (0o100600, 1001, 1003, 1)
+            && (s.mtime, s.mtime_ns, s.ctime, s.ctime_ns)
+                == (1792523498, 224188714, 1792523498, 224188714))
 }
 
-pub(super) fn check_owners() -> Result<()> {
+pub(super) fn check_owners(t: &Target) -> Result<()> {
+    if continuation::is_index(t) {
+        return continuation::check_owners();
+    }
     for unit in OLD_UNITS {
         let state = Command::new("/usr/bin/systemctl")
             .args([
@@ -113,13 +118,22 @@ pub(super) fn verify_scope(plan: &Plan, mutation_lock: &File) -> Result<()> {
         "different shared mutation lock"
     );
     ensure!(
-        plan.targets.len() == 1 && plan.proofs.len() == 1,
-        "select only the closed epoch 154 canary"
-    );
-    ensure!(
         plan.inventory_binary.path == Path::new(INVENTORY)
             && plan.inventory_binary.sha256 == INVENTORY_SHA,
         "different qualified inventory reader"
+    );
+    if plan.targets.iter().any(continuation::is_index) {
+        ensure!(
+            plan.proofs.len() == 1
+                && plan.targets.iter().all(continuation::is_index)
+                && plan.targets.len() == 2,
+            "select both retired 154 continuation indexes"
+        );
+        return continuation::check_owners();
+    }
+    ensure!(
+        plan.targets.len() == 1 && plan.proofs.len() == 1,
+        "select only the closed epoch 154 canary"
     );
     let canary: Value = serde_json::from_slice(&bound(
         &Bound {
@@ -138,7 +152,7 @@ pub(super) fn verify_scope(plan: &Plan, mutation_lock: &File) -> Result<()> {
                 .is_some_and(|args| args.contains(&json!(format!("--horizon-output={TARGET}")))),
         "different canary completion evidence"
     );
-    check_owners()
+    check_owners(&plan.targets[0])
 }
 
 fn receipt_fields(bytes: &[u8], digests: &[&str]) -> Result<()> {

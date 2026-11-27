@@ -805,6 +805,13 @@ fn run() -> Result<()> {
     #[cfg(feature = "anza-closed-154")]
     let closed_154 = p.targets.iter().any(anza_closed_154::is_target);
     #[cfg(feature = "anza-closed-154")]
+    let _continuation_lock = p
+        .targets
+        .iter()
+        .any(anza_closed_154::continuation::is_index)
+        .then(anza_closed_154::continuation::lock)
+        .transpose()?;
+    #[cfg(feature = "anza-closed-154")]
     if closed_154 {
         anza_closed_154::verify_scope(&p, &lock)?;
     }
@@ -910,7 +917,7 @@ fn run() -> Result<()> {
         }
         #[cfg(feature = "anza-closed-154")]
         if anza_closed_154::is_target(t) {
-            anza_closed_154::check_owners()?;
+            anza_closed_154::check_owners(t)?;
         }
         #[cfg(feature = "anza-closed-canaries")]
         if let Some(review) = &canary_review {
