@@ -474,7 +474,7 @@ fn collect(cohort: &Cohort) -> Result<Value> {
     Ok(output)
 }
 
-const USAGE: &str = "usage: horizon-epoch257-commit-source [--epoch230-hourly | --epoch230-hourly-second | --epoch252 | --epoch260 | --epoch261 | --epoch262 | --epoch288 | --reconcile-epoch252 | --check-epoch252-delivery-deployment | --launch-epoch252-delivery QUOTE SHA256]";
+const USAGE: &str = "usage: horizon-epoch257-commit-source [--epoch230-hourly | --epoch230-hourly-second | --epoch230-first-7871 | --epoch252 | --epoch260 | --epoch261 | --epoch262 | --epoch288 | --reconcile-epoch252 | --check-epoch252-delivery-deployment | --launch-epoch252-delivery QUOTE SHA256]";
 
 fn main() -> Result<()> {
     let mut args = std::env::args_os().skip(1);
@@ -496,13 +496,14 @@ fn main() -> Result<()> {
         return Ok(());
     }
     ensure!(args.next().is_none(), "{USAGE}");
-    if let Some("--epoch230-hourly" | "--epoch230-hourly-second") =
-        mode.as_deref().and_then(std::ffi::OsStr::to_str)
+    if let Some(window) = mode
+        .as_deref()
+        .and_then(std::ffi::OsStr::to_str)
+        .and_then(hourly230::select)
     {
-        let second = mode.as_deref() == Some(std::ffi::OsStr::new("--epoch230-hourly-second"));
         println!(
             "{}",
-            serde_json::to_string_pretty(&hourly230::collect(second)?)?
+            serde_json::to_string_pretty(&hourly230::collect(window)?)?
         );
         return Ok(());
     }
