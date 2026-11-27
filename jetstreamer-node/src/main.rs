@@ -10015,6 +10015,10 @@ async fn build_slot_presence_map(
             );
             let data = fs::read(&slot_index_path)
                 .map_err(|err| format!("failed to read {}: {err}", slot_index_path.display()))?;
+            #[cfg(feature = "epoch224-v1-6-25-qualification")]
+            if epoch == 223 {
+                epoch224_qualification::verify_warmup_compact(&data)?;
+            }
             if let Some(source) = &rooted {
                 source.verify_compact(&data)?;
             }
@@ -15387,6 +15391,10 @@ fn qualification_expectations(
     #[cfg(feature = "epoch141-hourly-original-qualification")]
     if plan.epoch == 141 {
         epoch141_hourly::validate_roots(plan, &expected)?;
+    }
+    #[cfg(feature = "epoch224-v1-6-25-qualification")]
+    if plan.epoch == 224 {
+        epoch224_qualification::verify_checkpoints(&expected)?;
     }
     epoch141_suffix::recheck_roots(&expected)?;
     #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
@@ -21365,6 +21373,11 @@ async fn main() {
                 || recover_unreceipted_root_cohort_only,
         )
     {
+        eprintln!("error: {error}");
+        exit(2);
+    }
+    #[cfg(feature = "epoch224-v1-6-25-qualification")]
+    if let Err(error) = epoch224_qualification::verify_rooted_tables().await {
         eprintln!("error: {error}");
         exit(2);
     }
