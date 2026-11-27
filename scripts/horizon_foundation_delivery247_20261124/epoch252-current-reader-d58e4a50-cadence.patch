@@ -13,3 +13,22 @@
 -        if not (directory / "acceptance.json").is_file():
 -            directory = V / "horizon252-delivery-fleet-v1"
 +        directory = V / "horizon252-delivery-fleet-v3"
+--- a/replay252.py
++++ b/replay252.py
+@@ -28,2 +28 @@
+-TERMINAL_COLLECTOR = V / 'horizon252-terminal-handoff-v1/horizon-epoch257-commit-source'
+-TERMINAL_COLLECTOR_SHA = '3a17b82e9b7e4ecb587d3402c5c3166eed7bfb9eef718dd196ef2fdc3298e9f8'
++TERMINAL_RELEASE = V / 'horizon252-delivery-fleet-v3/acceptance.json'
+@@ -159 +158,8 @@
+-    sealed(TERMINAL_COLLECTOR, TERMINAL_COLLECTOR_SHA)
++    release = bound(sealed(TERMINAL_RELEASE))
++    assert release['schema'] == 'foundation-epoch252-delivery-fleet-release-v1'
++    assert release['controller_sha256']['replay252.py'] == sealed(Path(__file__).resolve())['sha256']
++    plan = release['reader_plan']
++    assert plan == sealed(V / 'horizon252-current-reader-plan-v2/epoch-252-plan.json', plan['sha256'])
++    collector = release['launcher']
++    executable = TERMINAL_RELEASE.parent / 'horizon-epoch257-commit-source'
++    assert collector == sealed(executable, collector['sha256'])
+@@ -161 +167 @@
+-        [TERMINAL_COLLECTOR, '--reconcile-epoch252']))
++        [executable, '--reconcile-epoch252']))
