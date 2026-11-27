@@ -29,7 +29,7 @@ SEVEN = RT / "epoch141-foundation-seventh-bootstrap-20261127-v1"
 PREVIOUS = RT / "epoch185-lanem-main-holding-20261127-v1"
 OPLOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 TOOLS = Path(__file__).resolve().parent
-FOLLOWON = OUT / "n-tools-v4"
+FOLLOWON = OUT / "n-tools-v5"
 MAPPING = Path(
     "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json"
 )
@@ -255,14 +255,18 @@ def checked_remote(expected, accepted):
 
 def locked(p, identity=None):
     f = p.open("rb")
-    m = os.fstat(f.fileno())
-    need(
-        p.resolve() == p
-        and m.st_nlink == 1
-        and (identity is None or idstat(m)[:7] == identity[:7]),
-        "changed lock " + str(p),
-    )
-    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    try:
+        m = os.fstat(f.fileno())
+        need(
+            p.resolve() == p
+            and m.st_nlink == 1
+            and (identity is None or idstat(m)[:7] == identity[:7]),
+            "changed lock " + str(p),
+        )
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BaseException:
+        f.close()
+        raise
     return f
 
 
@@ -274,6 +278,20 @@ def deployment(phase, lane):
         )
     else:
         need(TOOLS == OUT / "tools", "use the deployed rotation operator")
+
+
+@contextlib.contextmanager
+def phase_quote(phase, disk, ram):
+    if TOOLS == FOLLOWON and phase == "retire":
+        import n_admission
+
+        with n_admission.retirement_quote(disk, ram) as quote:
+            yield quote
+        return
+    with locked(OPLOCK):
+        quote = recent_price()
+        owners(quote)
+        yield quote
 
 
 def recent_price():
@@ -777,14 +795,12 @@ def execute(phase, lane):
         current = census(row, "/system.slice/" + unit)
         proof = ref(OUT / "RESTORE_FIXTURE_ACCEPTED.json")
         bound(proof)
-        with locked(OPLOCK):
-            fleet_price = recent_price()
-            owners(fleet_price)
-            disk = (
-                expected["single_copy_peak"]
-                if phase == "restore" and not original.exists()
-                else 16 * M
-            )
+        disk = (
+            expected["single_copy_peak"]
+            if phase == "restore" and not original.exists()
+            else 16 * M
+        )
+        with phase_quote(phase, disk, hard) as fleet_price:
             need(
                 fleet_price["remaining_home"] >= disk
                 and fleet_price["remaining_ram"] >= hard,

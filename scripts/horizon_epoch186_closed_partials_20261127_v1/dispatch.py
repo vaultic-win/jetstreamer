@@ -90,22 +90,20 @@ def dispatch(phase, lane):
         op.PROVIDER, "a8d2139c524f06d38329cb9c7ab00ab036f26f1adbba3b3b501b365511fed471"
     )
     ops = __import__("runpy").run_path(str(op.PROVIDER))
-    with op.locked(op.OPLOCK):
-        q = op.recent_price()
-        op.owners(q)
-        rbytes = {
-            "fixture": 256 * op.M,
-            "precheck": 256 * op.M,
-            "park": 2 * op.G,
-            "retire": op.G,
-            "restore": 2 * op.G,
-        }[phase]
-        reserve = 16 * op.M if phase in ("park", "restore", "retire") else 2 * op.M
-        if phase == "restore" and not Path(row["source"]).exists():
-            reserve = op.read(d / "expected.json")["single_copy_peak"]
-        if phase in ("fixture", "precheck"):
-            rbytes += 2 * op.G  # independent of the serial park
-        else:
+    rbytes = {
+        "fixture": 256 * op.M,
+        "precheck": 256 * op.M,
+        "park": 2 * op.G,
+        "retire": op.G,
+        "restore": 2 * op.G,
+    }[phase]
+    reserve = 16 * op.M if phase in ("park", "restore", "retire") else 2 * op.M
+    if phase == "restore" and not Path(row["source"]).exists():
+        reserve = op.read(d / "expected.json")["single_copy_peak"]
+    if phase in ("fixture", "precheck"):
+        rbytes += 2 * op.G  # independent of the serial park
+    with op.phase_quote(phase, reserve, rbytes) as q:
+        if phase not in ("fixture", "precheck"):
             op.serial_handoff()
         op.need(
             q["remaining_ram"] >= rbytes and q["remaining_home"] >= reserve,

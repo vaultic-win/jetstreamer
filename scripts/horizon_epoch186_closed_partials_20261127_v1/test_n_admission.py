@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase, main, mock
+import os
+import subprocess
 import time
 
 import n_admission as n
@@ -127,6 +129,124 @@ class FollowonTest(TestCase):
                 n.op.deployment("park", "m")
             with self.assertRaisesRegex(ValueError, "only the lane N"):
                 n.op.deployment("fixture", "n")
+
+
+class RetirementTest(TestCase):
+    def setUp(self):
+        self.directory = Path(self.enterContext(TemporaryDirectory()))
+        self.lock = self.directory / "operation.lock"
+        self.lock.touch()
+        self.enterContext(mock.patch.object(n.op, "OPLOCK", self.lock))
+        self.enterContext(
+            mock.patch.object(
+                n, "retirement_guard_directory", return_value=self.directory
+            )
+        )
+        self.positive = dict(remaining_home=n.op.META, remaining_ram=n.op.G)
+        self.du = (
+            "/usr/bin/du",
+            "-sx",
+            "-B1",
+            str(n.op.BASE / "epoch170-standard-lane-20261109-v1"),
+        )
+        self.sample = "sample-" + "a" * 32 + ".json"
+
+    def test_native_rename_and_hard_link(self):
+        tmp = self.directory / ".guard-writing"
+        tmp.write_text("{}")
+        snapshot = self.directory / self.sample
+        with n.watch_guard(self.directory) as fd:
+            (self.directory / "sample-invalid.json").touch()
+            tmp.rename(snapshot)
+            self.assertEqual(n.wait_for_guard(fd, time.monotonic() + 2), self.sample)
+        snapshot.rename(tmp)
+        with n.watch_guard(self.directory) as fd:
+            os.link(tmp, snapshot)
+            self.assertEqual(n.wait_for_guard(fd, time.monotonic() + 2), self.sample)
+        with n.watch_guard(self.directory) as fd:
+            snapshot.read_bytes()
+            (self.directory / "unrelated").touch()
+            with self.assertRaisesRegex(ValueError, "timed out"):
+                n.wait_for_guard(fd, time.monotonic() + 0.03)
+
+    def test_lost_watch_is_fatal(self):
+        watched = self.directory / "guard"
+        watched.mkdir()
+        with n.watch_guard(watched) as fd:
+            (watched / self.sample).touch()
+            watched.rename(self.directory / "moved")
+            with self.assertRaisesRegex(ValueError, "guard directory changed"):
+                n.wait_for_guard(fd, time.monotonic() + 2)
+
+    def test_discard_partial_and_insufficient_quotes(self):
+        low = dict(
+            self.positive,
+            remaining_home=n.op.META - 1,
+            fleet="fleet",
+            post_reservation_ram_margin=1,
+            basis={"after": {"sample": "prior"}},
+        )
+        failed = subprocess.CalledProcessError(1, self.du, output="9999999999999")
+
+        def next_sample(fd, deadline):
+            with n.op.locked(self.lock):
+                return self.sample
+
+        with (
+            mock.patch.object(
+                n, "price", side_effect=[failed, low, self.positive]
+            ) as price,
+            mock.patch.object(n, "wait_for_guard", side_effect=next_sample) as wait,
+            mock.patch.object(n, "owners") as owners,
+            n.retirement_quote(n.op.META, n.op.G) as result,
+        ):
+            self.assertIs(result, self.positive)
+            with self.assertRaises(BlockingIOError):
+                n.op.locked(self.lock).close()
+            first, second = result["retirement_admission_events"]
+            self.assertEqual(first["reason"], "incomplete live 170 tree census")
+            self.assertNotIn(failed.output, str(first))
+            self.assertEqual((second["sample"], second["home"]), ("prior", -1))
+            self.assertEqual(first["next_guard_receipt"], self.sample)
+            self.assertEqual(second["next_guard_receipt"], self.sample)
+            self.assertEqual(
+                (price.call_count, wait.call_count, owners.call_count), (3, 2, 2)
+            )
+
+    def test_unrelated_or_fatal_errors_do_not_wait(self):
+        for error in (
+            subprocess.CalledProcessError(2, self.du),
+            subprocess.CalledProcessError(1, (*self.du[:-1], "/other")),
+            subprocess.CalledProcessError(1, ("/usr/bin/false",)),
+            ValueError("different native owner"),
+        ):
+            with (
+                self.subTest(error=error),
+                mock.patch.object(n, "price", side_effect=error),
+                mock.patch.object(n, "wait_for_guard") as wait,
+                self.assertRaises(type(error)) as raised,
+                n.retirement_quote(n.op.META, n.op.G),
+            ):
+                self.fail("unexpected accepted quote")
+            wait.assert_not_called()
+            self.assertIs(raised.exception, error)
+
+    def test_caller_error_after_admission_is_never_retried(self):
+        error = subprocess.CalledProcessError(1, self.du)
+        with (
+            mock.patch.object(n.op, "TOOLS", n.op.FOLLOWON),
+            mock.patch.object(n, "price", return_value=self.positive) as price,
+            mock.patch.object(n, "owners"),
+            mock.patch.object(n, "wait_for_guard") as wait,
+            self.assertRaises(subprocess.CalledProcessError) as raised,
+            n.op.phase_quote("retire", n.op.META, n.op.G),
+        ):
+            raise error
+        self.assertIs(raised.exception, error)
+        price.assert_called_once()
+        wait.assert_not_called()
+        with n.op.locked(self.lock):
+            pass
 
 
 if __name__ == "__main__":

@@ -3,11 +3,15 @@
 from datetime import datetime
 from pathlib import Path
 import argparse
+import contextlib
+import ctypes
 import json
 import os
 import re
 import runpy
+import select
 import stat
+import struct
 import subprocess
 import sys
 import time
@@ -577,6 +581,139 @@ def price():
         resource_credit_bytes=0,
         **rooms,
     )
+
+
+GUARD_PUBLISHED = 0x80 | 0x100  # IN_MOVED_TO or IN_CREATE (no-clobber hard link)
+GUARD_LOST = 0x400 | 0x800 | 0x4000 | 0x8000  # moved, deleted, overflow, ignored
+INOTIFY_EVENT = struct.Struct("iIII")
+
+
+@contextlib.contextmanager
+def watch_guard(directory):
+    libc = ctypes.CDLL(None, use_errno=True)
+    fd = libc.inotify_init1(os.O_CLOEXEC | os.O_NONBLOCK)
+    if fd < 0:
+        raise OSError(ctypes.get_errno(), "cannot observe native guard")
+    try:
+        wd = libc.inotify_add_watch(
+            fd, os.fsencode(directory), GUARD_PUBLISHED | 0x400 | 0x800
+        )
+        if wd < 0:
+            raise OSError(ctypes.get_errno(), "cannot watch native guard directory")
+        yield fd
+    finally:
+        os.close(fd)
+
+
+def wait_for_guard(fd, deadline):
+    # The native guard fsyncs a temporary receipt before its no-clobber publication.
+    while True:
+        timeout = deadline - time.monotonic()
+        op.need(
+            timeout > 0 and select.select([fd], [], [], timeout)[0],
+            "timed out waiting for the next guarded admission",
+        )
+        data = os.read(fd, 65536)
+        pos = 0
+        published = None
+        while pos < len(data):
+            _, mask, _, length = INOTIFY_EVENT.unpack_from(data, pos)
+            pos += INOTIFY_EVENT.size
+            name = data[pos : pos + length].rstrip(b"\0")
+            pos += length
+            op.need(
+                not mask & GUARD_LOST,
+                "guard directory changed or inotify overflowed",
+            )
+            if mask & GUARD_PUBLISHED and re.fullmatch(
+                rb"sample-[0-9a-f]{32}\.json", name
+            ):
+                published = os.fsdecode(name)
+        if published:
+            return published
+
+
+def is_changing_tree(error):
+    tree = str(op.BASE / "epoch170-standard-lane-20261109-v1")
+    return error.returncode == 1 and tuple(error.cmd) == (
+        "/usr/bin/du",
+        "-sx",
+        "-B1",
+        tree,
+    )
+
+
+def retirement_guard_directory():
+    park = op.bound(op.ref(op.OUT / "n/PARK_ACCEPTED.json"))
+    custody = op.bound(park["native_custody"])
+    op.need(
+        park["success"]
+        and park["native_terminal"]["success"]
+        and custody["remote_sha256_readback"]
+        and custody["local_source_revalidated"]
+        and custody["sha256"] == op.PINNED["n"][2],
+        "guard admission is only for retiring the authenticated lane N partial",
+    )
+    directory = op.RT / "epoch170-from-73746882-20261127-v1/guard-receipts"
+    meta = directory.lstat()
+    op.need(
+        directory.resolve() == directory
+        and stat.S_ISDIR(meta.st_mode)
+        and meta.st_uid == 0
+        and not meta.st_mode & 0o022,
+        "untrusted guard directory",
+    )
+    return directory
+
+
+@contextlib.contextmanager
+def retirement_quote(disk, ram):
+    op.need(disk == op.META and ram == op.G, "different N retirement envelope")
+    directory = retirement_guard_directory()
+    deadline = time.monotonic() + 15 * 60
+    failures = []
+    while True:
+        with contextlib.ExitStack() as transaction:
+            try:
+                transaction.enter_context(op.locked(op.OPLOCK))
+            except BlockingIOError:
+                failure = dict(reason="campaign admission lock in use")
+            else:
+                try:
+                    quote = price()
+                except subprocess.CalledProcessError as error:
+                    if not is_changing_tree(error):
+                        raise
+                    # Discard every byte of the failed traversal, including partial stdout.
+                    failure = dict(
+                        reason="incomplete live 170 tree census", command=error.cmd
+                    )
+                else:
+                    owners(quote)
+                    if (
+                        quote["remaining_home"] >= disk
+                        and quote["remaining_ram"] >= ram
+                    ):
+                        quote["retirement_admission_events"] = failures
+                        yield quote
+                        return
+                    failure = dict(
+                        reason="insufficient fresh fit",
+                        fleet=quote["fleet"],
+                        sample=quote["basis"]["after"]["sample"],
+                        home=quote["remaining_home"] - disk,
+                        ram=quote["post_reservation_ram_margin"],
+                    )
+        failure["utc"] = time.time()
+        failures.append(failure)
+        print(json.dumps(failure), file=sys.stderr, flush=True)
+        op.need(
+            len(failures) < 60,
+            "retirement admission remained unavailable through 60 guard events",
+        )
+        # Arm only after releasing the campaign lock. Never consume an old notification.
+        with watch_guard(directory) as fd:
+            failure["next_guard_receipt"] = wait_for_guard(fd, deadline)
 
 
 if __name__ == "__main__":
