@@ -36,12 +36,12 @@ value() { systemctl show "$1" -p "$2" --value; }
 
 publish() {
     local out=$1 temp
-    temp=$(mktemp "${out%/*}/.pending-XXXXXX")
-    cat > "$temp"
-    chmod 0444 "$temp"
-    sync "$temp"
-    mv -nT "$temp" "$out"
-    test ! -e "$temp"
+    temp=$(mktemp "${out%/*}/.pending-XXXXXX") || return
+    cat > "$temp" || return
+    chmod 0444 "$temp" || return
+    sync "$temp" || return
+    mv -nT "$temp" "$out" || return
+    test ! -e "$temp" || return
     python3 - "${out%/*}" <<'PY'
 import os, sys
 fd = os.open(sys.argv[1], os.O_RDONLY | os.O_DIRECTORY)
@@ -60,22 +60,45 @@ writer_live() {
     test "$(sha "$fleet")" = "$fleet_sha"
 }
 
-screen() {
-    local output=$1
-    shift
-    local quote
-    quote=$("$price" "$fleet" "$fleet_sha" "$@")
+assembly_clear() {
+    local assembly=horizon-assemble-168-private-20261127-v1.service
+    test "$(value "$assembly" ActiveState)" = inactive &&
+        test "$(value "$assembly" MainPID)" = 0 &&
+        test "$(value "$assembly" ControlPID)" = 0 &&
+        test -z "$(value "$assembly" Job)" &&
+        test ! -d "/sys/fs/cgroup/system.slice/$assembly" ||
+        { printf 'Epoch 168 assembly owns or is claiming the shared host window\n' >&2; return 1; }
+}
+
+accepts_screen() {
+    local quote=$1 held=$2
     jq -e --argjson home "$home_charge" --argjson ram "$ram_charge" --arg fleet "$fleet" --arg sha "$fleet_sha" '
         .fleet=={path:$fleet,sha256:$sha} and .disk_fits and .memory_fits
         and .resource_credit_bytes==0 and .candidate_home_bytes==$home
         and .candidate_ram_bytes==$ram and .candidate_cpu_quota_micros==3000000
         and .available_home_bytes>=.retained_required_home_bytes+.candidate_home_bytes
-        and .available_ram_bytes>=.retained_required_ram_bytes+.candidate_ram_bytes' <<<"$quote" >/dev/null
+        and .available_ram_bytes>=.retained_required_ram_bytes+.candidate_ram_bytes' <<<"$quote" >/dev/null || return 1
     if [[ $epoch == 143 ]]; then
-        jq -e --arg iid "${1:-}" --arg path "$contract" --arg sha "$contract_sha" '
+        jq -e --arg iid "$held" --arg path "$contract" --arg sha "$contract_sha" '
             .schema=="horizon-epoch143-first-hourly-replacement-fit-v1" and .projection_only==false
             and .contract=={path:$path,sha256:$sha} and (.closed141.sha256|length)==64
-            and (.held_invocation // "")==$iid and (.held_invocation==null or (.candidate_guard_sample.sha256|length)==64)' <<<"$quote" >/dev/null
+            and (.held_invocation // "")==$iid and (.held_invocation==null or (.candidate_guard_sample.sha256|length)==64)' <<<"$quote" >/dev/null || return 1
+    fi
+}
+
+screen() {
+    local output=$1 quote
+    shift
+    if ! quote=$("$price" "$fleet" "$fleet_sha" "$@"); then
+        printf 'Pricing provider failed before %s\n' "$output" >&2
+        return 2
+    fi
+    if ! accepts_screen "$quote" "${1:-}"; then
+        printf '%s\n' "$quote" | publish "${output%.json}.refused-$(date +%s%N).json" || return 2
+        jq -c '{disk_fits,memory_fits,home_margin_bytes,ram_margin_bytes,held_invocation,
+                retained_required_home_bytes,available_home_bytes,retained_required_ram_bytes,
+                available_ram_bytes}' <<<"$quote" >&2 || return 2
+        return 1
     fi
     printf '%s\n' "$quote" | publish "$output"
 }
@@ -169,6 +192,7 @@ b=${1:?Pass the writer booking}
 bsha=${2:?Pass its verified SHA-256}
 exec 9<>/run/horizon-epoch171-to136-g1.operation.lock
 flock -n -x 9
+if [[ $epoch == 143 ]]; then assembly_clear; fi
 test "$(realpath "$b")" = "$b"
 test "${b%/*}" = "$a"
 [[ $(stat -c %u:%g:%a:%h "$b") =~ ^0:0:4(00|44):1$ ]]
@@ -232,7 +256,12 @@ started=0
 guard_started=0
 cleanup() {
     if (( released == 0 )); then
-        if (( guard_started )); then systemctl stop "$guard_unit.timer" "$guard_unit.service" || true; fi
+        if (( guard_started )); then
+            systemctl stop "$guard_unit.timer" || true
+            if [[ $(value "$guard_unit.service" LoadState) != not-found ]]; then
+                systemctl stop "$guard_unit.service" || true
+            fi
+        fi
         if (( started )); then systemctl stop "$unit" || true; fi
     fi
 }
@@ -311,11 +340,25 @@ jq -e --argjson tree "$tree" --arg iid "$iid" --argjson pid "$pid" --arg digest 
     and .plan_sha256==$digest and .trip_reason==null and .root_physical_observation_error==null
     and .worker_observation_error==null and .maximum_root_physical_bytes==$tree
     and .root_physical_observation.exceeds_budget==false and .workers==[]' "$first" >/dev/null
-screen "$a/POST_GUARD_SCREEN.json" "$iid"
+if [[ $epoch == 143 ]]; then
+    # Guard and writer remain bound while a transient resource refusal is remeasured.
+    # Provider, custody and identity failures abort without a retry.
+    for attempt in 1 2 3; do
+        writer_live
+        assembly_clear
+        test "$(value "$unit" InvocationID)" = "$iid"
+        if screen "$a/POST_GUARD_SCREEN.json" "$iid"; then break; else screen_rc=$?; fi
+        if (( screen_rc != 1 || attempt == 3 )); then exit "$screen_rc"; fi
+        sleep 1
+    done
+else
+    screen "$a/POST_GUARD_SCREEN.json" "$iid"
+fi
 jq -e --argjson floor "$floor" '
     .retained_required_home_bytes<=$floor
     and .available_home_bytes>=($floor+.candidate_home_bytes)' "$a/POST_GUARD_SCREEN.json" >/dev/null
 writer_live
+if [[ $epoch == 143 ]]; then assembly_clear; fi
 test "$(sha "$b")" = "$bsha"
 test "$(value "$unit" InvocationID)" = "$iid"
 test "$(value "$unit" MainPID)" = "$pid"
