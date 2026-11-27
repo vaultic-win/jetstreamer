@@ -2,7 +2,7 @@
 use super::selected_prefix::{self, PrefixScope};
 use std::{error::Error, fs::File, io, os::unix::fs::MetadataExt};
 
-const SOURCE: &str = concat!(
+pub(super) const SOURCE: &str = concat!(
     "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/",
     "replacement-source-index-v1-20261121/cold-source-index-v3-20261122/private/",
     "destination-e677f81687d92afb1ef9d81f2d57842d0c8bd0d94c6353aa87a7ddc53eb10d0f/",
@@ -10,7 +10,7 @@ const SOURCE: &str = concat!(
 );
 const BYTES: u64 = 101_301_229_551;
 
-fn original_identity(file: &File) -> io::Result<()> {
+pub(super) fn original_identity(file: &File) -> io::Result<()> {
     let m = file.metadata()?;
     if !m.is_file()
         || m.nlink() != 1
