@@ -1,9 +1,13 @@
 """Dispatch the read-only comparison, protected actor and enrollment-dependent release."""
+import ctypes
 import fcntl
 import hashlib
 import importlib.util
 import json
 import os
+import re
+import select
+import struct
 from pathlib import Path
 import subprocess
 import sys
@@ -67,6 +71,75 @@ def closed():
     return q.compare_predecessor()
 
 
+class Changes:
+    def __init__(self):
+        self.lib = ctypes.CDLL(None, use_errno=True)
+        self.fd = self.lib.inotify_init1(os.O_CLOEXEC)
+        if self.fd < 0: raise OSError(ctypes.get_errno(), "inotify")
+        self.paths = {}
+
+    def watch(self,path):
+        wd = self.lib.inotify_add_watch(self.fd,os.fsencode(path),0x100|0x80|0x8)
+        if wd < 0: raise OSError(ctypes.get_errno(),"watch "+str(path))
+        self.paths[wd] = path
+
+    def events(self,timeout):
+        ready,_,_ = select.select([self.fd],[],[],timeout)
+        if not ready: return []
+        buf = os.read(self.fd,65536)
+        pos = 0
+        entries = []
+        while pos<len(buf):
+            wd,mask,_,length = struct.unpack_from("iIII",buf,pos)
+            name = os.fsdecode(buf[pos+16:pos+16+length].split(b"\0",1)[0])
+            pos += 16+length
+            if mask & 0x4000: entries.append(None)
+            elif wd in self.paths and name: entries.append(self.paths[wd]/name)
+        return entries
+
+    def close(self):
+        os.close(self.fd)
+
+
+def wait_for_guard():
+    receipt_dir = Path(q.scope()[0]["guard_receipts"])
+    changes = Changes()
+    try:
+        changes.watch(receipt_dir)
+        deadline = time.monotonic()+90
+        while not any(receipt_dir.glob("sample-*.json")):
+            remaining = deadline-time.monotonic()
+            q.need(remaining>0, "held guard did not produce its first sample")
+            changes.events(remaining)
+    finally: changes.close()
+
+
+def await_new_fleet(previous_path):
+    # The sole existing cadence writes one completed fleet file to each new root
+    # directory. Its creation is the only automatic capacity-retry signal.
+    changes = Changes()
+    try:
+        changes.watch(q.RT)
+        while True:
+            roots = [p for p in q.RT.glob("root*-live*-v*") if p.is_dir()
+                     and re.match(r"root[0-9]{6}-",p.name)]
+            newest = max(roots,key=lambda p:p.stat().st_mtime_ns)
+            changes.watch(newest)
+            latest = max(q.RT.glob("root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json"),key=lambda p:p.stat().st_mtime_ns)
+            if latest != previous_path: return
+            for event in changes.events(None):
+                if event is None or event.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json" or (
+                        event.parent==q.RT and re.match(r"root[0-9]{6}-",event.name)):
+                    break
+            else:
+                # Discard unrelated directory events without initiating a fleet scan.
+                while True:
+                    events = changes.events(None)
+                    if any(e is None or e.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json"
+                           or (e.parent==q.RT and re.match(r"root[0-9]{6}-",e.name)) for e in events): break
+    finally: changes.close()
+
+
 def dispatch(stage):
     i, ir = q.scope()
     q.need(operator.q.UNIT == q.UNIT and operator.D == q.DEP, "operator is outside its sealed deployment")
@@ -89,6 +162,7 @@ def dispatch(stage):
         operator.arm()
     if not (q.DEP/"WRITER_ENROLLMENT.json").exists(): return {"held_actor":q.read(q.DEP/"SUCCESSOR_ACTOR.json")[1],
             "held_guard_plan":q.read(q.DEP/"ACTUAL_GUARD_PLAN.json")[1],"awaiting_exact_writer_enrollment":True}
+    wait_for_guard()
     return operator.release()
 
 
@@ -98,11 +172,21 @@ def main():
     fd=os.open(q.DEP/"bounded-operator.lock",os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
     fcntl.flock(fd,fcntl.LOCK_EX)
     try:
-        print(json.dumps(dispatch(stage)),flush=True)
-    except Exception as error:
-        record(q.DEP/("DISPATCH_REFUSED_"+str(time.time_ns())+".json"),
-               dict(stage=stage,error=str(error),observed=int(time.time()),archive_publication_authorized=False))
-        raise
+        while True:
+            basis = max(q.RT.glob("root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json"),key=lambda p:p.stat().st_mtime_ns)
+            try:
+                print(json.dumps(dispatch(stage)),flush=True)
+                return
+            except Exception as error:
+                message = str(error)
+                retry = stage in ("advance","release") and any(fragment in message for fragment in
+                    (" fit failed: disk ", "readback capacity (HOME,RAM)", "cadence needs its current accepted fleet",
+                     "accepted fleet changed during price", "joint postguard HOME coverage failed"))
+                record(q.DEP/("DISPATCH_REFUSED_"+str(time.time_ns())+".json"),
+                       dict(stage=stage,error=message,observed=int(time.time()),fleet_at_attempt=str(basis),
+                            retry_on_new_accepted_fleet=retry,archive_publication_authorized=False))
+                if not retry: raise
+                await_new_fleet(basis)
     finally: os.close(fd)
 
 
