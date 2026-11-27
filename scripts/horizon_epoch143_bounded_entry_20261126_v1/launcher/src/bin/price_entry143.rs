@@ -117,6 +117,13 @@ fn protected(
     let unit = cgroup.rsplit('/').next().context("producer unit")?;
     let iid = string(&old["invocation_id"])?;
     let leader = number(&old["pid"])?;
+    let (memory_gib, cpu, resident_credit) = match unit {
+        "horizon-qualify-146-full-local-20261126-v1.service" => (68, "6.250000s", true),
+        "horizon-qualify-172-full-half-core-20261120-v1.service" => (68, "500ms", true),
+        "horizon-qualify-167-checkpoint-bounded-20261127-v2.service" => (42, "3s", false),
+        "horizon-qualify-170-checkpoint-suffix-20261127-v1.service" => (48, "6s", false),
+        _ => anyhow::bail!("foreign protected producer {unit}"),
+    };
     let props = state(unit)?;
     ensure!(
         property(&props, "InvocationID")? == iid
@@ -124,7 +131,9 @@ fn protected(
             && property(&props, "ControlGroup")? == cgroup
             && property(&props, "MainPID")? == leader.to_string()
             && property(&props, "Job")?.is_empty()
-            && property(&props, "MemorySwapMax")? == "0",
+            && property(&props, "MemorySwapMax")? == "0"
+            && property(&props, "MemoryMax")? == (memory_gib * GIB).to_string()
+            && property(&props, "CPUQuotaPerSecUSec")? == cpu,
         "incumbent changed {unit}"
     );
     let timer = unit
@@ -155,7 +164,7 @@ fn protected(
             "tracked process changed {pid}"
         );
         pids.insert(pid);
-        if unit.contains("-146-") || unit.contains("-172-") {
+        if resident_credit {
             let smaps = fs::read_to_string(format!("/proc/{pid}/smaps_rollup"))?;
             pss += kib_field(&smaps, "Pss:")?;
         }
@@ -418,7 +427,8 @@ fn main() -> Result<()> {
     ensure!(
         property(&selector, "ActiveState")? != "active"
             || (property(&selector, "MemoryMax")? == (4 * GIB).to_string()
-                && property(&selector, "MemorySwapMax")? == "0"),
+                && property(&selector, "MemorySwapMax")? == "0"
+                && property(&selector, "CPUQuotaPerSecUSec")? == "1s"),
         "167 retained prefix selector changed"
     );
     let fit_actor = if held {
