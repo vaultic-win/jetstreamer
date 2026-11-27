@@ -20,6 +20,8 @@ SCOPE_SHA = "b914d8570f3fe8fd2cc2bc91cc5285a9598b11515ab8763f17eeb28f13373a9c"
 WORK = Path("/home/sol/.jetstreamer-private/epoch168-private-archive-verify-20261127.0VHYTNgF")
 BUILD = WORK / "qualification/horizon-168-local-scan-build-1795817186264675279/BUILD.json"
 SOURCE = Path(__file__).resolve().parent
+ISSUED = PROD / "tools-v1"
+REPRICE = PROD / "split-price-v1"
 REPO = Path("/home/sol/workspace/jetstreamer")
 DEPLOYMENT = PROD / "deployment.json"
 ASSEMBLER = "horizon-assemble-168-private-20261127-v1.service"
@@ -129,7 +131,8 @@ def deployment(fixture):
         sealed(DEPLOYMENT)
         release = load(DEPLOYMENT)
         need(release["scope"] == {"path":str(SCOPE),"sha256":SCOPE_SHA}
-             and release["directory"] == str(SOURCE) and release["native_build"] == ref(BUILD),
+             and release["directory"] == str(ISSUED) and SOURCE in (ISSUED, REPRICE)
+             and release["native_build"] == ref(BUILD),
              "incorrect production verification deployment")
         proof = checked(release["qualification"])
         need(proof["accepted"] and proof["counts_rejected"] and proof["digest_rejected"]
@@ -140,8 +143,11 @@ def deployment(fixture):
             raw = git(["show",rev+":scripts/horizon_epoch168_private_verify/"+name])
             need(hashlib.sha256(raw).hexdigest() == item["sha256"], "operator not in fetched branch")
             if name.endswith(".py"):
-                sealed(SOURCE/name)
-                need(ref(SOURCE/name) == item, "installed dispatch source differs")
+                sealed(ISSUED/name)
+                need(ref(ISSUED/name) == item, "installed dispatch source differs")
+        if SOURCE == REPRICE:
+            bind = load_published_pricing()
+            need(bind["original_deployment"] == ref(DEPLOYMENT), "different verifier for split-fleet pricing")
         for name, binding in checked(release["native_build"])["source"].items():
             need(binding["sha256"] == release["source"][name]["sha256"], "compiled verifier source differs")
         result = release["binary"]
@@ -150,6 +156,25 @@ def deployment(fixture):
     sealed(binpath)
     need(ref(binpath) == result, "native verifier changed")
     return binpath
+
+
+def load_published_pricing():
+    registration = PROD / "SPLIT_PRICE_DEPLOYMENT.json"
+    sealed(registration)
+    item = load(registration)
+    receipt = checked(item["package"])
+    need(item["package"]["path"] == str(REPRICE/"deployment-seal-receipt.json") and
+         receipt["destination"] == str(REPRICE) and
+         {m["name"] for m in receipt["members"]} == {"dispatch.py","split_price.py"},
+         "different private pricing registration")
+    git(["merge-base","--is-ancestor",item["commit"],"refs/remotes/origin/account-updates"])
+    for member in receipt["members"]:
+        p = REPRICE/member["name"]
+        sealed(p)
+        committed = git(["show",item["commit"]+":scripts/horizon_epoch168_private_verify/"+p.name])
+        need(ref(p)["sha256"] == member["sha256"] == hashlib.sha256(committed).hexdigest(),
+             "split-fleet pricing differs from the merged source")
+    return item
 
 
 def run_native(binary, *args):
@@ -293,7 +318,7 @@ def dispatch(scope_path, fixture):
                     dict(assembler=content["unit"],invocation=content["invocation"],failures=failures,scope=scope))
         ready = run_native(binary,"ready",scope["path"],scope["sha256"])
         fetched = fetch()
-        capacity = runpy.run_path(str(SOURCE/"capacity.py"))
+        capacity = runpy.run_path(str(SOURCE/("split_price.py" if SOURCE == REPRICE else "capacity.py")))
         with capacity["OPERATION"].open("rb") as op, capacity["SERIAL"].open("rb") as serial:
             fcntl.flock(op,fcntl.LOCK_EX)
             fcntl.flock(serial,fcntl.LOCK_EX|fcntl.LOCK_NB)
