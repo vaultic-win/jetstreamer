@@ -34,6 +34,10 @@ READ_RETRY = re.compile(r"\[([^\]]+) WARN .+Original225 range at byte (\d+) inte
 FIRST_7871_REGISTRATION = V / "horizon230-first-7871-runtime-v1/cadence-registration.json"
 FIRST_7871_UNIT = "horizon-qualify-230-first-7871-v1.service"
 
+FIRST_7871_STATUS = FIRST_7871_REGISTRATION.parent / "repair-status-after-checkpoint-v1/completion.json"
+if FIRST_7871_STATUS.is_file():
+    CHECKPOINT_STATUS[230] = FIRST_7871_STATUS
+
 
 def registration_for_sample(epoch, sample):
     if epoch == 230 and FIRST_7871_REGISTRATION.is_file():
