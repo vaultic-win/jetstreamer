@@ -4,6 +4,7 @@ mod allocation;
 mod delivery252;
 mod focused;
 mod holding296;
+mod restore266;
 mod interval141;
 mod replay256;
 mod replay258;
@@ -15,6 +16,13 @@ use focused::{
 };
 mod suffix226;
 mod vote_boundary;
+
+struct AuxiliaryOwner {
+    launch: Bound,
+    owner: Value,
+    memory: u64,
+    ticks: u64,
+}
 
 const FLEET_ROOT: &str = "/home/ubuntu/.codex/diagnostics";
 const FLEET_PREFIX: &str = "horizon-foundation-seven-lane-v";
@@ -1272,6 +1280,14 @@ fn measure(
         .contains(holding296::UNIT)
         .then(|| holding296::active(n))
         .transpose()?;
+    let active_restore_266 = before
+        .contains(restore266::UNIT)
+        .then(|| restore266::active(n))
+        .transpose()?;
+    let auxiliary = [
+        (holding296::UNIT, active_holding_296.as_ref()),
+        (restore266::UNIT, active_restore_266.as_ref()),
+    ];
     let active_interval_141 = interval141::enrolled(n, &before)?;
     let private_141 = match &quote {
         Some(Quote::Interval141(ordinal)) => Some(interval141::candidate(*ordinal, &before)?),
@@ -1418,8 +1434,10 @@ fn measure(
             "epoch 262 held owner already booked as a peer"
         );
     }
-    if active_holding_296.is_some() {
-        ensure!(expected.insert(holding296::UNIT.to_owned()), "epoch 296 custody booked twice");
+    for (unit, owner) in auxiliary {
+        if owner.is_some() {
+            ensure!(expected.insert(unit.to_owned()), "{unit} booked twice");
+        }
     }
     for interval in &active_interval_141 {
         ensure!(expected.insert(interval.unit.to_owned()), "epoch 141 replay booked twice");
@@ -1512,12 +1530,15 @@ fn measure(
         let process_start_ticks = process_ticks(text(&owner, "MainPID")?.parse()?)?;
         recorded.insert(unit.clone(), (owner, memory, process_start_ticks));
     }
-    if let Some(holding) = &active_holding_296 {
-        require_disjoint_cpus(epoch, exclusive, holding296::UNIT, &holding.owner)?;
-        recorded.insert(
-            holding296::UNIT.to_owned(),
-            (holding.owner.clone(), holding.memory, holding.ticks),
-        );
+    for (unit, owner) in auxiliary {
+        if let Some(aux) = owner {
+            require_disjoint_cpus(epoch, exclusive, unit, &aux.owner)?;
+            recorded.insert(unit.to_owned(), (aux.owner.clone(), aux.memory, aux.ticks));
+        }
+    }
+    if active_restore_266.is_some() {
+        ensure!(exclusive.is_disjoint(&units::parse_cpu_list("32-39,96-103")?),
+            "epoch {epoch} overlaps the epoch 266 checkpoint's physical cores");
     }
     for interval in &active_interval_141 {
         interval.require_disjoint(exclusive)?;
@@ -1711,13 +1732,14 @@ fn measure(
         .values()
         .try_fold(0, |total, replay| capacity::add(total, replay.receipt_disk))?;
     let holding_296_disk = active_holding_296.as_ref().map_or(0, |_| holding296::RECEIPT_DISK);
+    let restore_266_disk = active_restore_266.as_ref().map_or(0, |_| restore266::RECEIPT_DISK);
     let interval_141_disk = active_interval_141.len() as u64 * interval141::DISK;
     let protected = capacity::add(
         capacity::add(
             capacity::add(disk_floor, non_guard_disk)?,
             capacity::add(
                 capacity::add(delivery_252_disk, delivery_261_disk)?,
-                capacity::add(replay_disk, capacity::add(holding_296_disk, interval_141_disk)?)?,
+                capacity::add(capacity::add(replay_disk, restore_266_disk)?, capacity::add(holding_296_disk, interval_141_disk)?)?,
             )?,
         )?,
         growth,
@@ -1777,7 +1799,8 @@ fn measure(
         )?,
     )?;
     let guard_141_memory = active_interval_141.len() as u64 * interval141::GUARD_MEMORY;
-    let reserve = capacity::add(resources_before.0 / 10, capacity::add(periodic_reserve, guard_141_memory)?)?;
+    let restore_allowance = active_restore_266.as_ref().map_or(0, |_| restore266::ADDITIONAL_MEMORY);
+    let reserve = capacity::add(resources_before.0 / 10, capacity::add(periodic_reserve, capacity::add(guard_141_memory, restore_allowance)?)?)?;
     let base_memory = capacity::add(capacity::add(reserve, candidate)?, reserved_audit_memory)?;
     let (hard, growth_memory) = recorded.values().try_fold(
         (base_memory, base_memory),
@@ -1797,6 +1820,8 @@ fn measure(
     let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
         "active_delivery_252_disk_bytes":delivery_252_disk,"active_delivery_261_disk_bytes":delivery_261_disk,
         "active_holding_296_disk_bytes":holding_296_disk,
+        "active_restore_266_receipt_bytes":restore_266_disk,
+        "active_restore_266_additional_memory_bytes":restore_allowance,
         "active_interval_141_disk_bytes":interval_141_disk,
         "active_diagnostic_230_receipt_disk_bytes":live_replays.get(&230).map_or(0, |lane| lane.receipt_disk),
         "active_replay_262_receipt_disk_bytes":live_replays.get(&262).map_or(0, |lane| lane.receipt_disk),
@@ -1855,6 +1880,7 @@ fn measure(
         "active_replay_260_registration":live_replays.get(&260).filter(|r| r.unit == replay260::UNIT).map(|r| &r.reference),
         "closed_delivery_257":closed_257,
         "active_holding_296_launch":active_holding_296.as_ref().map(|holding| &holding.launch),
+        "active_restore_266_launch":active_restore_266.as_ref().map(|restore| &restore.launch),
         "active_interval_141_launch":active_interval_141.iter().find(|interval| interval.ordinal() <= 3).map(|interval| &interval.launch),
         "active_interval_141_fourth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 4).map(|interval| &interval.launch),
         "active_interval_141_fifth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 5).map(|interval| &interval.launch),
