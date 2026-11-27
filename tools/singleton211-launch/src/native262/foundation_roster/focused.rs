@@ -501,15 +501,17 @@ pub(super) fn v1627_230_drained(n: &mut Native, row: &Value) -> Result<Option<Bo
     v1627_terminal_matches(row, &receipt, &terminal, &launch, &boot.trim().replace('-', ""))?;
     let archive = fs::symlink_metadata(V1627_ARCHIVE)?;
     let identity = &terminal["archive"]["identity"];
+    let nanos =
+        |seconds: i64, fraction: i64| seconds.checked_mul(1_000_000_000)?.checked_add(fraction);
     ensure!(
         archive.is_file()
             && archive.dev() == num(identity, "device")?
             && archive.ino() == num(identity, "inode")?
-            && archive.len() == num(identity, "length")?
-            && identity["modified_seconds"].as_i64() == Some(archive.mtime())
-            && identity["modified_nanoseconds"].as_i64() == Some(archive.mtime_nsec())
-            && identity["changed_seconds"].as_i64() == Some(archive.ctime())
-            && identity["changed_nanoseconds"].as_i64() == Some(archive.ctime_nsec()),
+            && archive.len() == num(identity, "bytes")?
+            && nanos(archive.mtime(), archive.mtime_nsec()).context("archive mtime overflow")?
+                == identity["mtime_ns"].as_i64().context("archive mtime missing")?
+            && nanos(archive.ctime(), archive.ctime_nsec()).context("archive ctime overflow")?
+                == identity["ctime_ns"].as_i64().context("archive ctime missing")?,
         "the retained epoch 230 v1.6.27 archive changed after terminal verification"
     );
     drained(n, V1627_230.unit, V1627_230.guard, V1627_INVOCATION)?;
