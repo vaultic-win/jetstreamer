@@ -15,7 +15,7 @@ import time
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 STATE = ROOT / "epoch185-lanem-main-holding-20261127-v1"
 PACKAGE = STATE / "package"
-RECOVERY = STATE / "restore-tools-v1"
+RECOVERY = STATE / "restore-tools-v2"
 RETIRE = STATE / "retirement-tools-v1"
 SIX = ROOT / "epoch141-foundation-sixth-bootstrap-20261127-v1"
 SERIAL = ROOT / "epoch185-lanem-holding-20261127-v1/PARK_ADMISSION.json"

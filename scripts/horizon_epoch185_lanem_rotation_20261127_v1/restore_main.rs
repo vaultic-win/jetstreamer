@@ -161,19 +161,54 @@ fn properties(unit: &str) -> Result<Value> {
     }
     Ok(d)
 }
-fn owners(fleet: &Value) -> Result<()> {
-    let rows = fleet["actual_executing_replays"]
-        .as_array()
-        .context("no fleet replay list")?;
+fn producer_rows(fleet: &Value) -> Result<std::collections::BTreeMap<&str, &Value>> {
     ensure!(
-        fleet["schema"] == "horizon-Root-complete-fleet-operational-review-v1"
-            && fleet["active_producer_count"].as_u64() == Some(rows.len() as u64),
+        fleet["schema"] == "horizon-Root-complete-fleet-operational-review-v1",
+        "foreign fleet"
+    );
+    let base = fleet["actual_executing_replays"]
+        .as_array()
+        .context("no base replay list")?;
+    let additive = fleet
+        .as_object()
+        .context("fleet is not an object")?
+        .values()
+        .filter(|row| {
+            row["phase"] == "worker"
+                && row["transaction_replay_claimed"] == true
+                && row["unit"]["ActiveState"] == "active"
+        });
+    let mut rows = std::collections::BTreeMap::new();
+    for row in base.iter().chain(additive) {
+        let unit = &row["unit"];
+        let name = unit["Id"].as_str().context("missing replay unit")?;
+        ensure!(
+            name.ends_with(".service")
+                && unit["ActiveState"] == "active"
+                && unit["InvocationID"]
+                    .as_str()
+                    .is_some_and(|id| id.len() == 32 && id.bytes().all(|c| c.is_ascii_hexdigit()))
+                && unit["MainPID"]
+                    .as_str()
+                    .is_some_and(|id| id.parse::<u32>().is_ok_and(|pid| pid > 0)),
+            "invalid replay identity"
+        );
+        if let Some(old) = rows.insert(name, unit) {
+            ensure!(
+                old["InvocationID"] == unit["InvocationID"] && old["MainPID"] == unit["MainPID"],
+                "ambiguous duplicate replay identity"
+            );
+        }
+    }
+    ensure!(
+        fleet["active_producer_count"].as_u64() == Some(rows.len() as u64),
         "incomplete replay roster"
     );
-    // These identities invalidate the fit when a producer is replaced during recovery.
-    for row in rows {
-        let u = &row["unit"];
-        let name = u["Id"].as_str().context("missing owner unit")?;
+    Ok(rows)
+}
+
+fn owners(fleet: &Value) -> Result<()> {
+    for (name, u) in producer_rows(fleet)? {
         let live = properties(name)?;
         ensure!(
             live["ActiveState"] == "active"
@@ -447,6 +482,24 @@ async fn qualify(self_sha: &str) -> Result<()> {
 
 async fn run() -> Result<()> {
     let args = env::args().skip(1).collect::<Vec<_>>();
+    if let [mode, path, digest] = args.as_slice()
+        && mode == "--check-roster"
+    {
+        let path = Path::new(path);
+        ensure!(
+            path.file_name().and_then(|s| s.to_str())
+                == Some("ROOT_COMPLETE_OPERATIONAL_FLEET.json")
+                && path.parent().and_then(Path::parent) == Path::new(STATE).parent(),
+            "outside campaign fleet"
+        );
+        let fleet = read_json(path, digest, 64 << 20, true)?;
+        owners(&fleet)?;
+        println!(
+            "{}",
+            json!({"fleet":path,"sha256":digest,"active_producer_count":fleet["active_producer_count"],"native_units":producer_rows(&fleet)?.keys().collect::<Vec<_>>(),"no_mutations":true})
+        );
+        return Ok(());
+    }
     if let [mode, sha] = args.as_slice()
         && mode == "--qualify"
     {
@@ -702,6 +755,23 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unions_base_and_separate_executing_replays_and_rejects_missing_and_conflicting_owners() {
+        let row = |name: &str, pid: &str| {
+            json!({"phase":"worker","transaction_replay_claimed":true,
+            "unit":{"Id":name,"ActiveState":"active","InvocationID":"1".repeat(32),"MainPID":pid}})
+        };
+        let a = row("a.service", "12");
+        let b = row("b.service", "13");
+        let mut fleet = json!({"schema":"horizon-Root-complete-fleet-operational-review-v1","active_producer_count":2,
+            "actual_executing_replays":[a],"current_private":b,"base_duplicate":a,"historical":{"phase":"closed"}});
+        assert_eq!(producer_rows(&fleet).unwrap().len(), 2);
+        fleet["base_duplicate"]["unit"]["MainPID"] = json!("24");
+        assert!(producer_rows(&fleet).is_err());
+        fleet.as_object_mut().unwrap().remove("base_duplicate");
+        fleet.as_object_mut().unwrap().remove("current_private");
+        assert!(producer_rows(&fleet).is_err());
+    }
     #[test]
     fn available_after_every_charge() {
         assert!(require_space(200, 120, 80).is_ok());
