@@ -19,11 +19,11 @@ HOME_BYTES = (44 << 30) + (64 << 20)
 RAM_BYTES = 31 << 30
 
 
-def book(price, quote, operator, runtime):
+def book(price, quote, operator, runtime, refused=None, dispatch_log=None):
     sys.path.insert(0, str(PACKAGE))
     import status_cycle as cycle
     from cutover41 import private_write
-    from evidence import bound, checked, json_bytes, need, utc
+    from evidence import bound, checked, digest, json_bytes, need, raw, utc
     from first_hourly143 import EPOCH141 as profile, EPOCH143, process_ids, props
     from transition import clock
 
@@ -88,17 +88,43 @@ def book(price, quote, operator, runtime):
                    native_census_enrolled=True, recording_authorized=True,
                    archive_publication_authorized=False, resource_credit_bytes=0)
     path = profile.base / "WRITER_BOOKING_FIRST_HOURLY.json"
+    if refused:
+        old = checked(refused)
+        log = raw(dispatch_log["path"])
+        guard = props(profile.guard_timer, "ActiveState,InvocationID,Job")
+        untouched = ("PRESTART_SCREEN.json", "ACTUAL_GUARD_PLAN.json", "HELD_OWNER.json", "barrier/allow")
+        predecessor = max(profile.base.glob("WRITER_BOOKING_FIRST_HOURLY*.json"),
+                          key=lambda candidate: candidate.stat().st_mtime_ns)
+        need(refused == bound(predecessor) and old["unit"] == profile.unit
+             and old["contract"] == profile.contract and old["writer_active"] == active
+             and old["latest_start_unix_seconds"] < now
+             and old["price"] != quote and old["sealed_price"] != price
+             and Path(dispatch_log["path"]).parent == profile.base
+             and digest(log) == dispatch_log["sha256"]
+             and b"' returned non-zero exit status 1." in log
+             and b"old_lower, old_upper = tree_bytes()" in log
+             and b"/usr/bin/du: cannot access " in log and log.rstrip().endswith(b"+ quote=")
+             and guard == {"ActiveState": "inactive", "InvocationID": "", "Job": ""}
+             and all(not (profile.base / item).exists() for item in untouched),
+             "the original booking is still live or did not fail before producer creation")
+        booking.update(replaces_expired_booking=refused, failed_prestart_dispatch=dispatch_log)
+        path = profile.base / f"WRITER_BOOKING_FIRST_HOURLY_{now}.json"
     private_write(path, json_bytes(booking), 0o400)
     return bound(path)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    for option in ("price", "quote", "operator"):
-        parser.add_argument(f"--{option}", nargs=2, metavar=("PATH", "SHA256"), required=True)
+    for option in ("price", "quote", "operator", "refused", "dispatch-log"):
+        parser.add_argument(f"--{option}", nargs=2, metavar=("PATH", "SHA256"),
+                            required=option in ("price", "quote", "operator"))
     parser.add_argument("--runtime-max-seconds", type=int, required=True)
     args = parser.parse_args()
+    if bool(args.refused) != bool(args.dispatch_log):
+        parser.error("--refused and --dispatch-log must be supplied together")
     refs = [dict(zip(("path", "sha256"), getattr(args, name))) for name in ("price", "quote", "operator")]
+    refs += [dict(zip(("path", "sha256"), values)) if values else None
+             for values in (args.refused, args.dispatch_log)]
     with LOCK.open("rb") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        print(json.dumps(book(*refs, args.runtime_max_seconds)))
+        print(json.dumps(book(*refs[:3], args.runtime_max_seconds, *refs[3:])))
