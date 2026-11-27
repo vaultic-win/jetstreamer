@@ -112,6 +112,30 @@ fn lane_k_retirement_charge() -> Result<(Value, u64)> {
     ))
 }
 
+fn bridge_exit_capture_charge() -> Result<(Value, u64, u64)> {
+    let unit = "horizon-170-bridge-exit-capture-20261127-v1.service";
+    let live = state(unit)?;
+    let active = property(&live, "ActiveState")?;
+    if matches!(active, "inactive" | "failed") {
+        ensure!(
+            property(&live, "MainPID")? == "0" && property(&live, "Job")?.is_empty(),
+            "170 exit capture is changing state"
+        );
+        return Ok((Value::Null, 0, 0));
+    }
+    ensure!(
+        active == "active"
+            && property(&live, "MainPID")?.parse::<u32>()? > 1
+            && property(&live, "InvocationID")? == "5d32e9177b714a528ceddb18b63d22ea"
+            && property(&live, "ControlGroup")? == format!("/system.slice/{unit}")
+            && property(&live, "MemoryMax")? == "33554432"
+            && property(&live, "MemorySwapMax")? == "0"
+            && property(&live, "CPUQuotaPerSecUSec")? == "150ms",
+        "170 exit capture owner or charge changed"
+    );
+    Ok((json!(live), 2 << 20, 32 << 20))
+}
+
 const RAM_CAP: u64 = 27 << 30;
 
 fn sample_lower(reference: &Value) -> Result<u64> {
@@ -121,8 +145,32 @@ fn sample_lower(reference: &Value) -> Result<u64> {
 }
 
 fn retire_uplift(fleet_ref: &Value, digest: &str) -> Result<(Value, u64)> {
+    let fleet_path = Path::new(string(&fleet_ref["path"])?);
+    let fleet_cycle = fleet_path
+        .parent()
+        .and_then(Path::file_name)
+        .and_then(|name| name.to_str())
+        .context("missing exact fleet generation")?;
+    let (filename, paths): (_, &[&str]) = match fleet_cycle {
+        "root091808-live166167170-20261127-v1" => (
+            "CACHE_RETIREMENT_AFTER_091808.json",
+            &[
+                "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/debug/deps",
+                "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/release/deps",
+            ],
+        ),
+        "root094808-live166167170-20261127-v1" => (
+            "CACHE_RETIREMENT_AFTER_094808.json",
+            &[
+                "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/debug/build",
+                "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/release/build",
+                "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build",
+            ],
+        ),
+        _ => anyhow::bail!("cache retirement does not belong to this accepted fleet"),
+    };
     let reference = json!({
-        "path":"/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-retry1/CACHE_RETIREMENT_AFTER_091808.json",
+        "path":format!("/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-retry1/{filename}"),
         "sha256":digest
     });
     let receipt = read(&reference)?;
@@ -136,13 +184,17 @@ fn retire_uplift(fleet_ref: &Value, digest: &str) -> Result<(Value, u64)> {
             && intent["live_or_staged_references"] == json!([]),
         "cache retirement does not belong to this accepted fleet"
     );
-    for path in [
-        "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/debug/deps",
-        "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/release/deps",
-    ] {
+    let retired_trees = intent["trees"]
+        .as_array()
+        .context("missing retired trees")?;
+    ensure!(
+        retired_trees.len() == paths.len(),
+        "extra compiler cache path"
+    );
+    for (path, retired) in paths.iter().zip(retired_trees) {
         ensure!(
-            !Path::new(path).try_exists()?,
-            "retired compiler cache has been recreated"
+            retired["path"] == *path && !Path::new(path).try_exists()?,
+            "retirement used a different cache or it has been recreated"
         );
     }
     let before = number(&receipt["home_available_before_bytes"])?;
@@ -177,6 +229,11 @@ fn main() -> Result<()> {
     let transfers = fleet["actual_active_holding_transfers"]
         .as_array()
         .context("missing transfer roster")?;
+    let (exit_capture, exit_capture_home, exit_capture_ram) = if retry {
+        bridge_exit_capture_charge()?
+    } else {
+        (Value::Null, 0, 0)
+    };
     let (retirement, retirement_ram) = if retry {
         lane_k_retirement_charge()?
     } else {
@@ -337,13 +394,15 @@ fn main() -> Result<()> {
         .context("tail allocation crosses initial protected charge")?
         .checked_add(growth_loss)
         .and_then(|bytes| bytes.checked_add(extra_home))
+        .and_then(|bytes| bytes.checked_add(exit_capture_home))
         .context("disk commitment overflow")?;
     let retained_required_ram = (number(&post["required_ram_bytes"])?
         + number(&base["resident_lower_bound_bytes"])?)
     .checked_sub(resident)
     .and_then(|bytes| bytes.checked_add(extra_ram))
     .and_then(|bytes| bytes.checked_add(retirement_ram))
-    .context("resident measurement or lane-K RAM invalid")?;
+    .and_then(|bytes| bytes.checked_add(exit_capture_ram))
+    .context("resident measurement or explicit RAM charge invalid")?;
     let expected = state("horizon-epoch140-suffix-recording.service")?;
     ensure!(
         matches!(property(&expected, "ActiveState")?, "inactive" | "failed")
@@ -364,7 +423,9 @@ fn main() -> Result<()> {
             "candidate_home_bytes":home_cap,"retained_185_lanek":lane_k,
             "verified_cache_retirement":cache_retirement,"confirmed_reclaimed_home_bytes":confirmed_reclaimed_home,
              "additional_185_lanek_home_bytes":extra_home,"additional_185_lanek_ram_bytes":extra_ram,
-            "live_185_retirement":retirement,"additional_185_retirement_ram_bytes":retirement_ram,"candidate_ram_bytes":RAM_CAP,
+            "live_185_retirement":retirement,"additional_185_retirement_ram_bytes":retirement_ram,
+            "live_170_exit_capture":exit_capture,"additional_170_exit_capture_home_bytes":exit_capture_home,
+            "additional_170_exit_capture_ram_bytes":exit_capture_ram,"candidate_ram_bytes":RAM_CAP,
             "candidate_cpu_quota_micros":3_000_000,
             "disk_fits":home_available >= retained_required_home + home_cap,
             "memory_fits":ram_available >= retained_required_ram + RAM_CAP,
