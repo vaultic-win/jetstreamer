@@ -5,7 +5,9 @@ mod delivery252;
 mod focused;
 mod replay258;
 mod replay260;
-use focused::{FEATURE_296, GAP_230, LOADER_296, RESTORE_258, RESTORE_260, SCOPES, TRACE_296};
+use focused::{
+    FEATURE_296, GAP_230, HOURLY_230, LOADER_296, RESTORE_258, RESTORE_260, SCOPES, TRACE_296,
+};
 mod suffix226;
 mod vote_boundary;
 
@@ -1372,7 +1374,10 @@ fn measure(
     let resources_before = live::resources_at(Path::new(FILESYSTEM))?;
     let selected = units::parse_cpu_list(match epoch {
         226 => "16-23",
-        230 => GAP_230.cpus,
+        230 => match &quote {
+            Some(Quote::Focused(spec, _)) => spec.cpus,
+            _ => GAP_230.cpus,
+        },
         258 if matches!(&quote, Some(Quote::FullReplay(_))) => replay258::CPUS,
         258 => RESTORE_258.cpus,
         260 => RESTORE_260.cpus,
@@ -1685,6 +1690,9 @@ fn measure(
         .collect();
     let schema = match epoch {
         226 => "foundation-epoch226-suffix-roster-binding-v1",
+        230 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == HOURLY_230.unit) => {
+            "foundation-epoch230-hourly-first-roster-binding-v1"
+        }
         230 => "foundation-epoch230-short-gap-roster-binding-v1",
         252 => "foundation-epoch252-delivery-roster-binding-v1",
         258 if matches!(&quote, Some(Quote::FullReplay(_))) => replay258::ROSTER_SCHEMA,
@@ -1850,6 +1858,7 @@ pub fn run() -> Result<()> {
                         | "--delivery261-quote"
                         | "--replay296-quote"
                         | "--focused230-quote"
+                        | "--hourly230-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--focused296-quote"
@@ -1868,7 +1877,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
+            "use --as-controller UNIT, --full-replay-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
         ),
     };
     let synchronize = match args.next() {
@@ -1926,6 +1935,7 @@ pub fn run() -> Result<()> {
                 flag.to_str(),
                 Some(
                     "--focused230-quote"
+                        | "--hourly230-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--focused296-quote"
@@ -1936,6 +1946,7 @@ pub fn run() -> Result<()> {
         {
             let spec = match flag.to_str() {
                 Some("--focused230-quote") => &GAP_230,
+                Some("--hourly230-quote") => &HOURLY_230,
                 Some("--focused258-quote") => &RESTORE_258,
                 Some("--focused260-quote") => &RESTORE_260,
                 Some("--trace296-quote") => &TRACE_296,

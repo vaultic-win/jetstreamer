@@ -68,6 +68,15 @@ GAP_230 = Scope(
     "1b9a96e850cb4b050f2f64ee90665399dbddc7c9b2a71fe5afb32796b2518dcb",
     225_000_000_000, 208 << 30, 256 << 20, "72-79",
 )
+HOURLY_230 = Scope(
+    230, V / "horizon230-middle-hourly-first-runtime-v1",
+    "horizon-qualify-230-middle-hourly-first-v1.service",
+    "horizon-230-middle-hourly-first-protective-v1.service",
+    "epoch230-private-first-hourly-window", "foundation-epoch230-hourly-first-roster-binding-v1",
+    "f54a68b09830f1ae8048b4a1db29ad63f0d10cba02d34a6a06b19dbeb3f7eaab",
+    "fae42b5f5183a21bed46786ddc0d23819ee1eadec8c84f9dd1a3f6debbec113b",
+    225_000_000_000, 208 << 30, 256 << 20, "72-79",
+)
 RESTORE_258 = Scope(
     258, V / "horizon258-native-restore-runtime-v1",
     "horizon-qualify-258-native-restore-v1.service", "horizon-258-native-restore-protective-v1.service",
@@ -103,6 +112,7 @@ FEATURE_296 = Scope(
 )
 SCOPED_ARGS = {
     "--epoch230": GAP_230, "--epoch258": RESTORE_258, "--epoch260": RESTORE_260,
+    "--hourly230": HOURLY_230,
     "--trace296": TRACE_296, "--feature296": FEATURE_296,
 }
 

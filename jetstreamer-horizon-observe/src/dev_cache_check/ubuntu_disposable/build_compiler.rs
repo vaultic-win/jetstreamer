@@ -6,7 +6,7 @@ use super::*;
 fn expected(policy_root: &Path, relative: &Path) -> Option<&'static str> {
     match (policy_root.to_str()?, relative.to_str()?) {
         (
-            DEBUG_BUILD,
+            DEBUG_BUILD | DEMOTION_DEBUG_BUILD,
             "librocksdb-sys-37eeae80f930ac01/out/bfe5d317b023d6cf-checkpoint_impl.o"
             | "librocksdb-sys-718199d3bc47b9d1/out/bfe5d317b023d6cf-checkpoint_impl.o",
         ) => Some("f53c0f2b84b90ab5423f2923bf2da073bdb15661b24457e7c34cd4a4263a42e8"),
@@ -61,6 +61,8 @@ mod tests {
         let relative =
             Path::new("librocksdb-sys-37eeae80f930ac01/out/bfe5d317b023d6cf-checkpoint_impl.o");
         assert!(expected(Path::new(DEBUG_BUILD), relative).is_some());
+        assert!(expected(Path::new(DEMOTION_DEBUG_BUILD), relative).is_some());
+        assert!(expected(Path::new(DEMOTION_DEBUG_DEPS), relative).is_none());
         assert!(expected(Path::new(RELEASE_BUILD), relative).is_none());
         assert!(expected(Path::new(RELEASE_DEPS), relative).is_none());
         for name in [
