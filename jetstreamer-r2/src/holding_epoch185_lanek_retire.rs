@@ -232,21 +232,44 @@ fn current_writer_fragment() -> Result<Option<PathBuf>> {
             && n["NoNewPrivileges"] == "yes"
             && n["ProtectHome"] == "read-only"
             && n["ProtectSystem"] == "strict"
-            && [
-                "TriggeredBy",
-                "OnSuccess",
-                "OnFailure",
-                "ExecCondition",
-                "ExecStartPre",
-                "ExecStartPost",
-                "ExecReload",
-                "ExecStop",
-                "ExecStopPost"
-            ]
-            .iter()
-            .all(|key| n[*key] == "")
+            && ["TriggeredBy", "OnSuccess", "OnFailure"]
+                .iter()
+                .all(|key| n[*key] == "")
             && writable == expected_paths,
         "unexpected current retirement unit or writable scope"
+    );
+    // systemctl omits empty command-array properties even with --all.
+    let commands = [
+        "ExecCondition",
+        "ExecStartPre",
+        "ExecStartPost",
+        "ExecReload",
+        "ExecStop",
+        "ExecStopPost",
+    ];
+    let output = std::process::Command::new("/usr/bin/busctl")
+        .args([
+            "--json=short",
+            "get-property",
+            "org.freedesktop.systemd1",
+            "/org/freedesktop/systemd1/unit/horizon_2dexact_2d185_2dlanek_2dretirement_2eservice",
+            "org.freedesktop.systemd1.Service",
+        ])
+        .args(commands)
+        .output()?;
+    ensure!(
+        output.status.success(),
+        "could not read typed retirement command arrays"
+    );
+    let arrays = serde_json::Deserializer::from_slice(&output.stdout)
+        .into_iter::<Value>()
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    ensure!(
+        arrays.len() == commands.len()
+            && arrays
+                .iter()
+                .all(|item| item["type"] == "a(sasbttttuii)" && item["data"] == json!([])),
+        "current retirement service contains another command"
     );
     Ok(Some(fragment))
 }
