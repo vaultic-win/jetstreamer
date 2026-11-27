@@ -12,6 +12,8 @@ keywords.workspace = true
 [features]
 # Private retained-input metadata planning; never issues replay admission.
 epoch185-offline-metadata-plan = []
+# Private executable limited to the exact lane-k retirement.
+epoch185-lanek-retirement = []
 
 [[bin]]
 name = "jetstreamer-epoch185-offline-metadata-plan"

@@ -3649,6 +3649,13 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
     Ok(())
 }
 
+#[cfg(feature = "epoch185-lanek-retirement")]
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
+    holding::run_lanek_retirement().await
+}
+
+#[cfg(not(feature = "epoch185-lanek-retirement"))]
 #[tokio::main]
 async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("recover-reader205-finalization") {
