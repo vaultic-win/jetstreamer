@@ -1,7 +1,9 @@
 """Focused tests against the saved fleet bindings and the V29 guard retry."""
 from copy import deepcopy
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest import TestCase, main
 from unittest.mock import Mock, patch
 import sys
@@ -10,7 +12,7 @@ root = Path(__file__).resolve().parent
 source = root/'tools-cold168-retry5-failed166-v29-entry146'
 authority = Path('/var/lib/jetstreamer/horizon_runtime_data')
 sys.path[:0] = [str(source), str(authority/'prefix140-status-cadence-20261122-v1/cadence-tools')]
-from evidence import bound, checked, sealed
+from evidence import bound, checked, need, sealed
 import cold168_commit as retry
 import joint168_status as joint
 
@@ -87,6 +89,46 @@ class GuardSelection(TestCase):
     def test_independent_protective_failure_propagates(self):
         with self.assertRaisesRegex(ValueError, 'foreign guard'):
             self.run_guard([ValueError('foreign guard'), AssertionError('unexpected retry')])
+
+class ExactGuardInvariants(TestCase):
+    def setUp(self):
+        self.fixture = json.loads((root/'EXACT_GUARD_FIXTURE.json').read_text())
+
+    def protective(self, distinguish=True, age=20):
+        lane, f = joint.lane, self.fixture
+        f['sample']['workers'] = []
+        bound_data = {f['requested'][k]['path']:f[k] for k in ('plan','sample')}
+        manager_data = {lane.TIMER:f['timer'],lane.SERVICE:f['service']}
+        watcher = SimpleNamespace(need=need,bound=lambda ref,_path:bound_data[ref['path']])
+        with patch.object(lane,'props',side_effect=lambda unit,_fields:manager_data[unit]), \
+             patch.object(lane.time,'time',return_value=f['sample']['recorded_unix_seconds']+age):
+            return lane.protective(watcher,f['requested'],f['e'],f['q'],None,
+                                   distinguish_churn=distinguish)
+
+    def test_native_churn_is_a_distinct_failure_only_for_cadence(self):
+        with self.assertRaises(joint.lane.GuardDirectoryChurn):
+            self.protective()
+        with self.assertRaises(ValueError) as stopped_admission:
+            self.protective(distinguish=False)
+        self.assertNotIsInstance(stopped_admission.exception,joint.lane.GuardDirectoryChurn)
+
+    def test_churn_cannot_mask_trip_crossed_identity_or_freshness(self):
+        for key,value,age in [('trip_reason','root-physical-budget',20),
+                              ('producer_invocation_id','foreign',20),
+                              ('available_bytes',0,20),
+                              ('trip_reason',None,121)]:
+            with self.subTest(key=key,age=age):
+                before=self.fixture['sample'][key]
+                self.fixture['sample'][key]=value
+                with self.assertRaises(ValueError) as plain:
+                    self.protective(age=age)
+                self.assertNotIsInstance(plain.exception,joint.lane.GuardDirectoryChurn)
+                self.fixture['sample'][key]=before
+
+    def test_clean_physical_receipt_returns_bound_guard(self):
+        for side in ('first','second'):
+            self.fixture['sample']['root_physical_observation'][side]['vanished_entries']=0
+        self.assertEqual(self.protective()['sample'],self.fixture['requested']['sample'])
 
 if __name__=='__main__':
     main()
