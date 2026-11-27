@@ -17,18 +17,47 @@ const PART_ALLOCATION: u64 = 67_427_381_248;
 
 // These are only stopped definitions of the original writer and its one
 // read-only diagnosis. Any new scheduled or live reference blocks retirement.
-const STOPPED: [(&str, &str, &str); 2] = [
+const STOPPED: [(&str, &str, StoppedReference); 2] = [
     (
         "foundation-292-closed-appendvec-staging-v304.service",
         "6979fb77543c406d9f016656303e86cc",
-        "8e23f5a0a03f4cab97e2470ec7a8cc8042f045a95ef6a4c2a6176535105d0fb5",
+        StoppedReference::Direct(
+            "8e23f5a0a03f4cab97e2470ec7a8cc8042f045a95ef6a4c2a6176535105d0fb5",
+        ),
     ),
     (
         "foundation-292-staged-part-diagnosis-v307.service",
         "1e02b3d840774baa86f48fd6748f881f",
-        "c41ccbd13e2a2a7fe69264d00b4d43f2f13a7d0b92c02d6634e61101b243ff68",
+        StoppedReference::Direct(
+            "c41ccbd13e2a2a7fe69264d00b4d43f2f13a7d0b92c02d6634e61101b243ff68",
+        ),
     ),
 ];
+
+#[derive(Clone, Copy)]
+pub(crate) enum StoppedReference {
+    Direct(&'static str),
+    GuardPlan {
+        recipe_sha256: &'static str,
+        path: &'static str,
+        plan_sha256: &'static str,
+    },
+}
+
+impl StoppedReference {
+    fn matches(self, row: &Value, unit: &str, target: &Path) -> bool {
+        let (chain, digest) = match self {
+            Self::Direct(digest) => (json!([]), digest),
+            Self::GuardPlan {
+                path, plan_sha256, ..
+            } => (json!([path]), plan_sha256),
+        };
+        row["origin"] == format!("/run/systemd/transient/{unit}")
+            && row["chain"] == chain
+            && row["sha256"] == digest
+            && row["targets"] == json!([target])
+    }
+}
 
 pub(super) fn accounts_readers(scope: &Path, target: &Path) -> Result<Value> {
     no_readers(scope, target, &STOPPED[..1])
@@ -37,13 +66,14 @@ pub(super) fn accounts_readers(scope: &Path, target: &Path) -> Result<Value> {
 pub(crate) fn no_readers(
     scope: &Path,
     target: &Path,
-    stopped: &[(&str, &str, &str)],
+    stopped: &[(&str, &str, StoppedReference)],
 ) -> Result<Value> {
     let report = scheduled_census(scope, target)?;
-    for &(unit, invocation, _) in stopped {
+    let mut verified = Vec::new();
+    for &(unit, invocation, reference) in stopped {
         let output = Command::new("/usr/bin/systemctl")
             .args(["show", unit, "-p",
-                "LoadState,ActiveState,MainPID,ControlPID,ControlGroup,Job,InvocationID,Restart,RequiredBy,WantedBy,Triggers,TriggeredBy,NRestarts"])
+                "Id,LoadState,ActiveState,MainPID,ControlPID,ControlGroup,Job,InvocationID,Restart,RequiredBy,WantedBy,Triggers,TriggeredBy,NRestarts,DropInPaths,FragmentPath,UnitFileState"])
             .output()?;
         ensure!(
             output.status.success(),
@@ -84,17 +114,47 @@ pub(crate) fn no_readers(
                 && !Path::new("/sys/fs/cgroup/system.slice").join(unit).exists(),
             "foreign or still-running invocation for {unit}"
         );
+        if let StoppedReference::GuardPlan {
+            recipe_sha256,
+            path,
+            plan_sha256,
+        } = reference
+        {
+            if lines.contains("LoadState=not-found") {
+                continue;
+            }
+            let fragment = Path::new("/run/systemd/transient").join(unit);
+            ensure!(
+                lines.contains(format!("Id={unit}").as_str())
+                    && lines.contains("DropInPaths=")
+                    && lines.contains("UnitFileState=transient")
+                    && lines.contains(format!("FragmentPath={}", fragment.display()).as_str()),
+                "unexpected stopped guard definition for {unit}"
+            );
+            // The scanner hashes the indirect plan. Verify the originating unit file separately.
+            let mut recipe = open_regular(&fragment)?;
+            let metadata = recipe.metadata()?;
+            ensure!(
+                metadata.uid() == 0
+                    && metadata.mode() & 0o022 == 0
+                    && metadata.len() <= JSON_LIMIT
+                    && digest(&mut recipe)? == recipe_sha256
+                    && identity(&metadata) == identity(&fragment.symlink_metadata()?)
+                    && crate::parked_accounts::sealed(Path::new(path), JSON_LIMIT)?.sha256
+                        == plan_sha256,
+                "changed stopped guard recipe or plan for {unit}"
+            );
+        }
+        verified.push((unit, reference));
     }
     for referrer in report["remaining"]
         .as_array()
         .context("invalid scheduled-reader response")?
     {
         ensure!(
-            stopped.iter().any(|(unit, _, digest)| {
-                referrer["origin"] == format!("/run/systemd/transient/{unit}")
-                    && referrer["sha256"] == *digest
-            }) && referrer["chain"] == json!([])
-                && referrer["targets"] == json!([target]),
+            verified
+                .iter()
+                .any(|(unit, reference)| reference.matches(referrer, unit, target)),
             "unexpected scheduled reference to stopped scratch"
         );
     }
@@ -285,6 +345,39 @@ pub(super) fn run(apply: bool, state: &Path, restored: &Value, tree: Binding) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stopped_guard_accepts_only_its_one_plan_edge() {
+        let reference = StoppedReference::GuardPlan {
+            recipe_sha256: "receipt for unit",
+            path: "/sealed/guard-plan.json",
+            plan_sha256: "receipt for plan",
+        };
+        let unit = "retired-guard.service";
+        let target = Path::new("/closed/work/index");
+        let row = json!({
+            "origin":"/run/systemd/transient/retired-guard.service",
+            "chain":["/sealed/guard-plan.json"], "sha256":"receipt for plan", "targets":[target]
+        });
+        assert!(reference.matches(&row, unit, target));
+        let direct = StoppedReference::Direct("receipt for plan");
+        assert!(!direct.matches(&row, unit, target));
+        for (field, changed) in [
+            ("origin", json!("/run/systemd/transient/other.service")),
+            ("chain", json!([])),
+            ("chain", json!(["/sealed/another.json"])),
+            ("chain", json!(["/outer.json", "/sealed/guard-plan.json"])),
+            ("sha256", json!("receipt for unit")),
+            ("targets", json!([target, "/another/index"])),
+        ] {
+            let mut different = row.clone();
+            different[field] = changed;
+            assert!(!reference.matches(&different, unit, target));
+        }
+        let mut direct_row = row;
+        direct_row["chain"] = json!([]);
+        assert!(direct.matches(&direct_row, unit, target));
+    }
 
     #[test]
     #[ignore = "read-only proof and manager census on the Foundation host"]
