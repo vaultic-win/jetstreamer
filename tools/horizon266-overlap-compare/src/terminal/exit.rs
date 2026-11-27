@@ -269,6 +269,70 @@ pub(super) fn capture_v1627(launch_sha: &str, destination: &Path) -> Result<Valu
     )
 }
 
+pub(super) fn capture_predecessor(launch_sha: &str, destination: &Path) -> Result<Value> {
+    const STATE: &str = "/var/lib/jetstreamer/horizon266-original-predecessor-runtime-v1";
+    const UNIT: &str = "horizon-qualify-266-original-predecessor-v1.service";
+    const NODE: &str = "/var/lib/jetstreamer/horizon253255-node-index-20261118-v2/jetstreamer-node";
+    require_root()?;
+    let parent = destination_parent(destination)?;
+    let state = Path::new(STATE);
+    let reference = Reference::new(state.join("cadence-registration.json"), launch_sha);
+    let launch = reference.read()?;
+    let invocation = string(&launch, "invocation_id")?;
+    let pid = serde_json::from_value(launch["main_pid"].clone())?;
+    let plan: Reference = serde_json::from_value(launch["guard_plan"].clone())?;
+    let guard: Reference = serde_json::from_value(launch["active_guard"].clone())?;
+    let sample = guard.read_guard_sample(&state.join("guard-receipts"))?;
+    ensure!(
+        launch["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+            && launch["epoch"] == 266
+            && launch["kind"] == "epoch266-private-original-predecessor"
+            && launch["unit"] == UNIT
+            && launch["node_path"] == NODE
+            && launch["profile"]["sha256"]
+                == "7ed80c05ae0e1c706a271452d9b0dcb516c651fd0f97a2ec3f1c61a477a30f21"
+            && launch["bootstrap_custody"]["sha256"]
+                == "afd03e2258229848a2878f1c2ff75b424ebf810b79fec65788c75ac5111a5959"
+            && launch["launched"] == true
+            && launch["diagnostic_only"] == true
+            && launch["canonical_epoch_publication_authorized"] == false
+            && hex(invocation, 32)
+            && pid > 1
+            && plan.path == state.join("guard-plan.json")
+            && plan.read()?["invocation_id"] == invocation
+            && sample["producer_invocation_id"] == invocation
+            && sample["producer"]["pid"] == pid
+            && sample["plan_sha256"] == plan.sha256
+            && sample["producer_stop_enabled"] == true
+            && sample["trip_reason"].is_null(),
+        "foreign epoch 266 predecessor launch or live guard"
+    );
+    let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    ensure!(hex(&boot_id, 32), "invalid running boot ID");
+    let producer = Producer {
+        unit: UNIT,
+        invocation,
+        pid,
+        node: Path::new(NODE),
+    };
+    let (_held, properties) = capture_properties(&producer, 7_300_000)?;
+    ensure!(reference.read()? == launch, "predecessor launch changed during capture");
+    persist_capture(
+        parent,
+        destination,
+        &Capture {
+            schema: "foundation-epoch266-private-predecessor-pid1-exit-v1".to_owned(),
+            launch: reference,
+            boot_id,
+            producer_invocation: invocation.to_owned(),
+            producer_pid: pid,
+            properties,
+        },
+    )
+}
+
 pub(super) fn read(reference: &Reference, admitted: &Admitted) -> Result<UnitState> {
     let capture: Capture = serde_json::from_value(reference.read()?)?;
     ensure!(

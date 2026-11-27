@@ -813,6 +813,10 @@ pub(super) fn capture_v1627_exit(launch_sha: &str, destination: &Path) -> Result
     exit::capture_v1627(launch_sha, destination)
 }
 
+pub(super) fn capture_predecessor_exit(launch_sha: &str, destination: &Path) -> Result<Value> {
+    exit::capture_predecessor(launch_sha, destination)
+}
+
 pub(super) fn collect_v1627_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {
     v1627::collect(exit, digest, destination)
 }
