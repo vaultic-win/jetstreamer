@@ -55,6 +55,23 @@ const FOURTH: Scope = Scope {
 };
 const FOURTH_PACKET: &str = "f7c8bebfa2a6e838f3f39f46ac4d32a18948192331fa29b46425268ed8592772";
 
+const FIFTH: Scope = Scope {
+    ordinal: 5,
+    unit: "horizon-qualify-141-foundation-interval5-v1.service",
+    guard: "horizon-141-foundation-interval5-guard-v1.service",
+    timer: "horizon-141-foundation-interval5-guard-v1.timer",
+    state: "/var/lib/jetstreamer/horizon141-foundation-interval5-runtime-v1",
+    handoff: "c024321f48da115b98ed2a25a91a81655aab4ca74728a4517aa4b8d4976a6455",
+    producer_cpus: [27, 28],
+    affinity: "27-28",
+    guard_cpu: 29,
+};
+const FIFTH_SOURCE: &str = "cd204d101e4aaa51a946c96db3745ab8b599edd05c45cabd2a5abc7a7d830525";
+const FIFTH_EXECUTION: &str = "e452a16accc13f9916d4052f1e67212a47cf5cb675648c8008e3aa3348343e95";
+const FIFTH_SCOPE: &str = "9188755bc441de30ed4e7c646c2c80889872b4d0cfb8a8f0c34c67847866337e";
+const FIFTH_CUSTODY: &str = "2193c11c736af4396f266d788325e02f87eeb857efdc98fa90137a7c22ba243f";
+const FOURTH_INVOCATION: &str = "e8ddd3cf18c64dba954e84604afc70b1";
+
 pub(super) struct Active {
     scope: &'static Scope,
     pub(super) unit: &'static str,
@@ -65,8 +82,8 @@ pub(super) struct Active {
 }
 
 impl Active {
-    pub(super) fn is_fourth(&self) -> bool {
-        self.scope.ordinal == 4
+    pub(super) fn ordinal(&self) -> u8 {
+        self.scope.ordinal
     }
     pub(super) fn require_disjoint(&self, cpus: &BTreeSet<u64>) -> Result<()> {
         let peer = placement(self.scope)?;
@@ -80,15 +97,16 @@ impl Active {
 }
 
 pub(super) fn is_guard(unit: &str) -> bool {
-    [SECOND.guard, THIRD.guard, FOURTH.guard].contains(&unit)
+    [SECOND.guard, THIRD.guard, FOURTH.guard, FIFTH.guard].contains(&unit)
 }
 
 pub(super) fn enrolled(n: &mut Native, running: &BTreeSet<String>) -> Result<Vec<Active>> {
     ensure!(
-        !(running.contains(SECOND.unit) && running.contains(THIRD.unit)),
+        !(running.contains(SECOND.unit) && running.contains(THIRD.unit))
+            && !(running.contains(FOURTH.unit) && running.contains(FIFTH.unit)),
         "sequential epoch 141 intervals overlap"
     );
-    [&SECOND, &THIRD, &FOURTH]
+    [&SECOND, &THIRD, &FOURTH, &FIFTH]
         .into_iter()
         .filter(|scope| running.contains(scope.unit))
         .map(|scope| active(n, scope))
@@ -151,6 +169,9 @@ fn active(n: &mut Native, scope: &'static Scope) -> Result<Active> {
     }
     if scope.ordinal == 4 {
         fourth_evidence(state, &fit)?;
+    }
+    if scope.ordinal == 5 {
+        fifth_evidence(state, &fit)?;
     }
     let timer = n.show_fields(scope.timer, "Id,ActiveState,InvocationID,Unit")?;
     ensure!(
@@ -228,29 +249,36 @@ pub(super) fn candidate(ordinal: u8, before: &BTreeSet<String>) -> Result<Candid
     let scope = match ordinal {
         3 => &THIRD,
         4 => &FOURTH,
+        5 => &FIFTH,
         _ => anyhow::bail!("unknown epoch 141 candidate"),
     };
+    let predecessor = match ordinal {
+        3 => Some(&SECOND),
+        5 => Some(&FOURTH),
+        _ => None,
+    };
     ensure!(
-        !before.contains(scope.unit) && (ordinal != 3 || !before.contains(SECOND.unit)),
+        !before.contains(scope.unit)
+            && predecessor.is_none_or(|prior| !before.contains(prior.unit)),
         "epoch 141 candidate overlaps a live owner"
     );
     let state = Path::new(scope.state);
     let inputs = local_ref(&state.join("static-inputs.json"))?;
-    let proof = if ordinal == 3 {
-        let previous = Path::new(SECOND.state);
-        let proof = json!({
-            "static_inputs": inputs,
-            "predecessor_terminal": local_ref(&previous.join("replay-terminal.json"))?,
-            "predecessor_drain": local_ref(&previous.join("post-custody-drain.json"))?,
-        });
-        successor_evidence(state, &proof)?;
-        proof
-    } else {
-        let assignment = state.join("inputs/foundation-assignment.json");
-        let proof = json!({"static_inputs":inputs,"handoff":local_ref(&assignment)?});
-        fourth_evidence(state, &proof)?;
-        proof
-    };
+    let mut proof = json!({"static_inputs":inputs});
+    if let Some(prior) = predecessor {
+        let previous = Path::new(prior.state);
+        proof["predecessor_terminal"] = json!(local_ref(&previous.join("replay-terminal.json"))?);
+        proof["predecessor_drain"] = json!(local_ref(&previous.join("post-custody-drain.json"))?);
+    }
+    if ordinal >= 4 {
+        proof["handoff"] = json!(local_ref(&state.join("inputs/foundation-assignment.json"))?);
+    }
+    match ordinal {
+        3 => successor_evidence(state, &proof)?,
+        4 => fourth_evidence(state, &proof)?,
+        5 => fifth_evidence(state, &proof)?,
+        _ => unreachable!(),
+    }
     Ok(Candidate {
         scope,
         inputs: proof,
@@ -356,6 +384,113 @@ fn successor_evidence(state: &Path, fit: &Value) -> Result<()> {
             && released["guard_drained"] == true
             && released["tmpfs_drained"] == true,
         "epoch 141 third interval lacks the exact verified input or predecessor drain"
+    );
+    Ok(())
+}
+
+fn fifth_evidence(state: &Path, fit: &Value) -> Result<()> {
+    const BOOT: &str = "snapshot-60942184-EMsXJsestzPAfJtGfNdQdeji3JmuvaCKDAMPcD8hW3ZT.tar.zst";
+    const PAYLOAD: &str = "47e9df6780b20eb6663f1bcb175600ec20a24ba004f67628169b1eefc1f0892d";
+    const MANIFEST: &str = "bdc1247ad453394100e2ab9346df03a973ba5cda4029e7d89a4532fe028bdf19";
+    const ETAG: &str = "51c697688661fd9c6c34d13dc7f734ac-33";
+    let previous = Path::new(FOURTH.state);
+    let terminal = binding(&fit["predecessor_terminal"])?;
+    let drain = binding(&fit["predecessor_drain"])?;
+    ensure!(
+        terminal.path == previous.join("replay-terminal.json")
+            && drain.path == previous.join("post-custody-drain.json"),
+        "foreign fourth predecessor evidence"
+    );
+    let closed = terminal.sealed()?;
+    let drained = drain.sealed()?;
+    ensure!(
+        closed["schema"] == "foundation-epoch141-interval4-terminal-v1"
+            && closed["invocation_id"] == FOURTH_INVOCATION
+            && closed["terminal_checkpoint"]["slot"] == 60_942_184
+            && closed["terminal_checkpoint"]["accounts_hash"]
+                == "EMsXJsestzPAfJtGfNdQdeji3JmuvaCKDAMPcD8hW3ZT"
+            && closed["original_entry_slots_verified"] == 340
+            && closed["private_custody"]["no_clobber"] == true
+            && drained["schema"] == "foundation-epoch141-interval4-post-custody-drain-v1"
+            && drained["invocation_id"] == FOURTH_INVOCATION
+            && drained["terminal"] == fit["predecessor_terminal"]
+            && drained["container"] == closed["private_custody"]["container"]
+            && drained["guard_drained"] == true
+            && drained["tmpfs_drained"] == true,
+        "the assigned fourth invocation has no verified output custody and drain"
+    );
+
+    let inputs = binding(&fit["static_inputs"])?;
+    let handoff = binding(&fit["handoff"])?;
+    ensure!(
+        inputs.path == state.join("static-inputs.json")
+            && inputs.sha256 == "01f4fd805577c45082dc567d02843ea9c0e27515def45f55130be62364af5e44"
+            && handoff.path == state.join("inputs/foundation-assignment.json")
+            && handoff.sha256 == FIFTH.handoff,
+        "foreign fifth inputs or assignment"
+    );
+    let source = inputs.sealed()?;
+    let handoff = handoff.sealed()?;
+    let packet = binding(&source["source_packet"])?;
+    let execution = binding(&source["execution_packet"])?;
+    let scope = binding(&source["scope"])?;
+    let boot = binding(&source["bootstrap_intake"])?;
+    ensure!(
+        packet.path == state.join("inputs/epoch141-fifth-source.json")
+            && packet.sha256 == FIFTH_SOURCE
+            && execution.path == state.join("inputs/epoch141-fifth-execution-inputs.json")
+            && execution.sha256 == FIFTH_EXECUTION
+            && scope.path == state.join("runtime-scope.json")
+            && scope.sha256 == FIFTH_SCOPE
+            && boot.path == state.join("bootstrap-intake.json"),
+        "foreign fifth scope, input packet or intake path"
+    );
+    let packet = packet.sealed()?;
+    let execution = execution.sealed()?;
+    let scope = scope.sealed()?;
+    let boot = boot.sealed()?;
+    let custody = binding(&boot["custody"])?;
+    ensure!(
+        custody.path == state.join("inputs/bootstrap-r2-custody.json")
+            && custody.sha256 == FIFTH_CUSTODY,
+        "foreign fifth remote custody receipt"
+    );
+    let custody = custody.sealed()?;
+    let installed = state.join("payloads").join(BOOT);
+    let metadata = fs::symlink_metadata(&installed)?;
+    ensure!(
+        handoff["schema"] == "foundation-epoch141-fifth-assignment-v1"
+            && handoff["canonical_publication_authorized"] == false
+            && handoff["predecessor_invocation"] == FOURTH_INVOCATION
+            && source["schema"] == "foundation-epoch141-interval5-static-inputs-v1"
+            && source["interval"] == handoff["interval"]
+            && source["interval"] == packet["interval"]
+            && source["interval"] == execution["interval"]
+            && source["interval"] == scope["interval"]
+            && source["original_target_count"] == 307
+            && scope["node"]["sha256"] == NODE_SHA
+            && scope["worker"]["sha256"] == execution["image_source"]["worker_sha256"]
+            && custody["object_etag"] == ETAG
+            && custody["manifest_sha256"] == MANIFEST
+            && custody["sha256"] == PAYLOAD
+            && boot["schema"] == "foundation-epoch141-interval5-private-object-intake-v1"
+            && boot["pinned_authenticated_get"] == true
+            && boot["single_physical_copy"] == true
+            && boot["gcs_generation_checksums_match"] == true
+            && boot["generation"] == 1_634_786_582_060_703u64
+            && boot["sha256"] == PAYLOAD
+            && boot["etag"] == ETAG
+            && boot["remote_manifest_sha256"] == MANIFEST
+            && boot["installed_path"] == json!(installed)
+            && boot["bytes"] == 2_209_515_703u64
+            && boot["inode"] == metadata.ino()
+            && boot["device"] == metadata.dev()
+            && metadata.is_file()
+            && metadata.len() == 2_209_515_703
+            && metadata.uid() == 0
+            && metadata.mode() & 0o222 == 0
+            && metadata.nlink() == 1,
+        "fifth interval lacks its exact verified bootstrap or execution scope"
     );
     Ok(())
 }

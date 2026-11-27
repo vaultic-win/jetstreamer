@@ -1,4 +1,4 @@
-"""Verify and preserve a closed Foundation epoch 141 third or fourth interval."""
+"""Verify and preserve a closed Foundation epoch 141 third, fourth, or fifth interval."""
 
 from datetime import datetime, timezone
 from hashlib import file_digest
@@ -22,6 +22,7 @@ FIXTURE_SHA = "72dbc82532cacf70857e035f564e8cc4f448bbfab3807c8f508b1f7552056f20"
 SCOPE_SHA = {
     3: "d0007aef065d1bc9af56f14fc22c63edf1f87cdf9b35f3f9b702b44f969acbfa",
     4: "e418efbb8329dd5e05c08aa9d829d50c719fd4412981a019416301985bbdf3a6",
+    5: "9188755bc441de30ed4e7c646c2c80889872b4d0cfb8a8f0c34c67847866337e",
 }
 HOME = 4 << 30
 
@@ -138,7 +139,11 @@ def finish(ordinal, quote_path):
     quote = read(quote_path)
     assert quote["schema"] == "foundation-epoch226-suffix-roster-binding-v1"
     assert 0 <= time.time() - quote["recorded_unix_seconds"] <= 300
-    owner = "active_interval_141_launch" if ordinal == 3 else "active_interval_141_fourth_launch"
+    owner = {
+        3: "active_interval_141_launch",
+        4: "active_interval_141_fourth_launch",
+        5: "active_interval_141_fifth_launch",
+    }[ordinal]
     assert quote[owner] is None and root.stat().st_dev == quote["filesystem_device"]
     free = os.statvfs(root)
     cap = quote["capacity"]

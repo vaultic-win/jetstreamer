@@ -24,6 +24,7 @@ const BASE: &str = "/var/lib/jetstreamer";
 const LOCK: &str = "/var/lib/jetstreamer/horizon-seven-publication-controller-v222/cycle.lock";
 const THIRD_SCOPE: &str = "d0007aef065d1bc9af56f14fc22c63edf1f87cdf9b35f3f9b702b44f969acbfa";
 const FOURTH_SCOPE: &str = "e418efbb8329dd5e05c08aa9d829d50c719fd4412981a019416301985bbdf3a6";
+const FIFTH_SCOPE: &str = "9188755bc441de30ed4e7c646c2c80889872b4d0cfb8a8f0c34c67847866337e";
 const RAM: u64 = 74 << 30;
 const GUARD_RAM: u64 = 1 << 30;
 const TMPFS: u64 = 44 << 30;
@@ -269,6 +270,7 @@ fn peer_check(roster: &Value, home: &Path) -> Result<()> {
                 "horizon-141-foundation-interval2-guard-v1.service",
                 "horizon-141-foundation-interval3-guard-v1.service",
                 "horizon-141-foundation-interval4-guard-v1.service",
+                "horizon-141-foundation-interval5-guard-v1.service",
             ]
             .contains(&unit)
                 && expected_running.contains(
@@ -357,17 +359,14 @@ fn guarded_sample(
     anyhow::bail!("first protective sample did not arrive")
 }
 
-fn scoped(ordinal: u8) -> Result<(PathBuf, PathBuf, Value)> {
+fn load_scope(path: &Path, ordinal: u8) -> Result<Value> {
     let scope_sha = match ordinal {
         3 => THIRD_SCOPE,
         4 => FOURTH_SCOPE,
+        5 => FIFTH_SCOPE,
         _ => anyhow::bail!("unknown private interval"),
     };
-    let state = Path::new(BASE).join(format!(
-        "horizon141-foundation-interval{ordinal}-runtime-v1"
-    ));
-    let scope_path = state.join("runtime-scope.json");
-    let scope = load(&scope_path, scope_sha)?;
+    let scope = load(path, scope_sha)?;
     ensure!(
         scope["ordinal"] == ordinal
             && scope["runtime_launch_authorized"] == false
@@ -377,6 +376,31 @@ fn scoped(ordinal: u8) -> Result<(PathBuf, PathBuf, Value)> {
             && scope["private_tmpfs_bytes"] == TMPFS,
         "changed runtime scope"
     );
+    let checkpoint = str_at(&scope["checkpoint_names"], "path")?;
+    require_projection(&scope, checkpoint, "--epoch-hashes=")?;
+    Ok(scope)
+}
+
+fn require_projection(scope: &Value, source: &str, argument: &str) -> Result<()> {
+    let target = str_at(&scope["read_only_bindings"], source)?;
+    let expected = format!("{argument}{target}");
+    ensure!(
+        scope["argv"]
+            .as_array()
+            .context("runtime argv")?
+            .iter()
+            .any(|arg| arg == &expected),
+        "{source} does not project to the bound {argument} argument"
+    );
+    Ok(())
+}
+
+fn scoped(ordinal: u8) -> Result<(PathBuf, PathBuf, Value)> {
+    let state = Path::new(BASE).join(format!(
+        "horizon141-foundation-interval{ordinal}-runtime-v1"
+    ));
+    let scope_path = state.join("runtime-scope.json");
+    let scope = load_scope(&scope_path, ordinal)?;
     Ok((state, scope_path, scope))
 }
 
@@ -439,6 +463,12 @@ fn main() -> Result<()> {
     if args.len() == 3 && args[1] == "--record-exit" {
         return record_exit(args[2].parse()?);
     }
+    if args.len() == 4 && args[1] == "--check-scope" {
+        let path = Path::new(&args[3]);
+        load_scope(path, args[2].parse()?)?;
+        println!("{}", serde_json::to_string(&reference(path)?)?);
+        return Ok(());
+    }
     ensure!(
         args.len() == 4,
         "usage: horizon-native141-foundation-launch INTERVAL ROSTER ROSTER_SHA256"
@@ -466,6 +496,11 @@ fn main() -> Result<()> {
     let boot = resolve(&input_doc["bootstrap_intake"])?;
     let payload = Path::new(str_at(&boot, "installed_path")?);
     let payload_meta = payload.symlink_metadata()?;
+    require_projection(
+        &scope,
+        str_at(&boot, "installed_path")?,
+        "--snapshot-archive=",
+    )?;
     ensure!(
         payload.parent() == Some(state.join("payloads").as_path())
             && payload_meta.is_file()
@@ -532,8 +567,31 @@ fn main() -> Result<()> {
         "inputs/foundation-assignment.json"
     });
     let handoff = reference(&handoff_path)?;
-    if ordinal == 4 {
-        ensure!(handoff == inputs["handoff"], "fourth assignment changed");
+    if ordinal >= 4 {
+        ensure!(
+            handoff == inputs["handoff"],
+            "private interval assignment changed"
+        );
+    }
+    if ordinal == 5 {
+        let fourth_unit = "horizon-qualify-141-foundation-interval4-v1.service";
+        let fourth_timer = "horizon-141-foundation-interval4-guard-v1.timer";
+        let fourth_guard = "horizon-141-foundation-interval4-guard-v1.service";
+        let prior = resolve(&inputs["predecessor_drain"])?;
+        ensure!(
+            prior["schema"] == "foundation-epoch141-interval4-post-custody-drain-v1"
+                && prior["invocation_id"] == "e8ddd3cf18c64dba954e84604afc70b1"
+                && prior["terminal"] == inputs["predecessor_terminal"]
+                && prior["guard_drained"] == true
+                && prior["tmpfs_drained"] == true,
+            "fourth interval lacks its exact drain"
+        );
+        for actor in [fourth_unit, fourth_guard, fourth_timer] {
+            ensure!(
+                has(actor, "inactive")?,
+                "fourth interval still owns {actor}"
+            );
+        }
     }
     peer_check(&roster, &state)?;
     let mut admission = json!({
@@ -544,7 +602,7 @@ fn main() -> Result<()> {
         "producer_memory_bytes":RAM,"guard_memory_bytes":GUARD_RAM,"future_home_bytes":HOME,
         "canonical_publication_authorized":false
     });
-    if ordinal == 3 {
+    if matches!(ordinal, 3 | 5) {
         admission["predecessor_terminal"] = inputs["predecessor_terminal"].clone();
         admission["predecessor_drain"] = inputs["predecessor_drain"].clone();
     }

@@ -388,10 +388,12 @@ fn retire_bootstrap(
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    if args.get(1).is_some_and(|mode| mode == "--drain-interval2-141") {
+    if let Some(mode @ ("--drain-interval2-141" | "--drain-interval4-141")) =
+        args.get(1).map(String::as_str)
+    {
         ensure!(
             unsafe { libc::geteuid() } == 0 && args.len() == 4,
-            "usage: horizon275-scratch-retire --drain-interval2-141 SELF_SHA256 TERMINAL_SHA256"
+            "usage: horizon275-scratch-retire {mode} SELF_SHA256 TERMINAL_SHA256"
         );
         let mut binary = File::open("/proc/self/exe")?;
         let metadata = binary.metadata()?;
@@ -399,7 +401,8 @@ fn main() -> Result<()> {
             metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut binary)? == args[2],
             "unsealed retirement image"
         );
-        return interval141::drain(&args[3]);
+        let ordinal = if mode == "--drain-interval2-141" { 2 } else { 4 };
+        return interval141::drain(ordinal, &args[3]);
     }
     if matches!(
         args.get(1).map(String::as_str),
