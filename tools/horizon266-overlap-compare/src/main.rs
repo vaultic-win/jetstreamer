@@ -509,12 +509,16 @@ fn main() -> Result<()> {
             terminal::capture_predecessor_exit(digest, Path::new(destination))?
         }
         #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, launch, exit, destination] if command == "collect-predecessor-terminal" => {
+            terminal::collect_predecessor(launch, exit, Path::new(destination))?
+        }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
         [command, exit, digest, destination] if command == "collect-v1627-terminal" => {
             terminal::collect_v1627_terminal(Path::new(exit), digest, Path::new(destination))?
         }
         [command, plan, digest] if command == "compare" => compare(Path::new(plan), digest)?,
         _ => anyhow::bail!(
-            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-predecessor-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-v1627-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
+            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-predecessor-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-predecessor-terminal LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-v1627-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
         ),
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
