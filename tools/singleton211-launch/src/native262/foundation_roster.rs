@@ -4,6 +4,7 @@ mod allocation;
 mod delivery252;
 mod focused;
 mod holding296;
+mod interval141;
 mod replay256;
 mod replay258;
 mod replay260;
@@ -977,6 +978,7 @@ fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
                 && unit != vote_boundary::GUARD_SERVICE
                 && unit != suffix226::GUARD_SERVICE
                 && unit != replay296::GUARD_SERVICE
+                && unit != interval141::GUARD
                 && !SCOPES
                     .iter()
                     .any(|spec| unit == format!("{}.service", spec.guard))
@@ -1269,6 +1271,10 @@ fn measure(
         .contains(holding296::UNIT)
         .then(|| holding296::active(n))
         .transpose()?;
+    let active_interval_141 = before
+        .contains(interval141::UNIT)
+        .then(|| interval141::active(n))
+        .transpose()?;
     let mut active_deliveries = BTreeMap::new();
     for (epoch, unit, candidate, closed) in [
         (
@@ -1410,6 +1416,9 @@ fn measure(
     if active_holding_296.is_some() {
         ensure!(expected.insert(holding296::UNIT.to_owned()), "epoch 296 custody booked twice");
     }
+    if active_interval_141.is_some() {
+        ensure!(expected.insert(interval141::UNIT.to_owned()), "epoch 141 replay booked twice");
+    }
     for (_, owner, _, _) in active_deliveries.values() {
         let unit = text(owner, "Id")?;
         ensure!(
@@ -1497,6 +1506,13 @@ fn measure(
         recorded.insert(
             holding296::UNIT.to_owned(),
             (holding.owner.clone(), holding.memory, holding.ticks),
+        );
+    }
+    if let Some(interval) = &active_interval_141 {
+        interval141::require_disjoint(exclusive)?;
+        recorded.insert(
+            interval141::UNIT.to_owned(),
+            (interval.owner.clone(), interval.memory, interval.ticks),
         );
     }
     for (_, owner, memory, ticks) in active_deliveries.values() {
@@ -1684,12 +1700,13 @@ fn measure(
         .values()
         .try_fold(0, |total, replay| capacity::add(total, replay.receipt_disk))?;
     let holding_296_disk = active_holding_296.as_ref().map_or(0, |_| holding296::RECEIPT_DISK);
+    let interval_141_disk = active_interval_141.as_ref().map_or(0, |_| interval141::DISK);
     let protected = capacity::add(
         capacity::add(
             capacity::add(disk_floor, non_guard_disk)?,
             capacity::add(
                 capacity::add(delivery_252_disk, delivery_261_disk)?,
-                capacity::add(replay_disk, holding_296_disk)?,
+                capacity::add(replay_disk, capacity::add(holding_296_disk, interval_141_disk)?)?,
             )?,
         )?,
         growth,
@@ -1747,7 +1764,8 @@ fn measure(
             },
         )?,
     )?;
-    let reserve = capacity::add(resources_before.0 / 10, periodic_reserve)?;
+    let guard_141_memory = active_interval_141.as_ref().map_or(0, |_| interval141::GUARD_MEMORY);
+    let reserve = capacity::add(resources_before.0 / 10, capacity::add(periodic_reserve, guard_141_memory)?)?;
     let base_memory = capacity::add(capacity::add(reserve, candidate)?, reserved_audit_memory)?;
     let (hard, growth_memory) = recorded.values().try_fold(
         (base_memory, base_memory),
@@ -1767,6 +1785,7 @@ fn measure(
     let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
         "active_delivery_252_disk_bytes":delivery_252_disk,"active_delivery_261_disk_bytes":delivery_261_disk,
         "active_holding_296_disk_bytes":holding_296_disk,
+        "active_interval_141_disk_bytes":interval_141_disk,
         "active_diagnostic_230_receipt_disk_bytes":live_replays.get(&230).map_or(0, |lane| lane.receipt_disk),
         "active_replay_262_receipt_disk_bytes":live_replays.get(&262).map_or(0, |lane| lane.receipt_disk),
         "active_replay_296_receipt_disk_bytes":live_replays.get(&296).map_or(0, |lane| lane.receipt_disk),
@@ -1822,6 +1841,7 @@ fn measure(
         "active_replay_260_registration":live_replays.get(&260).filter(|r| r.unit == replay260::UNIT).map(|r| &r.reference),
         "closed_delivery_257":closed_257,
         "active_holding_296_launch":active_holding_296.as_ref().map(|holding| &holding.launch),
+        "active_interval_141_launch":active_interval_141.as_ref().map(|interval| &interval.launch),
         "active_delivery_252_claim":active_deliveries.get(&252).map(|(claim, _, _, _)| claim),
         "active_delivery_261_claim":active_deliveries.get(&261).map(|(claim, _, _, _)| claim),
         "active_replay_262_registration":live_replays.get(&262).map(|replay| &replay.reference),
