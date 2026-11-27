@@ -3,6 +3,7 @@
 import fcntl
 import json
 import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 import subprocess
@@ -45,6 +46,9 @@ class Scope:
 
     @property
     def profile(self):
+        if self.kind == "epoch266-private-original-predecessor":
+            return {"path": str(V / "horizon266-original-predecessor-static-v1/profile.json"),
+                    "sha256": self.profile_sha}
         return {"path": str(self.state / "profile.json"), "sha256": self.profile_sha}
 
     @property
@@ -127,6 +131,19 @@ OVERLAP_266 = Scope(
     "1e014dac29ed075242cccd2d226c75a3088712540a90a7358b1cecee4df04b65",
     epoch266_overlap.PRODUCER_RAM, epoch266_overlap.HOME, epoch266_overlap.RECEIPTS, epoch266_overlap.CPU,
 )
+PREDECESSOR_266 = Scope(
+    266, V / "horizon266-original-predecessor-runtime-v1",
+    "horizon-qualify-266-original-predecessor-v1.service",
+    "horizon-266-original-predecessor-protective-v1.service",
+    "epoch266-private-original-predecessor", "foundation-epoch266-original-predecessor-roster-binding-v1",
+    "7ed80c05ae0e1c706a271452d9b0dcb516c651fd0f97a2ec3f1c61a477a30f21",
+    "de5680f4fc6634529348c9701f639a66cf333c7296f69a7645dc97f1297bc4ae",
+    epoch266_overlap.PRODUCER_RAM, epoch266_overlap.HOME, epoch266_overlap.RECEIPTS, epoch266_overlap.CPU,
+)
+PREDECESSOR_CUSTODY = {
+    "path": str(V / "horizon266-predecessor-intake-stage-v1/custody.json"),
+    "sha256": "afd03e2258229848a2878f1c2ff75b424ebf810b79fec65788c75ac5111a5959",
+}
 TRACE_296 = Scope(
     296, V / "horizon296-loader-log-v3",
     "horizon-qualify-296-loader-log-v3.service", "horizon-296-loader-log-protective-v3.service",
@@ -147,6 +164,7 @@ SCOPED_ARGS = {
     "--epoch230": GAP_230, "--epoch258": RESTORE_258, "--epoch260": RESTORE_260,
     "--hourly230": HOURLY_230, "--hourly230-second": SECOND_HOURLY_230,
     "--overlap266": OVERLAP_266,
+    "--predecessor266": PREDECESSOR_266,
     "--first7871-230": FIRST_7871_230, "--v1627-230": V1627_230, "--trace296": TRACE_296, "--feature296": FEATURE_296,
 }
 
@@ -190,9 +208,9 @@ def current_fit(kit, roster, root, scope, *, held=False):
     assert 0 <= time.time() - roster["recorded_unix_seconds"] <= 90
     assert roster[f"focused_{scope.epoch}_quote"]["preflight"] == scope.preflight and fit["fits"]
     assert fit["candidate_disk_bytes"] == scope.cap + scope.receipts
-    control_ram = epoch266_overlap.CONTROL_RAM if scope is OVERLAP_266 else (256 << 20)
+    control_ram = epoch266_overlap.CONTROL_RAM if scope.epoch == 266 else (256 << 20)
     assert fit["candidate_total_memory_bytes"] == scope.ram + (1 << 30) + control_ram
-    if scope is OVERLAP_266:
+    if scope.epoch == 266:
         suffix = fit["protected_226_suffix_state"]
         protected_226_fit(fit)
         assert (roster["active_suffix_226_registration"] is not None) == (suffix == "live")
@@ -217,13 +235,15 @@ def current_fit(kit, roster, root, scope, *, held=False):
                 "path": str(FIRST_7871_230.state / "terminal.json"),
                 "sha256": "16d546332a37fccd20a7b2609908288b426276a01908c6e255db886aba6ea8d2",
             }, "02b7dd1683d24efbabf6b5c2f8ff6a43", 99_445_304)
-    if scope is OVERLAP_266:
+    if scope.epoch == 266:
         protected_cpus = epoch266_overlap.EXCLUSIVE
         assert roster["focused_266_quote"]["exclusive_online_cpus"] == sorted(protected_cpus)
         for cpu in (*selected, 30):
             sibling_path = Path(f"/sys/devices/system/cpu/cpu{cpu}/topology/thread_siblings_list")
             assert cpus(sibling_path.read_text().replace(",", " ")) == {cpu, cpu + 64}
         assert protected_cpus.isdisjoint(cpus("16-23 80-87"))
+    if scope is PREDECESSOR_266:
+        assert roster["focused_266_quote"]["bootstrap_custody"] == PREDECESSOR_CUSTODY
     listing = subprocess.check_output(
         ["systemctl", "list-units", "--type=service", "--state=running,activating",
          "--plain", "--no-legend", "--no-pager"], text=True, timeout=10)
@@ -232,7 +252,7 @@ def current_fit(kit, roster, root, scope, *, held=False):
     guards = {row["unit"] for row in roster["periodic_guards"].values()}
     expected = set(roster["owners"])
     if held:
-        assert scope is OVERLAP_266 and scope.unit in live
+        assert scope.epoch == 266 and scope.unit in live
         guards.update((scope.unit, scope.guard))
     exposed = live - guards
     assert exposed == expected, {"unbooked": sorted(exposed - expected),
@@ -257,7 +277,8 @@ def current_fit(kit, roster, root, scope, *, held=False):
     assert fit["required_hard_memory_bytes"] <= fit["host_total_memory_bytes"]
     return {"available_disk_bytes": disk, "available_memory_bytes": available,
             "required_remaining_memory_bytes": growth, "sampled_unix_seconds": time.time(),
-            **({"protected_cpus": sorted(protected_cpus)} if scope in (SECOND_HOURLY_230, FIRST_7871_230, V1627_230, OVERLAP_266) else {})}
+            **({"protected_cpus": sorted(protected_cpus)} if scope in
+               (SECOND_HOURLY_230, FIRST_7871_230, V1627_230, OVERLAP_266, PREDECESSOR_266) else {})}
 
 
 def prepare_hourly_tokens(ops, attempt, tokens, template, guard, hook, probe_unit):
@@ -310,6 +331,44 @@ def prepare_hourly_tokens(ops, attempt, tokens, template, guard, hook, probe_uni
     return template
 
 
+def predecessor_namespace(ops, scope, preflight, profile):
+    custody = ops.bound(PREDECESSOR_CUSTODY)
+    proof = ops.bound(custody["namespace"])
+    guard = ops.bound(preflight["static_guard_validation"])
+    assert preflight["profile"] == custody["profile"] == scope.profile
+    assert (preflight["replay_first_slot"], preflight["output_first_slot"], preflight["last_slot"]) == (
+        114_910_769, 114_912_000, 114_923_430)
+    assert custody["whole_file_sha256_rechecked"] and custody["actual_readonly_projection_verified"]
+    assert not (custody["replay_launch_authorized"] or custody["publication_authorized"])
+    assert guard["validated"] and guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
+    assert proof["readonly_binds"] and proof["host_backed_output"]
+    assert proof["unprivileged_token_hook_reached"] and not proof["worker_executed"]
+    assert proof["scratch_noswap"] and proof["scratch_tmpfs_bytes"] == 128 << 30
+    input_proof = custody["input"]
+    for field in ("path", "bytes", "generation", "sha256"):
+        assert input_proof[field] == profile["bootstrap"][field]
+    assert input_proof["root_sealed"] and input_proof["identity"] == proof["source_identities"][-1]
+    mounted = []
+    for row, identity in zip(profile["readonly_bindings"], proof["source_identities"], strict=True):
+        source = Path(row["path"])
+        info = source.lstat()
+        assert stat.S_ISREG(info.st_mode) and info.st_uid == 0 and info.st_mode & 0o222 == 0
+        assert info.st_nlink == 1 and source.resolve() == source
+        assert identity == {
+            "device": info.st_dev, "inode": info.st_ino, "bytes": info.st_size,
+            "mtime": list(divmod(info.st_mtime_ns, 10**9)),
+            "ctime": list(divmod(info.st_ctime_ns, 10**9)),
+        }
+        mounted.append(f"{info.st_dev}:{info.st_ino}:{info.st_size}")
+    assert profile["properties"]["BindReadOnlyPaths"] == " ".join(
+        f'{row["path"]}:{row["destination"]}' for row in profile["readonly_bindings"])
+    info = Path(input_proof["path"]).stat()
+    return {"mounted_device_inode_size": mounted}, {
+        "path": input_proof["path"],
+        "identity": f"{info.st_dev}:{info.st_ino}:{info.st_size}:{int(info.st_mtime)}:{int(info.st_ctime)}",
+    }
+
+
 def launch(kit, roster_ref, scope):
     ops = kit.ops
     state = scope.state
@@ -338,7 +397,10 @@ def launch(kit, roster_ref, scope):
     assert not (attempt / "admission.json").exists()
     if scope is OVERLAP_266:
         tokens = epoch266_overlap.TOKENS
-    qualify_tokens = failed_start is not None or scope in (SECOND_HOURLY_230, FIRST_7871_230, V1627_230, OVERLAP_266)
+    if scope is PREDECESSOR_266:
+        tokens = V / "horizon266-original-predecessor-tokens-v1"
+    qualify_tokens = failed_start is not None or scope in (SECOND_HOURLY_230, FIRST_7871_230, V1627_230,
+                                                           OVERLAP_266, PREDECESSOR_266)
     assert qualify_tokens or not tokens.exists()
     roster = ops.bound(roster_ref)
     preflight = ops.bound(scope.preflight)
@@ -346,13 +408,13 @@ def launch(kit, roster_ref, scope):
     images = [profile[name] for name in ("node", "worker", "guard")]
     for image in images:
         ops.checked_image(image)
-    for entry in preflight["evidence"]:
+    for entry in preflight.get("evidence", ()):
         if entry not in images:
             assert ops.ref(Path(entry["path"])) == entry
     root = Path(profile["run_root"])
     writable = Path(profile["properties"]["ReadWritePaths"])
     runtime_state = Path(profile["environment"]["JETSTREAMER_PRIVATE_RUN_ROOT"])
-    assert preflight["writable_private_state_validated"] and writable == root / "work"
+    assert writable == root / "work"
     assert runtime_state.is_relative_to(writable) and runtime_state.is_dir()
     assert runtime_state.resolve() == runtime_state
     assert profile["unit"] == scope.unit and profile["properties"]["AllowedCPUs"] == scope.cpus
@@ -363,9 +425,13 @@ def launch(kit, roster_ref, scope):
         assert profile == json.loads(epoch266_overlap.files()["profile.json"])
     node = profile["node"]["path"]
     hook = ops.checked_image(HOOK)
-    namespace = ops.bound(ops.ref(state / "namespace.json"))
-    bootstrap = ops.bound(ops.ref(state / "bootstrap-recheck.json"))["bootstrap"]
-    assert namespace["profile"] == scope.profile and namespace["host_guard_sees_empty_placeholders"]
+    if scope is PREDECESSOR_266:
+        namespace, bootstrap = predecessor_namespace(ops, scope, preflight, profile)
+    else:
+        namespace = ops.bound(ops.ref(state / "namespace.json"))
+        bootstrap = ops.bound(ops.ref(state / "bootstrap-recheck.json"))["bootstrap"]
+        assert preflight["writable_private_state_validated"]
+        assert namespace["profile"] == scope.profile and namespace["host_guard_sees_empty_placeholders"]
     bindings = []
     for binding, measured in zip(profile["readonly_bindings"],
                                  namespace["mounted_device_inode_size"], strict=True):
@@ -415,12 +481,14 @@ def launch(kit, roster_ref, scope):
             probe_unit = "foundation-230-v1627-token-probe-v1"
         elif scope is OVERLAP_266:
             probe_unit = "foundation-266-overlap-token-probe-v1"
+        elif scope is PREDECESSOR_266:
+            probe_unit = "foundation-266-predecessor-token-probe-v1"
         template = prepare_hourly_tokens(ops, attempt, tokens, template, profile["guard"], hook, probe_unit)
     measured = current_fit(kit, roster, root, scope)
     properties = dict(profile["properties"], BindReadOnlyPaths=" ".join(bindings),
                       ReadOnlyPaths=str(tokens), Delegate="no", OOMPolicy="kill",
                       UnsetEnvironment="HORIZON_S3_ENDPOINT HORIZON_ACCESS_KEY_ID HORIZON_SECRET_ACCESS_KEY")
-    if scope is OVERLAP_266:
+    if scope.epoch == 266:
         properties["UnsetEnvironment"] += " HORIZON_PUBLIC_BASE_URL"
     props = [f"--property={key}={value}" for key, value in properties.items()]
     props.extend(f"--setenv={key}={value}" for key, value in profile["environment"].items())
@@ -433,7 +501,7 @@ def launch(kit, roster_ref, scope):
         "inventory": remote, "admitted": True, "publication_authorized": False,
         **({"failed_prestart": failed_start} if failed_start is not None else {}),
     })
-    def before_overlap_release(held, guard_plan, sample, clock, next_tick):
+    def before_266_release(held, guard_plan, sample, clock, next_tick):
         assert sample["producer_invocation_id"] == held["InvocationID"]
         assert sample["plan_sha256"] == guard_plan["sha256"] and sample["trip_reason"] is None
         assert clock["ActiveState"] == "active" and next_tick > time.monotonic_ns() // 1000
@@ -441,7 +509,8 @@ def launch(kit, roster_ref, scope):
             "AllowedCPUs": "30", "MemoryMax": str(epoch266_overlap.GUARD_RAM)}
         confirmation = current_fit(kit, roster, root, scope, held=True)
         ops.funds.put(attempt / "guard-release-fit.json", {
-            "schema": "foundation-epoch266-hourly-overlap-guard-release-fit-v1",
+            "schema": ("foundation-epoch266-original-predecessor-guard-release-fit-v1"
+                       if scope is PREDECESSOR_266 else "foundation-epoch266-hourly-overlap-guard-release-fit-v1"),
             "invocation_id": held["InvocationID"], "roster": roster_ref, "guard_plan": guard_plan,
             "fit": confirmation, "publication_authorized": False,
         })
@@ -449,7 +518,7 @@ def launch(kit, roster_ref, scope):
     owner, plan, token, active_guard = activate_guarded(
         kit, scope.epoch, attempt, tokens, scope.unit, scope.guard, profile["guard"], template, admission,
         props, f"ExecStartPre=/usr/bin/bash {hook} 60 {tokens}", profile["argv"],
-        **({"guard_cpuset": "30", "before_release": before_overlap_release} if scope is OVERLAP_266 else {}))
+        **({"guard_cpuset": "30", "before_release": before_266_release} if scope.epoch == 266 else {}))
     return ops.funds.put(state / "cadence-registration.json", {
         "schema": "jetstreamer-historical-performance-launch-receipt-v1",
         "kind": scope.kind, "epoch": scope.epoch, "unit": scope.unit,
@@ -461,9 +530,10 @@ def launch(kit, roster_ref, scope):
         "r2_mutations": False,
         **({"diagnostic_only": True,
             "predecessor_native_tuple_qualified": False, "cursor_normalization_qualified": False,
-            "lossless_restore": epoch266_overlap.RESTORE,
+            **({"bootstrap_custody": PREDECESSOR_CUSTODY} if scope is PREDECESSOR_266
+               else {"lossless_restore": epoch266_overlap.RESTORE}),
             "guard_release_fit": ops.ref(attempt / "guard-release-fit.json")}
-           if scope is OVERLAP_266 else {}),
+           if scope.epoch == 266 else {}),
     })
 
 
@@ -477,7 +547,7 @@ if __name__ == "__main__":
     os.umask(0o077)
     remote = git("rev-parse", "origin/account-updates").decode().strip()
     scripts = [Path(__file__), CONTROL / ADAPTER]
-    if scope is OVERLAP_266:
+    if scope.epoch == 266:
         scripts.extend((Path(epoch266_overlap.__file__), Path(activate_guarded.__code__.co_filename)))
     for path in scripts:
         assert path.read_bytes() == git("show", f"{remote}:{SOURCE / path.name}")

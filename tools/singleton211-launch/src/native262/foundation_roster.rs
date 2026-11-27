@@ -12,7 +12,8 @@ mod replay260;
 mod replay296;
 use focused::{
     FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, OVERLAP_266,
-    OVERLAP_266_EXCLUSIVE, RESTORE_258, RESTORE_260, SCOPES, SECOND_HOURLY_230, TRACE_296, V1627_230,
+    OVERLAP_266_EXCLUSIVE, PREDECESSOR_266, RESTORE_258, RESTORE_260, SCOPES, SECOND_HOURLY_230,
+    TRACE_296, V1627_230,
 };
 mod suffix226;
 mod vote_boundary;
@@ -1685,7 +1686,7 @@ fn measure(
             replay296::verify_cpu_group(V1627_230.cpus, &bridge_group)?;
             &bridge_group
         }
-        Some(Quote::Focused(spec, _)) if spec.unit == OVERLAP_266.unit => {
+        Some(Quote::Focused(spec, _)) if spec.epoch == 266 => {
             replay296::verify_cpu_group("30,32-39", &overlap_exclusive)?;
             &overlap_exclusive
         }
@@ -1744,7 +1745,7 @@ fn measure(
     }
     for replay in live_replays.values() {
         require_disjoint_cpus(epoch, exclusive, replay.unit, &replay.owner)?;
-        if replay.unit == OVERLAP_266.unit {
+        if [OVERLAP_266.unit, PREDECESSOR_266.unit].contains(&replay.unit) {
             replay296::verify_cpu_group("30,32-39", &overlap_exclusive)?;
             ensure!(
                 exclusive.is_disjoint(&overlap_exclusive),
@@ -2111,6 +2112,8 @@ fn measure(
         260 if matches!(&quote, Some(Quote::FullReplay(_))) => replay260::ROSTER_SCHEMA,
         260 => "foundation-epoch260-native-restore-roster-binding-v1",
         261 => "foundation-epoch261-delivery-roster-binding-v1",
+        266 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == PREDECESSOR_266.unit) =>
+            "foundation-epoch266-original-predecessor-roster-binding-v1",
         266 => "foundation-epoch266-hourly-overlap-roster-binding-v1",
         296 => "foundation-epoch296-replay-roster-binding-v1",
         _ => "foundation-epoch262-roster-binding-v1",
@@ -2134,7 +2137,8 @@ fn measure(
         "closed_delivery_257":closed_257,
         "active_holding_296_launch":active_holding_296.as_ref().map(|holding| &holding.launch),
         "active_restore_266_launch":active_restore_266.as_ref().map(|restore| &restore.launch),
-        "active_overlap_266_registration":live_replays.get(&266).map(|replay| &replay.reference),
+        "active_overlap_266_registration":live_replays.get(&266).filter(|replay| replay.unit == OVERLAP_266.unit).map(|replay| &replay.reference),
+        "active_predecessor_266_registration":live_replays.get(&266).filter(|replay| replay.unit == PREDECESSOR_266.unit).map(|replay| &replay.reference),
         "active_interval_141_launch":active_interval_141.iter().find(|interval| interval.ordinal() <= 3).map(|interval| &interval.launch),
         "active_interval_141_fourth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 4).map(|interval| &interval.launch),
         "active_interval_141_fifth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 5).map(|interval| &interval.launch),
@@ -2199,8 +2203,14 @@ fn measure(
             "candidate_memory_bytes":candidate,"candidate_cpus":selected,
         });
     }
-    if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == OVERLAP_266.unit) {
-        evidence[OVERLAP_266.quote_key()]["exclusive_online_cpus"] = json!(overlap_exclusive);
+    if let Some(Quote::Focused(spec, _)) = &quote
+        && spec.epoch == 266
+    {
+        let binding = &mut evidence[spec.quote_key()];
+        binding["exclusive_online_cpus"] = json!(overlap_exclusive);
+        if spec.unit == PREDECESSOR_266.unit {
+            binding["bootstrap_custody"] = json!(spec.predecessor_custody()?);
+        }
     }
     if first_7871_candidate {
         evidence[FIRST_7871_230.quote_key()]["exclusive_online_cpus"] = json!(bridge_group);
@@ -2303,6 +2313,7 @@ pub fn run() -> Result<()> {
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--overlap266-quote"
+                        | "--predecessor266-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
                         | "--feature296-quote"
@@ -2391,6 +2402,7 @@ pub fn run() -> Result<()> {
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--overlap266-quote"
+                        | "--predecessor266-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
                         | "--feature296-quote"
@@ -2406,6 +2418,7 @@ pub fn run() -> Result<()> {
                 Some("--focused258-quote") => &RESTORE_258,
                 Some("--focused260-quote") => &RESTORE_260,
                 Some("--overlap266-quote") => &OVERLAP_266,
+                Some("--predecessor266-quote") => &PREDECESSOR_266,
                 Some("--trace296-quote") => &TRACE_296,
                 Some("--feature296-quote") => &FEATURE_296,
                 _ => &LOADER_296,

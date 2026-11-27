@@ -190,6 +190,30 @@ pub(super) const OVERLAP_266: Focused = Focused {
 
 pub(super) const OVERLAP_266_EXCLUSIVE: &str = "30,32-39,94,96-103";
 
+pub(super) const PREDECESSOR_266: Focused = Focused {
+    epoch: 266,
+    unit: "horizon-qualify-266-original-predecessor-v1.service",
+    guard: "horizon-266-original-predecessor-protective-v1",
+    cpus: OVERLAP_266.cpus,
+    scratch_cap: OVERLAP_266.scratch_cap,
+    receipt_disk: OVERLAP_266.receipt_disk,
+    producer_memory: OVERLAP_266.producer_memory,
+    root: "/home/ubuntu/.jetstreamer-private/qualification-266-original-predecessor-v1",
+    first: 114_910_769,
+    last: 114_923_430,
+    kind: "epoch266-private-original-predecessor",
+    preflight_schema: "foundation-epoch266-original-predecessor-static-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon266-original-predecessor-runtime-v1",
+    preflight_sha: "de5680f4fc6634529348c9701f639a66cf333c7296f69a7645dc97f1297bc4ae",
+    profile_sha: "7ed80c05ae0e1c706a271452d9b0dcb516c651fd0f97a2ec3f1c61a477a30f21",
+};
+const PREDECESSOR_PROFILE: &str =
+    "/var/lib/jetstreamer/horizon266-original-predecessor-static-v1/profile.json";
+const PREDECESSOR_CUSTODY: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon266-predecessor-intake-stage-v1/custody.json",
+    "afd03e2258229848a2878f1c2ff75b424ebf810b79fec65788c75ac5111a5959",
+);
+
 pub(super) const TRACE_296: Focused = Focused {
     epoch: 296,
     unit: "horizon-qualify-296-loader-log-v3.service",
@@ -226,7 +250,7 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 11] = [
+pub(super) const SCOPES: [&Focused; 12] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
@@ -235,6 +259,7 @@ pub(super) const SCOPES: [&Focused; 11] = [
     &RESTORE_258,
     &RESTORE_260,
     &OVERLAP_266,
+    &PREDECESSOR_266,
     &LOADER_296,
     &TRACE_296,
     &FEATURE_296,
@@ -604,7 +629,7 @@ pub(super) fn overlap_266_drained(n: &mut Native, row: &Value) -> Result<Option<
 
 impl Focused {
     pub(super) fn control_memory(&self) -> u64 {
-        if self.unit == OVERLAP_266.unit {
+        if self.epoch == 266 {
             1 << 30
         } else {
             CONTROLLER_MEMORY
@@ -615,20 +640,77 @@ impl Focused {
         format!("focused_{}_quote", self.epoch)
     }
 
+    fn profile(&self) -> Bound {
+        let path = if self.unit == PREDECESSOR_266.unit {
+            PathBuf::from(PREDECESSOR_PROFILE)
+        } else {
+            Path::new(self.state).join("profile.json")
+        };
+        Bound::new(path, self.profile_sha)
+    }
+
+    pub(super) fn predecessor_custody(&self) -> Result<Bound> {
+        ensure!(self.unit == PREDECESSOR_266.unit, "foreign predecessor scope");
+        let reference = Bound::new(PREDECESSOR_CUSTODY.0, PREDECESSOR_CUSTODY.1);
+        let custody = reference.sealed()?;
+        let profile = self.profile().sealed()?;
+        let input = &custody["input"];
+        let snapshot = &profile["bootstrap"];
+        let path = Path::new(text(input, "path")?);
+        let meta = fs::symlink_metadata(path)?;
+        let identity = &input["identity"];
+        ensure!(
+            custody["schema"] == "foundation-epoch266-predecessor-input-custody-v1"
+                && custody["profile"] == json!(self.profile())
+                && custody["whole_file_sha256_rechecked"] == true
+                && custody["actual_readonly_projection_verified"] == true
+                && custody["publication_authorized"] == false
+                && input["root_sealed"] == true
+                && input["path"] == snapshot["path"]
+                && input["sha256"] == snapshot["sha256"]
+                && input["generation"] == snapshot["generation"]
+                && input["bytes"] == snapshot["bytes"]
+                && meta.is_file()
+                && meta.uid() == 0
+                && meta.mode() & 0o222 == 0
+                && meta.nlink() == 1
+                && path.canonicalize()? == path
+                && num(identity, "device")? == meta.dev()
+                && num(identity, "inode")? == meta.ino()
+                && num(input, "bytes")? == meta.len()
+                && identity["mtime"] == json!([meta.mtime(), meta.mtime_nsec()])
+                && identity["ctime"] == json!([meta.ctime(), meta.ctime_nsec()]),
+            "epoch 266 predecessor bootstrap custody changed"
+        );
+        Ok(reference)
+    }
+
     pub(super) fn preflight(&self) -> Result<Bound> {
         let state = Path::new(self.state);
         let reference = Bound::new(state.join("preflight.json"), self.preflight_sha);
         let receipt = reference.sealed()?;
-        let profile = Bound::new(state.join("profile.json"), self.profile_sha).sealed()?;
-        ensure!(
-            receipt["schema"] == self.preflight_schema
-                && receipt["epoch"] == self.epoch
-                && receipt["first_slot"] == self.first
-                && receipt["last_slot"] == self.last
+        let profile_ref = self.profile();
+        let profile = profile_ref.sealed()?;
+        let proven_inputs = if self.unit == PREDECESSOR_266.unit {
+            self.predecessor_custody()?;
+            let guard = binding(&receipt["static_guard_validation"])?.sealed()?;
+            receipt["replay_first_slot"] == self.first
+                && receipt["output_first_slot"] == 114_912_000
+                && receipt["profile"] == json!(profile_ref)
+                && guard["validated"] == true
+                && guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
+        } else {
+            receipt["first_slot"] == self.first
                 && receipt["snapshot_sha256_rechecked"] == true
                 && receipt["private_namespace_validated"] == true
                 && receipt["static_guard_validated"] == true
                 && receipt["writable_private_state_validated"] == true
+        };
+        ensure!(
+            receipt["schema"] == self.preflight_schema
+                && receipt["epoch"] == self.epoch
+                && receipt["last_slot"] == self.last
+                && proven_inputs
                 && receipt["publication_authorized"] == false
                 && profile["unit"] == self.unit
                 && profile["run_root"] == self.root
@@ -682,8 +764,7 @@ impl Focused {
                 && launch["node_path"] == json!(node.path)
                 && launch["worker"] == profile["worker"]
                 && launch["main_pid"] == pid
-                && profile_ref.path == state.join("profile.json")
-                && profile_ref.sha256 == self.profile_sha
+                && profile_ref == self.profile()
                 && admission["schema"]
                     == format!("foundation-epoch{}-focused-admission-v1", self.epoch)
                 && admission["profile"] == launch["profile"]
@@ -709,18 +790,25 @@ impl Focused {
             "epoch {} focused replay booking or invocation changed",
             self.epoch
         );
-        if self.unit == OVERLAP_266.unit {
+        if self.epoch == 266 {
             let released = binding(&launch["guard_release_fit"])?.sealed()?;
             let mount = format!("{}/work/scratch", self.root);
             let mountinfo = fs::read_to_string(format!("/proc/{pid}/mountinfo"))?;
 
+            let scope_bound = if self.unit == PREDECESSOR_266.unit {
+                let custody = json!(self.predecessor_custody()?);
+                launch["bootstrap_custody"] == custody
+                    && quote[self.quote_key()]["bootstrap_custody"] == custody
+                    && released["schema"] == "foundation-epoch266-original-predecessor-guard-release-fit-v1"
+            } else {
+                launch["lossless_restore"] == profile["restore_receipt"]
+                    && released["schema"] == "foundation-epoch266-hourly-overlap-guard-release-fit-v1"
+            };
             ensure!(
                 launch["diagnostic_only"] == true
                     && launch["predecessor_native_tuple_qualified"] == false
                     && launch["cursor_normalization_qualified"] == false
-                    && launch["lossless_restore"] == profile["restore_receipt"]
-                    && released["schema"]
-                        == "foundation-epoch266-hourly-overlap-guard-release-fit-v1"
+                    && scope_bound
                     && released["invocation_id"] == invocation
                     && released["roster"] == admission["roster"]
                     && released["guard_plan"] == launch["guard_plan"]
