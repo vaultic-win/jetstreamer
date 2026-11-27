@@ -1,11 +1,14 @@
 """Exercise the native scanner's shared-budget and audit-slice admission."""
 
 import runpy
+import os
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 decision = runpy.run_path(str(Path(__file__).with_name("split_price.py")))["decision"]
+registry = runpy.run_path(str(Path(__file__).with_name("dispatch.py")))["pricing_registration"]
 
 
 class Admission(unittest.TestCase):
@@ -31,6 +34,14 @@ class Admission(unittest.TestCase):
 
     def test_refuses_full_slice(self):
         self.assertFalse(decision(self.roster,self.slice,dict(self.slice,fits=False)))
+
+    def test_registration_selection(self):
+        for name in ("SPLIT_PRICE_DEPLOYMENT_V2.json","SPLIT_PRICE_DEPLOYMENT_V3.json"):
+            with patch.dict(os.environ, {"HORIZON_168_PRICE_REGISTRATION":name}):
+                self.assertEqual(registry().name,name)
+        for name in ("../SPLIT_PRICE_DEPLOYMENT_V2.json","/tmp/other","SPLIT_PRICE_DEPLOYMENT_V02.json"):
+            with patch.dict(os.environ, {"HORIZON_168_PRICE_REGISTRATION":name}), self.assertRaises(ValueError):
+                registry()
 
 
 if __name__ == "__main__":

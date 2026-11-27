@@ -11,7 +11,7 @@ import time
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT = RT / "epoch168-exact-private-verification-20261127-v1"
 ORIGINAL = ROOT / "tools-v1"
-SOURCE = ROOT / "split-price-v1"
+SOURCE = ROOT / "split-price-v2"
 OPERATION = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 SERIAL = Path("/run/lock/horizon-epoch140-suffix-compiler.lock")
 G = 1 << 30
@@ -116,6 +116,7 @@ def price(fixture=False):
     need(time.monotonic()-start < 120, "expired shared fleet price")
     return dict(schema="horizon-168-private-post-assembly-admission-price-v1",fits=fits,whole_roster=result,
                 shared_price=registration["shared_price"],contract=registration["contract"],
+                price_registration=entry["ref"](entry["pricing_registration"]()),
                 before=before,after=after,original_deployment=registration["original_deployment"],
                 home_margin=result["home_margin"],ram_margin=result["ram_margin"]-ENTRY_RAM,guard_floor=result["guard_floor"],
                 entry_controller=unit,entry_controller_ram=ENTRY_RAM,entry_controller_cpu_micros=250_000,
