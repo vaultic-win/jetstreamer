@@ -135,7 +135,10 @@ def current_fit(kit, roster, root, scope):
     live = {line.split()[0] for line in listing.splitlines()
             if line.startswith(("horizon-", "foundation-", "archive-", "jetstreamer-"))}
     guards = {row["unit"] for row in roster["periodic_guards"].values()}
-    assert live - guards == roster["owners"].keys()
+    expected = set(roster["owners"])
+    exposed = live - guards
+    assert exposed == expected, {"unbooked": sorted(exposed - expected),
+                                 "missing": sorted(expected - exposed)}
     growth = fit["required_remaining_memory_bytes"]
     for unit, row in roster["owners"].items():
         current = ops.props(unit, [*FIELDS, "MemoryCurrent"])
@@ -158,11 +161,77 @@ def current_fit(kit, roster, root, scope):
             "required_remaining_memory_bytes": growth, "sampled_unix_seconds": time.time()}
 
 
+def prepare_hourly_retry(ops, attempt, tokens, template, guard, hook):
+    def keep(path, payload):
+        if path.is_file():
+            reference = ops.ref(path)
+            assert ops.bound(reference) == payload
+            return reference
+        return ops.funds.put(path, payload)
+
+    attempt.mkdir(mode=0o700, exist_ok=True)
+    receipts = attempt / "guard-receipts"
+    receipts.mkdir(mode=0o700, exist_ok=True)
+    for directory in (attempt, receipts):
+        assert directory.resolve() == directory and directory.is_dir()
+        metadata = directory.stat()
+        assert metadata.st_uid == 0 and metadata.st_mode & 0o777 == 0o700
+    assert not any(receipts.iterdir())
+    template = dict(template, receipt_directory=str(receipts))
+    static_plan = keep(attempt / "static-guard-plan.json", template)
+    check = json.loads(subprocess.check_output([
+        guard["path"], static_plan["path"], "--plan-sha256", static_plan["sha256"],
+        "--self-sha256", guard["sha256"], "--validate-plan-only",
+    ], timeout=25))
+    assert check["validated"] and check["plan_sha256"] == static_plan["sha256"]
+    keep(attempt / "static-guard-validation.json", check)
+
+    probe = tokens / "qualification"
+    for directory in (tokens, probe):
+        if not directory.exists():
+            directory.mkdir(mode=0o755)
+            directory.chmod(0o755)
+        assert directory.resolve() == directory and directory.is_dir()
+        metadata = directory.stat()
+        assert metadata.st_uid == 0 and metadata.st_mode & 0o777 == 0o755
+    assert set(tokens.iterdir()) == {probe}
+    keep(probe / "guard-admission.json", {"qualification_only": True})
+    subprocess.run(["systemd-run", "--quiet", "--wait", "--pipe", "--collect",
+                    "--unit=foundation-230-hourly-token-probe-v1",
+                    "--property=User=ubuntu", "--property=Group=ubuntu",
+                    "--property=ProtectSystem=strict", "--property=ProtectHome=read-only",
+                    f"--property=ReadOnlyPaths={tokens}", "--property=PrivateNetwork=yes",
+                    "/usr/bin/bash", "-c",
+                    'INVOCATION_ID=qualification exec /usr/bin/bash "$1" 0 "$2"',
+                    "token-access-probe", hook, str(tokens)], check=True, timeout=20)
+    keep(attempt / "token-access-validation.json", {
+        "worker_user": "ubuntu", "token_root": str(tokens), "prestart_hook": HOOK,
+        "same_hook_reached_projected_token": True,
+    })
+    return template
+
+
 def launch(kit, roster_ref, scope):
     ops = kit.ops
     state = scope.state
+    attempt = state
     tokens = state / "tokens"
-    assert not (state / "admission.json").exists() and not tokens.exists()
+    failed_start = None
+    if scope is HOURLY_230:
+        failed_start = {
+            "path": str(state / "prestart-failure-881df10b.json"),
+            "sha256": "958af848bc8663315dfe94ca2945b99415cee39da47ff017ba3f4b0e8c4eb036",
+        }
+        failure = ops.bound(failed_start)
+        assert failure["epoch"] == scope.epoch and failure["worker_started"] is False
+        assert failure["timer_after"]["ActiveState"] == "inactive"
+        assert failure["producer"]["ExecMainStartTimestampMonotonic"] == "0"
+        assert failure["guard_token_exists"] and failure["prestart_uid_can_reach_token"] is False
+        attempt = state / "retry-v1"
+        tokens = V / "horizon230-middle-hourly-first-tokens-retry-v1"
+    assert not (state / "cadence-registration.json").exists()
+    assert not (attempt / "admission.json").exists()
+    assert failed_start is not None or not tokens.exists()
     roster = ops.bound(roster_ref)
     preflight = ops.bound(scope.preflight)
     profile = ops.bound(scope.profile)
@@ -202,27 +271,32 @@ def launch(kit, roster_ref, scope):
     template = ops.bound(profile["static_guard_plan"])
     assert template["unit"] == scope.unit and template["worker_root"] == str(root)
     assert template["maximum_root_physical_bytes"] == scope.cap
-    for directory in (root / "work/scratch", state / "guard-receipts"):
-        assert not any(directory.iterdir()), directory
+    assert not any((root / "work/scratch").iterdir())
+    if failed_start is None:
+        assert not any((state / "guard-receipts").iterdir())
     for unit in (scope.unit, scope.guard, scope.guard.removesuffix(".service") + ".timer"):
         assert ops.props(unit, ["LoadState", "ActiveState", "Job"]) == {
             "LoadState": "not-found", "ActiveState": "inactive", "Job": ""}
     remote = inventory(kit, epoch=scope.epoch, unit=f"foundation-{scope.epoch}-focused-inventory")
+    if failed_start is not None:
+        template = prepare_hourly_retry(ops, attempt, tokens, template, profile["guard"], hook)
     measured = current_fit(kit, roster, root, scope)
     properties = dict(profile["properties"], BindReadOnlyPaths=" ".join(bindings),
                       ReadOnlyPaths=str(tokens), Delegate="no", OOMPolicy="kill",
                       UnsetEnvironment="HORIZON_S3_ENDPOINT HORIZON_ACCESS_KEY_ID HORIZON_SECRET_ACCESS_KEY")
     props = [f"--property={key}={value}" for key, value in properties.items()]
     props.extend(f"--setenv={key}={value}" for key, value in profile["environment"].items())
-    tokens.mkdir(mode=0o755)
-    tokens.chmod(0o755)
-    admission = ops.funds.put(state / "admission.json", {
+    if failed_start is None:
+        tokens.mkdir(mode=0o755)
+        tokens.chmod(0o755)
+    admission = ops.funds.put(attempt / "admission.json", {
         "schema": f"foundation-epoch{scope.epoch}-focused-admission-v1", "epoch": scope.epoch,
         "profile": scope.profile, "preflight": scope.preflight, "roster": roster_ref, "fit": measured,
         "inventory": remote, "admitted": True, "publication_authorized": False,
+        **({"failed_prestart": failed_start} if failed_start is not None else {}),
     })
     owner, plan, token, active_guard = activate_guarded(
-        kit, scope.epoch, state, tokens, scope.unit, scope.guard, profile["guard"], template, admission,
+        kit, scope.epoch, attempt, tokens, scope.unit, scope.guard, profile["guard"], template, admission,
         props, f"ExecStartPre=/usr/bin/bash {hook} 60 {tokens}", profile["argv"])
     return ops.funds.put(state / "cadence-registration.json", {
         "schema": "jetstreamer-historical-performance-launch-receipt-v1",
