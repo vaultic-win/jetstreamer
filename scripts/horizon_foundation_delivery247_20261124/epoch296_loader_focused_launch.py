@@ -250,7 +250,8 @@ def launch(kit, roster_ref, scope):
         tokens = V / "horizon230-middle-hourly-second-tokens-v1"
     assert not (state / "cadence-registration.json").exists()
     assert not (attempt / "admission.json").exists()
-    assert failed_start is not None or not tokens.exists()
+    qualify_tokens = failed_start is not None or scope is SECOND_HOURLY_230
+    assert qualify_tokens or not tokens.exists()
     roster = ops.bound(roster_ref)
     preflight = ops.bound(scope.preflight)
     profile = ops.bound(scope.profile)
@@ -304,7 +305,6 @@ def launch(kit, roster_ref, scope):
         assert ops.props(unit, ["LoadState", "ActiveState", "Job"]) == {
             "LoadState": "not-found", "ActiveState": "inactive", "Job": ""}
     remote = inventory(kit, epoch=scope.epoch, unit=f"foundation-{scope.epoch}-focused-inventory")
-    qualify_tokens = failed_start is not None or scope is SECOND_HOURLY_230
     if qualify_tokens:
         probe_unit = ("foundation-230-hourly-second-token-probe-v1" if scope is SECOND_HOURLY_230
                       else "foundation-230-hourly-token-probe-v1")
