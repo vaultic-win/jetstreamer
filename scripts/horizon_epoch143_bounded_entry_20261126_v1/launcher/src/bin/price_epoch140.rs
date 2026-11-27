@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[path = "price_entry143.rs"]
@@ -71,16 +72,60 @@ fn sample_lower(reference: &Value) -> Result<u64> {
     Ok(number(&walk["first"]["physical_bytes"])?.min(number(&walk["second"]["physical_bytes"])?))
 }
 
+fn retire_uplift(fleet_ref: &Value, digest: &str) -> Result<(Value, u64)> {
+    let reference = json!({
+        "path":"/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-retry1/CACHE_RETIREMENT_AFTER_091808.json",
+        "sha256":digest
+    });
+    let receipt = read(&reference)?;
+    let intent = read(&receipt["intent"])?;
+    ensure!(
+        receipt["schema"] == "horizon-epoch140-post-census-cache-retirement-v1"
+            && receipt["fleet"] == *fleet_ref
+            && intent["fleet"] == *fleet_ref
+            && receipt["trees_absent"] == true
+            && receipt["r2_mutations"] == false
+            && intent["live_or_staged_references"] == json!([]),
+        "cache retirement does not belong to this accepted fleet"
+    );
+    for path in [
+        "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/debug/deps",
+        "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/release/deps",
+    ] {
+        ensure!(
+            !Path::new(path).try_exists()?,
+            "retired compiler cache has been recreated"
+        );
+    }
+    let before = number(&receipt["home_available_before_bytes"])?;
+    let after = number(&receipt["home_available_after_bytes"])?;
+    let exclusive = number(&receipt["exclusive_allocated_bytes_retired"])?;
+    let released = after.saturating_sub(before).min(exclusive);
+    ensure!(
+        released > 0,
+        "cache retirement released no verified capacity"
+    );
+    Ok((reference, released))
+}
+
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    let retry = args.len() == 3 && args[2] == "--retry1";
-    ensure!(
-        args.len() == 2 || retry,
-        "usage: price_epoch140 FLEET FLEET_SHA256 [--retry1]"
-    );
+    let retry = args.get(2).is_some_and(|mode| mode == "--retry1");
+    let cache_digest = match args.as_slice() {
+        [_, _] | [_, _, _] if args.len() == 2 || retry => None,
+        [_, _, _, flag, digest] if retry && flag == "--cache-retirement-sha" => Some(digest),
+        _ => anyhow::bail!(
+            "usage: price_epoch140 FLEET FLEET_SHA256 [--retry1 [--cache-retirement-sha HEX]]"
+        ),
+    };
     let home_cap = if retry { RETRY_HOME_CAP } else { HOME_CAP };
     let fleet_ref = json!({"path":args[0],"sha256":args[1]});
     let fleet = read(&fleet_ref)?;
+    let (cache_retirement, confirmed_reclaimed_home) = if let Some(digest) = cache_digest {
+        retire_uplift(&fleet_ref, digest)?
+    } else {
+        (Value::Null, 0)
+    };
     let transfers = fleet["actual_active_holding_transfers"]
         .as_array()
         .context("missing transfer roster")?;
@@ -228,9 +273,11 @@ fn main() -> Result<()> {
     )?;
     current_guards.insert(tail_unit, tail_sample);
     let after = usage()?;
-    let home_available = before.0.min(after.0).min(number(
-        &fleet["complete_cycle_conservative_available_DATA_bytes"],
-    )?);
+    let census_availability = number(&fleet["complete_cycle_conservative_available_DATA_bytes"])?;
+    let eligible_availability = census_availability
+        .checked_add(confirmed_reclaimed_home)
+        .context("disk availability overflow")?;
+    let home_available = before.0.min(after.0).min(eligible_availability);
     let ram_available = before.1.min(after.1);
     let retained_required_home = number(&post["required_home_bytes"])?
         .checked_sub(tail_physical)
@@ -261,6 +308,7 @@ fn main() -> Result<()> {
             "retained_required_home_bytes":retained_required_home,"available_home_bytes":home_available,
             "retained_required_ram_bytes":retained_required_ram,"available_ram_bytes":ram_available,
             "candidate_home_bytes":home_cap,"retained_185_lanek":lane_k,
+            "verified_cache_retirement":cache_retirement,"confirmed_reclaimed_home_bytes":confirmed_reclaimed_home,
             "additional_185_lanek_home_bytes":extra_home,"additional_185_lanek_ram_bytes":extra_ram,"candidate_ram_bytes":RAM_CAP,
             "candidate_cpu_quota_micros":3_000_000,
             "disk_fits":home_available >= retained_required_home + home_cap,
