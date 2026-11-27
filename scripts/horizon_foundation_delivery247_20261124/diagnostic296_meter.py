@@ -8,6 +8,7 @@ from ordinary249.delivery248 import V, bound, props, ref
 LOADER = "loader-upgrade-focused-v2"
 GAP = "short-gap-v1"
 HOURLY_230 = "middle-hourly-first-v1"
+SECOND_HOURLY_230 = "middle-hourly-second-v1"
 RESTORE = "native-restore-v1"
 RESTORE_260 = "native-restore-260-v1"
 TRACE = "loader-log-v3"
@@ -16,6 +17,8 @@ FOCUSED = {
     LOADER: (296, "horizon296-loader-upgrade-focused-v2", "epoch296-private-loader-upgrade-diagnostic"),
     GAP: (230, "horizon230-short-gap-runtime-v1", "epoch230-private-short-gap"),
     HOURLY_230: (230, "horizon230-middle-hourly-first-runtime-v1", "epoch230-private-first-hourly-window"),
+    SECOND_HOURLY_230: (230, "horizon230-middle-hourly-second-runtime-v1",
+                        "epoch230-private-second-hourly-window"),
     RESTORE: (258, "horizon258-native-restore-runtime-v1", "epoch258-private-native-restore"),
     RESTORE_260: (260, "horizon260-native-restore-runtime-v1", "epoch260-private-native-restore"),
     TRACE: (296, "horizon296-loader-log-v3", "epoch296-private-loader-log-diagnostic"),

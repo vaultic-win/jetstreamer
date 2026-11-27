@@ -73,6 +73,24 @@ pub(super) const HOURLY_230: Focused = Focused {
     profile_sha: "f54a68b09830f1ae8048b4a1db29ad63f0d10cba02d34a6a06b19dbeb3f7eaab",
 };
 
+pub(super) const SECOND_HOURLY_230: Focused = Focused {
+    epoch: 230,
+    unit: "horizon-qualify-230-middle-hourly-second-v1.service",
+    guard: "horizon-230-middle-hourly-second-protective-v1",
+    cpus: "48-55",
+    scratch_cap: 208 << 30,
+    receipt_disk: 256 << 20,
+    producer_memory: 225_000_000_000,
+    root: "/home/ubuntu/.jetstreamer-private/qualification-230-middle-hourly-second-v1",
+    first: 99_476_783,
+    last: 99_516_304,
+    kind: "epoch230-private-second-hourly-window",
+    preflight_schema: "foundation-epoch230-middle-hourly-second-runtime-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon230-middle-hourly-second-runtime-v1",
+    preflight_sha: "b7d2b77d99c3d42d6e85b9b724876ba700f6c598df75ade8bcc7db945907edda",
+    profile_sha: "76787b9a49ef39f2ae2e7cb6053abdc4e1d075301527e72b1878f9165c9cfe38",
+};
+
 pub(super) const RESTORE_258: Focused = Focused {
     epoch: 258,
     unit: "horizon-qualify-258-native-restore-v1.service",
@@ -145,9 +163,10 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 7] = [
+pub(super) const SCOPES: [&Focused; 8] = [
     &GAP_230,
     &HOURLY_230,
+    &SECOND_HOURLY_230,
     &RESTORE_258,
     &RESTORE_260,
     &LOADER_296,

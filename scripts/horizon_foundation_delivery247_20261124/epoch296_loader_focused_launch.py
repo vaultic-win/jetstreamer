@@ -77,6 +77,15 @@ HOURLY_230 = Scope(
     "fae42b5f5183a21bed46786ddc0d23819ee1eadec8c84f9dd1a3f6debbec113b",
     225_000_000_000, 208 << 30, 256 << 20, "72-79",
 )
+SECOND_HOURLY_230 = Scope(
+    230, V / "horizon230-middle-hourly-second-runtime-v1",
+    "horizon-qualify-230-middle-hourly-second-v1.service",
+    "horizon-230-middle-hourly-second-protective-v1.service",
+    "epoch230-private-second-hourly-window", "foundation-epoch230-hourly-second-roster-binding-v1",
+    "76787b9a49ef39f2ae2e7cb6053abdc4e1d075301527e72b1878f9165c9cfe38",
+    "b7d2b77d99c3d42d6e85b9b724876ba700f6c598df75ade8bcc7db945907edda",
+    225_000_000_000, 208 << 30, 256 << 20, "48-55",
+)
 RESTORE_258 = Scope(
     258, V / "horizon258-native-restore-runtime-v1",
     "horizon-qualify-258-native-restore-v1.service", "horizon-258-native-restore-protective-v1.service",
@@ -112,7 +121,7 @@ FEATURE_296 = Scope(
 )
 SCOPED_ARGS = {
     "--epoch230": GAP_230, "--epoch258": RESTORE_258, "--epoch260": RESTORE_260,
-    "--hourly230": HOURLY_230,
+    "--hourly230": HOURLY_230, "--hourly230-second": SECOND_HOURLY_230,
     "--trace296": TRACE_296, "--feature296": FEATURE_296,
 }
 
@@ -128,7 +137,14 @@ def current_fit(kit, roster, root, scope):
     assert fit["candidate_total_memory_bytes"] == scope.ram + (1 << 30) + (256 << 20)
     assert fit["guard_floor_bytes"] == 3_770_104_987_645
     cpus = kit.measure.source.helper.cpus
-    assert cpus(fit["cpus"]) == cpus(scope.cpus)
+    selected = cpus(scope.cpus)
+    assert cpus(fit["cpus"]) == selected
+    protected_cpus = selected
+    if scope is SECOND_HOURLY_230:
+        protected_cpus = set().union(*(cpus(Path(
+            f"/sys/devices/system/cpu/cpu{cpu}/topology/thread_siblings_list"
+        ).read_text().strip()) for cpu in selected))
+        assert selected <= protected_cpus
     listing = subprocess.check_output(
         ["systemctl", "list-units", "--type=service", "--state=running,activating",
          "--plain", "--no-legend", "--no-pager"], text=True, timeout=10)
@@ -143,7 +159,7 @@ def current_fit(kit, roster, root, scope):
     for unit, row in roster["owners"].items():
         current = ops.props(unit, [*FIELDS, "MemoryCurrent"])
         assert all(current[key] == row["systemd"][key] for key in FIELDS)
-        assert cpus(scope.cpus).isdisjoint(cpus(current["AllowedCPUs"]))
+        assert protected_cpus.isdisjoint(cpus(current["AllowedCPUs"]))
         growth += max(0, row["memory_current_bytes"] - int(current["MemoryCurrent"]))
     for guard in roster["periodic_guards"].values():
         row = ops.props(guard["timer"], ["ActiveState", "InvocationID", "Unit"])
@@ -158,10 +174,11 @@ def current_fit(kit, roster, root, scope):
     assert disk >= fit["required_disk_bytes"] and available >= growth
     assert fit["required_hard_memory_bytes"] <= fit["host_total_memory_bytes"]
     return {"available_disk_bytes": disk, "available_memory_bytes": available,
-            "required_remaining_memory_bytes": growth, "sampled_unix_seconds": time.time()}
+            "required_remaining_memory_bytes": growth, "sampled_unix_seconds": time.time(),
+            **({"protected_cpus": sorted(protected_cpus)} if scope is SECOND_HOURLY_230 else {})}
 
 
-def prepare_hourly_retry(ops, attempt, tokens, template, guard, hook):
+def prepare_hourly_tokens(ops, attempt, tokens, template, guard, hook, probe_unit):
     def keep(path, payload):
         if path.is_file():
             reference = ops.ref(path)
@@ -197,7 +214,7 @@ def prepare_hourly_retry(ops, attempt, tokens, template, guard, hook):
     assert set(tokens.iterdir()) == {probe}
     keep(probe / "guard-admission.json", {"qualification_only": True})
     subprocess.run(["systemd-run", "--quiet", "--wait", "--pipe", "--collect",
-                    "--unit=foundation-230-hourly-token-probe-v1",
+                    f"--unit={probe_unit}",
                     "--property=User=ubuntu", "--property=Group=ubuntu",
                     "--property=ProtectSystem=strict", "--property=ProtectHome=read-only",
                     f"--property=ReadOnlyPaths={tokens}", "--property=PrivateNetwork=yes",
@@ -229,6 +246,8 @@ def launch(kit, roster_ref, scope):
         assert failure["guard_token_exists"] and failure["prestart_uid_can_reach_token"] is False
         attempt = state / "retry-v1"
         tokens = V / "horizon230-middle-hourly-first-tokens-retry-v1"
+    if scope is SECOND_HOURLY_230:
+        tokens = V / "horizon230-middle-hourly-second-tokens-v1"
     assert not (state / "cadence-registration.json").exists()
     assert not (attempt / "admission.json").exists()
     assert failed_start is not None or not tokens.exists()
@@ -271,22 +290,32 @@ def launch(kit, roster_ref, scope):
     template = ops.bound(profile["static_guard_plan"])
     assert template["unit"] == scope.unit and template["worker_root"] == str(root)
     assert template["maximum_root_physical_bytes"] == scope.cap
-    assert not any((root / "work/scratch").iterdir())
+    scratch = root / "work/scratch"
+    if scope is SECOND_HOURLY_230:
+        cli_scratch = scratch / ".historical-runtime"
+        assert set(scratch.iterdir()) <= {cli_scratch}
+        if cli_scratch.exists():
+            assert cli_scratch.resolve() == cli_scratch and not any(cli_scratch.iterdir())
+    else:
+        assert not any(scratch.iterdir())
     if failed_start is None:
         assert not any((state / "guard-receipts").iterdir())
     for unit in (scope.unit, scope.guard, scope.guard.removesuffix(".service") + ".timer"):
         assert ops.props(unit, ["LoadState", "ActiveState", "Job"]) == {
             "LoadState": "not-found", "ActiveState": "inactive", "Job": ""}
     remote = inventory(kit, epoch=scope.epoch, unit=f"foundation-{scope.epoch}-focused-inventory")
-    if failed_start is not None:
-        template = prepare_hourly_retry(ops, attempt, tokens, template, profile["guard"], hook)
+    qualify_tokens = failed_start is not None or scope is SECOND_HOURLY_230
+    if qualify_tokens:
+        probe_unit = ("foundation-230-hourly-second-token-probe-v1" if scope is SECOND_HOURLY_230
+                      else "foundation-230-hourly-token-probe-v1")
+        template = prepare_hourly_tokens(ops, attempt, tokens, template, profile["guard"], hook, probe_unit)
     measured = current_fit(kit, roster, root, scope)
     properties = dict(profile["properties"], BindReadOnlyPaths=" ".join(bindings),
                       ReadOnlyPaths=str(tokens), Delegate="no", OOMPolicy="kill",
                       UnsetEnvironment="HORIZON_S3_ENDPOINT HORIZON_ACCESS_KEY_ID HORIZON_SECRET_ACCESS_KEY")
     props = [f"--property={key}={value}" for key, value in properties.items()]
     props.extend(f"--setenv={key}={value}" for key, value in profile["environment"].items())
-    if failed_start is None:
+    if not qualify_tokens:
         tokens.mkdir(mode=0o755)
         tokens.chmod(0o755)
     admission = ops.funds.put(attempt / "admission.json", {
