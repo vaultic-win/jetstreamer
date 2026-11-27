@@ -184,11 +184,28 @@ def price(phase):
              and s["MainPID"] == s["ControlPID"] == "0", "bridge exit did not accept exact producer")
         inactive(BRIDGE)
         old_lower, old_upper = tree_bytes()
-    loss += max(0,peak(bound(anchors[BRIDGE]))-old_lower)
+    old_scoped = 0
+    old_loss = max(0,peak(bound(anchors[BRIDGE]))-old_lower)
+    if phase in ("start","held"):
+        old_guard=bound(anchors[BRIDGE])
+        # The 167 ledger included this exact scoped bridge-growth term once.
+        # Replace it only after the closed comparison: the retained tree stays
+        # on disk and the new 40 GiB is measured against that entire tree.
+        done, _=read(DEP/"CLOSED_BRIDGE_COMPARISON.json")
+        need(done["release"]==interface["old_release"] and done["pid1_exit"]["native"]["InvocationID"]==ORIG
+             and done["pid1_exit"]["native"]["Result"]=="success" and done["checkpoints"][-1]["slot"]==73726716
+             and len(done["closed_segment"]["sha256"])==64,"no accepted original bridge")
+        old_scoped = base["remaining_170_bytes"]
+        need(old_scoped==old_guard["maximum_root_physical_bytes"]-physical(old_guard)
+             and post["required_home_bytes"]==base["complete_required_HOME_bytes"]-base["remaining_167_bytes"]+intent["run_guard_cap_bytes"]
+             and old_guard["plan_sha256"]=="94763c96a0f243d6f75bd315f10c664d9cec73c7b09ddd81605e773f641472d5",
+             "the accepted 167 price cannot isolate old 170 growth")
+        old_loss = 0
+    loss += old_loss
     # The 167 price covers the original 170 RAM independently of its current RSS.
     # Reuse the six-core/48 GiB payload slot and the separate one-core/1 GiB guard.
-    # Keep the complete historical disk charge and separately reserve the new 40 GiB.
-    incumbent_home = post["required_home_bytes"] - tail_lower + loss
+    # Keep the entire host envelope, replacing only the measured original bridge term.
+    incumbent_home = post["required_home_bytes"] - tail_lower + loss - old_scoped
     incumbent_ram = post["required_ram_bytes"] + base["resident_lower_bound_bytes"] - residents
     booking, booking_ref = read(B140/"WRITER_BOOKING_111808_CROSS_CADENCE.json",
                                 "e687eddf9e2b48b39e2a39ba6059a92a0f18c71178c8733d2636cfb07fccbac6")
@@ -264,7 +281,7 @@ def price(phase):
     ram = min(before[1],after[1])
     candidate = 40*G if phase in ("start","held") else 0
     required_ram = incumbent_ram+extra_ram
-    floor = incumbent_home+extra_home
+    floor = max(incumbent_home+extra_home,max(bound(ref)["minimum_free_bytes"] for ref in samples.values()))
     full_cap = 384*G
     need(old_upper <= full_cap, "original whole-tree cap exceeded")
     cap = min(full_cap,old_upper+candidate)
@@ -276,7 +293,7 @@ def price(phase):
         active_140=s140,charged140_home=charged140_home,charged140_ram=charged140_ram,return140=end140,booking140=booking_ref,held140=held_ref,loan140=loan_ref,extra=rr,active185=k,
         guard_sibling_allowance=G,producer_allowance=48*G,producer_quota_micros=6000000,guard_quota_micros=1000000,
         required_home=required_home,required_ram=required_ram,available_home=home,available_ram=ram,
-        resident_lower_bytes=residents,terminal_tree_bounds=[old_lower,old_upper],candidate_growth=candidate,
+        replaced_original_scoped_growth=old_scoped,resident_lower_bytes=residents,terminal_tree_bounds=[old_lower,old_upper],candidate_growth=candidate,
         guard_floor=floor,guard_cap=cap,home_margin=home-required_home,ram_margin=ram-required_ram,
         fits=home>=required_home and ram>=required_ram and cap>=old_upper+candidate,
         archive_publication_authorized=False,resource_credit_bytes=0)
