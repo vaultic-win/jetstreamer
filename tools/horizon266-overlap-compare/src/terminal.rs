@@ -806,6 +806,10 @@ pub(super) fn capture_exit(launch_sha: &str, destination: &Path) -> Result<Value
     exit::capture(launch_sha, destination)
 }
 
+pub(super) fn capture_v1627_exit(launch_sha: &str, destination: &Path) -> Result<Value> {
+    exit::capture_v1627(launch_sha, destination)
+}
+
 pub(super) fn collect(
     launch_sha: &str,
     destination: &Path,

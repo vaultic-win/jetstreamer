@@ -110,11 +110,29 @@ struct Capture {
     properties: UnitState,
 }
 
-fn ensure_unit(state: &UnitState, launch: &Launch) -> Result<()> {
+struct Producer<'a> {
+    unit: &'a str,
+    invocation: &'a str,
+    pid: u32,
+    node: &'a Path,
+}
+
+impl<'a> From<&'a Launch> for Producer<'a> {
+    fn from(launch: &'a Launch) -> Self {
+        Self {
+            unit: &launch.unit,
+            invocation: &launch.invocation_id,
+            pid: launch.main_pid,
+            node: &launch.node_path,
+        }
+    }
+}
+
+fn ensure_unit(state: &UnitState, producer: &Producer<'_>) -> Result<()> {
     for (field, expected) in [
-        ("Id", launch.unit.as_str()),
-        ("InvocationID", launch.invocation_id.as_str()),
-        ("ExecMainPID", &launch.main_pid.to_string()),
+        ("Id", producer.unit),
+        ("InvocationID", producer.invocation),
+        ("ExecMainPID", &producer.pid.to_string()),
         ("LoadState", "loaded"),
         ("NRestarts", "0"),
         ("Restart", "no"),
@@ -127,16 +145,15 @@ fn ensure_unit(state: &UnitState, launch: &Launch) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn capture(launch_sha: &str, destination: &Path) -> Result<Value> {
-    require_root()?;
-    let parent = destination_parent(destination)?;
-    let admitted = Admitted::load(launch_sha)?;
-    let launch = &admitted.launch;
-    let _held = UnitReference::hold(&launch.unit)
+fn capture_properties(
+    producer: &Producer<'_>,
+    timeout_ms: i32,
+) -> Result<(UnitReference, UnitState)> {
+    let held = UnitReference::hold(producer.unit)
         .context("retaining the producer unit until PID1 exit capture")?;
-    let fd = pidfd(launch.main_pid)?;
-    let running = unit_state(&launch.unit)?;
-    ensure_unit(&running, launch)?;
+    let fd = pidfd(producer.pid)?;
+    let running = unit_state(producer.unit)?;
+    ensure_unit(&running, producer)?;
     let start = state_timestamp(&running, "ExecMainStartTimestampMonotonic")?;
     ensure!(
         running
@@ -147,26 +164,25 @@ pub(super) fn capture(launch_sha: &str, destination: &Path) -> Result<Value> {
                 .is_some_and(|state| state == "running")
             && running
                 .get("MainPID")
-                .is_some_and(|pid| pid == &launch.main_pid.to_string())
+                .is_some_and(|pid| pid == &producer.pid.to_string())
             && running
                 .get("ControlGroup")
-                .is_some_and(|group| group == &launch.cgroup())
-            && PathBuf::from(format!("/proc/{}/exe", launch.main_pid)).read_link()?
-                == launch.node_path
+                .is_some_and(|group| group == &format!("/system.slice/{}", producer.unit))
+            && PathBuf::from(format!("/proc/{}/exe", producer.pid)).read_link()? == producer.node
             && !exited(&fd, 0)?,
         "producer is no longer running under the admitted identity"
     );
     eprintln!(
         "Watching PID1 exit for {} invocation {} PID {}",
-        launch.unit, launch.invocation_id, launch.main_pid
+        producer.unit, producer.invocation, producer.pid
     );
     ensure!(
-        exited(&fd, 7_300_000)?,
+        exited(&fd, timeout_ms)?,
         "producer exceeded the exit capture window"
     );
     for _ in 0..100 {
-        let properties = unit_state(&launch.unit)?;
-        ensure_unit(&properties, launch)?;
+        let properties = unit_state(producer.unit)?;
+        ensure_unit(&properties, producer)?;
         ensure!(
             state_timestamp(&properties, "ExecMainStartTimestampMonotonic")? == start,
             "PID1 records a new producer start"
@@ -183,25 +199,104 @@ pub(super) fn capture(launch_sha: &str, destination: &Path) -> Result<Value> {
                 state_timestamp(&properties, "ExecMainExitTimestampMonotonic")? > start,
                 "PID1 lacks a terminal process exit time"
             );
-            admitted.unchanged()?;
-            let receipt = Capture {
-                schema: SCHEMA.to_owned(),
-                launch: Reference::new(LAUNCH, launch_sha),
-                boot_id: admitted.boot.clone(),
-                producer_invocation: launch.invocation_id.clone(),
-                producer_pid: launch.main_pid,
-                properties,
-            };
-            let staging = stage_package(parent)?;
-            let reference = write_sealed(&staging.path().join("pid1-exit.json"), &receipt)?;
-            persist_package(staging, destination, parent)?;
-            return Ok(
-                json!({"pid1_exit": Reference::new(destination.join("pid1-exit.json"), &reference.sha256)}),
-            );
+            return Ok((held, properties));
         }
         thread::sleep(Duration::from_millis(100));
     }
     bail!("PID1 did not settle after the admitted producer exited")
+}
+
+fn persist_capture(parent: &Path, destination: &Path, receipt: &Capture) -> Result<Value> {
+    let staging = stage_package(parent)?;
+    let reference = write_sealed(&staging.path().join("pid1-exit.json"), receipt)?;
+    persist_package(staging, destination, parent)?;
+    Ok(json!({"pid1_exit": Reference::new(destination.join("pid1-exit.json"), &reference.sha256)}))
+}
+
+pub(super) fn capture(launch_sha: &str, destination: &Path) -> Result<Value> {
+    require_root()?;
+    let parent = destination_parent(destination)?;
+    let admitted = Admitted::load(launch_sha)?;
+    let producer = Producer::from(&admitted.launch);
+    let (_held, properties) = capture_properties(&producer, 7_300_000)?;
+    admitted.unchanged()?;
+    persist_capture(
+        parent,
+        destination,
+        &Capture {
+            schema: SCHEMA.to_owned(),
+            launch: Reference::new(LAUNCH, launch_sha),
+            boot_id: admitted.boot.clone(),
+            producer_invocation: producer.invocation.to_owned(),
+            producer_pid: producer.pid,
+            properties,
+        },
+    )
+}
+
+pub(super) fn capture_v1627(launch_sha: &str, destination: &Path) -> Result<Value> {
+    const STATE: &str = "/var/lib/jetstreamer/horizon230-v1627-replay-runtime-v1";
+    const LAUNCH_SHA: &str = "3a2f5a058c76a59707af77f98973c283d4542c8308d5a514a22ae1cb6534a7a6";
+    const UNIT: &str = "horizon-qualify-230-v1627-window-v1.service";
+    const IID: &str = "6c878d138821422d8a848d6bd16d63a9";
+    const NODE: &str =
+        "/var/lib/jetstreamer/horizon230-v1627-diagnostic-318e9028-v1/jetstreamer-node";
+    require_root()?;
+    let parent = destination_parent(destination)?;
+    ensure!(launch_sha == LAUNCH_SHA, "foreign epoch 230 launch receipt");
+    let state = Path::new(STATE);
+    let reference = Reference::new(state.join("cadence-registration.json"), launch_sha);
+    let launch = reference.read()?;
+    ensure!(
+        launch["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+            && launch["kind"] == "epoch230-private-v1627-window"
+            && launch["epoch"] == 230
+            && launch["unit"] == UNIT
+            && launch["invocation_id"] == IID
+            && launch["node_path"] == NODE
+            && launch["launched"] == true
+            && launch["canonical_epoch_publication_authorized"] == false,
+        "epoch 230 exit capture requires the exact guarded launch"
+    );
+    let pid: u32 = serde_json::from_value(launch["main_pid"].clone())?;
+    let guard: Reference = serde_json::from_value(launch["active_guard"].clone())?;
+    let sample = guard.read_guard_sample(&state.join("guard-receipts"))?;
+    ensure!(
+        pid > 1
+            && sample["producer"]["pid"] == pid
+            && sample["producer_invocation_id"] == IID
+            && sample["plan_sha256"] == launch["guard_plan"]["sha256"]
+            && sample["producer_stop_enabled"] == true
+            && sample["trip_reason"].is_null(),
+        "epoch 230 initial guard does not bind the exact producer"
+    );
+    let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    ensure!(hex(&boot_id, 32), "invalid running boot ID");
+    let producer = Producer {
+        unit: UNIT,
+        invocation: IID,
+        pid,
+        node: Path::new(NODE),
+    };
+    let (_held, properties) = capture_properties(&producer, 14_500_000)?;
+    ensure!(
+        reference.read()? == launch,
+        "epoch 230 launch changed during capture"
+    );
+    persist_capture(
+        parent,
+        destination,
+        &Capture {
+            schema: "foundation-epoch230-v1627-window-pid1-exit-v1".to_owned(),
+            launch: reference,
+            boot_id,
+            producer_invocation: IID.to_owned(),
+            producer_pid: pid,
+            properties,
+        },
+    )
 }
 
 pub(super) fn read(reference: &Reference, admitted: &Admitted) -> Result<UnitState> {
@@ -214,6 +309,6 @@ pub(super) fn read(reference: &Reference, admitted: &Admitted) -> Result<UnitSta
             && capture.producer_invocation == admitted.launch.invocation_id,
         "PID1 exit receipt belongs to a different launch or boot"
     );
-    ensure_unit(&capture.properties, &admitted.launch)?;
+    ensure_unit(&capture.properties, &Producer::from(&admitted.launch))?;
     Ok(capture.properties)
 }

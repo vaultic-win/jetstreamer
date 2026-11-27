@@ -500,9 +500,13 @@ fn main() -> Result<()> {
         [command, digest, destination] if command == "capture-exit" => {
             terminal::capture_exit(digest, Path::new(destination))?
         }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, digest, destination] if command == "capture-v1627-exit" => {
+            terminal::capture_v1627_exit(digest, Path::new(destination))?
+        }
         [command, plan, digest] if command == "compare" => compare(Path::new(plan), digest)?,
         _ => anyhow::bail!(
-            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
+            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
         ),
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
