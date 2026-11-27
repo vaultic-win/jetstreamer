@@ -25,6 +25,7 @@ const LOCK: &str = "/var/lib/jetstreamer/horizon-seven-publication-controller-v2
 const THIRD_SCOPE: &str = "d0007aef065d1bc9af56f14fc22c63edf1f87cdf9b35f3f9b702b44f969acbfa";
 const FOURTH_SCOPE: &str = "e418efbb8329dd5e05c08aa9d829d50c719fd4412981a019416301985bbdf3a6";
 const FIFTH_SCOPE: &str = "9188755bc441de30ed4e7c646c2c80889872b4d0cfb8a8f0c34c67847866337e";
+const SIXTH_SCOPE: &str = "f201ca9c60be597b88938be7ab92e13fd7413cf380910c5b81c9ceac12365ddd";
 const RAM: u64 = 74 << 30;
 const GUARD_RAM: u64 = 1 << 30;
 const TMPFS: u64 = 44 << 30;
@@ -271,6 +272,7 @@ fn peer_check(roster: &Value, home: &Path) -> Result<()> {
                 "horizon-141-foundation-interval3-guard-v1.service",
                 "horizon-141-foundation-interval4-guard-v1.service",
                 "horizon-141-foundation-interval5-guard-v1.service",
+                "horizon-141-foundation-interval6-guard-v1.service",
             ]
             .contains(&unit)
                 && expected_running.contains(
@@ -364,6 +366,7 @@ fn load_scope(path: &Path, ordinal: u8) -> Result<Value> {
         3 => THIRD_SCOPE,
         4 => FOURTH_SCOPE,
         5 => FIFTH_SCOPE,
+        6 => SIXTH_SCOPE,
         _ => anyhow::bail!("unknown private interval"),
     };
     let scope = load(path, scope_sha)?;
@@ -402,6 +405,32 @@ fn scoped(ordinal: u8) -> Result<(PathBuf, PathBuf, Value)> {
     let scope_path = state.join("runtime-scope.json");
     let scope = load_scope(&scope_path, ordinal)?;
     Ok((state, scope_path, scope))
+}
+
+fn host_mount(path: &Path, mountinfo: &str) -> Result<Value> {
+    let path_str = path.to_str().context("mount path encoding")?;
+    let mut entries = mountinfo.lines().filter_map(|line| {
+        let (left, filesystem) = line.split_once(" - ")?;
+        let fields: Vec<_> = left.split_whitespace().collect();
+        (fields.get(4) == Some(&path_str)).then_some((fields, filesystem))
+    });
+    let (fields, filesystem) = entries.next().context("missing host tmpfs mount")?;
+    ensure!(
+        entries.next().is_none()
+            && fields[3] == "/"
+            && filesystem.starts_with("tmpfs tmpfs ")
+            && filesystem
+                .split_whitespace()
+                .nth(2)
+                .is_some_and(|flags| flags.split(',').any(|flag| flag == "noswap")),
+        "unexpected host tmpfs identity"
+    );
+    let m = path.metadata()?;
+    ensure!(
+        m.uid() == 1000 && m.gid() == 1000 && m.ino() == 1 && m.mode() & 0o7777 == 0o700,
+        "unexpected host tmpfs root"
+    );
+    Ok(json!({"path":path,"mount_id":fields[0],"major_minor":fields[2],"device":m.dev()}))
 }
 
 fn record_exit(ordinal: u8) -> Result<()> {
@@ -573,23 +602,28 @@ fn main() -> Result<()> {
             "private interval assignment changed"
         );
     }
-    if ordinal == 5 {
-        let fourth_unit = "horizon-qualify-141-foundation-interval4-v1.service";
-        let fourth_timer = "horizon-141-foundation-interval4-guard-v1.timer";
-        let fourth_guard = "horizon-141-foundation-interval4-guard-v1.service";
-        let prior = resolve(&inputs["predecessor_drain"])?;
+    if matches!(ordinal, 5 | 6) {
+        let predecessor = if ordinal == 5 { 4 } else { 3 };
+        let drain = resolve(&inputs["predecessor_drain"])?;
+        let terminal = resolve(&inputs["predecessor_terminal"])?;
         ensure!(
-            prior["schema"] == "foundation-epoch141-interval4-post-custody-drain-v1"
-                && prior["invocation_id"] == "e8ddd3cf18c64dba954e84604afc70b1"
-                && prior["terminal"] == inputs["predecessor_terminal"]
-                && prior["guard_drained"] == true
-                && prior["tmpfs_drained"] == true,
-            "fourth interval lacks its exact drain"
+            drain["schema"]
+                == format!("foundation-epoch141-interval{predecessor}-post-custody-drain-v1")
+                && drain["invocation_id"] == terminal["invocation_id"]
+                && drain["terminal"] == inputs["predecessor_terminal"]
+                && drain["guard_drained"] == true
+                && drain["tmpfs_drained"] == true
+                && (ordinal != 5 || drain["invocation_id"] == "e8ddd3cf18c64dba954e84604afc70b1"),
+            "predecessor interval lacks its exact drain"
         );
-        for actor in [fourth_unit, fourth_guard, fourth_timer] {
+        for actor in [
+            format!("horizon-qualify-141-foundation-interval{predecessor}-v1.service"),
+            format!("horizon-141-foundation-interval{predecessor}-guard-v1.service"),
+            format!("horizon-141-foundation-interval{predecessor}-guard-v1.timer"),
+        ] {
             ensure!(
-                has(actor, "inactive")?,
-                "fourth interval still owns {actor}"
+                has(&actor, "inactive")?,
+                "predecessor interval still owns {actor}"
             );
         }
     }
@@ -602,7 +636,7 @@ fn main() -> Result<()> {
         "producer_memory_bytes":RAM,"guard_memory_bytes":GUARD_RAM,"future_home_bytes":HOME,
         "canonical_publication_authorized":false
     });
-    if matches!(ordinal, 3 | 5) {
+    if matches!(ordinal, 3 | 5 | 6) {
         admission["predecessor_terminal"] = inputs["predecessor_terminal"].clone();
         admission["predecessor_drain"] = inputs["predecessor_drain"].clone();
     }
@@ -629,7 +663,11 @@ fn main() -> Result<()> {
     }
     let genesis = fs::read(str_at(&scope["genesis"], "path")?)?;
     write(&tmpfs.join("ledger/genesis.tar.bz2"), &genesis, 0o444)?;
-    let affinity = if ordinal == 3 { "24-25" } else { "27-28" };
+    let affinity = if matches!(ordinal, 3 | 6) {
+        "24-25"
+    } else {
+        "27-28"
+    };
     let binding = scope["read_only_bindings"]
         .as_object()
         .context("missing read-only projections")?
@@ -711,10 +749,21 @@ fn main() -> Result<()> {
             "held read-only projection is foreign: {target}"
         );
     }
+    let host_mountinfo = fs::read_to_string("/proc/self/mountinfo")?;
+    let ram_mount = host_mount(tmpfs, &host_mountinfo)?;
+    let alias_mount = host_mount(alias, &host_mountinfo)?;
+    ensure!(
+        ram_mount["device"] == alias_mount["device"]
+            && ram_mount["major_minor"] == alias_mount["major_minor"]
+            && ram_mount["mount_id"] != alias_mount["mount_id"],
+        "host tmpfs or alias mount changed"
+    );
     let held = record(
         &state.join("held-namespace.json"),
         &json!({"schema":format!("foundation-epoch141-interval{ordinal}-held-namespace-v1"),
         "unit":unit,"producer":owner,"alias":alias,"tmpfs":tmpfs,"runtime_scope":reference(&scope_path)?,
+        "boot_id":fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),
+        "host_mounts":{"ram":ram_mount,"alias":alias_mount},
         "read_only_projection_count":scope["read_only_bindings"].as_object().unwrap().len()}),
     )?;
     let plan = record(

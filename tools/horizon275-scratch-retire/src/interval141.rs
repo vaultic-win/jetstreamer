@@ -5,27 +5,40 @@ use super::{
 use std::ffi::CString;
 
 struct Interval {
-    invocation: &'static str,
-    launch_sha: &'static str,
+    fixed_mounts: Option<FixedMounts>,
     ram: &'static str,
     alias: &'static str,
-    device: u64,
-    ram_mount: &'static str,
-    alias_mount: &'static str,
     first: u64,
     last: u64,
     targets: u64,
     output: &'static str,
 }
 
+struct FixedMounts {
+    invocation: &'static str,
+    launch_sha: &'static str,
+    device: u64,
+    ram_id: &'static str,
+    alias_id: &'static str,
+}
+
+struct Mounts<'a> {
+    device: u64,
+    major_minor: String,
+    ram_id: &'a str,
+    alias_id: &'a str,
+}
+
 const SECOND: Interval = Interval {
-    invocation: "94e2a4715b3a454eb3e7b0462863515e",
-    launch_sha: "50d12a9f19b0532f2f5abc8c8381e6b52e8fcc4043e7c4d39cb0b850ca31d589",
+    fixed_mounts: Some(FixedMounts {
+        invocation: "94e2a4715b3a454eb3e7b0462863515e",
+        launch_sha: "50d12a9f19b0532f2f5abc8c8381e6b52e8fcc4043e7c4d39cb0b850ca31d589",
+        device: 177,
+        ram_id: "447",
+        alias_id: "652",
+    }),
     ram: "/run/horizon141-foundation-interval2-ram-v4",
     alias: "/home/sol/.jetstreamer-private/epoch141-second-hourly",
-    device: 177,
-    ram_mount: "447",
-    alias_mount: "652",
     first: 60_921_283,
     last: 60_928_493,
     targets: 288,
@@ -33,21 +46,74 @@ const SECOND: Interval = Interval {
 };
 
 const FOURTH: Interval = Interval {
-    invocation: "e8ddd3cf18c64dba954e84604afc70b1",
-    launch_sha: "0c45c79d402d137f058ba10486fecffa54dfd482f5413e935fa13c8da464579d",
+    fixed_mounts: Some(FixedMounts {
+        invocation: "e8ddd3cf18c64dba954e84604afc70b1",
+        launch_sha: "0c45c79d402d137f058ba10486fecffa54dfd482f5413e935fa13c8da464579d",
+        device: 164,
+        ram_id: "117",
+        alias_id: "441",
+    }),
     ram: "/run/horizon141-foundation-interval4-ram-v1",
     alias: "/home/sol/.jetstreamer-private/epoch141-fourth-hourly-20261127-v1",
-    device: 164,
-    ram_mount: "117",
-    alias_mount: "441",
     first: 60_935_311,
     last: 60_942_184,
     targets: 340,
     output: "epoch-141-fourth-hourly",
 };
 
-fn mounts(scope: &Interval) -> Result<(bool, bool)> {
-    let device = format!("0:{}", scope.device);
+const THIRD: Interval = Interval {
+    fixed_mounts: None,
+    ram: "/run/horizon141-foundation-interval3-ram-v1",
+    alias: "/home/sol/.jetstreamer-private/epoch141-third-hourly-20261127-v1",
+    first: 60_928_494,
+    last: 60_935_310,
+    targets: 330,
+    output: "epoch-141-third-hourly",
+};
+
+fn text_field<'a>(row: &'a Value, key: &str) -> Result<&'a str> {
+    row[key].as_str().with_context(|| format!("missing {key}"))
+}
+
+fn bind_third_mounts<'a>(
+    held: &'a Value,
+    state: &Path,
+    unit: &str,
+    invocation: &str,
+) -> Result<Mounts<'a>> {
+    let scope: Binding = serde_json::from_value(held["runtime_scope"].clone())?;
+    let mount = &held["host_mounts"];
+    let ram = &mount["ram"];
+    let alias = &mount["alias"];
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+    let device = ram["device"].as_u64().context("missing tmpfs device")?;
+    let major_minor = text_field(ram, "major_minor")?;
+    let ram_id = text_field(ram, "mount_id")?;
+    let alias_id = text_field(alias, "mount_id")?;
+    ensure!(
+        held["schema"] == "foundation-epoch141-interval3-held-namespace-v1"
+            && held["unit"] == unit
+            && held["producer"]["InvocationID"] == invocation
+            && held["boot_id"] == boot.trim()
+            && scope.path == state.join("runtime-scope.json")
+            && scope.sha256 == "d0007aef065d1bc9af56f14fc22c63edf1f87cdf9b35f3f9b702b44f969acbfa"
+            && ram["path"] == THIRD.ram
+            && alias["path"] == THIRD.alias
+            && alias["device"] == device
+            && alias["major_minor"] == major_minor
+            && ram_id != alias_id,
+        "foreign third-interval held mount evidence"
+    );
+    let _: Value = read_bound(&scope.path, &scope.sha256, JSON_LIMIT)?;
+    Ok(Mounts {
+        device,
+        major_minor: major_minor.to_owned(),
+        ram_id,
+        alias_id,
+    })
+}
+
+fn mounts(scope: &Interval, bound: &Mounts) -> Result<(bool, bool)> {
     let mut ram = false;
     let mut alias = false;
     for line in fs::read_to_string("/proc/self/mountinfo")?.lines() {
@@ -56,23 +122,23 @@ fn mounts(scope: &Interval) -> Result<(bool, bool)> {
         let target = Path::new(columns[4]);
         let is_ram = target == Path::new(scope.ram);
         let is_alias = target == Path::new(scope.alias);
-        if columns[2] != device
+        if columns[2] != bound.major_minor
             && !target.starts_with(scope.ram)
             && !target.starts_with(scope.alias)
         {
             continue;
         }
         ensure!(
-            columns[2] == device
+            columns[2] == bound.major_minor
                 && columns[3] == "/"
                 && line.contains(" - tmpfs tmpfs ")
-                && ((is_ram && columns[0] == scope.ram_mount && !ram)
-                    || (is_alias && columns[0] == scope.alias_mount && !alias)),
+                && ((is_ram && columns[0] == bound.ram_id && !ram)
+                    || (is_alias && columns[0] == bound.alias_id && !alias)),
             "foreign epoch 141 mount or alias"
         );
         let info = fs::metadata(target)?;
         ensure!(
-            info.dev() == scope.device
+            info.dev() == bound.device
                 && info.ino() == 1
                 && info.uid() == 1000
                 && info.gid() == 1000
@@ -96,6 +162,7 @@ fn unmount(path: &str) -> Result<()> {
 pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
     let scope = match ordinal {
         2 => &SECOND,
+        3 => &THIRD,
         4 => &FOURTH,
         _ => anyhow::bail!("unknown epoch 141 drain scope"),
     };
@@ -121,23 +188,57 @@ pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
     let native = &terminal["native_terminal"];
     let private = &terminal["private_custody"];
     let container: Binding = serde_json::from_value(private["container"].clone())?;
-    let launch_path = state.join("replay-launch.json");
-    let launch: Value = read_bound(&launch_path, scope.launch_sha, JSON_LIMIT)?;
-    // The fourth unit captures the native exit before PID1 can unload the unit.
-    // Interval two instead retains its full terminal properties in PID1.
-    let exit_ok = if ordinal == 4 {
+    let launch_ref: Binding = serde_json::from_value(terminal["launch"].clone())?;
+    ensure!(
+        launch_ref.path == state.join("replay-launch.json"),
+        "foreign epoch 141 launch path"
+    );
+    let launch: Value = read_bound(&launch_ref.path, &launch_ref.sha256, JSON_LIMIT)?;
+    let invocation = text_field(&launch, "invocation_id")?;
+    let held;
+    let bound = if let Some(fixed) = &scope.fixed_mounts {
+        ensure!(
+            invocation == fixed.invocation && launch_ref.sha256 == fixed.launch_sha,
+            "foreign epoch 141 launch identity"
+        );
+        Mounts {
+            device: fixed.device,
+            major_minor: format!("0:{}", fixed.device),
+            ram_id: fixed.ram_id,
+            alias_id: fixed.alias_id,
+        }
+    } else {
+        let admission: Binding = serde_json::from_value(launch["admission"].clone())?;
+        let held_ref: Binding = serde_json::from_value(launch["held_namespace"].clone())?;
+        ensure!(
+            held_ref.path == state.join("held-namespace.json")
+                && admission.path == state.join("replay-admission.json"),
+            "foreign third-interval launch bindings"
+        );
+        let admission: Value = read_bound(&admission.path, &admission.sha256, JSON_LIMIT)?;
+        ensure!(
+            admission["handoff"]["sha256"]
+                == "dda2a0a0f919c7c277281f43d46d8ed2c2b6fab71ee4b08c466d1c6db4069e18"
+                && admission["canonical_publication_authorized"] == false,
+            "foreign third-interval assignment"
+        );
+        held = read_bound(&held_ref.path, &held_ref.sha256, JSON_LIMIT)?;
+        bind_third_mounts(&held, &state, &unit, invocation)?
+    };
+    // Newer units capture the native exit before PID1 can unload the unit.
+    let exit_ok = if ordinal >= 3 {
         let exit: Binding = serde_json::from_value(terminal["native_exit"].clone())?;
         ensure!(
             exit.path == state.join("terminal-evidence/native-exit.json"),
             "foreign epoch 141 native exit path"
         );
         let exit: Value = read_bound(&exit.path, &exit.sha256, JSON_LIMIT)?;
-        exit["schema"] == "foundation-epoch141-interval4-native-exit-v1"
+        exit["schema"] == format!("foundation-epoch141-interval{ordinal}-native-exit-v1")
             && exit["unit"] == unit
-            && exit["invocation_id"] == scope.invocation
+            && exit["invocation_id"] == invocation
             && exit["launch"] == terminal["launch"]
             && exit["native_properties"]["Id"] == unit
-            && exit["native_properties"]["InvocationID"] == scope.invocation
+            && exit["native_properties"]["InvocationID"] == invocation
             && exit["native_properties"]["ExecMainCode"] == "1"
             && exit["native_properties"]["ExecMainStatus"] == "0"
             && exit["service_result"] == "success"
@@ -145,10 +246,14 @@ pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
             && exit["exit_status"] == "0"
             && terminal["terminal_checkpoint"]["slot_complete"] == true
             && terminal["terminal_checkpoint"]["accounts_hash"]
-                == "EMsXJsestzPAfJtGfNdQdeji3JmuvaCKDAMPcD8hW3ZT"
+                == if ordinal == 3 {
+                    "FU1VdL2RPr4Ubn2SGE727jU8TQscWYn1gWbBE6peiC6r"
+                } else {
+                    "EMsXJsestzPAfJtGfNdQdeji3JmuvaCKDAMPcD8hW3ZT"
+                }
             && terminal["guard_drained"] == true
     } else {
-        native["InvocationID"] == scope.invocation
+        native["InvocationID"] == invocation
             && native["ExecMainCode"] == "1"
             && native["ExecMainStatus"] == "0"
             && native["Result"] == "success"
@@ -156,14 +261,11 @@ pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
     ensure!(
         exit_ok
             && terminal["schema"] == format!("foundation-epoch141-interval{ordinal}-terminal-v1")
-            && terminal["invocation_id"] == scope.invocation
-            && terminal["launch"]["path"] == json!(launch_path)
-            && terminal["launch"]["sha256"] == scope.launch_sha
+            && terminal["invocation_id"] == invocation
             && launch["unit"] == unit
-            && launch["invocation_id"] == scope.invocation
             && native["Id"] == unit
             && native["ActiveState"] == "inactive"
-            && (native["InvocationID"] == "" || native["InvocationID"] == scope.invocation)
+            && (native["InvocationID"] == "" || native["InvocationID"] == invocation)
             && terminal["terminal_checkpoint"]["slot"] == scope.last
             && terminal["output_slot_start"] == scope.first
             && terminal["output_slot_count"] == scope.last - scope.first + 1
@@ -197,7 +299,7 @@ pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
         sha256: terminal_sha.to_owned(),
     };
     let evidence =
-        json!({"terminal":terminal_ref,"container":container,"invocation_id":scope.invocation});
+        json!({"terminal":terminal_ref,"container":container,"invocation_id":invocation});
     let intent_path = state.join("post-custody-drain-intent.json");
     let done_path = state.join("post-custody-drain.json");
     let prior = lookup_receipt(&intent_path)?;
@@ -207,7 +309,7 @@ pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
             "epoch 141 drain intent differs"
         );
     }
-    let initial = mounts(scope)?;
+    let initial = mounts(scope, &bound)?;
     if let Some((binding, document)) = lookup_receipt(&done_path)? {
         ensure!(
             prior.is_some()
@@ -233,7 +335,7 @@ pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
             );
             record(
                 &intent_path,
-                &json!({"evidence":evidence,"ram_mount_id":scope.ram_mount,"alias_mount_id":scope.alias_mount}),
+                &json!({"evidence":evidence,"ram_mount_id":bound.ram_id,"alias_mount_id":bound.alias_id}),
             )?
         }
     };
@@ -242,20 +344,20 @@ pub(super) fn drain(ordinal: u8, terminal_sha: &str) -> Result<()> {
     }
     if initial.0 {
         ensure!(
-            mounts(scope)? == (true, false),
+            mounts(scope, &bound)? == (true, false),
             "epoch 141 aliases changed before drain"
         );
         unmount(scope.ram)?;
     }
     ensure!(
-        mounts(scope)? == (false, false),
+        mounts(scope, &bound)? == (false, false),
         "epoch 141 tmpfs remains mounted"
     );
     let done = record(
         &done_path,
         &json!({
             "schema":format!("foundation-epoch141-interval{ordinal}-post-custody-drain-v1"),
-            "invocation_id":scope.invocation,"terminal":terminal_ref,"intent":intent,"container":container,
+            "invocation_id":invocation,"terminal":terminal_ref,"intent":intent,"container":container,
             "guard_drained":true,"tmpfs_drained":true,"canonical_publication_authorized":false
         }),
     )?;

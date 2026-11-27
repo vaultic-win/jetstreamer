@@ -1858,6 +1858,7 @@ fn measure(
         "active_interval_141_launch":active_interval_141.iter().find(|interval| interval.ordinal() <= 3).map(|interval| &interval.launch),
         "active_interval_141_fourth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 4).map(|interval| &interval.launch),
         "active_interval_141_fifth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 5).map(|interval| &interval.launch),
+        "active_interval_141_sixth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 6).map(|interval| &interval.launch),
         "active_delivery_252_claim":active_deliveries.get(&252).map(|(claim, _, _, _)| claim),
         "active_delivery_261_claim":active_deliveries.get(&261).map(|(claim, _, _, _)| claim),
         "active_replay_262_registration":live_replays.get(&262).map(|replay| &replay.reference),
@@ -2015,6 +2016,7 @@ pub fn run() -> Result<()> {
                         | "--interval141-third-quote"
                         | "--interval141-fourth-quote"
                         | "--interval141-fifth-quote"
+                        | "--interval141-sixth-quote"
                 )
             ) =>
         {
@@ -2027,7 +2029,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote, --interval141-fourth-quote or --interval141-fifth-quote"
+            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote, --interval141-fourth-quote, --interval141-fifth-quote or --interval141-sixth-quote"
         ),
     };
     let synchronize = match args.next() {
@@ -2116,6 +2118,7 @@ pub fn run() -> Result<()> {
         Some(flag) if flag == "--interval141-third-quote" => measure(&mut native, None, Some(Quote::Interval141(3))),
         Some(flag) if flag == "--interval141-fourth-quote" => measure(&mut native, None, Some(Quote::Interval141(4))),
         Some(flag) if flag == "--interval141-fifth-quote" => measure(&mut native, None, Some(Quote::Interval141(5))),
+        Some(flag) if flag == "--interval141-sixth-quote" => measure(&mut native, None, Some(Quote::Interval141(6))),
         _ => receipt(&mut native, controller),
     };
     match result {

@@ -1,4 +1,4 @@
-"""Verify and preserve a closed Foundation epoch 141 third, fourth, or fifth interval."""
+"""Verify and preserve a closed Foundation epoch 141 third through sixth interval."""
 
 from datetime import datetime, timezone
 from hashlib import file_digest
@@ -23,6 +23,7 @@ SCOPE_SHA = {
     3: "d0007aef065d1bc9af56f14fc22c63edf1f87cdf9b35f3f9b702b44f969acbfa",
     4: "e418efbb8329dd5e05c08aa9d829d50c719fd4412981a019416301985bbdf3a6",
     5: "9188755bc441de30ed4e7c646c2c80889872b4d0cfb8a8f0c34c67847866337e",
+    6: "f201ca9c60be597b88938be7ab92e13fd7413cf380910c5b81c9ceac12365ddd",
 }
 HOME = 4 << 30
 
@@ -143,6 +144,7 @@ def finish(ordinal, quote_path):
         3: "active_interval_141_launch",
         4: "active_interval_141_fourth_launch",
         5: "active_interval_141_fifth_launch",
+        6: "active_interval_141_sixth_launch",
     }[ordinal]
     assert quote[owner] is None and root.stat().st_dev == quote["filesystem_device"]
     free = os.statvfs(root)
