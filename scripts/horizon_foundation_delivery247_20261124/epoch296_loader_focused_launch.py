@@ -107,8 +107,8 @@ RESTORE_260 = Scope(
 OVERLAP_266 = Scope(
     266, epoch266_overlap.STATE, epoch266_overlap.UNIT, epoch266_overlap.GUARD_UNIT,
     "epoch266-private-hourly-overlap", "foundation-epoch266-hourly-overlap-roster-binding-v1",
-    "5f12d3ba864dd64b14add832a4e8c9d441e26d097862763a0bfa74d854418964",
-    "6fb5bee98e51ad666280e8aee0248d1078aac6739a641be0693948355c6d2e7e",
+    "494849a05eb8b63f1770c5ae54dc63a1cc1dfadbd09b235c3938ee28393d08ea",
+    "1e014dac29ed075242cccd2d226c75a3088712540a90a7358b1cecee4df04b65",
     epoch266_overlap.PRODUCER_RAM, epoch266_overlap.HOME, epoch266_overlap.RECEIPTS, epoch266_overlap.CPU,
 )
 TRACE_296 = Scope(

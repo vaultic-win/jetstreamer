@@ -20,10 +20,10 @@ class OverlapProfileTest(unittest.TestCase):
             preflight["evidence"][0],
         )
         self.assertEqual(preflight["evidence"][0]["sha256"],
-                         "5f12d3ba864dd64b14add832a4e8c9d441e26d097862763a0bfa74d854418964")
+                         "494849a05eb8b63f1770c5ae54dc63a1cc1dfadbd09b235c3938ee28393d08ea")
         self.assertEqual(
             OVERLAP.reference(OVERLAP.STATE / "preflight.json", files["preflight.json"])["sha256"],
-            "6fb5bee98e51ad666280e8aee0248d1078aac6739a641be0693948355c6d2e7e",
+            "1e014dac29ed075242cccd2d226c75a3088712540a90a7358b1cecee4df04b65",
         )
         self.assertFalse(profile["publication_authorized"])
         self.assertFalse(profile["cursor_normalization_qualified"])
@@ -39,6 +39,7 @@ class OverlapProfileTest(unittest.TestCase):
         self.assertEqual(int(profile["properties"]["MemoryMax"]),
                          profile["scratch_tmpfs_bytes"] + profile["non_tmpfs_producer_memory_bytes"])
         self.assertEqual(profile["properties"]["MemorySwapMax"], "0")
+        self.assertEqual(profile["environment"]["JETSTREAMER_ALLOW_CANDIDATE_RUNTIME"], "1")
         self.assertEqual(profile["lossless_native_result"], OVERLAP.JOURNAL)
         self.assertEqual(profile["restore_receipt"], OVERLAP.RESTORE)
 

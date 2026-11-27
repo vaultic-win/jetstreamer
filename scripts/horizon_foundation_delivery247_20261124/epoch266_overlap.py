@@ -62,6 +62,7 @@ SOURCES = tuple(
     for name, digest in (
         ("boundary.json", "89e20c0b401a8e99da6717462c51d5ade1cce4d98c8e43650cfdb1a2dda261b2"),
         ("end-114929697-gcs.json", "1403b662c15e1d33b558f77c4f2e7da18b268b005b0ea23d684b57001bb34008"),
+        ("end-114929697-finalized-block.json", "97482933725a90cf170aa645452e5a5c6290c9e88bc273b18e5928aaa7591f75"),
     )
 )
 INDEXES = Path("/var/lib/jetstreamer/horizon266-index-acquire-v1/cache/sealed")
@@ -146,6 +147,7 @@ def files():
             "JETSTREAMER_FORCE_LEGACY_INDEX": "1", "JETSTREAMER_PRIVATE_RUN_ROOT": str(work / "state"),
             "JETSTREAMER_HISTORICAL_POH_THREADS": "8", "SOLANA_RAYON_THREADS": "8",
             "RAYON_NUM_THREADS": "8", "RUST_MIN_STACK": "134217728", "TMPDIR": str(scratch),
+            "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME": "1",
             "JETSTREAMER_NETWORK": "mainnet", "JETSTREAMER_VERIFY_SNAPSHOTS": "1",
             "JETSTREAMER_SKIP_SNAPSHOT_VERIFY": "0", "JETSTREAMER_ENFORCE_ARCHIVE_HASH": "1",
             "JETSTREAMER_PRUNE_EPOCH_SNAPSHOTS": "0", "JETSTREAMER_REPLAY_THREADS": "8",
@@ -207,12 +209,15 @@ def validate_sources():
     assert native["capitalization"] == 512823375441850375 and native["snapshot_sha256"] == SNAPSHOT["sha256"]
     assert native["worker_sha256"] == WORKER["sha256"] and native["slot_complete"]
     assert native["initialization_writes"] == native["replay_entries_sent"] == 0
-    boundary, terminal = map(read, SOURCES)
+    boundary, terminal, finalized = map(read, SOURCES)
     assert boundary["dense_last_observed_write_plus_one"] == 187121877105
     assert boundary["native_initialized_cursor"] == native["initialized_cursor"] == 187129398665
     assert boundary["raw_cursors_match"] is False and boundary["native_predecessor_tuple_qualified"] is False
     assert Path(terminal["name"]).name == TERMINAL_NAME and terminal["generation"] == "1641767198731933"
     assert terminal["size"] == 15514070431 and terminal["crc32c_hash"] == "exIgJw=="
+    assert terminal["md5_hash"] == "8VhGHIp7ijX7haXULetQ0A==" and terminal["etag"] == "CJ3dvLXbpfUCEAE="
+    assert finalized["result"]["blockhash"] == "2kMwZAMPiphaQsWPNKgtRrpwraXwyatcXfnEY2tHQaMm"
+    assert finalized["result"]["parentSlot"] == LAST - 1
     read(STAGE)
 
 

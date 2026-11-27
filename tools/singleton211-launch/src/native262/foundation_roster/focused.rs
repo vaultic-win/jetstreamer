@@ -141,8 +141,8 @@ pub(super) const OVERLAP_266: Focused = Focused {
     kind: "epoch266-private-hourly-overlap",
     preflight_schema: "foundation-epoch266-hourly-overlap-preflight-v1",
     state: "/var/lib/jetstreamer/horizon266-hourly-overlap-114929697-runtime-v1",
-    preflight_sha: "6fb5bee98e51ad666280e8aee0248d1078aac6739a641be0693948355c6d2e7e",
-    profile_sha: "5f12d3ba864dd64b14add832a4e8c9d441e26d097862763a0bfa74d854418964",
+    preflight_sha: "1e014dac29ed075242cccd2d226c75a3088712540a90a7358b1cecee4df04b65",
+    profile_sha: "494849a05eb8b63f1770c5ae54dc63a1cc1dfadbd09b235c3938ee28393d08ea",
 };
 
 pub(super) const OVERLAP_266_EXCLUSIVE: &str = "30,32-39,94,96-103";
