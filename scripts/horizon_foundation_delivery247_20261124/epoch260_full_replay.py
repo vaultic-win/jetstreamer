@@ -164,11 +164,16 @@ def main():
     assert roster_path.name == "roster.json" and roster_path.parent.parent == V
     assert roster_path.parent.name.startswith("horizon262-foundation-roster-")
     remote = git("rev-parse", "origin/account-updates").decode().strip()
-    assert Path(__file__).read_bytes() == git("show", f"{remote}:{SOURCE / Path(__file__).name}")
+    for path in (Path(__file__), CONTROL / "replay260.py"):
+        assert path.read_bytes() == git("show", f"{remote}:{SOURCE / path.name}")
     with kit.partition.take(), (CONTROL / "cycle.lock").open("rb") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         assert kit.ops.props("foundation-publication-cadence-v222.service", ["ActiveState", "Job"]) == {
             "ActiveState": "inactive", "Job": ""}
+        installation = kit.ops.bound(kit.ops.ref(STATE / "cadence-installation.json"))
+        assert installation["epoch"] == 260
+        assert installation["adapter"] == kit.ops.ref(CONTROL / "replay260.py")
+        assert installation["registry"] == kit.ops.ref(CONTROL / "guarded_replays.py")
         print(json.dumps(launch(kit, dict(path=str(roster_path), sha256=digest))))
 
 
