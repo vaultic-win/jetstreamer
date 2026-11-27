@@ -14,6 +14,8 @@ use xxhash_rust::xxh64::xxh64;
 mod assembly_sources;
 #[path = "../../horizon_epoch167_checkpoint_recovery/selected_prefix.rs"]
 mod epoch167;
+#[path = "../../horizon_epoch167_checkpoint_recovery/assembly.rs"]
+mod epoch167_assembly;
 mod joint_compare;
 mod selected_prefix;
 
@@ -174,6 +176,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let argv: Vec<_> = std::env::args().skip(1).collect();
     match argv.as_slice() {
         [selector, sha256] if selector == "--compare-joint" => joint_compare::run(sha256),
+        [mode, plan, sha] if mode=="--assemble-epoch167-private" => epoch167_assembly::assemble(plan,sha),
+        [mode, plan, sha] if mode=="--qualify-epoch167-assembly" => epoch167_assembly::qualify(plan, sha),
+        [selector] if selector == "--inspect-epoch167-assembly" => epoch167_assembly::inspect(),
         [selector] if selector == "--select-epoch167-prefix" => epoch167::run(),
         [selector] if selector == "--select-retry4-prefix" => selected_prefix::run(),
         [selector] if selector == "--inspect-assembly-layout" => assembly_sources::inspect_layout(),

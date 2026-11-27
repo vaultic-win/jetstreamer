@@ -38,7 +38,7 @@ fn bound_doc(reference: &Value) -> Result<Value> {
     )
 }
 
-fn home_floor(directory: &File, minimum: u64, next: u64) -> io::Result<()> {
+pub(crate) fn home_floor(directory: &File, minimum: u64, next: u64) -> io::Result<()> {
     let mut info = MaybeUninit::<libc::statvfs>::uninit();
     if unsafe { libc::fstatvfs(directory.as_raw_fd(), info.as_mut_ptr()) } != 0 {
         return Err(io::Error::last_os_error());
@@ -48,11 +48,12 @@ fn home_floor(directory: &File, minimum: u64, next: u64) -> io::Result<()> {
     let aligned = next.div_ceil(block).saturating_mul(block);
     require(
         info.f_bavail.saturating_mul(block).saturating_sub(aligned) >= minimum,
-        "epoch 168 output would cross the admitted HOME floor",
+        "output would cross the admitted HOME floor",
     )
 }
 
-struct GuardedOutput<'a> {
+pub(crate) struct GuardedOutput<'a> {
+    epoch: u64,
     file: &'a mut File,
     directory: &'a File,
     floor: u64,
@@ -61,18 +62,38 @@ struct GuardedOutput<'a> {
     last_progress: Instant,
 }
 
+impl<'a> GuardedOutput<'a> {
+    pub(crate) fn new(file: &'a mut File, directory: &'a File, floor: u64, epoch: u64) -> Self {
+        Self {
+            file,
+            directory,
+            floor,
+            epoch,
+            written: 0,
+            sha256: Sha256::new(),
+            last_progress: Instant::now(),
+        }
+    }
+    pub(crate) fn result(self) -> (u64, String) {
+        (self.written, hex(&self.sha256.finalize()))
+    }
+}
+
 impl Write for GuardedOutput<'_> {
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
         require(
             data.len() as u64 <= ARCHIVE_CAP - self.written,
-            "epoch 168 archive exceeds its admitted allocation",
+            "archive exceeds its admitted allocation",
         )?;
         home_floor(self.directory, self.floor, data.len() as u64)?;
         let written = self.file.write(data)?;
         self.written += written as u64;
         self.sha256.update(&data[..written]);
         if self.last_progress.elapsed() >= Duration::from_secs(60) {
-            eprintln!("epoch 168 private assembly wrote {} bytes", self.written);
+            eprintln!(
+                "epoch {} private assembly wrote {} bytes",
+                self.epoch, self.written
+            );
             self.last_progress = Instant::now();
         }
         Ok(written)
@@ -298,14 +319,7 @@ pub(in super::super) fn assemble(path: &str, sha256: &str) -> Result<()> {
         ),
     ];
     let mut output = NamedTempFile::new_in(output_root)?;
-    let sink = GuardedOutput {
-        file: output.as_file_mut(),
-        directory: &directory,
-        floor,
-        written: 0,
-        sha256: Sha256::new(),
-        last_progress: Instant::now(),
-    };
+    let sink = GuardedOutput::new(output.as_file_mut(), &directory, floor, 168);
     eprintln!("epoch 168 verifying selected source digests and assembling the V4 archive");
     let (mut sink, stats) = merge_checkpoint_restart_segments(
         source_readers,
@@ -314,8 +328,7 @@ pub(in super::super) fn assemble(path: &str, sha256: &str) -> Result<()> {
         &v4,
     )?;
     sink.flush()?;
-    let bytes = sink.written;
-    let archive_sha = hex(&sink.sha256.finalize());
+    let (bytes, archive_sha) = sink.result();
     output
         .as_file()
         .set_permissions(Permissions::from_mode(0o400))?;
@@ -383,6 +396,7 @@ mod tests {
         let directory = File::open(root.path()).unwrap();
         let mut output = NamedTempFile::new_in(root.path()).unwrap();
         let mut writer = GuardedOutput {
+            epoch: 168,
             file: output.as_file_mut(),
             directory: &directory,
             floor: 0,

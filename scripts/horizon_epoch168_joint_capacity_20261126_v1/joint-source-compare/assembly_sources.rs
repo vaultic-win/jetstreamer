@@ -23,7 +23,7 @@ use super::{
 };
 
 #[path = "private_assembly.rs"]
-mod private_assembly;
+pub(crate) mod private_assembly;
 pub(super) use private_assembly::{assemble, check_plan};
 
 const EPOCH_END: u64 = 73_008_000;
@@ -61,7 +61,7 @@ fn number(doc: &Value, key: &str) -> io::Result<u64> {
         .ok_or_else(|| invalid("missing evidence number"))
 }
 
-fn digest(value: &str) -> Result<[u8; 32]> {
+pub(super) fn digest(value: &str) -> Result<[u8; 32]> {
     require(
         value.len() == 64
             && value
@@ -207,13 +207,14 @@ fn source_evidence(lineage: &Value) -> Result<(Value, u64)> {
     Ok((manifest, prefix_bytes))
 }
 
-struct SourceLayout {
-    header: FileHeader,
-    provenance: ArchiveProvenanceV2,
-    buckets: Vec<BucketIndexEntry>,
+pub(super) struct SourceLayout {
+    pub(super) header: FileHeader,
+    pub(super) provenance: ArchiveProvenanceV2,
+    pub(super) buckets: Vec<BucketIndexEntry>,
 }
 
-fn source_layout<R: Read + Seek>(
+pub(super) fn source_layout<R: Read + Seek>(
+    epoch: u64,
     mut reader: ArchiveReader<R>,
     start: u64,
     selected_end: u64,
@@ -221,7 +222,7 @@ fn source_layout<R: Read + Seek>(
 ) -> Result<SourceLayout> {
     let header = reader.header().clone();
     require(
-        header.epoch == 168
+        header.epoch == epoch
             && header.slot_start == start
             && header
                 .slot_start
@@ -247,13 +248,13 @@ fn source_layout<R: Read + Seek>(
     })
 }
 
-fn checkpoint(doc: &Value) -> Result<RuntimeStateCheckpoint> {
+pub(super) fn checkpoint_at(doc: &Value, slot: u64) -> Result<RuntimeStateCheckpoint> {
     require(
-        doc["slot"] == SEAM && doc["slot_complete"] == true,
+        doc["slot"] == slot && doc["slot_complete"] == true,
         "wrong seam checkpoint",
     )?;
     Ok(RuntimeStateCheckpoint {
-        slot: SEAM,
+        slot,
         bank_hash: string(doc, "bank_hash")?.parse()?,
         accounts_hash_kind: AccountsHashKind::LegacyAccountsHash,
         accounts_hash: string(doc, "accounts_hash")?.parse()?,
@@ -264,6 +265,34 @@ fn checkpoint(doc: &Value) -> Result<RuntimeStateCheckpoint> {
         slot_complete: true,
         next_write_version: number(doc, "next_write_version")?,
     })
+}
+
+fn checkpoint(doc: &Value) -> Result<RuntimeStateCheckpoint> {
+    checkpoint_at(doc, SEAM)
+}
+
+pub(super) fn segment(
+    source: &SourceLayout,
+    slot_count: u64,
+    raw: Range<u64>,
+    archive_start: u64,
+) -> RuntimeSegmentProvenance {
+    let policy = &source.provenance.base;
+    RuntimeSegmentProvenance {
+        slot_start: source.header.slot_start,
+        slot_count,
+        generation_profile: policy.generation_profile.clone(),
+        runtime_profile: policy.runtime_profile.clone(),
+        runtime_admission: policy.runtime_admission,
+        runtime_revision: policy.runtime_revision.clone(),
+        runtime_toolchain: policy.runtime_toolchain.clone(),
+        worker_executable_sha256: Some(source.provenance.worker_executable_sha256),
+        write_versions: WriteVersionNormalization {
+            worker_start: raw.start,
+            worker_end_exclusive: raw.end,
+            archive_start,
+        },
+    }
 }
 
 fn provenance(
@@ -291,24 +320,6 @@ fn provenance(
             && right_base.bootstrap_state_hash == successor.accounts_hash,
         "source runtime policy or restart differs",
     )?;
-    let segment = |source: &SourceLayout, slot_count, raw: Range<u64>, archive_start| {
-        let policy = &source.provenance.base;
-        RuntimeSegmentProvenance {
-            slot_start: source.header.slot_start,
-            slot_count,
-            generation_profile: policy.generation_profile.clone(),
-            runtime_profile: policy.runtime_profile.clone(),
-            runtime_admission: policy.runtime_admission,
-            runtime_revision: policy.runtime_revision.clone(),
-            runtime_toolchain: policy.runtime_toolchain.clone(),
-            worker_executable_sha256: Some(source.provenance.worker_executable_sha256),
-            write_versions: WriteVersionNormalization {
-                worker_start: raw.start,
-                worker_end_exclusive: raw.end,
-                archive_start,
-            },
-        }
-    };
     let normalized = left_cursor.end - left_cursor.start;
     let destination = ArchiveProvenanceV4 {
         base: ArchiveProvenanceV3 {
@@ -358,12 +369,14 @@ fn open_sources() -> Result<OpenSources> {
         "retry6 differs from the closed producer file",
     )?;
     let left = source_layout(
+        168,
         ArchiveReader::open(PrefixView::open(&mut prefix, 168, FIRST, END)?)?,
         FIRST,
         SEAM + 1,
         false,
     )?;
     let right = source_layout(
+        168,
         ArchiveReader::open(BufReader::new(&mut suffix))?,
         SEAM + 1,
         EPOCH_END,
