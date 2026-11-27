@@ -5,6 +5,8 @@ use std::os::unix::fs::DirBuilderExt;
 
 pub(super) const ACTION: &str = "holding-foundation-296-failed-retry-park";
 pub(super) const CHECK: &str = "holding-foundation-296-failed-retry-check";
+pub(super) const RECHECK: &str = "holding-foundation-296-failed-retry-recheck";
+const KEY_NAME: &str = "failed-retry-custody.key";
 const ROOT: &str = "/var/lib/jetstreamer/horizon296-closed-first-retry-custody-v1";
 const CLOSED_SHA: &str = "0066541f0c6112951ffe8b5eb24c3b3da136d2ecb2806edd1b962179321cbb80";
 const PROOF_SHA: &str = "f0649cddd1b976ef9da319c5f49e29c6517311048e036d8808e6d2d4b5c46f78";
@@ -174,7 +176,7 @@ pub(super) async fn run(action: &str, value: Value, spec: &Bound) -> Result<()> 
     let r2 = r2_config_from_env()?;
     ensure!(r2.bucket == BUCKET, "foreign epoch 296 holding bucket");
     let client = s3_client(&r2);
-    let key = format!("{SUBPREFIX}encrypted-failed296/{CLEAR_SHA}.blob");
+    let key = object_key();
     let (remote, wire_sha) = openpgp::park(
         &client,
         openpgp::Park {
@@ -184,7 +186,7 @@ pub(super) async fn run(action: &str, value: Value, spec: &Bound) -> Result<()> 
             clear_sha: CLEAR_SHA,
             cipher_overhead: CIPHER_OVERHEAD,
             key_root: Path::new(ROOT),
-            key_name: "failed-retry-custody.key",
+            key_name: KEY_NAME,
             tmpfs,
             format: FORMAT,
         },
@@ -238,9 +240,179 @@ pub(super) async fn run(action: &str, value: Value, spec: &Bound) -> Result<()> 
     Ok(())
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Recheck {
+    schema: String,
+    mapping: Bound,
+    custody: Bound,
+    launch: Bound,
+}
+
+fn object_key() -> String {
+    format!("{SUBPREFIX}encrypted-failed296/{CLEAR_SHA}.blob")
+}
+
+fn verify_manifest(manifest: &Value) -> Result<(&str, &str, u64)> {
+    let wire_sha = manifest["ciphertext_sha256"]
+        .as_str()
+        .context("missing epoch 296 ciphertext digest")?;
+    let length = manifest["ciphertext_length"]
+        .as_u64()
+        .context("missing epoch 296 ciphertext length")?;
+    let etag = manifest["object_etag"]
+        .as_str()
+        .context("missing epoch 296 ciphertext ETag")?;
+    let (part_digest, count) = etag.split_once('-').context("expected multipart ETag")?;
+    ensure!(
+        manifest["schema"] == "foundation-epoch296-encrypted-failed-retry-manifest-v1"
+            && manifest["epoch"] == 296
+            && manifest["object_key"] == object_key()
+            && manifest["format"] == FORMAT
+            && manifest["plaintext_length"] == CLEAR_BYTES
+            && manifest["plaintext_sha256"] == CLEAR_SHA
+            && manifest["canonical_archive"] == false
+            && manifest["resumable_checkpoint"] == false
+            && digest(wire_sha)
+            && (CLEAR_BYTES..=CLEAR_BYTES + CIPHER_OVERHEAD).contains(&length)
+            && is_lower_hex(part_digest, 32)
+            && count == length.div_ceil(DEFAULT_PART_SIZE).to_string(),
+        "foreign epoch 296 encrypted manifest"
+    );
+    Ok((etag, wire_sha, length))
+}
+
+fn accepted(plan: &Recheck, custody: &Value, invocation: &Value) -> Result<()> {
+    let closed = sealed("closed-byte-evidence.json", CLOSED_SHA);
+    let proof = sealed("offline-crypto-volume-proof.json", PROOF_SHA);
+    ensure!(
+        plan.schema == "foundation-epoch296-encrypted-custody-recheck-plan-v1"
+            && invocation["schema"] == "foundation-epoch296-encrypted-custody-launch-v1"
+            && invocation["actual"]["Id"] == UNIT
+            && invocation["credentials_loaded_by_manager"] == true
+            && invocation["canonical_publication_authorized"] == false
+            && invocation["retirement_authorized"] == false
+            && custody["schema"] == "foundation-epoch296-encrypted-custody-v1"
+            && custody["epoch"] == 296
+            && custody["invocation_id"]
+                .as_str()
+                .is_some_and(|iid| is_lower_hex(iid, 32))
+            && custody["invocation_id"] == invocation["actual"]["InvocationID"]
+            && custody["closed_evidence"] == json!(closed)
+            && custody["offline_proof"] == json!(proof)
+            && custody["remote_ciphertext_sha256_verified"] == true
+            && custody["remote_authenticated_decryption_verified"] == true
+            && custody["restored_plaintext_reread_verified"] == true
+            && custody["local_source_revalidated"] == true
+            && custody["publication_authorized"] == false
+            && custody["local_retirement_authorized"] == false,
+        "no complete epoch 296 custody proof for the launched invocation"
+    );
+    Ok(())
+}
+
+pub(super) async fn recheck(value: Value, spec: &Bound) -> Result<()> {
+    let plan: Recheck = serde_json::from_value(value)?;
+    mapping(&plan.mapping)?;
+    ensure!(
+        ["park-launch-v1.json", "park-launch-v2.json"]
+            .iter()
+            .any(|file| plan.launch.path == Path::new(ROOT).join(file)),
+        "foreign epoch 296 launch record"
+    );
+    let launch = saved(&plan.launch)?;
+    let admission: Bound = serde_json::from_value(launch["admission"].clone())?;
+    let booking = saved(&admission)?;
+    let park_binding: Bound = serde_json::from_value(booking["spec"].clone())?;
+    ensure!(
+        booking["schema"] == "foundation-epoch296-encrypted-custody-admission-v1"
+            && booking["unit"] == UNIT
+            && park_binding.path == Path::new(ROOT).join("park.json")
+            && plan.custody.path
+                == Path::new(STATE)
+                    .join("receipts")
+                    .join(format!("failed296-custody-{}.json", park_binding.sha256)),
+        "epoch 296 custody is outside the admitted plan"
+    );
+    let custody = saved(&plan.custody)?;
+    ensure!(
+        custody["plan"] == json!(park_binding),
+        "changed epoch 296 custody plan"
+    );
+    accepted(&plan, &custody, &launch)?;
+    let park = saved(&park_binding)?;
+    ensure!(
+        park["mapping"] == json!(plan.mapping),
+        "changed epoch 296 holding mapping"
+    );
+
+    let manifest = &custody["manifest"];
+    let (etag, wire_sha, length) = verify_manifest(manifest)?;
+    let bytes = serde_json::to_vec(manifest)?;
+    let manifest_sha = hex_lower(&Sha256::digest(&bytes));
+    let marker = manifest_key(&manifest_sha)?;
+    ensure!(
+        custody["manifest_sha256"] == manifest_sha && custody["manifest_key"] == marker,
+        "epoch 296 content-addressed manifest differs"
+    );
+    verify_closed_units()?;
+    let (path, stamp) = source(&saved(&sealed("closed-byte-evidence.json", CLOSED_SHA))?)?;
+    no_references(&path)?;
+    let key = openpgp::key_file(Path::new(ROOT), KEY_NAME, false)?;
+    let key_identity = Stamp::of(&fs::symlink_metadata(key)?);
+
+    let r2 = r2_config_from_env()?;
+    ensure!(r2.bucket == BUCKET, "foreign epoch 296 holding bucket");
+    let client = s3_client(&r2);
+    let remote_manifest = get_mutable_object(&client, BUCKET, &marker)
+        .await?
+        .context("missing epoch 296 authenticated manifest")?;
+    ensure!(
+        remote_manifest.bytes == bytes,
+        "epoch 296 remote manifest bytes differ"
+    );
+    let object = object_key();
+    let remote = head_archive(&client, BUCKET, &object)
+        .await?
+        .context("missing epoch 296 authenticated ciphertext")?;
+    remote_matches(&remote, &object, length, wire_sha, Some(etag))?;
+    let observed = clock()?;
+    let result = receipt(
+        &format!("failed296-remote-recheck-{}-{observed}.json", spec.sha256),
+        &json!({
+            "schema":"foundation-epoch296-encrypted-custody-recheck-v1","epoch":296,
+            "spec":spec,"custody":plan.custody,"launch":plan.launch,
+            "source_identity":stamp,"key_file_identity":key_identity,
+            "manifest":manifest,"manifest_sha256":manifest_sha,"manifest_key":marker,
+            "recorded_unix_seconds":observed,"authenticated_manifest_and_object_match":true,
+            "remote_mutations":false,"publication_authorized":false,"local_retirement_authorized":false,
+        }),
+    )?;
+    println!("{}", result.display());
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn custody_manifest_rejects_canonical_key_and_changed_etag() {
+        let length = 41_646_490_199u64;
+        let mut manifest = json!({
+            "schema":"foundation-epoch296-encrypted-failed-retry-manifest-v1","epoch":296,
+            "object_key":object_key(),"object_etag":format!("{}-{}", "a".repeat(32), length.div_ceil(DEFAULT_PART_SIZE)),
+            "ciphertext_length":length,"ciphertext_sha256":"b".repeat(64),"format":FORMAT,
+            "plaintext_length":CLEAR_BYTES,"plaintext_sha256":CLEAR_SHA,
+            "canonical_archive":false,"resumable_checkpoint":false
+        });
+        assert!(verify_manifest(&manifest).is_ok());
+        manifest["object_key"] = json!("epoch-296.jet");
+        assert!(verify_manifest(&manifest).is_err());
+        manifest["object_key"] = json!(object_key());
+        manifest["object_etag"] = json!("weak");
+        assert!(verify_manifest(&manifest).is_err());
+    }
 
     #[test]
     fn binds_the_closed_artifact_and_rejects_out_of_profile_ciphertext() {
