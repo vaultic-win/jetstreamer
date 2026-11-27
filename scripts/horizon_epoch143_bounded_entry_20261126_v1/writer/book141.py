@@ -19,13 +19,20 @@ HOME_BYTES = (44 << 30) + (64 << 20)
 RAM_BYTES = 31 << 30
 
 
-def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, epoch=141):
+def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, epoch=141, v46=None):
     replacement = epoch == 143
     version = 45 if replacement else 44
     package = PACKAGE.with_name("tools-cold168-retry5-failed166-v45-entry146") if replacement else PACKAGE
     active_path = WRITER_ROOT/"FAILED166_CADENCE_V45_ACTIVE.json" if replacement else ACTIVE
     active_sha = "a95b8ea8c0fc8692b5b534bb1afe33800476e48156a362c8f59dff75d12ae202" if replacement else ACTIVE_SHA
     seal_sha = "237ff74a47d9d3fce22399ea81ff268aa50b6ed09daa3a03bf102a228f09e0bb" if replacement else SEAL_SHA
+    if v46 is not None:
+        if not replacement:
+            raise ValueError("V46 booking is scoped to epoch 143")
+        version = 46
+        package = WRITER_ROOT / "tools-cold168-retry5-failed166-v46-entry146"
+        active_path = WRITER_ROOT / "FAILED166_CADENCE_V46_ACTIVE.json"
+        active_sha, seal_sha = v46
     home_bytes = (64 << 30)+(64 << 20) if replacement else HOME_BYTES
     ram_bytes = 41 << 30 if replacement else RAM_BYTES
     sys.path.insert(0, str(package))
@@ -40,7 +47,13 @@ def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, ep
          "different first-hourly writer package")
     active = bound(active_path)
     need(active["sha256"] == active_sha, "different live first-hourly writer")
-    writer = checked(active)["new"]
+    active_record = checked(active)
+    writer = active_record["new"]
+    if v46 is not None:
+        ready = checked(active_record["ready"])
+        need(ready["package"] == cycle.entry() and ready["hourly_reader"] == bound(package / "first_hourly143.py")
+             and writer["program"] == str(package / "status_cycle.py"),
+             "V46 adoption does not bind the epoch 143 reader")
     writer_state = props(writer["unit"], "MainPID,InvocationID,ActiveState,ExecStart,Job")
     fd = Path(f"/proc/{writer['pid']}/fd/{writer['lock']['fd']}").stat()
     need(writer_state["ActiveState"] == "active" and writer_state["Job"] == ""
@@ -57,7 +70,7 @@ def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, ep
     if replacement:
         module = Path(price["path"])
         need(module.name == "price_hourly143.py" and module.parent.parent == profile.base
-             and module.parent.name in {"booking-price-v2", "booking-price-v3"}
+             and module.parent.name in ({"booking-price-v4"} if v46 is not None else {"booking-price-v2", "booking-price-v3"})
              and Path(operator["path"]) == module.with_name("launch-first-hourly143.sh"),
              "foreign epoch 143 operator or price")
         sys.path.insert(0,str(module.parent))
