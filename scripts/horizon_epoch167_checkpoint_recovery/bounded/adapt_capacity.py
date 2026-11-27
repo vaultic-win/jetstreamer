@@ -10,7 +10,7 @@ import tempfile
 
 PROVIDERS = Path("/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1")
 BASELINE = "tools-homefloor-170-full-metered-independent-v20-joint168-v31"
-ROUTE = BASELINE + "-replace167-reserve-v2"
+ROUTE = BASELINE + "-replace167-reserve-v3"
 ADDED = {
     "replacement167_capacity.py": 0o444,
     "terminal_joint168_capacity.py": 0o444,
