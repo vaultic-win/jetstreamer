@@ -423,7 +423,6 @@ fn timestamp(event: &Value) -> Result<u64> {
 
 fn journal_rows(args: &[&str]) -> Result<Vec<Value>> {
     let mut options = vec![
-        "--system",
         "--no-pager",
         "--quiet",
         "--boot=0",
@@ -446,6 +445,7 @@ fn manager_events(unit: &str) -> Result<Vec<Value>> {
     // Search the unit across invocations so a later collected run invalidates
     // an earlier success. Never select only the expected invocation here.
     journal_rows(&[
+        "--system",
         "--lines=32",
         "--output-fields=MESSAGE,MESSAGE_ID,UNIT,INVOCATION_ID,_PID,_UID,_BOOT_ID,UNIT_RESULT",
         "_PID=1",
@@ -519,6 +519,8 @@ fn checkpoint_message(checkpoint: &SegmentCheckpointSummary) -> String {
 }
 
 fn native_events(launch: &Launch) -> Result<Vec<Value>> {
+    // A system service running as UID 1000 may log to the user's journal.
+    // The invocation, unit, boot, executable and UID checks still bind every record.
     journal_rows(&[
         "--lines=5",
         "--output-fields=MESSAGE,_SYSTEMD_INVOCATION_ID,_SYSTEMD_UNIT,_SYSTEMD_CGROUP,_PID,_UID,_EXE,_BOOT_ID",
