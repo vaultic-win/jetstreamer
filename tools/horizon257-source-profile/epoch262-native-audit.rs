@@ -40,6 +40,16 @@ const EPOCH_258: Source = Source {
     windows: 12,
     max_window: 6_501_521,
 };
+const EPOCH_260: Source = Source {
+    epoch: 260,
+    directory: "/var/lib/jetstreamer/horizon260-rooted-index-source-v1",
+    raw_sha: "38173a117b50c7a02ba5e3cf04df6a5dc38853d29463121bbf1df52214499a25",
+    prefix_sha: "22770f8963f266b8dac98b4ac12f6b052b1086450192f5ccf7204dc8eb918aa3",
+    plan_sha: "1de93cb5240ed2c3ff5df4a569119df8c4c6320691d411f90ef53c9d8535c65d",
+    download_sha: "ce989f106365e7dece235807925bd711e68fee40bf52f361cdcac19539a2a7e2",
+    windows: 20,
+    max_window: 5_939_448,
+};
 
 fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
@@ -83,7 +93,12 @@ fn main() -> Result<()> {
     let (source, candidate_dir) = match args.as_slice() {
         [directory] => (EPOCH_262, directory),
         [flag, directory] if flag == "--epoch258" => (EPOCH_258, directory),
-        _ => return Err("usage: epoch262-native-audit [--epoch258] CANDIDATE_DIRECTORY".into()),
+        [flag, directory] if flag == "--epoch260" => (EPOCH_260, directory),
+        _ => {
+            return Err(
+                "usage: epoch262-native-audit [--epoch258 | --epoch260] CANDIDATE_DIRECTORY".into(),
+            );
+        }
     };
     let epoch = source.epoch;
     let first = epoch * ROWS;
