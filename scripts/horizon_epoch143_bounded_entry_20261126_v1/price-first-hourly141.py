@@ -11,8 +11,8 @@ import time
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 AUTHORITY = BASE / "epoch141-first-hourly-20261127-v1"
 SUCCESSOR = BASE / "epoch170-from-73726716-20261127-v1"
-CORE = SUCCESSOR / "successor-operator-v4/successor_price.py"
-CORE_SHA = "22279aee8b0bba0450a2d2503caf1f4abab96569926f12fe8f2e3a09f05c024e"
+CORE = SUCCESSOR / "attempt-2/operator-v1/successor_price.py"
+CORE_SHA = "fe69d7bd87a7617675fc96175ac173b054d154e06e70135b0ab1013fc03c84e2"
 TERMINAL = SUCCESSOR / "FAILED_SUCCESSOR_NATIVE_START.json"
 TERMINAL_SHA = "d81363677caab2e8789c01fd4ca6d9728d9f47f05ce57a08a9b29db7ab3d0f0a"
 CONTRACT = AUTHORITY / "contract-v1/LAUNCH_PROFILE.json"
@@ -39,7 +39,7 @@ def load_core():
     return core
 
 
-def guard(core, unit, timer, authority, native, producer_ram):
+def guard(core, unit, timer, authority, receipt_directory, native, producer_ram):
     iid = native["InvocationID"]
     pid = int(native["MainPID"])
     cgroup = f"/system.slice/{unit}"
@@ -64,7 +64,7 @@ def guard(core, unit, timer, authority, native, producer_ram):
     samples = Path(plan["receipt_directory"])
     core.need(
         plan["unit"] == unit and plan["invocation_id"] == iid and plan["filesystem"] == "/home/sol"
-        and samples.is_relative_to(authority) and samples.is_dir(),
+        and samples == receipt_directory and samples.is_dir(),
         f"guard plan identity changed for {unit}",
     )
     sample, sample_ref = core.read(max(samples.glob("sample-*.json"), key=lambda path: path.stat().st_mtime_ns))
@@ -96,7 +96,9 @@ def observe_successor(core):
                 and actor["boot_id"] == Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
                 "wrong active 170 replacement",
             )
-            plan, sample, sample_ref, clock = guard(core, core.UNIT, GUARD_170, authority, native, 48 << 30)
+            plan, sample, sample_ref, clock = guard(
+                core, core.UNIT, GUARD_170, authority, SUCCESSOR / "guard-receipts", native, 48 << 30
+            )
             cap = plan["maximum_root_physical_bytes"]
             lower = core.physical(sample)
             core.need(0 < lower <= cap <= 384 << 30, "170 guard lost the exact retained tree envelope")
@@ -135,7 +137,9 @@ def price(fleet, fleet_sha, held):
         pid = int(candidate["MainPID"])
         core.need(Path(f"/proc/{pid}/exe").samefile(AUTHORITY / "tools-v1/hold-141"),
                   "141 holder is not its sealed release gate")
-        plan, _, own_guard, _ = guard(core, UNIT, TIMER, AUTHORITY, candidate, 30 << 30)
+        plan, _, own_guard, _ = guard(
+            core, UNIT, TIMER, AUTHORITY, AUTHORITY / "guard-receipts", candidate, 30 << 30
+        )
         core.need(plan["worker_root"] == profile["root_mount"] and plan["maximum_root_physical_bytes"] == 44 << 30,
                   "wrong 141 whole-tree guard")
     else:
