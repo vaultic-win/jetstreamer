@@ -11,9 +11,46 @@ read-only stopped producer. It then decodes exactly the original 89 retained
 overlap slots 114,923,431–114,923,519. The bounded reader reuses the existing
 synthetic index and reads the selected buckets.
 
-The `compare` command requires a root-owned, read-only JSON plan with these
-fields. Populate it from the exact successful, drained invocation and the
-node's native segment-validation receipt.
+## Terminal handoff
+
+Arm the observer as root on the producer's boot once the guarded launch
+receipt exists and the admitted producer is running. Supply the receipt's
+SHA-256 from the launch handoff.
+
+```sh
+horizon266-overlap-compare capture-exit LAUNCH_SHA256 /absolute/sealed/epoch266-exit
+```
+
+The observer holds a systemd reference to the exact transient unit and
+waits on the admitted PID's pidfd. It seals PID1's process exit properties
+as `pid1-exit.json` and prints the file's SHA-256. A transient unit can be
+collected immediately after it drains. Its successful-deactivation journal
+entry omits the process exit code, so arm the observer while it is running.
+
+After the producer drains, run the collector as root with the same launch
+digest and the observer's receipt. The input launch path and archive scope
+are fixed. Both commands require a new destination directory under a
+root-controlled parent.
+
+```sh
+horizon266-overlap-compare collect-terminal LAUNCH_SHA256 /absolute/sealed/epoch266-terminal \
+  /absolute/sealed/epoch266-exit/pid1-exit.json EXIT_SHA256
+```
+
+When systemd still retains the exact exit properties, the last two
+arguments are optional. The collector binds the executable images,
+admission, guard release and guard samples to the launch. It checks the
+current boot, latest PID1 lifecycle for the unit, exact normal zero exit,
+physical cgroup drain, the two native checkpoints and the ordered snapshot
+and segment success records. The guard may remain held. The collector
+independently hashes the complete archive and uses the native manifest
+validator with one decoder. It checks the terminal block and resamples the
+manager, journal and file identities before sealing the output.
+
+The new directory contains root-owned mode `0400` files
+`terminal-evidence.json` and `comparison-plan.json`. Both files appear
+together. Use the plan path and SHA-256 printed by the collector for
+`compare`. The collector derives these fields from the accepted evidence.
 
 | Plan field | Data from the accepted invocation |
 | --- | --- |
@@ -23,7 +60,7 @@ node's native segment-validation receipt.
 | `segment_manifest_sha256` | SHA-256 of the adjacent native `.jet.segment.json` |
 | `segment_sha256` | Archive SHA-256 from the authenticated complete native source validation |
 | `segment_identity` | Exact descriptor/path identity as integers `device`, `inode`, `bytes`, `mtime_ns`, `ctime_ns` |
-| `producer_exit_status` | `0` from the terminal PID1 record |
+| `producer_exit_status` | `0` from PID1’s exact main-process exit properties |
 | `producer_drained` | `true` after verifying the invocation has drained |
 | `native_manifest_complete_verified` | `true` after the full native manifest and archive validation are accepted |
 | `publication_authorized` | `false` |

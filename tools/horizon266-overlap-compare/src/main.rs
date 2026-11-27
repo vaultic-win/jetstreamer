@@ -1,4 +1,4 @@
-//! Bounded, read-only comparison of epoch 266's old and restarted overlap.
+//! Private terminal evidence and bounded overlap comparison for epoch 266.
 
 #[allow(dead_code)]
 #[path = "../../../jetstreamer-node/src/archive_checksum.rs"]
@@ -15,6 +15,8 @@ mod segment_manifest;
 #[allow(dead_code)]
 #[path = "../../../jetstreamer-node/src/segment_progress.rs"]
 mod segment_progress;
+#[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+mod terminal;
 
 use anyhow::{Context, Result, ensure};
 use archive_checksum::open_regular_nofollow;
@@ -96,7 +98,7 @@ impl FileIdentity {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ComparePlan {
     schema: String,
@@ -322,6 +324,66 @@ fn validate_checkpoint(
     Ok(())
 }
 
+fn validate_manifest(manifest: &HistoricalSegmentManifest) -> Result<()> {
+    manifest.validate()?;
+    ensure!(
+        manifest.epoch == EPOCH
+            && manifest.output_slot_start == START
+            && manifest.output_slot_end()? == SEGMENT_END
+            && manifest.runtime.runtime_profile == "solana-v1.8.11"
+            && manifest.runtime.runtime_revision == RUNTIME_REVISION
+            && manifest.runtime.runtime_admission == SegmentRuntimeAdmission::Candidate
+            && manifest.runtime.genesis_hash == GENESIS
+            && sha256_hex_string(&manifest.worker_executable_sha256) == WORKER_SHA
+            && manifest
+                .bootstrap_archive_sha256
+                .is_none_or(|sha| sha256_hex_string(&sha) == SNAPSHOT_SHA)
+            && manifest.terminal.slot == SEGMENT_END - 1
+            && manifest.terminal.accounts_hash == TERMINAL_ACCOUNTS
+            && manifest.terminal.last_blockhash == TERMINAL_BLOCK,
+        "native segment manifest differs from the selected runtime or canonical terminal reference"
+    );
+    let restore = bound_json(RESTORE, RESTORE_SHA)?;
+    let native = bound_json(JOURNAL, JOURNAL_SHA)?;
+    ensure!(
+        restore["native_result"] == native
+            && restore["native_result_journal_bytes"]
+                == json!({"path": JOURNAL, "sha256": JOURNAL_SHA}),
+        "lossless restore receipt and journal differ"
+    );
+    validate_checkpoint(&manifest.bootstrap, &serde_json::from_value(native)?)
+}
+
+fn validate_provenance<R: Read + Seek>(
+    reader: &mut ArchiveReader<R>,
+    manifest: &HistoricalSegmentManifest,
+) -> Result<()> {
+    let Some(ArchiveProvenance::V2(provenance)) = reader.provenance()? else {
+        anyhow::bail!("expected single-runtime V2 segment provenance");
+    };
+    let header = reader.header();
+    ensure!(
+        header.epoch == EPOCH
+            && header.format_version == 2
+            && header.slot_start == START
+            && header.slot_count == SEGMENT_END - START
+            && provenance.base.requested_slot_start == START
+            && provenance.base.requested_slot_count == SEGMENT_END - START
+            && provenance.base.runtime_profile == manifest.runtime.runtime_profile
+            && provenance.base.runtime_revision == manifest.runtime.runtime_revision
+            && provenance.base.runtime_admission == RuntimeAdmission::Candidate
+            && provenance.base.runtime_toolchain == manifest.runtime.runtime_toolchain
+            && provenance.base.genesis_hash.to_string() == manifest.runtime.genesis_hash
+            && provenance.base.generation_profile == manifest.runtime.generation_profile
+            && provenance.base.bootstrap_slot == manifest.bootstrap.slot
+            && provenance.base.bootstrap_state_kind == BootstrapStateKind::SnapshotArchive
+            && provenance.base.bootstrap_state_hash.to_string() == manifest.bootstrap.accounts_hash
+            && provenance.worker_executable_sha256 == manifest.worker_executable_sha256,
+        "selected archive does not carry the bound segment range and bootstrap provenance"
+    );
+    Ok(())
+}
+
 fn compare(plan_path: &Path, plan_sha: &str) -> Result<Value> {
     let plan: ComparePlan =
         serde_json::from_slice(&bound_bytes(plan_path, plan_sha, JSON_LIMIT, true)?)?;
@@ -355,34 +417,11 @@ fn compare(plan_path: &Path, plan_sha: &str) -> Result<Value> {
         false,
     )?;
     let manifest: HistoricalSegmentManifest = serde_json::from_slice(&manifest_bytes)?;
-    manifest.validate()?;
+    validate_manifest(&manifest)?;
     ensure!(
-        manifest.epoch == EPOCH
-            && manifest.output_slot_start == START
-            && manifest.output_slot_end()? == SEGMENT_END
-            && manifest.runtime.runtime_profile == "solana-v1.8.11"
-            && manifest.runtime.runtime_revision == RUNTIME_REVISION
-            && manifest.runtime.runtime_admission == SegmentRuntimeAdmission::Candidate
-            && manifest.runtime.genesis_hash == GENESIS
-            && sha256_hex_string(&manifest.worker_executable_sha256) == WORKER_SHA
-            && sha256_hex_string(&manifest.archive_sha256) == plan.segment_sha256
-            && manifest
-                .bootstrap_archive_sha256
-                .is_none_or(|sha| sha256_hex_string(&sha) == SNAPSHOT_SHA)
-            && manifest.terminal.slot == SEGMENT_END - 1
-            && manifest.terminal.accounts_hash == TERMINAL_ACCOUNTS
-            && manifest.terminal.last_blockhash == TERMINAL_BLOCK,
-        "native segment manifest differs from the selected runtime or canonical terminal reference"
+        sha256_hex_string(&manifest.archive_sha256) == plan.segment_sha256,
+        "manifest does not carry the accepted archive digest"
     );
-    let restore = bound_json(RESTORE, RESTORE_SHA)?;
-    let native = bound_json(JOURNAL, JOURNAL_SHA)?;
-    ensure!(
-        restore["native_result"] == native
-            && restore["native_result_journal_bytes"]
-                == json!({"path": JOURNAL, "sha256": JOURNAL_SHA}),
-        "lossless restore receipt and journal differ"
-    );
-    validate_checkpoint(&manifest.bootstrap, &serde_json::from_value(native)?)?;
     let (segment, identity) = open(Path::new(SEGMENT))?;
     ensure!(
         identity == plan.segment_identity,
@@ -392,29 +431,7 @@ fn compare(plan_path: &Path, plan_sha: &str) -> Result<Value> {
         source: &segment,
         read: 0,
     })?;
-    let Some(ArchiveProvenance::V2(provenance)) = reader.provenance()? else {
-        anyhow::bail!("expected single-runtime V2 segment provenance");
-    };
-    let header = reader.header();
-    ensure!(
-        header.epoch == EPOCH
-            && header.format_version == 2
-            && header.slot_start == START
-            && header.slot_count == SEGMENT_END - START
-            && provenance.base.requested_slot_start == START
-            && provenance.base.requested_slot_count == SEGMENT_END - START
-            && provenance.base.runtime_profile == manifest.runtime.runtime_profile
-            && provenance.base.runtime_revision == manifest.runtime.runtime_revision
-            && provenance.base.runtime_admission == RuntimeAdmission::Candidate
-            && provenance.base.runtime_toolchain == manifest.runtime.runtime_toolchain
-            && provenance.base.genesis_hash.to_string() == manifest.runtime.genesis_hash
-            && provenance.base.generation_profile == manifest.runtime.generation_profile
-            && provenance.base.bootstrap_slot == manifest.bootstrap.slot
-            && provenance.base.bootstrap_state_kind == BootstrapStateKind::SnapshotArchive
-            && provenance.base.bootstrap_state_hash.to_string() == manifest.bootstrap.accounts_hash
-            && provenance.worker_executable_sha256 == manifest.worker_executable_sha256,
-        "selected archive does not carry the bound segment range and bootstrap provenance"
-    );
+    validate_provenance(&mut reader, &manifest)?;
     let new = capture(&mut reader, START, OVERLAP_END, SEAM_BLOCK, true)?;
     drop(reader);
     ensure!(
@@ -467,8 +484,26 @@ fn main() -> Result<()> {
                 "predecessor_native_tuple_qualified": false, "publication_authorized": false,
             })
         }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, digest, destination] if command == "collect-terminal" => {
+            terminal::collect(digest, Path::new(destination), None)?
+        }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, digest, destination, exit, exit_digest] if command == "collect-terminal" => {
+            terminal::collect(
+                digest,
+                Path::new(destination),
+                Some((Path::new(exit), exit_digest)),
+            )?
+        }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, digest, destination] if command == "capture-exit" => {
+            terminal::capture_exit(digest, Path::new(destination))?
+        }
         [command, plan, digest] if command == "compare" => compare(Path::new(plan), digest)?,
-        _ => anyhow::bail!("usage: horizon266-overlap-compare retained | compare PLAN PLAN_SHA256"),
+        _ => anyhow::bail!(
+            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
+        ),
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())
