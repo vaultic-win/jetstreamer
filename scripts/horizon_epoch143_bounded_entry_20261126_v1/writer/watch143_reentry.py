@@ -23,8 +23,8 @@ FAILURE = "98e322203f7a4ed290d09fe03c09fe15"
 
 sys.path.insert(0, str(WRITER_PACKAGE))
 import status_cycle
-from cutover41 import BOOKING_LOCK, state
-from evidence import bound, checked, durable, need
+from cutover41 import BOOKING_LOCK, private_write, state
+from evidence import bound, checked, json_bytes, need
 from first_hourly143 import EPOCH143, process_ids
 
 
@@ -68,7 +68,10 @@ def close_phase(phase_ref, phase):
                       native_start=manager_record, native_terminal=terminals[-1], epoch168_output=dict(
                           path=str(output), device=meta.st_dev, inode=meta.st_ino),
                       resource_credit_bytes=0, archive_publication_authorized=False)
-        durable(REOPEN, report)
+        if REOPEN.exists():
+            need(checked(bound(REOPEN)) == report, "different 143 phase release already exists")
+        else:
+            private_write(REOPEN, json_bytes(report), 0o400)
         return True
 
 
