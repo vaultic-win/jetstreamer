@@ -18,7 +18,7 @@ PROD = RT / "epoch168-exact-private-verification-20261127-v1"
 SCOPE = PROD / "scope.json"
 SCOPE_SHA = "b914d8570f3fe8fd2cc2bc91cc5285a9598b11515ab8763f17eeb28f13373a9c"
 WORK = Path("/home/sol/.jetstreamer-private/epoch168-private-archive-verify-20261127.0VHYTNgF")
-BUILD = WORK / "qualification/horizon-168-local-scan-build-1795815782664324710/BUILD.json"
+BUILD = WORK / "qualification/horizon-168-local-scan-build-1795817186264675279/BUILD.json"
 SOURCE = Path(__file__).resolve().parent
 REPO = Path("/home/sol/workspace/jetstreamer")
 DEPLOYMENT = PROD / "deployment.json"
@@ -229,7 +229,10 @@ def reconcile(control_root, binary, fixture):
         native = props(unit)
         target = attempt/"output"
         adb = checked(intent["admission"])
-        need(adb["output"] == str(target) and adb["scan_unit"] == unit, "wrong verification intent")
+        need(adb["output"] == str(target) and adb["scan_unit"] == unit and
+             intent["command"] == managed_argv(binary,intent["scope"],intent["admission"],target,unit)
+             and (intent.get("binary") == ref(binary) or (fixture and "binary" not in intent)),
+             "wrong verification intent or verifier")
         entered = target/"STARTED.json"
         if native["ActiveState"] in {"active","activating","deactivating"} or native["Job"]:
             if entered.exists():
@@ -308,7 +311,6 @@ def dispatch(scope_path, fixture):
             attempt.mkdir(mode=0o700)
             target = attempt/"output"
             target.mkdir(mode=0o700)
-            now = int(time.time())
             evidence = save(attempt/"FIT.json",q)
             ad = save(attempt/"ADMISSION.json",dict(schema="horizon-168-private-native-scan-admission-v1",
                       scope=scope,assembly=ready["assembly"],assembly_terminal=ready["assembly_terminal"],
@@ -316,7 +318,7 @@ def dispatch(scope_path, fixture):
                       output=str(target),scan_unit=unit,ram_bytes=2<<30,issued_at=priced_at,valid_until=priced_at+180,
                       fits=True,canonical_writes=False))
             cmd = managed_argv(binary,scope,ad,target,unit)
-            save(attempt/"INTENT.json",dict(scope=scope,admission=ad,command=cmd,unit=unit))
+            save(attempt/"INTENT.json",dict(scope=scope,admission=ad,command=cmd,unit=unit,binary=ref(binary)))
             fcntl.flock(serial,fcntl.LOCK_UN)
             subprocess.run(cmd,check=True,timeout=45)
             expires = time.monotonic()+20

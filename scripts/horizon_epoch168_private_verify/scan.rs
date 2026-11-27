@@ -2,13 +2,15 @@ use crate::custody::{Bound, Opened, bound, num, save, string};
 use crate::scope::{Inputs, branch};
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     fs::{self, File, OpenOptions},
+    io::{Read, Write},
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::Path,
     process::{Command, Stdio},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 pub fn terminal(unit: &str, iid: &str) -> Result<Value> {
@@ -90,16 +92,90 @@ fn output(path: &Path) -> Result<File> {
         .open(path)?)
 }
 
+// The native PoH verifier reports progress twice per second. Drain the pipe to EOF
+// even when the retained head and tail fill. Hash every original stderr byte.
+fn retain_stderr(
+    name: &str,
+    mut stream: impl Read,
+    mut dest: impl Write,
+    keep: usize,
+) -> Result<Value> {
+    let mut left = keep;
+    let mut tail: VecDeque<u8> = VecDeque::with_capacity(keep);
+    let mut total = 0u64;
+    let mut hasher = Sha256::new();
+    let mut buf = [0; 32 * 1024];
+    let mut pulse = Instant::now();
+    loop {
+        let n = stream.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+        total = total
+            .checked_add(n as u64)
+            .context("diagnostic byte count")?;
+        let head = n.min(left);
+        dest.write_all(&buf[..head])?;
+        left -= head;
+        let remaining = &buf[head..n];
+        if remaining.len() >= keep {
+            tail.clear();
+            tail.extend(&remaining[remaining.len() - keep..]);
+        } else {
+            let discard = (tail.len() + remaining.len()).saturating_sub(keep);
+            tail.drain(..discard);
+            tail.extend(remaining);
+        }
+        if pulse.elapsed() >= Duration::from_secs(1800) {
+            if let Some(line) = String::from_utf8_lossy(&buf[..n]).lines().rev().find(|s| {
+                s.len() <= 1024 && (s.starts_with("[verify]") || s.contains("horizon_tps "))
+            }) {
+                eprintln!("{name}: {line}");
+            }
+            pulse = Instant::now();
+        }
+    }
+    let head = keep - left;
+    let omitted = total - head as u64 - tail.len() as u64;
+    if omitted > 0 {
+        writeln!(
+            dest,
+            "\n[private verifier retained head and tail; {omitted} intervening bytes]"
+        )?;
+    }
+    let (front, back) = tail.as_slices();
+    dest.write_all(front)?;
+    dest.write_all(back)?;
+    dest.flush()?;
+    Ok(
+        json!({"raw_bytes":total,"raw_sha256":format!("{:x}",hasher.finalize()),
+              "head_bytes":head,"tail_bytes":tail.len(),"omitted_bytes":omitted}),
+    )
+}
+
 fn job(name: &str, exe: &Bound, args: &[String], root: &Path) -> Result<Value> {
     exe.binary()?;
     let out = root.join(format!("{name}.stdout"));
     let err = root.join(format!("{name}.stderr"));
-    let result = Command::new(&exe.path)
+    let retained = output(&err)?;
+    let mut child = Command::new(&exe.path)
         .args(args)
         .stdin(Stdio::null())
         .stdout(output(&out)?)
-        .stderr(output(&err)?)
-        .status()?;
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let capture = retain_stderr(
+        name,
+        child.stderr.take().context("native stderr")?,
+        retained,
+        128 * 1024,
+    );
+    if capture.is_err() {
+        let _ = child.kill();
+    }
+    let result = child.wait()?;
+    let diagnostic = capture?;
     File::open(&out)?.sync_all()?;
     File::open(&err)?.sync_all()?;
     ensure!(
@@ -108,7 +184,34 @@ fn job(name: &str, exe: &Bound, args: &[String], root: &Path) -> Result<Value> {
         err.display()
     );
     exe.binary()?;
-    Ok(json!({"program":exe,"argv":args,"exit":0,"stdout":bound(&out)?,"stderr":bound(&err)?}))
+    Ok(
+        json!({"program":exe,"argv":args,"exit":0,"stdout":bound(&out)?,"stderr":bound(&err)?,
+              "stderr_original":diagnostic}),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diagnostics_keep_both_ends_and_hash_the_entire_stream() {
+        let input: Vec<u8> = (0..2_000_000).map(|n| (n % 251) as u8).collect();
+        for len in [0, 2, 127, 256, 257, input.len()] {
+            let original = &input[..len];
+            let mut out = Vec::new();
+            let report = retain_stderr("fixture", original, &mut out, 128).unwrap();
+            assert_eq!(report["raw_bytes"], len);
+            assert_eq!(report["raw_sha256"], crate::custody::digest(original));
+            assert_eq!(report["omitted_bytes"], len.saturating_sub(256));
+            if len <= 256 {
+                assert_eq!(&out, original);
+            } else {
+                assert!(out.starts_with(&original[..128]) && out.ends_with(&original[len - 128..]));
+                assert!(out.len() < 400);
+            }
+        }
+    }
 }
 
 fn count(text: &str, label: &str) -> Result<u64> {
