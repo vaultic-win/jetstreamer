@@ -670,6 +670,11 @@ pub(super) fn run() -> Result<()> {
 }
 
 pub(super) fn verify(scope: &PrefixScope) -> Result<()> {
+    println!("{}", verify_document(scope)?);
+    Ok(())
+}
+
+pub(super) fn verify_document(scope: &PrefixScope) -> Result<serde_json::Value> {
     let path = Path::new(scope.path);
     check(
         path.canonicalize()? == path,
@@ -732,9 +737,7 @@ pub(super) fn verify(scope: &PrefixScope) -> Result<()> {
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(path)?;
     (scope.check_identity)(&reopened)?;
-    println!(
-        "{}",
-        json!({
+    Ok(json!({
             "schema":scope.schema,
             "source_archive_sha256":scope.source_sha,"selected_archive_sha256":hex(&selected_hash),
             "selected_semantic_sha256":hex(&verified.semantic),"first_slot":scope.first,"last_slot":scope.seam,
@@ -742,9 +745,7 @@ pub(super) fn verify(scope: &PrefixScope) -> Result<()> {
             "independently_decoded":true,"selected_archive_bytes":layout.len(),
             "unchanged_source_extent":{"offset":layout.middle.start,"length":layout.middle_len()},
             "physical_archive_bytes_written":0
-        })
-    );
-    Ok(())
+        }))
 }
 
 #[cfg(test)]

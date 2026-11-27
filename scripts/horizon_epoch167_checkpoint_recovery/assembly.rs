@@ -42,7 +42,7 @@ fn require(check: bool, msg: &'static str) -> Result<()> {
         Err(invalid(msg).into())
     }
 }
-fn open(path: &Path) -> Result<File> {
+pub(super) fn open(path: &Path) -> Result<File> {
     require(path.canonicalize()? == path, "indirect source")?;
     let f = OpenOptions::new()
         .read(true)
@@ -55,7 +55,7 @@ fn open(path: &Path) -> Result<File> {
     )?;
     Ok(f)
 }
-fn doc(path: &Path, sha: &str, uid: u32) -> Result<Value> {
+pub(super) fn doc(path: &Path, sha: &str, uid: u32) -> Result<Value> {
     let file = open(path)?;
     let m = file.metadata()?;
     require(
@@ -72,11 +72,22 @@ fn doc(path: &Path, sha: &str, uid: u32) -> Result<Value> {
 }
 #[derive(Default)]
 struct Seen {
+    seam: u64,
+    first_raw: Option<u64>,
     rows: Vec<Value>,
     invalid: bool,
 }
 impl Seen {
+    fn new(seam: u64) -> Self {
+        Self { seam, ..Self::default() }
+    }
+
+    fn record_version(&mut self, version: u64) {
+        self.first_raw = Some(self.first_raw.map_or(version, |first| first.min(version)));
+    }
+
     fn update(&mut self, slot: u64, key: &[u8], owner: &[u8], version: u64, data: &[u8]) {
+        self.record_version(version);
         let key_text = bs58::encode(key).into_string();
         if key_text != "SysvarS1otHashes111111111111111111111111111" {
             return;
@@ -97,13 +108,18 @@ impl Seen {
             return;
         }
         for item in data[8..8 + n as usize * 40].chunks_exact(40) {
-            if u64::from_le_bytes(item[..8].try_into().unwrap()) == SEAM {
-                self.rows.push(json!({"observed_slot":slot,"parent_slot":SEAM,"bank_hash":bs58::encode(&item[8..]).into_string(),"raw_write_version":version,"data_sha256":format!("{:x}",Sha256::digest(data))}));
+            if u64::from_le_bytes(item[..8].try_into().unwrap()) == self.seam {
+                self.rows.push(json!({"observed_slot":slot,"parent_slot":self.seam,"bank_hash":bs58::encode(&item[8..]).into_string(),"raw_write_version":version,"data_sha256":format!("{:x}",Sha256::digest(data))}));
             }
         }
     }
 }
 impl SlotVisitor for Seen {
+    fn on_epoch(&mut self, meta: &jetstreamer_horizon::epochs::EpochMeta) {
+        for row in meta.updates.updates() {
+            self.record_version(row.write_version);
+        }
+    }
     fn on_pre_account_update(&mut self, s: u64, u: &AccountUpdateView<'_>) {
         self.update(
             s,
@@ -124,29 +140,34 @@ impl SlotVisitor for Seen {
     fn on_block(&mut self, _: &BlockNotification, _: &[EntryRecord]) {}
 }
 fn witness<R: Read + Seek>(reader: &mut ArchiveReader<R>, expected_worker: &str) -> Result<Value> {
+    Ok(child_witness(reader, expected_worker, 167, SEAM)?.0)
+}
+
+pub(super) fn child_witness<R: Read + Seek>(reader: &mut ArchiveReader<R>, expected_worker: &str, epoch: u64, seam: u64) -> Result<(Value, u64)> {
     let Some(ArchiveProvenance::V2(p)) = reader.provenance()? else {
         return Err(invalid("missing original V2 executable").into());
     };
     require(
         crate::selected_prefix::hex(&p.worker_executable_sha256) == expected_worker
-            && reader.header().epoch == 167,
+            && reader.header().epoch == epoch,
         "unexpected producer",
     )?;
     reader.verify_chain = true;
     reader.chain_mismatch_policy = ChainMismatchPolicy::Reject;
-    let mut seen = Seen::default();
+    let mut seen = Seen::new(seam);
     require(
-        reader.read_slots(SEAM + 1, 1, &mut seen)? == 1 && !seen.invalid,
+        reader.read_slots(seam + 1, 1, &mut seen)? == 1 && !seen.invalid,
         "bad post-seam state update",
     )?;
     require(
         seen.rows.len() == 1,
         "missing unique first child SlotHashes entry",
     )?;
-    Ok(
+    Ok((
         json!({"runtime_revision":p.base.runtime_revision,"runtime_profile":p.base.runtime_profile,"runtime_toolchain":p.base.runtime_toolchain,
     "worker_sha256":expected_worker,"generation":p.base.generation_profile,"slot_hashes":seen.rows[0]}),
-    )
+        seen.first_raw.ok_or("first child emitted no account writes")?,
+    ))
 }
 pub(super) fn inspect() -> Result<()> {
     let t = doc(
@@ -935,13 +956,13 @@ mod tests {
         let mut data = 1u64.to_le_bytes().to_vec();
         data.extend(SEAM.to_le_bytes());
         data.extend(bs58::decode(NATIVE_BANK).into_vec().unwrap());
-        let mut witness = Seen::default();
+        let mut witness = Seen::new(SEAM);
         witness.update(SEAM + 1, &key, &owner, 52_685_674_983, &data);
         assert_eq!(witness.rows[0]["bank_hash"], NATIVE_BANK);
         assert!(!witness.invalid);
         witness.update(SEAM + 1, &key, &[], 52_685_674_983, &data);
         assert!(witness.invalid);
-        let mut other = Seen::default();
+        let mut other = Seen::new(SEAM);
         data[8..16].copy_from_slice(&(SEAM - 1).to_le_bytes());
         other.update(SEAM + 1, &key, &owner, 0, &data);
         assert!(other.rows.is_empty());

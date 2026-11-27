@@ -16,6 +16,8 @@ mod assembly_sources;
 mod epoch167;
 #[path = "../../horizon_epoch167_checkpoint_recovery/assembly.rs"]
 mod epoch167_assembly;
+#[path = "../../horizon_epoch170_checkpoint_suffix/selected_prefix.rs"]
+mod epoch170;
 mod joint_compare;
 mod selected_prefix;
 
@@ -179,6 +181,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         [mode, plan, sha] if mode=="--assemble-epoch167-private" => epoch167_assembly::assemble(plan,sha),
         [mode, plan, sha] if mode=="--qualify-epoch167-assembly" => epoch167_assembly::qualify(plan, sha),
         [selector] if selector == "--inspect-epoch167-assembly" => epoch167_assembly::inspect(),
+        [selector] if selector == "--inspect-epoch170-prefix-seam" => epoch170::inspect(),
+        [selector] if selector == "--select-epoch170-prefix" => epoch170::run(),
         [selector] if selector == "--select-epoch167-prefix" => epoch167::run(),
         [selector] if selector == "--select-retry4-prefix" => selected_prefix::run(),
         [selector] if selector == "--inspect-assembly-layout" => assembly_sources::inspect_layout(),
@@ -196,7 +200,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "expected --compare-joint SHA, --select-retry4-prefix, --select-epoch167-prefix, or --check-assembly-sources/--qualify-assembly-sources LINEAGE SHA, or --check-private-assembly-plan/--assemble-private PLAN SHA",
+            "expected --compare-joint SHA, --select-retry4-prefix, --select-epoch167-prefix, --inspect-epoch170-prefix-seam, --select-epoch170-prefix, or --check-assembly-sources/--qualify-assembly-sources LINEAGE SHA, or --check-private-assembly-plan/--assemble-private PLAN SHA",
         )
         .into()),
     }
