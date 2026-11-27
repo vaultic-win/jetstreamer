@@ -1,5 +1,6 @@
 //! Restore the encrypted epoch 228 ext4 guest into a private verification mount.
 use super::*;
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 pub(super) const ACTION: &str = "holding-foundation-228-ext4-restore-check";

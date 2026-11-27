@@ -1,6 +1,7 @@
 //! Encrypted byte custody for the closed Foundation epoch 228 guest image.
 use super::*;
-use std::process::{ChildStdout, Command, Stdio};
+use openpgp::{copy_verified_plaintext, verify_plaintext};
+use std::process::{ChildStdout, Command};
 
 #[path = "holding_foundation_ext4_228_restore.rs"]
 mod restore;
@@ -74,108 +75,11 @@ fn cipher_path() -> PathBuf {
 }
 
 fn key_file(create: bool) -> Result<PathBuf> {
-    let root = Path::new(ROOT);
-    let path = root.join(KEY_FILE);
-    if create {
-        match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o400)
-            .custom_flags(libc::O_NOFOLLOW)
-            .open(&path)
-        {
-            Ok(mut file) => {
-                let mut bytes = [0; 32];
-                File::open("/dev/urandom")?.read_exact(&mut bytes)?;
-                writeln!(file, "{}", hex_lower(&bytes))?;
-                file.sync_all()?;
-                File::open(root)?.sync_all()?;
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(error) => return Err(error.into()),
-        }
-    }
-    let meta = fs::symlink_metadata(&path)?;
-    ensure!(
-        path.canonicalize()? == path
-            && meta.is_file()
-            && meta.uid() == 0
-            && meta.nlink() == 1
-            && meta.mode() & 0o7777 == 0o400
-            && meta.len() == 65,
-        "unsafe epoch 228 custody key file"
-    );
-    Ok(path)
+    openpgp::key_file(Path::new(ROOT), KEY_FILE, create)
 }
 
 fn gpg(key: &Path) -> Result<Command> {
-    let home = Path::new(ROOT).join("gpg");
-    private(&home)?;
-    let mut command = Command::new("/usr/bin/gpg");
-    command
-        .args(["--no-options", "--homedir"])
-        .arg(home)
-        .args([
-            "--batch",
-            "--no-tty",
-            "--pinentry-mode",
-            "loopback",
-            "--no-symkey-cache",
-            "--passphrase-file",
-        ])
-        .arg(key);
-    Ok(command)
-}
-
-fn verify_plaintext(plain: impl Read, length: u64, sha: &str) -> Result<()> {
-    copy_verified_plaintext(plain, std::io::sink(), length, sha, || Ok(()))
-}
-
-fn copy_verified_plaintext(
-    mut plain: impl Read,
-    mut destination: impl Write,
-    length: u64,
-    sha: &str,
-    mut check_capacity: impl FnMut() -> Result<()>,
-) -> Result<()> {
-    let mut digest = Sha256::new();
-    let mut remaining = length;
-    let mut buffer = vec![0; 1 << 20];
-    loop {
-        let count = plain.read(&mut buffer)?;
-        if count == 0 {
-            break;
-        }
-        remaining = remaining
-            .checked_sub(count as u64)
-            .context("decrypted bundle exceeds sealed length")?;
-        check_capacity()?;
-        digest.update(&buffer[..count]);
-        destination.write_all(&buffer[..count])?;
-    }
-    ensure!(
-        remaining == 0 && hex_lower(&digest.finalize()) == sha,
-        "decrypted bundle differs from sealed sparse bundle"
-    );
-    Ok(())
-}
-
-fn verify_encrypted_file(file: File, key: &Path) -> Result<()> {
-    let mut child = gpg(key)?
-        .arg("--decrypt")
-        .stdin(file)
-        .stdout(Stdio::piped())
-        .spawn()?;
-    let clear = verify_plaintext(
-        child.stdout.take().context("missing OpenPGP output")?,
-        CLEAR_LEN,
-        CLEAR_SHA,
-    );
-    ensure!(
-        child.wait()?.success(),
-        "OpenPGP local authentication failed"
-    );
-    clear
+    openpgp::gpg(&Path::new(ROOT).join("gpg"), key)
 }
 
 fn cipher_identity(path: &Path) -> Result<FileIdentity> {
@@ -199,25 +103,11 @@ fn prepare(plan: Plan, spec: &Bound) -> Result<()> {
     let key = key_file(!encrypted_exists)?;
     if !encrypted_exists {
         let temporary = tempfile::NamedTempFile::new_in(parent)?;
-        let status = gpg(&key)?
-            .args([
-                "--rfc4880",
-                "--symmetric",
-                "--cipher-algo",
-                "AES256",
-                "--compress-algo",
-                "none",
-                "--s2k-digest-algo",
-                "SHA512",
-                "--s2k-count",
-                "65011712",
-                "--output",
-                "-",
-            ])
-            .stdin(File::open(BUNDLE)?)
-            .stdout(temporary.as_file().try_clone()?)
-            .status()?;
-        ensure!(status.success(), "epoch 228 OpenPGP encryption failed");
+        openpgp::encrypt(
+            gpg(&key)?,
+            File::open(BUNDLE)?,
+            temporary.as_file().try_clone()?,
+        )?;
         temporary
             .as_file()
             .set_permissions(fs::Permissions::from_mode(0o400))?;
@@ -226,7 +116,7 @@ fn prepare(plan: Plan, spec: &Bound) -> Result<()> {
         File::open(parent)?.sync_all()?;
     }
     let identity = cipher_identity(&path)?;
-    verify_encrypted_file(File::open(&path)?, &key)?;
+    openpgp::verify_encrypted_file(gpg(&key)?, File::open(&path)?, CLEAR_LEN, CLEAR_SHA)?;
     let proof = hash_and_etag(&path, identity, DEFAULT_PART_SIZE)?;
     validate_stage(&plan.staging)?;
     let output = receipt(
@@ -258,24 +148,7 @@ async fn read_decrypted(
     key: &Path,
     consume: impl FnOnce(ChildStdout) -> Result<()> + Send + 'static,
 ) -> Result<()> {
-    let mut child = gpg(key)?
-        .arg("--decrypt")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()?;
-    let mut input = child.stdin.take().context("missing OpenPGP input")?;
-    let output = child.stdout.take().context("missing OpenPGP output")?;
-    let compare = std::thread::spawn(move || consume(output));
-    let transfer = read_remote_sha256_resumable(client, read, &mut input).await;
-    drop(input);
-    let status = child.wait();
-    let restored = compare
-        .join()
-        .map_err(|_| anyhow!("epoch 228 decrypted digest worker failed"));
-    transfer?;
-    ensure!(status?.success(), "OpenPGP remote authentication failed");
-    restored??;
-    Ok(())
+    openpgp::read_decrypted(client, read, gpg(key)?, consume).await
 }
 
 async fn park(client: &Client, plan: Plan, spec: &Bound) -> Result<()> {

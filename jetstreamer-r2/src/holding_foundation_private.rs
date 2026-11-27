@@ -7,8 +7,12 @@ use std::os::fd::AsRawFd;
 mod appendvec288;
 #[path = "holding_foundation_appendvec292.rs"]
 mod appendvec292;
+#[path = "holding_foundation_accounts229.rs"]
+mod accounts229;
 #[path = "holding_foundation_ext4_228.rs"]
 mod ext4_228;
+#[path = "holding_foundation_openpgp.rs"]
+mod openpgp;
 #[path = "holding_foundation_private_checkpoint203.rs"]
 mod checkpoint203;
 #[path = "holding_foundation_private_closure.rs"]
@@ -1010,7 +1014,7 @@ async fn restore(client: &Client, p: RestoreSpec, spec: &Bound) -> Result<()> {
 }
 
 pub(super) fn command(s: &str) -> bool {
-    ext4_228::command(s) || appendvec288::command(s) || appendvec292::command(s) || matches!(
+    s == accounts229::ACTION || ext4_228::command(s) || appendvec288::command(s) || appendvec292::command(s) || matches!(
         s,
         "holding-foundation-private-inspect"
             | "holding-foundation-private-inspect-old-v2-237"
@@ -1057,6 +1061,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     );
     if appendvec292::command(action) {
         return appendvec292::run(action, v, spec).await;
+    }
+    if action == accounts229::ACTION {
+        return accounts229::run(v, spec).await;
     }
     if appendvec288::command(action) {
         return appendvec288::run(action, v, spec).await;
