@@ -65,7 +65,9 @@ def current_fleet():
     fleet, ref = read(path)
     previous = fleet
     cursor = ref
-    for _ in range(12):
+    seen = set()
+    while cursor["sha256"] not in seen:
+        seen.add(cursor["sha256"])
         if cursor["sha256"] == FLEET_SHA:
             break
         cursor = previous["previous_Root_operational_review"]
@@ -155,7 +157,22 @@ def scope(attempt=ATTEMPT):
     return interface, ref
 
 
-def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None):
+def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=None):
+    if held_replacement is not None:
+        need(phase == "held" and held_replacement == "horizon-qualify-170-from-73746882-20261127-v1.service",
+             "unknown replacement actor")
+        incoming = RT / "epoch170-from-73746882-20261127-v1"
+        release, release_ref = read(DEP / "attempt-2/SUCCESSOR_RELEASE.json",
+                                    "b0bb87af6c93f61c90727d9dfcf775d469d567e7baf8246f0a436b74284820fa")
+        original = bound(release["actor"])
+        exit_record, _ = read(incoming / "predecessor-exit/PID1_EXIT.json")
+        terminal = exit_record["properties"]
+        need(exit_record["release"] == release_ref and exit_record["actor"] == original
+             and terminal["Id"] == UNIT and terminal["InvocationID"] == original["producer_invocation_id"]
+             and terminal["MainPID"] == terminal["ControlPID"] == terminal["ExecMainStatus"] == "0"
+             and terminal["Result"] == "success" and terminal["ExecMainCode"] == "1",
+             "replacement lacks its exact clean predecessor")
+        inactive(UNIT)
     if live_tree_bounds is not None:
         lower, upper = live_tree_bounds
         need(phase == "held" and type(lower) is int and type(upper) is int and 0 < lower <= upper,
@@ -303,7 +320,7 @@ def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None):
          "--type=service","--state=running,activating,deactivating","horizon-qualify-*").splitlines()}
     expected={r["unit"]["Id"] for r in peer_rows}|{tail}
     if phase=="live": expected.add(BRIDGE)
-    if phase=="held": expected.add(UNIT)
+    if phase=="held": expected.add(held_replacement or UNIT)
     if successor and profile141["unit"] in units:
         s141=state(profile141["unit"])
         need(s141["CPUQuotaPerSecUSec"]=="2s" and s141["MemoryMax"]==str(30*G)

@@ -19,11 +19,12 @@ def load(name):
     return mod
 
 
-q=load("successor_price")
+NEXT_DEPLOYMENT=Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73746882-20261127-v1/operator")
+q=load("continuation_price" if Path(__file__).resolve().parent == NEXT_DEPLOYMENT else "successor_price")
 persist=load("closed_successor").persist
 D=q.ATTEMPT
 UNIT=q.UNIT
-ALIAS="/run/horizon-170-from-73726716-v1"
+ALIAS=getattr(q,"ALIAS","/run/horizon-170-from-73726716-v1")
 GUARD=UNIT.replace("-qualify-","-guard-")
 TIMER=GUARD.replace(".service",".timer")
 need=q.need
@@ -71,6 +72,8 @@ def static():
 
 
 def compare():
+    if hasattr(q, "compare_predecessor"):
+        return q.compare_predecessor()
     v,ref=q.read(q.scope()[0]["closed_comparison"])
     need(v["release"]==q.scope()[0]["old_release"] and v["pid1_exit"]["native"]["InvocationID"]==q.ORIG
          and v["pid1_exit"]["native"]["Result"]=="success" and v["checkpoints"][-1]["slot"]==73726716
