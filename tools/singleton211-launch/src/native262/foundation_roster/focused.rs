@@ -109,6 +109,24 @@ pub(super) const FIRST_7871_230: Focused = Focused {
     profile_sha: "7d3a7c8bad8d3b257622800874a92a278d287a6b1cd6d377f729c2e139e9f4fd",
 };
 
+pub(super) const V1627_230: Focused = Focused {
+    epoch: 230,
+    unit: "horizon-qualify-230-v1627-window-v1.service",
+    guard: "horizon-230-v1627-window-protective-v1",
+    cpus: "48-55",
+    scratch_cap: 90 << 30,
+    receipt_disk: 256 << 20,
+    producer_memory: 225_000_000_000,
+    root: "/home/ubuntu/.jetstreamer-private/qualification-230-v1627-window-v1",
+    first: 99_461_592,
+    last: 99_468_089,
+    kind: "epoch230-private-v1627-window",
+    preflight_schema: "foundation-epoch230-v1627-window-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon230-v1627-replay-runtime-v1",
+    preflight_sha: "8301ba667e1f440365cc40dcdbe4b5f69fa6d224e2e754734738908345b35cca",
+    profile_sha: "1e300ad51ba5f75a91af2f68c80241dd90a5c6d279b630de8f92f882655b43d5",
+};
+
 pub(super) const RESTORE_258: Focused = Focused {
     epoch: 258,
     unit: "horizon-qualify-258-native-restore-v1.service",
@@ -201,11 +219,12 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 10] = [
+pub(super) const SCOPES: [&Focused; 11] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
     &FIRST_7871_230,
+    &V1627_230,
     &RESTORE_258,
     &RESTORE_260,
     &OVERLAP_266,
@@ -392,6 +411,24 @@ pub(super) fn second_hourly_drained(n: &mut Native) -> Result<()> {
         "epoch 230 replacement lacks the exact prior terminal and launch"
     );
     drained(n, SECOND_HOURLY_230.unit, SECOND_HOURLY_230.guard, invocation)
+}
+
+pub(super) fn first_7871_drained(n: &mut Native) -> Result<Bound> {
+    let reference = Bound::new(Path::new(FIRST_7871_230.state).join("terminal.json"),
+        "16d546332a37fccd20a7b2609908288b426276a01908c6e255db886aba6ea8d2");
+    let receipt = reference.sealed()?;
+    let invocation = "02b7dd1683d24efbabf6b5c2f8ff6a43";
+    ensure!(
+        receipt["schema"] == "foundation-epoch230-first-7871-terminal-v1"
+            && receipt["unit"] == FIRST_7871_230.unit
+            && receipt["invocation_id"] == invocation
+            && receipt["state"] == "local-segment-committed"
+            && receipt["guard_drained"] == true
+            && receipt["checkpoint"]["slot"] == FIRST_7871_230.last,
+        "epoch 230 v1.6.27 requires the verified closure of its predecessor"
+    );
+    drained(n, FIRST_7871_230.unit, FIRST_7871_230.guard, invocation)?;
+    Ok(reference)
 }
 
 impl Focused {

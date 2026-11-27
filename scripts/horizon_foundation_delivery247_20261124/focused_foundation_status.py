@@ -33,6 +33,8 @@ READ_RETRY = re.compile(r"\[([^\]]+) WARN .+Original225 range at byte (\d+) inte
 
 FIRST_7871_REGISTRATION = V / "horizon230-first-7871-runtime-v1/cadence-registration.json"
 FIRST_7871_UNIT = "horizon-qualify-230-first-7871-v1.service"
+V1627_REGISTRATION = V / "horizon230-v1627-replay-runtime-v1/cadence-registration.json"
+V1627_UNIT = "horizon-qualify-230-v1627-window-v1.service"
 
 FIRST_7871_STATUS = FIRST_7871_REGISTRATION.parent / "repair-status-after-checkpoint-v1/completion.json"
 if FIRST_7871_STATUS.is_file():
@@ -40,8 +42,13 @@ if FIRST_7871_STATUS.is_file():
 
 
 def registration_for_sample(epoch, sample):
-    if epoch == 230 and FIRST_7871_REGISTRATION.is_file():
-        units = {row["producer_unit"] for row in sample["diagnostic_replays"]}
+    if epoch != 230:
+        return REGISTRATIONS[epoch]
+    units = {row["producer_unit"] for row in sample["diagnostic_replays"]}
+    if V1627_UNIT in units:
+        assert V1627_REGISTRATION.is_file() and FIRST_7871_UNIT not in units
+        return V1627_REGISTRATION
+    if FIRST_7871_REGISTRATION.is_file():
         if "horizon-qualify-230-middle-hourly-second-v1.service" in units:
             assert FIRST_7871_UNIT not in units
         else:
@@ -106,6 +113,19 @@ def placement(epoch, sample):
         retained = closed["last_slot"] - closed["first_slot"] + 1
         assert retained == closed["slot_count"] == 39522
         evidence.append(closed_ref)
+    elif registration == V1627_REGISTRATION:
+        assert launch["unit"] == V1627_UNIT and (window_start, window_end) == (99461592, 99468089)
+        prior_ref = profile["prior_drained_window"]
+        assert prior_ref["sha256"] == "16d546332a37fccd20a7b2609908288b426276a01908c6e255db886aba6ea8d2"
+        prior = bound(prior_ref)
+        assert prior["guard_drained"] and prior["state"] == "local-segment-committed"
+        earlier = bound(profile["sizing_predecessor"])["prior_drained_window"]
+        assert earlier["sha256"] == "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56"
+        later = bound(earlier)
+        assert later["guard_drained"] and later["state"] == "local-segment-committed"
+        retained = prior["slot_count"] + later["slot_count"]
+        assert retained == 47393
+        evidence.extend((prior_ref, earlier))
     else:
         assert (window_start, window_end) == (99476783, 99516304)
     accepted = 0
@@ -117,11 +137,12 @@ def placement(epoch, sample):
             phase = "replay"
     rate = 1.6
     allowance = 12 * 3600
-    seconds = math.ceil((last - first + 1 - retained - accepted) / rate) + allowance + DELIVERY_SECONDS
+    canonical_credit = 0 if registration == V1627_REGISTRATION else accepted
+    seconds = math.ceil((last - first + 1 - retained - canonical_credit) / rate) + allowance + DELIVERY_SECONDS
     path = Path(next(arg.split("=", 1)[1] for arg in profile["argv"] if arg.startswith("--horizon-output=")))
     assert path.is_relative_to(root / "work/output")
     model = dict(remaining_slot_range=[first, last], window_slots_executed=accepted,
-                 completed_window_positions=retained,
+                 completed_window_positions=retained, window_positions_credited=canonical_credit,
                  replay_slots_per_sec=rate, repair_and_turnover_seconds=allowance,
                  delivery_seconds=DELIVERY_SECONDS)
     return owner, None, phase, path, seconds, [*evidence, remaining], model

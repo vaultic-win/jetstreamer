@@ -95,6 +95,14 @@ FIRST_7871_230 = Scope(
     "3c0d5ac1c970cffa0473fa3c5d01ad2466f7d041b4fe25dc7cdb65039688a3ea",
     225_000_000_000, 90 << 30, 256 << 20, "48-55",
 )
+V1627_230 = Scope(
+    230, V / "horizon230-v1627-replay-runtime-v1",
+    "horizon-qualify-230-v1627-window-v1.service", "horizon-230-v1627-window-protective-v1.service",
+    "epoch230-private-v1627-window", "foundation-epoch230-v1627-window-roster-binding-v1",
+    "1e300ad51ba5f75a91af2f68c80241dd90a5c6d279b630de8f92f882655b43d5",
+    "8301ba667e1f440365cc40dcdbe4b5f69fa6d224e2e754734738908345b35cca",
+    225_000_000_000, 90 << 30, 256 << 20, "48-55",
+)
 RESTORE_258 = Scope(
     258, V / "horizon258-native-restore-runtime-v1",
     "horizon-qualify-258-native-restore-v1.service", "horizon-258-native-restore-protective-v1.service",
@@ -139,7 +147,7 @@ SCOPED_ARGS = {
     "--epoch230": GAP_230, "--epoch258": RESTORE_258, "--epoch260": RESTORE_260,
     "--hourly230": HOURLY_230, "--hourly230-second": SECOND_HOURLY_230,
     "--overlap266": OVERLAP_266,
-    "--first7871-230": FIRST_7871_230, "--trace296": TRACE_296, "--feature296": FEATURE_296,
+    "--first7871-230": FIRST_7871_230, "--v1627-230": V1627_230, "--trace296": TRACE_296, "--feature296": FEATURE_296,
 }
 
 
@@ -151,22 +159,26 @@ def protected_226_fit(fit):
 
 
 def second_hourly_drained(ops, terminal_ref):
-    assert terminal_ref == {
+    require_230_drained(ops, terminal_ref, SECOND_HOURLY_230, {
         "path": str(SECOND_HOURLY_230.state / "terminal.json"),
         "sha256": "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56",
-    }
+    }, "a0a94d2d42984804877c1a80fc934585", 99_516_304)
+
+
+def require_230_drained(ops, terminal_ref, scope, expected, invocation, checkpoint):
+    assert terminal_ref == expected
     terminal = ops.bound(terminal_ref)
-    assert terminal["unit"] == SECOND_HOURLY_230.unit and terminal["guard_drained"]
-    assert terminal["invocation_id"] == "a0a94d2d42984804877c1a80fc934585"
-    assert terminal["state"] == "local-segment-committed" and terminal["checkpoint"]["slot"] == 99_516_304
-    assert ops.props(SECOND_HOURLY_230.guard.removesuffix(".service") + ".timer", ["ActiveState", "Job"]) == {
+    assert terminal["unit"] == scope.unit and terminal["guard_drained"]
+    assert terminal["invocation_id"] == invocation
+    assert terminal["state"] == "local-segment-committed" and terminal["checkpoint"]["slot"] == checkpoint
+    assert ops.props(scope.guard.removesuffix(".service") + ".timer", ["ActiveState", "Job"]) == {
         "ActiveState": "inactive", "Job": ""}
-    for unit in (SECOND_HOURLY_230.unit, SECOND_HOURLY_230.guard):
+    for unit in (scope.unit, scope.guard):
         owner = ops.props(unit, ["ActiveState", "Result", "InvocationID", "Job", "MainPID", "ControlPID", "ControlGroup"])
         assert owner["ActiveState"] in ("inactive", "failed") and not owner["Job"] and not owner["ControlGroup"]
         assert owner["MainPID"] == owner["ControlPID"] == "0"
         assert not (Path("/sys/fs/cgroup/system.slice") / unit).exists()
-        if unit == SECOND_HOURLY_230.unit:
+        if unit == scope.unit:
             assert owner["Result"] == "success" and owner["InvocationID"] in ("", terminal["invocation_id"])
 
 
@@ -189,16 +201,22 @@ def current_fit(kit, roster, root, scope, *, held=False):
     selected = cpus(scope.cpus)
     assert cpus(fit["cpus"]) == selected
     protected_cpus = selected
-    if scope in (SECOND_HOURLY_230, FIRST_7871_230):
+    if scope in (SECOND_HOURLY_230, FIRST_7871_230, V1627_230):
         protected_cpus = set().union(*(cpus(Path(
             f"/sys/devices/system/cpu/cpu{cpu}/topology/thread_siblings_list"
         ).read_text().replace(",", " ")) for cpu in selected))
         assert selected <= protected_cpus
-    if scope is FIRST_7871_230:
+    if scope in (FIRST_7871_230, V1627_230):
         proof = roster["focused_230_quote"]
         assert sorted(protected_cpus) == proof["exclusive_online_cpus"] == [*range(48, 56), *range(112, 120)]
         protected_226_fit(fit)
-        second_hourly_drained(ops, proof["predecessor_terminal"])
+        if scope is FIRST_7871_230:
+            second_hourly_drained(ops, proof["predecessor_terminal"])
+        else:
+            require_230_drained(ops, proof["predecessor_terminal"], FIRST_7871_230, {
+                "path": str(FIRST_7871_230.state / "terminal.json"),
+                "sha256": "16d546332a37fccd20a7b2609908288b426276a01908c6e255db886aba6ea8d2",
+            }, "02b7dd1683d24efbabf6b5c2f8ff6a43", 99_445_304)
     if scope is OVERLAP_266:
         protected_cpus = epoch266_overlap.EXCLUSIVE
         assert roster["focused_266_quote"]["exclusive_online_cpus"] == sorted(protected_cpus)
@@ -239,7 +257,7 @@ def current_fit(kit, roster, root, scope, *, held=False):
     assert fit["required_hard_memory_bytes"] <= fit["host_total_memory_bytes"]
     return {"available_disk_bytes": disk, "available_memory_bytes": available,
             "required_remaining_memory_bytes": growth, "sampled_unix_seconds": time.time(),
-            **({"protected_cpus": sorted(protected_cpus)} if scope in (SECOND_HOURLY_230, FIRST_7871_230, OVERLAP_266) else {})}
+            **({"protected_cpus": sorted(protected_cpus)} if scope in (SECOND_HOURLY_230, FIRST_7871_230, V1627_230, OVERLAP_266) else {})}
 
 
 def prepare_hourly_tokens(ops, attempt, tokens, template, guard, hook, probe_unit):
@@ -314,11 +332,13 @@ def launch(kit, roster_ref, scope):
         tokens = V / "horizon230-middle-hourly-second-tokens-v1"
     if scope is FIRST_7871_230:
         tokens = V / "horizon230-first-7871-tokens-v1"
+    if scope is V1627_230:
+        tokens = V / "horizon230-v1627-tokens-v1"
     assert not (state / "cadence-registration.json").exists()
     assert not (attempt / "admission.json").exists()
     if scope is OVERLAP_266:
         tokens = epoch266_overlap.TOKENS
-    qualify_tokens = failed_start is not None or scope in (SECOND_HOURLY_230, FIRST_7871_230, OVERLAP_266)
+    qualify_tokens = failed_start is not None or scope in (SECOND_HOURLY_230, FIRST_7871_230, V1627_230, OVERLAP_266)
     assert qualify_tokens or not tokens.exists()
     roster = ops.bound(roster_ref)
     preflight = ops.bound(scope.preflight)
@@ -355,7 +375,7 @@ def launch(kit, roster_ref, scope):
         assert source.resolve() == source and destination.resolve() == destination
         assert destination.is_relative_to(root) and destination.stat().st_size == 0
         assert f"{info.st_dev}:{info.st_ino}:{info.st_size}" == measured
-        if scope is FIRST_7871_230:
+        if scope in (FIRST_7871_230, V1627_230):
             assert (info.st_mtime_ns, info.st_ctime_ns) == (binding["mtime_ns"], binding["ctime_ns"])
             assert info.st_nlink == 1 and not source.is_symlink()
         bindings.append(f"{source}:{destination}")
@@ -391,6 +411,8 @@ def launch(kit, roster_ref, scope):
                       else "foundation-230-hourly-token-probe-v1")
         if scope is FIRST_7871_230:
             probe_unit = "foundation-230-first-7871-token-probe-v1"
+        elif scope is V1627_230:
+            probe_unit = "foundation-230-v1627-token-probe-v1"
         elif scope is OVERLAP_266:
             probe_unit = "foundation-266-overlap-token-probe-v1"
         template = prepare_hourly_tokens(ops, attempt, tokens, template, profile["guard"], hook, probe_unit)

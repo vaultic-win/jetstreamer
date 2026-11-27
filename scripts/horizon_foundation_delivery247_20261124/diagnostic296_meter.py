@@ -10,6 +10,7 @@ GAP = "short-gap-v1"
 HOURLY_230 = "middle-hourly-first-v1"
 SECOND_HOURLY_230 = "middle-hourly-second-v1"
 FIRST_7871_230 = "first-7871-v1"
+V1627_230 = "v1627-window-v1"
 RESTORE = "native-restore-v1"
 RESTORE_260 = "native-restore-260-v1"
 OVERLAP_266 = "hourly-overlap-114929697-v1"
@@ -22,6 +23,7 @@ FOCUSED = {
     SECOND_HOURLY_230: (230, "horizon230-middle-hourly-second-runtime-v1",
                         "epoch230-private-second-hourly-window"),
     FIRST_7871_230: (230, "horizon230-first-7871-runtime-v1", "epoch230-private-first-7871-window"),
+    V1627_230: (230, "horizon230-v1627-replay-runtime-v1", "epoch230-private-v1627-window"),
     RESTORE: (258, "horizon258-native-restore-runtime-v1", "epoch258-private-native-restore"),
     RESTORE_260: (260, "horizon260-native-restore-runtime-v1", "epoch260-private-native-restore"),
     OVERLAP_266: (266, "horizon266-hourly-overlap-114929697-runtime-v1", "epoch266-private-hourly-overlap"),
