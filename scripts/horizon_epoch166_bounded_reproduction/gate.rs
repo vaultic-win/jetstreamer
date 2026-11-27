@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[cfg(not(epoch170_suffix))]
+#[cfg(not(any(epoch170_suffix, epoch140_suffix)))]
 mod route {
     pub(super) const EPOCH: u64 = 166;
     pub(super) const UNIT: &str =
@@ -32,6 +32,15 @@ mod route {
     #[cfg(epoch170_bridge)]
     pub(super) const TERMINAL_SLOT: u64 = 73_726_716;
 }
+#[cfg(epoch140_suffix)]
+mod route {
+    pub(super) const EPOCH: u64 = 140;
+    pub(super) const UNIT: &str = "horizon-epoch140-suffix-recording.service";
+    pub(super) const ALIAS: &str = "/run/horizon140-suffix-gate";
+    pub(super) const RUN: &str =
+        "/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-v1";
+    pub(super) const TERMINAL_SLOT: u64 = 60_911_999;
+}
 use route::*;
 #[cfg(not(epoch170_suffix))]
 const RELEASE_TIMEOUT: Duration = Duration::from_secs(180);
@@ -42,6 +51,7 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(60);
 #[cfg(all(epoch170_bridge, not(epoch170_suffix)))]
 compile_error!("the short epoch 170 bridge must use the epoch 170 suffix gate");
 
+#[cfg(not(epoch140_suffix))]
 fn replay_args() -> Vec<String> {
     #[cfg(not(epoch170_bridge))]
     let (hashes, output, scratch) = (
@@ -65,6 +75,34 @@ fn replay_args() -> Vec<String> {
         format!("--replay-scratch={RUN}/{scratch}"),
         format!("--qualification-end-slot={TERMINAL_SLOT}"),
     ]
+}
+
+#[cfg(epoch140_suffix)]
+fn recording_command() -> io::Result<(String, Vec<String>)> {
+    let args = env::args().skip(1).collect::<Vec<_>>();
+    let [digest] = args.as_slice() else {
+        return Err(io::Error::other(
+            "expected the sealed epoch 140 plan digest",
+        ));
+    };
+    if digest.len() != 64
+        || !digest
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        || !digest.bytes().any(|b| b != b'0')
+    {
+        return Err(io::Error::other("invalid epoch 140 plan digest"));
+    }
+    Ok((
+        "/run/horizon140-suffix-node/jetstreamer-node".into(),
+        vec![
+            EPOCH.to_string(),
+            RUN.into(),
+            "--verify".into(),
+            "--epoch140-suffix-plan=/run/horizon140-suffix-plan/plan.json".into(),
+            format!("--epoch140-suffix-plan-sha256={digest}"),
+        ],
+    ))
 }
 
 fn invocation_id_is_valid(id: &str) -> bool {
@@ -104,6 +142,11 @@ fn is_released(path: &Path, invocation: &str) -> io::Result<bool> {
 }
 
 fn main() -> io::Result<()> {
+    #[cfg(epoch140_suffix)]
+    let (executable, args) = recording_command()?;
+    #[cfg(not(epoch140_suffix))]
+    let (executable, args) = (format!("{ALIAS}/jetstreamer-node"), replay_args());
+    #[cfg(not(epoch140_suffix))]
     if env::args_os().len() != 1 {
         return Err(io::Error::other(format!(
             "unexpected epoch {EPOCH} gate arguments"
@@ -132,9 +175,7 @@ fn main() -> io::Result<()> {
                 "epoch {EPOCH}: invocation {invocation} released after {} seconds through slot {TERMINAL_SLOT}",
                 started.elapsed().as_secs()
             );
-            return Err(Command::new(format!("{ALIAS}/jetstreamer-node"))
-                .args(replay_args())
-                .exec());
+            return Err(Command::new(executable).args(args).exec());
         }
         if Instant::now() >= next_heartbeat {
             eprintln!(
