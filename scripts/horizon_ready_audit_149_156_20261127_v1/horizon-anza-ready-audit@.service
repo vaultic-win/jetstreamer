@@ -1,0 +1,62 @@
+[Unit]
+Description=Play Anza's admitted public Horizon epoch %i
+After=network-online.target horizon-ready-top-metadata-guard-20261121-v1.service
+RequiresMountsFor=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool
+ConditionPathExists=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/queue/epoch-%i.json
+ConditionPathExists=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/jobs/%i/READY
+ConditionPathExists=!/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/jobs/%i/ACCEPTED.json
+ConditionPathExists=/var/lib/jetstreamer/horizon_runtime_data/epoch168-current-anza-reader-20261127-v1/main-acceptance.json
+ConditionPathExists=/var/lib/jetstreamer/horizon_runtime_data/epoch168-current-anza-reader-20261127-v1/public-range-qualification.json
+ConditionPathExists=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/FOUNDATION_CLOSURE.json
+
+[Service]
+Type=exec
+Slice=horizonaudit.slice
+CPUQuota=100%
+CPUWeight=10
+Nice=10
+MemoryHigh=1536M
+MemoryMax=2G
+MemorySwapMax=0
+TasksMax=32
+KillMode=control-group
+Restart=no
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=tmpfs
+PrivateDevices=yes
+ProtectControlGroups=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SETUID CAP_SETGID
+InaccessiblePaths=/etc/jetstreamer
+# Expose this sealed reader to the sol account at the canonical executable path.
+TemporaryFileSystem=/var/lib/jetstreamer/horizon_runtime_data:ro,mode=0755
+BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/epoch168-current-anza-reader-20261127-v1
+TemporaryFileSystem=/run/horizon-anza-ready-audit:ro,mode=0755
+BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/queue/inventory.json:/run/horizon-anza-ready-audit/inventory.json
+BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/148-156/lease:/run/horizon-anza-ready-audit/range.lease
+BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/FOUNDATION_CLOSURE.json:/run/horizon-anza-ready-audit/ownership.json
+BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/queue/epoch-%i.json:/run/horizon-anza-ready-audit/request.json
+BindPaths=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/jobs/%i:/run/horizon-anza-ready-audit/job
+BindPaths=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/jobs/%i/current/reports:/run/horizon-anza-ready-audit/reports
+BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/operator/admission.jq:/run/horizon-anza-ready-audit/admission.jq
+WorkingDirectory=/run/horizon-anza-ready-audit
+Environment=HOME=/nonexistent TMPDIR=/tmp
+Environment=RUST_MIN_STACK=67108864 RAYON_NUM_THREADS=1 TOKIO_WORKER_THREADS=2
+Environment=RUST_LOG=info,jetstreamer_horizon_range=debug
+Environment=MALLOC_ARENA_MAX=2 MALLOC_CONF=narenas:2,dirty_decay_ms:0,muzzy_decay_ms:0,background_thread:true,tcache_max:8192
+# The admitted attempt owns one READY ticket. A duplicate start cannot consume it twice.
+ExecStartPre=/usr/bin/ln -T job/READY job/current/CONSUMED
+ExecStartPre=/usr/bin/unlink job/READY
+ExecStartPre=/usr/bin/test ! -d /sys/fs/cgroup/horizonaudit.slice/horizon-168-current-anza-reader-build-20261127-v1.service
+ExecStartPre=/usr/bin/test ! -d /sys/fs/cgroup/horizonaudit.slice/horizon-r2-ready-inventory-extension.service
+ExecStartPre=/usr/bin/sha256sum --strict --quiet --check job/current/CONSUMED
+ExecStartPre=/usr/bin/jq -ne --arg instance %i --rawfile ticket job/current/CONSUMED --slurpfile scope request.json --slurpfile ready job/current/AUTHENTICATED_RECHECK.json --slurpfile owner ownership.json --slurpfile quote job/current/FIT.json --slurpfile reader job/current/CURRENT_READER.json --slurpfile before job/current/PREDECESSOR.json --slurpfile admit job/current/ADMISSION.json -f admission.jq
+ExecStart=/usr/bin/flock --nonblock --no-fork range.lease /usr/bin/setpriv --reuid=sol --regid=sol --clear-groups --inh-caps=-all --ambient-caps=-all -- /var/lib/jetstreamer/horizon_runtime_data/epoch168-current-anza-reader-20261127-v1/horizon_pipeline %i:%i https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev --verify-only --slot-ranges --threads 256 --max-active-partitions 1 --archive-inventory /run/horizon-anza-ready-audit/inventory.json --verification-report-dir /run/horizon-anza-ready-audit/reports
+StandardOutput=append:/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/pool/anza-149-156/jobs/%i/current/playback.log
+StandardError=inherit
