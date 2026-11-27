@@ -5,7 +5,7 @@ use super::{
     *,
 };
 #[path = "appendvec292_failed_stage.rs"]
-mod failed;
+pub(super) mod failed;
 
 const STATE: &str = "/var/lib/jetstreamer/horizon292-appendvec-retirement-v308";
 const ISSUER_LOCK: &str = "/run/horizon292-300-finite-v205-a1/issuer.lock";

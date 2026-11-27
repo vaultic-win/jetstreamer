@@ -34,7 +34,11 @@ pub(super) fn accounts_readers(scope: &Path, target: &Path) -> Result<Value> {
     no_readers(scope, target, &STOPPED[..1])
 }
 
-fn no_readers(scope: &Path, target: &Path, stopped: &[(&str, &str, &str)]) -> Result<Value> {
+pub(crate) fn no_readers(
+    scope: &Path,
+    target: &Path,
+    stopped: &[(&str, &str, &str)],
+) -> Result<Value> {
     let report = scheduled_census(scope, target)?;
     for &(unit, invocation, _) in stopped {
         let output = Command::new("/usr/bin/systemctl")
@@ -91,13 +95,13 @@ fn no_readers(scope: &Path, target: &Path, stopped: &[(&str, &str, &str)]) -> Re
                     && referrer["sha256"] == *digest
             }) && referrer["chain"] == json!([])
                 && referrer["targets"] == json!([target]),
-            "unexpected scheduled reference to epoch 292 scratch"
+            "unexpected scheduled reference to stopped scratch"
         );
     }
     let processes = process_references::scan(Path::new("/proc"), target)?;
     ensure!(
         processes.inspected_processes > 0 && processes.references.is_empty(),
-        "live epoch 292 scratch reference"
+        "live stopped-scratch reference"
     );
     Ok(json!({"scheduled":report,"processes":processes}))
 }

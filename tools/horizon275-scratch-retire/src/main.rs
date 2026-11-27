@@ -6,6 +6,7 @@ mod appendvec292;
 mod appendvec292_bundle;
 mod ext4_228;
 mod failed296_bundle;
+mod index230;
 mod parked_accounts;
 #[path = "../../../scripts/horizon_standard_backfill_scratch_retirement_20261110_v1/source/process_references.rs"]
 mod process_references;
@@ -386,6 +387,22 @@ fn retire_bootstrap(
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
+    if matches!(
+        args.get(1).map(String::as_str),
+        Some("--check-duplicate-index-230" | "--retire-duplicate-index-230")
+    ) {
+        ensure!(
+            unsafe { libc::geteuid() } == 0 && args.len() == 3,
+            "usage: horizon275-scratch-retire --check-duplicate-index-230|--retire-duplicate-index-230 SELF_SHA256"
+        );
+        let mut binary = File::open("/proc/self/exe")?;
+        let metadata = binary.metadata()?;
+        ensure!(
+            metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut binary)? == args[2],
+            "unsealed retirement image"
+        );
+        return index230::run(args[1] == "--retire-duplicate-index-230");
+    }
     if matches!(
         args.get(1).map(String::as_str),
         Some("--check-held-failed-296" | "--retire-held-failed-296")
