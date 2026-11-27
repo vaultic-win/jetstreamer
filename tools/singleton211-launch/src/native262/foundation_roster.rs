@@ -2,6 +2,7 @@
 use super::*;
 mod allocation;
 mod delivery252;
+mod replay260;
 mod focused;
 use focused::{FEATURE_296, GAP_230, LOADER_296, RESTORE_258, RESTORE_260, SCOPES, TRACE_296};
 mod suffix226;
@@ -34,7 +35,7 @@ const KNOWN_GUARDS: [(u64, &str); 9] = [
     (230, "horizon-230-middle-protective-v1"),
     (252, "horizon-252-regional-singleton-protective-v1"),
     (258, RESTORE_258.guard),
-    (260, RESTORE_260.guard),
+    (260, replay260::GUARD),
     (261, "horizon-261-singleton-protective-v1"),
     (262, "horizon-262-singleton-protective-v1"),
     (288, "horizon-288-full-shrink-debt-protective-v1"),
@@ -99,7 +100,8 @@ const CLAIM_261: (&str, &str) = (
 );
 const UPLOAD_261_MEMORY: u64 = 64 << 30;
 const UPLOAD_261_DISK: u64 = 1 << 30;
-const REGISTERED_REPLAYS: [ReplayRegistration; 2] = [
+const REGISTERED_REPLAYS: [ReplayRegistration; 3] = [
+    replay260::REGISTRATION,
     ReplayRegistration {
         epoch: 262,
         unit: "horizon-qualify-262-singleton-v1.service",
@@ -129,6 +131,7 @@ const RECOVERY_296: (&str, &str) = (
 );
 
 struct FullReplayQuote {
+    epoch: u64,
     reference: Bound,
     inputs: Bound,
     working_disk: u64,
@@ -189,6 +192,7 @@ fn full_replay_quote() -> Result<FullReplayQuote> {
     );
     binding(&plan["replay_node"])?.artifact()?;
     Ok(FullReplayQuote {
+        epoch: EPOCH,
         reference,
         inputs,
         working_disk: num(&profile, "maximum_root_physical_bytes")?,
@@ -331,13 +335,23 @@ fn live_replay(n: &mut Native, spec: &ReplayRegistration) -> Result<LiveReplay> 
         node_key,
         receipt_disk,
     } = *spec;
-    let reference = Bound::new(receipt.0, receipt.1);
+    let reference = if epoch == replay260::EPOCH {
+        let path = Path::new(receipt.0);
+        trusted_parents(path)?;
+        Bound::new(path, hash(path)?)
+    } else {
+        Bound::new(receipt.0, receipt.1)
+    };
     let registered = reference.sealed()?;
     let profile = binding(&registered["profile"])?.sealed()?;
     let admission = binding(&registered["admission"])?.sealed()?;
     let handoff = binding(&registered["handoff"])?.sealed()?;
     let admitted_fit = binding(&admission["roster"])?.sealed()?;
-    let inputs = binding(&profile["inputs"])?.sealed()?;
+    let inputs_ref = binding(&profile["inputs"])?;
+    if epoch == replay260::EPOCH {
+        replay260::check_live_binding(&registered, &admission, &admitted_fit, &inputs_ref)?;
+    }
+    let inputs = inputs_ref.sealed()?;
     let node = binding(&inputs[node_key])?;
     node.artifact()?;
     let owner = n.show_fields(unit, OWNER_FIELDS)?;
@@ -1156,6 +1170,7 @@ fn measure(
         }
     }
     let epoch = match &quote {
+        Some(Quote::FullReplay(full)) => full.epoch,
         Some(Quote::Suffix226(_) | Quote::Suffix226Preview) => 226,
         Some(Quote::Delivery252) => 252,
         Some(Quote::Delivery261(_)) => 261,
@@ -1630,6 +1645,7 @@ fn measure(
         230 => "foundation-epoch230-short-gap-roster-binding-v1",
         252 => "foundation-epoch252-delivery-roster-binding-v1",
         258 => "foundation-epoch258-native-restore-roster-binding-v1",
+        260 if matches!(&quote, Some(Quote::FullReplay(_))) => replay260::ROSTER_SCHEMA,
         260 => "foundation-epoch260-native-restore-roster-binding-v1",
         261 => "foundation-epoch261-delivery-roster-binding-v1",
         296 => "foundation-epoch296-replay-roster-binding-v1",
@@ -1645,7 +1661,8 @@ fn measure(
         "active_suffix_226_registration":live_replays.get(&226).map(|replay| &replay.reference),
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
         "active_restore_258_registration":live_replays.get(&258).map(|replay| &replay.reference),
-        "active_restore_260_registration":live_replays.get(&260).map(|replay| &replay.reference),
+        "active_restore_260_registration":live_replays.get(&260).filter(|r| r.unit == RESTORE_260.unit).map(|r| &r.reference),
+        "active_replay_260_registration":live_replays.get(&260).filter(|r| r.unit == replay260::UNIT).map(|r| &r.reference),
         "closed_delivery_257":closed_257,
         "active_delivery_252_claim":active_deliveries.get(&252).map(|(claim, _, _, _)| claim),
         "active_delivery_261_claim":active_deliveries.get(&261).map(|(claim, _, _, _)| claim),
@@ -1782,6 +1799,7 @@ pub fn run() -> Result<()> {
                 flag.to_str(),
                 Some(
                     "--full-replay-quote"
+                        | "--full260-quote"
                         | "--delivery252-quote"
                         | "--delivery261-quote"
                         | "--replay296-quote"
@@ -1804,7 +1822,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
+            "use --as-controller UNIT, --full-replay-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
         ),
     };
     let synchronize = match args.next() {
@@ -1845,6 +1863,8 @@ pub fn run() -> Result<()> {
             });
     let result = match command.as_deref() {
         Some(flag) if flag == "--full-replay-quote" => full_replay_quote()
+            .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),
+        Some(flag) if flag == "--full260-quote" => replay260::quote()
             .and_then(|quote| measure(&mut native, None, Some(Quote::FullReplay(quote)))),
         Some(flag) if flag == "--delivery252-quote" => {
             measure(&mut native, None, Some(Quote::Delivery252))
