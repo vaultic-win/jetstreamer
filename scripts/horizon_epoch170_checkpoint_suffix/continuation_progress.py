@@ -15,9 +15,10 @@ FOLLOWING_ROOT = ROOT.parent/"epoch170-from-73766969-20261127-v1"
 RETRY = Path(__file__).resolve().parent in (RETRY_ROOT/"progress-v1", RETRY_ROOT/"progress-v2", RETRY_ROOT/"progress-v3")
 if RETRY:
     ROOT = RETRY_ROOT
-elif Path(__file__).resolve().parent == FOLLOWING_ROOT/"progress-v1":
+elif Path(__file__).resolve().parent in (FOLLOWING_ROOT/"progress-v1", FOLLOWING_ROOT/"progress-v2"):
     ROOT = FOLLOWING_ROOT
 WRAPPERS = {
+    FOLLOWING_ROOT/"progress-v2": ("operator-v2", "09281f70df692f622c7e8ff52439bb00414ef2d58128e610cecb6d1dd3ac0351"),
     FOLLOWING_ROOT/"progress-v1": ("operator-v1", "386d55ec91710ff3ededb9d019370a68264c74fd0c739ac83ea06c523d64d9d4"),
     RETRY_ROOT/"progress-v3": ("operator-v3", "64f167d88145f2deca94f488d99fc2b0283e6264d1ba220ba702f55b6666dbfd"),
     RETRY_ROOT/"progress-v2": ("operator-v2", "6452dabfdb8ed76c67342c58cbdeca66355dbf45ba89395bf906f6468b2544a4"),
