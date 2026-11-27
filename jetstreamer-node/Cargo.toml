@@ -24,6 +24,8 @@ epoch229-called-program-demotion-retry = ["epoch229-called-program-demotion-qual
 epoch230-called-program-demotion-qualification = []
 # Private epoch 230 later vote boundary through its independently pinned hourly root.
 epoch230-vote-boundary-demotion-qualification = []
+# Private upstream runtime comparison between two pinned epoch 230 snapshots.
+epoch230-v1-6-27-diagnostic = []
 # Private epoch 231 predecessor Bank comparison through its pinned hourly root.
 epoch231-called-program-demotion-qualification = []
 # Retain the epoch 230 slots in that same checked boundary replay.

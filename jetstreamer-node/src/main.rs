@@ -118,6 +118,8 @@ mod epoch223_qualification;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+mod epoch230_v1627;
 mod failed_prefix220;
 mod qualification_checkpoint_exit;
 mod qualification_checkpoint_pause;
@@ -8057,6 +8059,12 @@ fn historical_worker_profile(
         compatibility::RuntimeBackend::SolanaV1_6_15 => historical::SOLANA_V1_6_15_CANDIDATE,
         compatibility::RuntimeBackend::SolanaV1_6_16 => historical::SOLANA_V1_6_16_CANDIDATE,
         compatibility::RuntimeBackend::SolanaV1_6_17 => historical::SOLANA_V1_6_17_CANDIDATE,
+        #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+        compatibility::RuntimeBackend::SolanaV1_6_20
+            if descriptor.identity.name == compatibility::SOLANA_V1_6_27_RUNTIME.identity.name =>
+        {
+            historical::SOLANA_V1_6_27_CANDIDATE
+        }
         compatibility::RuntimeBackend::SolanaV1_6_20 => historical::SOLANA_V1_6_20_CANDIDATE,
         compatibility::RuntimeBackend::SolanaV1_7_13 => historical::SOLANA_V1_7_13_CANDIDATE,
         compatibility::RuntimeBackend::SolanaV1_7_15 => historical::SOLANA_V1_7_15_CANDIDATE,
@@ -15374,6 +15382,10 @@ fn qualification_expectations(
         epoch224_qualification::verify_checkpoints(&expected)?;
     }
     epoch141_suffix::recheck_roots(&expected)?;
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    if plan.epoch == 230 {
+        epoch230_v1627::validate_expectations(&expected)?;
+    }
     let (snapshot_slot, snapshot_expectation) =
         snapshot_path_expectation(snapshot_archive, bootstrap)?;
     if snapshot_slot != plan.bootstrap_slot {
@@ -20137,6 +20149,11 @@ async fn main() {
         }
     }
 
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    if let Err(error) = epoch230_v1627::validate_entrypoint(&probe_args) {
+        eprintln!("error: {error}");
+        exit(2);
+    }
     if epoch223_qualification::private_build_enabled()
         && let Err(error) = epoch223_qualification::validate_entrypoint(&probe_args)
     {
@@ -21349,6 +21366,36 @@ async fn main() {
         eprintln!("error: {error}");
         exit(2);
     }
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    {
+        if inherited_epoch_lease
+            || env::var_os("JETSTREAMER_EXPORT_HANDOFF_SNAPSHOT_DIR").is_some()
+            || env_truthy("JETSTREAMER_LOAD_FROM_DIR")
+        {
+            eprintln!("error: epoch 230 v1.6.27 requires its standalone private archive path");
+            exit(2);
+        }
+        if let Err(error) = epoch230_v1627::validate_launch(
+            qualification,
+            &dest_dir,
+            horizon_output.as_deref(),
+            replay_scratch.as_deref(),
+        ) {
+            eprintln!("error: {error}");
+            exit(2);
+        }
+    }
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    {
+        let checkpoints = epoch_hashes.as_deref().expect("v1.6.27 requires explicit checkpoints");
+        if let Err(error) =
+            read_epoch_hashes_file(checkpoints, compatibility::SOLANA_V1_6_27_RUNTIME.bootstrap)
+                .and_then(|expected| epoch230_v1627::validate_expectations(&expected))
+        {
+            eprintln!("error: {error}");
+            exit(2);
+        }
+    }
     if let Some(plan) = qualification {
         info!(
             "focused qualification requested: epoch {}, bootstrap {}, replay {}..={}, output {}",
@@ -21838,17 +21885,17 @@ async fn main() {
                         );
                         exit(1);
                     }
+                    let identity = selection.descriptor.identity;
                     info!(
                         "epoch {epoch}: selected execution profile {} ({:?}) from slots {}..{}",
-                        selection.backend, selection.admission, span.slots.start, span.slots.end
+                        identity.name, selection.admission, span.slots.start, span.slots.end
                     );
-                    if let Some(artifact) = selection.backend.historical_artifact() {
+                    if let Some(target) = identity.target
+                        && selection.descriptor.worker.is_some()
+                    {
                         info!(
                             "epoch {epoch}: historical artifact revision={} rust={} target={} genesis={}",
-                            artifact.upstream_revision,
-                            artifact.rust_toolchain,
-                            artifact.target,
-                            artifact.genesis_hash,
+                            identity.revision, identity.rust_toolchain, target, identity.genesis_hash,
                         );
                     }
                 }

@@ -192,6 +192,8 @@ const SOLANA_V1_6_20_TAG: &str = "v1.6.20";
 const SOLANA_V1_6_20_COMMIT: &str = "77bdb45d4af61fc687161ec06cc0178ff79726d5";
 const SOLANA_V1_6_20_RUST_TOOLCHAIN: &str = "rustc 1.51.0 (2fd73fabe 2021-03-23)";
 const SOLANA_V1_6_20_TARGET: &str = "x86_64-unknown-linux-gnu";
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+const SOLANA_V1_6_27_BACKEND_ID: &str = "solana-v1.6.27";
 const SOLANA_V1_6_25_BACKEND_ID: &str = "solana-v1.6.25";
 const SOLANA_V1_6_25_TAG: &str = "v1.6.25";
 const SOLANA_V1_6_25_COMMIT: &str = "7de8a55b54d3e11058b82f9483bb405d143b455c";
@@ -212,6 +214,10 @@ const SOLANA_V1_8_11_RUST_TOOLCHAIN: &str = "rustc 1.52.1 (9bc8c42bb 2021-05-09)
 const SOLANA_V1_8_11_TARGET: &str = "x86_64-unknown-linux-gnu";
 
 fn backend_supports_entry_batches(backend_id: &str) -> bool {
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    if backend_id == SOLANA_V1_6_27_BACKEND_ID {
+        return true;
+    }
     #[cfg(feature = "epoch228-called-program-demotion-qualification")]
     if backend_id == crate::epoch228_demotion::BACKEND {
         return true;
@@ -580,6 +586,17 @@ pub const SOLANA_V1_6_20_CANDIDATE: WorkerProfile = WorkerProfile {
     } else {
         SOLANA_V1_6_20_COMMIT
     },
+    rust_toolchain: SOLANA_V1_6_20_RUST_TOOLCHAIN,
+    target: SOLANA_V1_6_20_TARGET,
+    required_genesis_hash: protocol::MAINNET_GENESIS_HASH,
+    snapshot_archive_extensions: &[".tar.bz2", ".tar.zst"],
+};
+
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+pub const SOLANA_V1_6_27_CANDIDATE: WorkerProfile = WorkerProfile {
+    backend_id: SOLANA_V1_6_27_BACKEND_ID,
+    solana_tag: "v1.6.27",
+    solana_commit: "c5d174c1701b795d702654a76ddd458c4d8b97ea",
     rust_toolchain: SOLANA_V1_6_20_RUST_TOOLCHAIN,
     target: SOLANA_V1_6_20_TARGET,
     required_genesis_hash: protocol::MAINNET_GENESIS_HASH,
