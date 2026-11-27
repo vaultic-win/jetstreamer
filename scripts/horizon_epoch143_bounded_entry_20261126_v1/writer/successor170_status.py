@@ -327,7 +327,7 @@ def enroll(api, head, writer_ref):
     ref, actor = read_actor()
     fleet = checked(head)
     writer = checked(writer_ref)["new"]
-    manager = native.props(writer["unit"], ("MainPID", "InvocationID", "ActiveState", "ExecStart"))
+    manager = native.props(writer["unit"], ("Id", "MainPID", "InvocationID", "ActiveState", "ExecStart"))
     lock = Path(f"/proc/{writer['pid']}/fd/{writer['lock']['fd']}").stat()
     need(Path(head["path"]) == max(BASE.glob("root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json"),
                                    key=lambda path: path.stat().st_mtime_ns)
