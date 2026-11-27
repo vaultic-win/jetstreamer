@@ -56,6 +56,13 @@ const SCOPES: &[Scope] = &[
         kind: "epoch260-private-native-restore",
     },
     Scope {
+        epoch: 266,
+        unit: "horizon-qualify-266-hourly-overlap-114929697-v1.service",
+        attempt: "hourly-overlap-114929697-v1",
+        state: "horizon266-hourly-overlap-114929697-runtime-v1",
+        kind: "epoch266-private-hourly-overlap",
+    },
+    Scope {
         epoch: 296,
         unit: "horizon-qualify-296-loader-upgrade-focused-v2.service",
         attempt: "loader-upgrade-focused-v2",
@@ -165,6 +172,22 @@ pub(super) fn check_bindings(claim: &DiagnosticClaim, launch: &Value) -> Result<
             && guard["trip_reason"].is_null(),
         "focused Foundation launch and admission bindings differ"
     );
+    if claim.epoch == 266 {
+        let release = evidence(launch, "guard_release_fit")?;
+        ensure!(
+            profile["diagnostic_only"] == true
+                && launch["diagnostic_only"] == true
+                && launch["predecessor_native_tuple_qualified"] == false
+                && launch["cursor_normalization_qualified"] == false
+                && launch["lossless_restore"] == profile["restore_receipt"]
+                && release["schema"] == "foundation-epoch266-hourly-overlap-guard-release-fit-v1"
+                && release["invocation_id"] == launch["invocation_id"]
+                && release["roster"] == admission["roster"]
+                && release["guard_plan"] == launch["guard_plan"]
+                && release["publication_authorized"] == false,
+            "epoch 266 diagnostic-only or guard release binding differs"
+        );
+    }
     Ok(())
 }
 

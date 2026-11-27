@@ -12,7 +12,7 @@ mod replay260;
 mod replay296;
 use focused::{
     FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, RESTORE_258, RESTORE_260, SCOPES,
-    SECOND_HOURLY_230, TRACE_296,
+    OVERLAP_266, OVERLAP_266_EXCLUSIVE, SECOND_HOURLY_230, TRACE_296,
 };
 mod suffix226;
 mod vote_boundary;
@@ -46,7 +46,7 @@ const HANDOFF_UPLOAD_257: (&str, &str) = (
 const OWNER_FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemorySwapMax,ExecStart,AllowedCPUs";
 const GUARD_FIELDS: &str =
     "Id,LoadState,ActiveState,SubState,InvocationID,Unit,MemoryMax,ExecStart";
-const KNOWN_GUARDS: [(u64, &str); 9] = [
+const KNOWN_GUARDS: [(u64, &str); 10] = [
     (226, "horizon-guard-226-checkpoint-continuation-extract-v3"),
     (230, "horizon-230-middle-protective-v1"),
     (252, "horizon-252-regional-singleton-protective-v1"),
@@ -54,6 +54,7 @@ const KNOWN_GUARDS: [(u64, &str); 9] = [
     (260, replay260::GUARD),
     (261, "horizon-261-singleton-protective-v1"),
     (262, "horizon-262-singleton-protective-v1"),
+    (266, OVERLAP_266.guard),
     (288, "horizon-288-full-shrink-debt-protective-v1"),
     (296, "horizon-296-full-retry-protective-v1"),
 ];
@@ -1556,6 +1557,7 @@ fn measure(
         258 if matches!(&quote, Some(Quote::FullReplay(_))) => replay258::CPUS,
         258 => RESTORE_258.cpus,
         260 => RESTORE_260.cpus,
+        266 => OVERLAP_266.cpus,
         252 | 261 => "24-31",
         296 if matches!(&quote, Some(Quote::Replay296(_))) => replay296::CPUS,
         296 => "56-63",
@@ -1566,12 +1568,14 @@ fn measure(
     let cpus = units::affinity_width(&json!({"cpu_affinity":selected}), cpu_width)?;
     let private_exclusive = private_141.as_ref().map(interval141::Candidate::exclusive).transpose()?;
     let bridge_group = units::parse_cpu_list("48-55,112-119")?;
+    let overlap_exclusive = units::parse_cpu_list(OVERLAP_266_EXCLUSIVE)?;
     let exclusive = match &quote {
         Some(Quote::Focused(_, _)) if first_7871_candidate => {
             focused::second_hourly_drained(n)?;
             replay296::verify_cpu_group(FIRST_7871_230.cpus, &bridge_group)?;
             &bridge_group
         }
+        Some(Quote::Focused(spec, _)) if spec.unit == OVERLAP_266.unit => &overlap_exclusive,
         Some(Quote::Replay296(replay)) => &replay.placement.exclusive_cpus,
         _ => private_exclusive.as_ref().unwrap_or(&selected),
     };
@@ -1631,6 +1635,12 @@ fn measure(
             replay296::verify_cpu_group(FIRST_7871_230.cpus, &bridge_group)?;
             ensure!(exclusive.is_disjoint(&bridge_group), "epoch {epoch} overlaps the running epoch 230 physical cores");
         }
+        if replay.unit == OVERLAP_266.unit {
+            ensure!(
+                exclusive.is_disjoint(&overlap_exclusive),
+                "epoch {epoch} overlaps the epoch 266 diagnostic's physical cores"
+            );
+        }
         if replay.unit == replay296::UNIT {
             ensure!(
                 selected.is_disjoint(&replay296::placement()?.exclusive_cpus),
@@ -1674,7 +1684,7 @@ fn measure(
         let (owner, guard_booking) = if let Some(replay) = live_replays.get(&guard_epoch) {
             (&replay.owner, &replay.guard_booking)
         } else {
-            if matches!(guard_epoch, 258 | 260)
+            if matches!(guard_epoch, 258 | 260 | 266)
                 || REGISTERED_REPLAYS
                     .iter()
                     .any(|spec| spec.epoch == guard_epoch)
@@ -1874,7 +1884,7 @@ fn measure(
             capacity::add(spec.scratch_cap, spec.receipt_disk)?,
             capacity::add(
                 spec.producer_memory,
-                capacity::add(CONTROLLER_MEMORY, 1 << 30)?,
+                capacity::add(spec.control_memory(), 1 << 30)?,
             )?,
         ),
         None => (
@@ -1896,6 +1906,10 @@ fn measure(
                 0
             },
         )?,
+    )?;
+    let periodic_reserve = capacity::add(
+        periodic_reserve,
+        live_replays.get(&266).map_or(0, |_| OVERLAP_266.control_memory()),
     )?;
     let guard_141_memory = active_interval_141.len() as u64 * interval141::GUARD_MEMORY;
     let restore_allowance = active_restore_266.as_ref().map_or(0, |_| restore266::ADDITIONAL_MEMORY);
@@ -1967,6 +1981,7 @@ fn measure(
         260 if matches!(&quote, Some(Quote::FullReplay(_))) => replay260::ROSTER_SCHEMA,
         260 => "foundation-epoch260-native-restore-roster-binding-v1",
         261 => "foundation-epoch261-delivery-roster-binding-v1",
+        266 => "foundation-epoch266-hourly-overlap-roster-binding-v1",
         296 => "foundation-epoch296-replay-roster-binding-v1",
         _ => "foundation-epoch262-roster-binding-v1",
     };
@@ -1986,6 +2001,7 @@ fn measure(
         "closed_delivery_257":closed_257,
         "active_holding_296_launch":active_holding_296.as_ref().map(|holding| &holding.launch),
         "active_restore_266_launch":active_restore_266.as_ref().map(|restore| &restore.launch),
+        "active_overlap_266_registration":live_replays.get(&266).map(|replay| &replay.reference),
         "active_interval_141_launch":active_interval_141.iter().find(|interval| interval.ordinal() <= 3).map(|interval| &interval.launch),
         "active_interval_141_fourth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 4).map(|interval| &interval.launch),
         "active_interval_141_fifth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 5).map(|interval| &interval.launch),
@@ -2145,6 +2161,7 @@ pub fn run() -> Result<()> {
                         | "--first7871-230-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
+                        | "--overlap266-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
                         | "--feature296-quote"
@@ -2166,7 +2183,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --first7871-230-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote, --interval141-fourth-quote, --interval141-fifth-quote, --interval141-sixth-quote or --interval141-seventh-quote"
+            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --first7871-230-quote, --focused258-quote, --focused260-quote, --overlap266-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote, --interval141-fourth-quote, --interval141-fifth-quote, --interval141-sixth-quote or --interval141-seventh-quote"
         ),
     };
     let synchronize = match args.next() {
@@ -2231,6 +2248,7 @@ pub fn run() -> Result<()> {
                         | "--first7871-230-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
+                        | "--overlap266-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
                         | "--feature296-quote"
@@ -2244,6 +2262,7 @@ pub fn run() -> Result<()> {
                 Some("--first7871-230-quote") => &FIRST_7871_230,
                 Some("--focused258-quote") => &RESTORE_258,
                 Some("--focused260-quote") => &RESTORE_260,
+                Some("--overlap266-quote") => &OVERLAP_266,
                 Some("--trace296-quote") => &TRACE_296,
                 Some("--feature296-quote") => &FEATURE_296,
                 _ => &LOADER_296,
