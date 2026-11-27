@@ -105,7 +105,6 @@ def register_attempt(plan, version, ordinary_replay, include_focused):
     if not profile.is_file():
         return
     epoch = FOCUSED.get(version, (296,))[0]
-    ordinary_replay = ordinary_replay and epoch == 296
     gate = plan["gates"][str(epoch)]
     registered = registration(version)
     evidence = [sealed(profile)]
@@ -152,8 +151,17 @@ def register_attempt(plan, version, ordinary_replay, include_focused):
 
 
 def register(plan, ordinary_replay=False, include_focused=True):
+    sample = bound(plan["observer"])
+    ordinary_260 = any(
+        row["range"] == "260-260"
+        and row["invocation_binding_stable"]
+        and row["producer_after"]["unit"] == "horizon-qualify-260-singleton-v1.service"
+        for row in sample["replays"]
+    )
     for version in ATTEMPTS:
-        register_attempt(plan, version, ordinary_replay, include_focused)
+        epoch = FOCUSED.get(version, (296,))[0]
+        ordinary = (epoch == 296 and ordinary_replay) or (epoch == 260 and ordinary_260)
+        register_attempt(plan, version, ordinary, include_focused)
 
 
 def owns(row):
