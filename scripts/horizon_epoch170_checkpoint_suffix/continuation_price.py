@@ -24,7 +24,7 @@ READ_UNIT = "horizon-170-73746882-closed-read-20261127-v1.service"
 CHECKER = "bounded-checkpoints"
 PREVIOUS_SLOTS = [73726716, 73746882]
 NEXT_DIRECTORY = RT / "epoch170-from-73766969-20261127-v1"
-FOLLOWING = OPERATOR in (NEXT_DIRECTORY / "operator-v1", NEXT_DIRECTORY / "closed-reader-v1")
+FOLLOWING = OPERATOR in (NEXT_DIRECTORY / "operator-v1", NEXT_DIRECTORY / "operator-v2", NEXT_DIRECTORY / "closed-reader-v1")
 if FOLLOWING:
     BRIDGE = UNIT
     ORIG = "c3ab30cfeb05428bb8f5c48a5a44822c"

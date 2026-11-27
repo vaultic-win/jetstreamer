@@ -22,8 +22,9 @@ def load(name):
 NEXT_DEPLOYMENT=Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73746882-20261127-v1/operator")
 RETRY_OPERATORS = {NEXT_DEPLOYMENT.parent/"attempt-2"/name for name in ("operator-v1", "operator-v2", "operator-v3")}
 FOLLOWING_DEPLOYMENT = NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73766969-20261127-v1/operator-v1"
+ENROLLING_FOLLOWING = FOLLOWING_DEPLOYMENT.with_name("operator-v2")
 FOLLOWING_READER = FOLLOWING_DEPLOYMENT.with_name("closed-reader-v1")
-CONTINUATIONS = {FOLLOWING_DEPLOYMENT, NEXT_DEPLOYMENT, NEXT_DEPLOYMENT.with_name("operator-with143-v1"), NEXT_DEPLOYMENT.with_name("operator-with143-v2")}
+CONTINUATIONS = {FOLLOWING_DEPLOYMENT, ENROLLING_FOLLOWING, NEXT_DEPLOYMENT, NEXT_DEPLOYMENT.with_name("operator-with143-v1"), NEXT_DEPLOYMENT.with_name("operator-with143-v2")}
 q=load("continuation_price" if Path(__file__).resolve().parent in CONTINUATIONS | RETRY_OPERATORS | {FOLLOWING_READER} else "successor_price")
 persist=load("closed_successor").persist
 D=q.ATTEMPT

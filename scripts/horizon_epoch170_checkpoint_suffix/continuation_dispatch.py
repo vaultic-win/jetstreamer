@@ -190,9 +190,20 @@ def admission_lock():
         yield
 
 
-def retry_writer(interface, ref):
+def enrollment_writer(interface, ref):
     base = q.RT/"survivor172-cadence-20261122-v1"
-    active, _ = q.read(base/"FAILED166_CADENCE_V46_ACTIVE.json")
+    if q.OPERATOR == operator.ENROLLING_FOLLOWING:
+        version = 47
+        binding, _ = q.read(q.OPERATOR/"binding.json")
+        expected = binding["writer_active"]
+        q.need(expected["path"] == str(base/"FAILED166_CADENCE_V47_ACTIVE.json"), "different fourth-window writer")
+        active = q.bound(expected)
+        prior_interface = q.bound(interface["old_release"])["interface"]
+    else:
+        q.need(q.RETRY, "this operator has no writer enrollment command")
+        version = 46
+        active, _ = q.read(base/"FAILED166_CADENCE_V46_ACTIVE.json")
+        prior_interface = interface["previous_interface"]
     writer = active["new"]
     state = q.state(writer["unit"])
     ready = q.bound(active["ready"])
@@ -200,15 +211,15 @@ def retry_writer(interface, ref):
     seal = q.bound(ready["package"])
     member, = (m for m in seal["members"] if m["name"] == program.name)
     q.need(active["schema"] == "horizon-epoch166-cadence-rejoin-active-v1" and not active["producer_mutations"]
-           and ready["successor170_interface"] == ref and ready["prior_successor170_interface"] == interface["previous_interface"]
+           and ready["successor170_interface"] == ref and ready["prior_successor170_interface"] == prior_interface
            and program.name == "status_cycle.py" and program.parent.parent == base
-           and re.fullmatch(r"tools-cold168-retry5-failed166-v46-entry146(?:-r[1-9][0-9]*)?", program.parent.name)
+           and re.fullmatch(rf"tools-cold168-retry5-failed166-v{version}-entry146(?:-r[1-9][0-9]*)?", program.parent.name)
            and program.resolve(strict=True) == program and seal["destination"] == str(program.parent)
            and ready["package"]["path"] == str(program.parent/"deployment-seal-receipt.json")
            and operator.digest(program) == member["sha256"] and state["ActiveState"] == "active"
            and state["InvocationID"] == writer["invocation_id"] and state["MainPID"] == str(writer["pid"])
            and int((Path("/proc")/str(writer["pid"])/"stat").read_text().rsplit(") ",1)[1].split()[19]) == writer["start_ticks"],
-           "current V46 writer has not accepted the retry")
+           "active writer has not accepted this bounded interface")
     return program
 
 
@@ -217,7 +228,7 @@ def dispatch(stage):
         q.need(q.FOLLOWING, "capture check requires its following-window reader")
     if q.FOLLOWING and stage in ("check-capture", "close"):
         deployment = Path(__file__).resolve().parent
-        q.need(deployment in {operator.FOLLOWING_READER, operator.FOLLOWING_DEPLOYMENT}
+        q.need(deployment in {operator.FOLLOWING_READER, operator.FOLLOWING_DEPLOYMENT, operator.ENROLLING_FOLLOWING}
                and q.DEP == operator.D and q.UNIT == operator.q.UNIT, "unbound following checker")
         if stage == "check-capture":
             return following_checker()
@@ -237,8 +248,9 @@ def dispatch(stage):
         v,ref=q.read(q.DEP/"SUCCESSOR_RELEASE.json")
         q.need(v["interface"]==ir and q.bound(v["actor"])["unit"]==q.UNIT,"unknown successor release")
         return ref
-    if q.RETRY:
-        retry_writer(i, ir)
+    enroll = q.RETRY or deployment == operator.ENROLLING_FOLLOWING
+    if enroll:
+        enrollment_writer(i, ir)
     if not (q.DEP/"SUCCESSOR_ACTOR.json").exists():
         q.need(stage=="advance","actor is not held")
         with admission_lock():
@@ -248,15 +260,15 @@ def dispatch(stage):
         q.need(stage=="advance","no actual guard")
         with admission_lock():
             operator.arm()
-    if q.RETRY and not (q.DEP/"WRITER_ENROLLMENT.json").exists():
+    if enroll and not (q.DEP/"WRITER_ENROLLMENT.json").exists():
         wait_for_guard()
         with admission_lock():
             operator.guard()
-            command = retry_writer(i, ir)
+            command = enrollment_writer(i, ir)
             _, head = q.prior.current_fleet()
             subprocess.run(["/usr/bin/python3", "-IB", str(command), "--enroll-next-bounded-170",
                             head["path"], head["sha256"]], check=True, timeout=70)
-            q.need((q.DEP/"WRITER_ENROLLMENT.json").is_file(), "V46 returned without an enrollment")
+            q.need((q.DEP/"WRITER_ENROLLMENT.json").is_file(), "writer returned without an enrollment")
     if not (q.DEP/"WRITER_ENROLLMENT.json").exists():
         changes = Changes()
         try:
@@ -289,7 +301,7 @@ def main():
                        dict(stage=stage,error=message,observed=int(time.time()),fleet_at_attempt=str(basis),
                             retry_on_new_accepted_fleet=retry,archive_publication_authorized=False))
                 if not retry: raise
-                if q.RETRY and (q.DEP/"SUCCESSOR_ACTOR.json").exists():
+                if (q.RETRY or q.OPERATOR == operator.ENROLLING_FOLLOWING) and (q.DEP/"SUCCESSOR_ACTOR.json").exists():
                     operator.same_actor()
                     # The native pre-release gate expires in ten minutes; reprice within its lifetime.
                     time.sleep(20)

@@ -19,7 +19,7 @@ HOME_BYTES = (44 << 30) + (64 << 20)
 RAM_BYTES = 31 << 30
 
 
-def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, epoch=141, v46=None):
+def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, epoch=141, v46=None, v47=None):
     replacement = epoch == 143
     version = 45 if replacement else 44
     package = PACKAGE.with_name("tools-cold168-retry5-failed166-v45-entry146") if replacement else PACKAGE
@@ -33,6 +33,13 @@ def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, ep
         package = WRITER_ROOT / "tools-cold168-retry5-failed166-v46-entry146-r2"
         active_path = WRITER_ROOT / "FAILED166_CADENCE_V46_ACTIVE.json"
         active_sha, seal_sha = v46
+    if v47 is not None:
+        if not replacement or v46 is not None:
+            raise ValueError("V47 booking is scoped to epoch 143")
+        version = 47
+        package = WRITER_ROOT / "tools-cold168-retry5-failed166-v47-entry146"
+        active_path = WRITER_ROOT / "FAILED166_CADENCE_V47_ACTIVE.json"
+        active_sha, seal_sha = v47
     home_bytes = (64 << 30)+(64 << 20) if replacement else HOME_BYTES
     ram_bytes = 41 << 30 if replacement else RAM_BYTES
     sys.path.insert(0, str(package))
@@ -49,7 +56,7 @@ def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, ep
     need(active["sha256"] == active_sha, "different live first-hourly writer")
     active_record = checked(active)
     writer = active_record["new"]
-    if v46 is not None:
+    if v46 is not None or v47 is not None:
         ready = checked(active_record["ready"])
         need(ready["package"] == cycle.entry() and ready["hourly_reader"] == bound(package / "first_hourly143.py")
              and writer["program"] == str(package / "status_cycle.py"),
@@ -69,8 +76,14 @@ def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, ep
     fit = checked(quote)
     if replacement:
         module = Path(price["path"])
+        allowed = {"booking-price-v47"} if v47 is not None else (
+            {"booking-price-v4", "booking-price-v5"} if v46 is not None else {"booking-price-v2", "booking-price-v3"})
+        if v47 is not None:
+            need(ready["old_owner"]["sha256"] == "657c9965f71dbff5478308c1c6a703bb4732855c6ac3d4b6daaa4dfa67907f4f"
+                 and checked(ready["retained_143_phase"])["writer"] == ready["old_owner"],
+                 "V47 did not inherit the original 143 booking authority")
         need(module.name == "price_hourly143.py" and module.parent.parent == profile.base
-             and module.parent.name in ({"booking-price-v4", "booking-price-v5"} if v46 is not None else {"booking-price-v2", "booking-price-v3"})
+             and module.parent.name in allowed
              and Path(operator["path"]) == module.with_name("launch-first-hourly143.sh"),
              "foreign epoch 143 operator or price")
         sys.path.insert(0,str(module.parent))
