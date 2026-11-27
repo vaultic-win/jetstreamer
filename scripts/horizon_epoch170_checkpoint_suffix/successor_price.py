@@ -140,11 +140,12 @@ def inactive(unit):
     return s
 
 
-def scope():
+def scope(attempt=ATTEMPT):
+    need(attempt in (DEP, DEP / "attempt-2"), "unknown successor pricing attempt")
     sha = ("b1977d6a8b65b654349b98a66748b77439b3539869bf1f4e758d2d76ea0851d3"
-           if ATTEMPT != DEP else "30ba2b754885f8ba7cf9abc04d9453bb1b8a030b0534b31d1801543ea8c4906a")
-    interface, ref = read(ATTEMPT/"BOUNDED_SUCCESSOR_WRITER_INTERFACE.json", sha)
-    if ATTEMPT != DEP:
+           if attempt != DEP else "30ba2b754885f8ba7cf9abc04d9453bb1b8a030b0534b31d1801543ea8c4906a")
+    interface, ref = read(attempt/"BOUNDED_SUCCESSOR_WRITER_INTERFACE.json", sha)
+    if attempt != DEP:
         failed = bound(interface["failed_predecessor"])
         preflight = bound(interface["private_state_native_preflight"])
         need(failed["guard_drained"] and failed["node_exited_before_worker"] and failed["private_segment_absent"]
@@ -154,8 +155,12 @@ def scope():
     return interface, ref
 
 
-def price(phase):
-    interface, iref = scope()
+def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None):
+    if live_tree_bounds is not None:
+        lower, upper = live_tree_bounds
+        need(phase == "held" and type(lower) is int and type(upper) is int and 0 < lower <= upper,
+             "invalid live guard tree bounds")
+    interface, iref = scope(attempt)
     fleet, fref = current_fleet()
     progress, progress_ref = read(RT/"epoch167-checkpoint-tail-20261127-v1/FIRST_PROTECTED_PROGRESS.json", PROGRESS)
     release = bound(progress["release"])
@@ -192,7 +197,7 @@ def price(phase):
              and s["Result"] == "success" and s["ExecMainCode"] == "1" and s["ExecMainStatus"] == "0"
              and s["MainPID"] == s["ControlPID"] == "0", "bridge exit did not accept exact producer")
         inactive(BRIDGE)
-        old_lower, old_upper = tree_bytes()
+        old_lower, old_upper = live_tree_bounds if live_tree_bounds is not None else tree_bytes()
     old_scoped = 0
     old_loss = max(0,peak(bound(anchors[BRIDGE]))-old_lower)
     if phase in ("start","held"):

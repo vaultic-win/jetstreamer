@@ -11,8 +11,8 @@ import time
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 AUTHORITY = BASE / "epoch141-first-hourly-20261127-v1"
 SUCCESSOR = BASE / "epoch170-from-73726716-20261127-v1"
-CORE = SUCCESSOR / "attempt-2/operator-v1/successor_price.py"
-CORE_SHA = "fe69d7bd87a7617675fc96175ac173b054d154e06e70135b0ab1013fc03c84e2"
+CORE = Path(__file__).with_name("successor_price.py")
+CORE_SHA = "27a6be851e54c23916d06769d2bc849038ae5316d936b3043692525a8661ee6c"
 TERMINAL = SUCCESSOR / "FAILED_SUCCESSOR_NATIVE_START.json"
 TERMINAL_SHA = "d81363677caab2e8789c01fd4ca6d9728d9f47f05ce57a08a9b29db7ab3d0f0a"
 CONTRACT = AUTHORITY / "contract-v1/LAUNCH_PROFILE.json"
@@ -111,6 +111,7 @@ def observe_successor(core):
                 "guard_timer_invocation_id": clock["InvocationID"],
                 "minimum_free_bytes": plan["minimum_free_bytes"],
                 "unallocated_HOME_bytes": cap - lower,
+                "tree_bounds": (lower, core.peak(sample)),
             }
         raise ValueError("active 170 replacement has no exact protected actor")
     ended, ended_ref = core.read(TERMINAL, TERMINAL_SHA)
@@ -148,7 +149,11 @@ def price(fleet, fleet_sha, held):
                   "wrong 141 whole-tree guard")
     else:
         core.inactive(UNIT)
-    joint = core.price("held" if successor["ActiveState"] == "active" else "start")
+    joint = core.price(
+        "held" if successor["ActiveState"] == "active" else "start",
+        attempt=SUCCESSOR / "attempt-2",
+        live_tree_bounds=successor_evidence.get("tree_bounds"),
+    )
     core.need(
         joint["fleet"] == {"path": fleet, "sha256": fleet_sha}
         and joint["extra"]["reserved_141"] == profile_ref
