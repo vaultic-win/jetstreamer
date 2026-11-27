@@ -12,6 +12,22 @@ struct Scope {
     kind: &'static str,
 }
 
+const PREDECESSOR_266_UNIT: &str = "horizon-qualify-266-original-predecessor-v1.service";
+const PREDECESSOR_266_PROFILE: &str =
+    "/var/lib/jetstreamer/horizon266-original-predecessor-static-v1/profile.json";
+const PREDECESSOR_266_PROFILE_SHA: &str =
+    "7ed80c05ae0e1c706a271452d9b0dcb516c651fd0f97a2ec3f1c61a477a30f21";
+const PREDECESSOR_266_PREFLIGHT: &str =
+    "/var/lib/jetstreamer/horizon266-original-predecessor-runtime-v1/preflight.json";
+const PREDECESSOR_266_PREFLIGHT_SHA: &str =
+    "de5680f4fc6634529348c9701f639a66cf333c7296f69a7645dc97f1297bc4ae";
+const PREDECESSOR_266_CUSTODY: &str =
+    "/var/lib/jetstreamer/horizon266-predecessor-intake-stage-v1/custody.json";
+const PREDECESSOR_266_CUSTODY_SHA: &str =
+    "afd03e2258229848a2878f1c2ff75b424ebf810b79fec65788c75ac5111a5959";
+const PREDECESSOR_266_RELEASE_SCHEMA: &str =
+    "foundation-epoch266-original-predecessor-guard-release-fit-v1";
+
 const SCOPES: &[Scope] = &[
     Scope {
         epoch: 230,
@@ -68,6 +84,13 @@ const SCOPES: &[Scope] = &[
         attempt: "hourly-overlap-114929697-v1",
         state: "horizon266-hourly-overlap-114929697-runtime-v1",
         kind: "epoch266-private-hourly-overlap",
+    },
+    Scope {
+        epoch: 266,
+        unit: PREDECESSOR_266_UNIT,
+        attempt: "original-predecessor-v1",
+        state: "horizon266-original-predecessor-runtime-v1",
+        kind: "epoch266-private-original-predecessor",
     },
     Scope {
         epoch: 296,
@@ -129,6 +152,10 @@ pub(super) fn launch_matches(claim: &DiagnosticClaim, launch: &Value) -> Option<
     )
 }
 
+fn predecessor_profile(bound: &BoundFile) -> bool {
+    bound.path == Path::new(PREDECESSOR_266_PROFILE) && bound.sha256 == PREDECESSOR_266_PROFILE_SHA
+}
+
 fn evidence(registration: &Value, key: &str) -> Result<Value> {
     let bound: BoundFile = serde_json::from_value(registration[key].clone())?;
     let meta = fs::symlink_metadata(&bound.path)?;
@@ -137,7 +164,10 @@ fn evidence(registration: &Value, key: &str) -> Result<Value> {
             && meta.is_file()
             && meta.uid() == 0
             && meta.nlink() == 1
-            && meta.mode() & 0o077 == 0,
+            && (meta.mode() & 0o077 == 0
+                || (key == "profile"
+                    && predecessor_profile(&bound)
+                    && meta.mode() & 0o777 == 0o444)),
         "focused Foundation evidence custody changed for {key}"
     );
     bound_json(&bound)
@@ -181,13 +211,38 @@ pub(super) fn check_bindings(claim: &DiagnosticClaim, launch: &Value) -> Result<
     );
     if claim.epoch == 266 {
         let release = evidence(launch, "guard_release_fit")?;
+        let release_schema = if claim.unit == PREDECESSOR_266_UNIT {
+            check_predecessor_scope(launch, &profile, &admission, &plan)?;
+            let custody = evidence(launch, "bootstrap_custody")?;
+            ensure!(
+                custody["schema"] == "foundation-epoch266-predecessor-input-custody-v1"
+                    && custody["epoch"] == 266
+                    && custody["profile"] == launch["profile"]
+                    && custody["input"]["path"] == profile["bootstrap"]["path"]
+                    && custody["input"]["sha256"] == profile["bootstrap"]["sha256"]
+                    && custody["input"]["generation"] == profile["bootstrap"]["generation"]
+                    && custody["input"]["bytes"] == profile["bootstrap"]["bytes"]
+                    && custody["whole_file_sha256_rechecked"] == true
+                    && custody["actual_readonly_projection_verified"] == true
+                    && custody["copy_only"] == true
+                    && custody["replay_launch_authorized"] == false
+                    && custody["publication_authorized"] == false,
+                "epoch 266 predecessor bootstrap custody differs"
+            );
+            PREDECESSOR_266_RELEASE_SCHEMA
+        } else {
+            ensure!(
+                launch["lossless_restore"] == profile["restore_receipt"],
+                "epoch 266 overlap restore binding differs"
+            );
+            "foundation-epoch266-hourly-overlap-guard-release-fit-v1"
+        };
         ensure!(
             profile["diagnostic_only"] == true
                 && launch["diagnostic_only"] == true
                 && launch["predecessor_native_tuple_qualified"] == false
                 && launch["cursor_normalization_qualified"] == false
-                && launch["lossless_restore"] == profile["restore_receipt"]
-                && release["schema"] == "foundation-epoch266-hourly-overlap-guard-release-fit-v1"
+                && release["schema"] == release_schema
                 && release["invocation_id"] == launch["invocation_id"]
                 && release["roster"] == admission["roster"]
                 && release["guard_plan"] == launch["guard_plan"]
@@ -195,6 +250,40 @@ pub(super) fn check_bindings(claim: &DiagnosticClaim, launch: &Value) -> Result<
             "epoch 266 diagnostic-only or guard release binding differs"
         );
     }
+    Ok(())
+}
+
+fn check_predecessor_scope(
+    launch: &Value,
+    profile: &Value,
+    admission: &Value,
+    plan: &Value,
+) -> Result<()> {
+    let profile_ref: BoundFile = serde_json::from_value(launch["profile"].clone())?;
+    ensure!(
+        predecessor_profile(&profile_ref)
+            && profile["schema"] == "foundation-epoch266-original-predecessor-runtime-profile-v1"
+            && profile["bootstrap_slot"] == 114_910_768
+            && profile["first_replay_slot"] == 114_910_769
+            && profile["first_output_slot"] == 114_912_000
+            && profile["last_slot"] == 114_923_430
+            && profile["expected_executed_positions"] == 12_662
+            && profile["expected_output_positions"] == 11_431
+            && profile["persistent_archive"]
+                == "/home/ubuntu/.jetstreamer-private/qualification-266-original-predecessor-v1/work/output/epoch-266-through-114923430.jet"
+            && admission["preflight"]["path"] == PREDECESSOR_266_PREFLIGHT
+            && admission["preflight"]["sha256"] == PREDECESSOR_266_PREFLIGHT_SHA
+            && launch["bootstrap_custody"]["path"] == PREDECESSOR_266_CUSTODY
+            && launch["bootstrap_custody"]["sha256"] == PREDECESSOR_266_CUSTODY_SHA
+            && plan["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
+            && plan["filesystem"] == "/"
+            && plan["minimum_free_bytes"] == profile["guard_floor_bytes"]
+            && plan["maximum_root_physical_bytes"] == profile["guarded_whole_tree_cap_bytes"]
+            && plan["maximum_worker_vmas"] == 3_500_000
+            && plan["receipt_directory"]
+                == "/var/lib/jetstreamer/horizon266-original-predecessor-runtime-v1/guard-receipts",
+        "epoch 266 predecessor profile, admission or guard scope differs"
+    );
     Ok(())
 }
 
@@ -266,5 +355,41 @@ mod tests {
             claim.unit = format!("horizon-perf-epoch{}-alias@v1.service", scope.epoch);
             assert_eq!(launch_matches(&claim, &launch), Some(false));
         }
+    }
+    #[test]
+    fn predecessor_scope_requires_its_sealed_profile_and_exact_private_window() {
+        let launch = json!({
+            "profile":{"path":PREDECESSOR_266_PROFILE,"sha256":PREDECESSOR_266_PROFILE_SHA},
+            "bootstrap_custody":{"path":PREDECESSOR_266_CUSTODY,"sha256":PREDECESSOR_266_CUSTODY_SHA}
+        });
+        let profile = json!({
+            "schema":"foundation-epoch266-original-predecessor-runtime-profile-v1",
+            "bootstrap_slot":114_910_768,"first_replay_slot":114_910_769,
+            "first_output_slot":114_912_000,"last_slot":114_923_430,
+            "expected_executed_positions":12_662,"expected_output_positions":11_431,
+            "persistent_archive":"/home/ubuntu/.jetstreamer-private/qualification-266-original-predecessor-v1/work/output/epoch-266-through-114923430.jet",
+            "guard_floor_bytes":3_770_104_987_645u64,"guarded_whole_tree_cap_bytes":16u64<<30,
+        });
+        let admission = json!({"preflight":{"path":PREDECESSOR_266_PREFLIGHT,
+                                            "sha256":PREDECESSOR_266_PREFLIGHT_SHA}});
+        let plan = json!({
+            "schema":"jetstreamer-horizon-standalone-guard-plan-v1","filesystem":"/",
+            "minimum_free_bytes":3_770_104_987_645u64,"maximum_root_physical_bytes":16u64<<30,
+            "maximum_worker_vmas":3_500_000,
+            "receipt_directory":"/var/lib/jetstreamer/horizon266-original-predecessor-runtime-v1/guard-receipts",
+        });
+        check_predecessor_scope(&launch, &profile, &admission, &plan).unwrap();
+        let mut wrong_output = profile.clone();
+        wrong_output["first_output_slot"] = json!(114_910_769);
+        assert!(check_predecessor_scope(&launch, &wrong_output, &admission, &plan).is_err());
+        let mut wrong_profile = launch.clone();
+        wrong_profile["profile"]["sha256"] = json!("a".repeat(64));
+        assert!(check_predecessor_scope(&wrong_profile, &profile, &admission, &plan).is_err());
+        let mut wrong_admission = admission.clone();
+        wrong_admission["preflight"]["sha256"] = json!("b".repeat(64));
+        assert!(check_predecessor_scope(&launch, &profile, &wrong_admission, &plan).is_err());
+        let mut wrong_plan = plan.clone();
+        wrong_plan["minimum_free_bytes"] = json!(1);
+        assert!(check_predecessor_scope(&launch, &profile, &admission, &wrong_plan).is_err());
     }
 }

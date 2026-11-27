@@ -99,6 +99,25 @@ class EnrollmentWriterTests(TestCase):
             with self.assertRaisesRegex(ValueError, "active writer"):
                 dispatch.enrollment_writer(self.interface, self.current)
 
+    def test_reconciled_operator_consumes_only_the_matching_v48_handoff(self):
+        self.stage(47)
+        predecessor = self.base/"FAILED166_CADENCE_V47_ACTIVE.json"
+        anchor = {"path": str(predecessor)}
+        original = self.docs[str(predecessor)]["new"]
+        original["lock"] = {"path": "/tmp/fixture", "device": 12, "inode": 15, "fd": 3}
+        program = self.stage(48)
+        successor = self.base/"FAILED166_CADENCE_V48_ACTIVE.json"
+        successor.touch()
+        self.docs[str(successor)]["old"] = original
+        self.docs[str(successor)]["new"]["lock"] = original["lock"]
+        self.docs["ready"]["old_owner"] = anchor
+        self.docs[str(dispatch.operator.RECONCILED_FOLLOWING/"binding.json")] = {"writer_active": anchor}
+        with patch.object(self.q, "OPERATOR", dispatch.operator.RECONCILED_FOLLOWING):
+            self.assertEqual(dispatch.enrollment_writer(self.interface, self.current), program)
+            self.docs["ready"]["old_owner"] = {"path": "different"}
+            with self.assertRaisesRegex(ValueError, "did not inherit"):
+                dispatch.enrollment_writer(self.interface, self.current)
+
 
 if __name__ == "__main__":
     main()
