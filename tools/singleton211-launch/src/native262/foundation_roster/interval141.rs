@@ -289,8 +289,9 @@ pub(super) fn candidate(ordinal: u8, before: &BTreeSet<String>) -> Result<Candid
         _ => None,
     };
     ensure!(
-        !before.contains(scope.unit)
-            && predecessor.is_none_or(|prior| !before.contains(prior.unit)),
+        ![&SECOND, &THIRD, &FOURTH, &FIFTH, &SIXTH]
+            .into_iter()
+            .any(|peer| peer.affinity == scope.affinity && before.contains(peer.unit)),
         "epoch 141 candidate overlaps a live owner"
     );
     let state = Path::new(scope.state);
@@ -529,6 +530,10 @@ fn fifth_evidence(state: &Path, fit: &Value) -> Result<()> {
 
 fn sixth_evidence(state: &Path, fit: &Value) -> Result<()> {
     const BOOT: &str = "snapshot-60948885-2EsJDSWGzZUaPKtjefUMfFnE2TWAn8ba5hAvDZbGaFfa.tar.zst";
+    const CUSTODY: &str = "4c8edb81d72670651eba603fc4e47a55b2411f9641d8ffc740e6af6e95df27fa";
+    const PAYLOAD: &str = "1024b6cce42b2a8e16c553056821d43f812dde0984481a4d1ad2d7fc1061c96f";
+    const MANIFEST: &str = "cbbec3909a24cf2afa31c2fdd9e3991abd16a6f3e52ebb103ce7dfd91f9dd01d";
+    const ETAG: &str = "c4b2d61a7b2271db50533414942fd208-38";
     let prior = Path::new(THIRD.state);
     let terminal = binding(&fit["predecessor_terminal"])?;
     let drain = binding(&fit["predecessor_drain"])?;
@@ -592,14 +597,12 @@ fn sixth_evidence(state: &Path, fit: &Value) -> Result<()> {
     let boot = boot.sealed()?;
     let custody = binding(&boot["custody"])?;
     ensure!(
-        custody.path == state.join("inputs/bootstrap-r2-custody.json"),
+        custody.path == state.join("inputs/bootstrap-r2-custody.json") && custody.sha256 == CUSTODY,
         "foreign sixth custody path"
     );
     let custody = custody.sealed()?;
     let installed = state.join("payloads").join(BOOT);
     let metadata = fs::symlink_metadata(&installed)?;
-    let payload = text(&boot, "sha256")?;
-    let manifest = text(&boot, "remote_manifest_sha256")?;
     ensure!(
         assignment["schema"] == "foundation-epoch141-sixth-assignment-v1"
             && assignment["predecessor_handoff_sha256"] == THIRD.handoff
@@ -618,12 +621,17 @@ fn sixth_evidence(state: &Path, fit: &Value) -> Result<()> {
             && boot["generation"] == 1_634_786_591_609_884u64
             && boot["installed_path"] == json!(installed)
             && boot["bytes"] == 2_529_738_702u64
+            && boot["sha256"] == PAYLOAD
+            && boot["remote_manifest_sha256"] == MANIFEST
+            && boot["etag"] == ETAG
             && custody["bytes"] == boot["bytes"]
-            && custody["sha256"] == payload
-            && custody["manifest_sha256"] == manifest
-            && custody["object_etag"] == boot["etag"]
-            && custody["object_key"] == format!("node_02/objects/{payload}.blob")
-            && custody["manifest_key"] == format!("node_02/manifests/{manifest}.json")
+            && custody["source_packet"]["sha256"] == SIXTH_SOURCE
+            && custody["sha256"] == PAYLOAD
+            && custody["manifest_sha256"] == MANIFEST
+            && custody["object_etag"] == ETAG
+            && custody["object_key"] == format!("node_02/objects/{PAYLOAD}.blob")
+            && custody["manifest_key"] == format!("node_02/manifests/{MANIFEST}.json")
+            && custody["authenticated_post_readback"]["authenticated"] == true
             && custody["authenticated_post_readback"]["conditional_final_identity"] == true
             && boot["inode"] == metadata.ino()
             && boot["device"] == metadata.dev()
@@ -635,4 +643,21 @@ fn sixth_evidence(state: &Path, fit: &Value) -> Result<()> {
         "sixth interval lacks its exact verified bootstrap or execution scope"
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sixth_candidate_refuses_both_live_predecessors_on_its_cpu_group() {
+        for occupied in [SECOND.unit, THIRD.unit, SIXTH.unit] {
+            let before = BTreeSet::from([occupied.to_owned()]);
+            let error = candidate(6, &before).err().unwrap();
+            assert_eq!(
+                error.to_string(),
+                "epoch 141 candidate overlaps a live owner"
+            );
+        }
+    }
 }
