@@ -10,7 +10,7 @@
 +        private_unit = "horizon-qualify-141-foundation-interval2-v1.service"
 +        assert registration["schema"] == "foundation-epoch141-interval2-replay-launch-v1"
 +        assert registration["unit"] == private_unit and not registration["canonical_publication_authorized"]
-+        current = props(private_unit, "ActiveState,InvocationID,MainPID")
++        current = props(private_unit, ["ActiveState", "InvocationID", "MainPID"])
 +        if current["ActiveState"] == "active":
 +            assert current["InvocationID"] == registration["invocation_id"] and int(current["MainPID"]) > 0
 +        assert private_unit not in plan["tracked_units"]
