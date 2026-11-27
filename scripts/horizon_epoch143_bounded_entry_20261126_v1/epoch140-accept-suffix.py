@@ -4,9 +4,12 @@ import hashlib
 import json
 import os
 import re
+import select
 import stat
 import subprocess
+import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -44,12 +47,16 @@ def read(path, uid):
     return json.loads(data), reference
 
 
-def inactive(unit):
+def native_properties(unit, fields):
     result = subprocess.run(
-        ["systemctl", "show", unit, "--property=Id,ActiveState,MainPID,ControlPID,Job"],
+        ["systemctl", "show", unit, "--property=" + fields],
         capture_output=True, text=True, check=False,
     )
-    values = dict(line.split("=", 1) for line in result.stdout.splitlines())
+    return dict(line.split("=", 1) for line in result.stdout.splitlines())
+
+
+def inactive(unit):
+    values = native_properties(unit, "Id,ActiveState,MainPID,ControlPID,Job")
     if values["Id"] != unit or values["ActiveState"] != "inactive" or values["Job"]:
         raise ValueError(f"scope has not drained: {unit}")
     if unit.endswith(".service") and (values["MainPID"], values["ControlPID"]) != ("0", "0"):
@@ -118,6 +125,11 @@ def accept():
         "start_slot": 60911752, "end_slot": 60911999, "pending_canonical_root_slot": 61328765,
         "canonical_root_verified": False, "publication_authorized": False,
     }
+    persist(output, receipt)
+
+
+
+def persist(output, receipt):
     fd, temp_name = tempfile.mkstemp(dir=AUTHORITY, prefix=".suffix-acceptance-")
     temp = Path(temp_name)
     try:
@@ -138,5 +150,69 @@ def accept():
     print(json.dumps(file_ref(output, 0)[0]))
 
 
+def capture_native():
+    import dbus
+
+    owner, owner_ref = read(AUTHORITY / "HELD_OWNER.json", 0)
+    loan, loan_ref = read(AUTHORITY / "CPU_LOAN_ACTIVE.json", 0)
+    iid = owner["invocation_id"]
+    pid = owner["pid"]
+    if owner["unit"] != UNIT or loan["candidate_invocation"] != iid or loan["candidate_pid"] != pid:
+        raise ValueError("CPU loan differs from the held recorder")
+    with open("/proc/sys/kernel/random/boot_id") as identity:
+        if identity.read().strip() != owner["boot_id"]:
+            raise ValueError("recorder boot identity changed")
+    bus = dbus.SystemBus(private=True)
+    proxy = bus.get_object("org.freedesktop.systemd1", "/org/freedesktop/systemd1")
+    manager = dbus.Interface(proxy, "org.freedesktop.systemd1.Manager")
+    # Keep the completed transient unit available while reading PID1's exact exit status.
+    manager.RefUnit(UNIT)
+    try:
+        fields = (
+            "InvocationID,ActiveState,MainPID,ExecMainPID,ExecMainCode,ExecMainStatus,"
+            "ExecMainExitTimestampMonotonic,Result"
+        )
+        start = native_properties(UNIT, fields)
+        if start["InvocationID"] != iid or int(start["MainPID"]) != pid:
+            raise ValueError("native recorder changed before capture")
+        with os.fdopen(os.pidfd_open(pid), "rb") as handle:
+            ticks = int(Path(f"/proc/{pid}/stat").read_text().rsplit(") ", 1)[1].split()[19])
+            if ticks != owner["start_ticks"]:
+                raise ValueError("recorder PID was reused")
+            deadline = loan["must_drain_by_unix_seconds"]
+            while time.time() < deadline:
+                if select.select([handle], [], [], min(50, max(0, deadline - time.time())))[0]:
+                    break
+            else:
+                raise ValueError("recorder missed its drain deadline")
+            for _ in range(30):
+                end = native_properties(UNIT, fields)
+                if end["ActiveState"] in ("inactive", "failed") and end["MainPID"] == "0":
+                    break
+                time.sleep(0.1)
+            else:
+                raise ValueError("PID1 did not report recorder drain")
+        if end["InvocationID"] != iid or int(end["ExecMainPID"]) != pid:
+            raise ValueError("PID1 terminal identity differs from the held recorder")
+        if int(end["ExecMainExitTimestampMonotonic"]) <= 0:
+            raise ValueError("PID1 has no immutable exit timestamp")
+        persist(AUTHORITY / "NATIVE_TERMINAL.json", {
+            "schema": "horizon-epoch140-native-terminal-v1", "invocation_id": iid, "pid": pid,
+            "boot_id": owner["boot_id"], "exec_main_code": int(end["ExecMainCode"]),
+            "exec_main_status": int(end["ExecMainStatus"]), "result": end["Result"],
+            "terminal_state": end["ActiveState"],
+            "exit_timestamp_monotonic_usec": int(end["ExecMainExitTimestampMonotonic"]),
+            "actor": owner_ref, "cpu_loan": loan_ref,
+        })
+    finally:
+        manager.UnrefUnit(UNIT)
+        bus.close()
+
+
 if __name__ == "__main__":
-    accept()
+    if sys.argv[1:] == ["--capture-native"]:
+        capture_native()
+    elif not sys.argv[1:]:
+        accept()
+    else:
+        raise SystemExit("usage: epoch140-accept-suffix.py [--capture-native]")
