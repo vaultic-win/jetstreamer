@@ -1,0 +1,925 @@
+--- a/post-stop-fit
++++ b/post-stop-fit
+@@ -57,7 +57,11 @@
+     D / "tools-homefloor-170-metered-hourly-v3",
+ )
+ FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
+-V31_JOINT168 = HERE == D / "tools-homefloor-170-full-metered-independent-v20-joint168-v31"
++REPLACE167 = HERE == D / "tools-homefloor-170-full-metered-independent-v20-joint168-v31-replace167-reserve"
++BOUNDED167_INTENT = None
++BOUNDED167_FIRST_GUARD = None
++V31_JOINT168 = REPLACE167 or HERE == D / "tools-homefloor-170-full-metered-independent-v20-joint168-v31"
++REPLACEMENT167_REQUEST = None
+ V30_JOINT168 = V31_JOINT168 or HERE == D / "tools-homefloor-170-full-metered-independent-v20-joint168-v30"
+ V29_JOINT168 = V30_JOINT168 or HERE == D / "tools-homefloor-170-full-metered-independent-v20-joint168-v29"
+ JOINT168 = V29_JOINT168 or HERE in (D / "tools-homefloor-170-full-metered-independent-v20-joint168",
+@@ -72,6 +76,7 @@
+ joint168_original_enrollment = None
+ v30_cadence = None
+ v31_cadence = None
++v32_cadence = None
+ FULL146 = JOINT168 or HERE in (
+     D / "tools-homefloor-170-full-metered-independent-v18-full146",
+     D / "tools-homefloor-170-full-metered-independent-v19-full146",
+@@ -285,6 +290,25 @@
+                            "V31 lost its sealed metered 170 terminal")
+                     native170_terminal = vars(authority31["full170_terminal"])
+                     terminal170_capacity = runpy.run_path(str(HERE/"terminal170_capacity.py"))
++                    if REPLACE167:
++                        replacement167_capacity = runpy.run_path(str(HERE/"replacement167_capacity.py"))
++                        terminal_joint168 = runpy.run_path(str(HERE/"terminal_joint168_capacity.py"))
++                        successor = latest.with_name("tools-cold168-retry5-failed166-v32-entry146")
++                        active32 = successor.parent/"FAILED166_CADENCE_V32_ACTIVE.json"
++                        if active32.exists():
++                            record32, active_ref32 = s.read(active32)
++                            ready32 = s.bound(record32["ready"], successor.parent/"FAILED166_CADENCE_V32_READY.json")
++                            seal32 = ready32["package"]
++                            s.need(record32["schema"] == "horizon-epoch166-cadence-rejoin-active-v1"
++                                   and ready32["old_owner"] == v31_cadence["active"]
++                                   and ready32["full170_terminal"] == native170_terminal["TERMINAL"]
++                                   and seal32["path"] == str(successor/"deployment-seal-receipt.json"),
++                                   "V32 lost the exact V31 predecessor or retained epoch 170 authority")
++                            loader["load_package"](successor, seal32["sha256"])
++                            v32_cadence = dict(schema="horizon-v32-joint168-capacity-generation-v1",
++                                               predecessor=v31_cadence["cadence_seal"], cadence_seal=seal32,
++                                               active=active_ref32, ready=record32["ready"])
++                            latest, joint168_cadence_seal = successor, seal32
+                 seal = s.bound(joint168_cadence_seal, latest / "deployment-seal-receipt.json")
+                 native_reader, = (m for m in seal["members"]
+                                   if m["name"] == "joint168_capacity.py" and m["mode"] == "0444")
+@@ -385,7 +409,11 @@
+     if V31_JOINT168:
+         writer168v4["DELIVERY_CADENCE_SEALS"][30] = v30_cadence["cadence_seal"]["sha256"]
+         writer168v4["JOINT_CADENCE"][31] = (
+-            v31_cadence["active"]["sha256"], v31_cadence["ready"]["sha256"], joint168_cadence_seal["sha256"])
++            v31_cadence["active"]["sha256"], v31_cadence["ready"]["sha256"], v31_cadence["cadence_seal"]["sha256"])
++        if v32_cadence is not None:
++            writer168v4["DELIVERY_CADENCE_SEALS"][31] = v31_cadence["cadence_seal"]["sha256"]
++            writer168v4["JOINT_CADENCE"][32] = (
++                v32_cadence["active"]["sha256"], v32_cadence["ready"]["sha256"], v32_cadence["cadence_seal"]["sha256"])
+ if CLOSED_RETRY3:
+     closed_bootstrap = runpy.run_path(str(HERE / "closed_retry3.py"))
+ if RETRY3_168:
+@@ -1377,6 +1405,38 @@
+     return json.loads(subprocess.check_output([program, "owner", mode, ref["path"], ref["sha256"]], timeout=20))
+
+
++def bounded167_owner(ref):
++    if BOUNDED167_INTENT is None:
++        return None, None
++    s.need(REPLACE167, "bounded 167 requires its exact reserve provider")
++    intent = bound(BOUNDED167_INTENT)
++    s.need(intent["prestart"]["fleet"] == ref, "bounded 167 crossed the fleet")
++    seal, _ = s.read(HERE / "deployment-seal-receipt.json")
++    program = HERE / "bounded167-admission.py"
++    row, = (item for item in seal["members"] if item["name"] == program.name and item["mode"] == "0555")
++    prepared = bound(intent["prepared"])
++    s.need(seal["destination"] == str(HERE) and
++           prepared["gate_source_sha256"] == row["sha256"],
++           "bounded 167 callback differs from the sealed gate source")
++    fit.binary(program, row["sha256"])
++    command = ["/usr/bin/python3", "-IB", program]
++    intent_args = [BOUNDED167_INTENT[key] for key in ("path", "sha256")]
++    actor = json.loads(subprocess.check_output([*command, "owner", *intent_args], timeout=20))
++    s.need(actor["intent"] == BOUNDED167_INTENT, "bounded 167 callback crossed the intent")
++    if BOUNDED167_FIRST_GUARD is None:
++        return actor, None
++    guard = bound(BOUNDED167_FIRST_GUARD)
++    s.need(guard["schema"] == "horizon-epoch167-bounded-first-guard-v1"
++           and guard["intent"] == BOUNDED167_INTENT and guard["actor"] == actor,
++           "bounded 167 crossed the first-guard receipt")
++    proof = json.loads(subprocess.check_output(
++        [*command, "first-guard", *intent_args,
++         guard["plan"]["path"], guard["plan"]["sha256"],
++         guard["sample"]["path"], guard["sample"]["sha256"]], timeout=20))
++    s.need(proof == guard, "bounded 167 native guard lost its exact first proof")
++    return actor, guard
++
++
+ def focused168_held():
+     unit = "horizon-qualify-168-full-metered-cold-v6-20261126.service"
+     state = s.show(unit)
+@@ -1407,7 +1467,7 @@
+
+
+ def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None,hourly170_owner=None,repro166=None,
+-           focused168=None, entry143=False, full146=None, joint168=None):
++           focused168=None, entry143=False, full146=None, joint168=None, held167=None):
+     expect={v["unit"]:v["processes"] for v in peers.values()}
+     expect.update({v["producer_unit"]:v["processes"] for v in replacements.values()})
+     if extra and extra["actor"]:
+@@ -1429,6 +1489,13 @@
+                len(repro166["processes"]) == 1 and repro166["processes"][0][:2] ==
+                [repro166["producer_pid"], repro166["start_ticks"]], "different held epoch 166 qualifier")
+         expect[unit] = repro166["processes"]
++    if held167 is not None:
++        unit = replacement167_capacity["EXACT_UNIT"]
++        s.need(REPLACE167 and own == 145 and repro166 is None and held167["unit"] == unit
++               and unit not in expect and len(held167["processes"]) == 1
++               and held167["processes"][0][:2] == [held167["producer_pid"], held167["start_ticks"]],
++               "different held bounded epoch 167 qualifier")
++        expect[unit] = held167["processes"]
+     if focused168 is not None:
+         unit = focused168_capacity["UNIT"]
+         bound170 = hourly170_owner is not None or V31_JOINT168 and focused168.get("terminal")
+@@ -1887,7 +1954,7 @@
+     return {"observation": receipt, "terminal": terminal}
+
+
+-def inspect_joint168(actor, status, *, measured=None):
++def inspect_joint168(actor, status, fleet, *, measured=None):
+     if JOINT168_REQUEST is None:
+         return None
+     s.need(actor and actor["mode"] == "active", "joint 168 requires exact active epoch 146")
+@@ -1896,6 +1963,9 @@
+            or joint168_cadence_seal is not None and status["consumer_seal"] == joint168_cadence_seal,
+            "joint 168 requires its registered sole cadence writer")
+     enrollment_status = joint168_original_enrollment or status
++    if REPLACE167 and JOINT168_REQUEST["mode"] == "terminal":
++        return terminal_joint168["inspect"](s, joint168_capacity, JOINT168_REQUEST, incumbent,
++                                            enrollment_status, fleet, tree_size, measured=measured)
+     return joint168_capacity["inspect"](s, JOINT168_REQUEST, incumbent, enrollment_status, tree_size,
+                                         measured=measured)
+
+@@ -1943,7 +2013,7 @@
+     peers=survivors(rows,ledger);status=registered_status()
+     epoch146_actor = full146_capacity["inspect"](
+         s, fit, FULL146_REQUEST, ref, f, status, successor=joint168_cadence_seal) if FULL146 else None
+-    joint168_actor = inspect_joint168(epoch146_actor, status)
++    joint168_actor = inspect_joint168(epoch146_actor, status, f)
+     focused168 = None
+     if FULL170_FOCUSED168_ACTIVE:
+         s.need(active170 or retained170, "focused epoch 168 price requires a bound full epoch 170 generation")
+@@ -1953,6 +2023,7 @@
+     hourly170_owner = hourly170_guard = hourly170_contract = hourly170_row = None
+     full170_guard = None
+     repro166 = reproduction166_owner(repro166_mode,ref)
++    held167, protection167 = bounded167_owner(ref)
+     if FULL170 and not retained170:
+         if FULL146:
+             s.need(FULL146_REQUEST is not None and full170_mode == "active",
+@@ -2012,6 +2083,10 @@
+     if retained170:
+         s.need(170 not in rows and 170 not in closed and 170 in interrupted,
+                "epoch 170 terminal lost the original stopped booking")
++    if REPLACE167:
++        s.need(retained167 and retained170 and repro166 is None,
++               "replace only the original drained 167 compute envelope")
++        replaced167 = replacement167_capacity["original"](s, f, retained167, REPLACEMENT167_REQUEST, held167, protection167)
+     closed_prepaid={}
+     rep={};books={}
+     for e in sorted(ORIGINAL):
+@@ -2102,7 +2177,7 @@
+         focused_run = Path(focused168["run"]) if focused168 else None
+         # The joint producer's changing subtree is measured by its whole-lane guard.
+         # Keep the older settled retry5 walk limited to the fixed remainder.
+-        joint_tree = joint168_capacity["RUN"] if V29_JOINT168 and joint168_actor and joint168_actor["mode"] == "active" else None
++        joint_tree = joint168_capacity["RUN"] if V29_JOINT168 and joint168_actor and joint168_actor["mode"] in ("active", "terminal") else None
+         static = tree_size(s.TREE, cap168, run168, focused_run, joint_exclusion=joint_tree)
+         s.need(static == tree_size(s.TREE, cap168, run168, focused_run, joint_exclusion=joint_tree),
+                "retained retry4 and sibling allocation changed")
+@@ -2198,7 +2273,7 @@
+     entry143 = epoch143_lease is not None
+     entry_lease = epoch143_lease if entry143 else entry_lease
+     population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner,repro166,
+-                                   focused168, entry143, epoch146_actor, joint168_actor)
++                                   focused168, entry143, epoch146_actor, joint168_actor, held167)
+     if closed169:books["169"]=focused169_booking(closed169)
+     if closed172:books["172"]=full172_booking(closed172)
+     raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
+@@ -2231,17 +2306,24 @@
+     if resident168:resident["168"]=resident168
+     needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
+     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
++    if REPLACE167:
++        compute167 = replacement167_capacity["memory"](s, fit, REPLACEMENT167_REQUEST,
++                                                        peers["172"], epoch146_actor, joint168_actor)
++        needmem = compute167["native_required_available_memory_bytes"]
++        after_mem = next(int(line.split()[1])*1024 for line in Path("/proc/meminfo").read_text().splitlines()
++                         if line.startswith("MemAvailable:"))
++        mem["MemAvailable:"] = min(mem["MemAvailable:"], after_mem)
+     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
+     s.need(fleet_head(ref)[1]==fleet_rows and phase145(epoch, ref, serial_holder_pid=serial_holder_pid)==phase and registered_status()==status and
+            census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner,repro166,
+-                  focused168, entry143, epoch146_actor, joint168_actor)==(population,qualification),
++                  focused168, entry143, epoch146_actor, joint168_actor, held167)==(population,qualification),
+            "capacity generation changed during collection")
+     if FULL146:
+         full146_capacity["check_same"](s, epoch146_actor, full146_capacity["inspect"](
+             s, fit, FULL146_REQUEST, ref, f, status, successor=joint168_cadence_seal))
+     if joint168_actor is not None:
+         joint168_actor = joint168_capacity["pair"](s, joint168_actor,
+-                                                  inspect_joint168(epoch146_actor, status))
++                                                  inspect_joint168(epoch146_actor, status, f))
+     if prestart136 is None and not c136["occupied"]:
+         s.need(registered136(f,status["registration"])==c136,"136 idle or release generation changed during collection")
+     if prestart136 is not None:
+@@ -2326,6 +2408,13 @@
+                "drained epoch 170 changed during capacity capture")
+         recovered_price["retained_170"] = terminal170_capacity["bind_booking"](s, retained170, books["170"])
+         recovered_price["v31_cadence"] = v31_cadence
++        if v32_cadence is not None:
++            recovered_price["v32_cadence"] = v32_cadence
++    if REPLACE167:
++        s.need(replacement167_capacity["original"](s, f, retained167, REPLACEMENT167_REQUEST, held167, protection167)==replaced167,
++               "bounded 167 replaced compute proof changed")
++        recovered_price["replacement_167_compute"] = compute167
++        recovered_price["original_167_compute"] = replaced167
+     if failed166:
+         s.need(retry11["failed"](s, fit, f, rows) == failed166 and "166" not in rep,
+                "failed epoch 166 changed during capacity capture")
+@@ -2394,6 +2483,11 @@
+     if REPRO166 or V31_JOINT168:
+         s.need(reproduction166_owner(repro166_mode, ref) == repro166, "epoch 166 gate or first guard changed during capture")
+         native["reproduction166_owner"] = repro166
++    if REPLACE167:
++        s.need(bounded167_owner(ref) == (held167, protection167),
++               "bounded 167 gate or first guard changed during capture")
++        native["bounded167_owner"] = held167
++        native["bounded167_first_guard"] = protection167
+     if FULL170_RETRY5:
+         native.update(full170_retry5_owner=retry5_owner, full170_retry5_current=retry5_current)
+         if focused168:
+@@ -2645,7 +2739,7 @@
+         native = capture_native(epoch,ref,verified_prestart if prestart136 is not None else None,
+                                 hourly170_mode,full170_mode,repro166_mode,
+                                 serial_holder_pid=serial_holder_pid)
+-        if V31_JOINT168:
++        if V31_JOINT168 and not REPLACE167:
+             followup = native["full146_census"]["proposal"]["epoch168_followup_memory_bytes"]
+             required = native["required_available_memory_bytes"] + followup + 52*G
+             available = native["available_memory_bytes"]
+@@ -2740,7 +2834,7 @@
+                 joint = price.pop("joint168_census", None)
+                 if joint is not None:
+                     joint = joint168_capacity["pair"](s, joint, inspect_joint168(
+-                        basis, status, measured=joint["physical"]))
++                        basis, status, fleet, measured=joint["physical"]))
+                     joined = dict(price["population"])
+                     unit = joint168_capacity["UNIT"]
+                     booked = price["population"].pop(unit, None)
+@@ -2750,8 +2844,15 @@
+                 price = full146_capacity["project"](s, price, basis, FULL146_REQUEST)
+                 if joint is not None:
+                     price = joint168_capacity["project"](s, price, joint, JOINT168_REQUEST)
++                    if REPLACE167 and joint["mode"] == "terminal":
++                        price = terminal_joint168["settle_compute"](s, price, joint)
+                     price["joined_native_population"] = joined
+-                    if V31_JOINT168:
++                    if REPLACE167:
++                        price["replacement167_fit"] = replacement167_capacity["project"](
++                            s, price, REPLACEMENT167_REQUEST,
++                            native["original_167_compute"], native["replacement_167_compute"])
++                        price["fit"]["fits"] = price["replacement167_fit"]["fits"]
++                    elif V31_JOINT168:
+                         price["dormant166_HOME_projection"] = terminal170_capacity["dormant166"](
+                             s, price, full170_capacity["MIN_FLOOR"])
+                     elif V29_JOINT168 and joint["mode"] == "active":
+@@ -2760,10 +2861,18 @@
+             if V30_JOINT168:
+                 want = {full146_capacity["UNIT"], joint168_capacity["UNIT"],
+                         "horizon-qualify-172-full-half-core-20261120-v1.service"}
++                if REPLACE167 and price["mode"] == "terminal":
++                    want.remove(joint168_capacity["UNIT"])
+                 if not V31_JOINT168:
+                     want.add(full170["UNIT"])
+                 elif held166 := native.get("reproduction166_owner"):
+                     want.add(held166["unit"])
++                if REPLACE167:
++                    selected = native["bounded167_owner"], native["bounded167_first_guard"]
++                    if selected[0] is not None:
++                        want.add(selected[0]["unit"])
++                    s.need(bounded167_owner(ref) == selected,
++                           "bounded 167 gate or first guard changed after repricing")
+                 s.need(price["schema"] == joint168_capacity["OUTPUT_SCHEMA"]
+                        and set(price["joined_native_population"]) == want,
+                        "combined capacity changed the exact live population")
+@@ -2878,9 +2987,34 @@
+                and FULL146_REQUEST["mode"] in ("prestart", "held", "active"),
+                "invalid full 146 accounting request")
+     if JOINT168 and args[:1] == ["--joint168-request"]:
+-        s.need(len(args) == 6 and args[1].startswith("/") and FULL146_REQUEST["mode"] == "active",
++        s.need(len(args) in ((9, 12, 15) if REPLACE167 else (6,))
++               and args[1].startswith("/") and FULL146_REQUEST["mode"] == "active",
+                "usage: ... --full146-request REQUEST SHA256 --joint168-request REQUEST SHA256 145 FLEET SHA256")
+-        JOINT168_REQUEST = joint168_capacity["request_args"](s, s.ref(Path(args[1]), args[2]))
++        joint_ref = s.ref(Path(args[1]), args[2])
++        if REPLACE167 and joint168_capacity["read"](s, joint_ref)["mode"] == "terminal":
++            JOINT168_REQUEST = terminal_joint168["request_args"](s, joint168_capacity, joint_ref)
++        else:
++            JOINT168_REQUEST = joint168_capacity["request_args"](s, joint_ref)
++        args = args[3:]
++    if REPLACE167:
++        s.need(len(args) in (6, 9, 12) and args[0] == "--replacement167-request" and args[1].startswith("/"),
++               "missing exact bounded 167 replacement request")
++        proposal = s.ref(Path(args[1]), args[2])
++        REPLACEMENT167_REQUEST = replacement167_capacity["ready_request"](s, proposal, bound(proposal))
++        args = args[3:]
++    if args[:1] == ["--bounded167-request"]:
++        s.need(REPLACE167 and len(args) in (6, 9) and args[1].startswith("/"),
++               "missing exact bounded 167 held admission request")
++        BOUNDED167_INTENT = s.ref(Path(args[1]), args[2])
++        s.need(Path(BOUNDED167_INTENT["path"]) == replacement167_capacity["CANDIDATE_ROOT"]/"START_INTENT.json",
++               "different bounded 167 start intent path")
++        args = args[3:]
++    if args[:1] == ["--bounded167-first-guard"]:
++        s.need(BOUNDED167_INTENT is not None and len(args) == 6 and args[1].startswith("/"),
++               "missing exact bounded 167 first guard request")
++        BOUNDED167_FIRST_GUARD = s.ref(Path(args[1]), args[2])
++        s.need(Path(BOUNDED167_FIRST_GUARD["path"]) == replacement167_capacity["CANDIDATE_ROOT"]/"FIRST_GUARD.json",
++               "different bounded 167 first guard path")
+         args = args[3:]
+     repro166_mode = None
+     if args and args[0].startswith("--repro166="):
+@@ -2891,7 +3025,8 @@
+         args=args[1:]
+     s.need(len(args)==3,"usage: post-stop-fit [--next-admission] EPOCH FLEET_ABSOLUTE_PATH FLEET_SHA256")
+     if V30_JOINT168:
+-        s.need(JOINT168_REQUEST is not None and JOINT168_REQUEST["mode"] == "active"
++        s.need(JOINT168_REQUEST is not None
++               and JOINT168_REQUEST["mode"] in (("active", "terminal") if REPLACE167 else ("active",))
+                and FULL146_REQUEST["mode"] == "active"
+                and full170_mode == ("retained" if V31_JOINT168 else "active"),
+                "V30 requires the combined active 146, 168 and 170 requests")
+--- a/full146_capacity.py
++++ b/full146_capacity.py
+@@ -112,7 +112,7 @@
+         st = (Path('/proc')/str(pid)/'exe').stat()
+         processes.append([pid, ticks, st.st_dev, st.st_ino])
+     protected = request['guard']
+-    footprint, timers = 0, None
++    footprint, physical_lower, timers = 0, None, None
+     if protected:
+         plan = read(s, protected['plan'])
+         sample = read(s, protected['sample'])
+@@ -132,13 +132,17 @@
+             oldest = max(oldest, boot + child['start_ticks'] // os.sysconf('SC_CLK_TCK'))
+         route['sample_guard'](sample, a, profile, protected['plan'],
+                               row['worker']['pid'] if row.get('worker') else None, oldest)
+-        footprint = sample['root_physical_observation']['conservative_physical_bytes']
++        walk = sample['root_physical_observation']
++        footprint = walk['conservative_physical_bytes']
++        if all(walk[side]['vanished_entries'] == 0 for side in ('first', 'second')):
++            physical_lower = min(walk[side]['physical_bytes'] for side in ('first', 'second'))
+     else:
+         s.need(mode == 'held', 'released full 146 requires its exact current protective sample')
+     route['recheck'](row)
+     return dict(mode=mode, proposal=p, unit=UNIT, actor=a, enrollment=row['enrollment'],
+                 quote=enrolled['quote'], profile=enrolled['profile'], processes=processes,
+-                phase=row['phase'], footprint=footprint, timers=timers, guard=protected,
++                phase=row['phase'], footprint=footprint, guard_physical_lower_bytes=physical_lower,
++                timers=timers, guard=protected,
+                 armed_floor=quote['pending_guard']['minimum_free_bytes'],
+                 available_guard_bytes=sample['available_bytes'] if protected else None)
+
+@@ -180,6 +184,11 @@
+         expected.add(held166['unit'])
+         s.need(native['population'].get(held166['unit']) == [row[:2] for row in held166['processes']],
+                'epoch 166 hold changed the native census')
++    if held167 := native.get('bounded167_owner'):
++        s.need(held166 is None and held167['unit'] not in expected
++               and native['population'].get(held167['unit']) == [row[:2] for row in held167['processes']],
++               'bounded epoch 167 changed the full 146 census')
++        expected.add(held167['unit'])
+     old = native['retry5_complete_booking']
+     terminal = native['focused168_retry6']
+     cost = native['epoch185_serial_cost']
+--- a/focused168_capacity.py
++++ b/focused168_capacity.py
+@@ -15,7 +15,8 @@
+             "tools-cold168-retry5-failed166-v28-entry146",
+             "tools-cold168-retry5-failed166-v29-entry146",
+             "tools-cold168-retry5-failed166-v30-entry146",
+-            "tools-cold168-retry5-failed166-v31-entry146"}
++            "tools-cold168-retry5-failed166-v31-entry146",
++            "tools-cold168-retry5-failed166-v32-entry146"}
+ FLEET_FIELD = "current_cold168_retry6_focused"
+ TERMINAL_FIELD = "current_cold168_retry6_terminal"
+ TERMINAL_SHA = "5e67a984da9df5350bfce86060557a18603dbac5a18a06747c272922d14b7b71"
+@@ -42,7 +43,8 @@
+                                                        "tools-cold168-retry5-failed166-v28-entry146",
+                                                        "tools-cold168-retry5-failed166-v29-entry146",
+                                                        "tools-cold168-retry5-failed166-v30-entry146",
+-                                                       "tools-cold168-retry5-failed166-v31-entry146")
++                                                       "tools-cold168-retry5-failed166-v31-entry146",
++                                                       "tools-cold168-retry5-failed166-v32-entry146")
+                and not fleet.get(FLEET_FIELD), "foreign or overlapping focused epoch 168 terminal transition")
+         return inspect_terminal(s, script, fleet, authority)
+     code = (
+--- /dev/null
++++ b/replacement167_capacity.py
+@@ -0,0 +1,312 @@
++"""Reprice only stopped 167's compute for a bounded, private replacement."""
++import os
++from pathlib import Path
++import subprocess
++
++G = 1 << 30
++R = Path('/var/lib/jetstreamer/horizon_runtime_data')
++HOME = Path('/home/sol')
++LANE = HOME/'.jetstreamer-private/epoch167-standard-lane-20261109-v1'
++TERMINAL_ROOT = R/'epoch167-source-index-rebook-20261122-v3'
++CANDIDATE_ROOT = R/'epoch167-checkpoint-bounded-20261127-v1'
++ORIGINAL_PRODUCER = 68*G
++ORIGINAL_GUARD = G
++ORIGINAL_CPU = 9_000_000
++ORIGINAL_GUARD_CPU = 1_000_000
++HOST_MEMORY = 810_658_050_048
++HOST_CPU = 64_000_000
++CAP = 512*G
++EXACT_BOOTSTRAP = 72_509_256
++FAILURE_SLOT = 72_512_769
++EXACT_ENDPOINT = 72_515_090
++EXACT_CHECKPOINT_HASH = 'DWgHoJPPD1XaWGLpasfR4RVnAU1CBoKUrjCgtoCfEDPK'
++EXACT_CHECKPOINT_GENERATION = '1634787383763977'
++EXACT_UNIT = 'horizon-qualify-167-checkpoint-bounded-20261127-v1.service'
++EXACT_RUN = LANE/'checkpoint-inputs-20261127-v1/bounded-72509256-72515090-v1'
++OLD_IID = '6e4b569b61d7420fb30a24a4ad0609dd'
++ORIGINAL_SOURCES = {
++    'admitted_profile': (TERMINAL_ROOT/'PREPARED.json',
++                         '624812f486eb3340eb83acc540c8ec17a9082cad81c9a618fb1f7f98acafe916'),
++    'guard_command': (TERMINAL_ROOT/'GUARD_ARGV.json',
++                      '5252aaf37b2a91b6bcb82a812bdd95629ba46f3f2988ca1795c74ecc1c26d32c'),
++    'same_book': (TERMINAL_ROOT/'POST_GUARD_CAPACITY.json',
++                  '82d684eb0ea2220b599d2deec942f6236923b0f2a0b2be760dcdc76198c9f615'),
++    'original_accounting': (R/'epoch145-guarded-export-20261121-v1/state/de6780b860b3467bae21fbd19176ca14/first-guard.json',
++                            '5860cc4748c58a76b34ec56234e1d8fd2ae7293df8cb424f22f1cc1dca677be4'),
++    'survivor_ledger': (R/'epoch172-full-half-core-20261120-v1/POST_GUARD_CAPACITY.json',
++                        'e94d1b2cb8eed6c1df6ffa4e5958a24e660ef25fbd7e9a80e99a1cf914afc9eb'),
++}
++INPUT_DIGEST = HOME/'.jetstreamer-private/epoch167-terminal-20261127.erjgkVSx/167_SOURCE_DIGESTS.json'
++
++
++def ready_request(s, refs, raw):
++    keys = {'schema','epoch','producer_unit','run_root','append_log','bootstrap_slot','stop_at_slot',
++            'producer_memory_bytes','producer_memory_high_bytes','guard_memory_bytes','producer_cpu_quota_micros','guard_cpu_quota_micros',
++            'run_peak_bytes','log_allowance_bytes','swap_bytes','closed_inputs',
++            'checkpoint_accounts_hash','checkpoint_generation'}
++    s.need(set(raw)==keys and raw['schema']=='horizon-epoch167-replacement-compute-request-v1'
++           and raw['epoch']==167 and raw['bootstrap_slot']==EXACT_BOOTSTRAP and raw['stop_at_slot']==EXACT_ENDPOINT
++           and raw['checkpoint_accounts_hash']==EXACT_CHECKPOINT_HASH
++           and raw['checkpoint_generation']==EXACT_CHECKPOINT_GENERATION
++           and raw['producer_unit']==EXACT_UNIT
++           and all(type(raw[key]) is int for key in
++                   ('producer_memory_bytes','producer_memory_high_bytes','guard_memory_bytes','producer_cpu_quota_micros',
++                    'guard_cpu_quota_micros','run_peak_bytes','log_allowance_bytes','swap_bytes'))
++           and raw['producer_memory_bytes']==42*G and raw['producer_memory_high_bytes']==40*G
++           and raw['guard_memory_bytes']==ORIGINAL_GUARD and raw['swap_bytes']==0
++           and raw['producer_cpu_quota_micros']==3_000_000 and raw['guard_cpu_quota_micros']==250_000
++           and raw['run_peak_bytes']==48*G and raw['log_allowance_bytes']==512 << 20,
++           'invalid bounded 167 replacement compute or scope')
++    path = Path(raw['run_root'])
++    log = Path(raw['append_log'])
++    s.need(path==EXACT_RUN and path.resolve()==path and (not path.exists() or path.is_dir())
++           and log==path/'producer.log' and log.resolve()==log and
++           (not log.exists() or (log.is_file() and log.stat().st_nlink==1
++                                 and log.stat().st_size<=raw['log_allowance_bytes'])),
++           'candidate output and append log must have one private run leaf under the paid lane')
++    closed = s.bound(raw['closed_inputs'], INPUT_DIGEST)
++    s.need(closed['schema']=='horizon-167-closed-input-digests-v1'
++           and closed['archive_finalized'] is closed['payload_semantics_verified'] is False
++           and closed['physical_end_exclusive']==FAILURE_SLOT-1,
++           'candidate lacks exact original input provenance')
++    for key in ('bootstrap','source_archive'):
++        item = closed[key]
++        target = Path(item['path'])
++        meta = target.lstat()
++        s.need(target.is_relative_to(LANE) and target.resolve(strict=True)==target
++               and (meta.st_dev,meta.st_ino,meta.st_size,meta.st_mtime_ns)==
++                   (item['device'],item['inode'],item['length'],item['mtime_ns']),
++               'closed epoch 167 input changed: '+key)
++    return dict(ref=refs, scope=raw, closed_terminal=closed['terminal'])
++
++
++def original(s, fleet, retained, request, actor, guard):
++    paths = {name:s.ref(path,digest) for name,(path,digest) in ORIGINAL_SOURCES.items()}
++    data = {name:s.bound(ref,ORIGINAL_SOURCES[name][0]) for name,ref in paths.items()}
++    prior = fleet['cold167_execution_failure']
++    manager = prior['historical_replay']['unit']
++    stopped = data['same_book']
++    anchor = data['original_accounting']['fit']
++    ledger = data['survivor_ledger']
++    owner = stopped['actual_original_stops']['167']['original']
++    allocated = stopped['bookings']['167']
++    cpu = data['admitted_profile']['profile']['producer_argv']
++    original_guard_argv = data['guard_command']
++    s.need(prior['terminal']==retained['terminal']==request['closed_terminal']
++           and prior['post_guard_capacity']==paths['same_book']
++           and prior['producer_invocation_id']==manager['InvocationID']==OLD_IID
++           and prior['reservation_ending_bytes']==prior['resource_credit_bytes']==0
++           and fleet['all_existing_memory_DATA_OS_native_transport_promises_retained'] is True
++           and fleet['all_reservation_ending_bytes']==fleet['resource_credit_bytes']==0
++           and owner['producer_unit']==ledger['owners']['167']['unit']
++           and owner['producer_invocation_id']==ledger['owners']['167']['iid']
++           and owner['timer_invocation_id']==ledger['owners']['167']['timer_iid']
++           and manager['MemoryMax']==str(ORIGINAL_PRODUCER) and manager['CPUQuotaPerSecUSec']=='9s'
++           and manager['MemorySwapMax']=='0'
++           and all(arg in cpu for arg in ('--property=MemoryMax=73014444032','--property=CPUQuota=900%'))
++           and all(arg in original_guard_argv for arg in ('--property=MemoryMax=1G','--property=CPUQuota=100%'))
++           and allocated['root']==str(LANE) and allocated['cap_bytes']==CAP
++           and anchor['existing_total_memory']==ledger['complete_memory_plus_reserve_bytes']
++               ==stopped['complete_memory_plus_reserve_bytes']==HOST_MEMORY
++           and anchor['charged_cpu_micros']==ledger['complete_cpu_quota_micros']
++               ==stopped['complete_cpu_quota_micros']==HOST_CPU,
++           'no proof that the historical 167 producer and guard are still in the complete booking')
++    proposed = request['scope']
++    s.need(proposed['producer_unit']!=manager['Id'], 'candidate cannot reuse the stopped producer unit')
++    service = proposed['producer_unit'].replace('horizon-qualify-','horizon-guard-',1)
++    timer = service.removesuffix('.service')+'.timer'
++    producer = proposed['producer_unit']
++    manager = unit_status(s, producer)
++    guard_service = unit_status(s, service)
++    guard_timer = unit_status(s, timer)
++    if actor is None:
++        s.need(guard is None and all(idle(row) for row in (manager, guard_timer, guard_service)),
++               'replacement 167 or candidate guard appeared during prestart')
++    else:
++        s.need(actor['unit'] == actor['producer_unit'] == producer
++               and manager['ActiveState'] == 'active' and not manager['Job']
++               and manager['MainPID'] == str(actor['producer_pid']) and manager['ControlPID'] == '0'
++               and manager['InvocationID'] == actor['producer_invocation_id']
++               and manager['ControlGroup'] == '/system.slice/'+producer
++               and manager['CPUQuotaPerSecUSec'] == '3s'
++               and manager['MemoryMax'] == str(proposed['producer_memory_bytes'])
++               and manager['MemoryHigh'] == str(proposed['producer_memory_high_bytes'])
++               and manager['MemorySwapMax'] == '0',
++               'replacement 167 held actor differs from its paid manager limits')
++        if guard is None:
++            s.need(idle(guard_timer) and idle(guard_service), 'replacement 167 has an unproved held guard')
++        else:
++            s.need(guard['actor'] == actor and guard_timer['ActiveState'] == 'active'
++                   and guard_timer['InvocationID'] == guard['timer_invocation_id'] and not guard_timer['Job']
++                   and guard_service['ActiveState'] in ('inactive', 'activating', 'active')
++                   and guard_service['MemoryMax'] == str(proposed['guard_memory_bytes'])
++                   and guard_service['MemorySwapMax'] == '0',
++                   'replacement 167 post-guard native protection changed')
++    return dict(sources=paths,terminal=retained['terminal'],historical_producer_bytes=ORIGINAL_PRODUCER,
++                historical_guard_bytes=ORIGINAL_GUARD,historical_cpu_micros=ORIGINAL_CPU,
++                historical_guard_cpu_micros=ORIGINAL_GUARD_CPU,retained_original_tree_cap_bytes=CAP,
++                historical_compute_still_booked=True)
++
++
++def unit_status(s, unit):
++    fields = ('Id,LoadState,ActiveState,InvocationID,MainPID,ControlPID,Job,ControlGroup,'
++              'CPUQuotaPerSecUSec,MemoryMax,MemoryHigh,MemorySwapMax')
++    res=subprocess.run(['/usr/bin/systemctl','show','-p',fields,unit],
++                       capture_output=True,text=True,timeout=8)
++    props=dict(line.split('=',1) for line in res.stdout.splitlines())
++    s.need(res.returncode in (0,4) and props['Id']==unit, 'cannot identify bounded 167 unit')
++    return props
++
++
++def idle(unit):
++    return (unit['ActiveState'] in ('inactive','failed')
++            and all(unit.get(key,'0')=='0' for key in ('MainPID','ControlPID'))
++            and not unit.get('Job') and not unit.get('ControlGroup'))
++
++
++def lower_pair(s, fit, unit, processes, memory_max):
++    group = '/system.slice/'+unit
++    expected = tuple(sorted(p[0] for p in processes))
++    def one():
++        s.need(fit.members(unit)==expected, 'changed live resident group '+unit)
++        pss=0
++        for pid,ticks,device,inode in processes:
++            proc=Path('/proc')/str(pid)
++            image=(proc/'exe').stat()
++            s.need(s.process(pid)[1:]==(ticks,'0::'+group) and (image.st_dev,image.st_ino)==(device,inode),
++                   'changed paid process image or start '+unit)
++            pss += next(int(line.split()[1])*1024 for line in (proc/'smaps_rollup').read_text().splitlines()
++                        if line.startswith('Pss:'))
++        cgroup=Path('/sys/fs/cgroup')/group.removeprefix('/')
++        rows={k:int(v) for k,v in (line.split() for line in (cgroup/'memory.stat').read_text().splitlines())}
++        s.need(int((cgroup/'memory.max').read_text())==memory_max and int((cgroup/'memory.swap.max').read_text())==0,
++               'changed live memory limit '+unit)
++        s.need(fit.members(unit)==expected, 'changed live resident group '+unit)
++        return min(pss,rows['anon']+rows['file_mapped'],memory_max)
++    return min(one(),one())
++
++
++def memory(s, fit, request, survivor172, full146, joint168):
++    s.need(full146['mode']=='active' and full146['phase']=='worker'
++           and len(survivor172['processes'])==len(full146['processes'])==2,
++           'replacement RAM requires both paid incumbent worker pairs under guard')
++    sources = {172:(survivor172['unit'],survivor172['processes'],68*G),
++               146:(full146['unit'],full146['processes'],68*G)}
++    if joint168['mode']=='active':
++        s.need(joint168['worker'] and len(joint168['processes'])==2,
++               'live joint 168 has no paid guarded worker pair')
++        sources[168] = (joint168['unit']['Id'],joint168['processes'],59*G)
++    else:
++        s.need(joint168['mode']=='terminal' and joint168['terminal'] and not joint168['processes'],
++               'joint 168 disposition has no native worker or terminal authority')
++    residents = {str(epoch):lower_pair(s,fit,*item) for epoch,item in sources.items()}
++    chosen = request['scope']['producer_memory_bytes']
++    total = HOST_MEMORY-ORIGINAL_PRODUCER+chosen
++    return dict(pre_replacement_memory_plus_reserve_bytes=HOST_MEMORY,
++                post_replacement_memory_plus_reserve_bytes=total,
++                replaced_167_producer_bytes=ORIGINAL_PRODUCER,charged_167_producer_bytes=chosen,
++                charged_167_guard_bytes=ORIGINAL_GUARD,
++                incumbent_guarded_resident_lower_bounds=residents,
++                native_required_available_memory_bytes=total-sum(residents.values()),
++                complete_cpu_quota_micros=HOST_CPU,reservation_ending_bytes=0,resource_credit_bytes=0)
++
++
++def project(s, combined, request, old, mem):
++    budget = request['scope']
++    native = combined['full146']['native_successor_quote']
++    fit = combined['fit']
++    book = native['bookings']['167']
++    remaining = book['remaining_bytes']
++    growth = budget['run_peak_bytes']
++    serial = native['epoch185_serial_cost']
++    s.need(book['root']==str(LANE) and book['measurement']=='two complete stopped-tree walks'
++           and book['physical_bytes']+remaining==book['cap_bytes']==CAP
++           and budget['run_peak_bytes']<=remaining and budget['log_allowance_bytes']<budget['run_peak_bytes']
++           and serial['serial_restore_enlargement_bytes']==54_016_054_271
++           and serial['metadata_allowance_bytes']==2_097_152 and serial['resource_credit_bytes']==0,
++           'bounded epoch 167 exceeds retained tree or the serial holding charge changed')
++    full146 = combined['full146']
++    active146 = full146['active_full146']
++    measured146 = full146['bookings']['146']['physical_bytes']
++    lower146 = active146['guard_physical_lower_bytes']
++    s.need(type(lower146) is int and 0 < lower146 <= measured146 == active146['footprint'],
++           'no clean lower-bound allocation witness for the paid epoch 146 tree')
++    sample_uncertainty146 = measured146-lower146
++    incumbent_home = fit['required_home_bytes'] + sample_uncertainty146
++    guard_floor = max(incumbent_home, native['retained_167']['guard_floor_bytes'],
++                      native['retained_170']['guard_floor_bytes'],
++                      native['survivors']['172']['guard']['floor'],
++                      native['focused168_retry6']['minimum_free_bytes'],
++                      full146['pending_guard']['minimum_free_bytes'],
++                      combined['joint168']['guard_floor_bytes'])
++    # The entire measured incumbent envelope stays below the candidate's trip
++    # threshold. Reserve the candidate's maximum additional physical growth on
++    # top, even where its older retained booking already funds those bytes.
++    required_floor = guard_floor
++    book_physical = book['physical_bytes']
++    physical = book_physical
++    cap = physical+growth
++    owner = native['bounded167_owner']
++    guard = native['bounded167_first_guard']
++    available_home = fit['available_home_bytes']
++    if owner is not None:
++        intent = s.bound(owner['intent'], CANDIDATE_ROOT/'START_INTENT.json')
++        baseline = intent['prestart']['booking']
++        s.need(all(book[key] == baseline[key]
++                   for key in ('root','run','stable_root','cap_bytes','historical_realized_bytes'))
++               and 0 < baseline['physical_bytes'] <= CAP-growth,
++               'bounded 167 start intent changed the original home booking')
++        cap = baseline['physical_bytes']+growth
++        s.need(intent['bounded_cap_bytes'] == cap, 'bounded 167 start intent changed the paid run cap')
++        physical = min(baseline['physical_bytes'],book_physical)
++        guard_floor = intent['armed_floor']
++        if guard is not None:
++            plan = s.bound(guard['plan'], CANDIDATE_ROOT/'ACTUAL_GUARD_PLAN.json')
++            s.need(guard['floor'] == guard_floor == plan['minimum_free_bytes']
++                   and plan['maximum_root_physical_bytes'] == cap,
++                   'bounded 167 installed guard changed the exact priced floor or run cap')
++            available_home = min(available_home,guard['available_home'])
++            physical = min(physical,guard['physical_bytes'])
++    remaining_growth = cap-physical
++    required = guard_floor+remaining_growth
++    disk_basis = dict(aggregate_incumbent_home_bytes=incumbent_home,
++                      required_candidate_floor_bytes=required_floor,
++                      full146_guard_walk_uncertainty_bytes=sample_uncertainty146,
++                      full146_armed_floor_shortfall_bytes=full146['fit']['armed_floor_shortfall_bytes'],
++                      joint168_armed_floor_shortfall_bytes=fit['guard_floor_shortfall_bytes'],
++                      original_epoch170_remaining_bytes=native['bookings']['170']['remaining_bytes'],
++                      joint168_mode=combined['mode'],
++                      unreserved_other_growth_allowed=False)
++    settlement = combined.get('terminal168_compute_settlement')
++    retired_memory = settlement['released_memory_bytes'] if settlement else 0
++    admissible_incumbents = (native['fits'] and
++        all(full146['fit'][key] == 0 for key in ('home_shortfall_bytes','cpu_shortfall_micros')) and
++        (settlement is not None or full146['fit']['memory_shortfall_bytes'] == 0) and
++        all(fit[key] == 0 for key in ('home_shortfall_bytes','memory_shortfall_bytes','whole_tree_over_cap_bytes')))
++    s.need(fit['required_available_memory_bytes'] ==
++           mem['native_required_available_memory_bytes']+60*G-retired_memory,
++           'replacement RAM disagrees with the outer projections')
++    previous = Path(budget['run_root'])
++    leaf_physical=0
++    if previous.exists():
++        result=subprocess.check_output(['/usr/bin/du','-sx','-B1','--',str(previous)],timeout=20)
++        leaf_physical=int(result.split()[0])
++    available_mem = fit['available_memory_bytes']
++    return dict(schema='horizon-epoch167-replacement-compute-fit-v1',
++                fits=(admissible_incumbents and guard_floor>=required_floor
++                      and book_physical<=cap and required<=available_home), replay_launch_authorized=False,
++                source_launch_qualification_verified=False,
++                request=request['ref'],scope=budget,original_compute_proof=old,compute=mem,
++                terminal168_compute_settlement=settlement,
++                admitted_producer_bytes=budget['producer_memory_bytes'],admitted_guard_bytes=budget['guard_memory_bytes'],
++                complete_required_HOME_bytes=required,available_HOME_bytes=available_home,
++                required_available_memory_bytes=fit['required_available_memory_bytes'],available_memory_bytes=available_mem,
++                protected_home_floor_bytes=guard_floor, existing_reserved_HOME_bytes=incumbent_home,
++                candidate_guard_counterfactual=disk_basis,
++                measured_retained_tree_bytes=book['physical_bytes'],original_retained_tree_cap_bytes=CAP,
++                bounded_whole_tree_cap_bytes=cap, measured_candidate_leaf_bytes=leaf_physical,
++                bounded_growth_remaining_bytes=remaining_growth, conservative_whole_tree_bytes=physical,
++                stage='post-guard' if guard else 'held' if owner else 'prestart',
++                run_additional_peak_bytes=growth,planned_log_allowance_within_run_bytes=budget['log_allowance_bytes'],
++                unspent_original_book_after_candidate_cap_bytes=CAP-cap,
++                resource_credit_bytes=0,reservation_ending_bytes=0)
+--- /dev/null
++++ b/terminal_joint168_capacity.py
+@@ -0,0 +1,199 @@
++"""Bind the accepted joint-168 terminal to its existing full reservation."""
++import json
++from pathlib import Path
++import subprocess
++
++SUCCESS = '7ad2d189f7e94e70a38c781354912448'
++FAILURE = '98e322203f7a4ed290d09fe03c09fe15'
++GIB = 1 << 30
++COMPARATOR = 'horizon-168-joint-continuity-9d6a680157ac.service'
++COMPARATOR_IID = '328366ba244949efb9c9725df7279051'
++COMPARATOR_SEAL = '55b98899587fc5409787cc83981810cc1266d396918906d445a3ceedb2a35c8e'
++COMPARATOR_SHA = 'bfe14ac703ed4f5e256fab9d6a24526f1540cdd5bda1bd544ab62b70643deed4'
++
++
++def request_args(s, lane, ref):
++    request = lane['read'](s, ref)
++    s.need(request.get('mode') == 'terminal' and request.get('guard') is None
++           and set(request) == {'schema','mode','retirement','growth_bytes','stop_allowance_bytes',
++                                'enrollment','guard','terminal','compute_release'}
++           and request['compute_release'] in (None, dict(unit=COMPARATOR, invocation_id=COMPARATOR_IID)),
++           'terminal joint 168 requires exact closure and a scoped compute settlement')
++    original = dict(request, mode='active')
++    original.pop('terminal')
++    s.need(original['schema'] == lane['REQUEST_SCHEMA']
++           and all(type(original[key]) is int and 0 < original[key] < 1 << 64
++                   for key in ('growth_bytes','stop_allowance_bytes'))
++           and original['enrollment'] is not None, 'invalid retained joint 168 request')
++    return request
++
++
++def native_exit(s, unit, actor, terminal):
++    identity = actor['invocation_id']
++    journal = terminal['pid1_terminal_event']
++    event_id = journal['MESSAGE_ID']
++    boot = actor['boot_id'].replace('-', '')
++    s.need((terminal['disposition'] == 'checkpoint-complete' and event_id == SUCCESS
++            and terminal['independent_archive_scan_pending'] is True)
++           or (terminal['disposition'] == 'failed' and event_id == FAILURE
++               and journal['COMMAND'] == 'ExecStart' and str(journal['EXIT_STATUS']) != '0'),
++           'joint 168 lacks its exact checkpoint or native failure outcome')
++    selectors = ('_PID=1', '_UID=0', '_BOOT_ID='+boot, 'UNIT='+unit,
++                 'INVOCATION_ID='+identity, 'MESSAGE_ID='+event_id)
++    result = subprocess.check_output(['/usr/bin/journalctl','--quiet','--no-pager','--all','--output=json',*selectors],
++                                     text=True, timeout=15)
++    matched = [json.loads(line) for line in result.splitlines()]
++    s.need(len(matched) == 1 and matched[0] == journal
++           and int(journal['__REALTIME_TIMESTAMP']) >= actor['ready_at']*1_000_000,
++           'joint 168 closure did not match the native PID1 event')
++
++
++def comparator(s, lane, terminal):
++    from owners import ticks
++
++    tools = lane['ROOT']/'continuity-tools'
++    program = tools/'horizon-168-joint-compare'
++    seal_ref = s.ref(tools/'deployment-seal-receipt.json', COMPARATOR_SEAL)
++    seal = s.bound(seal_ref, tools/'deployment-seal-receipt.json')
++    s.need(seal['destination'] == str(tools) and any(
++        row['name'] == program.name and row['mode'] == '0555' and row['sha256'] == COMPARATOR_SHA
++        for row in seal['members']), 'foreign terminal epoch 168 comparator seal')
++    fields = ('Id','InvocationID','ActiveState','SubState','MainPID','ControlPID','ControlGroup','Job',
++              'Restart','NRestarts','MemoryMax','MemorySwapMax','CPUQuotaPerSecUSec')
++    status = lane['props'](COMPARATOR, fields)
++    units = subprocess.check_output(
++        ['/usr/bin/systemctl','list-units','--type=service','--state=activating,active,deactivating',
++         '--no-legend','--plain','--no-pager','horizon-168-joint-continuity-*.service'],
++        text=True, timeout=12)
++    active = [line.split()[0] for line in units.splitlines() if line.strip()]
++    group = '/system.slice/'+COMPARATOR
++    cgroup = Path('/sys/fs/cgroup')/group.lstrip('/')
++    expected = [str(program),'--compare-joint',terminal['archive_sha256']]
++    if status['ActiveState'] == 'active':
++        pid = int(status['MainPID'])
++        proc = Path('/proc')/str(pid)
++        start = ticks(pid)
++        s.need(active == [COMPARATOR] and status['Id'] == COMPARATOR
++               and status['InvocationID'] == COMPARATOR_IID and status['SubState'] == 'running'
++               and status['ControlPID'] == '0' and not status['Job'] and status['ControlGroup'] == group
++               and status['Restart'] == 'no' and status['NRestarts'] == '0'
++               and status['MemoryMax'] == str(2*GIB) and status['MemorySwapMax'] == '0'
++               and status['CPUQuotaPerSecUSec'] == '1s' and lane['cgroup_limits'](cgroup,1_000_000,2*GIB)
++               and lane['process_members'](cgroup) == {pid}
++               and (proc/'cgroup').read_text().strip() == '0::'+group
++               and (proc/'exe').samefile(program) and lane['sha'](proc/'exe') == COMPARATOR_SHA
++               and lane['proc_argv'](proc) == expected and ticks(pid) == start
++               and lane['props'](COMPARATOR,fields) == status,
++               'terminal epoch 168 comparator crossed its identity, budget or executable')
++        return dict(unit=COMPARATOR,invocation_id=COMPARATOR_IID,pid=pid,start_ticks=start,
++                    seal=seal_ref,phase='active',memory_bytes=2*GIB,cpu_quota_micros=1_000_000)
++    selectors = ('_PID=1','UNIT='+COMPARATOR,'INVOCATION_ID='+COMPARATOR_IID,'MESSAGE_ID='+SUCCESS)
++    result = subprocess.check_output(
++        ['/usr/bin/journalctl','--quiet','--no-pager','--all','--output=json',*selectors],
++        text=True, timeout=12)
++    exits = [json.loads(line) for line in result.splitlines()]
++    s.need(status['Id'] == COMPARATOR and status['ActiveState'] == 'inactive'
++           and status['InvocationID'] in ('',COMPARATOR_IID) and not status['Job']
++           and all(status.get(name,'0') == '0' for name in ('MainPID','ControlPID'))
++           and not active and not lane['process_members'](cgroup) and len(exits) == 1
++           and int(exits[0]['__REALTIME_TIMESTAMP']) >= int(terminal['pid1_terminal_event']['__REALTIME_TIMESTAMP'])
++           and lane['props'](COMPARATOR,fields) == status,
++           'terminal epoch 168 comparator has no exact active or drained generation')
++    return dict(unit=COMPARATOR,invocation_id=COMPARATOR_IID,phase='complete',seal=seal_ref,
++                terminal_event=exits[0],memory_bytes=2*GIB,cpu_quota_micros=1_000_000)
++
++
++def settle_compute(s, combined, candidate):
++    witness = candidate['settled_compute']
++    if witness is None:
++        return combined
++    paid = combined['joint168']
++    terminal = candidate['terminal']
++    fit = combined['fit']
++    incumbent = combined['full146']['fit']
++    stopped_memory = paid['producer_memory_bytes']+paid['guard_memory_bytes']
++    stopped_cpu = paid['producer_cpu_quota_micros']+paid['guard_cpu_quota_micros']
++    released_memory = stopped_memory-witness['memory_bytes']
++    released_cpu = stopped_cpu-witness['cpu_quota_micros']
++    s.need(combined['mode'] == candidate['mode'] == 'terminal' and not candidate['processes']
++           and stopped_memory == 60*GIB and stopped_cpu == 2_000_000
++           and released_memory == 58*GIB and released_cpu == 1_000_000
++           and fit['required_available_memory_bytes'] == incumbent['existing_required_memory_bytes']+stopped_memory
++           and fit['extra_memory_bytes'] == 52*GIB,
++           'different paid epoch 168 compute at terminal')
++    required = fit['required_available_memory_bytes']-released_memory
++    available = fit['available_memory_bytes']
++    fit.update(required_available_memory_bytes=required,memory_shortfall_bytes=max(0,required-available))
++    combined['terminal168_compute_settlement'] = dict(
++        terminal=terminal, comparator=witness, replaced_168_memory_bytes=stopped_memory,
++        replaced_168_cpu_quota_micros=stopped_cpu, released_memory_bytes=released_memory,
++        released_cpu_quota_micros=released_cpu, preserved_comparator_memory_bytes=witness['memory_bytes'],
++        preserved_comparator_cpu_quota_micros=witness['cpu_quota_micros'],
++        effective_complete_cpu_quota_micros=incumbent['projected_cpu_quota_micros']-released_cpu,
++        source_scope_epoch=167, other_operation_can_reuse=False, disk_reservation_ending_bytes=0,
++        stopped_generation_resident_credit_bytes=0)
++    return combined
++
++
++def inspect(s, lane, request, incumbent, status, fleet, tree_size, *, measured=None):
++    rr = lane['retirement'](s, request['retirement'])
++    enrollment, quote = lane['enrollment'](s, request['enrollment'], request, incumbent, status)
++    lane['load_payload'](s, enrollment, quote)
++    actor = enrollment['actor']
++    row = fleet[lane['FIELD']]
++    ref = request['terminal']
++    terminal = s.bound(ref, lane['ROOT']/'TERMINAL.json')
++    unit = lane['UNIT']
++    s.need(row['enrollment'] == request['enrollment'] and row['prestart'] == enrollment['prestart_quote']
++           and row['unit']['Id'] == unit
++           and row['actor']['producer_invocation_id'] == actor['invocation_id']
++           and row['actor']['producer_pid'] == terminal['producer_pid'] == actor['pid']
++           and row['actor']['producer_start_ticks'] == terminal['producer_start_ticks'] == actor['start_ticks']
++           and row['actor']['boot_id'] == actor['boot_id']
++           and row['resource_credit_bytes'] == terminal['resource_credit_bytes'] == 0
++           and row['archive_publication_authorized'] is terminal['archive_publication_authorized'] is False
++           and terminal['schema'] == 'horizon-epoch168-joint-reduced-terminal-v1'
++           and terminal['enrollment'] == request['enrollment']
++           and terminal['producer_invocation_id'] == actor['invocation_id']
++           and terminal['private_output_preserved'] is True and terminal['remote_mutations'] is False,
++           'terminal joint 168 differs from the sole cadence roster or paid generation')
++    census = [(name, item)
++              for name in ('actual_executing_replays','actual_active_bootstraps','actual_active_private_diagnostics')
++              for item in fleet[name] if item['unit']['Id'] == unit]
++    if row['phase'] == 'terminal':
++        s.need(row['terminal'] == ref and not census,
++               'terminal joint 168 differs from the accepted stopped census')
++    else:
++        release = s.bound(row['release'], lane['RELEASE'])
++        guard = row['guard']
++        plan = lane['read'](s, guard['plan'])
++        sample = lane['read'](s, guard['sample'])
++        native_time = int(terminal['pid1_terminal_event']['__REALTIME_TIMESTAMP'])
++        s.need(row['phase'] == 'worker' and census == [('actual_active_private_diagnostics', row)]
++               and row['unit']['InvocationID'] == actor['invocation_id']
++               and release['enrollment'] == request['enrollment']
++               and release['producer_invocation_id'] == actor['invocation_id']
++               and plan['invocation_id'] == sample['producer_invocation_id'] == actor['invocation_id']
++               and plan['minimum_free_bytes'] == guard['floor'] == quote['joint168']['guard_floor_bytes']
++               and plan['maximum_root_physical_bytes'] == quote['joint168']['whole_tree_cap_bytes']
++               and sample['plan_sha256'] == guard['plan']['sha256']
++               and sample['producer_stop_enabled'] is True and sample['trip_reason'] is None
++               and [worker[0] for worker in sample['workers']] == [row['worker']['pid']]
++               and max(fleet['recorded_unix_seconds'],sample['recorded_unix_seconds'])*1_000_000 < native_time,
++               'native joint 168 exit did not follow the last accepted protected worker')
++    native_exit(s, unit, actor, terminal)
++    lane['require_idle'](s)
++    if measured is None:
++        root = lane['LANE']
++        cap = quote['joint168']['whole_tree_cap_bytes']
++        measured = tree_size(root, cap)
++        s.need(measured == tree_size(root, cap), 'terminal joint 168 paid tree changed between complete scans')
++    s.need(0 < measured <= quote['joint168']['whole_tree_cap_bytes'], 'terminal joint 168 exceeds paid whole-tree cap')
++    witness = None if request['compute_release'] is None else comparator(s, lane, terminal)
++    lane['require_idle'](s)
++    return dict(mode='terminal', retirement=rr, physical=measured, processes=[], worker=None,
++                unit=row['unit'], release=None, actor=actor, terminal=ref, fleet_phase=row['phase'],
++                settled_compute=witness,
++                enrollment=request['enrollment'], prestart=enrollment['prestart_quote'],
++                first_fit=quote['joint168'], guard=None, reservation_ending_bytes=0,
++                resource_credit_bytes=0, **lane['availability']())
