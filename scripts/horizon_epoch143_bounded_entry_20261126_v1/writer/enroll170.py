@@ -1,6 +1,7 @@
 """Write the held-owner receipt using the active V42 package and exact PID1 properties."""
 
 import json
+from importlib import util
 from pathlib import Path
 import sys
 
@@ -15,17 +16,18 @@ def main(path, sha256):
     if hashlib.sha256(seal.read_bytes()).hexdigest() != WRITER_SEAL:
         raise ValueError("different active V42 writer package")
     local = Path(__file__).resolve().parent
-    sys.path[:0] = [str(local), str(WRITER_PACKAGE)]
-    import successor170_status
+    sys.path.insert(0, str(WRITER_PACKAGE))
     import status_cycle
     from evidence import bound, checked, need
 
+    spec = util.spec_from_file_location("bounded_170_enrollment", local / "successor170_status.py")
+    receiver = util.module_from_spec(spec)
+    spec.loader.exec_module(receiver)
     active = bound(WRITER / "FAILED166_CADENCE_V42_ACTIVE.json")
     ready = checked(checked(active)["ready"])
-    need(ready["package"] == bound(seal) and status_cycle.CURRENT == WRITER_PACKAGE / "status_cycle.py"
-         and Path(successor170_status.__file__) == local / "successor170_status.py",
+    need(ready["package"] == bound(seal) and status_cycle.CURRENT == WRITER_PACKAGE / "status_cycle.py",
          "different active V42 reader")
-    report = successor170_status.enroll(vars(status_cycle), dict(path=path, sha256=sha256), active)
+    report = receiver.enroll(vars(status_cycle), dict(path=path, sha256=sha256), active)
     print(json.dumps(report))
 
 
