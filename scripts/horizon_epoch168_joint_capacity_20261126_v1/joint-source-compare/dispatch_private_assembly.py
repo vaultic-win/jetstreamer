@@ -25,11 +25,15 @@ QUAL = BASE / "assembly-source-native-qualification-20261127-v1"
 ROTATION = RT / "epoch186-closed-partial-rotation-20261127-v1"
 MAIN185 = RT / "epoch185-lanem-main-holding-20261127-v1"
 SEVENTH = RT / "epoch141-foundation-seventh-bootstrap-20261127-v1"
+EIGHTH = RT / "epoch141-foundation-eighth-bootstrap-20261127-v1"
+EIGHTH_UNIT = "horizon-141-eighth-bootstrap-ordered-20261127-v1"
+EIGHTH_WORK = PRIVATE / "epoch141-eighth-bootstrap-anza-20261127-v1"
+EIGHTH_WITHDRAWAL_SHA = "d7bc9b06328dc05f9aa3806b998658cda0ff8dbda7b3be785ab00fcc42f5e327"
 REPO = HOME / "workspace/jetstreamer"
 OUTPUT = PRIVATE / "epoch168-private-assembly-20261127-v1/output"
 LOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 UNIT = "horizon-assemble-168-private-20261127-v1.service"
-EVENT_UNIT = "horizon-168-assembly-on-reclamation-20261127-v1"
+EVENT_UNIT = "horizon-168-assembly-on-reclamation-20261127-v2"
 RELEASES = {
     "185": MAIN185 / "MEASURED_LOCAL_RECLAMATION.json",
     "186m": ROTATION / "M_SERIAL_HANDBACK.json",
@@ -48,7 +52,7 @@ MEMORY = 8 * GIB
 CPU = 1_000_000
 CPU_TOTAL = 64_000_000
 SERIAL = 123_350_028_052
-FIELDS = "Id,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,MemoryMax,MemorySwapMax,Job"
+FIELDS = "Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,MemoryMax,MemorySwapMax,Job"
 PINS = {
     "qualification": (QUAL / "QUALIFIED_REPORT.json", "1fdbd34bc1edee4db9781f5ba27b3f9d5b6443c717a07ce6fd08ea3f7940bd3b"),
     "qualification_native": (QUAL / "NATIVE_ACCEPTANCE.json", "63067817b1dfb2bd11b4c184dd089aec8cb58d9b19ab1bc93112a7171cae7044"),
@@ -258,7 +262,7 @@ def source_head(build, launch):
              f"sealed build input is different from the merged source: {name}")
     if launch:
         operator_source = "scripts/horizon_epoch168_joint_capacity_20261126_v1/joint-source-compare/dispatch_private_assembly.py"
-        operator_sha = ref(HERE / "dispatch.py")["sha256"]
+        operator_sha = ref(Path(__file__).resolve())["sha256"]
         need(hashlib.sha256(git("show", f"{remote}:{operator_source}")).hexdigest() == operator_sha,
              "deployed operator is not the merged campaign source")
     return remote
@@ -329,6 +333,32 @@ def carried_resources(pins, fleet, core, roster):
     }
 
 
+def eighth_bootstrap_charge(source):
+    size = source["bootstrap"]["size"]
+    total = source["budget"]["bootstrap_with_64_mib_minimum_free_bytes"]
+    need(size == 2_921_574_455 and total == size + 64 * MIB,
+         "eighth bootstrap envelope changed")
+    withdrawal = EIGHTH / "WITHDRAWN_HOST_RANGE.json"
+    if not withdrawal.exists():
+        return size, total - size, None
+    receipt = ref(withdrawal, EIGHTH_WITHDRAWAL_SHA)
+    decision = bound(receipt)
+    units = [native(EIGHTH_UNIT + suffix) for suffix in (".path", ".service")]
+    snapshot = Path(source["bootstrap"]["versioned_uri"].rsplit("/", 1)[1].split("#", 1)[0])
+    need(not decision["serial_assignment_created"] and not decision["bootstrap_transfer_started"]
+         and all(row["Id"] == unit["Id"] and row["LoadState"] == unit["LoadState"] == "not-found"
+                 and row["ActiveState"] == unit["ActiveState"] == "inactive"
+                 and not row["Job"] and not unit["Job"]
+                 for row, unit in zip(decision["after"], units, strict=True))
+         and units[1]["MainPID"] == units[1]["ControlPID"] == "0"
+         and not os.path.lexists(EIGHTH / "EIGHTH_SERIAL_ASSIGNMENT.json")
+         and not list(EIGHTH.glob("*_START*.json"))
+         and not os.path.lexists(EIGHTH_WORK / snapshot)
+         and not list(EIGHTH_WORK.glob("*.download")),
+         "eighth Foundation bootstrap still has an assignment, worker or staged input")
+    return 0, 0, {"receipt": receipt, "current_units": units}
+
+
 def quote(pins):
     code = runpy.run_path(pins["rotation_pricer"]["path"])
     rotation = code["recent_price"]()
@@ -339,11 +369,8 @@ def quote(pins):
     credits = retirement_terms(pins, fleet)
     inherited = core["inherited_complete_margin"] + sum(x["inherited_screen_bytes"] for x in credits.values())
     eighth = bound(pins["eighth_source"])
-    eighth_bytes = eighth["bootstrap"]["size"]
-    eighth_total = eighth["budget"]["bootstrap_with_64_mib_minimum_free_bytes"]
-    need(eighth_bytes == 2_921_574_455 and eighth_total == eighth_bytes + 64 * MIB,
-         "eighth bootstrap envelope changed")
-    pending = rotation["additional_holding_disk"] + eighth_total
+    eighth_bytes, eighth_evidence, eighth_withdrawal = eighth_bootstrap_charge(eighth)
+    pending = rotation["additional_holding_disk"] + eighth_bytes + eighth_evidence
     seventh = bound(pins["seventh_assignment"])
     need(rotation["serial_slot"] == SERIAL and rotation["additional_holding_disk"] >= seventh["byte_length"] + 4096
          and rotation["holding_ram_available_from_serial"] == 2 * GIB,
@@ -378,7 +405,8 @@ def quote(pins):
         "assembly_memory_bytes": MEMORY, "assembly_cpu_quota_micros": CPU,
         "inherited_home_margin_after_terms": inherited - pending, "live_home_floor_bytes": live_floor,
         "serial_restore_envelope_bytes": SERIAL, "seventh_input_bytes": seventh["byte_length"],
-        "eighth_single_copy_bootstrap_bytes": eighth_bytes, "eighth_staging_and_evidence_bytes": eighth_total - eighth_bytes,
+        "eighth_single_copy_bootstrap_bytes": eighth_bytes, "eighth_staging_and_evidence_bytes": eighth_evidence,
+        "eighth_transfer_withdrawal": eighth_withdrawal,
         "additional_holding_and_input_home_bytes": pending, "retirement_observations": credits,
         "native_roster": roster, "rotation_price": rotation, "resource_credit_bytes": 0,
         "fits": not blockers, "blockers": blockers, "publication_authorized": False,
@@ -534,12 +562,14 @@ def on_reclamation(pins, build, layout):
     events = {name: ref(path) for name, path in RELEASES.items() if path.exists()}
     if not events:
         return
-    digest = hashlib.sha256(json.dumps(events, sort_keys=True).encode()).hexdigest()
+    event_identity = {"reclamation": events, "operator": ref(Path(__file__).resolve())}
+    digest = hashlib.sha256(json.dumps(event_identity, sort_keys=True).encode()).hexdigest()
     result_path = HERE / f"RECLAMATION_EVENT_{digest}.json"
     if result_path.exists():
         return
     report = {"schema": "horizon-epoch168-private-assembly-reclamation-event-v1",
-              "observed_unix_seconds": int(time.time()), "events": events, "launched": False}
+              "observed_unix_seconds": int(time.time()), "events": events,
+              "operator": event_identity["operator"], "launched": False}
     try:
         source = source_head(build, True)
         with operation_lock():
