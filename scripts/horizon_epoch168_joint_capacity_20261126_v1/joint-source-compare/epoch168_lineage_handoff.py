@@ -20,9 +20,14 @@ RETRY6 = HOME / "cold-retry6-20261126/output/epoch-168-tail.jet"
 COMPARATOR = STATE / "continuity-tools/horizon-168-joint-compare"
 COMPARATOR_SHA = "bfe14ac703ed4f5e256fab9d6a24526f1540cdd5bda1bd544ab62b70643deed4"
 COMPARATOR_SEAL_SHA = "55b98899587fc5409787cc83981810cc1266d396918906d445a3ceedb2a35c8e"
-TOOLS = STATE / "lineage-tools-20261127-v1"
+SELECTOR_STATE = STATE.parent / "epoch168-retry4-selected-prefix-20261127-v1"
+SELECTOR_IID = "3398149c02ad460d98ab1ec8f656f55e"
+SELECTOR_UNIT = "horizon-168-retry4-selected-prefix-20261127-v1.service"
+ACTIVE_SHA = "f32a20461b7e4c524ffbb6d7de86288516114c2bea6020c710ca0642e2ba1b26"
+TOOLS = SELECTOR_STATE / "tools"
 CHECKER = TOOLS / "horizon-168-joint-lineage"
-CHECKER_SHA = "6743e2a022a6003eadc5cf913e6911e4721d4f930c8b6504c5e803e75dc93a22"
+CHECKER_SHA = "fe627e54f0bae428f37b9ba54db2037d3dcb47e96733a3ee4c5e9c74e9279920"
+CHECKER_SEAL_SHA = "6e5959fc84c1abc37817d13d5f69fd995e25ecfecce7dd4683653ca6adb60292"
 JOINT_IID = "31c1503cecaf4edbb9a78a0c19c0ac9d"
 JOINT_UNIT = "horizon-qualify-168-joint-checkpoint-reduced-20261126-v1.service"
 SUCCESS = "7ad2d189f7e94e70a38c781354912448"
@@ -223,20 +228,51 @@ def capture(launch_path, output, iid):
     print(json.dumps(store(output, capture)))
 
 
+def checker_deployment():
+    checker, data = bound(CHECKER, 0, 16 << 20)
+    seal_ref, seal = bound_json(TOOLS / "deployment-seal-receipt.json")
+    need(
+        checker["sha256"] == CHECKER_SHA and stat.S_IMODE(CHECKER.stat().st_mode) == 0o555
+        and seal_ref["sha256"] == CHECKER_SEAL_SHA
+        and seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+        and seal["destination"] == str(TOOLS)
+        and any(m["name"] == CHECKER.name and m["sha256"] == CHECKER_SHA
+                and m["bytes"] == len(data) and m["mode"] == "0555" for m in seal["members"]),
+        "lineage checker or deployment differs from the qualified build",
+    )
+    return checker, seal_ref
+
+
+def completed_selection(path, deployment):
+    need(path == SELECTOR_STATE / "RESULT.stdout", "expected the original selector stdout")
+    active_ref, active = bound_json(SELECTOR_STATE / "ACTIVE.json")
+    need(active_ref["sha256"] == ACTIVE_SHA and active["invocation_id"] == SELECTOR_IID
+         and active["unit"] == SELECTOR_UNIT, "selector invocation differs")
+    intent_ref, intent = bound_json(SELECTOR_STATE / "START_INTENT.json")
+    need(intent_ref == active["intent"] and intent["deployment"] == deployment
+         and "--property=StandardOutput=file:" + str(path) in intent["run_argv"],
+         "selector output or deployment differs from its launch")
+    events = journal("_PID=1", "_UID=0", f"UNIT={SELECTOR_UNIT}",
+                     f"INVOCATION_ID={SELECTOR_IID}", f"MESSAGE_ID={SUCCESS}")
+    need(len(events) == 1 and terminal_ok(events[0], SELECTOR_UNIT, SELECTOR_IID),
+         "waiting for the original selector's successful PID1 terminal event")
+    selected, _ = bound_json(path)
+    return selected, {"active": active_ref, "intent": intent_ref, "pid1_event": events[0]}
+
+
 def verify(launch_path, capture_path, selected_path, output_dir):
     _, record = bound_json(launch_path)
     need(record == launch_record(record["unit"]), "launch plan differs from closed inputs")
     cap, capture_record = bound_json(capture_path)
     need(capture_record["unit"] == record["unit"] and capture_record["argv"] == record["argv"],
          "capture does not belong to this launch")
-    selected, _ = bound_json(selected_path)
-    checker, _ = bound(CHECKER, 0, 16 << 20)
-    need(checker["sha256"] == CHECKER_SHA and stat.S_IMODE(CHECKER.stat().st_mode) == 0o555,
-         "lineage checker differs from the qualified build")
+    checker, deployment = checker_deployment()
+    selected, terminal = completed_selection(selected_path, deployment)
     plan = store(output_dir / "LINEAGE_PLAN.json", {
         "schema": "horizon-epoch168-private-joint-lineage-plan-v1",
         "joint_terminal": record["joint_terminal"], "joint_manifest": record["joint_manifest"],
         "selected_prefix": selected, "comparison": cap,
+        "selector_terminal": terminal, "lineage_checker": checker, "checker_deployment": deployment,
     })
     result = subprocess.run(
         [str(CHECKER), plan["path"], plan["sha256"]], check=True, stdout=subprocess.PIPE,

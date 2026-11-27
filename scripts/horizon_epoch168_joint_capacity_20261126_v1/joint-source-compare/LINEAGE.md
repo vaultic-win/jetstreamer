@@ -31,7 +31,9 @@ Preserve the original journal fields, including `MESSAGE`, `_TRANSPORT`, `_SYSTE
 
 ## Retry4 selection evidence
 
-Run `horizon-168-joint-compare --select-retry4-prefix` on the pinned, closed retry4 source. The selection uses a seekable view of the compressed whole buckets, with a rewritten first bucket, a partial final bucket, and a rebuilt header and index. It hashes the full retained source and the exact selected bytes, compares both rewritten boundaries against independently decoded source events, and decodes the entire selected archive. The command prints one JSON evidence record and writes zero physical archive bytes.
+The admitted selector runs `horizon-168-retry4-select --select-retry4-prefix` on the pinned, closed retry4 source. The selection uses a seekable view of the compressed whole buckets, with a rewritten first bucket, a partial final bucket, and a rebuilt header and index. It hashes the full retained source and the exact selected bytes, compares both rewritten boundaries against independently decoded source events, and decodes the entire selected archive. The command prints one JSON evidence record and writes zero physical archive bytes.
+
+Use `epoch168_lineage_handoff.py verify LAUNCH CAPTURE RESULT.stdout OUTPUT_DIR` with the selector's original root-owned stdout. The helper checks the admitted invocation's successful PID 1 journal event and authenticates the corrected lineage executable from the same sealed deployment as the selector. The plan binds both proofs to the comparison and selection.
 
 The selection evidence schema is `horizon-epoch168-private-selected-prefix-evidence-v1`. Record `source_archive_sha256`, `selected_archive_sha256`, `selected_semantic_sha256`, `first_slot`, `last_slot`, `terminal_blockhash`, `raw_start`, `raw_end_exclusive`, and `independently_decoded` from the verified selection ending at slot 72,994,766. The raw range comes from the selected output's account events. The comparator's predecessor range must end at the same exclusive raw cursor in the retained source.
 
