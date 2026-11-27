@@ -896,8 +896,17 @@ fn prefix_export_source(anchor: Hash, epoch_count: u64) -> Vec<u8> {
 }
 
 fn closed_prefix_export_source(anchor: Hash, epoch_count: u64, actual_count: u64) -> Vec<u8> {
+    indexed_prefix_export_source(anchor, 7, epoch_count, actual_count)
+}
+
+fn indexed_prefix_export_source(
+    anchor: Hash,
+    declared_count: u64,
+    epoch_count: u64,
+    actual_count: u64,
+) -> Vec<u8> {
     let mut base = sample_archive_provenance_v1();
-    base.requested_slot_count = 7;
+    base.requested_slot_count = declared_count;
     let provenance = ArchiveProvenance::V2(ArchiveProvenanceV2 {
         base,
         worker_executable_sha256: [0x42; 32],
@@ -906,7 +915,7 @@ fn closed_prefix_export_source(anchor: Hash, epoch_count: u64, actual_count: u64
         Vec::new(),
         1,
         432_000,
-        7,
+        declared_count,
         ArchiveWriterConfig {
             bucket_slots: 4,
             compression: Compression::None,
@@ -1091,6 +1100,53 @@ fn closed_checkpoint_prefix_rejects_inexact_extent_checkpoint_and_source() {
             terminal,
         )
         .is_err()
+    );
+}
+
+#[test]
+fn retained_checkpoint_prefix_cuts_inside_a_physically_larger_retained_bucket() {
+    let anchor = Hash::new_from_array([0xa5; 32]);
+    // All three retained buckets are full. The cut falls inside bucket 1,
+    // and bucket 2 is outside the selection but inside the retained extent.
+    let source = indexed_prefix_export_source(anchor, 13, 13, 12);
+    let terminal = Hash::new_from_array([4; 32]);
+    let export = |retained, selected, hash| {
+        reencode_archive_prefix_from_retained_buckets(
+            std::io::Cursor::new(&source),
+            Vec::new(),
+            ArchiveWriterConfig::default(),
+            retained,
+            selected,
+            hash,
+        )
+    };
+    assert!(export(11, 4, Hash::new_from_array([3; 32])).is_err());
+    assert!(export(13, 5, terminal).is_err());
+    assert!(export(12, 5, anchor).is_err());
+    assert!(export(12, 2, anchor).is_err());
+    assert!(export(12, 13, terminal).is_err());
+
+    let (output, stats) = export(12, 5, terminal).unwrap();
+    let mut reader = ArchiveReader::open(std::io::Cursor::new(&output)).unwrap();
+    assert!(reader.has_complete_slot_coverage().unwrap());
+    assert_eq!(
+        reader
+            .provenance()
+            .unwrap()
+            .unwrap()
+            .requested_range()
+            .unwrap(),
+        432_000..432_005
+    );
+    assert_eq!(stats.slots_reencoded, 5);
+    assert_eq!(stats.source_buckets, 2);
+    assert_eq!(
+        read_all(&output, 432_000, 10, true),
+        read_all(&source, 432_000, 5, true)
+    );
+    assert_eq!(
+        stats.output_semantic_sha256,
+        archive_semantic_sha256(&output)
     );
 }
 

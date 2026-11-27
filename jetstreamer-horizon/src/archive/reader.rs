@@ -154,16 +154,23 @@ impl<R: std::io::Read + std::io::Seek> ArchiveReader<R> {
     /// an interrupted writer can leave the expected bucket keys while one of
     /// those buckets contains fewer frames than its declared range requires.
     pub fn has_complete_slot_coverage(&mut self) -> Result<bool, ArchiveFormatError> {
+        self.has_exact_prefix_coverage(self.header.slot_count)
+    }
+
+    pub(super) fn has_exact_prefix_coverage(
+        &mut self,
+        slot_count: u64,
+    ) -> Result<bool, ArchiveFormatError> {
         use std::io::SeekFrom;
 
-        let expected_buckets = self
-            .header
-            .slot_count
-            .div_ceil(u64::from(self.header.bucket_slots));
+        if slot_count > self.header.slot_count {
+            return Ok(false);
+        }
+        let expected_buckets = slot_count.div_ceil(u64::from(self.header.bucket_slots));
         if u64::try_from(self.index.len()).ok() != Some(expected_buckets) {
             return Ok(false);
         }
-        let slot_end = self.header.slot_start + self.header.slot_count;
+        let slot_end = self.header.slot_start + slot_count;
         for (index, entry) in self.index.iter().enumerate() {
             let expected_first = self.header.slot_start
                 + u64::try_from(index).map_err(|_| {

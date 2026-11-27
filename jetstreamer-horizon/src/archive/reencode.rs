@@ -417,6 +417,39 @@ where
     R: Read + Seek,
     W: Write,
 {
+    reencode_archive_prefix_from_retained_buckets(
+        source,
+        sink,
+        writer_config,
+        prefix_slot_count,
+        prefix_slot_count,
+        terminal_blockhash,
+    )
+}
+
+/// Re-encodes a checkpoint-bounded selection of an indexed V2 source that
+/// retains only a declared prefix of its original range. The selection may
+/// end inside a physically complete retained bucket.
+///
+/// The caller supplies a separately authenticated source, its exact retained
+/// extent, and the independently frozen checkpoint's last blockhash. A
+/// read-only index/footer view may expose complete buckets from a stopped
+/// file. Keep the physical source digest and the derivation receipt separate
+/// from the indexed view and the resulting archive digest. Neither this
+/// conversion nor the terminal blockhash establishes native checkpoint
+/// equality, full PoH, or publication eligibility.
+pub fn reencode_archive_prefix_from_retained_buckets<R, W>(
+    source: R,
+    sink: W,
+    writer_config: ArchiveWriterConfig,
+    retained_slot_count: u64,
+    prefix_slot_count: u64,
+    terminal_blockhash: Hash,
+) -> Result<(W, ReencodeStats), ArchiveFormatError>
+where
+    R: Read + Seek,
+    W: Write,
+{
     if terminal_blockhash == Hash::default() {
         return Err(ArchiveFormatError::InvalidContainerLayout(
             "closed checkpoint requires a nonzero terminal blockhash",
@@ -427,8 +460,16 @@ where
         sink,
         writer_config,
         prefix_slot_count,
-        Some(terminal_blockhash),
+        Some(RetainedCheckpoint {
+            source_slots: retained_slot_count,
+            terminal_blockhash,
+        }),
     )
+}
+
+struct RetainedCheckpoint {
+    source_slots: u64,
+    terminal_blockhash: Hash,
 }
 
 fn reencode_prefix_inner<R, W>(
@@ -436,7 +477,7 @@ fn reencode_prefix_inner<R, W>(
     sink: W,
     writer_config: ArchiveWriterConfig,
     prefix_slot_count: u64,
-    closed_terminal: Option<Hash>,
+    retained_checkpoint: Option<RetainedCheckpoint>,
 ) -> Result<(W, ReencodeStats), ArchiveFormatError>
 where
     R: Read + Seek,
@@ -455,16 +496,16 @@ where
             "prefix export requires a nonempty proper V2 prefix of a V2 source",
         ));
     }
-    if closed_terminal.is_none() && !reader.has_complete_slot_coverage()? {
+    if let Some(checkpoint) = &retained_checkpoint {
+        if checkpoint.source_slots < prefix_slot_count
+            || !reader.has_exact_prefix_coverage(checkpoint.source_slots)?
+        {
+            return Err(invalid(
+                "closed checkpoint source has missing or extra buckets or frames",
+            ));
+        }
+    } else if !reader.has_complete_slot_coverage()? {
         return Err(invalid("prefix export requires a dense complete source"));
-    }
-    if closed_terminal.is_some()
-        && u64::try_from(reader.bucket_count()).ok()
-            != Some(prefix_slot_count.div_ceil(u64::from(header.bucket_slots)))
-    {
-        return Err(invalid(
-            "closed checkpoint source has missing or extra buckets",
-        ));
     }
     let end = header
         .slot_start
@@ -512,15 +553,24 @@ where
         ));
         visitor.prefix_next_slot = Some(header.slot_start);
         visitor.prefix_last_blockhash = Some(anchor);
-        let slots = if closed_terminal.is_some() {
+        let slots = if let Some(checkpoint) = &retained_checkpoint {
             let mut slots = 0;
+            let width = u64::from(header.bucket_slots);
+            let retained_end = header.slot_start + checkpoint.source_slots;
             for index in 0..reader.bucket_count() {
+                if slots == prefix_slot_count {
+                    break;
+                }
                 let first = header.slot_start + slots;
-                let count = (end - first).min(u64::from(header.bucket_slots));
-                slots +=
-                    reader.read_bucket_with_header(index, &mut visitor, |bucket, visitor| {
+                let retained_count = (retained_end - first).min(width);
+                let selected_count = (end - first).min(retained_count);
+                let visited = reader.read_bucket_prefix_with_header(
+                    index,
+                    selected_count,
+                    &mut visitor,
+                    |bucket, visitor| {
                         if bucket.first_slot != first
-                            || u64::from(bucket.slot_count) != count
+                            || u64::from(bucket.slot_count) != retained_count
                             || Some(bucket.poh_start_hash) != visitor.prefix_last_blockhash
                         {
                             return Err(invalid(
@@ -528,10 +578,15 @@ where
                             ));
                         }
                         Ok(())
-                    })?;
+                    },
+                )?;
                 if let Some(error) = visitor.error.take() {
                     return Err(error);
                 }
+                if visited != selected_count {
+                    return Err(invalid("closed checkpoint bucket ended before the cut"));
+                }
+                slots += visited;
             }
             slots
         } else {
@@ -546,10 +601,10 @@ where
         if visitor.prefix_first_block_slot.is_some() && !visitor.prefix_epoch_seen {
             return Err(invalid("prefix source first block has no epoch metadata"));
         }
-        if let Some(terminal) = closed_terminal {
+        if let Some(checkpoint) = retained_checkpoint {
             if visitor.prefix_next_slot != Some(end)
                 || visitor.prefix_last_block_slot != Some(end - 1)
-                || visitor.prefix_last_blockhash != Some(terminal)
+                || visitor.prefix_last_blockhash != Some(checkpoint.terminal_blockhash)
             {
                 return Err(invalid("closed checkpoint terminal block mismatch"));
             }
