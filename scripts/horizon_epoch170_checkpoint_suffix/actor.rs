@@ -1,7 +1,38 @@
 //! Match the actual service, frozen writable leaf, projected inputs and native worker.
 use super::*;
 use std::io::{Seek, SeekFrom};
-use std::os::unix::fs::MetadataExt;
+use std::os::fd::AsRawFd;
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+
+/// Kernel mount IDs distinguish the visible read-only HOME bind from covered host mounts.
+fn visible_mount(root: &Path, target: &str) -> Result<Option<String>> {
+    ensure!(
+        target.starts_with('/') && !target.contains('\\'),
+        "unsupported escaped mount path"
+    );
+    let fd = match fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_PATH | libc::O_CLOEXEC)
+        .open(root.join(target.trim_start_matches('/')))
+    {
+        Ok(fd) => fd,
+        Err(e)
+            if matches!(
+                e.kind(),
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+            ) =>
+        {
+            return Ok(None);
+        }
+        Err(e) => return Err(e.into()),
+    };
+    let info = fs::read_to_string(format!("/proc/self/fdinfo/{}", fd.as_raw_fd()))?;
+    let id = info
+        .lines()
+        .find_map(|line| line.strip_prefix("mnt_id:"))
+        .context("missing kernel mount ID")?;
+    Ok(Some(id.trim().to_owned()))
+}
 pub(super) fn actor(held: bool) -> Result<Value> {
     let state = props(
         UNIT,
@@ -96,16 +127,46 @@ pub(super) fn actor(held: bool) -> Result<Value> {
                 && (object[2].is_null() || object[2] == meta.len()),
             "replaced input {target}"
         );
+        let visible = visible_mount(&path.join("root"), target)?.context("missing input mount")?;
         let matches = mounts
             .lines()
             .filter_map(|line| {
                 let cols = line.split_whitespace().take(6).collect::<Vec<_>>();
-                (cols.len() == 6 && cols[4] == target).then(|| cols[5])
+                (cols.len() == 6 && cols[0] == visible && cols[4] == target).then(|| cols[5])
             })
             .collect::<Vec<_>>();
         ensure!(
             matches.iter().any(|s| s.split(',').any(|x| x == "ro")),
             "input has no read-only projection {target}"
+        );
+    }
+    let dev = fs::metadata(RUN)?.dev();
+    let device = format!("{}:{}", libc::major(dev), libc::minor(dev));
+    let mut writable = Vec::new();
+    let mut readonly_home = false;
+    for line in mounts.lines() {
+        let columns: Vec<_> = line.split_whitespace().take(6).collect();
+        ensure!(columns.len() == 6, "malformed native mount record");
+        if columns[2] == device
+            && visible_mount(&path.join("root"), columns[4])?.as_deref() == Some(columns[0])
+        {
+            if columns[5].split(',').any(|opt| opt == "rw") {
+                writable.push(columns[4]);
+            }
+            if columns[4] == "/home/sol" && columns[5].split(',').any(|opt| opt == "ro") {
+                readonly_home = true;
+            }
+        }
+    }
+    ensure!(
+        writable == [RUN] && readonly_home,
+        "unexpected writable HOME-backed mounts: {writable:?}"
+    );
+    let log = fs::metadata(Path::new(RUN).join("producer.log"))?;
+    for fd in ["1", "2"] {
+        ensure!(
+            inode(&path.join("fd").join(fd))? == (log.dev(), log.ino()),
+            "unbound append log"
         );
     }
     let mut worker = Value::Null;

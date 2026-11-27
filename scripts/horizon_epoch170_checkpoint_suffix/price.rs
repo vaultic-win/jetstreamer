@@ -1,5 +1,6 @@
 //! Reprice each phase using the sealed complete-fleet provider and the current 167 reservation.
 use super::*;
+use std::os::unix::fs::MetadataExt;
 const PROVIDERS: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1";
 const WRITERS: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1";
 
@@ -292,12 +293,24 @@ fn capture_released(
         ],
     )?)?;
     let after = available()?;
+    if let Some(intent) = held {
+        // The waiting gate writes its readiness and heartbeat to the already-bound append log.
+        let log = fs::metadata(Path::new(RUN).join("producer.log"))?;
+        let old = num(&native["old170_book"], "physical_bytes")?;
+        ensure!(
+            log.dev() == num(&intent["append_log"], "device")?
+                && log.ino() == num(&intent["append_log"], "inode")?
+                && log.len() < 65536
+                && old.checked_add(log.blocks() * 512) == Some(physical),
+            "unaccounted growth or shrinkage in held epoch 170 tree"
+        );
+    }
     ensure!(
         native["fleet"] == req["fleet"]
             && native["release"] == req["released167"]
             && native["credit_bytes"] == 0
             && physical == du(LANE)?
-            && native["old170_book"]["physical_bytes"] == physical
+            && (held.is_some() || native["old170_book"]["physical_bytes"] == physical)
             && native["old170_book"]["root"] == LANE
             && writer(&req["writer"])? == *observer
             && bound(&req["fleet"])? == *fleet,
