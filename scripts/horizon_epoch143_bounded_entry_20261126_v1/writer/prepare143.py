@@ -37,10 +37,10 @@ def prepare(runtime, v46=None):
     core.need(status_cycle.FAILED166_VERSION == version, "different booking writer")
     _, fleet = core.current_fleet()
     fit = funding.price(fleet["path"], fleet["sha256"])
-    core.need(fit["disk_fits"] and fit["memory_fits"],
-              f'143 fit failed: HOME {fit["home_margin_bytes"]} bytes, RAM {fit["ram_margin_bytes"]} bytes')
     quote = funding.roll.ROOT/f"BOOKING_PRICE_{time.time_ns()}.json"
     private_write(quote, json_bytes(fit), 0o400)
+    core.need(fit["disk_fits"] and fit["memory_fits"],
+              f'143 fit failed: HOME {fit["home_margin_bytes"]} bytes, RAM {fit["ram_margin_bytes"]} bytes. Receipt {quote}')
     return book141.book(bound(PACKAGE/"price_hourly143.py"), bound(quote),
                         bound(PACKAGE/"launch-first-hourly143.sh"), runtime, epoch=143, v46=v46)
 

@@ -29,11 +29,23 @@ def owner170():
         return "predecessor",live
     second.predecessor_exit()
     if new["ActiveState"] == "active":
-        a, _ = core.read(second.DEP/"SUCCESSOR_ACTOR.json")
+        actor_root = second.DEP
+        retry_interface = second.DEP/"attempt-2/BOUNDED_SUCCESSOR_WRITER_INTERFACE.json"
+        if retry_interface.exists():
+            retry, retry_ref = core.read(retry_interface, "f5da8a618bfb147d98d2db1ec91526d9b711df014189c4e6485503f003e63dcd")
+            retry_actor = Path(retry["actor_path"])
+            if retry_actor.exists():
+                candidate, _ = core.read(retry_actor)
+                if candidate["producer_invocation_id"] == new["InvocationID"]:
+                    core.need(candidate["interface"] == retry_ref and retry_actor.parent == retry_interface.parent
+                              and retry["guard_receipts"] == str(second.DEP/"guard-receipts"),
+                              "foreign second 170 attempt-2 owner")
+                    actor_root = retry_actor.parent
+        a, _ = core.read(actor_root/"SUCCESSOR_ACTOR.json")
         core.need(a["producer_invocation_id"]==new["InvocationID"] and a["producer_pid"]==int(new["MainPID"]),
                   "second 170 owner changed")
-        mode = "live" if (second.DEP/"SUCCESSOR_RELEASE.json").exists() else "held170"
-        live = roll.guard(core, second.DEP, second.UNIT, second.DEP/"guard-receipts",new["InvocationID"],mode)
+        mode = "live" if (actor_root/"SUCCESSOR_RELEASE.json").exists() else "held170"
+        live = roll.guard(core, actor_root, second.UNIT, second.DEP/"guard-receipts",new["InvocationID"],mode)
         return "successor",live
     core.inactive(second.UNIT)
     if Path(interface["closed_comparison"]).exists():
