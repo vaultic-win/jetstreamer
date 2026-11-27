@@ -25,7 +25,8 @@ READ_UNIT = "horizon-170-73746882-closed-read-20261127-v1.service"
 CHECKER = "bounded-checkpoints"
 PREVIOUS_SLOTS = [73726716, 73746882]
 NEXT_DIRECTORY = RT / "epoch170-from-73766969-20261127-v1"
-FOLLOWING = OPERATOR in (NEXT_DIRECTORY / "operator-v1", NEXT_DIRECTORY / "operator-v2", NEXT_DIRECTORY / "closed-reader-v1")
+RECONCILED = OPERATOR in (NEXT_DIRECTORY / "operator-v3", NEXT_DIRECTORY / "closed-reader-v2")
+FOLLOWING = RECONCILED or OPERATOR in (NEXT_DIRECTORY / "operator-v1", NEXT_DIRECTORY / "operator-v2", NEXT_DIRECTORY / "closed-reader-v1")
 if FOLLOWING:
     BRIDGE = UNIT
     ORIG = "c3ab30cfeb05428bb8f5c48a5a44822c"
@@ -349,7 +350,13 @@ def price(phase):
         capacity = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(capacity)
         scope_for_price = None if phase == "read" else scope()[0]
-        return capacity.charge(prior, result, assembly, scope_for_price)
+        quote = capacity.charge(prior, result, assembly, scope_for_price)
+        if RECONCILED:
+            spec = importlib.util.spec_from_file_location("verification_reservation", OPERATOR / "verification_reservation.py")
+            verification = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(verification)
+            return verification.apply(prior, quote)
+        return quote
     if OPERATOR in (FIRST/"attempt-2/operator-v3", ISSUED_PRICE):
         return overlay.apply_170(result, assembly, use_phase=True)
     return overlay.apply_170(result, assembly)

@@ -192,12 +192,22 @@ def admission_lock():
 
 def enrollment_writer(interface, ref):
     base = q.RT/"survivor172-cadence-20261122-v1"
-    if q.OPERATOR == operator.ENROLLING_FOLLOWING:
+    if q.OPERATOR in operator.ENROLLING_OPERATORS:
         version = 47
         binding, _ = q.read(q.OPERATOR/"binding.json")
         expected = binding["writer_active"]
         q.need(expected["path"] == str(base/"FAILED166_CADENCE_V47_ACTIVE.json"), "different fourth-window writer")
         active = q.bound(expected)
+        successor = base / "FAILED166_CADENCE_V48_ACTIVE.json"
+        if q.OPERATOR == operator.RECONCILED_FOLLOWING and successor.exists():
+            version = 48
+            next_active, _ = q.read(successor)
+            ready = q.bound(next_active["ready"])
+            q.need(ready["old_owner"] == expected and next_active["old"] == active["new"]
+                   and next_active["new"]["unit"] == active["new"]["unit"]
+                   and all(next_active["new"]["lock"][k] == active["new"]["lock"][k] for k in ("path", "device", "inode")),
+                   "V48 did not inherit the V47 writer and its cadence lock")
+            active = next_active
         prior_interface = q.bound(interface["old_release"])["interface"]
     else:
         q.need(q.RETRY, "this operator has no writer enrollment command")
@@ -228,7 +238,7 @@ def dispatch(stage):
         q.need(q.FOLLOWING, "capture check requires its following-window reader")
     if q.FOLLOWING and stage in ("check-capture", "close"):
         deployment = Path(__file__).resolve().parent
-        q.need(deployment in {operator.FOLLOWING_READER, operator.FOLLOWING_DEPLOYMENT, operator.ENROLLING_FOLLOWING}
+        q.need(deployment in operator.FOLLOWING_READERS | operator.ENROLLING_OPERATORS | {operator.FOLLOWING_DEPLOYMENT}
                and q.DEP == operator.D and q.UNIT == operator.q.UNIT, "unbound following checker")
         if stage == "check-capture":
             return following_checker()
@@ -248,7 +258,7 @@ def dispatch(stage):
         v,ref=q.read(q.DEP/"SUCCESSOR_RELEASE.json")
         q.need(v["interface"]==ir and q.bound(v["actor"])["unit"]==q.UNIT,"unknown successor release")
         return ref
-    enroll = q.RETRY or deployment == operator.ENROLLING_FOLLOWING
+    enroll = q.RETRY or deployment in operator.ENROLLING_OPERATORS
     if enroll:
         enrollment_writer(i, ir)
     if not (q.DEP/"SUCCESSOR_ACTOR.json").exists():
@@ -296,12 +306,14 @@ def main():
                 message = str(error)
                 retry = (stage in ("advance","release") or (q.FOLLOWING and stage == "close")) and any(fragment in message for fragment in
                     (" fit failed: disk ", "readback capacity (HOME,RAM)", "cadence needs its current accepted fleet",
-                     "accepted fleet changed during price", "joint postguard HOME coverage failed"))
+                     "accepted fleet changed during price", "joint postguard HOME coverage failed",
+                     "changed during the fourth-window quote", "private listener is in transition",
+                     "private scanner is in transition"))
                 record(q.DEP/("DISPATCH_REFUSED_"+str(time.time_ns())+".json"),
                        dict(stage=stage,error=message,observed=int(time.time()),fleet_at_attempt=str(basis),
                             retry_on_new_accepted_fleet=retry,archive_publication_authorized=False))
                 if not retry: raise
-                if (q.RETRY or q.OPERATOR == operator.ENROLLING_FOLLOWING) and (q.DEP/"SUCCESSOR_ACTOR.json").exists():
+                if (q.RETRY or q.OPERATOR in operator.ENROLLING_OPERATORS) and (q.DEP/"SUCCESSOR_ACTOR.json").exists():
                     operator.same_actor()
                     # The native pre-release gate expires in ten minutes; reprice within its lifetime.
                     time.sleep(20)
