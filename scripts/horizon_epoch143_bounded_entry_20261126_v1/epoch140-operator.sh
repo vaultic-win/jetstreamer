@@ -5,6 +5,7 @@ profile=${HORIZON140_PROFILE:-initial}
 case "$profile" in
     initial) suffix=v1; tree_cap=25769803776; price_mode=() ;;
     retry1) suffix=retry1; tree_cap=60129542144; price_mode=(--retry1) ;;
+    retry2) suffix=retry2; tree_cap=$((44 << 30)); price_mode=(--retry2) ;;
     *) exit 2 ;;
 esac
 a="/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-$suffix"
@@ -19,7 +20,10 @@ marker=/run/horizon-epoch140-epoch170-cpu-loan.active
 original_bus_path=/org/freedesktop/systemd1/unit/horizon_2dqualify_2d170_2dfull_2dmetered_2d20261124_2dv1_2eservice
 guard="$a/static/guard"
 price="$a/pricing-v2/price-epoch140"
-if [[ $profile == retry1 ]]; then price="$a/pricing-v5/price-epoch140"; fi
+case "$profile" in
+    retry1) price="$a/pricing-v5/price-epoch140" ;;
+    retry2) price="$a/pricing-v6/price-epoch140" ;;
+esac
 render="$(dirname "$0")/epoch140-producer-argv.sh"
 sealer=/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment
 self_sha=e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3
@@ -49,7 +53,7 @@ jq -e --arg f "$fleet" --arg s "$fsha" --arg unit "$u" --argjson home "$home_cha
   and .recording_authorized==true and .archive_publication_authorized==false' "$booking" >/dev/null
 cache_retirement_sha=$(jq -r '.local_cache_retirement.sha256 // empty' "$booking")
 if [[ -n $cache_retirement_sha ]]; then
-    [[ $profile == retry1 && $cache_retirement_sha =~ ^[0-9a-f]{64}$ ]]
+    [[ $profile != initial && $cache_retirement_sha =~ ^[0-9a-f]{64}$ ]]
     price_mode+=(--cache-retirement-sha "$cache_retirement_sha")
 fi
 

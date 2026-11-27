@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 suffix=${1:-v1}
-[[ $suffix == v1 || $suffix == retry1 ]]
+[[ $suffix == v1 || $suffix == retry1 || $suffix == retry2 ]]
 authority="/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-$suffix"
 producer=horizon-epoch140-suffix-recording.service
 guard="horizon-guard-epoch140-suffix-recording-20261127-$suffix"

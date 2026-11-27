@@ -37,12 +37,15 @@ mod route {
     pub(super) const EPOCH: u64 = 140;
     pub(super) const UNIT: &str = "horizon-epoch140-suffix-recording.service";
     pub(super) const ALIAS: &str = "/run/horizon140-suffix-gate";
-    #[cfg(not(epoch140_suffix_retry))]
+    #[cfg(not(any(epoch140_suffix_retry, epoch140_suffix_retry2)))]
     pub(super) const RUN: &str =
         "/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-v1";
     #[cfg(epoch140_suffix_retry)]
     pub(super) const RUN: &str =
         "/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-retry1";
+    #[cfg(epoch140_suffix_retry2)]
+    pub(super) const RUN: &str =
+        "/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-retry2";
     pub(super) const TERMINAL_SLOT: u64 = 60_911_999;
 }
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 runtime=/var/lib/jetstreamer/horizon_runtime_data
 suffix=${2:-v1}
-[[ $suffix == v1 || $suffix == retry1 ]]
+[[ $suffix == v1 || $suffix == retry1 || $suffix == retry2 ]]
 authority="$runtime/epoch140-suffix-recording-20261127-$suffix"
 node="$runtime/epoch140-recording-build-20261122-v1/44153c667a564b36ad8feb7e7cffb5db/node/jetstreamer-node"
 run="/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-$suffix"

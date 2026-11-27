@@ -210,9 +210,15 @@ def capture_native():
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--capture-native"]:
+    args = sys.argv[1:]
+    if args[:1] == ["--retry2"]:
+        args = args[1:]
+        AUTHORITY = AUTHORITY.with_name("epoch140-suffix-recording-20261127-retry2")
+        RUN = RUN.with_name(AUTHORITY.name)
+        GUARD = "horizon-guard-epoch140-suffix-recording-20261127-retry2"
+    if args == ["--capture-native"]:
         capture_native()
-    elif not sys.argv[1:]:
+    elif not args:
         accept()
     else:
-        raise SystemExit("usage: epoch140-accept-suffix.py [--capture-native]")
+        raise SystemExit("usage: epoch140-accept-suffix.py [--retry2] [--capture-native]")

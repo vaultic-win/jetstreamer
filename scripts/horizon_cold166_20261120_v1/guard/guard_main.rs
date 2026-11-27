@@ -708,6 +708,20 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
             )
         }
         #[cfg(feature = "epoch140-suffix-recording")]
+        "horizon-epoch140-suffix-recording.service"
+            if plan.worker_root
+                == Path::new(
+                    "/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-retry2",
+                ) =>
+        {
+            (
+                "/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-retry2",
+                "/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-retry2/guard-receipts",
+                9_470_567_509_909,
+                44_u64 << 30,
+            )
+        }
+        #[cfg(feature = "epoch140-suffix-recording")]
         "horizon-epoch140-suffix-recording.service" => (
             "/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-v1",
             "/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-v1/guard-receipts",

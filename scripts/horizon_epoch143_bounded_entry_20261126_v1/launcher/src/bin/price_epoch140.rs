@@ -13,6 +13,7 @@ use prior::{command, number, property, protected, read, state, string, usage};
 
 const HOME_CAP: u64 = (24 << 30) + (64 << 20);
 const RETRY_HOME_CAP: u64 = (56 << 30) + (64 << 20);
+const RETRY2_HOME_CAP: u64 = (44 << 30) + (64 << 20);
 
 fn retry_holding(fleet: &Value, transfers: &[Value]) -> Result<(Value, u64, u64)> {
     let start_ref = json!({
@@ -151,32 +152,41 @@ fn retire_uplift(fleet_ref: &Value, digest: &str) -> Result<(Value, u64)> {
         .and_then(Path::file_name)
         .and_then(|name| name.to_str())
         .context("missing exact fleet generation")?;
-    let (filename, paths): (_, &[&str]) = match fleet_cycle {
+    let (relative_path, schema, paths): (_, _, &[&str]) = match fleet_cycle {
         "root091808-live166167170-20261127-v1" => (
-            "CACHE_RETIREMENT_AFTER_091808.json",
+            "retry1/CACHE_RETIREMENT_AFTER_091808.json",
+            "horizon-epoch140-post-census-cache-retirement-v1",
             &[
                 "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/debug/deps",
                 "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/release/deps",
             ],
         ),
         "root094808-live166167170-20261127-v1" => (
-            "CACHE_RETIREMENT_AFTER_094808.json",
+            "retry1/CACHE_RETIREMENT_AFTER_094808.json",
+            "horizon-epoch140-post-census-cache-retirement-v1",
             &[
                 "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/debug/build",
                 "/home/sol/.jetstreamer-private/compiler-targets/queue193-20261024-v1/cache-stage/release/build",
                 "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build",
             ],
         ),
+        "root101808-live166167170-20261127-v1" => (
+            "retry2/CLOSED_140_RETRY1_SCRATCH_RETIREMENT.json",
+            "horizon-epoch140-post-census-scratch-retirement-v1",
+            &[
+                "/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-retry1/recording/scratch",
+            ],
+        ),
         _ => anyhow::bail!("cache retirement does not belong to this accepted fleet"),
     };
     let reference = json!({
-        "path":format!("/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-retry1/{filename}"),
+        "path":format!("/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-{relative_path}"),
         "sha256":digest
     });
     let receipt = read(&reference)?;
     let intent = read(&receipt["intent"])?;
     ensure!(
-        receipt["schema"] == "horizon-epoch140-post-census-cache-retirement-v1"
+        receipt["schema"] == schema
             && receipt["fleet"] == *fleet_ref
             && intent["fleet"] == *fleet_ref
             && receipt["trees_absent"] == true
@@ -210,15 +220,20 @@ fn retire_uplift(fleet_ref: &Value, digest: &str) -> Result<(Value, u64)> {
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    let retry = args.get(2).is_some_and(|mode| mode == "--retry1");
+    let profile = args.get(2).map(String::as_str);
+    let retry = matches!(profile, Some("--retry1" | "--retry2"));
     let cache_digest = match args.as_slice() {
         [_, _] | [_, _, _] if args.len() == 2 || retry => None,
         [_, _, _, flag, digest] if retry && flag == "--cache-retirement-sha" => Some(digest),
         _ => anyhow::bail!(
-            "usage: price_epoch140 FLEET FLEET_SHA256 [--retry1 [--cache-retirement-sha HEX]]"
+            "usage: price_epoch140 FLEET FLEET_SHA256 [--retry1|--retry2 [--cache-retirement-sha HEX]]"
         ),
     };
-    let home_cap = if retry { RETRY_HOME_CAP } else { HOME_CAP };
+    let home_cap = match profile {
+        Some("--retry2") => RETRY2_HOME_CAP,
+        Some("--retry1") => RETRY_HOME_CAP,
+        _ => HOME_CAP,
+    };
     let fleet_ref = json!({"path":args[0],"sha256":args[1]});
     let fleet = read(&fleet_ref)?;
     let (cache_retirement, confirmed_reclaimed_home) = if let Some(digest) = cache_digest {
