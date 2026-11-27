@@ -15,8 +15,8 @@ import time
 
 
 V = Path("/var/lib/jetstreamer")
-PROOF = V / "horizon141-foundation-receiver-fixture-v1"
-ROOT = Path("/home/ubuntu/.jetstreamer-private/horizon141-receiver-fixture-v1")
+PROOF = V / "horizon141-foundation-receiver-fixture-v2"
+ROOT = Path("/home/ubuntu/.jetstreamer-private/horizon141-receiver-fixture-v2")
 RAM = ROOT / "ram"
 GUARD = V / "horizon251-published-guard-20261118-v1/horizon251-standalone-guard"
 GUARD_SHA = "938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d"
@@ -104,13 +104,14 @@ def producer(root):
         raise RuntimeError("the projected input was writable")
     assert input_path.stat().st_size == FIXTURE_BYTES
     assert (root / "historical-worker").stat().st_uid == 1000
-    child = subprocess.Popen([root / "historical-worker", "90"])
+    child = subprocess.Popen(["sleep", "90"], executable=root / "historical-worker")
     try:
         output = root / "segment.jet"
         with input_path.open("rb") as src, output.open("xb") as dst:
             shutil.copyfileobj(src, dst)
             dst.flush()
             os.fsync(dst.fileno())
+        assert child.poll() is None, "synthetic worker exited before guard sampling"
         segment = seal(root / "segment.jet.segment.json",
                        {"fixture": True, "bytes": FIXTURE_BYTES, "sha256": ref(output)["sha256"]})
         seal(root / "live.json", {"uid": os.getuid(), "gid": os.getgid(), "cpus": [32, 33],
@@ -177,8 +178,8 @@ def copy_container(work, destination, limit):
 
 
 def fixture(case, layout, source):
-    unit = f"horizon-qualify-141-receiver-{case}-fixture-v1.service"
-    guard_unit = f"horizon-141-receiver-{case}-fixture-guard-v1.service"
+    unit = f"horizon-qualify-141-receiver-{case}-fixture-v2.service"
+    guard_unit = f"horizon-141-receiver-{case}-fixture-guard-v2.service"
     assert manager(unit)["LoadState"] == manager(guard_unit)["LoadState"] == "not-found"
     root = RAM / case
     root.mkdir(mode=0o700)
