@@ -150,6 +150,7 @@ struct FullReplayQuote {
 
 enum Quote {
     FullReplay(FullReplayQuote),
+    Interval141(u8),
     Suffix226(Bound),
     Suffix226Preview,
     Delivery252,
@@ -1272,6 +1273,10 @@ fn measure(
         .then(|| holding296::active(n))
         .transpose()?;
     let active_interval_141 = interval141::enrolled(n, &before)?;
+    let private_141 = match &quote {
+        Some(Quote::Interval141(ordinal)) => Some(interval141::candidate(*ordinal, &before)?),
+        _ => None,
+    };
     let mut active_deliveries = BTreeMap::new();
     for (epoch, unit, candidate, closed) in [
         (
@@ -1291,6 +1296,7 @@ fn measure(
         }
     }
     let epoch = match &quote {
+        Some(Quote::Interval141(_)) => 141,
         Some(Quote::FullReplay(full)) => full.epoch,
         Some(Quote::Suffix226(_) | Quote::Suffix226Preview) => 226,
         Some(Quote::Delivery252) => 252,
@@ -1346,16 +1352,18 @@ fn measure(
         &active_deliveries,
         &live_replays,
     )?;
-    let missing: Vec<_> = fleet["inventory"]["entries"]
-        .as_array()
-        .context("Foundation inventory")?
-        .iter()
-        .filter(|row| row["epoch"] == epoch)
-        .collect();
-    ensure!(
-        missing.len() == 1 && missing[0]["state"] == "missing",
-        "epoch {epoch} inventory no longer missing"
-    );
+    if private_141.is_none() {
+        let missing: Vec<_> = fleet["inventory"]["entries"]
+            .as_array()
+            .context("Foundation inventory")?
+            .iter()
+            .filter(|row| row["epoch"] == epoch)
+            .collect();
+        ensure!(
+            missing.len() == 1 && missing[0]["state"] == "missing",
+            "epoch {epoch} inventory no longer missing"
+        );
+    }
     let booked: BTreeSet<String> = booking["owners"]
         .as_object()
         .context("booked owners")?
@@ -1413,7 +1421,7 @@ fn measure(
     if active_holding_296.is_some() {
         ensure!(expected.insert(holding296::UNIT.to_owned()), "epoch 296 custody booked twice");
     }
-    if let Some(interval) = &active_interval_141 {
+    for interval in &active_interval_141 {
         ensure!(expected.insert(interval.unit.to_owned()), "epoch 141 replay booked twice");
     }
     for (_, owner, _, _) in active_deliveries.values() {
@@ -1450,7 +1458,10 @@ fn measure(
         pristine(device)?
     };
     let resources_before = live::resources_at(Path::new(FILESYSTEM))?;
-    let selected = units::parse_cpu_list(match epoch {
+    let selected = if let Some(candidate) = &private_141 {
+        candidate.cpus()
+    } else {
+        units::parse_cpu_list(match epoch {
         226 => "16-23",
         230 => match &quote {
             Some(Quote::Focused(spec, _)) => spec.cpus,
@@ -1464,11 +1475,13 @@ fn measure(
         296 if matches!(&quote, Some(Quote::Replay296(_))) => replay296::CPUS,
         296 => "56-63",
         _ => "40-47",
-    })?;
+        })?
+    };
     let cpus = units::affinity(&json!({"cpu_affinity":selected}))?;
+    let private_exclusive = private_141.as_ref().map(interval141::Candidate::exclusive).transpose()?;
     let exclusive = match &quote {
         Some(Quote::Replay296(replay)) => &replay.placement.exclusive_cpus,
-        _ => &selected,
+        _ => private_exclusive.as_ref().unwrap_or(&selected),
     };
     let mut recorded = BTreeMap::new();
     for unit in booked
@@ -1505,8 +1518,8 @@ fn measure(
             (holding.owner.clone(), holding.memory, holding.ticks),
         );
     }
-    if let Some(interval) = &active_interval_141 {
-        interval141::require_disjoint(exclusive)?;
+    for interval in &active_interval_141 {
+        interval.require_disjoint(exclusive)?;
         recorded.insert(
             interval.unit.to_owned(),
             (interval.owner.clone(), interval.memory, interval.ticks),
@@ -1697,7 +1710,7 @@ fn measure(
         .values()
         .try_fold(0, |total, replay| capacity::add(total, replay.receipt_disk))?;
     let holding_296_disk = active_holding_296.as_ref().map_or(0, |_| holding296::RECEIPT_DISK);
-    let interval_141_disk = active_interval_141.as_ref().map_or(0, |_| interval141::DISK);
+    let interval_141_disk = active_interval_141.len() as u64 * interval141::DISK;
     let protected = capacity::add(
         capacity::add(
             capacity::add(disk_floor, non_guard_disk)?,
@@ -1709,6 +1722,7 @@ fn measure(
         growth,
     )?;
     let (candidate_disk, candidate) = match &quote {
+        Some(Quote::Interval141(_)) => private_141.as_ref().context("private 141 inputs")?.resources()?,
         Some(Quote::FullReplay(quote)) => (
             capacity::add(quote.working_disk, DISK_RECEIPTS)?,
             capacity::add(
@@ -1761,7 +1775,7 @@ fn measure(
             },
         )?,
     )?;
-    let guard_141_memory = active_interval_141.as_ref().map_or(0, |_| interval141::GUARD_MEMORY);
+    let guard_141_memory = active_interval_141.len() as u64 * interval141::GUARD_MEMORY;
     let reserve = capacity::add(resources_before.0 / 10, capacity::add(periodic_reserve, guard_141_memory)?)?;
     let base_memory = capacity::add(capacity::add(reserve, candidate)?, reserved_audit_memory)?;
     let (hard, growth_memory) = recorded.values().try_fold(
@@ -1804,7 +1818,9 @@ fn measure(
             )
         })
         .collect();
+    let private_schema = private_141.as_ref().map(interval141::Candidate::schema);
     let schema = match epoch {
+        141 => private_schema.as_deref().context("private 141 schema")?,
         226 => "foundation-epoch226-suffix-roster-binding-v1",
         230 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == HOURLY_230.unit) => {
             "foundation-epoch230-hourly-first-roster-binding-v1"
@@ -1838,11 +1854,15 @@ fn measure(
         "active_replay_260_registration":live_replays.get(&260).filter(|r| r.unit == replay260::UNIT).map(|r| &r.reference),
         "closed_delivery_257":closed_257,
         "active_holding_296_launch":active_holding_296.as_ref().map(|holding| &holding.launch),
-        "active_interval_141_launch":active_interval_141.as_ref().map(|interval| &interval.launch),
+        "active_interval_141_launch":active_interval_141.iter().find(|interval| !interval.is_fourth()).map(|interval| &interval.launch),
+        "active_interval_141_fourth_launch":active_interval_141.iter().find(|interval| interval.is_fourth()).map(|interval| &interval.launch),
         "active_delivery_252_claim":active_deliveries.get(&252).map(|(claim, _, _, _)| claim),
         "active_delivery_261_claim":active_deliveries.get(&261).map(|(claim, _, _, _)| claim),
         "active_replay_262_registration":live_replays.get(&262).map(|replay| &replay.reference),
         "active_replay_296_registration":live_replays.get(&296).map(|replay| &replay.reference)});
+    if let Some(candidate) = &private_141 {
+        evidence["private_interval_141_candidate"] = candidate.inputs.clone();
+    }
     if let Some(Quote::FullReplay(quote)) = &quote {
         evidence["full_replay_quote"] = json!({"sizing_reference":quote.reference,"inputs":quote.inputs,
             "whole_tree_bytes":quote.working_disk,"producer_memory_bytes":quote.producer_memory,
@@ -1990,6 +2010,8 @@ pub fn run() -> Result<()> {
                         | "--trace296-quote"
                         | "--feature296-quote"
                         | "--suffix226-preview"
+                        | "--interval141-third-quote"
+                        | "--interval141-fourth-quote"
                 )
             ) =>
         {
@@ -2002,7 +2024,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
+            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote or --interval141-fourth-quote"
         ),
     };
     let synchronize = match args.next() {
@@ -2087,6 +2109,10 @@ pub fn run() -> Result<()> {
         }
         Some(flag) if flag == "--suffix226-preview" => {
             measure(&mut native, None, Some(Quote::Suffix226Preview))
+        }
+        Some(flag) if flag == "--interval141-third-quote" || flag == "--interval141-fourth-quote" => {
+            let ordinal = if flag == "--interval141-third-quote" { 3 } else { 4 };
+            measure(&mut native, None, Some(Quote::Interval141(ordinal)))
         }
         _ => receipt(&mut native, controller),
     };
