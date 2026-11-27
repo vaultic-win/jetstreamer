@@ -87,7 +87,7 @@ def observer_event(event, owner):
             and bound(path) == receipt)
 
 
-def start(active_ref, package_ref):
+def start(active_ref, package_ref, booker=BOOKER, version=46):
     actor_path = TARGET / "HELD_OWNER.json"
     if actor_path.exists():
         owner = checked(bound(actor_path))
@@ -97,8 +97,8 @@ def start(active_ref, package_ref):
         return True
     need(not process_ids(EPOCH143), "143 producer exists without an owner receipt")
     quote = subprocess.run(
-        ["/usr/bin/python3", "-IB", str(BOOKER / "prepare143.py"), "--runtime-max-seconds", "28800",
-         "--v46", active_ref["sha256"], package_ref["sha256"]], capture_output=True, text=True, timeout=80)
+        ["/usr/bin/python3", "-IB", str(booker / "prepare143.py"), "--runtime-max-seconds", "28800",
+         f"--v{version}", active_ref["sha256"], package_ref["sha256"]], capture_output=True, text=True, timeout=80)
     if quote.returncode:
         print(quote.stderr.strip(), flush=True)
         return False
@@ -107,7 +107,7 @@ def start(active_ref, package_ref):
     need(document["writer_active"] == active_ref and document["runtime_max_seconds"] == 28800
          and document["HOME_bytes"] == (64 << 30) + (64 << 20) and document["RAM_bytes"] == 41 << 30,
          "different 143 booking")
-    launch = subprocess.run([str(BOOKER / "launch-first-hourly143.sh"), booking["path"], booking["sha256"]])
+    launch = subprocess.run([str(booker / "launch-first-hourly143.sh"), booking["path"], booking["sha256"]])
     need(launch.returncode == 0, "guarded 143 entry refused after booking")
     actor = bound(TARGET / "HELD_OWNER.json")
     owner = checked(actor)
