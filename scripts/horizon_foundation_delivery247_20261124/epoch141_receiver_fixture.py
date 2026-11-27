@@ -15,8 +15,8 @@ import time
 
 
 V = Path("/var/lib/jetstreamer")
-PROOF = V / "horizon141-foundation-receiver-fixture-v2"
-ROOT = Path("/home/ubuntu/.jetstreamer-private/horizon141-receiver-fixture-v2")
+PROOF = V / "horizon141-foundation-receiver-fixture-v3"
+ROOT = Path("/home/ubuntu/.jetstreamer-private/horizon141-receiver-fixture-v3")
 RAM = ROOT / "ram"
 GUARD = V / "horizon251-published-guard-20261118-v1/horizon251-standalone-guard"
 GUARD_SHA = "938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d"
@@ -178,14 +178,14 @@ def copy_container(work, destination, limit):
 
 
 def fixture(case, layout, source):
-    unit = f"horizon-qualify-141-receiver-{case}-fixture-v2.service"
-    guard_unit = f"horizon-141-receiver-{case}-fixture-guard-v2.service"
+    unit = f"horizon-qualify-141-receiver-{case}-fixture-v3.service"
+    guard_unit = f"horizon-141-receiver-{case}-fixture-guard-v3.service"
     assert manager(unit)["LoadState"] == manager(guard_unit)["LoadState"] == "not-found"
     root = RAM / case
     root.mkdir(mode=0o700)
     (root / "input").mkdir(mode=0o700)
     (root / "input/source").touch(mode=0o400)
-    shutil.copyfile("/usr/bin/sleep", root / "historical-worker")
+    shutil.copyfile("/usr/bin/gnusleep", root / "historical-worker")
     (root / "historical-worker").chmod(0o500)
     for path in (root, root / "input", root / "input/source", root / "historical-worker"):
         os.chown(path, 1000, 1000)
