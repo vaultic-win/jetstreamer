@@ -353,6 +353,7 @@ def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=Non
         expected.add(hourly_unit)
     if native169 is not None and native169["phase"] != "terminal":
         need(Path(__file__).resolve().parent in (RT/"epoch169-hourly-admission-20261123-v1/issued-split-v1",
+                 RT/"epoch162-first-hourly-completion-20261127-v2/issued-price-v2",
                    RT/"epoch143-first-hourly-20261127-v1/booking-price-v48",
                    RT/"epoch170-from-73766969-20261127-v1/operator-v4",
                    RT/"epoch170-from-73766969-20261127-v1/closed-reader-v3")
@@ -370,6 +371,7 @@ def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=Non
         expected.add(observed["Id"])
     if native162 is not None and native162["phase"] != "terminal":
         need(Path(__file__).resolve().parent in (RT/"epoch169-hourly-admission-20261123-v1/issued-split-v1",
+                 RT/"epoch162-first-hourly-completion-20261127-v2/issued-price-v2",
                  RT/"epoch143-first-hourly-20261127-v1/booking-price-v48",
                  RT/"epoch170-from-73766969-20261127-v1/operator-v4", RT/"epoch170-from-73766969-20261127-v1/closed-reader-v3")
              and native162["epoch"] == 162 and native162["phase"] in ("held","bootstrap","worker")

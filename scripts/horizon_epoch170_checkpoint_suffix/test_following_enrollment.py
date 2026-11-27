@@ -25,7 +25,7 @@ class EnrollmentWriterTests(TestCase):
             patch.object(self.q, "bound", lambda ref: self.docs[ref["path"]])
         )
         context.enter_context(
-            patch.object(self.q, "read", lambda path: (self.docs[str(path)], None))
+            patch.object(self.q, "read", lambda path: (self.docs[str(path)], {"path": str(path)}))
         )
         self.iid = "4f" * 16
         self.state = {
@@ -117,6 +117,30 @@ class EnrollmentWriterTests(TestCase):
             self.docs["ready"]["old_owner"] = {"path": "different"}
             with self.assertRaisesRegex(ValueError, "did not inherit"):
                 dispatch.enrollment_writer(self.interface, self.current)
+
+    def test_split_operator_tracks_all_transitions_through_v49(self):
+        previous, owner = None, None
+        for version in (47,48,49):
+            program = self.stage(version)
+            path = self.base / f"FAILED166_CADENCE_V{version}_ACTIVE.json"
+            path.touch()
+            ref = {"path": str(path)}
+            value = self.docs[str(path)]
+            value["new"]["lock"] = {"path":"/tmp/fixture", "device":11, "inode":24, "fd":3}
+            ready_ref = {"path":f"ready{version}"}
+            self.docs[ready_ref["path"]] = self.docs["ready"].copy()
+            value["ready"] = ready_ref
+            if version == 47:
+                self.docs[str(dispatch.operator.SPLIT_FOLLOWING/"binding.json")] = {"writer_active":ref}
+            else:
+                self.docs[ready_ref["path"]]["old_owner"] = previous
+                value["old"] = owner
+            previous, owner = ref, value["new"]
+        with patch.object(self.q,"OPERATOR",dispatch.operator.SPLIT_FOLLOWING):
+            self.assertEqual(dispatch.enrollment_writer(self.interface,self.current),program)
+            self.docs["ready49"]["old_owner"] = {"path":"foreign"}
+            with self.assertRaisesRegex(ValueError,"V49 did not inherit"):
+                dispatch.enrollment_writer(self.interface,self.current)
 
 
 if __name__ == "__main__":

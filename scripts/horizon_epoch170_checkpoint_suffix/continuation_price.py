@@ -14,7 +14,8 @@ FIRST = RT / "epoch170-from-73746882-20261127-v1"
 OPERATOR = Path(__file__).resolve().parent
 ISSUED_PRICE = FIRST/"attempt-2/issued-price-v47"
 FOCUSED169_PRICE = RT/"epoch169-hourly-admission-20261123-v1/issued-split-v1"
-ISSUED_PRICES = (ISSUED_PRICE, FOCUSED169_PRICE)
+SPLIT162_PRICE = RT/"epoch162-first-hourly-completion-20261127-v2/issued-price-v2"
+ISSUED_PRICES = (ISSUED_PRICE, FOCUSED169_PRICE, SPLIT162_PRICE)
 RETRY = OPERATOR in ISSUED_PRICES or OPERATOR.parent == FIRST/"attempt-2" and OPERATOR.name in ("operator-v1", "operator-v2", "operator-v3")
 DEP = ATTEMPT = FIRST/"attempt-2" if RETRY else FIRST
 OLD = prior.DEP / "attempt-2"
@@ -27,7 +28,8 @@ READ_UNIT = "horizon-170-73746882-closed-read-20261127-v1.service"
 CHECKER = "bounded-checkpoints"
 PREVIOUS_SLOTS = [73726716, 73746882]
 NEXT_DIRECTORY = RT / "epoch170-from-73766969-20261127-v1"
-RECONCILED = OPERATOR in (NEXT_DIRECTORY / "operator-v3", NEXT_DIRECTORY / "closed-reader-v2")
+SPLIT_PEERS = OPERATOR in (NEXT_DIRECTORY / "operator-v4", NEXT_DIRECTORY / "closed-reader-v3")
+RECONCILED = SPLIT_PEERS or OPERATOR in (NEXT_DIRECTORY / "operator-v3", NEXT_DIRECTORY / "closed-reader-v2")
 FOLLOWING = RECONCILED or OPERATOR in (NEXT_DIRECTORY / "operator-v1", NEXT_DIRECTORY / "operator-v2", NEXT_DIRECTORY / "closed-reader-v1")
 if FOLLOWING:
     BRIDGE = UNIT
@@ -250,8 +252,14 @@ def issued_tree_bounds(actor):
 
 def price(phase, *, native169=None, native162=None):
     need(phase in ("read","start","held"),"unknown continuation phase")
-    need((native169 is None and native162 is None) or OPERATOR == FOCUSED169_PRICE, "peer is outside this operator")
+    need((native169 is None and native162 is None) or OPERATOR in (FOCUSED169_PRICE, SPLIT162_PRICE), "peer is outside this operator")
     need(OPERATOR not in ISSUED_PRICES or phase == "held", "issued-price-v47 only prices the live 170 worker")
+    if SPLIT_PEERS:
+        peers_spec = importlib.util.spec_from_file_location("following_peers", OPERATOR / "following_peers.py")
+        peers = importlib.util.module_from_spec(peers_spec)
+        peers_spec.loader.exec_module(peers)
+        first, providers = peers.snapshot(prior)
+        native169, native162 = first["row169"], first["row162"]
     prior_receipt = predecessor_exit()
     if phase != "read": compare_predecessor()
     before = prior.availability()
@@ -305,8 +313,16 @@ def price(phase, *, native169=None, native162=None):
                               [p[:2] for p in tail["processes"]], 42*G)
     low, high = joint["terminal_tree_bounds"]
     old_plan = bound(bound(close_interface()["old_release"])["guard_plan"])
-    need(0 < low <= high <= old_plan["maximum_root_physical_bytes"] <= 384*G,
-         "original subtree exceeds admitted cap")
+    cap = old_plan["maximum_root_physical_bytes"]
+    if sample:
+        plan, identity = read(DEP/"ACTUAL_GUARD_PLAN.json", "94796cd68618a38945f895c1dfc7c962b9c714c9334467d974c7656f0cd55ae5")
+        release, _ = read(DEP/"SUCCESSOR_RELEASE.json", "a943145ddc01d4eaff76041eaf131818228e2cb484c32bc7753e84a8dc64bdef")
+        need(phase == "held" and OPERATOR in ISSUED_PRICES and release["guard_plan"] == identity
+             and bound(release["actor"]) == actor and plan["unit"] == UNIT
+             and actor["producer_invocation_id"] == plan["invocation_id"] == s["InvocationID"]
+             and bound(sample)["plan_sha256"] == identity["sha256"], "different active 170 tree cap")
+        cap = plan["maximum_root_physical_bytes"]
+    need(0 < low <= high <= cap <= 384*G, "original subtree exceeds admitted cap")
     if hourly is not None: need(bound(hourly)["producer_stop_enabled"],"unprotected hourly producer")
     highest = max(hourly_floor, *(bound(r)["minimum_free_bytes"] for r in joint["guard_samples"].values()))
     # During readback the predecessor's full remaining tree still belongs to 170.
@@ -361,7 +377,10 @@ def price(phase, *, native169=None, native162=None):
             spec = importlib.util.spec_from_file_location("verification_reservation", OPERATOR / "verification_reservation.py")
             verification = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(verification)
-            return verification.apply(prior, quote)
+            quote = verification.apply(prior, quote)
+            if SPLIT_PEERS:
+                return peers.finish(prior, quote, first, providers)
+            return quote
         return quote
     if OPERATOR in (FIRST/"attempt-2/operator-v3", *ISSUED_PRICES):
         return overlay.apply_170(result, assembly, use_phase=True)

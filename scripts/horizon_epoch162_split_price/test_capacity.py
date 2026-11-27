@@ -1,5 +1,6 @@
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+from types import SimpleNamespace
 
 import capacity
 import peer162
@@ -47,6 +48,31 @@ class SplitCapacity(unittest.TestCase):
             capacity.calculate(self.peer, dict(self.base, split162={}), None, 'prestart', None, 0, {})
         self.assertEqual(capacity.report169(dict(phase='terminal', invocation_id='end')),
                          dict(phase='terminal',invocation_id='end'))
+
+    def test_external_scan_reserves_the_sixth_before_issue(self):
+        basis = self.base | dict(provider={},fleet={'path':'fleet'},writer={'path':'writer'},native={'available_ram':10000})
+        common = (self.peer, SimpleNamespace(MIN_FLOOR=0), {'donor':{'usable_166_ram':63*capacity.G}},
+                  {}, basis, None, {}, {'path':'package'})
+        with patch.object(capacity, 'common', return_value=common):
+            q = capacity.whole_roster()
+        self.assertTrue(q['prospective_162'])
+        self.assertEqual(q['required_home'],116*capacity.G+2*peer162.CONTROL)
+        self.assertEqual(q['required_ram'],9000)
+        self.assertEqual(q['donor_compute']['usable_166_ram'],63*capacity.G)
+
+    def test_external_scan_uses_the_current_actor_only_once(self):
+        row = {'phase':'worker','invocation_id':'current'}
+        prior = dict(required_home=12,guard_floor=4,home_margin=8,ram_margin=2,realized_162_ram=1,fits=True)
+        charge = Mock(return_value=prior)
+        basis = self.base | dict(provider={},fleet={'path':'fleet'},writer={'path':'writer'},native={'available_ram':10000})
+        common = (self.peer | {'charge':charge}, SimpleNamespace(MIN_FLOOR=0), {'donor':{}},
+                  {}, basis, row, {}, {})
+        with patch.object(capacity, 'common', return_value=common):
+            q = capacity.whole_roster()
+        self.assertFalse(q['prospective_162'])
+        self.assertEqual(q['existing_162'],row)
+        self.assertEqual(q['ram_margin'],2)
+        charge.assert_called_once_with(basis,row)
 
     def test_busy_donor_is_refused(self):
         self.assertFalse(capacity.drained(dict(ActiveState='active', MainPID='42', ControlPID='0')))

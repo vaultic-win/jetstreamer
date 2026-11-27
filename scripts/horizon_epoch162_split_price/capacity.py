@@ -13,6 +13,10 @@ RT = Path('/var/lib/jetstreamer/horizon_runtime_data')
 ROOT = RT / 'epoch162-first-hourly-completion-20261127-v2'
 DIRECTORY169 = RT / 'epoch169-hourly-admission-20261123-v1/issued-split-v1'
 SELF = ROOT / 'issued-price-v1/capacity.py'
+AFTER = ROOT / 'issued-price-v2/capacity.py'
+MODULES = {'capacity.py','after_assembly.py','following_peers.py','continuation_price.py',
+           'successor_price.py','rollover143.py','assembly_reservation.py'}
+FIRST_DIGEST = '3853af915b2c9b58a790ed9c686770631fe2be1cb1a2575cbc1ad34db748e07b'
 PEER_DIGEST = 'cf69f9a999c4b5ae81ca6d32bd215578164751291e6cde66261ee0b5b18547d0'
 OPERATOR_DIGEST = 'ca5ac887bdb0ca18b607966df05e890dbbc0ba3f73fb1112c4717ab97dc9415e'
 G = 1 << 30
@@ -34,12 +38,13 @@ def immutable(path, digest):
     need(sha256(path.read_bytes()).hexdigest() == digest, 'different program ' + str(path))
 
 
-def software(peer, enrollment):
+def software(peer, enrollment, *, read_only=False):
     spec = peer['bound'](enrollment)
     need(enrollment['path'] == str(peer['ENROLL']) and spec['donor'] == peer['DONOR']
          and spec['operator'] == dict(path=str(peer['PACKAGE']/'deployment-seal-receipt.json'), sha256=OPERATOR_DIGEST)
-         and spec['capacity']['path'] == str(SELF), 'different 162 enrollment')
-    immutable(SELF, spec['capacity']['sha256'])
+         and (spec['capacity']['path'] == str(Path(__file__).resolve()) or
+              read_only and spec['capacity'] == {'path':str(SELF), 'sha256':FIRST_DIGEST}), 'different 162 enrollment')
+    immutable(Path(spec['capacity']['path']), spec['capacity']['sha256'])
     status, _ = peer['package'](spec)
     ready = peer['bound'](peer['bound'](spec['writer_active'])['ready'])
     other = ready['split169_provider']
@@ -142,30 +147,75 @@ def calculate(peer, base, row, phase, held, min_floor, fleet):
                 peers={'169':report169(base['actor'])})
 
 
-def quote(*, phase, held_invocation, profile, enrollment):
-    need(Path(__file__).resolve() == SELF and os.geteuid() == 0 and __debug__, 'use the issued 162 price')
+def sealed_after(peer):
+    directory = AFTER.parent
+    seal, ref = peer['read'](directory/'deployment-seal-receipt.json')
+    immutable(Path(ref['path']),ref['sha256'])
+    members = {m['name']:m for m in seal['members']}
+    need(seal['destination'] == str(directory) and len(members) == len(seal['members'])
+         and set(members) in (MODULES, MODULES | {'SOURCE.json'}), 'incomplete post-assembly package')
+    for name, member in members.items():
+        path = directory/name
+        need(path.lstat().st_size == member['bytes'], 'different post-assembly member')
+        immutable(path, member['sha256'])
+    return ref
+
+
+def common(enrollment, *, read_only=False):
+    entry = Path(__file__).resolve()
+    need(os.geteuid() == 0 and __debug__ and entry in (SELF, AFTER)
+         and (not read_only or entry == AFTER), 'use an issued 162 price')
     module = DIRECTORY169/'peer162.py'
     immutable(module, PEER_DIGEST)
     peer = runpy.run_path(str(module))
-    layout, provider, writer_ref = software(peer, enrollment)
-    need(profile == layout.profile(36) and profile['combined_ram'] == 63*G
-         and profile['producer_cpu_micros'] + profile['guard_cpu_micros'] == 3_000_000, 'different 162 profile')
+    if read_only:
+        _, enrollment = peer['read'](peer['ENROLL'])
+    layout, provider, writer_ref = software(peer, enrollment, read_only=read_only)
     proof = peer['bound'](peer['DONOR'])
     before = donor_observation(peer, proof)
-    # This provider checks all actual producers, the V48 writer and its package, the
-    # 168 verification reservation, and 169's issued bootstrap or precharged envelope.
-    other = runpy.run_path(str(DIRECTORY169/'split_operator.py'))
-    need(other['writer']()['active'] == writer_ref, '169 and 162 have different cadence owners')
-    base, row = other['price'](separate_162=True)
+    own = None
+    if entry == AFTER:
+        own = sealed_after(peer)
+        helper = runpy.run_path(str(AFTER.with_name('following_peers.py')))
+        after = runpy.run_path(str(AFTER.with_name('after_assembly.py')))
+        base, row = after['price'](helper, AFTER.parent)
+        need(read_only or base['writer'] == writer_ref, '162 enrollment refers to another cadence writer')
+    else:
+        other = runpy.run_path(str(DIRECTORY169/'split_operator.py'))
+        need(other['writer']()['active'] == writer_ref, '169 and 162 have different cadence owners')
+        base, row = other['price'](separate_162=True)
     need(base['provider'] == provider and not base['resource_credit_bytes'], 'foreign base price')
     fleet = peer['bound'](base['fleet'])
     need(fleet['owner'] == '/root' and not fleet['resource_credit_bytes']
          and not {166,173,199,200}.intersection(r['epoch'] for r in base['observed_actors']), 'competing compute loan')
-    amounts = calculate(peer, base, row, phase, held_invocation, layout.MIN_FLOOR, fleet)
     need(before == donor_observation(peer, proof), '166 loan changed during price')
+    peer['recheck'](fleet,row)
+    return peer, layout, proof, before, base, row, fleet, own
+
+
+def whole_roster():
+    """Return the lock holder's current 168 scan fit, including the sixth 162 output on either side of issuance."""
+    peer, layout, proof, donor, base, row, fleet, own = common(None,read_only=True)
+    if row is None:
+        final = calculate(peer, base, None, 'prestart', None, layout.MIN_FLOOR, fleet)
+    else:
+        applied = peer['charge'](base,row)
+        final = {key:applied[key] for key in ('required_home','guard_floor','home_margin','ram_margin','fits','realized_162_ram')}
+    return dict(schema='horizon-168-post-assembly-six-owner-price-v1', base_169=base, existing_162=row,
+                prospective_162=row is None, donor=peer['DONOR'], donor_compute=proof['donor'], native_donor=donor,
+                package=own, fleet=base['fleet'], writer=base['writer'], available_home=base['available_home'],
+                available_ram=base['native']['available_ram'], required_ram=base['native']['available_ram']-final['ram_margin'],
+                resource_credit_bytes=0, recorded_unix_seconds=time.time(), **final)
+
+
+def quote(*, phase, held_invocation, profile, enrollment):
+    peer, layout, proof, before, base, row, fleet, own = common(enrollment)
+    need(profile == layout.profile(36) and profile['combined_ram'] == 63*G
+         and profile['producer_cpu_micros'] + profile['guard_cpu_micros'] == 3_000_000, 'different 162 profile')
+    amounts = calculate(peer, base, row, phase, held_invocation, layout.MIN_FLOOR, fleet)
     peer['recheck'](fleet,row)
     return dict(schema='horizon-162-split-fleet-price-v1', phase=phase, unit=peer['UNIT'], profile=profile,
                 scratch_gib=36, held_invocation=held_invocation, donor=peer['DONOR'], enrollment=enrollment,
                 boot_id=BOOT.read_text().strip(), fleet=base['fleet'], exclusive_166_lease=True,
-                donor_compute=proof['donor'], native_donor=before, base_169=base, existing_162=row,
+                donor_compute=proof['donor'], native_donor=before, base_169=base, existing_162=row, package=own,
                 credited_166_disk_bytes=0, recorded_unix_seconds=time.time(), **amounts)
