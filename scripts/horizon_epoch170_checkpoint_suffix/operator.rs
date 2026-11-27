@@ -197,6 +197,8 @@ fn start_argv() -> Result<Vec<String>> {
     );
     // This earlier private audit still projects a writable HOME-backed tree under /run.
     args.push("--property=InaccessiblePaths=/run/jetstreamer-ready-bounds-20261121-v1".into());
+    // New host lane mounts must not become writable in an already-released service.
+    args.push("--property=MountFlags=private".into());
     // systemd-run checks its first executable outside the private mount namespace.
     // env replaces itself with the sealed gate once the namespace is installed.
     args.extend(["--".into(), "/usr/bin/env".into(), command_path]);
