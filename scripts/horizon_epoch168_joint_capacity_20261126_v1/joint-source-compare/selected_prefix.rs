@@ -37,7 +37,7 @@ fn check(ok: bool, message: &'static str) -> io::Result<()> {
     if ok { Ok(()) } else { Err(invalid(message)) }
 }
 
-struct Layout {
+pub(super) struct Layout {
     front: Vec<u8>,
     middle: Range<u64>,
     back: Vec<u8>,
@@ -48,15 +48,25 @@ impl Layout {
         self.middle.end - self.middle.start
     }
 
-    fn len(&self) -> u64 {
+    pub(super) fn len(&self) -> u64 {
         self.front.len() as u64 + self.middle_len() + self.back.len() as u64
     }
 }
 
-struct Selected<'a, R> {
+pub(super) struct Selected<'a, R> {
     source: R,
     bytes: &'a Layout,
     at: u64,
+}
+
+impl<'a, R> Selected<'a, R> {
+    pub(super) fn new(source: R, bytes: &'a Layout) -> Self {
+        Self {
+            source,
+            bytes,
+            at: 0,
+        }
+    }
 }
 
 impl<R: Read + Seek> Read for Selected<'_, R> {
@@ -217,7 +227,7 @@ fn append_index(
     Ok(())
 }
 
-fn cut(
+pub(super) fn cut(
     source: &mut (impl Read + Seek),
     original: &FileHeader,
     provenance: ArchiveProvenance,
@@ -337,14 +347,14 @@ struct Verify {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct Verified {
+pub(super) struct Verified {
     count: u64,
-    last_block: Option<u64>,
-    last_hash: [u8; 32],
+    pub(super) last_block: Option<u64>,
+    pub(super) last_hash: [u8; 32],
     epoch_count: u64,
-    first_raw: Option<u64>,
-    next_raw: Option<u64>,
-    semantic: [u8; 32],
+    pub(super) first_raw: Option<u64>,
+    pub(super) next_raw: Option<u64>,
+    pub(super) semantic: [u8; 32],
 }
 
 impl Verify {
@@ -502,7 +512,7 @@ fn read_boundary(
     Ok((visitor.finish()?, decoder.byte_stats().total()))
 }
 
-fn boundaries(
+pub(super) fn boundaries(
     source: &mut (impl Read + Seek),
     original: &FileHeader,
     entries: &[BucketIndexEntry],
@@ -546,7 +556,7 @@ fn boundaries(
     Ok(())
 }
 
-fn semantic_read<R: Read + Seek>(source: R, end: u64) -> Result<Verified> {
+pub(super) fn semantic_read<R: Read + Seek>(source: R, end: u64) -> Result<Verified> {
     let mut reader = ArchiveReader::open(source)?;
     let header = reader.header().clone();
     check(
@@ -585,7 +595,10 @@ fn semantic_read<R: Read + Seek>(source: R, end: u64) -> Result<Verified> {
     Ok(seen)
 }
 
-fn hashes(source: &mut (impl Read + Seek), layout: &Layout) -> Result<([u8; 32], [u8; 32], u64)> {
+pub(super) fn hashes(
+    source: &mut (impl Read + Seek),
+    layout: &Layout,
+) -> Result<([u8; 32], [u8; 32], u64)> {
     source.seek(SeekFrom::Start(0))?;
     let mut source_sha = Sha256::new();
     let mut selected_sha = Sha256::new();
@@ -617,7 +630,7 @@ fn hashes(source: &mut (impl Read + Seek), layout: &Layout) -> Result<([u8; 32],
     ))
 }
 
-fn hex(digest: &[u8]) -> String {
+pub(super) fn hex(digest: &[u8]) -> String {
     use std::fmt::Write;
     let mut out = String::with_capacity(digest.len() * 2);
     for byte in digest {

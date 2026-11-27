@@ -11,6 +11,7 @@ use jetstreamer_horizon::archive::{
 use lencode::prelude::*;
 use xxhash_rust::xxh64::xxh64;
 
+mod assembly_sources;
 mod joint_compare;
 mod selected_prefix;
 
@@ -172,9 +173,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match argv.as_slice() {
         [selector, sha256] if selector == "--compare-joint" => joint_compare::run(sha256),
         [selector] if selector == "--select-retry4-prefix" => selected_prefix::run(),
+        [selector] if selector == "--inspect-assembly-layout" => assembly_sources::inspect_layout(),
+        [selector, path, sha256] if selector == "--check-assembly-sources" => {
+            assembly_sources::run(path, sha256, false)
+        }
+        [selector, path, sha256] if selector == "--qualify-assembly-sources" => {
+            assembly_sources::run(path, sha256, true)
+        }
         _ => Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "expected --compare-joint JOINT_ARCHIVE_SHA256 or --select-retry4-prefix",
+            "expected --compare-joint SHA, --select-retry4-prefix, or --check-assembly-sources/--qualify-assembly-sources LINEAGE SHA",
         )
         .into()),
     }
