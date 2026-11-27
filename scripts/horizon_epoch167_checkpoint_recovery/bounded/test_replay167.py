@@ -38,12 +38,14 @@ class Admission(unittest.TestCase):
         return plan, sample, actor, plan_ref, sample_ref, timer, service
 
     def test_existing_booking_and_measurement(self):
-        self.assertEqual(route.funding(1100, 1000, 900, 200, 100, 1200), (1000, 1200))
-        self.assertEqual(route.funding(1100, 1000, 900, 200, 90, 1200, 1000, 10), (1000, 1200))
-        for values in ((1100,1000,900,200,99,1200), (1100,1000,900,200,100,1199),
-                       (1100,1000,900,200,100,1200,999), (1100,1101,900,200,100,1301)):
+        price = dict(booking=dict(cap_bytes=route.CAP, physical_bytes=800),
+                     growth=200, strongest_floor=1000, bounded_cap=1000)
+        self.assertEqual(route.physical_budget(price, 1000, 800, 1200), (1000, 200, 1200))
+        self.assertEqual(route.physical_budget(price, 1000, 790, 1220), (1010, 210, 1220))
+        for cap, observed, available, armed in ((1001,800,1300,1000), (1000,800,1199,1000),
+                                               (1000,790,1219,1010), (1000,790,1220,1000)):
             with self.assertRaises(ValueError):
-                route.funding(*values)
+                route.physical_budget(price, cap, observed, available, armed=armed)
 
     def test_native_guard_crossing_and_conservative_measurement(self):
         args = self.fixture()
@@ -86,15 +88,15 @@ class Admission(unittest.TestCase):
     def test_release_preserves_exact_actor_document(self):
         pending = dict(path="/prestart", sha256="d"*64)
         actor = dict(producer_invocation_id="4"*32)
-        guard = dict(floor=150, sample=dict(path="/guard", sha256="a"*64))
+        guard = dict(floor=150, cap=70, sample=dict(path="/guard", sha256="a"*64))
         post = dict(schema="horizon-epoch167-bounded-stage-price-v1", phase="post-guard", intent=pending,
                     actor=actor, resource_credit_bytes=0, archive_publication_authorized=False,
                     replay_launch_authorized=False, first_guard=guard, guard_floor_bytes=150,
                     whole_tree_remaining_bytes=50, required_home_bytes=200,
-                    native=dict(recorded_unix_seconds=int(time.time()), required_ram=10, writer="same", fleet="fleet"))
+                    native=dict(recorded_unix_seconds=int(time.time()), required_ram=10, writer="same", writer_binding="binding", fleet="fleet"))
         with tempfile.TemporaryDirectory() as directory, patch.object(route, "ROOT", Path(directory)), \
              patch.object(route, "native_owner", return_value=actor), patch.object(route, "read", return_value=post), \
-             patch.object(route, "intent_data", return_value=({"armed_floor": 150},)), \
+             patch.object(route, "intent_data", return_value=({"armed_floor": 150, "bounded_cap_bytes": 70},)), \
              patch.object(route, "reread_guard", return_value=guard), \
              patch.object(route, "snapshot_stamp", return_value=(200, 10)), \
              patch.object(route, "fleet_authority", return_value=(None, "same")):

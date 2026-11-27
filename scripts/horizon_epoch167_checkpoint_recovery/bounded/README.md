@@ -1,12 +1,12 @@
 # Epoch 167 bounded checkpoint replay
 
-The private route uses the existing 512 GiB epoch 167 tree, a 44 GiB producer, a 1 GiB guard and zero swap. It starts at the authenticated FR2 snapshot at slot 72,509,256 and verifies through the authenticated NY5 checkpoint at slot 72,515,090. The signed trace worker observes the historical mismatch within that interval. The result is a bounded diagnostic segment.
+The private route uses the existing 512 GiB epoch 167 tree, a 42 GiB producer with a 40 GiB memory.high limit, a 1 GiB guard and zero swap. It starts at the authenticated FR2 snapshot at slot 72,509,256 and verifies through the authenticated NY5 checkpoint at slot 72,515,090. The signed trace worker observes the historical mismatch within that interval. The result is a bounded diagnostic segment.
 
 The producer is `horizon-qualify-167-checkpoint-bounded-20261127-v1.service`. The protective timer is `horizon-guard-167-checkpoint-bounded-20261127-v1.timer`, with the corresponding oneshot service. They are separate from the original drained epoch 167 invocation and its timer.
 
 ## Prepare
 
-Use the existing HOME-backed checkpoint input leaf. Make `bounded-72509256-72515090-v1` inside that leaf, with separate `output` and `private` children. The three directories use UID 1001, GID 1003 and mode 0700. Create a root-owned 0600 `producer.log` in the run root before making the run root immutable. The children and append file remain writable. The guard measures all existing epoch 167 bytes, including this child, against the original 512 GiB cap.
+Use the existing HOME-backed checkpoint input leaf. Make `bounded-72509256-72515090-v1` inside that leaf, with separate `output` and `private` children. The three directories use UID 1001, GID 1003 and mode 0700. Create a root-owned 0600 `producer.log` in the run root before making the run root immutable. The children and append file remain writable. The guard measures all existing epoch 167 bytes, including this child, against a cap of the measured retained allocation plus 48 GiB. The original 512 GiB booking stays charged.
 
 Use `/var/lib/jetstreamer/horizon_runtime_data/epoch167-checkpoint-bounded-20261127-v1` as the root-owned mode-0700 state leaf. Create a root-owned mode-0755 `barrier` and mode-0700 `guard-receipts` there. Use a private root-owned working directory for the preparation outputs.
 
@@ -14,7 +14,7 @@ Prepare a root-owned JSON specification with schema `horizon-epoch167-bounded-re
 
 Run `replay167.py --record PREPARED.json prepare SPEC SHA STAGING`. Its package plan seals the gate, payload and exact checkpoint list. The payload pins the node, trace worker, bootstrap, genesis and the existing qualified source range index by inode and SHA-256.
 
-Use `adapt_capacity.py V31_SEAL_PLAN.json PROVIDER_STAGING` to generate the independent capacity seal plan. The adapter uses the V31 resource equation and adds the single held gate to the paired native census. It preserves the stopped epoch 167 and 170 bookings and serial epoch 185 restore commitments. Seal the generated capacity provider under its specified basename. The capacity request schema is `horizon-epoch167-bounded-capacity-request-v1`, with `fleet`, `capacity_deployment`, `full146_request` and `joint168_request` as exact path and SHA-256 references. Create the two incumbent requests from their current live guard samples.
+Use `adapt_capacity.py V31_SEAL_PLAN.json PROVIDER_STAGING` to generate the independent capacity seal plan. The provider includes the current fleet and 185 restore reservations in the HOME floor. It prices the bounded 167 run on top, using its prestart physical measurement and the 48 GiB growth limit. The whole-tree and HOME limits are fixed in the start intent and rechecked against fresh held and post-guard observations. The capacity request schema is `horizon-epoch167-bounded-capacity-request-v1`. Bind `fleet`, `capacity_deployment`, `full146_request`, `joint168_request`, and `replacement167_request` by exact path and SHA-256. Include `writer` with its `active` registration and deployment `seal` references. The provider checks the incumbent guard samples or the accepted joint 168 terminal receipt. The 167 scope binds 300% producer CPU, 25% guard CPU and zero swap.
 
 ## Guarded startup
 

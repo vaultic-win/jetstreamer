@@ -16,7 +16,7 @@ HOME = Path("/home/sol")
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT = RT / "epoch167-checkpoint-bounded-20261127-v1"
 PACKAGE = ROOT / "package"
-CAPACITY_DEPLOYMENT = RT / "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v20-joint168-v31-bounded167"
+CAPACITY_DEPLOYMENT = RT / "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v20-joint168-v31-replace167-reserve"
 LANE = HOME / ".jetstreamer-private/epoch167-standard-lane-20261109-v1"
 RUN = LANE / "checkpoint-inputs-20261127-v1/bounded-72509256-72515090-v1"
 OUTPUT = RUN / "output"
@@ -37,7 +37,7 @@ END_SNAPSHOT = "snapshot-72515090-DWgHoJPPD1XaWGLpasfR4RVnAU1CBoKUrjCgtoCfEDPK.t
 CHECKPOINTS = f"{BOOTSTRAP}\n{END_SNAPSHOT}\n".encode()
 GENESIS_SHA = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"
 GIB = 1 << 30
-CAP, MEMORY, MEMORY_HIGH, GUARD_MEMORY = 512 * GIB, 44 * GIB, 42 * GIB, GIB
+CAP, MEMORY, MEMORY_HIGH, GUARD_MEMORY = 512 * GIB, 42 * GIB, 40 * GIB, GIB
 CPU, GUARD_CPU = 3_000_000, 250_000
 MAX_VMAS = 3_500_000
 ORIGINAL_FLOOR = 8_594_041_336_400
@@ -56,14 +56,6 @@ TERMINAL = {
 OVERLAP = {
     "path": str(RT / "epoch167-source-index-rebook-20261122-v3/RETAINED_OVERLAP_VERIFIED_20261127.json"),
     "sha256": "38dd9f69f4eacf3b619fcb6a1ff36d07c88ffa7c80cbf0514a52f688ec96d84d",
-}
-V31_SEAL = {
-    "path": str(RT / "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v31-entry146/deployment-seal-receipt.json"),
-    "sha256": "fce9080d3190e16d9353a594113d9ebb785d7f0be6f22c9e5c56f31e40f3240e",
-}
-V31_ACTIVE = {
-    "path": str(RT / "survivor172-cadence-20261122-v1/FAILED166_CADENCE_V31_ACTIVE.json"),
-    "sha256": "e1656e850ee59398d8d5489b39d81a023744dc1d37132f632592feb52c54f2f5",
 }
 PEER146 = "horizon-qualify-146-full-local-20261126-v1.service"
 PEER168 = "horizon-qualify-168-joint-checkpoint-reduced-20261126-v1.service"
@@ -211,17 +203,21 @@ def guard_floor(pod, quote):
                *(row["floor"] for row in pod["replacements"].values()))
 
 
-def funding(current, zero, absolute, remaining, donor, available, armed=None, unmeasured=0):
-    need(0 < zero <= current and 0 < absolute <= current and 0 < remaining <= CAP
-         and 0 <= unmeasured <= remaining, "invalid combined HOME projection")
-    floor = max(absolute, zero, current - remaining + unmeasured)
-    need(armed is None or armed >= floor, f"armed floor short by {floor - (armed or 0)} bytes")
-    floor = floor if armed is None else armed
-    required = floor + remaining
-    need(required <= available, f"epoch 167 HOME shortfall {required-available} bytes")
-    need(required - (current + unmeasured) <= donor,
-         f"epoch 167 donor headroom shortfall {required-current-unmeasured-donor} bytes")
-    return floor, required
+def physical_budget(price, cap, minimum_physical, available, *, armed=None):
+    book = price["booking"]
+    growth = price["growth"]
+    need(0 < minimum_physical <= book["physical_bytes"] <= cap <= CAP
+         and cap == price["bounded_cap"] and 0 < growth <= CAP
+         and book["cap_bytes"] == CAP, "bounded physical allocation changed")
+    remaining = cap - minimum_physical
+    # A lower physical measurement leaves more of the original booking unspent.
+    # Charge the discrepancy to the incumbent floor as well as retaining the guard cap.
+    base = price["strongest_floor"] + book["physical_bytes"] - minimum_physical
+    headroom = available - (base + remaining)
+    need(headroom >= 0, f"epoch 167 HOME shortfall {-headroom} bytes")
+    floor = base + min(GIB, headroom) if armed is None else armed
+    need(floor >= base and floor + remaining <= available, "armed candidate envelope no longer fits")
+    return floor, remaining, floor + remaining
 
 
 def cli_args():
@@ -287,13 +283,13 @@ def immutable(path):
         os.close(fd)
 
 
-def run_directories():
+def run_directories(home_device):
     base = child(RUN, 1001, 1003, 0o700)
     need(immutable(RUN), "seal the run parent before admission")
     for path in (OUTPUT, PRIVATE):
         meta = child(path, 1001, 1003, 0o700)
         need(meta.st_dev == base.st_dev and not immutable(path), f"wrong writable run child {path}")
-    need(base.st_dev == HOME.stat().st_dev, "epoch 167 must use the HOME filesystem")
+    need(base.st_dev == home_device, "epoch 167 must use the HOME filesystem")
 
 
 def gate_environment():
@@ -371,7 +367,7 @@ def worker_member(spec):
 def verify_payload(row):
     need(row["schema"] == "horizon-epoch167-bounded-replay-payload-v1" and row["epoch"] == 167
          and row["terminal"] == TERMINAL and row["overlap"] == OVERLAP and row["range"] == [START, END] and row["argv"] == node_argv()
-         and row["environment"] == gate_environment() and row["guard_cap"] == CAP
+         and row["environment"] == gate_environment() and row["original_booking_cap"] == CAP
          and row["worker"] == ref(WORKER_DIR/"jetstreamer-historical-worker-v1-5-6", WORKER_SHA)
          and row["guard"] == ref(GUARD, GUARD_SHA)
          and row["producer_unit"] == UNIT and row["archive_publication_authorized"] is False,
@@ -414,7 +410,7 @@ def prepare(spec_ref, output):
          "FR2 custody changed after digest")
     payload = dict(schema="horizon-epoch167-bounded-replay-payload-v1", epoch=167, range=[START, END],
                    terminal=TERMINAL, overlap=OVERLAP, spec=spec_ref, worker=worker, files=files, argv=node_argv(),
-                   environment=gate_environment(), guard_cap=CAP, guard=guard, producer_unit=UNIT,
+                   environment=gate_environment(), original_booking_cap=CAP, guard=guard, producer_unit=UNIT,
                    archive_publication_authorized=False)
     verify_payload(payload)
     child(output, 0, 0, 0o700)
@@ -442,7 +438,7 @@ def projected(row):
         identity_now = file_identity(item["target"], mounted=True, executable=item["executable"])
         need(identity_now == item["source"]["identity"], f"wrong projected inode: {item['target']}")
     file_identity(ALIAS/"epoch-hashes.txt", digest(CHECKPOINTS), trusted=True, mounted=True)
-    run_directories()
+    run_directories(row["files"][2]["source"]["identity"][0])
     mounts = set()
     for path in (RUN, OUTPUT, PRIVATE):
         fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | FLAGS)
@@ -515,7 +511,7 @@ def snapshot_stamp():
     return (available.f_bavail * available.f_frsize, int(mem["MemAvailable"].split()[0]) * 1024)
 
 
-def fleet_authority(fleet_ref):
+def fleet_authority(fleet_ref, writer):
     fleet = read(fleet_ref)
     path = Path(fleet_ref["path"])
     need(path == RT/path.parent.name/"ROOT_COMPLETE_OPERATIONAL_FLEET.json", "wrong operational fleet path")
@@ -536,14 +532,27 @@ def fleet_authority(fleet_ref):
          and all(all(item["epoch"] != 167 for item in fleet[key])
                  for key in ("actual_executing_replays", "actual_active_bootstraps", "actual_active_private_diagnostics")),
          "fleet does not preserve the stopped epoch 167 booking")
-    active = read(V31_ACTIVE)["new"]
-    seal = read(V31_SEAL)
+    seal_ref, registration = writer["seal"], writer["active"]
+    cadence = RT/"survivor172-cadence-20261122-v1"
+    active = read(registration)["new"]
+    program = Path(active["program"])
+    need(program.parent.parent == cadence and program.name == "status_cycle.py"
+         and Path(seal_ref["path"]) == program.parent/"deployment-seal-receipt.json"
+         and Path(registration["path"]).parent == cadence
+         and active["unit"] == "horizon-archive-status-cadence-after172-20261120-v1.service",
+         "wrong cadence authority")
+    present_member(seal_ref, program.name)
     observer = props(active["unit"], STATE)
-    need(seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
-         and observer["InvocationID"] == active["invocation_id"]
-         and observer["MainPID"] == str(active["pid"]) and observer["ActiveState"] == "active"
-         and observer["SubState"] == "running" and ticks(active["pid"]) == active["start_ticks"],
-         "V31 sole writer changed")
+    pid = active["pid"]
+    lock = active["lock"]
+    lockpath = RT/"stable-cadence-controller-20261120-v1/consumer.lock"
+    fd = Path(f"/proc/{pid}/fd/{int(lock['fd'])}")
+    need(lock["path"] == str(lockpath) and lockpath.stat().st_ino == lock["inode"]
+         and lockpath.stat().st_dev == lock["device"] and os.path.samestat(fd.stat(), lockpath.stat())
+         and f"{program}".encode() in Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+         and observer["InvocationID"] == active["invocation_id"] and observer["MainPID"] == str(pid)
+         and observer["ActiveState"] == "active" and observer["SubState"] == "running"
+         and ticks(pid) == active["start_ticks"], "sole cadence writer changed")
     return fleet, active
 
 
@@ -603,9 +612,15 @@ def producer_argv(intent, payload, gate_ref, payload_ref, checkpoints):
 
 def quote_population(quote, fleet, actor):
     joined = quote["joined_native_population"]
-    want = {PEER146, PEER168, PEER172} | ({UNIT} if actor else set())
+    joint_mode = quote["mode"]
+    joint = fleet["current_joint168_checkpoint"]
+    need((joint_mode, joint["phase"]) in (("active", "worker"), ("terminal", "terminal")),
+         "joint 168 disposition changed")
+    want = {PEER146, PEER172} | ({PEER168} if joint_mode == "active" else set()) | ({UNIT} if actor else set())
     need(want == set(joined), "incorrect phase-specific replay population")
     for key, unit in (("current_full146", PEER146), ("current_joint168_checkpoint", PEER168)):
+        if unit not in want:
+            continue
         row = fleet[key]
         need(row["unit"]["Id"] == unit and row["phase"] == "worker"
              and joined[unit] == [[int(row["unit"]["MainPID"]), row["start_ticks"]]
@@ -620,18 +635,18 @@ def quote_population(quote, fleet, actor):
         need(joined[UNIT] == [actor["processes"][0][:2]], "held 167 gate was absent from capacity census")
 
 
-def quote_base(quote, fleet, fleet_ref, active, actor):
+def quote_base(quote, fleet, fleet_ref, active, actor, request, first):
     pod = quote["full146"]["native_successor_quote"]
     route = quote["full146"]
     fit = quote["fit"]
     now = int(time.time())
-    need(quote["schema"] == "horizon-epoch168-joint-reduced-combined-fit-v1" and quote["mode"] == "active"
+    need(quote["schema"] == "horizon-epoch168-joint-reduced-combined-fit-v1" and quote["mode"] in ("active", "terminal")
          and all(part["fleet"] == fleet_ref and part["resource_credit_bytes"] == 0
                  and part["recorded_unix_seconds"] == quote["recorded_unix_seconds"]
                  and part["replay_launch_authorized"] is False for part in (quote, route, pod))
          and 0 <= now - quote["recorded_unix_seconds"] <= MAX_AGE
          and quote["archive_publication_authorized"] is False
-         and pod["status_registration"]["consumer_seal"] == V31_SEAL
+         and pod["status_registration"]["consumer_seal"] == request["writer"]["seal"]
          and all(pod["status_registration"][key] == active[key] for key in ("pid", "start_ticks", "invocation_id"))
          and pod["epoch170_metered_full"]["stage"] == "retained"
          and pod.get("bounded167_owner") == actor
@@ -652,26 +667,55 @@ def quote_base(quote, fleet, fleet_ref, active, actor):
          and book["measurement"] == "two complete stopped-tree walks"
          and pod["replacements"].get("167") is None,
          "the original stopped epoch 167 booking changed")
-    need(fit["fits"] is True and route["fit"]["fits"] is True,
-         "current incumbents do not fit the native HOME, RAM or guard envelope")
-    need(fit["extra_cpu_quota_micros"] == 0
-         and fit["extra_memory_bytes"] == 52 * GIB
-         and fit["required_available_memory_bytes"] == route["fit"]["projected_required_memory_bytes"] + 52 * GIB
-         and route["fit"]["projected_home_floor_bytes"] + quote["joint168"]["stop_allowance_bytes"]
-             <= quote["joint168"]["guard_floor_bytes"]
-         and fit["required_home_bytes"] == quote["joint168"]["guard_floor_bytes"]+quote["joint168"]["remaining_home_bytes"],
-         "wrong combined HOME and RAM equation")
-    donor = pod["epoch159_donor_cover"]
-    need(donor["fleet"] == fleet_ref and donor["native_recorded_unix_seconds"] == quote["recorded_unix_seconds"]
-         and 0 <= donor["remaining_home_bytes"], "wrong retained donor")
-    return book, guard_floor(pod, quote), donor["remaining_home_bytes"], fit
+    replacement = quote["replacement167_fit"]
+    scope = read(request["replacement167_request"])
+    counter = replacement["candidate_guard_counterfactual"]
+    compute = replacement["compute"]
+    stage = "post-guard" if first else "held" if actor else "prestart"
+    remaining = replacement["bounded_growth_remaining_bytes"]
+    cap = replacement["bounded_whole_tree_cap_bytes"]
+    physical = replacement["conservative_whole_tree_bytes"]
+    need(replacement["stage"] == stage and pod["bounded167_first_guard"] == (read(first) if first else None)
+         and 0 < physical <= book["physical_bytes"] <= cap <= CAP
+         and remaining == cap - physical
+         and (actor is not None or cap == physical + scope["run_peak_bytes"] and physical == book["physical_bytes"]),
+         "replacement cap, phase or conservative measurement changed")
+    need(fit["fits"] is True and replacement["fits"] is True and pod["fits"] is True
+         and replacement["schema"] == "horizon-epoch167-replacement-compute-fit-v1"
+         and replacement["request"] == request["replacement167_request"] and replacement["scope"] == scope
+         and scope["producer_unit"] == UNIT and scope["run_root"] == str(RUN) and scope["append_log"] == str(LOG)
+         and [scope["bootstrap_slot"], scope["stop_at_slot"]] == [START, END]
+         and scope["producer_memory_bytes"] == replacement["admitted_producer_bytes"] == MEMORY
+         and scope["guard_memory_bytes"] == replacement["admitted_guard_bytes"] == GUARD_MEMORY
+         and CPU == scope["producer_cpu_quota_micros"] and MEMORY_HIGH == scope["producer_memory_high_bytes"]
+         and GUARD_CPU == scope["guard_cpu_quota_micros"] and scope["swap_bytes"] == 0
+         and replacement["replay_launch_authorized"] is False
+         and replacement["resource_credit_bytes"] == replacement["reservation_ending_bytes"] == 0
+         and compute["complete_cpu_quota_micros"] == 64_000_000
+         and compute["post_replacement_memory_plus_reserve_bytes"] ==
+             compute["pre_replacement_memory_plus_reserve_bytes"] - 68 * GIB + MEMORY
+         and compute["charged_167_guard_bytes"] == GUARD_MEMORY
+         and replacement["required_available_memory_bytes"] == fit["required_available_memory_bytes"]
+         and replacement["available_memory_bytes"] >= replacement["required_available_memory_bytes"]
+         and counter["unreserved_other_growth_allowed"] is False
+         and counter["joint168_mode"] == quote["mode"]
+         and replacement["protected_home_floor_bytes"] >= counter["required_candidate_floor_bytes"] >= max(guard_floor(pod, quote),
+             counter["aggregate_incumbent_home_bytes"], fit["required_home_bytes"])
+         and replacement["original_retained_tree_cap_bytes"] == CAP
+         and replacement["measured_retained_tree_bytes"] == book["physical_bytes"]
+         and 0 < scope["log_allowance_bytes"] < replacement["run_additional_peak_bytes"] == scope["run_peak_bytes"]
+         and replacement["complete_required_HOME_bytes"] ==
+             replacement["protected_home_floor_bytes"] + remaining <= replacement["available_HOME_bytes"],
+         "replacement quote does not cover the paid fleet and bounded 167 scope")
+    return book, replacement
 
 
-def capture(request_ref, *, intent_ref=None, actor=None):
+
+def capture(request_ref, *, intent_ref=None, actor=None, first_guard_ref=None):
     request = read(request_ref)
     need(request["schema"] == "horizon-epoch167-bounded-capacity-request-v1", "wrong capacity request")
     fleet_ref = request["fleet"]
-    fleet, active = fleet_authority(fleet_ref)
+    fleet, active = fleet_authority(fleet_ref, request["writer"])
     need(request["capacity_deployment"]["path"] == str(CAPACITY_DEPLOYMENT/"deployment-seal-receipt.json"),
          "wrong bounded capacity provider")
     capacity = present_member(request["capacity_deployment"], "post-stop-fit")
@@ -679,25 +723,32 @@ def capture(request_ref, *, intent_ref=None, actor=None):
     read(request["joint168_request"])
     args = ["/usr/bin/python3", "-IB", capacity["path"], "--full170=retained",
             "--full146-request", request["full146_request"]["path"], request["full146_request"]["sha256"],
-            "--joint168-request", request["joint168_request"]["path"], request["joint168_request"]["sha256"]]
+            "--joint168-request", request["joint168_request"]["path"], request["joint168_request"]["sha256"],
+            "--replacement167-request", request["replacement167_request"]["path"], request["replacement167_request"]["sha256"]]
     if actor:
         args += ["--bounded167-request", intent_ref["path"], intent_ref["sha256"]]
+    if first_guard_ref:
+        need(Path(first_guard_ref["path"]) == ROOT/"FIRST_GUARD.json" and actor is not None,
+             "first guard requires its actual held actor")
+        args += ["--bounded167-first-guard", first_guard_ref["path"], first_guard_ref["sha256"]]
     args += ["145", fleet_ref["path"], fleet_ref["sha256"]]
     before = snapshot_stamp()
     raw = command(args, timeout=100)
     after = snapshot_stamp()
     quote = json.loads(raw)
-    need(fleet_authority(fleet_ref) == (fleet, active) and read(request_ref) == request,
+    need(fleet_authority(fleet_ref, request["writer"]) == (fleet, active) and read(request_ref) == request,
          "fleet or phase request changed during capacity capture")
-    book, absolute, donor, fit = quote_base(quote, fleet, fleet_ref, active, actor)
+    book, repl = quote_base(quote, fleet, fleet_ref, active, actor, request, first_guard_ref)
+    fit = quote["fit"]
     disk = min(before[0], after[0], fit["available_home_bytes"], fleet["complete_cycle_conservative_available_DATA_bytes"])
     memory = min(before[1], after[1], fit["available_memory_bytes"])
     need(fit["required_available_memory_bytes"] <= memory,
          f"epoch 167 RAM shortfall {fit['required_available_memory_bytes']-memory} bytes")
     return dict(fleet=fleet_ref, provider=request["capacity_deployment"], program=capacity, stdout_sha256=digest(raw),
-                recorded_unix_seconds=quote["recorded_unix_seconds"], writer=active,
+                recorded_unix_seconds=quote["recorded_unix_seconds"], writer=active, writer_binding=request["writer"],
                 population=quote["joined_native_population"], booking=book, incumbent_home=fit["required_home_bytes"],
-                strongest_floor=absolute, original_donor_bytes=donor, available_home=disk,
+                strongest_floor=repl["candidate_guard_counterfactual"]["required_candidate_floor_bytes"], bounded_cap=repl["bounded_whole_tree_cap_bytes"],
+                growth=repl["run_additional_peak_bytes"], available_home=disk,
                 required_ram=fit["required_available_memory_bytes"], available_ram=memory)
 
 
@@ -705,7 +756,7 @@ def prestart(prepared_ref, seal_ref, request_ref):
     prepared = read(prepared_ref)
     payload, _, payload_ref, _ = sealed_deployment(prepared, seal_ref)
     fresh_outputs()
-    run_directories()
+    run_directories(HOME.stat().st_dev)
     child(ROOT/"barrier", 0, 0, 0o755)
     child(ROOT/"guard-receipts", 0, 0, 0o700)
     need(not permit_exists() and not (ROOT/"guard-receipts/stop-intent.json").exists(), "dirty admission state")
@@ -717,15 +768,13 @@ def prestart(prepared_ref, seal_ref, request_ref):
         need(file_identity(item["source"]["path"], executable=item["executable"]) == item["source"]["identity"],
              f"prepared input changed: {item['target']}")
     price = capture(request_ref)
-    current = price["incumbent_home"]
-    remaining = price["booking"]["remaining_bytes"]
-    floor, required = funding(current, current, price["strongest_floor"], remaining,
-                              price["original_donor_bytes"], price["available_home"])
+    cap = price["bounded_cap"]
+    floor, _, required = physical_budget(price, cap, price["booking"]["physical_bytes"], price["available_home"])
     need(MEMORY <= 68 * GIB and GUARD_MEMORY == GIB and CPU <= 9_000_000,
          "candidate cap exceeds its stopped booking")
     return dict(schema="horizon-epoch167-bounded-start-intent-v1", epoch=167, terminal=TERMINAL,
                 prepared=prepared_ref, deployment=seal_ref, payload=payload_ref, request=request_ref,
-                prestart=price, producer_unit=UNIT, armed_floor=floor, required_home=required, append_log=append,
+                prestart=price, producer_unit=UNIT, armed_floor=floor, bounded_cap_bytes=cap, required_home=required, append_log=append,
                 producer_memory_bytes=MEMORY, guard_memory_bytes=GUARD_MEMORY, resource_credit_bytes=0,
                 additional_cpu_quota_micros=0, additional_booked_memory_bytes=0,
                 archive_publication_authorized=False, replay_launch_authorized=False)
@@ -745,7 +794,7 @@ def intent_data(reference, *, live=False):
         return intent, payload, gate_ref, payload_ref, checkpoints
     need(0 <= int(time.time()) - intent["prestart"]["recorded_unix_seconds"] <= MAX_AGE
          and not permit_exists(), "start intent exceeded its native capture window")
-    need(fleet_authority(intent["prestart"]["fleet"])[1] == intent["prestart"]["writer"], "writer changed")
+    need(fleet_authority(intent["prestart"]["fleet"], intent["prestart"]["writer_binding"])[1] == intent["prestart"]["writer"], "writer changed")
     return intent, payload, gate_ref, payload_ref, checkpoints
 
 
@@ -816,7 +865,10 @@ def native_owner(intent_ref):
 
 def reprice(intent_ref, actor, guard=None):
     intent, *_ = intent_data(intent_ref, live=True)
-    current = capture(intent["request"], intent_ref=intent_ref, actor=actor)
+    first = ref(ROOT/"FIRST_GUARD.json", digest(encode(guard))) if guard else None
+    if first:
+        need(read(first) == guard, "first guard custody changed")
+    current = capture(intent["request"], intent_ref=intent_ref, actor=actor, first_guard_ref=first)
     prestart = intent["prestart"]
     for key in ("writer", "fleet", "provider", "program"):
         need(prestart[key] == current[key], f"admission {key} changed between phases")
@@ -831,11 +883,8 @@ def reprice(intent_ref, actor, guard=None):
     if guard:
         physical = min(physical, guard["physical_bytes"])
         available = min(available, guard["available_home"])
-    remaining = CAP - physical
-    incumbent = current["incumbent_home"]
-    floor, required = funding(incumbent, incumbent, current["strongest_floor"], remaining,
-                              current["original_donor_bytes"], available, intent["armed_floor"],
-                              book["physical_bytes"] - physical)
+    floor, remaining, required = physical_budget(current, intent["bounded_cap_bytes"], physical, available,
+                                                armed=intent["armed_floor"])
     return dict(schema="horizon-epoch167-bounded-stage-price-v1", phase="post-guard" if guard else "held",
                 intent=intent_ref, actor=actor, native=current, first_guard=guard, physical_bytes=physical,
                 whole_tree_remaining_bytes=remaining, guard_floor_bytes=floor,
@@ -858,7 +907,7 @@ def guard_plan(intent_ref, held_ref):
     return dict(schema="jetstreamer-horizon-standalone-guard-plan-v1", unit=UNIT,
                 invocation_id=actor["producer_invocation_id"], filesystem=str(HOME),
                 worker_root=str(LANE), maximum_worker_vmas=MAX_VMAS, minimum_free_bytes=intent["armed_floor"],
-                maximum_root_physical_bytes=CAP, receipt_directory=str(ROOT/"guard-receipts"))
+                maximum_root_physical_bytes=intent["bounded_cap_bytes"], receipt_directory=str(ROOT/"guard-receipts"))
 
 
 def native_static_validation(plan_ref):
@@ -879,12 +928,15 @@ def guard_argv(plan_ref):
     need(Path(plan_ref["path"]) == ROOT/"ACTUAL_GUARD_PLAN.json"
          and plan["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
          and plan["unit"] == UNIT and plan["worker_root"] == str(LANE)
-         and plan["filesystem"] == str(HOME) and plan["maximum_root_physical_bytes"] == CAP
+         and plan["filesystem"] == str(HOME) and 0 < plan["maximum_root_physical_bytes"] <= CAP
          and plan["maximum_worker_vmas"] == MAX_VMAS and plan["minimum_free_bytes"] >= ORIGINAL_FLOOR
          and plan["receipt_directory"] == str(ROOT/"guard-receipts")
          and props(UNIT, STATE)["InvocationID"] == plan["invocation_id"] and not permit_exists(),
          "guard plan does not match the held producer")
 
+    intent = read(ref(ROOT/"START_INTENT.json", digest((ROOT/"START_INTENT.json").read_bytes())))
+    need(plan["maximum_root_physical_bytes"] == intent["bounded_cap_bytes"]
+         and plan["minimum_free_bytes"] == intent["armed_floor"], "guard bounds differ from prestart")
     guard_binary()
     native_static_validation(plan_ref)
     arguments = [
@@ -916,7 +968,7 @@ def sample_proof(plan, sample, actor, plan_ref, sample_ref, timer, service):
          and plan["unit"] == UNIT and plan["invocation_id"] == iid
          and plan["worker_root"] == str(LANE) and plan["filesystem"] == str(HOME)
          and plan["receipt_directory"] == str(ROOT/"guard-receipts")
-         and plan["maximum_root_physical_bytes"] == CAP and plan["maximum_worker_vmas"] == MAX_VMAS
+         and 0 < plan["maximum_root_physical_bytes"] <= CAP and plan["maximum_worker_vmas"] == MAX_VMAS
          and plan["minimum_free_bytes"] >= ORIGINAL_FLOOR, "guard plan crossed the held actor")
     need(timer["ActiveState"] == "active" and timer["SubState"] in ("waiting", "running")
          and not timer["Job"] and IID.fullmatch(timer["InvocationID"]) and timer["Triggers"] == GUARD_SERVICE
@@ -939,15 +991,15 @@ def sample_proof(plan, sample, actor, plan_ref, sample_ref, timer, service):
          and sample["worker_observation_error"] is None and sample["root_physical_observation_error"] is None
          and sample["workers"] == [] and walk["exceeds_budget"] is False
          and sample["minimum_free_bytes"] == plan["minimum_free_bytes"]
-         and sample["maximum_root_physical_bytes"] == CAP
+         and sample["maximum_root_physical_bytes"] == plan["maximum_root_physical_bytes"]
          and sample["available_bytes"] >= plan["minimum_free_bytes"], "first guard crossed or failed")
     copies = [walk[key] for key in ("first", "second")]
-    need(all(0 < copy["physical_bytes"] <= CAP and copy["vanished_entries"] == 0 for copy in copies),
+    need(all(0 < copy["physical_bytes"] <= plan["maximum_root_physical_bytes"] and copy["vanished_entries"] == 0 for copy in copies),
          "first guard tree census is unstable or over cap")
     return dict(plan=plan_ref, sample=sample_ref, timer_invocation_id=timer["InvocationID"],
                 guard_invocation_id=guard_iid, available_home=sample["available_bytes"],
                 physical_bytes=min(copy["physical_bytes"] for copy in copies),
-                floor=plan["minimum_free_bytes"], recorded_unix_seconds=sample["recorded_unix_seconds"])
+                floor=plan["minimum_free_bytes"], cap=plan["maximum_root_physical_bytes"], recorded_unix_seconds=sample["recorded_unix_seconds"])
 
 
 def first_guard(intent_ref, plan_ref, sample_ref):
@@ -962,7 +1014,7 @@ def first_guard(intent_ref, plan_ref, sample_ref):
     entries = command(["/usr/bin/journalctl", "--no-pager", "-q", "-o", "json", guard_unit, invocation]).splitlines()
     need(any(json.loads(entry).get("_EXE") == str(GUARD) for entry in entries),
          "first guard has no invocation-bound native journal evidence")
-    need(proof["floor"] == intent["armed_floor"] and native_owner(intent_ref) == actor
+    need(proof["cap"] == intent["bounded_cap_bytes"] and proof["floor"] == intent["armed_floor"] and native_owner(intent_ref) == actor
          and not (ROOT/"guard-receipts/stop-intent.json").exists(), "first guard changed before handoff")
     return dict(schema="horizon-epoch167-bounded-first-guard-v1", intent=intent_ref, actor=actor, **proof)
 
@@ -985,10 +1037,10 @@ def release(intent_ref, post_ref):
     guard = reread_guard(intent_ref, post["first_guard"])
     intent, *_ = intent_data(intent_ref, live=True)
     disk, mem = snapshot_stamp()
-    need(guard["floor"] == intent["armed_floor"] == post["guard_floor_bytes"]
+    need(guard["cap"] == intent["bounded_cap_bytes"] and guard["floor"] == intent["armed_floor"] == post["guard_floor_bytes"]
          and post["required_home_bytes"] == post["guard_floor_bytes"] + post["whole_tree_remaining_bytes"]
          and disk >= post["required_home_bytes"] and mem >= post["native"]["required_ram"]
-         and fleet_authority(post["native"]["fleet"])[1] == post["native"]["writer"],
+         and fleet_authority(post["native"]["fleet"], post["native"]["writer_binding"])[1] == post["native"]["writer"],
          "admission no longer fits at permit time")
     iid = actor["producer_invocation_id"].encode()
     receipt = dict(schema="horizon-epoch167-bounded-authorized-release-v1", intent=intent_ref,
