@@ -22,7 +22,8 @@ RAM_BYTES = 31 << 30
 def book(price, quote, operator, runtime):
     sys.path.insert(0, str(PACKAGE))
     import status_cycle as cycle
-    from evidence import bound, checked, durable, need, utc
+    from cutover41 import private_write
+    from evidence import bound, checked, json_bytes, need, utc
     from first_hourly143 import EPOCH141 as profile, EPOCH143, process_ids, props
     from transition import clock
 
@@ -87,7 +88,7 @@ def book(price, quote, operator, runtime):
                    native_census_enrolled=True, recording_authorized=True,
                    archive_publication_authorized=False, resource_credit_bytes=0)
     path = profile.base / "WRITER_BOOKING_FIRST_HOURLY.json"
-    durable(path, booking)
+    private_write(path, json_bytes(booking), 0o400)
     return bound(path)
 
 
