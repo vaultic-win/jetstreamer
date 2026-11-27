@@ -72,22 +72,26 @@ pub(super) fn placement() -> Result<Placement> {
 }
 
 pub(super) fn verify_topology(placement: &Placement) -> Result<()> {
+    verify_cpu_group(CPUS, &placement.exclusive_cpus)
+}
+
+pub(super) fn verify_cpu_group(cpus: &str, exclusive: &BTreeSet<u64>) -> Result<()> {
     let sys = Path::new("/sys/devices/system/cpu");
     let online = units::parse_cpu_list(fs::read_to_string(sys.join("online"))?.trim())?;
-    let selected = units::parse_cpu_list(CPUS)?;
+    let selected = units::parse_cpu_list(cpus)?;
     let mut siblings = BTreeSet::new();
     for cpu in &selected {
         let path = sys.join(format!("cpu{cpu}/topology/thread_siblings_list"));
         let core = units::parse_cpu_list(fs::read_to_string(path)?.trim())?;
         ensure!(
             core.contains(cpu) && core.intersection(&selected).count() == 1,
-            "epoch 296 CPUs do not select distinct physical cores"
+            "CPUs {cpus} do not select distinct physical cores"
         );
         siblings.extend(core.intersection(&online).copied());
     }
     ensure!(
-        selected.is_subset(&online) && siblings == placement.exclusive_cpus,
-        "epoch 296 online physical-core placement changed"
+        selected.is_subset(&online) && &siblings == exclusive,
+        "online physical-core placement for {cpus} changed"
     );
     Ok(())
 }

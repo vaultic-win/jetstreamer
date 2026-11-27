@@ -11,8 +11,8 @@ mod replay258;
 mod replay260;
 mod replay296;
 use focused::{
-    FEATURE_296, GAP_230, HOURLY_230, LOADER_296, RESTORE_258, RESTORE_260, SCOPES,
-    OVERLAP_266, OVERLAP_266_EXCLUSIVE, SECOND_HOURLY_230, TRACE_296,
+    FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, OVERLAP_266,
+    OVERLAP_266_EXCLUSIVE, RESTORE_258, RESTORE_260, SCOPES, SECOND_HOURLY_230, TRACE_296,
 };
 mod suffix226;
 mod vote_boundary;
@@ -1271,6 +1271,7 @@ fn measure(
     controller: Option<Controller<'_>>,
     quote: Option<Quote>,
 ) -> Result<Value> {
+    let first_7871_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == FIRST_7871_230.unit);
     let completion = latest_completion()?;
     let done = completion.json()?;
     let fleet_ref = binding(&done["fleet"])?;
@@ -1567,8 +1568,17 @@ fn measure(
     let cpus = units::affinity_width(&json!({"cpu_affinity":selected}), cpu_width)?;
     let private_exclusive = private_141.as_ref().map(interval141::Candidate::exclusive).transpose()?;
     let overlap_exclusive = units::parse_cpu_list(OVERLAP_266_EXCLUSIVE)?;
+    let bridge_group = units::parse_cpu_list("48-55,112-119")?;
     let exclusive = match &quote {
-        Some(Quote::Focused(spec, _)) if spec.unit == OVERLAP_266.unit => &overlap_exclusive,
+        Some(Quote::Focused(_, _)) if first_7871_candidate => {
+            focused::second_hourly_drained(n)?;
+            replay296::verify_cpu_group(FIRST_7871_230.cpus, &bridge_group)?;
+            &bridge_group
+        }
+        Some(Quote::Focused(spec, _)) if spec.unit == OVERLAP_266.unit => {
+            replay296::verify_cpu_group("30,32-39", &overlap_exclusive)?;
+            &overlap_exclusive
+        }
         Some(Quote::Replay296(replay)) => &replay.placement.exclusive_cpus,
         _ => private_exclusive.as_ref().unwrap_or(&selected),
     };
@@ -1625,10 +1635,15 @@ fn measure(
     for replay in live_replays.values() {
         require_disjoint_cpus(epoch, exclusive, replay.unit, &replay.owner)?;
         if replay.unit == OVERLAP_266.unit {
+            replay296::verify_cpu_group("30,32-39", &overlap_exclusive)?;
             ensure!(
                 exclusive.is_disjoint(&overlap_exclusive),
                 "epoch {epoch} overlaps the epoch 266 diagnostic's physical cores"
             );
+        }
+        if replay.unit == FIRST_7871_230.unit {
+            replay296::verify_cpu_group(FIRST_7871_230.cpus, &bridge_group)?;
+            ensure!(exclusive.is_disjoint(&bridge_group), "epoch {epoch} overlaps the running epoch 230 physical cores");
         }
         if replay.unit == replay296::UNIT {
             ensure!(
@@ -1754,6 +1769,9 @@ fn measure(
     if let Some(proof) = &extraction_drain {
         terminal_extract_226(n, &booking, proof)?;
     }
+    if first_7871_candidate {
+        focused::second_hourly_drained(n)?;
+    }
     if let Some(Quote::Replay296(full)) = &quote {
         let checkpoint = full.checkpoint.sealed()?;
         focused::feature_296_drained(n, text(&checkpoint, "invocation_id")?)?;
@@ -1816,6 +1834,19 @@ fn measure(
     let holding_296_disk = active_holding_296.as_ref().map_or(0, |_| holding296::RECEIPT_DISK);
     let restore_266_disk = active_restore_266.as_ref().map_or(0, |_| restore266::RECEIPT_DISK);
     let interval_141_disk = active_interval_141.len() as u64 * interval141::DISK;
+    let shares_suffix = matches!(&quote, Some(Quote::Focused(scope, _))
+        if scope.unit == FIRST_7871_230.unit || scope.epoch == 266)
+        || live_replays.get(&230).is_some_and(|replay| replay.unit == FIRST_7871_230.unit)
+        || live_replays.contains_key(&266);
+    let suffix_quote = matches!(&quote, Some(Quote::Suffix226(_) | Quote::Suffix226Preview));
+    let suffix_active = live_replays.contains_key(&226);
+    let (pending_suffix_disk, pending_suffix_memory) = if suffix226::reserve_for_overlap(shares_suffix, suffix_quote, suffix_active) {
+        ensure!(before.contains(EXTRACT_226) || extraction_drain.is_some(),
+            "epoch 226 extraction or exact drain is required for the protected suffix");
+        suffix226::pending_reservation(n)?
+    } else {
+        (0, 0)
+    };
     let protected = capacity::add(
         capacity::add(
             capacity::add(disk_floor, non_guard_disk)?,
@@ -1824,7 +1855,7 @@ fn measure(
                 capacity::add(capacity::add(replay_disk, restore_266_disk)?, capacity::add(holding_296_disk, interval_141_disk)?)?,
             )?,
         )?,
-        growth,
+        capacity::add(growth, pending_suffix_disk)?,
     )?;
     let (candidate_disk, candidate) = match &quote {
         Some(Quote::Interval141(_)) => private_141.as_ref().context("private 141 inputs")?.resources()?,
@@ -1886,7 +1917,9 @@ fn measure(
     )?;
     let guard_141_memory = active_interval_141.len() as u64 * interval141::GUARD_MEMORY;
     let restore_allowance = active_restore_266.as_ref().map_or(0, |_| restore266::ADDITIONAL_MEMORY);
-    let reserve = capacity::add(resources_before.0 / 10, capacity::add(periodic_reserve, capacity::add(guard_141_memory, restore_allowance)?)?)?;
+    let guarded_memory = capacity::add(guard_141_memory, restore_allowance)?;
+    let headroom = capacity::add(resources_before.0 / 10, pending_suffix_memory)?;
+    let reserve = capacity::add(headroom, capacity::add(periodic_reserve, guarded_memory)?)?;
     let base_memory = capacity::add(reserve, candidate)?;
     let (hard, growth_memory) = recorded.values().try_fold(
         (base_memory, base_memory),
@@ -1912,6 +1945,9 @@ fn measure(
         "active_diagnostic_230_receipt_disk_bytes":live_replays.get(&230).map_or(0, |lane| lane.receipt_disk),
         "active_replay_262_receipt_disk_bytes":live_replays.get(&262).map_or(0, |lane| lane.receipt_disk),
         "active_replay_296_receipt_disk_bytes":live_replays.get(&296).map_or(0, |lane| lane.receipt_disk),
+        "protected_226_suffix_state":if !shares_suffix {"outside-quote"} else if suffix_quote {"candidate"}
+            else if suffix_active {"live"} else if pending_suffix_disk > 0 {"pending"} else {"verified-closed"},
+        "pending_suffix226_disk_bytes":pending_suffix_disk,"pending_suffix226_memory_bytes":pending_suffix_memory,
         "remaining_guard_growth_bytes":growth,"protected_existing_disk_bytes":protected,
         "candidate_disk_bytes":candidate_disk,"required_disk_bytes":required,"available_disk_bytes":free,
         "disk_shortfall_bytes":required.saturating_sub(free),"disk_margin_bytes":free.saturating_sub(required),
@@ -1940,6 +1976,7 @@ fn measure(
         230 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == SECOND_HOURLY_230.unit) => {
             "foundation-epoch230-hourly-second-roster-binding-v1"
         }
+        230 if first_7871_candidate => "foundation-epoch230-first-7871-roster-binding-v1",
         230 => "foundation-epoch230-short-gap-roster-binding-v1",
         252 => "foundation-epoch252-delivery-roster-binding-v1",
         256 => replay256::ROSTER_SCHEMA,
@@ -2033,6 +2070,15 @@ fn measure(
             "candidate_memory_bytes":candidate,"candidate_cpus":selected,
         });
     }
+    if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == OVERLAP_266.unit) {
+        evidence[OVERLAP_266.quote_key()]["exclusive_online_cpus"] = json!(overlap_exclusive);
+    }
+    if first_7871_candidate {
+        evidence[FIRST_7871_230.quote_key()]["exclusive_online_cpus"] = json!(bridge_group);
+        evidence[FIRST_7871_230.quote_key()]["predecessor_terminal"] = json!(Bound::new(
+            Path::new("/var/lib/jetstreamer/horizon230-middle-hourly-second-runtime-v1/terminal.json"),
+            "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56"));
+    }
     deny_authority(&mut evidence);
     Ok(evidence)
 }
@@ -2119,6 +2165,7 @@ pub fn run() -> Result<()> {
                         | "--focused230-quote"
                         | "--hourly230-quote"
                         | "--hourly230-second-quote"
+                        | "--first7871-230-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--overlap266-quote"
@@ -2143,7 +2190,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --focused258-quote, --focused260-quote, --overlap266-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote, --interval141-fourth-quote, --interval141-fifth-quote, --interval141-sixth-quote or --interval141-seventh-quote"
+            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --first7871-230-quote, --focused258-quote, --focused260-quote, --overlap266-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote, --interval141-fourth-quote, --interval141-fifth-quote, --interval141-sixth-quote or --interval141-seventh-quote"
         ),
     };
     let synchronize = match args.next() {
@@ -2205,6 +2252,7 @@ pub fn run() -> Result<()> {
                     "--focused230-quote"
                         | "--hourly230-quote"
                         | "--hourly230-second-quote"
+                        | "--first7871-230-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--overlap266-quote"
@@ -2218,6 +2266,7 @@ pub fn run() -> Result<()> {
                 Some("--focused230-quote") => &GAP_230,
                 Some("--hourly230-quote") => &HOURLY_230,
                 Some("--hourly230-second-quote") => &SECOND_HOURLY_230,
+                Some("--first7871-230-quote") => &FIRST_7871_230,
                 Some("--focused258-quote") => &RESTORE_258,
                 Some("--focused260-quote") => &RESTORE_260,
                 Some("--overlap266-quote") => &OVERLAP_266,
