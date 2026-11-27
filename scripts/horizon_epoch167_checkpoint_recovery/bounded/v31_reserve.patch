@@ -258,9 +258,12 @@
                      joined = dict(price["population"])
                      unit = joint168_capacity["UNIT"]
                      booked = price["population"].pop(unit, None)
-@@ -2751,7 +2845,12 @@
+@@ -2750,8 +2844,15 @@
+                 price = full146_capacity["project"](s, price, basis, FULL146_REQUEST)
                  if joint is not None:
                      price = joint168_capacity["project"](s, price, joint, JOINT168_REQUEST)
++                    if REPLACE167 and joint["mode"] == "terminal":
++                        price = terminal_joint168["settle_compute"](s, price, joint)
                      price["joined_native_population"] = joined
 -                    if V31_JOINT168:
 +                    if REPLACE167:
@@ -272,7 +275,7 @@
                          price["dormant166_HOME_projection"] = terminal170_capacity["dormant166"](
                              s, price, full170_capacity["MIN_FLOOR"])
                      elif V29_JOINT168 and joint["mode"] == "active":
-@@ -2760,10 +2859,18 @@
+@@ -2760,10 +2861,18 @@
              if V30_JOINT168:
                  want = {full146_capacity["UNIT"], joint168_capacity["UNIT"],
                          "horizon-qualify-172-full-half-core-20261120-v1.service"}
@@ -291,7 +294,7 @@
                  s.need(price["schema"] == joint168_capacity["OUTPUT_SCHEMA"]
                         and set(price["joined_native_population"]) == want,
                         "combined capacity changed the exact live population")
-@@ -2878,9 +2985,34 @@
+@@ -2878,9 +2987,34 @@
                 and FULL146_REQUEST["mode"] in ("prestart", "held", "active"),
                 "invalid full 146 accounting request")
      if JOINT168 and args[:1] == ["--joint168-request"]:
@@ -328,7 +331,7 @@
          args = args[3:]
      repro166_mode = None
      if args and args[0].startswith("--repro166="):
-@@ -2891,7 +3023,8 @@
+@@ -2891,7 +3025,8 @@
          args=args[1:]
      s.need(len(args)==3,"usage: post-stop-fit [--next-admission] EPOCH FLEET_ABSOLUTE_PATH FLEET_SHA256")
      if V30_JOINT168:
@@ -405,7 +408,7 @@
      code = (
 --- /dev/null
 +++ b/replacement167_capacity.py
-@@ -0,0 +1,308 @@
+@@ -0,0 +1,312 @@
 +"""Reprice only stopped 167's compute for a bounded, private replacement."""
 +import os
 +from pathlib import Path
@@ -685,12 +688,15 @@
 +                      original_epoch170_remaining_bytes=native['bookings']['170']['remaining_bytes'],
 +                      joint168_mode=combined['mode'],
 +                      unreserved_other_growth_allowed=False)
++    settlement = combined.get('terminal168_compute_settlement')
++    retired_memory = settlement['released_memory_bytes'] if settlement else 0
 +    admissible_incumbents = (native['fits'] and
-+        all(full146['fit'][key] == 0 for key in
-+            ('home_shortfall_bytes','cpu_shortfall_micros','memory_shortfall_bytes')) and
++        all(full146['fit'][key] == 0 for key in ('home_shortfall_bytes','cpu_shortfall_micros')) and
++        (settlement is not None or full146['fit']['memory_shortfall_bytes'] == 0) and
 +        all(fit[key] == 0 for key in ('home_shortfall_bytes','memory_shortfall_bytes','whole_tree_over_cap_bytes')))
 +    s.need(fit['required_available_memory_bytes'] ==
-+           mem['native_required_available_memory_bytes']+60*G, 'replacement RAM disagrees with the outer projections')
++           mem['native_required_available_memory_bytes']+60*G-retired_memory,
++           'replacement RAM disagrees with the outer projections')
 +    previous = Path(budget['run_root'])
 +    leaf_physical=0
 +    if previous.exists():
@@ -702,6 +708,7 @@
 +                      and book_physical<=cap and required<=available_home), replay_launch_authorized=False,
 +                source_launch_qualification_verified=False,
 +                request=request['ref'],scope=budget,original_compute_proof=old,compute=mem,
++                terminal168_compute_settlement=settlement,
 +                admitted_producer_bytes=budget['producer_memory_bytes'],admitted_guard_bytes=budget['guard_memory_bytes'],
 +                complete_required_HOME_bytes=required,available_HOME_bytes=available_home,
 +                required_available_memory_bytes=fit['required_available_memory_bytes'],available_memory_bytes=available_mem,
@@ -716,7 +723,7 @@
 +                resource_credit_bytes=0,reservation_ending_bytes=0)
 --- /dev/null
 +++ b/terminal_joint168_capacity.py
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,199 @@
 +"""Bind the accepted joint-168 terminal to its existing full reservation."""
 +import json
 +from pathlib import Path
@@ -724,14 +731,20 @@
 +
 +SUCCESS = '7ad2d189f7e94e70a38c781354912448'
 +FAILURE = '98e322203f7a4ed290d09fe03c09fe15'
++GIB = 1 << 30
++COMPARATOR = 'horizon-168-joint-continuity-9d6a680157ac.service'
++COMPARATOR_IID = '328366ba244949efb9c9725df7279051'
++COMPARATOR_SEAL = '55b98899587fc5409787cc83981810cc1266d396918906d445a3ceedb2a35c8e'
++COMPARATOR_SHA = 'bfe14ac703ed4f5e256fab9d6a24526f1540cdd5bda1bd544ab62b70643deed4'
 +
 +
 +def request_args(s, lane, ref):
 +    request = lane['read'](s, ref)
 +    s.need(request.get('mode') == 'terminal' and request.get('guard') is None
 +           and set(request) == {'schema','mode','retirement','growth_bytes','stop_allowance_bytes',
-+                                'enrollment','guard','terminal'},
-+           'terminal joint 168 requires exact closure evidence and no live guard')
++                                'enrollment','guard','terminal','compute_release'}
++           and request['compute_release'] in (None, dict(unit=COMPARATOR, invocation_id=COMPARATOR_IID)),
++           'terminal joint 168 requires exact closure and a scoped compute settlement')
 +    original = dict(request, mode='active')
 +    original.pop('terminal')
 +    s.need(original['schema'] == lane['REQUEST_SCHEMA']
@@ -759,6 +772,93 @@
 +    s.need(len(matched) == 1 and matched[0] == journal
 +           and int(journal['__REALTIME_TIMESTAMP']) >= actor['ready_at']*1_000_000,
 +           'joint 168 closure did not match the native PID1 event')
++
++
++def comparator(s, lane, terminal):
++    from owners import ticks
++
++    tools = lane['ROOT']/'continuity-tools'
++    program = tools/'horizon-168-joint-compare'
++    seal_ref = s.ref(tools/'deployment-seal-receipt.json', COMPARATOR_SEAL)
++    seal = s.bound(seal_ref, tools/'deployment-seal-receipt.json')
++    s.need(seal['destination'] == str(tools) and any(
++        row['name'] == program.name and row['mode'] == '0555' and row['sha256'] == COMPARATOR_SHA
++        for row in seal['members']), 'foreign terminal epoch 168 comparator seal')
++    fields = ('Id','InvocationID','ActiveState','SubState','MainPID','ControlPID','ControlGroup','Job',
++              'Restart','NRestarts','MemoryMax','MemorySwapMax','CPUQuotaPerSecUSec')
++    status = lane['props'](COMPARATOR, fields)
++    units = subprocess.check_output(
++        ['/usr/bin/systemctl','list-units','--type=service','--state=activating,active,deactivating',
++         '--no-legend','--plain','--no-pager','horizon-168-joint-continuity-*.service'],
++        text=True, timeout=12)
++    active = [line.split()[0] for line in units.splitlines() if line.strip()]
++    group = '/system.slice/'+COMPARATOR
++    cgroup = Path('/sys/fs/cgroup')/group.lstrip('/')
++    expected = [str(program),'--compare-joint',terminal['archive_sha256']]
++    if status['ActiveState'] == 'active':
++        pid = int(status['MainPID'])
++        proc = Path('/proc')/str(pid)
++        start = ticks(pid)
++        s.need(active == [COMPARATOR] and status['Id'] == COMPARATOR
++               and status['InvocationID'] == COMPARATOR_IID and status['SubState'] == 'running'
++               and status['ControlPID'] == '0' and not status['Job'] and status['ControlGroup'] == group
++               and status['Restart'] == 'no' and status['NRestarts'] == '0'
++               and status['MemoryMax'] == str(2*GIB) and status['MemorySwapMax'] == '0'
++               and status['CPUQuotaPerSecUSec'] == '1s' and lane['cgroup_limits'](cgroup,1_000_000,2*GIB)
++               and lane['process_members'](cgroup) == {pid}
++               and (proc/'cgroup').read_text().strip() == '0::'+group
++               and (proc/'exe').samefile(program) and lane['sha'](proc/'exe') == COMPARATOR_SHA
++               and lane['proc_argv'](proc) == expected and ticks(pid) == start
++               and lane['props'](COMPARATOR,fields) == status,
++               'terminal epoch 168 comparator crossed its identity, budget or executable')
++        return dict(unit=COMPARATOR,invocation_id=COMPARATOR_IID,pid=pid,start_ticks=start,
++                    seal=seal_ref,phase='active',memory_bytes=2*GIB,cpu_quota_micros=1_000_000)
++    selectors = ('_PID=1','UNIT='+COMPARATOR,'INVOCATION_ID='+COMPARATOR_IID,'MESSAGE_ID='+SUCCESS)
++    result = subprocess.check_output(
++        ['/usr/bin/journalctl','--quiet','--no-pager','--all','--output=json',*selectors],
++        text=True, timeout=12)
++    exits = [json.loads(line) for line in result.splitlines()]
++    s.need(status['Id'] == COMPARATOR and status['ActiveState'] == 'inactive'
++           and status['InvocationID'] in ('',COMPARATOR_IID) and not status['Job']
++           and all(status.get(name,'0') == '0' for name in ('MainPID','ControlPID'))
++           and not active and not lane['process_members'](cgroup) and len(exits) == 1
++           and int(exits[0]['__REALTIME_TIMESTAMP']) >= int(terminal['pid1_terminal_event']['__REALTIME_TIMESTAMP'])
++           and lane['props'](COMPARATOR,fields) == status,
++           'terminal epoch 168 comparator has no exact active or drained generation')
++    return dict(unit=COMPARATOR,invocation_id=COMPARATOR_IID,phase='complete',seal=seal_ref,
++                terminal_event=exits[0],memory_bytes=2*GIB,cpu_quota_micros=1_000_000)
++
++
++def settle_compute(s, combined, candidate):
++    witness = candidate['settled_compute']
++    if witness is None:
++        return combined
++    paid = combined['joint168']
++    terminal = candidate['terminal']
++    fit = combined['fit']
++    incumbent = combined['full146']['fit']
++    stopped_memory = paid['producer_memory_bytes']+paid['guard_memory_bytes']
++    stopped_cpu = paid['producer_cpu_quota_micros']+paid['guard_cpu_quota_micros']
++    released_memory = stopped_memory-witness['memory_bytes']
++    released_cpu = stopped_cpu-witness['cpu_quota_micros']
++    s.need(combined['mode'] == candidate['mode'] == 'terminal' and not candidate['processes']
++           and stopped_memory == 60*GIB and stopped_cpu == 2_000_000
++           and released_memory == 58*GIB and released_cpu == 1_000_000
++           and fit['required_available_memory_bytes'] == incumbent['existing_required_memory_bytes']+stopped_memory
++           and fit['extra_memory_bytes'] == 52*GIB,
++           'different paid epoch 168 compute at terminal')
++    required = fit['required_available_memory_bytes']-released_memory
++    available = fit['available_memory_bytes']
++    fit.update(required_available_memory_bytes=required,memory_shortfall_bytes=max(0,required-available))
++    combined['terminal168_compute_settlement'] = dict(
++        terminal=terminal, comparator=witness, replaced_168_memory_bytes=stopped_memory,
++        replaced_168_cpu_quota_micros=stopped_cpu, released_memory_bytes=released_memory,
++        released_cpu_quota_micros=released_cpu, preserved_comparator_memory_bytes=witness['memory_bytes'],
++        preserved_comparator_cpu_quota_micros=witness['cpu_quota_micros'],
++        effective_complete_cpu_quota_micros=incumbent['projected_cpu_quota_micros']-released_cpu,
++        source_scope_epoch=167, other_operation_can_reuse=False, disk_reservation_ending_bytes=0,
++        stopped_generation_resident_credit_bytes=0)
++    return combined
 +
 +
 +def inspect(s, lane, request, incumbent, status, fleet, tree_size, *, measured=None):
@@ -815,9 +915,11 @@
 +        measured = tree_size(root, cap)
 +        s.need(measured == tree_size(root, cap), 'terminal joint 168 paid tree changed between complete scans')
 +    s.need(0 < measured <= quote['joint168']['whole_tree_cap_bytes'], 'terminal joint 168 exceeds paid whole-tree cap')
++    witness = None if request['compute_release'] is None else comparator(s, lane, terminal)
 +    lane['require_idle'](s)
 +    return dict(mode='terminal', retirement=rr, physical=measured, processes=[], worker=None,
 +                unit=row['unit'], release=None, actor=actor, terminal=ref, fleet_phase=row['phase'],
++                settled_compute=witness,
 +                enrollment=request['enrollment'], prestart=enrollment['prestart_quote'],
 +                first_fit=quote['joint168'], guard=None, reservation_ending_bytes=0,
 +                resource_credit_bytes=0, **lane['availability']())
