@@ -40,7 +40,11 @@ def reference(path):
 
 def resolve(binding):
     source = Path(binding["path"])
-    assert reference(source) == binding
+    assert reference(source)["sha256"] == binding["sha256"]
+    metadata = source.lstat()
+    for key, actual in (("bytes", metadata.st_size), ("inode", metadata.st_ino), ("device", metadata.st_dev)):
+        if key in binding:
+            assert binding[key] == actual
     return read(source)
 
 
@@ -91,6 +95,35 @@ def container_custody(path, names, hashes):
             "no_clobber": True, "one_home_inode": True, "tmpfs_source_preserved_through_readback": True}
 
 
+
+def raw_bootstrap(root, scope, launch, statics, manifest, journal):
+    intake_ref = statics["bootstrap_intake"]
+    intake = resolve(intake_ref)
+    assert Path(intake_ref["path"]) == root / "bootstrap-intake.json"
+    payload = Path(intake["installed_path"])
+    assert payload.resolve() == payload and payload.parent == root / "payloads"
+    assert (intake["gcs_generation_checksums_match"] is True
+            and intake["pinned_authenticated_get"] is True and intake["single_physical_copy"] is True)
+    before = payload.lstat()
+    assert stat.S_ISREG(before.st_mode) and before.st_uid == before.st_gid == 0 and before.st_nlink == 1
+    assert stat.S_IMODE(before.st_mode) == 0o444
+    assert (before.st_dev, before.st_ino, before.st_size) == (intake["device"], intake["inode"], intake["bytes"])
+    expected = f"snapshot-{manifest['bootstrap']['slot']}-{manifest['bootstrap']['accounts_hash']}.tar.zst"
+    assert payload.name == expected
+    alias = scope["read_only_bindings"][str(payload)]
+    assert f"--snapshot-archive={alias}" in scope["argv"]
+    assert journal.count(f"Found existing snapshot archive at {alias}; skipping download".encode()) == 1
+    namespace = resolve(launch["held_namespace"])
+    assert namespace["producer"]["InvocationID"] == launch["invocation_id"]
+    assert namespace["runtime_scope"] == reference(root / "runtime-scope.json")
+    payload_ref = reference(payload)
+    assert payload_ref["sha256"] == intake["sha256"]
+    after = payload.lstat()
+    assert (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) == (
+        after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+    return {"file": payload_ref, "intake": intake_ref, "held_namespace": launch["held_namespace"],
+            "read_only_alias": alias}
+
 def finish(ordinal, quote_path):
     root = BASE / f"horizon141-foundation-interval{ordinal}-runtime-v1"
     scope_path = root / "runtime-scope.json"
@@ -133,8 +166,10 @@ def finish(ordinal, quote_path):
     assert manifest["terminal"]["slot_complete"] and manifest["terminal"]["accounts_hash"] == scope["terminal_account_hash"]
     assert manifest["worker_executable_sha256"] == scope["worker"]["sha256"]
     statics = resolve(admission["static_inputs"])
-    boot = resolve(statics["bootstrap_intake"])
-    assert manifest["bootstrap_archive_sha256"] == boot["sha256"]
+    # This field identifies a registered replay handoff archive. The hourly
+    # route starts from externally verified raw snapshot bytes.
+    assert manifest["bootstrap_archive_sha256"] is None
+    bootstrap_payload = raw_bootstrap(root, scope, launch, statics, manifest, raw)
     assert reference(archive)["sha256"] == manifest["archive_sha256"]
 
     quote = read(quote_path)
@@ -182,6 +217,7 @@ def finish(ordinal, quote_path):
         "native_journal": reference(journal), "original_entry_index": reference(index),
         "original_entry_slots_verified": len(covered), "private_custody": custody,
         "post_exit_fit": reference(quote_path), "bootstrap": manifest["bootstrap"],
+        "bootstrap_payload": bootstrap_payload,
         "terminal_checkpoint": manifest["terminal"], "archive_sha256": manifest["archive_sha256"],
         "archive_bytes": archive.stat().st_size, "output_slot_start": start,
         "output_slot_count": interval["positions"], "guard_drained": True,
