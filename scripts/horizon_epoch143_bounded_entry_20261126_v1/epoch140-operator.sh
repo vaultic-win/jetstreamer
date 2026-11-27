@@ -110,6 +110,10 @@ drain_by=$(jq -er '.must_drain_by_unix_seconds' "$booking")
 booked_runtime=$(jq -er '.runtime_max_seconds' "$booking")
 test "$booked_runtime" -le 1600
 test "$((drain_by - $(date +%s)))" -ge 150
+if [[ $profile == retry2 ]] && (( booked_runtime != 1600 || drain_by - $(date +%s) < 1655 )); then
+    printf 'Epoch 140 retry2 requires the full 1600-second native window\n' >&2
+    exit 1
+fi
 
 exec 9<>/run/horizon-epoch171-to136-g1.operation.lock
 flock -n -x 9
@@ -172,6 +176,10 @@ jq -n --arg dest "$a/plan" --arg path "$a/PLAN_SOURCE.json" --arg sha "$plan_sha
 bound_runtime=$((drain_by - $(date +%s) - 55))
 if (( bound_runtime > booked_runtime )); then bound_runtime=$booked_runtime; fi
 (( bound_runtime >= 120 ))
+if [[ $profile == retry2 ]] && (( bound_runtime != booked_runtime )); then
+    printf 'Epoch 140 retry2 setup consumed part of the native window\n' >&2
+    exit 1
+fi
 mapfile -t launch_args < <(bash "$render" "$plan_sha" "$suffix" | jq -r --arg bound "$bound_runtime" 'map(if startswith("--property=RuntimeMaxSec=") then "--property=RuntimeMaxSec="+$bound else . end)[]')
 launch_attempted=1
 "${launch_args[@]}"
