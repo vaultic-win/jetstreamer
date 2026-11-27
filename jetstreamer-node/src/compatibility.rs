@@ -1315,6 +1315,24 @@ pub static SOLANA_V1_6_20_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
     }),
 };
 
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+pub static SOLANA_V1_6_27_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
+    backend: RuntimeBackend::SolanaV1_6_20,
+    identity: RuntimeIdentity {
+        name: "solana-v1.6.27",
+        revision: "c5d174c1701b795d702654a76ddd458c4d8b97ea",
+        rust_toolchain: "rustc 1.51.0 (2fd73fabe 2021-03-23)",
+        target: Some("x86_64-unknown-linux-gnu"),
+        genesis_hash: MAINNET_GENESIS_HASH,
+    },
+    bootstrap: SOLANA_V1_6_20_RUNTIME.bootstrap,
+    worker: Some(WorkerExecutable {
+        identity: "jetstreamer-historical-worker-v1-6-27",
+        environment_override: "JETSTREAMER_HISTORICAL_WORKER_V1_6_27",
+        default_manifest_relative_path: "../historical-runtime/v1_6_27/target/release/jetstreamer-historical-worker-v1-6-27",
+    }),
+};
+
 pub static SOLANA_V1_7_13_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
     backend: RuntimeBackend::SolanaV1_7_13,
     identity: RuntimeIdentity {

@@ -118,6 +118,8 @@ mod epoch223_qualification;
 mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+mod epoch230_v1627;
 mod failed_prefix220;
 mod qualification_checkpoint_exit;
 mod qualification_checkpoint_pause;
@@ -5853,6 +5855,10 @@ fn select_runtime_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    if focused_qualification && epoch230_v1627::selected(&range) {
+        return epoch230_v1627::selection(allow_candidate_runtime);
+    }
     #[cfg(feature = "epoch228-called-program-demotion-qualification")]
     if focused_qualification && epoch228_demotion::selected(&range) {
         return epoch228_demotion::select(range, focused_qualification, allow_candidate_runtime);
@@ -5877,6 +5883,13 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    if focused_qualification && epoch230_v1627::selected(&output_range) {
+        if replay_start != epoch230_v1627::BOOTSTRAP + 1 {
+            return Err("the epoch 230 v1.6.27 diagnostic requires the exact replay start".into());
+        }
+        return epoch230_v1627::selection(allow_candidate_runtime);
+    }
     #[cfg(feature = "epoch228-called-program-demotion-qualification")]
     if focused_qualification && epoch228_demotion::selected(&output_range) {
         if replay_start != epoch228_demotion::BOOTSTRAP + 1 {
@@ -5923,6 +5936,10 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
 fn runtime_span_selection(
     span: &compatibility::RuntimeSpan,
 ) -> Result<compatibility::RuntimeSelection, String> {
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    if epoch230_v1627::selected(&span.slots) {
+        return epoch230_v1627::selection(true);
+    }
     #[cfg(feature = "epoch228-called-program-demotion-qualification")]
     if epoch228_demotion::selected(&span.slots) {
         return epoch228_demotion::select(span.slots.clone(), true, true);
@@ -8057,6 +8074,12 @@ fn historical_worker_profile(
         compatibility::RuntimeBackend::SolanaV1_6_15 => historical::SOLANA_V1_6_15_CANDIDATE,
         compatibility::RuntimeBackend::SolanaV1_6_16 => historical::SOLANA_V1_6_16_CANDIDATE,
         compatibility::RuntimeBackend::SolanaV1_6_17 => historical::SOLANA_V1_6_17_CANDIDATE,
+        #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+        compatibility::RuntimeBackend::SolanaV1_6_20
+            if descriptor.identity.name == compatibility::SOLANA_V1_6_27_RUNTIME.identity.name =>
+        {
+            historical::SOLANA_V1_6_27_CANDIDATE
+        }
         compatibility::RuntimeBackend::SolanaV1_6_20 => historical::SOLANA_V1_6_20_CANDIDATE,
         compatibility::RuntimeBackend::SolanaV1_7_13 => historical::SOLANA_V1_7_13_CANDIDATE,
         compatibility::RuntimeBackend::SolanaV1_7_15 => historical::SOLANA_V1_7_15_CANDIDATE,
@@ -15366,6 +15389,10 @@ fn qualification_expectations(
         epoch141_hourly::validate_roots(plan, &expected)?;
     }
     epoch141_suffix::recheck_roots(&expected)?;
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    if plan.epoch == 230 {
+        epoch230_v1627::validate_expectations(&expected)?;
+    }
     let (snapshot_slot, snapshot_expectation) =
         snapshot_path_expectation(snapshot_archive, bootstrap)?;
     if snapshot_slot != plan.bootstrap_slot {
@@ -20129,6 +20156,11 @@ async fn main() {
         }
     }
 
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    if let Err(error) = epoch230_v1627::validate_entrypoint(&probe_args) {
+        eprintln!("error: {error}");
+        exit(2);
+    }
     if epoch223_qualification::private_build_enabled()
         && let Err(error) = epoch223_qualification::validate_entrypoint(&probe_args)
     {
@@ -21335,6 +21367,25 @@ async fn main() {
     {
         eprintln!("error: {error}");
         exit(2);
+    }
+    #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+    {
+        if inherited_epoch_lease
+            || env::var_os("JETSTREAMER_EXPORT_HANDOFF_SNAPSHOT_DIR").is_some()
+            || env_truthy("JETSTREAMER_LOAD_FROM_DIR")
+        {
+            eprintln!("error: epoch 230 v1.6.27 requires its standalone private archive path");
+            exit(2);
+        }
+        if let Err(error) = epoch230_v1627::validate_launch(
+            qualification,
+            &dest_dir,
+            horizon_output.as_deref(),
+            replay_scratch.as_deref(),
+        ) {
+            eprintln!("error: {error}");
+            exit(2);
+        }
     }
     if let Some(plan) = qualification {
         info!(
