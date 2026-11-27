@@ -5,7 +5,7 @@
  )
  FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
 -V31_JOINT168 = HERE == D / "tools-homefloor-170-full-metered-independent-v20-joint168-v31"
-+REPLACE167 = HERE == D / "tools-homefloor-170-full-metered-independent-v20-joint168-v31-replace167-reserve-v2"
++REPLACE167 = HERE == D / "tools-homefloor-170-full-metered-independent-v20-joint168-v31-replace167-reserve-v3"
 +BOUNDED167_INTENT = None
 +BOUNDED167_FIRST_GUARD = None
 +V31_JOINT168 = REPLACE167 or HERE == D / "tools-homefloor-170-full-metered-independent-v20-joint168-v31"
@@ -437,9 +437,10 @@
      code = (
 --- /dev/null
 +++ b/replacement167_capacity.py
-@@ -0,0 +1,312 @@
+@@ -0,0 +1,345 @@
 +"""Reprice only stopped 167's compute for a bounded, private replacement."""
 +import os
++import stat
 +from pathlib import Path
 +import subprocess
 +
@@ -448,7 +449,7 @@
 +HOME = Path('/home/sol')
 +LANE = HOME/'.jetstreamer-private/epoch167-standard-lane-20261109-v1'
 +TERMINAL_ROOT = R/'epoch167-source-index-rebook-20261122-v3'
-+CANDIDATE_ROOT = R/'epoch167-checkpoint-bounded-20261127-v1'
++CANDIDATE_ROOT = R/'epoch167-checkpoint-bounded-20261127-v2'
 +ORIGINAL_PRODUCER = 68*G
 +ORIGINAL_GUARD = G
 +ORIGINAL_CPU = 9_000_000
@@ -461,8 +462,10 @@
 +EXACT_ENDPOINT = 72_515_090
 +EXACT_CHECKPOINT_HASH = 'DWgHoJPPD1XaWGLpasfR4RVnAU1CBoKUrjCgtoCfEDPK'
 +EXACT_CHECKPOINT_GENERATION = '1634787383763977'
-+EXACT_UNIT = 'horizon-qualify-167-checkpoint-bounded-20261127-v1.service'
-+EXACT_RUN = LANE/'checkpoint-inputs-20261127-v1/bounded-72509256-72515090-v1'
++EXACT_UNIT = 'horizon-qualify-167-checkpoint-bounded-20261127-v2.service'
++PREVIOUS_BOUNDED_UNIT = 'horizon-qualify-167-checkpoint-bounded-20261127-v1.service'
++MAX_RUN_BASELINE = 1 << 20
++EXACT_RUN = LANE/'checkpoint-inputs-20261127-v1/bounded-72509256-72515090-v2'
 +OLD_IID = '6e4b569b61d7420fb30a24a4ad0609dd'
 +ORIGINAL_SOURCES = {
 +    'admitted_profile': (TERMINAL_ROOT/'PREPARED.json',
@@ -551,6 +554,8 @@
 +           and anchor['charged_cpu_micros']==ledger['complete_cpu_quota_micros']
 +               ==stopped['complete_cpu_quota_micros']==HOST_CPU,
 +           'no proof that the historical 167 producer and guard are still in the complete booking')
++    s.need(idle(unit_status(s, PREVIOUS_BOUNDED_UNIT)),
++           'the previous bounded epoch 167 producer is still present')
 +    proposed = request['scope']
 +    s.need(proposed['producer_unit']!=manager['Id'], 'candidate cannot reuse the stopped producer unit')
 +    service = proposed['producer_unit'].replace('horizon-qualify-','horizon-guard-',1)
@@ -651,6 +656,24 @@
 +                complete_cpu_quota_micros=HOST_CPU,reservation_ending_bytes=0,resource_credit_bytes=0)
 +
 +
++def run_physical(s, root, *, allow_missing):
++    if allow_missing and not root.exists():
++        return 0
++    before = root.lstat()
++    s.need(root == EXACT_RUN and root.resolve(strict=True) == root
++           and before.st_dev == LANE.stat().st_dev and stat.S_ISDIR(before.st_mode),
++           'epoch 167 guard RUN crosses the paid filesystem or exact leaf')
++    def measure():
++        raw = subprocess.check_output(['/usr/bin/du','-sx','-B1','--',str(root)],timeout=20)
++        size, path = raw.decode().rstrip("\n").split("\t")
++        s.need(path == str(root), 'epoch 167 RUN walk changed scope')
++        return int(size)
++    first = measure()
++    s.need(first == measure() and os.path.samestat(before, root.lstat()),
++           'epoch 167 RUN allocation changed during independent walks')
++    return first
++
++
 +def project(s, combined, request, old, mem):
 +    budget = request['scope']
 +    native = combined['full146']['native_successor_quote']
@@ -684,10 +707,16 @@
 +    # top, even where its older retained booking already funds those bytes.
 +    required_floor = guard_floor
 +    book_physical = book['physical_bytes']
-+    physical = book_physical
-+    cap = physical+growth
 +    owner = native['bounded167_owner']
 +    guard = native['bounded167_first_guard']
++    leaf_physical = run_physical(s, Path(budget['run_root']), allow_missing=owner is None)
++    s.need(0 <= leaf_physical <= MAX_RUN_BASELINE and leaf_physical < book_physical,
++           'bounded 167 held RUN already contains unreleased data')
++    outside = book_physical-leaf_physical
++    run_baseline = leaf_physical
++    run_cap = run_baseline+growth
++    physical = book_physical
++    cap = outside+run_cap
 +    available_home = fit['available_home_bytes']
 +    if owner is not None:
 +        intent = s.bound(owner['intent'], CANDIDATE_ROOT/'START_INTENT.json')
@@ -696,17 +725,24 @@
 +                   for key in ('root','run','stable_root','cap_bytes','historical_realized_bytes'))
 +               and 0 < baseline['physical_bytes'] <= CAP-growth,
 +               'bounded 167 start intent changed the original home booking')
-+        cap = baseline['physical_bytes']+growth
-+        s.need(intent['bounded_cap_bytes'] == cap, 'bounded 167 start intent changed the paid run cap')
-+        physical = min(baseline['physical_bytes'],book_physical)
++        run_baseline = baseline['physical_bytes']-outside
++        run_cap = run_baseline+growth
++        cap = outside+run_cap
++        s.need(0 < run_baseline <= MAX_RUN_BASELINE
++               and intent['retained_outside_run_bytes'] == outside
++               and intent['run_guard_cap_bytes'] == run_cap and intent['bounded_cap_bytes'] == cap,
++               'bounded 167 retained footprint or narrow RUN cap changed before release')
++        physical = outside+min(run_baseline,leaf_physical)
 +        guard_floor = intent['armed_floor']
 +        if guard is not None:
 +            plan = s.bound(guard['plan'], CANDIDATE_ROOT/'ACTUAL_GUARD_PLAN.json')
 +            s.need(guard['floor'] == guard_floor == plan['minimum_free_bytes']
-+                   and plan['maximum_root_physical_bytes'] == cap,
-+                   'bounded 167 installed guard changed the exact priced floor or run cap')
++                   and plan['worker_root'] == budget['run_root']
++                   and guard['cap'] == plan['maximum_root_physical_bytes'] == run_cap
++                   and 0 < guard['physical_bytes'] <= run_cap,
++                   'bounded 167 installed guard changed the exact priced floor or narrow RUN cap')
 +            available_home = min(available_home,guard['available_home'])
-+            physical = min(physical,guard['physical_bytes'])
++            physical = min(physical,outside+guard['physical_bytes'])
 +    remaining_growth = cap-physical
 +    required = guard_floor+remaining_growth
 +    disk_basis = dict(aggregate_incumbent_home_bytes=incumbent_home,
@@ -726,11 +762,6 @@
 +    s.need(fit['required_available_memory_bytes'] ==
 +           mem['native_required_available_memory_bytes']+60*G-retired_memory,
 +           'replacement RAM disagrees with the outer projections')
-+    previous = Path(budget['run_root'])
-+    leaf_physical=0
-+    if previous.exists():
-+        result=subprocess.check_output(['/usr/bin/du','-sx','-B1','--',str(previous)],timeout=20)
-+        leaf_physical=int(result.split()[0])
 +    available_mem = fit['available_memory_bytes']
 +    return dict(schema='horizon-epoch167-replacement-compute-fit-v1',
 +                fits=(admissible_incumbents and guard_floor>=required_floor
@@ -745,6 +776,8 @@
 +                candidate_guard_counterfactual=disk_basis,
 +                measured_retained_tree_bytes=book['physical_bytes'],original_retained_tree_cap_bytes=CAP,
 +                bounded_whole_tree_cap_bytes=cap, measured_candidate_leaf_bytes=leaf_physical,
++                retained_outside_run_bytes=outside, run_baseline_physical_bytes=run_baseline,
++                run_guard_cap_bytes=run_cap,
 +                bounded_growth_remaining_bytes=remaining_growth, conservative_whole_tree_bytes=physical,
 +                stage='post-guard' if guard else 'held' if owner else 'prestart',
 +                run_additional_peak_bytes=growth,planned_log_allowance_within_run_bytes=budget['log_allowance_bytes'],
