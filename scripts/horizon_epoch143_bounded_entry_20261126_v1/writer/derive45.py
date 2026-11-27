@@ -75,7 +75,7 @@ def cutover(text):
                  and live[u["Id"]]["MainPID"] == u["MainPID"] and live[u["Id"]]["ActiveState"] == "active",
                  "protected process changed since the accepted fleet")
         roster = {line.split()[0] for line in command("/usr/bin/systemctl", "list-units", "--plain", "--no-legend",
-            "--type=service", "--state=running,activating,deactivating", "horizon-qualify-*").splitlines()}
+            "--type=service", "--state=running,activating,deactivating", "horizon-qualify-*").decode().splitlines()}
         expected = {r["unit"]["Id"] for r in fleet["actual_executing_replays"] + fleet["actual_active_private_diagnostics"]}
         need(roster == expected and SUCCESSOR in roster, "unpriced producer appeared before writer transfer")
         need(live[SUCCESSOR]["InvocationID"] == "04b0750aead84a83914d18edea9c8736" and
