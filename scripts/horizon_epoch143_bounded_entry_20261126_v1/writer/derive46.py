@@ -10,12 +10,14 @@ from derive41 import one
 
 HERE = Path(__file__).resolve().parent
 OLD = "tools-cold168-retry5-failed166-v45-entry146"
-NEW = OLD.replace("v45", "v46")
+NEW = OLD.replace("v45", "v46") + "-r2"
 PREVIOUS_SEAL = "237ff74a47d9d3fce22399ea81ff268aa50b6ed09daa3a03bf102a228f09e0bb"
 
 
 def cycle(text):
     text = text.replace(", 45)", ", 45, 46)")
+    old = "    if version == 42:"
+    text = one(text, old, '    if version == 46:\n        return name + "-entry146-r2"\n' + old)
     old = "            import rolling170_status as successor170_status"
     text = one(text, old, old + """
             import transition_v46
@@ -52,6 +54,17 @@ def cycle(text):
 """ + old)
 
 
+def tail167(text):
+    start = text.index('    samples = sorted((ROOT/"guard-receipts")')
+    end = text.index('    return dict(plan=first["plan"]', start)
+    witness = one(text[start:end],
+                  'walked[key]["vanished_entries"] == 0 and 0 < walked[key]["physical_bytes"] <= cap',
+                  '0 < walked[key]["physical_bytes"] <= cap')
+    return (text[:start] + '    deadline = time.monotonic() + 40\n    while True:\n'
+            + ''.join('    ' + line if line.strip() else line for line in witness.splitlines(keepends=True))
+            + '        if all(walked[key]["vanished_entries"] == 0 for key in ("first", "second")):\n            break\n        need(time.monotonic() < deadline, "bounded 167 guard still saw entries vanish")\n        time.sleep(2)\n' + text[end:])
+
+
 def stage(old, staging):
     raw = (old / "deployment-seal-receipt.json").read_bytes()
     if hashlib.sha256(raw).hexdigest() != PREVIOUS_SEAL:
@@ -80,6 +93,8 @@ def stage(old, staging):
             data = cycle(data.decode()).encode()
         if name in {"full170_status.py", "cold170_status.py", "joint168_status.py"}:
             data = data.replace(f"'{OLD}')".encode(), f"'{OLD}', '{NEW}')".encode())
+        if name == "tail167_status.py":
+            data = tail167(data.decode()).encode()
         if name == "continuation170_native.py":
             native = one(data.decode(), "from continuation170_contract import ",
                          "from continuation170_retry_contract import ").encode()

@@ -28,7 +28,8 @@ def prepare(runtime, v46=None):
                   and reconciled["release_absent"] and reconciled["resource_credit_bytes"] == 0,
                   "failed 143 gate evidence not reconciled")
     version = 46 if v46 is not None else 45
-    writer = book141.PACKAGE.with_name(f"tools-cold168-retry5-failed166-v{version}-entry146")
+    package_name = f"tools-cold168-retry5-failed166-v{version}-entry146"
+    writer = book141.PACKAGE.with_name(package_name + "-r2" if version == 46 else package_name)
     sys.path.insert(0, str(writer))
     import status_cycle
     from cutover41 import private_write

@@ -30,7 +30,7 @@ def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, ep
         if not replacement:
             raise ValueError("V46 booking is scoped to epoch 143")
         version = 46
-        package = WRITER_ROOT / "tools-cold168-retry5-failed166-v46-entry146"
+        package = WRITER_ROOT / "tools-cold168-retry5-failed166-v46-entry146-r2"
         active_path = WRITER_ROOT / "FAILED166_CADENCE_V46_ACTIVE.json"
         active_sha, seal_sha = v46
     home_bytes = (64 << 30)+(64 << 20) if replacement else HOME_BYTES

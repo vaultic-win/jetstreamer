@@ -23,7 +23,7 @@ def interface():
     for field in ("schema", "bootstrap", "first_new_slot", "last", "expected_producer_unit",
                   "expected_guard_timer", "expected_guard_unit", "actor_path", "plan_path", "release_path",
                   "run", "barrier", "guard_receipts", "guard_seal", "guard_sha", "profile", "handoff",
-                  "source_preflight", "recording", "admission_or_release", "publication_authorized",
+                  "source_preflight", "recording", "admission_or_release",
                   "closed_comparison", "old_actor", "old_release", "namespace", "fixture"):
         need(scope[field] == following[field], "bounded 170 retry changed " + field)
     need(scope["previous_interface"] == original.INTERFACE
@@ -31,7 +31,9 @@ def interface():
          and scope["retained_guard_receipt_directory"] == prior["guard_receipts"]
          and scope["closed_terminal_handoff"] == prior["handoff"]
          and scope["log"] == prior["log"].removesuffix("producer.log") + "producer-attempt2.log"
-         and scope["stdio_changed_only"] is True,
+         and scope["stdio_changed_only"] is True
+         and scope["native_enrollment_needed"] is True
+         and scope["publication_authorized"] is False,
          "different bounded 170 attempt-2 interface")
     return scope
 

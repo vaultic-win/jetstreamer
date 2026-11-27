@@ -7,10 +7,11 @@ import subprocess
 import sys
 import time
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cutover41 import BASE, BOOKING_LOCK, WRITER, clock, command, need, private_write, state
 
 OLD = BASE / "tools-cold168-retry5-failed166-v45-entry146"
-NEW = BASE / "tools-cold168-retry5-failed166-v46-entry146"
+NEW = BASE / "tools-cold168-retry5-failed166-v46-entry146-r2"
 READY = BASE / "FAILED166_CADENCE_V46_READY.json"
 ACTIVE = BASE / "FAILED166_CADENCE_V46_ACTIVE.json"
 ASSEMBLY = "horizon-assemble-168-private-20261127-v1.service"
@@ -67,8 +68,42 @@ def systemctl(action, *units):
 def restore_before_stop(dropin, old, timer, observed_clock):
     dropin.unlink(missing_ok=True)
     systemctl("daemon-reload")
-    owner(old, OLD)
-    need(clock(timer) == observed_clock, "observer changed while restoring V45 configuration")
+    if observed_clock is not None:
+        owner(old, OLD)
+        need(clock(timer) == observed_clock, "observer changed while restoring V45 configuration")
+
+
+def failed_incumbent(actor):
+    state_keys = ("Result", "ExecMainPID", "ExecMainCode", "ExecMainStatus", "ExecMainExitTimestamp")
+    result = state(WRITER, *ACTOR_PROPS, *state_keys)
+    need(result["Id"] == actor["unit"] and result["InvocationID"] == actor["invocation_id"]
+         and result["ExecMainPID"] == str(actor["pid"]) and result["ExecMainCode"] == "1"
+         and result["ExecMainStatus"] == "1" and result["Result"] == "exit-code"
+         and result["ActiveState"] == "failed" and result["ControlPID"] == result["MainPID"] == "0"
+         and not result["Job"] and bool(result["ExecMainExitTimestamp"]),
+         "the completed sample is not paired with the exact failed V45 writer")
+    journal = command("/usr/bin/journalctl", "--no-pager", "-q", "-o", "cat",
+                      "-u", WRITER, "_SYSTEMD_INVOCATION_ID=" + actor["invocation_id"])
+    need(b"ValueError: foreign or unprotected bounded 167 guard observation" in journal,
+         "the failed writer needs a separately qualified recovery")
+    return result
+
+
+def adopt_next_clock(fleet, head, selected):
+    directory = Path(head["path"]).parent.parent
+    due = time.monotonic() + 115
+    while time.monotonic() < due:
+        latest = max(directory.glob("root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json"),
+                     key=lambda path: path.stat().st_mtime_ns)
+        if str(latest) != head["path"]:
+            successor = json.loads(latest.read_bytes())
+            need(successor["previous_Root_operational_review"] == head
+                 and successor["observer"]["path"] != fleet["observer"]["path"],
+                 "V46 did not commit the inherited completed observation")
+            return clock(successor["sole_next_timer"])
+        owner(selected, NEW)
+        time.sleep(1)
+    raise ValueError("V46 did not commit the inherited completed observation")
 
 
 def main(path):
@@ -81,12 +116,20 @@ def main(path):
                                       "--check-v46-handoff", target["fleet"]["path"], target["fleet"]["sha256"]))
         need(target == verified and not ACTIVE.exists(), "stale V46 handoff")
         old = json.loads(Path(target["old_owner"]["path"]).read_bytes())["new"]
-        owner(old, OLD)
         fleet = json.loads(Path(target["fleet"]["path"]).read_bytes())
         live = endpoints(fleet)
-        observed_clock = clock(timer)
-        due = int(command("/usr/bin/date", "-u", "-d", observed_clock["NextElapseUSecRealtime"], "+%s"))
-        need(due - time.time() > 120, "observer is too close to transfer the writer")
+        completed = target["completed_sample"]
+        if completed is None:
+            owner(old, OLD)
+            incumbent_exit = None
+            observed_clock = clock(timer)
+            due = int(command("/usr/bin/date", "-u", "-d", observed_clock["NextElapseUSecRealtime"], "+%s"))
+            need(due - time.time() > 120, "observer is too close to transfer the writer")
+        else:
+            incumbent_exit = failed_incumbent(old)
+            observed_clock = None
+            need(not listed("timer", "waiting", "horizon-observer-*.timer"),
+                 "the completed observation already has a replacement clock")
         directory = Path("/run/systemd/system") / f"{WRITER}.d"
         predecessor = max(directory.glob("*.conf"), key=lambda value: value.name)
         previous = predecessor.read_text()
@@ -101,14 +144,20 @@ def main(path):
         try:
             systemctl("daemon-reload")
             need(str(NEW / "status_cycle.py") in state(WRITER, "ExecStart")["ExecStart"]
-                 and clock(timer) == observed_clock and endpoints(fleet) == live,
-                 "V46 configuration changed the live roster or observer")
+                 and endpoints(fleet) == live, "V46 configuration changed the live roster")
+            if completed is None:
+                need(clock(timer) == observed_clock, "V46 changed the armed observer")
+            else:
+                need(failed_incumbent(old) == incumbent_exit
+                     and not listed("timer", "waiting", "horizon-observer-*.timer"),
+                     "V46 completed-sample handoff changed before adoption")
         except Exception:
             restore_before_stop(dropin, old, timer, observed_clock)
             raise
-        systemctl("stop", WRITER)
-        need(state(WRITER, "MainPID")["MainPID"] == "0" and clock(timer) == observed_clock,
-             "V45 did not release the consumer lock before V46 adoption")
+        if completed is None:
+            systemctl("stop", WRITER)
+            need(state(WRITER, "MainPID")["MainPID"] == "0" and clock(timer) == observed_clock,
+                 "V45 did not release the consumer lock before V46 adoption")
         systemctl("start", WRITER)
         deadline = time.monotonic() + 15
         while not ACTIVE.exists() and time.monotonic() < deadline:
@@ -119,9 +168,13 @@ def main(path):
         selected = json.loads(ACTIVE.read_bytes())["new"]
         owner(selected, NEW)
         need(all(selected["lock"][key] == old["lock"][key] for key in ("path", "device", "inode"))
-             and clock(timer) == observed_clock and endpoints(fleet) == live,
-             "V46 did not adopt the same lock, roster and observer")
-        print(json.dumps(dict(writer=selected, timer=observed_clock, protected=live), sort_keys=True))
+             and endpoints(fleet) == live, "V46 did not adopt the same lock and roster")
+        if completed is None:
+            need(clock(timer) == observed_clock, "V46 changed the armed observer")
+        else:
+            observed_clock = adopt_next_clock(fleet, target["fleet"], selected)
+        print(json.dumps(dict(writer=selected, timer=observed_clock, protected=live,
+                              incumbent_exit=incumbent_exit, inherited_completed_sample=completed), sort_keys=True))
 
 
 if __name__ == "__main__":
