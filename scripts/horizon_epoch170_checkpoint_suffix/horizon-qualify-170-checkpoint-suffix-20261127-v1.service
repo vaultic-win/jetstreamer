@@ -44,6 +44,7 @@ AmbientCapabilities=
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 InaccessiblePaths=-/home/sol/.config -/home/sol/.ssh -/home/sol/.gnupg -/home/sol/.codex -/home/sol/workspace
 NoExecPaths=/home/sol
+BindReadOnlyPaths=/home/sol:/home/sol
 ExecPaths=/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/suffix-73706460-73879004-v1 /run/horizon-170-checkpoint-suffix-v1/gate /run/horizon-170-checkpoint-suffix-v1/jetstreamer-node /run/horizon-170-checkpoint-suffix-v1/historical-worker-v1-5-6
 ReadWritePaths=/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/suffix-73706460-73879004-v1
 BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/epoch170-storage-witness-recovery-20261127-v1/suffix-run-v1/tools/gate:/run/horizon-170-checkpoint-suffix-v1/gate
