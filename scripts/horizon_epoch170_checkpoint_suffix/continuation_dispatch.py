@@ -160,8 +160,13 @@ def dispatch(stage):
     if not (q.DEP/"ACTUAL_GUARD_PLAN.json").exists():
         q.need(stage=="advance","no actual guard")
         operator.arm()
-    if not (q.DEP/"WRITER_ENROLLMENT.json").exists(): return {"held_actor":q.read(q.DEP/"SUCCESSOR_ACTOR.json")[1],
-            "held_guard_plan":q.read(q.DEP/"ACTUAL_GUARD_PLAN.json")[1],"awaiting_exact_writer_enrollment":True}
+    if not (q.DEP/"WRITER_ENROLLMENT.json").exists():
+        changes = Changes()
+        try:
+            changes.watch(q.DEP)
+            while not (q.DEP/"WRITER_ENROLLMENT.json").exists():
+                changes.events(None)
+        finally: changes.close()
     wait_for_guard()
     return operator.release()
 
