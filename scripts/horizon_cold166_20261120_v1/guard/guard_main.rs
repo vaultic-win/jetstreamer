@@ -688,6 +688,7 @@ fn validate_plan(plan: &Plan) -> Result<()> {
     feature = "epoch168-joint-reduced",
     feature = "epoch167-checkpoint-bounded",
     feature = "epoch170-checkpoint-suffix",
+    feature = "epoch170-checkpoint-continuation",
     feature = "epoch140-suffix-recording"
 ))]
 fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
@@ -733,6 +734,13 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
             "/var/lib/jetstreamer/horizon_runtime_data/epoch167-checkpoint-bounded-20261127-v2/guard-receipts",
             8_594_041_336_400,
             (48_u64 << 30) + (1_u64 << 20),
+        ),
+        #[cfg(feature = "epoch170-checkpoint-continuation")]
+        "horizon-qualify-170-from-73726716-20261127-v1.service" => (
+            "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73726716-20261127-v1/guard-receipts",
+            8_958_105_897_878,
+            384_u64 << 30,
         ),
         #[cfg(feature = "epoch170-checkpoint-suffix")]
         "horizon-qualify-170-checkpoint-suffix-20261127-v1.service" => (
@@ -828,15 +836,41 @@ fn bounded_167_retry_meters_only_its_fresh_run() {
     }
 }
 
-#[cfg(all(test, feature = "epoch170-checkpoint-suffix"))]
+#[cfg(all(
+    test,
+    any(
+        feature = "epoch170-checkpoint-suffix",
+        feature = "epoch170-checkpoint-continuation"
+    )
+))]
 #[test]
-fn suffix_170_preserves_original_cap_and_floor() {
+fn epoch170_checkpoint_guards_preserve_original_cap_and_floor() {
+    #[cfg(feature = "epoch170-checkpoint-suffix")]
+    check_170_scope(
+        "horizon-qualify-170-checkpoint-suffix-20261127-v1.service",
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch170-storage-witness-recovery-20261127-v1/suffix-run-v1/guard-receipts",
+    );
+    #[cfg(feature = "epoch170-checkpoint-continuation")]
+    check_170_scope(
+        "horizon-qualify-170-from-73726716-20261127-v1.service",
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73726716-20261127-v1/guard-receipts",
+    );
+}
+
+#[cfg(all(
+    test,
+    any(
+        feature = "epoch170-checkpoint-suffix",
+        feature = "epoch170-checkpoint-continuation"
+    )
+))]
+fn check_170_scope(unit: &str, receipts: &str) {
     let initial = serde_json::json!({
         "schema":"jetstreamer-horizon-standalone-guard-plan-v1",
-        "unit":"horizon-qualify-170-checkpoint-suffix-20261127-v1.service",
+        "unit":unit,
         "invocation_id":"0123456789abcdef0123456789abcdef","filesystem":"/home/sol",
         "worker_root":"/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
-        "receipt_directory":"/var/lib/jetstreamer/horizon_runtime_data/epoch170-storage-witness-recovery-20261127-v1/suffix-run-v1/guard-receipts",
+        "receipt_directory":receipts,
         "minimum_free_bytes":8_958_105_897_878_u64,"maximum_root_physical_bytes":384_u64 << 30,
         "maximum_worker_vmas":3_500_000
     });
@@ -950,6 +984,7 @@ fn run() -> Result<()> {
         feature = "epoch168-joint-reduced",
         feature = "epoch167-checkpoint-bounded",
         feature = "epoch170-checkpoint-suffix",
+        feature = "epoch170-checkpoint-continuation",
         feature = "epoch140-suffix-recording"
     ))]
     validate_checkpoint_scope(&plan)?;
@@ -958,6 +993,7 @@ fn run() -> Result<()> {
         feature = "epoch168-joint-reduced",
         feature = "epoch167-checkpoint-bounded",
         feature = "epoch170-checkpoint-suffix",
+        feature = "epoch170-checkpoint-continuation",
         feature = "epoch140-suffix-recording"
     )))]
     ensure!(
