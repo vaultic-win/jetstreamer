@@ -8,12 +8,14 @@ from ordinary249.delivery248 import V, bound, props, ref
 LOADER = "loader-upgrade-focused-v2"
 GAP = "short-gap-v1"
 RESTORE = "native-restore-v1"
+RESTORE_260 = "native-restore-260-v1"
 TRACE = "loader-log-v3"
 FEATURE_ACCOUNTS = "feature-account-v4"
 FOCUSED = {
     LOADER: (296, "horizon296-loader-upgrade-focused-v2", "epoch296-private-loader-upgrade-diagnostic"),
     GAP: (230, "horizon230-short-gap-runtime-v1", "epoch230-private-short-gap"),
     RESTORE: (258, "horizon258-native-restore-runtime-v1", "epoch258-private-native-restore"),
+    RESTORE_260: (260, "horizon260-native-restore-runtime-v1", "epoch260-private-native-restore"),
     TRACE: (296, "horizon296-loader-log-v3", "epoch296-private-loader-log-diagnostic"),
     FEATURE_ACCOUNTS: (296, "horizon296-feature-account-v4", "epoch296-private-feature-account-qualification"),
 }
@@ -25,8 +27,9 @@ def attempt_paths(version):
     assert version in ATTEMPTS
     if version in FOCUSED:
         epoch, directory, _ = FOCUSED[version]
-        return (f"horizon-qualify-{epoch}-{version}.service", V / directory,
-                Path(f"/home/ubuntu/.jetstreamer-private/qualification-{epoch}-{version}"))
+        suffix = RESTORE if version == RESTORE_260 else version
+        return (f"horizon-qualify-{epoch}-{suffix}.service", V / directory,
+                Path(f"/home/ubuntu/.jetstreamer-private/qualification-{epoch}-{suffix}"))
     unit = f"horizon-perf-epoch296-meter-bounded@{version}.service"
     state = V / f"horizon296-meter-bounded-{version}"
     root = Path(f"/home/ubuntu/.jetstreamer-private/qualification-296-meter-bounded-{version}")
@@ -122,7 +125,7 @@ def register_attempt(plan, version, ordinary_replay, include_focused):
         elif not ordinary_replay:
             gate["next_action"] = (
                 "Verify the restored accounts root and drain its guard."
-                if version == RESTORE else
+                if version in (RESTORE, RESTORE_260) else
                 "Collect the bounded replay result and drain its guard."
                 if version in FOCUSED else
                 "Collect the private meter trace and drain guards after its terminal result.")
@@ -139,7 +142,7 @@ def register_attempt(plan, version, ordinary_replay, include_focused):
     elif not ordinary_replay:
         gate["next_action"] = (
             "Admit the no-replay snapshot restore against the complete live fleet."
-            if version == RESTORE else
+            if version in (RESTORE, RESTORE_260) else
             "Admit the checkpoint-bounded replay against the complete live fleet."
             if version in FOCUSED else
             "Admit the bounded meter diagnostic against the complete live fleet.")

@@ -446,8 +446,13 @@ fn main() -> Result<()> {
     }
     ensure!(
         args.next().is_none(),
-        "usage: horizon-epoch257-commit-source [--epoch252 | --epoch261 | --reconcile-epoch252 | --launch-epoch252-delivery QUOTE SHA256]"
+        "usage: horizon-epoch257-commit-source [--epoch252 | --epoch261 | --reconcile-epoch252 | --check-epoch252-delivery-deployment | --launch-epoch252-delivery QUOTE SHA256]"
     );
+    if mode.as_deref() == Some(std::ffi::OsStr::new("--check-epoch252-delivery-deployment")) {
+        let report = handoff252::delivery::check_installed_deployment()?;
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
     if mode.as_deref() == Some(std::ffi::OsStr::new("--reconcile-epoch252")) {
         println!("{}", serde_json::to_string_pretty(&handoff252::run()?)?);
         return Ok(());

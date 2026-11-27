@@ -7,7 +7,10 @@ const UNIT: &str = "horizon-upload-252-current-reader-v1.service";
 const PROFILE: &str =
     "/var/lib/jetstreamer/horizon252-delivery-service-preparation-v1/service-profile.json";
 const PROFILE_SHA: &str = "1910d51429d25490591b775af11bcfd94eb3c5bac957480c0838727f9f2cfca2";
-const RELEASE: &str = "/var/lib/jetstreamer/horizon252-delivery-fleet-v1/acceptance.json";
+const RELEASES: [&str; 2] = [
+    "/var/lib/jetstreamer/horizon252-delivery-fleet-v1/acceptance.json",
+    "/var/lib/jetstreamer/horizon252-delivery-fleet-v2/acceptance.json",
+];
 const FILESYSTEM: &str = "/var/lib/jetstreamer";
 const CONTROLLER: &str = "/var/lib/jetstreamer/horizon-seven-publication-controller-v222";
 const RUN: &str = "/usr/bin/systemd-run";
@@ -66,7 +69,13 @@ fn process_ticks(pid: u32) -> Result<u64> {
 }
 
 fn check_deployment(reader: &Value) -> Result<Value> {
-    let (bytes, _) = read_bound(Path::new(RELEASE), 1 << 20, 0)?;
+    let executable = fs::read_link("/proc/self/exe")?;
+    let release_path = RELEASES
+        .iter()
+        .map(Path::new)
+        .find(|path| path.parent() == executable.parent())
+        .context("use a sealed epoch 252 launcher release")?;
+    let (bytes, _) = read_bound(release_path, 1 << 20, 0)?;
     let release: Value = serde_json::from_slice(&bytes)?;
     ensure!(
         release["schema"] == "foundation-epoch252-delivery-fleet-release-v1"
@@ -82,7 +91,7 @@ fn check_deployment(reader: &Value) -> Result<Value> {
         let reference = &release[field];
         let path = Path::new(text(reference, "path")?);
         ensure!(
-            path.parent() == Path::new(RELEASE).parent()
+            path.parent() == release_path.parent()
                 && path.file_name().is_some_and(|name| name == filename),
             "unexpected epoch 252 deployed {field}"
         );
@@ -91,10 +100,7 @@ fn check_deployment(reader: &Value) -> Result<Value> {
             "epoch 252 deployed {field} changed"
         );
         if field == "launcher" {
-            ensure!(
-                fs::read_link("/proc/self/exe")? == path,
-                "use the sealed epoch 252 launcher"
-            );
+            ensure!(executable == path, "use the sealed epoch 252 launcher");
         }
     }
     for filename in [
@@ -110,7 +116,12 @@ fn check_deployment(reader: &Value) -> Result<Value> {
             "epoch 252 cadence integration is missing or changed at {filename}"
         );
     }
-    Ok(json!({"path":RELEASE,"sha256":sha256(&bytes)}))
+    Ok(json!({"path":release_path,"sha256":sha256(&bytes)}))
+}
+
+pub(crate) fn check_installed_deployment() -> Result<Value> {
+    let profile = pinned_json(PROFILE, PROFILE_SHA)?;
+    check_deployment(&profile["reader_plan"])
 }
 
 fn recheck_fit(quote: &Value) -> Result<()> {

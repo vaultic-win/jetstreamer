@@ -3,7 +3,7 @@ use super::*;
 mod allocation;
 mod delivery252;
 mod focused;
-use focused::{FEATURE_296, GAP_230, LOADER_296, RESTORE_258, SCOPES, TRACE_296};
+use focused::{FEATURE_296, GAP_230, LOADER_296, RESTORE_258, RESTORE_260, SCOPES, TRACE_296};
 mod suffix226;
 mod vote_boundary;
 
@@ -29,11 +29,12 @@ const HANDOFF_UPLOAD_257: (&str, &str) = (
 const OWNER_FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemorySwapMax,ExecStart,AllowedCPUs";
 const GUARD_FIELDS: &str =
     "Id,LoadState,ActiveState,SubState,InvocationID,Unit,MemoryMax,ExecStart";
-const KNOWN_GUARDS: [(u64, &str); 8] = [
+const KNOWN_GUARDS: [(u64, &str); 9] = [
     (226, "horizon-guard-226-checkpoint-continuation-extract-v3"),
     (230, "horizon-230-middle-protective-v1"),
     (252, "horizon-252-regional-singleton-protective-v1"),
     (258, RESTORE_258.guard),
+    (260, RESTORE_260.guard),
     (261, "horizon-261-singleton-protective-v1"),
     (262, "horizon-262-singleton-protective-v1"),
     (288, "horizon-288-full-shrink-debt-protective-v1"),
@@ -1306,6 +1307,7 @@ fn measure(
         226 => "16-23",
         230 => GAP_230.cpus,
         258 => RESTORE_258.cpus,
+        260 => RESTORE_260.cpus,
         252 | 261 => "24-31",
         296 => "56-63",
         _ => "40-47",
@@ -1393,7 +1395,7 @@ fn measure(
         let (owner, guard_booking) = if let Some(replay) = live_replays.get(&guard_epoch) {
             (&replay.owner, &replay.guard_booking)
         } else {
-            if guard_epoch == RESTORE_258.epoch
+            if matches!(guard_epoch, 258 | 260)
                 || REGISTERED_REPLAYS
                     .iter()
                     .any(|spec| spec.epoch == guard_epoch)
@@ -1628,6 +1630,7 @@ fn measure(
         230 => "foundation-epoch230-short-gap-roster-binding-v1",
         252 => "foundation-epoch252-delivery-roster-binding-v1",
         258 => "foundation-epoch258-native-restore-roster-binding-v1",
+        260 => "foundation-epoch260-native-restore-roster-binding-v1",
         261 => "foundation-epoch261-delivery-roster-binding-v1",
         296 => "foundation-epoch296-replay-roster-binding-v1",
         _ => "foundation-epoch262-roster-binding-v1",
@@ -1642,6 +1645,7 @@ fn measure(
         "active_suffix_226_registration":live_replays.get(&226).map(|replay| &replay.reference),
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
         "active_restore_258_registration":live_replays.get(&258).map(|replay| &replay.reference),
+        "active_restore_260_registration":live_replays.get(&260).map(|replay| &replay.reference),
         "closed_delivery_257":closed_257,
         "active_delivery_252_claim":active_deliveries.get(&252).map(|(claim, _, _, _)| claim),
         "active_delivery_261_claim":active_deliveries.get(&261).map(|(claim, _, _, _)| claim),
@@ -1783,6 +1787,7 @@ pub fn run() -> Result<()> {
                         | "--replay296-quote"
                         | "--focused230-quote"
                         | "--focused258-quote"
+                        | "--focused260-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
                         | "--feature296-quote"
@@ -1799,7 +1804,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
+            "use --as-controller UNIT, --full-replay-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --focused258-quote, --focused260-quote, --focused296-quote, --trace296-quote, --feature296-quote or --suffix226-preview"
         ),
     };
     let synchronize = match args.next() {
@@ -1854,6 +1859,7 @@ pub fn run() -> Result<()> {
                 Some(
                     "--focused230-quote"
                         | "--focused258-quote"
+                        | "--focused260-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
                         | "--feature296-quote"
@@ -1863,6 +1869,7 @@ pub fn run() -> Result<()> {
             let spec = match flag.to_str() {
                 Some("--focused230-quote") => &GAP_230,
                 Some("--focused258-quote") => &RESTORE_258,
+                Some("--focused260-quote") => &RESTORE_260,
                 Some("--trace296-quote") => &TRACE_296,
                 Some("--feature296-quote") => &FEATURE_296,
                 _ => &LOADER_296,

@@ -76,6 +76,15 @@ RESTORE_258 = Scope(
     "ac7cef6418be874cf8437171323fa2f9f1c1cf84ce41917096df4c489f270c6d",
     160 << 30, 96 << 30, 64 << 20, "56-63",
 )
+RESTORE_260 = Scope(
+    260, V / "horizon260-native-restore-runtime-v1",
+    "horizon-qualify-260-native-restore-v1.service",
+    "horizon-260-native-restore-protective-v1.service",
+    "epoch260-private-native-restore", "foundation-epoch260-native-restore-roster-binding-v1",
+    "8f8b33dd3aad7a27924d22bf8c28ffa061baf0a781c68aadb8d716be50c2be23",
+    "06e13588b0a57910215304785a2160dd94925a4f95dd9cbaa5951ddec153e04d",
+    160 << 30, 96 << 30, 64 << 20, "56-63",
+)
 TRACE_296 = Scope(
     296, V / "horizon296-loader-log-v3",
     "horizon-qualify-296-loader-log-v3.service", "horizon-296-loader-log-protective-v3.service",
@@ -93,7 +102,7 @@ FEATURE_296 = Scope(
     173_207_977_984, 112 << 30, 64 << 20, "56-63",
 )
 SCOPED_ARGS = {
-    "--epoch230": GAP_230, "--epoch258": RESTORE_258,
+    "--epoch230": GAP_230, "--epoch258": RESTORE_258, "--epoch260": RESTORE_260,
     "--trace296": TRACE_296, "--feature296": FEATURE_296,
 }
 

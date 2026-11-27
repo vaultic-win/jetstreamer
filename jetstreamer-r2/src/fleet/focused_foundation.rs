@@ -28,6 +28,13 @@ const SCOPES: &[Scope] = &[
         kind: "epoch258-private-native-restore",
     },
     Scope {
+        epoch: 260,
+        unit: "horizon-qualify-260-native-restore-v1.service",
+        attempt: "native-restore-v1",
+        state: "horizon260-native-restore-runtime-v1",
+        kind: "epoch260-private-native-restore",
+    },
+    Scope {
         epoch: 296,
         unit: "horizon-qualify-296-loader-upgrade-focused-v2.service",
         attempt: "loader-upgrade-focused-v2",

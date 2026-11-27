@@ -73,6 +73,24 @@ pub(super) const RESTORE_258: Focused = Focused {
     profile_sha: "1cc91a3e939dd93920ddc6efbd720b9f558b00b3f27d2b6d654362068d2af035",
 };
 
+pub(super) const RESTORE_260: Focused = Focused {
+    epoch: 260,
+    unit: "horizon-qualify-260-native-restore-v1.service",
+    guard: "horizon-260-native-restore-protective-v1",
+    cpus: "56-63",
+    scratch_cap: 96 << 30,
+    receipt_disk: 64 << 20,
+    producer_memory: 160 << 30,
+    root: "/home/ubuntu/.jetstreamer-private/qualification-260-native-restore-v1",
+    first: 112_316_757,
+    last: 112_316_757,
+    kind: "epoch260-private-native-restore",
+    preflight_schema: "foundation-epoch260-native-restore-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon260-native-restore-runtime-v1",
+    preflight_sha: "06e13588b0a57910215304785a2160dd94925a4f95dd9cbaa5951ddec153e04d",
+    profile_sha: "8f8b33dd3aad7a27924d22bf8c28ffa061baf0a781c68aadb8d716be50c2be23",
+};
+
 pub(super) const TRACE_296: Focused = Focused {
     epoch: 296,
     unit: "horizon-qualify-296-loader-log-v3.service",
@@ -109,9 +127,10 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 5] = [
+pub(super) const SCOPES: [&Focused; 6] = [
     &GAP_230,
     &RESTORE_258,
+    &RESTORE_260,
     &LOADER_296,
     &TRACE_296,
     &FEATURE_296,
