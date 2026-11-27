@@ -23,3 +23,7 @@ path = "bridge_checkpoints.rs"
 [[bin]]
 name = "bounded-checkpoints"
 path = "bounded_checkpoints.rs"
+
+[[bin]]
+name = "following-checkpoints"
+path = "following_checkpoints.rs"
