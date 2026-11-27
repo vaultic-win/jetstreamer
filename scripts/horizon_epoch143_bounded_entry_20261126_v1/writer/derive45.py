@@ -30,6 +30,12 @@ def cycle(text):
     text = one(text,old,old+"                45: (transition_v45.V44_SHA, transition_v45.V44_SEAL),\n")
     old = "                    44: 'fb9db4e77c4dd78a49865d46e903a5c081f332ddc10ffdfc099c366cb3742182',\n"
     text = one(text,old,old+old.replace("44:","45:"))
+    old = "        time.sleep(max(0,(due-now()).total_seconds()+2))"
+    text = one(text,old,"""        delay = max(0,(due-now()).total_seconds()+2)
+        if FAILED166_VERSION == 45:
+            successor170_status.wait_on_existing_clock(globals(),delay)
+        else:
+            time.sleep(delay)""")
     old = "    if FAILED166_VERSION == 44 and len(sys.argv) == 4:"
     return one(text,old,"""    if FAILED166_VERSION == 45 and len(sys.argv) == 4:
         head = dict(path=str(Path(sys.argv[2])), sha256=sys.argv[3])
