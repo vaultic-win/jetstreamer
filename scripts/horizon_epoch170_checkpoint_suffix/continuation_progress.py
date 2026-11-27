@@ -10,7 +10,12 @@ import sys
 import time
 
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73746882-20261127-v1")
+RETRY_ROOT = ROOT/"attempt-2"
+RETRY = Path(__file__).resolve().parent == RETRY_ROOT/"progress-v1"
+if RETRY:
+    ROOT = RETRY_ROOT
 WRAPPERS = {
+    RETRY_ROOT/"progress-v1": ("operator-v1", "0de9e1ecbd4569acb74ad6c691e953ba0dab94222c1ef617aab809d5b82d808b"),
     ROOT/"progress-with143-v1": ("operator-with143-v1", "37ef972912965856076461d7e480897b2ad2696cdfae2dbfa7215605a8bc12f3"),
     ROOT/"progress-with143-v2": ("operator-with143-v2", "bd5bcd1a55199382dde3ada2dcb3ab8426cef69f8e1057dd32a6c187a69c36fe"),
 }

@@ -20,7 +20,7 @@ def load(name):
 
 
 NEXT_DEPLOYMENT=Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73746882-20261127-v1/operator")
-q=load("continuation_price" if Path(__file__).resolve().parent in (NEXT_DEPLOYMENT, NEXT_DEPLOYMENT.with_name("operator-with143-v1"), NEXT_DEPLOYMENT.with_name("operator-with143-v2")) else "successor_price")
+q=load("continuation_price" if Path(__file__).resolve().parent in (NEXT_DEPLOYMENT, NEXT_DEPLOYMENT.with_name("operator-with143-v1"), NEXT_DEPLOYMENT.with_name("operator-with143-v2"), NEXT_DEPLOYMENT.parent/"attempt-2/operator-v1") else "successor_price")
 persist=load("closed_successor").persist
 D=q.ATTEMPT
 UNIT=q.UNIT
@@ -165,6 +165,13 @@ def start():
     need(directory.stat().st_uid==0 and not (directory/"stop-intent.json").exists(),"occupied guard scope")
     if D == q.DEP:
         need(not any(directory.iterdir()), "foreign first-attempt guard samples")
+        if getattr(q, "RETRY", False):
+            previous=q.bound(i["unreleased_failed_attempt"])["terminal"]
+            prior=q.inactive(UNIT)
+            if prior["ActiveState"]=="failed":
+                need(prior["InvocationID"]==previous["InvocationID"], "different terminal producer")
+                subprocess.run(["/usr/bin/systemctl","reset-failed",UNIT],check=True)
+                q.inactive(UNIT)
     else:
         failed=q.bound(i["failed_predecessor"])
         previous=q.bound(failed["actor"])
@@ -199,6 +206,10 @@ def start():
         key,value=line.split("=",1)
         if key in ("ExecStart","Description","Type"):
             continue
+        if getattr(q, "RETRY", False) and key == "StandardOutput":
+            original = q.bound(i["previous_interface"])
+            need(value == "append:"+original["log"], "changed original output stream")
+            line = "StandardOutput=append:"+i["log"]
         props+=["--property",line]
     props+=["--property","InaccessiblePaths=-/run/jetstreamer-ready-bounds-20261121-v1"]
     need(time.time()-fit["observed"]<60, "priced start expired")

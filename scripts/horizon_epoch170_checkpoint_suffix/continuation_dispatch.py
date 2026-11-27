@@ -150,19 +150,40 @@ def admission_lock():
         yield
 
 
+def retry_writer(interface, ref):
+    base = q.RT/"survivor172-cadence-20261122-v1"
+    active, _ = q.read(base/"FAILED166_CADENCE_V46_ACTIVE.json")
+    writer = active["new"]
+    state = q.state(writer["unit"])
+    ready = q.bound(active["ready"])
+    program = base/"tools-cold168-retry5-failed166-v46-entry146/status_cycle.py"
+    seal = q.bound(ready["package"])
+    member, = (m for m in seal["members"] if m["name"] == program.name)
+    q.need(active["schema"] == "horizon-epoch166-cadence-rejoin-active-v1" and not active["producer_mutations"]
+           and ready["successor170_interface"] == ref and ready["prior_successor170_interface"] == interface["previous_interface"]
+           and writer["program"] == str(program) and seal["destination"] == str(program.parent)
+           and operator.digest(program) == member["sha256"] and state["ActiveState"] == "active"
+           and state["InvocationID"] == writer["invocation_id"] and state["MainPID"] == str(writer["pid"])
+           and int((Path("/proc")/str(writer["pid"])/"stat").read_text().rsplit(") ",1)[1].split()[19]) == writer["start_ticks"],
+           "current V46 writer has not accepted the retry")
+    return program
+
+
 def dispatch(stage):
     i, ir = q.scope()
     q.need(operator.q.UNIT == q.UNIT and operator.D == q.DEP, "operator is outside its sealed deployment")
-    q.need(Path(__file__).resolve().parent in (q.DEP/"operator",q.DEP/"operator-with143-v1",q.DEP/"operator-with143-v2"),"wrong dispatch executable directory")
+    q.need(Path(__file__).resolve().parent in (q.DEP/"operator",q.DEP/"operator-with143-v1",q.DEP/"operator-with143-v2",q.DEP/"operator-v1" if q.RETRY else q.DEP/"operator"),"wrong dispatch executable directory")
     if stage == "check":
         operator.static()
-        return {"interface":ir,"wait_for":str(q.DEP/"predecessor-exit/PID1_EXIT.json")}
+        return {"interface":ir,"predecessor_exit":q.predecessor_exit()}
     closed()
     if stage == "close": return q.compare_predecessor()
     if (q.DEP/"SUCCESSOR_RELEASE.json").exists():
         v,ref=q.read(q.DEP/"SUCCESSOR_RELEASE.json")
         q.need(v["interface"]==ir and q.bound(v["actor"])["unit"]==q.UNIT,"unknown successor release")
         return ref
+    if q.RETRY:
+        retry_writer(i, ir)
     if not (q.DEP/"SUCCESSOR_ACTOR.json").exists():
         q.need(stage=="advance","actor is not held")
         with admission_lock():
@@ -172,6 +193,15 @@ def dispatch(stage):
         q.need(stage=="advance","no actual guard")
         with admission_lock():
             operator.arm()
+    if q.RETRY and not (q.DEP/"WRITER_ENROLLMENT.json").exists():
+        wait_for_guard()
+        with admission_lock():
+            operator.guard()
+            command = retry_writer(i, ir)
+            _, head = q.prior.current_fleet()
+            subprocess.run(["/usr/bin/python3", "-IB", str(command), "--enroll-next-bounded-170",
+                            head["path"], head["sha256"]], check=True, timeout=70)
+            q.need((q.DEP/"WRITER_ENROLLMENT.json").is_file(), "V46 returned without an enrollment")
     if not (q.DEP/"WRITER_ENROLLMENT.json").exists():
         changes = Changes()
         try:
@@ -204,7 +234,12 @@ def main():
                        dict(stage=stage,error=message,observed=int(time.time()),fleet_at_attempt=str(basis),
                             retry_on_new_accepted_fleet=retry,archive_publication_authorized=False))
                 if not retry: raise
-                await_new_fleet(basis)
+                if q.RETRY and (q.DEP/"SUCCESSOR_ACTOR.json").exists():
+                    operator.same_actor()
+                    # The native pre-release gate expires in ten minutes; reprice within its lifetime.
+                    time.sleep(20)
+                else:
+                    await_new_fleet(basis)
     finally: os.close(fd)
 
 
