@@ -33,7 +33,7 @@ REPO = HOME / "workspace/jetstreamer"
 OUTPUT = PRIVATE / "epoch168-private-assembly-20261127-v1/output"
 LOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 UNIT = "horizon-assemble-168-private-20261127-v1.service"
-EVENT_UNIT = "horizon-168-assembly-on-reclamation-20261127-v3"
+EVENT_UNIT = "horizon-168-assembly-on-reclamation-20261127-v4"
 RELEASES = {
     "185": MAIN185 / "MEASURED_LOCAL_RECLAMATION.json",
     "186m": ROTATION / "M_SERIAL_HANDBACK.json",
@@ -62,7 +62,10 @@ PINS = {
     "deployment": (TOOLS / "deployment-seal-receipt.json", "7bdc200595b8aaaa343457118a7a129d1d947cd7002bec0ee5409fd2112bcd18"),
     "186m_profile": (ROTATION / "m/profile.json", "03e37da3b386ddadba226cf3fd654356723acd88f9461351f54801a0d89237d9"),
     "186n_profile": (ROTATION / "n/profile.json", "f57d5ed937ac7995a057f0227c400b6e2e70a21903cebf77bedd05a5474453b0"),
-    "rotation_pricer": (ROTATION / "tools/rotation.py", "9fbd3d4029d3f415f83d6d6fe03b2b97f7509e212da299c806c643467d36f801"),
+    "replay_price_deployment": (RT / "epoch143-first-hourly-20261127-v1/booking-price-v2/deployment-seal-receipt.json", "999a4a32c1b30343c2d51aea3e7aa7011077231dfa43a0d9924060fb4744f0cc"),
+    "post_m_price": (HERE / "POST_M_COMPLETE_PRICE.json", "8161a3e2933fc358390f643a3818d8746de747a6f8941aa62d475cedf57a628c"),
+    "closed141": (RT / "epoch141-first-hourly-20261127-v1/terminal-capture-v1/PRIVATE_FIRST_HOURLY_ACCEPTANCE.json", "e6ad4a81d6873d5d5473f82a085af14116a7a737ac18bd9b3f18f4bdcee12f69"),
+    "closed170": (RT / "epoch170-from-73746882-20261127-v1/CLOSED_READ_ACCEPTANCE.json", "f5fce66bdbf3fcdf6f7257679e78aed0f2ba0b8c8f7f43961dc7c9bf43be3079"),
     "seventh_assignment": (SEVENTH / "SERIAL_ASSIGNMENT.json", "19e79eebf95c26680a9cd81836ce8cf041d0123850d5d92f5d87a9be90698a78"),
     "eighth_source": (RT / "epoch141-eighth-original-source-packet-20261127-v1/EIGHTH_SOURCE_PACKET.json", "dac263259ee719bc3d01e326ca72eb74786ea062ca2b0aad00eac1eba7200480"),
     "source185": (MAIN185 / "package/EXPECTED.json", "e4e9216caad33766d35013357e8c414f49667341440e5cb6976a828f4050d8d1"),
@@ -264,7 +267,9 @@ def source_head(build, launch):
             remote = fields[0]
             break
     need(remote is not None, "no live sol SSH agent can read origin/account-updates")
-    if launch:
+    have_remote = subprocess.run(["/usr/sbin/runuser", "-u", "sol", "--", "/usr/bin/git", "-C", str(REPO),
+                                  "cat-file", "-e", remote + "^{commit}"], capture_output=True).returncode == 0
+    if launch or not have_remote:
         git("fetch", "--quiet", "origin", "refs/heads/account-updates")
         remote = git(*remote_args, text=True).split()[0]
     git("merge-base", "--is-ancestor", COMMIT, remote)
@@ -299,6 +304,20 @@ def carried_resources(pins, fleet, core, roster):
     settled = bound(prior["bounded_native"])["terminal168_compute_settlement"]
     selector_end = bound(prior["terminal_native"])
     qualification = source_start["native"]
+    comparator = settled["comparator"]
+    lineage = bound(pins["lineage"])
+    comparison_ref = lineage["evidence"]["comparison_native"]
+    comparison = bound(comparison_ref)
+    comparator_memory = settled["preserved_comparator_memory_bytes"]
+    # The 167 admission retained this separate 168 slot. This assembly consumes the very
+    # comparison whose result is bound into the qualified input lineage.
+    need(comparator["phase"] == "complete" and comparator_memory == comparator["memory_bytes"] == 2 * GIB
+         and comparator["unit"] == comparison["unit"] and comparator["invocation_id"] == comparison["invocation_id"]
+         and comparator["terminal_event"] == comparison["pid1_event"]
+         and comparator["seal"] == lineage["evidence"]["comparison_deployment"]
+         and settled["terminal"] == lineage["evidence"]["joint_terminal"]
+         and comparison["argv"][-2:] == ["--compare-joint", lineage["joint_archive_sha256"]]
+         and acceptance["lineage"] == pins["lineage"], "comparator slot is not bound to the accepted assembly lineage")
     need(selected == settled["active_selector"] and selected["cpu_quota_micros"] == prior["quota_micros"] == CPU
          and selected["memory_bytes"] == prior["reused_same_epoch_selector_bytes"] == REUSED_MEMORY
          and settled["replaced_168_memory_bytes"] - settled["released_memory_bytes"]
@@ -314,6 +333,7 @@ def carried_resources(pins, fleet, core, roster):
     for unit, invocation, event in (
         (selected["unit"], selected["invocation_id"], selector_end["pid1_terminal_event"]),
         (acceptance["unit"], acceptance["invocation_id"], acceptance["pid1_terminal_event"]),
+        (comparator["unit"], comparator["invocation_id"], comparator["terminal_event"]),
     ):
         owner = native(unit)
         need(event["UNIT"] == unit and event["INVOCATION_ID"] == invocation
@@ -336,8 +356,10 @@ def carried_resources(pins, fleet, core, roster):
         "native_finite_cpu_plus_assembly_micros": known + CPU,
         "additional_cpu_quota_micros": 0,
         "same_epoch_reused_cpu_quota_micros": CPU,
-        "same_epoch_reused_memory_bytes": REUSED_MEMORY,
-        "additional_assembly_memory_bytes": MEMORY - REUSED_MEMORY,
+        "same_epoch_reused_memory_bytes": REUSED_MEMORY + comparator_memory,
+        "additional_assembly_memory_bytes": MEMORY - REUSED_MEMORY - comparator_memory,
+        "carried_comparator_memory_bytes": comparator_memory,
+        "drained_comparator": comparison_ref,
         "carried_selector_fit": intent["fit"],
         "drained_selector": prior["terminal_native"],
         "drained_source_qualification": pins["qualification_native"],
@@ -370,31 +392,107 @@ def eighth_bootstrap_charge(source):
     return 0, 0, {"receipt": receipt, "current_units": units}
 
 
+def replay_price(pins):
+    seal = bound(pins["replay_price_deployment"])
+    directory = Path(pins["replay_price_deployment"]["path"]).parent
+    need(directory == Path(seal["destination"]), "unexpected replay pricing deployment")
+    for member in seal["members"]:
+        ref(directory / member["name"], member["sha256"])
+    package = runpy.run_path(str(directory / "price_hourly143.py"))
+    continuation, hourly = package["second"], package["roll"]
+    core = continuation.prior
+    need(hourly.first_closed(core) == pins["closed141"]
+         and continuation.compare_predecessor() == bound(pins["closed170"])["comparison"],
+         "141 or 170 predecessor differs from the authenticated terminal")
+    _, fleet_ref = core.current_fleet()
+    actor = native(hourly.UNIT)
+    if actor["ActiveState"] == "active" and (hourly.ROOT / "barrier/allow").exists():
+        # The 170 provider authenticates the released 143 worker and counts its remaining tree.
+        successor = native(continuation.UNIT)
+        phase = "held" if successor["ActiveState"] == "active" else "start"
+        q = continuation.price(phase)
+        peer_phase, peer = package["owner170"]()
+        need(q["replacement143"] and q["replacement143"]["iid"] == actor["InvocationID"]
+             and q["terminal_tree_bounds"][1] + 36 * GIB <= 384 * GIB,
+             "released replay owners exceed the shared tree envelope")
+        required = q["required_home"]
+        if peer:
+            # The immutable 170 guard floor applies even if both producers grow before the next check.
+            remaining = max(0, peer["cap"] - peer["low"]) + q["guarded_hourly_remaining"]
+            required = max(required, peer["floor"] + remaining + q["auxiliary"]["evidence_home"]
+                           + q["dispatch_home_bytes"])
+        result = dict(phase170=peer_phase, phase143="released", joint=q["joint"], source=q,
+                      protected_170_growth_bytes=max(0, peer["cap"] - peer["low"]) if peer else 36 * GIB,
+                      protected_143_growth_bytes=q["guarded_hourly_remaining"],
+                      historical_margin=q["historical_home_margin"], required_home=required,
+                      required_ram=q["required_ram"], home=q["available_home"], ram=q["available_ram"])
+    else:
+        held = actor["InvocationID"] if actor["ActiveState"] == "active" else None
+        q = package["price"](fleet_ref["path"], fleet_ref["sha256"], held)
+        need(q["closed141"] == pins["closed141"] and q["peer_tree_cap_fits"] and not q["projection_only"],
+             "invalid shared 143/170 price")
+        peer = q["protected170"]
+        result = dict(phase170=q["phase170"], phase143="held" if held else "reserved",
+                      protected_170_growth_bytes=q["peer_remaining"] + q["next_170_reserved"],
+                      protected_143_growth_bytes=q["candidate_home_bytes"] - EVIDENCE,
+                      joint=q["joint_funding"], source=q, historical_margin=q["historical_home_margin"],
+                      required_home=q["retained_required_home_bytes"] + q["candidate_home_bytes"],
+                      required_ram=q["retained_required_ram_bytes"] + q["candidate_ram_bytes"],
+                      home=q["live_available_home_bytes"], ram=q["available_ram_bytes"])
+    result.update(producer_170_unit=peer["unit"] if peer else None,
+                  producer_170_invocation=peer["iid"] if peer else None)
+    need(q["fleet"] == fleet_ref and core.current_fleet()[1] == fleet_ref
+         and q["resource_credit_bytes"] == 0, "shared replay fleet changed while pricing")
+    return result
+
+
 def quote(pins):
-    code = runpy.run_path(pins["rotation_pricer"]["path"])
-    rotation = code["recent_price"]()
-    code["owners"](rotation)
-    core = rotation["basis"]["live_quote"]
-    fleet_ref = core["fleet"]
+    core = replay_price(pins)
+    fleet_ref = core["source"]["fleet"]
     fleet = bound(fleet_ref)
     credits = retirement_terms(pins, fleet)
-    inherited = core["inherited_complete_margin"] + sum(x["inherited_screen_bytes"] for x in credits.values())
+    inherited = core["historical_margin"] + sum(x["inherited_screen_bytes"] for x in credits.values())
     eighth = bound(pins["eighth_source"])
     eighth_bytes, eighth_evidence, eighth_withdrawal = eighth_bootstrap_charge(eighth)
+    # Carry the bounded holding and staging allocation. The old five-worker resource sample
+    # never supplies the live fleet, available RAM, free disk or floor for this admission.
+    rotation = bound(pins["post_m_price"])["rotation_price"]
+    old_inputs = rotation["basis"]["live_quote"]
+    completed_inputs = {}
+    historical_input_allowance = 0
+    for name, unit, invocation in (
+        ("170", "horizon-170-continuation-73746882-download-20261127-v1.service", "fc5fd38323144eb09082625b3d5b67b3"),
+        ("141", "horizon-141-third-bootstrap-input-20261127-v1.service", "562f11d0eb7643ac97d782dc5592a46e"),
+    ):
+        events = command("/usr/bin/journalctl", "--quiet", "--no-pager", "--output=json", "_PID=1", "_UID=0",
+                         "UNIT=" + unit, "INVOCATION_ID=" + invocation, "MESSAGE_ID=7ad2d189f7e94e70a38c781354912448",
+                         text=True).splitlines()
+        state = native(unit)
+        need(len(events) == 1 and state["ActiveState"] == "inactive" and not state["Job"]
+             and state["MainPID"] == state["ControlPID"] == "0", "previous snapshot transfer is active or unconfirmed")
+        completed_inputs[name] = json.loads(events[0])
+        # The versioned input remains on HOME. Preserve the older allowance in the historical
+        # screen when the sample predates custody; current statvfs already counts occupied files.
+        if datetime.fromisoformat(fleet["sampled_at_utc"]).timestamp() < int(completed_inputs[name]["__REALTIME_TIMESTAMP"]) / 1e6:
+            historical_input_allowance += old_inputs[f"separate_{name}_input_home"]
     pending = rotation["additional_holding_disk"] + eighth_bytes + eighth_evidence
     seventh = bound(pins["seventh_assignment"])
-    need(rotation["serial_slot"] == SERIAL and rotation["additional_holding_disk"] >= seventh["byte_length"] + 4096
+    aux = core["source"]["auxiliary"]
+    need(rotation["serial_slot"] == aux["serial_restore_overlap_already_reserved"] == SERIAL
+         and aux["parallel_controls_ram"] == rotation["charged_parallel_control"] == 2 * GIB
+         and rotation["additional_holding_disk"] >= seventh["byte_length"] + 4096
          and rotation["holding_ram_available_from_serial"] == 2 * GIB,
          "serial restore envelope or the full seventh input charge changed")
-    realized = rotation["basis"]["charged_bootstrap_inputs_observed_resident"]
     home = min(core["home"], available_home())
-    live_floor = max(core["max_guard_floor"], core["required_home"] - realized) + pending
-    inherited_floor = home - (inherited - pending)
+    live_floor = core["required_home"] + pending
+    inherited_floor = home - (inherited - pending - historical_input_allowance)
     floor = max(live_floor, inherited_floor)
-    # The serial uploader/downloader and parallel controls are already in this
-    # price. The shared selector carries its 4 GiB and 16 MiB in the provider.
+    # Preserve the 256 MiB rotation overhead used by the original holding price.
+    # The dashboard projector is a separate unit added since the shared admission.
+    projector = native("horizon-anza-gent-dashboard-projection.service")
+    projector_ram = int(projector["MemoryMax"]) if projector["ActiveState"] == "active" else 0
     ram = core["ram"]
-    retained_ram = ram - rotation["remaining_ram"]
+    retained_ram = core["required_ram"] + 256 * MIB + projector_ram
     roster = native_roster()
     selector = roster.get("horizon-170-retained-prefix-select-20261127-v1.service")
     if selector:
@@ -414,12 +512,14 @@ def quote(pins):
         "required_available_home_bytes": floor + PEAK, "booked_assembly_home_bytes": PEAK,
         **compute, "available_memory_bytes": ram, "required_available_memory_bytes": required_ram,
         "assembly_memory_bytes": MEMORY, "assembly_cpu_quota_micros": CPU,
-        "inherited_home_margin_after_terms": inherited - pending, "live_home_floor_bytes": live_floor,
+        "inherited_home_margin_after_terms": inherited - pending - historical_input_allowance, "live_home_floor_bytes": live_floor,
         "serial_restore_envelope_bytes": SERIAL, "seventh_input_bytes": seventh["byte_length"],
         "eighth_single_copy_bootstrap_bytes": eighth_bytes, "eighth_staging_and_evidence_bytes": eighth_evidence,
         "eighth_transfer_withdrawal": eighth_withdrawal,
         "additional_holding_and_input_home_bytes": pending, "retirement_observations": credits,
-        "native_roster": roster, "rotation_price": rotation, "resource_credit_bytes": 0,
+        "native_roster": roster, "replay_price": core, "retained_holding_price": pins["post_m_price"],
+        "completed_input_transfers": completed_inputs,
+        "dashboard_projector_ram_bytes": projector_ram, "resource_credit_bytes": 0,
         "fits": not blockers, "blockers": blockers, "publication_authorized": False,
     }
 
@@ -573,14 +673,22 @@ def on_reclamation(pins, build, layout):
     events = {name: ref(path) for name, path in RELEASES.items() if path.exists()}
     if not events:
         return
-    event_identity = {"reclamation": events, "operator": ref(Path(__file__).resolve())}
+    fleet = max(RT.glob("root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json"), key=lambda p: p.stat().st_mtime_ns)
+    owners = {}
+    for unit in ("horizon-qualify-143-first-hourly-20261127-v1.service",
+                 "horizon-qualify-170-from-73746882-20261127-v1.service"):
+        live = native(unit)
+        owners[unit] = {key: live[key] for key in ("ActiveState", "InvocationID")}
+    event_identity = {"reclamation": events, "operator": ref(Path(__file__).resolve()),
+                      "fleet": ref(fleet), "replay_owners": owners}
     digest = hashlib.sha256(json.dumps(event_identity, sort_keys=True).encode()).hexdigest()
     result_path = HERE / f"RECLAMATION_EVENT_{digest}.json"
     if result_path.exists():
         return
     report = {"schema": "horizon-epoch168-private-assembly-reclamation-event-v1",
               "observed_unix_seconds": int(time.time()), "events": events,
-              "operator": event_identity["operator"], "launched": False}
+              "operator": event_identity["operator"], "trigger_fleet": event_identity["fleet"],
+              "trigger_replay_owners": owners, "launched": False}
     try:
         source = source_head(build, True)
         with operation_lock():
