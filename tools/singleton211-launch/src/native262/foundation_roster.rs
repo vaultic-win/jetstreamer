@@ -11,8 +11,8 @@ mod replay258;
 mod replay260;
 mod replay296;
 use focused::{
-    FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, RESTORE_258, RESTORE_260, SCOPES,
-    OVERLAP_266, OVERLAP_266_EXCLUSIVE, SECOND_HOURLY_230, TRACE_296,
+    FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, OVERLAP_266,
+    OVERLAP_266_EXCLUSIVE, RESTORE_258, RESTORE_260, SCOPES, SECOND_HOURLY_230, TRACE_296,
 };
 mod suffix226;
 mod vote_boundary;
@@ -1567,15 +1567,18 @@ fn measure(
     let cpu_width = if private_141.is_some() { 3 } else { 8 };
     let cpus = units::affinity_width(&json!({"cpu_affinity":selected}), cpu_width)?;
     let private_exclusive = private_141.as_ref().map(interval141::Candidate::exclusive).transpose()?;
-    let bridge_group = units::parse_cpu_list("48-55,112-119")?;
     let overlap_exclusive = units::parse_cpu_list(OVERLAP_266_EXCLUSIVE)?;
+    let bridge_group = units::parse_cpu_list("48-55,112-119")?;
     let exclusive = match &quote {
         Some(Quote::Focused(_, _)) if first_7871_candidate => {
             focused::second_hourly_drained(n)?;
             replay296::verify_cpu_group(FIRST_7871_230.cpus, &bridge_group)?;
             &bridge_group
         }
-        Some(Quote::Focused(spec, _)) if spec.unit == OVERLAP_266.unit => &overlap_exclusive,
+        Some(Quote::Focused(spec, _)) if spec.unit == OVERLAP_266.unit => {
+            replay296::verify_cpu_group("30,32-39", &overlap_exclusive)?;
+            &overlap_exclusive
+        }
         Some(Quote::Replay296(replay)) => &replay.placement.exclusive_cpus,
         _ => private_exclusive.as_ref().unwrap_or(&selected),
     };
@@ -1631,15 +1634,16 @@ fn measure(
     }
     for replay in live_replays.values() {
         require_disjoint_cpus(epoch, exclusive, replay.unit, &replay.owner)?;
-        if replay.unit == FIRST_7871_230.unit {
-            replay296::verify_cpu_group(FIRST_7871_230.cpus, &bridge_group)?;
-            ensure!(exclusive.is_disjoint(&bridge_group), "epoch {epoch} overlaps the running epoch 230 physical cores");
-        }
         if replay.unit == OVERLAP_266.unit {
+            replay296::verify_cpu_group("30,32-39", &overlap_exclusive)?;
             ensure!(
                 exclusive.is_disjoint(&overlap_exclusive),
                 "epoch {epoch} overlaps the epoch 266 diagnostic's physical cores"
             );
+        }
+        if replay.unit == FIRST_7871_230.unit {
+            replay296::verify_cpu_group(FIRST_7871_230.cpus, &bridge_group)?;
+            ensure!(exclusive.is_disjoint(&bridge_group), "epoch {epoch} overlaps the running epoch 230 physical cores");
         }
         if replay.unit == replay296::UNIT {
             ensure!(
@@ -2065,6 +2069,9 @@ fn measure(
             "preflight":preflight,"candidate_disk_bytes":candidate_disk,
             "candidate_memory_bytes":candidate,"candidate_cpus":selected,
         });
+    }
+    if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == OVERLAP_266.unit) {
+        evidence[OVERLAP_266.quote_key()]["exclusive_online_cpus"] = json!(overlap_exclusive);
     }
     if first_7871_candidate {
         evidence[FIRST_7871_230.quote_key()]["exclusive_online_cpus"] = json!(bridge_group);

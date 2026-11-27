@@ -115,8 +115,8 @@ RESTORE_260 = Scope(
 OVERLAP_266 = Scope(
     266, epoch266_overlap.STATE, epoch266_overlap.UNIT, epoch266_overlap.GUARD_UNIT,
     "epoch266-private-hourly-overlap", "foundation-epoch266-hourly-overlap-roster-binding-v1",
-    "5f12d3ba864dd64b14add832a4e8c9d441e26d097862763a0bfa74d854418964",
-    "6fb5bee98e51ad666280e8aee0248d1078aac6739a641be0693948355c6d2e7e",
+    "494849a05eb8b63f1770c5ae54dc63a1cc1dfadbd09b235c3938ee28393d08ea",
+    "1e014dac29ed075242cccd2d226c75a3088712540a90a7358b1cecee4df04b65",
     epoch266_overlap.PRODUCER_RAM, epoch266_overlap.HOME, epoch266_overlap.RECEIPTS, epoch266_overlap.CPU,
 )
 TRACE_296 = Scope(
@@ -182,14 +182,8 @@ def current_fit(kit, roster, root, scope, *, held=False):
     assert fit["candidate_total_memory_bytes"] == scope.ram + (1 << 30) + control_ram
     if scope is OVERLAP_266:
         suffix = fit["protected_226_suffix_state"]
-        if suffix == "pending":
-            assert roster["active_suffix_226_registration"] is None
-            assert fit["pending_suffix226_disk_bytes"] == (160 << 30) + (256 << 20)
-            assert fit["pending_suffix226_memory_bytes"] == (161 << 30) + (256 << 20)
-        else:
-            assert suffix in ("live", "verified-closed")
-            assert (roster["active_suffix_226_registration"] is not None) == (suffix == "live")
-            assert fit["pending_suffix226_disk_bytes"] == fit["pending_suffix226_memory_bytes"] == 0
+        protected_226_fit(fit)
+        assert (roster["active_suffix_226_registration"] is not None) == (suffix == "live")
     assert fit["guard_floor_bytes"] == 3_770_104_987_645
     cpus = kit.measure.source.helper.cpus
     selected = cpus(scope.cpus)
@@ -207,6 +201,7 @@ def current_fit(kit, roster, root, scope, *, held=False):
         second_hourly_drained(ops, proof["predecessor_terminal"])
     if scope is OVERLAP_266:
         protected_cpus = epoch266_overlap.EXCLUSIVE
+        assert roster["focused_266_quote"]["exclusive_online_cpus"] == sorted(protected_cpus)
         for cpu in (*selected, 30):
             sibling_path = Path(f"/sys/devices/system/cpu/cpu{cpu}/topology/thread_siblings_list")
             assert cpus(sibling_path.read_text().replace(",", " ")) == {cpu, cpu + 64}
@@ -395,7 +390,7 @@ def launch(kit, roster_ref, scope):
                       else "foundation-230-hourly-token-probe-v1")
         if scope is FIRST_7871_230:
             probe_unit = "foundation-230-first-7871-token-probe-v1"
-        if scope is OVERLAP_266:
+        elif scope is OVERLAP_266:
             probe_unit = "foundation-266-overlap-token-probe-v1"
         template = prepare_hourly_tokens(ops, attempt, tokens, template, profile["guard"], hook, probe_unit)
     measured = current_fit(kit, roster, root, scope)

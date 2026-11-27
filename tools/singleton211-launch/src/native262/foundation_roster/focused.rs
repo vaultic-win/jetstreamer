@@ -159,8 +159,8 @@ pub(super) const OVERLAP_266: Focused = Focused {
     kind: "epoch266-private-hourly-overlap",
     preflight_schema: "foundation-epoch266-hourly-overlap-preflight-v1",
     state: "/var/lib/jetstreamer/horizon266-hourly-overlap-114929697-runtime-v1",
-    preflight_sha: "6fb5bee98e51ad666280e8aee0248d1078aac6739a641be0693948355c6d2e7e",
-    profile_sha: "5f12d3ba864dd64b14add832a4e8c9d441e26d097862763a0bfa74d854418964",
+    preflight_sha: "1e014dac29ed075242cccd2d226c75a3088712540a90a7358b1cecee4df04b65",
+    profile_sha: "494849a05eb8b63f1770c5ae54dc63a1cc1dfadbd09b235c3938ee28393d08ea",
 };
 
 pub(super) const OVERLAP_266_EXCLUSIVE: &str = "30,32-39,94,96-103";
@@ -313,29 +313,6 @@ pub(super) fn drained(n: &mut Native, producer: &str, guard: &str, invocation: &
     Ok(())
 }
 
-pub(super) fn second_hourly_drained(n: &mut Native) -> Result<()> {
-    let state = Path::new(SECOND_HOURLY_230.state);
-    let terminal = Bound::new(state.join("terminal.json"),
-        "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56").sealed()?;
-    let launch = Bound::new(state.join("cadence-registration.json"),
-        "c2aea886494f66ed6e2077422894abf68f644a346181da989ac869d9aba43cac");
-    let registered = launch.sealed()?;
-    let invocation = "a0a94d2d42984804877c1a80fc934585";
-    ensure!(
-        terminal["schema"] == "foundation-epoch230-middle-hourly-second-terminal-v1"
-            && terminal["unit"] == SECOND_HOURLY_230.unit
-            && terminal["state"] == "local-segment-committed"
-            && terminal["launch"] == json!(launch)
-            && terminal["invocation_id"] == invocation
-            && terminal["checkpoint"]["slot"] == SECOND_HOURLY_230.last
-            && terminal["guard_drained"] == true
-            && registered["unit"] == SECOND_HOURLY_230.unit
-            && registered["invocation_id"] == invocation,
-        "epoch 230 replacement lacks the exact prior terminal and launch"
-    );
-    drained(n, SECOND_HOURLY_230.unit, SECOND_HOURLY_230.guard, invocation)
-}
-
 fn overlap_private_tmpfs(path: &str, mountinfo: &str) -> bool {
     mountinfo.lines().any(|line| {
         let Some((left, right)) = line.split_once(" - ") else {
@@ -392,6 +369,29 @@ mod tests {
         );
         assert_eq!(OVERLAP_266.last - OVERLAP_266.first + 1, 6267);
     }
+}
+
+pub(super) fn second_hourly_drained(n: &mut Native) -> Result<()> {
+    let state = Path::new(SECOND_HOURLY_230.state);
+    let terminal = Bound::new(state.join("terminal.json"),
+        "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56").sealed()?;
+    let launch = Bound::new(state.join("cadence-registration.json"),
+        "c2aea886494f66ed6e2077422894abf68f644a346181da989ac869d9aba43cac");
+    let registered = launch.sealed()?;
+    let invocation = "a0a94d2d42984804877c1a80fc934585";
+    ensure!(
+        terminal["schema"] == "foundation-epoch230-middle-hourly-second-terminal-v1"
+            && terminal["unit"] == SECOND_HOURLY_230.unit
+            && terminal["state"] == "local-segment-committed"
+            && terminal["launch"] == json!(launch)
+            && terminal["invocation_id"] == invocation
+            && terminal["checkpoint"]["slot"] == SECOND_HOURLY_230.last
+            && terminal["guard_drained"] == true
+            && registered["unit"] == SECOND_HOURLY_230.unit
+            && registered["invocation_id"] == invocation,
+        "epoch 230 replacement lacks the exact prior terminal and launch"
+    );
+    drained(n, SECOND_HOURLY_230.unit, SECOND_HOURLY_230.guard, invocation)
 }
 
 impl Focused {
