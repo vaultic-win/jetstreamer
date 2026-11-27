@@ -8,7 +8,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[cfg(not(any(epoch170_suffix, epoch170_continuation, epoch140_suffix)))]
+#[cfg(not(any(
+    epoch170_suffix,
+    epoch170_continuation,
+    epoch140_suffix,
+    epoch143_first_hourly
+)))]
 mod route {
     pub(super) const EPOCH: u64 = 166;
     pub(super) const UNIT: &str =
@@ -49,6 +54,18 @@ mod route {
     pub(super) const TERMINAL_SLOT: u64 = 60_911_999;
 }
 
+#[cfg(epoch143_first_hourly)]
+mod route {
+    pub(super) const EPOCH: u64 = 143;
+    pub(super) const UNIT: &str = "horizon-qualify-143-first-hourly-20261127-v1.service";
+    pub(super) const ALIAS: &str = "/run/horizon143-first-hourly";
+    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch143-first-hourly-20261127-v1";
+    pub(super) const SNAPSHOT: &str =
+        "bootstrap/snapshot-61775538-65YRW5KRaq6JezqoEc9rUqnmgp7TjVw3koFbnMtbuun.tar.zst";
+    pub(super) const TERMINAL_SLOT: u64 = 61_787_631;
+    pub(super) const NODE: &str = "/usr/local/lib/jetstreamer/deploy-epochs144-147-upgradeable-loader-20261016-v1/jetstreamer-node";
+}
+
 #[cfg(epoch170_continuation)]
 mod route {
     pub(super) const EPOCH: u64 = 170;
@@ -80,16 +97,22 @@ compile_error!("the short epoch 170 continuation requires its own gate");
 
 #[cfg(not(epoch140_suffix))]
 fn replay_args() -> Vec<String> {
-    #[cfg(not(epoch170_bridge))]
+    #[cfg(not(any(epoch170_bridge, epoch143_first_hourly)))]
     let (hashes, output, scratch) = (
         "canonical-hashes.txt",
-        format!("epoch-{EPOCH}.diagnostic.jet"),
+        format!("ledger/epoch-{EPOCH}.diagnostic.jet"),
+        "scratch",
+    );
+    #[cfg(epoch143_first_hourly)]
+    let (hashes, output, scratch) = (
+        "canonical-hashes.txt",
+        "epoch-143-first-hourly.jet",
         "scratch",
     );
     #[cfg(epoch170_bridge)]
     let (hashes, output, scratch) = (
         "bridge-hashes.txt",
-        format!("epoch-{EPOCH}.bridge-{TERMINAL_SLOT}.jet"),
+        format!("ledger/epoch-{EPOCH}.bridge-{TERMINAL_SLOT}.jet"),
         "scratch/bridge-73726716",
     );
     vec![
@@ -98,7 +121,7 @@ fn replay_args() -> Vec<String> {
         "--verify".into(),
         format!("--snapshot-archive={ALIAS}/{SNAPSHOT}"),
         format!("--epoch-hashes={ALIAS}/{hashes}"),
-        format!("--horizon-output={RUN}/ledger/{output}"),
+        format!("--horizon-output={RUN}/{output}"),
         format!("--replay-scratch={RUN}/{scratch}"),
         format!("--qualification-end-slot={TERMINAL_SLOT}"),
     ]
@@ -171,8 +194,10 @@ fn is_released(path: &Path, invocation: &str) -> io::Result<bool> {
 fn main() -> io::Result<()> {
     #[cfg(epoch140_suffix)]
     let (executable, args) = recording_command()?;
-    #[cfg(not(epoch140_suffix))]
+    #[cfg(not(any(epoch140_suffix, epoch143_first_hourly)))]
     let (executable, args) = (format!("{ALIAS}/jetstreamer-node"), replay_args());
+    #[cfg(epoch143_first_hourly)]
+    let (executable, args) = (NODE, replay_args());
     #[cfg(not(epoch140_suffix))]
     if env::args_os().len() != 1 {
         return Err(io::Error::other(format!(
@@ -241,11 +266,27 @@ mod tests {
         assert_eq!(args[0], EPOCH.to_string());
         assert_eq!(args[2], "--verify");
         assert_eq!(args[3], format!("--snapshot-archive={ALIAS}/{SNAPSHOT}"));
-        #[cfg(not(epoch170_bridge))]
+        #[cfg(not(any(epoch170_bridge, epoch143_first_hourly)))]
         assert_eq!(
             args[5],
             format!("--horizon-output={RUN}/ledger/epoch-{EPOCH}.diagnostic.jet")
         );
+        #[cfg(epoch143_first_hourly)]
+        {
+            assert_eq!(
+                args[4],
+                format!("--epoch-hashes={ALIAS}/canonical-hashes.txt")
+            );
+            assert_eq!(
+                args[5],
+                format!("--horizon-output={RUN}/epoch-143-first-hourly.jet")
+            );
+            assert_eq!(args[6], format!("--replay-scratch={RUN}/scratch"));
+            assert_eq!(
+                (EPOCH, args[7].as_str()),
+                (143, "--qualification-end-slot=61787631")
+            );
+        }
         #[cfg(epoch170_bridge)]
         {
             assert_eq!(args[4], format!("--epoch-hashes={ALIAS}/bridge-hashes.txt"));
@@ -262,7 +303,7 @@ mod tests {
                 (170, "--qualification-end-slot=73726716")
             );
         }
-        #[cfg(not(any(epoch170_suffix, epoch170_continuation)))]
+        #[cfg(not(any(epoch170_suffix, epoch170_continuation, epoch143_first_hourly)))]
         assert_eq!(
             (EPOCH, args[7].as_str()),
             (166, "--qualification-end-slot=72004310")

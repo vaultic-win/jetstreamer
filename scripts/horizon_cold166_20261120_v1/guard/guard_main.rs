@@ -631,6 +631,9 @@ fn supported_unit(plan: &Plan) -> bool {
     if plan.unit == "horizon-epoch140-suffix-recording.service" {
         return cfg!(feature = "epoch140-suffix-recording");
     }
+    if plan.unit == "horizon-qualify-143-first-hourly-20261127-v1.service" {
+        return cfg!(feature = "epoch143-first-hourly");
+    }
     if plan.unit.starts_with("horizon-qualify-") {
         return true;
     }
@@ -689,10 +692,18 @@ fn validate_plan(plan: &Plan) -> Result<()> {
     feature = "epoch167-checkpoint-bounded",
     feature = "epoch170-checkpoint-suffix",
     feature = "epoch170-checkpoint-continuation",
-    feature = "epoch140-suffix-recording"
+    feature = "epoch140-suffix-recording",
+    feature = "epoch143-first-hourly"
 ))]
 fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
     let (worker_root, receipts, minimum_floor, maximum_tree_bytes) = match plan.unit.as_str() {
+        #[cfg(feature = "epoch143-first-hourly")]
+        "horizon-qualify-143-first-hourly-20261127-v1.service" => (
+            "/home/sol/.jetstreamer-private/epoch143-first-hourly-20261127-v1",
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch143-first-hourly-20261127-v1/guard-receipts",
+            9_470_567_509_909,
+            64_u64 << 30,
+        ),
         #[cfg(feature = "epoch140-suffix-recording")]
         "horizon-epoch140-suffix-recording.service"
             if plan.worker_root
@@ -999,7 +1010,8 @@ fn run() -> Result<()> {
         feature = "epoch167-checkpoint-bounded",
         feature = "epoch170-checkpoint-suffix",
         feature = "epoch170-checkpoint-continuation",
-        feature = "epoch140-suffix-recording"
+        feature = "epoch140-suffix-recording",
+        feature = "epoch143-first-hourly"
     ))]
     validate_checkpoint_scope(&plan)?;
     #[cfg(not(any(
@@ -1008,7 +1020,8 @@ fn run() -> Result<()> {
         feature = "epoch167-checkpoint-bounded",
         feature = "epoch170-checkpoint-suffix",
         feature = "epoch170-checkpoint-continuation",
-        feature = "epoch140-suffix-recording"
+        feature = "epoch140-suffix-recording",
+        feature = "epoch143-first-hourly"
     )))]
     ensure!(
         plan.unit == data_fulfillment::COLD_UNIT
