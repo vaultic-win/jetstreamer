@@ -1,5 +1,6 @@
 use super::*;
 mod exit;
+mod predecessor;
 mod v1627;
 use anyhow::bail;
 use jetstreamer_horizon::archive::{BlockNotification, Consumption, EntryRecord, SlotVisitor};
@@ -815,6 +816,14 @@ pub(super) fn capture_v1627_exit(launch_sha: &str, destination: &Path) -> Result
 
 pub(super) fn capture_predecessor_exit(launch_sha: &str, destination: &Path) -> Result<Value> {
     exit::capture_predecessor(launch_sha, destination)
+}
+
+pub(super) fn collect_predecessor(
+    launch_sha: &str,
+    exit_sha: &str,
+    destination: &Path,
+) -> Result<Value> {
+    predecessor::collect(launch_sha, exit_sha, destination)
 }
 
 pub(super) fn collect_v1627_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {

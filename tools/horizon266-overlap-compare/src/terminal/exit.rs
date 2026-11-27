@@ -269,12 +269,12 @@ pub(super) fn capture_v1627(launch_sha: &str, destination: &Path) -> Result<Valu
     )
 }
 
-pub(super) fn capture_predecessor(launch_sha: &str, destination: &Path) -> Result<Value> {
+pub(super) const PREDECESSOR_UNIT: &str = "horizon-qualify-266-original-predecessor-v1.service";
+const PREDECESSOR_EXIT_SCHEMA: &str = "foundation-epoch266-private-predecessor-pid1-exit-v1";
+
+pub(super) fn predecessor_launch(launch_sha: &str) -> Result<(Reference, Value, u32)> {
     const STATE: &str = "/var/lib/jetstreamer/horizon266-original-predecessor-runtime-v1";
-    const UNIT: &str = "horizon-qualify-266-original-predecessor-v1.service";
     const NODE: &str = "/var/lib/jetstreamer/horizon253255-node-index-20261118-v2/jetstreamer-node";
-    require_root()?;
-    let parent = destination_parent(destination)?;
     let state = Path::new(STATE);
     let reference = Reference::new(state.join("cadence-registration.json"), launch_sha);
     let launch = reference.read()?;
@@ -287,7 +287,7 @@ pub(super) fn capture_predecessor(launch_sha: &str, destination: &Path) -> Resul
         launch["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
             && launch["epoch"] == 266
             && launch["kind"] == "epoch266-private-original-predecessor"
-            && launch["unit"] == UNIT
+            && launch["unit"] == PREDECESSOR_UNIT
             && launch["node_path"] == NODE
             && launch["profile"]["sha256"]
                 == "7ed80c05ae0e1c706a271452d9b0dcb516c651fd0f97a2ec3f1c61a477a30f21"
@@ -307,15 +307,23 @@ pub(super) fn capture_predecessor(launch_sha: &str, destination: &Path) -> Resul
             && sample["trip_reason"].is_null(),
         "foreign epoch 266 predecessor launch or live guard"
     );
+    Ok((reference, launch, pid))
+}
+
+pub(super) fn capture_predecessor(launch_sha: &str, destination: &Path) -> Result<Value> {
+    require_root()?;
+    let parent = destination_parent(destination)?;
+    let (reference, launch, pid) = predecessor_launch(launch_sha)?;
+    let invocation = string(&launch, "invocation_id")?;
     let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
         .trim()
         .replace('-', "");
     ensure!(hex(&boot_id, 32), "invalid running boot ID");
     let producer = Producer {
-        unit: UNIT,
+        unit: PREDECESSOR_UNIT,
         invocation,
         pid,
-        node: Path::new(NODE),
+        node: Path::new(string(&launch, "node_path")?),
     };
     let (_held, properties) = capture_properties(&producer, 7_300_000)?;
     ensure!(reference.read()? == launch, "predecessor launch changed during capture");
@@ -323,7 +331,7 @@ pub(super) fn capture_predecessor(launch_sha: &str, destination: &Path) -> Resul
         parent,
         destination,
         &Capture {
-            schema: "foundation-epoch266-private-predecessor-pid1-exit-v1".to_owned(),
+            schema: PREDECESSOR_EXIT_SCHEMA.to_owned(),
             launch: reference,
             boot_id,
             producer_invocation: invocation.to_owned(),
@@ -331,6 +339,25 @@ pub(super) fn capture_predecessor(launch_sha: &str, destination: &Path) -> Resul
             properties,
         },
     )
+}
+
+pub(super) fn read_predecessor(
+    reference: &Reference,
+    launch: &Reference,
+    invocation: &str,
+    pid: u32,
+    boot: &str,
+) -> Result<UnitState> {
+    let captured: Capture = serde_json::from_value(reference.read()?)?;
+    ensure!(
+        captured.schema == PREDECESSOR_EXIT_SCHEMA
+            && captured.launch == *launch
+            && captured.producer_invocation == invocation
+            && captured.producer_pid == pid
+            && captured.boot_id == boot,
+        "PID1 predecessor exit belongs to a different launch or boot"
+    );
+    Ok(captured.properties)
 }
 
 pub(super) fn read(reference: &Reference, admitted: &Admitted) -> Result<UnitState> {

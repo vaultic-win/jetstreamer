@@ -66,6 +66,65 @@ fn main() {
     ] {
         visitor = one_replace(visitor, old, new);
     }
+    visitor = one_replace(
+        visitor,
+        "    envelope_count: usize,",
+        "    envelope_count: usize,\n    compare_epoch_events: bool,",
+    );
+    visitor = one_replace(
+        visitor,
+        "            envelope_count: 0,",
+        "            envelope_count: 0,\n            compare_epoch_events: false,",
+    );
+    visitor = one_replace(
+        visitor,
+        "    fn update_version(&mut self, raw: u64) -> u64 {",
+        r#"    pub(crate) fn with_epoch_events(mut self) -> Self {
+        self.compare_epoch_events = true;
+        self
+    }
+
+    fn update_version(&mut self, raw: u64) -> u64 {"#,
+    );
+    visitor = one_replace(
+        visitor,
+        r#"            || value.num_reward_partitions.is_some()
+            || value.updates.iter().next().is_some()
+        {
+            self.error
+                .get_or_insert("unexpected nonempty or misplaced epoch envelope");
+        }"#,
+        r#"            || (!self.compare_epoch_events
+                && (value.num_reward_partitions.is_some() || value.updates.iter().next().is_some()))
+        {
+            self.error.get_or_insert("unexpected nonempty or misplaced epoch envelope");
+            return;
+        }
+        if self.compare_epoch_events {
+            let mut normalized = EpochMeta::new_boxed();
+            normalized.epoch = value.epoch;
+            normalized.start_slot = value.start_slot;
+            normalized.slot_count = value.slot_count;
+            normalized.first_block_slot = value.first_block_slot;
+            normalized.num_reward_partitions = value.num_reward_partitions;
+            for (account, data) in value.updates.iter() {
+                let update = AccountUpdateView {
+                    pubkey: account.pubkey,
+                    lamports: account.lamports,
+                    owner: account.owner,
+                    executable: account.executable,
+                    rent_epoch: account.rent_epoch,
+                    write_version: self.update_version(account.write_version),
+                    data,
+                };
+                if normalized.updates.push(&update).is_err() {
+                    self.error.get_or_insert("epoch update exceeds its original arena");
+                    return;
+                }
+            }
+            self.digest.on_epoch(&normalized);
+        }"#,
+    );
     let tests = one_replace(
         code[code.find(first_test).unwrap()..].to_owned(),
         "let slot = BOOTSTRAP + 1;",
@@ -113,5 +172,32 @@ pub(crate) fn compare(label: &str, left: &Overlap, right: &Overlap) -> io::Resul
         digest.update(frame.digest);
     }
     Ok(digest.finalize().into())
+}
+
+#[cfg(test)]
+#[test]
+fn full_prefix_normalizes_epoch_writes_and_preserves_their_values() {
+    fn encode(raw: u64, lamports: u64, partitions: u64) -> [u8; 32] {
+        let mut visitor = Overlap::new(266, 101..102, "fixture", Some(101..102)).with_epoch_events();
+        visitor.on_slot_start(101, SlotKind::Block);
+        let mut meta = EpochMeta::new_boxed();
+        meta.epoch = 266;
+        meta.start_slot = 101;
+        meta.slot_count = 1;
+        meta.first_block_slot = 101;
+        meta.num_reward_partitions = Some(partitions);
+        meta.updates.push(&AccountUpdateView {
+            pubkey: Default::default(), lamports, owner: Default::default(),
+            executable: false, rent_epoch: 0, write_version: raw, data: &[17],
+        }).unwrap();
+        visitor.on_epoch(&meta);
+        assert!(visitor.error.is_none());
+        visitor.versions.finish_slot().unwrap();
+        assert_eq!(visitor.versions.next_raw, Some(raw + 1));
+        visitor.digest.finish().unwrap()
+    }
+    assert_eq!(encode(12, 2, 3), encode(1200, 2, 3));
+    assert_ne!(encode(12, 2, 3), encode(1200, 3, 3));
+    assert_ne!(encode(12, 2, 3), encode(1200, 2, 4));
 }
 "#;

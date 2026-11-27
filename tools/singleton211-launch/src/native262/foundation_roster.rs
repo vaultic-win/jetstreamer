@@ -166,8 +166,40 @@ enum Quote {
     Suffix226Preview,
     Delivery252,
     Delivery261(Bound),
+    AdjacentIntake230(Bound),
     Replay296(Replay296Quote),
     Focused(&'static focused::Focused, Bound),
+}
+
+const ADJACENT_230_SLOT: u64 = 99_445_304;
+const ADJACENT_230_BYTES: u64 = 10_310_927_058;
+const ADJACENT_230_COPY_OVERHEAD: u64 = 16 << 20;
+const ADJACENT_230_COPY_MEMORY: u64 = 2 << 30;
+
+fn adjacent_230_intake() -> Result<Bound> {
+    let readiness = Bound::new(
+        "/home/ubuntu/.jetstreamer-private/epoch230-adjacent-sources.20261127T221352Z.gZgDWf/adjacent-replay-readiness.json",
+        "21c5f57015042eb21e7a38f7b54e73fd9efc87ab44bdb3bfa4790f6774060bc0",
+    );
+    let source = readiness.json()?;
+    let route = &source["routes"][0];
+    let metadata_ref = binding(&route["bootstrap_metadata"])?;
+    let metadata = metadata_ref.json()?;
+    ensure!(
+        source["epoch"] == 230
+            && source["publication_authorized"] == false
+            && route["bootstrap_slot"] == ADJACENT_230_SLOT
+            && route["first_slot"] == ADJACENT_230_SLOT + 1
+            && route["last_slot"] == 99_461_591
+            && route["bootstrap_payload_bytes"] == ADJACENT_230_BYTES
+            && route["bootstrap_uri"] == metadata["storage_url"]
+            && metadata["size"] == ADJACENT_230_BYTES
+            && metadata["generation"] == "1633495970251676"
+            && metadata["crc32c_hash"] == "5gcBCg=="
+            && metadata["md5_hash"] == "M2BJKcmEIRupKTRT/LhO6Q==",
+        "epoch 230 adjacent bootstrap metadata differs from the pinned copy"
+    );
+    Ok(readiness)
 }
 
 struct Replay296Quote {
@@ -1479,6 +1511,7 @@ fn measure(
         Some(Quote::Suffix226(_) | Quote::Suffix226Preview) => 226,
         Some(Quote::Delivery252) => 252,
         Some(Quote::Delivery261(_)) => 261,
+        Some(Quote::AdjacentIntake230(_)) => 230,
         Some(Quote::Replay296(_)) => 296,
         Some(Quote::Focused(spec, _)) => spec.epoch,
         _ => EPOCH,
@@ -1651,12 +1684,14 @@ fn measure(
         pristine(device)?
     };
     let resources_before = live::resources_at(Path::new(FILESYSTEM))?;
+    let adjacent_230 = matches!(&quote, Some(Quote::AdjacentIntake230(_)));
     let selected = if let Some(candidate) = &private_141 {
         candidate.cpus()
     } else {
         units::parse_cpu_list(match epoch {
         226 => "16-23",
         230 => match &quote {
+            Some(Quote::AdjacentIntake230(_)) => "48",
             Some(Quote::Focused(spec, _)) => spec.cpus,
             _ => GAP_230.cpus,
         },
@@ -1671,12 +1706,17 @@ fn measure(
         _ => "40-47",
         })?
     };
-    let cpu_width = if private_141.is_some() { 3 } else { 8 };
+    let cpu_width = if adjacent_230 { 1 } else if private_141.is_some() { 3 } else { 8 };
     let cpus = units::affinity_width(&json!({"cpu_affinity":selected}), cpu_width)?;
     let private_exclusive = private_141.as_ref().map(interval141::Candidate::exclusive).transpose()?;
     let overlap_exclusive = units::parse_cpu_list(OVERLAP_266_EXCLUSIVE)?;
     let bridge_group = units::parse_cpu_list("48-55,112-119")?;
+    let adjacent_copy_group = units::parse_cpu_list("48,112")?;
     let exclusive = match &quote {
+        Some(Quote::AdjacentIntake230(_)) => {
+            replay296::verify_cpu_group("48", &adjacent_copy_group)?;
+            &adjacent_copy_group
+        }
         Some(Quote::Focused(_, _)) if first_7871_candidate => {
             focused::second_hourly_drained(n)?;
             replay296::verify_cpu_group(FIRST_7871_230.cpus, &bridge_group)?;
@@ -1960,7 +2000,7 @@ fn measure(
     let holding_296_disk = active_holding_296.as_ref().map_or(0, |_| holding296::RECEIPT_DISK);
     let restore_266_disk = active_restore_266.as_ref().map_or(0, |_| restore266::RECEIPT_DISK);
     let interval_141_disk = active_interval_141.len() as u64 * interval141::DISK;
-    let shares_suffix = matches!(&quote, Some(Quote::Focused(scope, _))
+    let shares_suffix = adjacent_230 || matches!(&quote, Some(Quote::Focused(scope, _))
         if [FIRST_7871_230.unit, V1627_230.unit].contains(&scope.unit) || scope.epoch == 266)
         || live_replays.get(&230).is_some_and(|replay| [FIRST_7871_230.unit, V1627_230.unit].contains(&replay.unit))
         || live_replays.contains_key(&266);
@@ -2006,6 +2046,10 @@ fn measure(
                 num(&delivery, "memory_max_bytes")?,
                 capacity::add(CONTROLLER_MEMORY, num(&delivery, "guard_memory_allowance")?)?,
             )?,
+        ),
+        Some(Quote::AdjacentIntake230(_)) => (
+            capacity::add(ADJACENT_230_BYTES, ADJACENT_230_COPY_OVERHEAD)?,
+            ADJACENT_230_COPY_MEMORY,
         ),
         Some(Quote::Replay296(quote)) => {
             (quote.disk, capacity::add(quote.memory, CONTROLLER_MEMORY)?)
@@ -2096,6 +2140,7 @@ fn measure(
     let schema = match epoch {
         141 => private_schema.as_deref().context("private 141 schema")?,
         226 => "foundation-epoch226-suffix-roster-binding-v1",
+        230 if adjacent_230 => "foundation-epoch230-adjacent-intake-roster-binding-v1",
         230 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == HOURLY_230.unit) => {
             "foundation-epoch230-hourly-first-roster-binding-v1"
         }
@@ -2201,6 +2246,13 @@ fn measure(
         evidence[spec.quote_key()] = json!({
             "preflight":preflight,"candidate_disk_bytes":candidate_disk,
             "candidate_memory_bytes":candidate,"candidate_cpus":selected,
+        });
+    }
+    if let Some(Quote::AdjacentIntake230(source)) = &quote {
+        evidence["adjacent_230_intake_quote"] = json!({
+            "readiness":source,"bootstrap_slot":ADJACENT_230_SLOT,"payload_bytes":ADJACENT_230_BYTES,
+            "stage_peak_bytes":candidate_disk,"memory_bytes":candidate,"candidate_cpu":48,
+            "exclusive_online_cpus":adjacent_copy_group,"single_payload_copy":true,
         });
     }
     if let Some(Quote::Focused(spec, _)) = &quote
@@ -2314,6 +2366,7 @@ pub fn run() -> Result<()> {
                         | "--focused260-quote"
                         | "--overlap266-quote"
                         | "--predecessor266-quote"
+                        | "--adjacent230-intake-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
                         | "--feature296-quote"
@@ -2390,6 +2443,8 @@ pub fn run() -> Result<()> {
             .and_then(|prep| measure(&mut native, None, Some(Quote::Delivery261(prep)))),
         Some(flag) if flag == "--replay296-quote" => replay_296_quote(&mut native)
             .and_then(|quote| measure(&mut native, None, Some(Quote::Replay296(quote)))),
+        Some(flag) if flag == "--adjacent230-intake-quote" => adjacent_230_intake()
+            .and_then(|source| measure(&mut native, None, Some(Quote::AdjacentIntake230(source)))),
         Some(flag)
             if matches!(
                 flag.to_str(),
