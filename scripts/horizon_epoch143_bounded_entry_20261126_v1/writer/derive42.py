@@ -9,12 +9,14 @@ from derive41 import one
 
 HERE = Path(__file__).resolve().parent
 OLD = "tools-cold168-retry5-failed166-v41-entry146"
-NEW = OLD.replace("v41", "v42")
+NEW = OLD.replace("v41", "v42") + "-r2"
 V41_SEAL = "245dda3f40bc976ff0a293b3256291a351aecc1473528694b00126bf9b1573aa"
 
 
 def cycle(body):
     body = body.replace(", 41)", ", 41, 42)")
+    old = "    return name + '-entry146' if version >= 4 else name"
+    body = one(body, old, "    if version == 42:\n        return name + '-entry146-r2'\n" + old)
     old = "        if FAILED166_VERSION == 41:\n            import transition_v41\n            import recording140_status\n"
     body = one(body, old, old.replace("== 41", ">= 41") + """        if FAILED166_VERSION == 42:
             import transition_v42

@@ -9,7 +9,7 @@ import time
 from cutover41 import BASE, BOOKING_LOCK, OLD as V40, WRITER, clock, command, need, private_write, state
 
 OLD = V40.with_name(V40.name.replace("v40", "v41"))
-NEW = OLD.with_name(OLD.name.replace("v41", "v42"))
+NEW = OLD.with_name(OLD.name.replace("v41", "v42") + "-r2")
 READY = BASE / "FAILED166_CADENCE_V42_READY.json"
 ACTIVE = BASE / "FAILED166_CADENCE_V42_ACTIVE.json"
 LOAN = Path("/run/horizon-epoch140-epoch170-cpu-loan.active")

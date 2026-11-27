@@ -45,7 +45,10 @@ def closed_comparison(scope):
     ref = bound(Path(scope["closed_comparison"]))
     report = checked(ref)
     segment = report["closed_segment"]
-    manifest = checked(segment["manifest"])
+    source = Path(segment["manifest"]["path"]).lstat()
+    need(source.st_uid == 1001 and source.st_gid == 1003 and stat.S_IMODE(source.st_mode) == 0o600,
+         "foreign bounded epoch 170 segment manifest ownership")
+    manifest = checked(segment["manifest"], root=False)
     need(report["schema"] == "epoch170-bridge-checkpoint-comparison-v1"
          and report["mode"] == "closed" and report["release"] == scope["old_release"]
          and report["pid1_exit"] and [row["slot"] for row in report["checkpoints"]]
@@ -283,8 +286,12 @@ def observe(c, prior, observed_lane):
                          and sample["observation"][name]["executable"] == row["worker"]["path"]
                          for name in ("worker_before", "worker_after")),
                  "bounded epoch 170 sample does not bind its protected child")
-            row["transaction_replay_claimed"] = observed_lane(
-                sample["observation"], expected, iid, actor["producer_pid"])
+            work = sample["observation"]["useful_work"]
+            bounded = all(scope["first_new_slot"] <= (work.get(key) or {}).get("slot", 0) <= scope["last"]
+                          and (work.get(key) or {}).get("terminal_slot") == scope["last"]
+                          for key in ("first", "last"))
+            row["transaction_replay_claimed"] = bool(bounded and observed_lane(
+                sample["observation"], expected, iid, actor["producer_pid"]))
     return row
 
 
