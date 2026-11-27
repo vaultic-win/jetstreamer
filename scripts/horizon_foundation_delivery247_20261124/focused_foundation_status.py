@@ -31,8 +31,23 @@ COPY = re.compile(r"\[([^\]]+) INFO .+private 226 extraction: validating and cop
 READ_RETRY = re.compile(r"\[([^\]]+) WARN .+Original225 range at byte (\d+) interrupted")
 
 
+FIRST_7871_REGISTRATION = V / "horizon230-first-7871-runtime-v1/cadence-registration.json"
+FIRST_7871_UNIT = "horizon-qualify-230-first-7871-v1.service"
+
+
+def registration_for_sample(epoch, sample):
+    if epoch == 230 and FIRST_7871_REGISTRATION.is_file():
+        units = {row["producer_unit"] for row in sample["diagnostic_replays"]}
+        if "horizon-qualify-230-middle-hourly-second-v1.service" in units:
+            assert FIRST_7871_UNIT not in units
+        else:
+            return FIRST_7871_REGISTRATION
+    return REGISTRATIONS[epoch]
+
+
 def placement(epoch, sample):
-    launch_ref = ref(REGISTRATIONS[epoch])
+    registration = registration_for_sample(epoch, sample)
+    launch_ref = ref(registration)
     launch = bound(launch_ref)
     owner = props(launch["unit"], FIELDS)
     if (owner["ActiveState"], owner["SubState"]) != ("active", "running"):
@@ -74,19 +89,35 @@ def placement(epoch, sample):
     remaining = {"path": str(V / "horizon230-retained-segment-bindings.tkl5l1q7/bindings.json"),
                  "sha256": "52d1e4fb7ab373cebba7994a7a0b4cdb2f0b27570b00a32d081833131bc3d9ff"}
     first, last = bound(remaining)["remaining_replay"]
+    profile = bound(launch["profile"])
+    window_start, window_end = (profile["replay_bounds"][key] for key in ("first_slot", "last_slot"))
+    retained = 0
+    if registration == FIRST_7871_REGISTRATION:
+        assert launch["unit"] == FIRST_7871_UNIT and (window_start, window_end) == (99437434, 99445304)
+        closed_ref = profile["prior_drained_window"]
+        assert closed_ref["sha256"] == "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56"
+        closed = bound(closed_ref)
+        assert closed["state"] == "local-segment-committed" and closed["guard_drained"]
+        assert window_end < closed["first_slot"] <= closed["last_slot"] <= last
+        retained = closed["last_slot"] - closed["first_slot"] + 1
+        assert retained == closed["slot_count"] == 39522
+        evidence.append(closed_ref)
+    else:
+        assert (window_start, window_end) == (99476783, 99516304)
     accepted = 0
     if work["last"] is not None:
         slot = work["last"]["slot"]
-        assert 99476783 <= slot <= 99516304
-        accepted = slot - 99476782
-        phase = "replay"
+        assert window_start - 1 <= slot <= window_end
+        accepted = slot - (window_start - 1)
+        if accepted:
+            phase = "replay"
     rate = 1.6
     allowance = 12 * 3600
-    seconds = math.ceil((last - first + 1 - accepted) / rate) + allowance + DELIVERY_SECONDS
-    profile = bound(launch["profile"])
+    seconds = math.ceil((last - first + 1 - retained - accepted) / rate) + allowance + DELIVERY_SECONDS
     path = Path(next(arg.split("=", 1)[1] for arg in profile["argv"] if arg.startswith("--horizon-output=")))
     assert path.is_relative_to(root / "work/output")
     model = dict(remaining_slot_range=[first, last], window_slots_executed=accepted,
+                 completed_window_positions=retained,
                  replay_slots_per_sec=rate, repair_and_turnover_seconds=allowance,
                  delivery_seconds=DELIVERY_SECONDS)
     return owner, None, phase, path, seconds, [*evidence, remaining], model
@@ -198,7 +229,8 @@ if __name__ == "__main__":
         INITIAL.mkdir(mode=0o700, exist_ok=True)
         for epoch in REGISTRATIONS:
             row, = (row for row in fleet["active"] if row["epoch"] == epoch)
-            assert row["launch_receipt"] == str(REGISTRATIONS[epoch])
-            assert row["launch_receipt_sha256"] == ref(REGISTRATIONS[epoch])["sha256"]
+            registration = registration_for_sample(epoch, sample)
+            assert row["launch_receipt"] == str(registration)
+            assert row["launch_receipt_sha256"] == ref(registration)["sha256"]
             assert str(epoch) not in audit["statuses"]
             print(json.dumps(refresh(epoch, None, sample, observer_ref, INITIAL / str(epoch))))
