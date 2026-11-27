@@ -136,9 +136,13 @@ def register_attempt(plan, version, ordinary_replay, include_focused):
             closed = bound(terminal)
             assert closed["launch"] == source and closed["guard_drained"]
             evidence.append(terminal)
-            if version == SECOND_HOURLY_230:
+            disposition_digests = {
+                SECOND_HOURLY_230: "209c2d85e896a9e11dd61709ff403c7da82e3920c3b4997bbc0096cb82299b2a",
+                FIRST_7871_230: "3e5ad33b99b32a39ebae808a7c4b9c4854e1cfd53d5ee73ec0257019fbd53828",
+            }
+            if version in disposition_digests:
                 disposition = sealed(state / "terminal-cadence.json")
-                assert disposition["sha256"] == "209c2d85e896a9e11dd61709ff403c7da82e3920c3b4997bbc0096cb82299b2a"
+                assert disposition["sha256"] == disposition_digests[version]
                 closed = bound(disposition)
                 assert closed["terminal_receipt"] == terminal and closed["launch"] == source
                 evidence.append(disposition)
