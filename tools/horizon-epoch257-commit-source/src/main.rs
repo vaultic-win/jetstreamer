@@ -65,6 +65,22 @@ const EPOCH_257: Cohort = Cohort {
     checkpoint_hash: "EKfxe81ej53cPZXptcBTgvJLQwSZ3k4nqdaxyUGTRYCw",
 };
 
+const EPOCH_260: Cohort = Cohort {
+    epoch: 260,
+    unit: "horizon-qualify-260-singleton-v1.service",
+    invocation: "754e0feaf1f042779dddada28038de19",
+    pid: 2_469_976,
+    node: "/var/lib/jetstreamer/horizon258-parent-88cfc82b-v1/jetstreamer-node",
+    run: "/home/ubuntu/.jetstreamer-private/qualification-260-singleton-v1",
+    handoff: None,
+    fingerprint: "5072a10529e0aa6f80022b0dd00726562b88c83e08ec0de7efaf46d4e7dc9f23",
+    bootstrap: 112_316_757,
+    checkpoint: 112_751_309,
+    epoch_end: 112_751_999,
+    bootstrap_hash: "7bFgHyuoXhyvqhxdZ9bog5i6MrQanLNakePzbmhCLivi",
+    checkpoint_hash: "GjFUHtRB29hxZoxWjEcQBm8w4nTNRtn3rKZTVsoFKZMX",
+};
+
 const EPOCH_261: Cohort = Cohort {
     epoch: 261,
     unit: "horizon-qualify-261-singleton-v1.service",
@@ -79,6 +95,38 @@ const EPOCH_261: Cohort = Cohort {
     epoch_end: 113_183_999,
     bootstrap_hash: "Hgio4phsEt74AkKo6KdVmFzDoK35yS3fUkF6u3RkhSut",
     checkpoint_hash: "39EumnbfaaQdkf2ZMjL1uvVR9T9HcmE1RUP1xeCfpXVU",
+};
+
+const EPOCH_262: Cohort = Cohort {
+    epoch: 262,
+    unit: "horizon-qualify-262-singleton-v1.service",
+    invocation: "de99f16b104046929862a90e77fd1d8f",
+    pid: 2_030_776,
+    node: "/var/lib/jetstreamer/horizon262-full-node-b9b95b02-v1/jetstreamer-node",
+    run: "/home/ubuntu/.jetstreamer-private/qualification-262-singleton-v1",
+    handoff: None,
+    fingerprint: "8163fe7dc28e19a4c624242273e1188fd7767731bab26374af4561f067e27cfd",
+    bootstrap: 113_182_967,
+    checkpoint: 113_615_476,
+    epoch_end: 113_615_999,
+    bootstrap_hash: "39EumnbfaaQdkf2ZMjL1uvVR9T9HcmE1RUP1xeCfpXVU",
+    checkpoint_hash: "9VhNZirsXzcu2X1P3PE9TbB9XNHJ383LVFuaMtDFguAo",
+};
+
+const EPOCH_288: Cohort = Cohort {
+    epoch: 288,
+    unit: "horizon-qualify-288-root-shrink-debt-v1.service",
+    invocation: "88edf4dd09f343c9ac90cfff907c7b18",
+    pid: 1_495_530,
+    node: "/var/lib/jetstreamer/horizon288-node-v303/jetstreamer-node",
+    run: "/home/ubuntu/.jetstreamer-private/qualification-288-full-shrink-debt-v1",
+    handoff: None,
+    fingerprint: "b476c8c2c2a9e838969b12d0aabccb3ba101defd62aa0e7851d46b2f0807fd3b",
+    bootstrap: 124_415_782,
+    checkpoint: 124_846_819,
+    epoch_end: 124_847_999,
+    bootstrap_hash: "ApsjgCndKc38Wv37guZpxbR7MuTs5WATjVtm3MeGSPM6",
+    checkpoint_hash: "82QEwuM774K6MCdbCQydkufsLDrtg9AA1wSyumKVuLve",
 };
 
 fn commit_marker(epoch: u64) -> String {
@@ -425,6 +473,8 @@ fn collect(cohort: &Cohort) -> Result<Value> {
     Ok(output)
 }
 
+const USAGE: &str = "usage: horizon-epoch257-commit-source [--epoch252 | --epoch260 | --epoch261 | --epoch262 | --epoch288 | --reconcile-epoch252 | --check-epoch252-delivery-deployment | --launch-epoch252-delivery QUOTE SHA256]";
+
 fn main() -> Result<()> {
     let mut args = std::env::args_os().skip(1);
     let mode = args.next();
@@ -444,10 +494,7 @@ fn main() -> Result<()> {
         println!("{}", serde_json::to_string_pretty(&report)?);
         return Ok(());
     }
-    ensure!(
-        args.next().is_none(),
-        "usage: horizon-epoch257-commit-source [--epoch252 | --epoch261 | --reconcile-epoch252 | --check-epoch252-delivery-deployment | --launch-epoch252-delivery QUOTE SHA256]"
-    );
+    ensure!(args.next().is_none(), "{USAGE}");
     if mode.as_deref() == Some(std::ffi::OsStr::new("--check-epoch252-delivery-deployment")) {
         let report = handoff252::delivery::check_installed_deployment()?;
         println!("{}", serde_json::to_string_pretty(&report)?);
@@ -460,8 +507,11 @@ fn main() -> Result<()> {
     let cohort = match mode.as_deref() {
         None => &EPOCH_257,
         Some(flag) if flag == "--epoch252" => &EPOCH_252,
+        Some(flag) if flag == "--epoch260" => &EPOCH_260,
         Some(flag) if flag == "--epoch261" => &EPOCH_261,
-        _ => anyhow::bail!("usage: horizon-epoch257-commit-source [--epoch252 | --epoch261]"),
+        Some(flag) if flag == "--epoch262" => &EPOCH_262,
+        Some(flag) if flag == "--epoch288" => &EPOCH_288,
+        _ => anyhow::bail!("{USAGE}"),
     };
     let report = collect(cohort)?;
     println!("{}", serde_json::to_string_pretty(&report)?);
@@ -474,7 +524,9 @@ mod tests {
 
     #[test]
     fn commit_event_requires_complete_native_message() {
-        for cohort in [&EPOCH_252, &EPOCH_257, &EPOCH_261] {
+        for cohort in [
+            &EPOCH_252, &EPOCH_257, &EPOCH_260, &EPOCH_261, &EPOCH_262, &EPOCH_288,
+        ] {
             let epoch = cohort.epoch;
             let transaction = "a".repeat(64);
             let marker = commit_marker(epoch);
@@ -498,7 +550,10 @@ mod tests {
         for (cohort, other) in [
             (&EPOCH_252, &EPOCH_257),
             (&EPOCH_257, &EPOCH_261),
+            (&EPOCH_260, &EPOCH_262),
             (&EPOCH_261, &EPOCH_257),
+            (&EPOCH_262, &EPOCH_260),
+            (&EPOCH_288, &EPOCH_262),
         ] {
             let gate = json!({
                 "kind": "sealed-root-checkpoint-cohort", "version": 1,
