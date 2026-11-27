@@ -1,0 +1,32 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -1079,6 +1079,29 @@
+         plan["gates"]["296"]["next_action"] = (
+             "Reassess full replay after a measured disk reservation release. "
+             "The repaired production worker is sealed and the bounded failure transaction matched canonical execution.")
++    restore_266 = V / "horizon266-hourly-checkpoint-runtime-v1"
++    if (restore_266 / "launch.json").is_file():
++        launch_ref = sealed_226_file(restore_266 / "launch.json")
++        launch = bound(launch_ref)
++        unit = "horizon-qualify-266-hourly-checkpoint-restore-v1.service"
++        assert launch["schema"] == "foundation-epoch266-hourly-checkpoint-launch-v1"
++        assert launch["unit"] == unit and launch["checkpoint_slot"] == 114923430
++        assert launch["probe_sha256"] == "4d14c33f1a5e9ba373a2e474bbe1926812140f7ec8586da68a67ad3cf7c7740a"
++        assert launch["entry_replay"] is False and launch["publication_authorized"] is False
++        if unit not in plan["tracked_units"]:
++            plan["tracked_units"].append(unit)
++        gate = plan["gates"]["266"]
++        add(gate, launch_ref, launch["admission"])
++        current = props(unit, ["ActiveState", "InvocationID", "MainPID", "ExecStart", "MemoryMax", "MemorySwapMax", "AllowedCPUs"])
++        if current["ActiveState"] == "active":
++            assert current["InvocationID"] == launch["invocation_id"] and int(current["MainPID"]) == launch["main_pid"]
++            assert current["ExecStart"] == launch["exec_start"] and current["AllowedCPUs"] == "32-39"
++            assert current["MemoryMax"] == "192000000000" and current["MemorySwapMax"] == "0"
++            gate["next_action"] = "Collect the private snapshot restore and compare the Bank, accounts root and last blockhash at slot 114923430."
++        elif (restore_266 / "completion.json").is_file():
++            terminal = sealed_226_file(restore_266 / "completion.json")
++            assert bound(terminal)["launch"] == launch_ref
++            add(gate, terminal)
+     active_private_intervals = set()
+     for ordinal, cohort_label in ((2, "-private141"), (3, "-private141-third"), (4, "-private141-fourth"), (5, "-private141-fifth"), (6, "-private141-sixth"), (7, "-private141-seventh"), (8, "-private141-eighth")):
+         interval141_launch = V / f"horizon141-foundation-interval{ordinal}-runtime-v1/replay-launch.json"

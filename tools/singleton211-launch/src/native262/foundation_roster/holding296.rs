@@ -57,14 +57,7 @@ fn match_admission(admission: &Value) -> Result<()> {
     Ok(())
 }
 
-pub(super) struct Active {
-    pub(super) launch: Bound,
-    pub(super) owner: Value,
-    pub(super) memory: u64,
-    pub(super) ticks: u64,
-}
-
-pub(super) fn active(n: &mut Native) -> Result<Active> {
+pub(super) fn active(n: &mut Native) -> Result<AuxiliaryOwner> {
     let owner = n.show_fields(UNIT, OWNER_FIELDS)?;
     let invocation = text(&owner, "InvocationID")?;
     let memory = live::finite_owner(&owner, UNIT, invocation, MEMORY)?;
@@ -121,7 +114,7 @@ pub(super) fn active(n: &mut Native) -> Result<Active> {
             && process_ticks(pid)? == ticks,
         "live epoch 296 custody image or command differs"
     );
-    Ok(Active {
+    Ok(AuxiliaryOwner {
         launch,
         owner,
         memory,
