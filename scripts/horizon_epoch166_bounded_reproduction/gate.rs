@@ -12,6 +12,7 @@ use std::{
     epoch170_suffix,
     epoch170_continuation,
     epoch140_suffix,
+    epoch141_first_hourly,
     epoch143_first_hourly
 )))]
 mod route {
@@ -66,6 +67,17 @@ mod route {
     pub(super) const NODE: &str = "/usr/local/lib/jetstreamer/deploy-epochs144-147-upgradeable-loader-20261016-v1/jetstreamer-node";
 }
 
+#[cfg(epoch141_first_hourly)]
+mod route {
+    pub(super) const EPOCH: u64 = 141;
+    pub(super) const UNIT: &str = "horizon-qualify-141-first-hourly-20261127-v1.service";
+    pub(super) const ALIAS: &str = "/run/horizon141-first-hourly";
+    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch141-first-hourly-20261127-v1";
+    pub(super) const SNAPSHOT: &str =
+        "bootstrap/snapshot-60911751-GyFbDnPnUWrFStHKfwWC98xJpmBQKjLyJ9sMf2m6MrWR.tar.zst";
+    pub(super) const TERMINAL_SLOT: u64 = 60_921_282;
+}
+
 #[cfg(epoch170_continuation)]
 mod route {
     pub(super) const EPOCH: u64 = 170;
@@ -97,7 +109,7 @@ compile_error!("the short epoch 170 continuation requires its own gate");
 
 #[cfg(not(epoch140_suffix))]
 fn replay_args() -> Vec<String> {
-    #[cfg(not(any(epoch170_bridge, epoch143_first_hourly)))]
+    #[cfg(not(any(epoch170_bridge, epoch141_first_hourly, epoch143_first_hourly)))]
     let (hashes, output, scratch) = (
         "canonical-hashes.txt",
         format!("ledger/epoch-{EPOCH}.diagnostic.jet"),
@@ -109,6 +121,8 @@ fn replay_args() -> Vec<String> {
         "epoch-143-first-hourly.jet",
         "scratch",
     );
+    #[cfg(epoch141_first_hourly)]
+    let (hashes, output, scratch) = ("epoch-hashes.txt", "epoch-141-first-hourly.jet", "scratch");
     #[cfg(epoch170_bridge)]
     let (hashes, output, scratch) = (
         "bridge-hashes.txt",
@@ -124,6 +138,14 @@ fn replay_args() -> Vec<String> {
         format!("--horizon-output={RUN}/{output}"),
         format!("--replay-scratch={RUN}/{scratch}"),
         format!("--qualification-end-slot={TERMINAL_SLOT}"),
+        #[cfg(epoch141_first_hourly)]
+        format!("--epoch141-original-index={ALIAS}/original/index.json"),
+        #[cfg(epoch141_first_hourly)]
+        "--epoch141-original-index-sha256=fe38bd4ce018996349c10029720dd7f738340fb0ad30ce6b8577b9651bf87df3".into(),
+        #[cfg(epoch141_first_hourly)]
+        format!("--epoch141-original-data={ALIAS}/original/original-entries.data"),
+        #[cfg(epoch141_first_hourly)]
+        "--epoch141-original-data-sha256=5605dd1ba08b7e790227b0efc388a74a02cdf665220d2455c3ed39f803feada0".into(),
     ]
 }
 
@@ -266,7 +288,7 @@ mod tests {
         assert_eq!(args[0], EPOCH.to_string());
         assert_eq!(args[2], "--verify");
         assert_eq!(args[3], format!("--snapshot-archive={ALIAS}/{SNAPSHOT}"));
-        #[cfg(not(any(epoch170_bridge, epoch143_first_hourly)))]
+        #[cfg(not(any(epoch170_bridge, epoch141_first_hourly, epoch143_first_hourly)))]
         assert_eq!(
             args[5],
             format!("--horizon-output={RUN}/ledger/epoch-{EPOCH}.diagnostic.jet")
@@ -287,6 +309,24 @@ mod tests {
                 (143, "--qualification-end-slot=61787631")
             );
         }
+        #[cfg(epoch141_first_hourly)]
+        assert_eq!(
+            args,
+            [
+                "141",
+                "/home/sol/.jetstreamer-private/epoch141-first-hourly-20261127-v1/ledger",
+                "--verify",
+                "--snapshot-archive=/run/horizon141-first-hourly/bootstrap/snapshot-60911751-GyFbDnPnUWrFStHKfwWC98xJpmBQKjLyJ9sMf2m6MrWR.tar.zst",
+                "--epoch-hashes=/run/horizon141-first-hourly/epoch-hashes.txt",
+                "--horizon-output=/home/sol/.jetstreamer-private/epoch141-first-hourly-20261127-v1/epoch-141-first-hourly.jet",
+                "--replay-scratch=/home/sol/.jetstreamer-private/epoch141-first-hourly-20261127-v1/scratch",
+                "--qualification-end-slot=60921282",
+                "--epoch141-original-index=/run/horizon141-first-hourly/original/index.json",
+                "--epoch141-original-index-sha256=fe38bd4ce018996349c10029720dd7f738340fb0ad30ce6b8577b9651bf87df3",
+                "--epoch141-original-data=/run/horizon141-first-hourly/original/original-entries.data",
+                "--epoch141-original-data-sha256=5605dd1ba08b7e790227b0efc388a74a02cdf665220d2455c3ed39f803feada0",
+            ]
+        );
         #[cfg(epoch170_bridge)]
         {
             assert_eq!(args[4], format!("--epoch-hashes={ALIAS}/bridge-hashes.txt"));
@@ -303,7 +343,12 @@ mod tests {
                 (170, "--qualification-end-slot=73726716")
             );
         }
-        #[cfg(not(any(epoch170_suffix, epoch170_continuation, epoch143_first_hourly)))]
+        #[cfg(not(any(
+            epoch170_suffix,
+            epoch170_continuation,
+            epoch141_first_hourly,
+            epoch143_first_hourly
+        )))]
         assert_eq!(
             (EPOCH, args[7].as_str()),
             (166, "--qualification-end-slot=72004310")
