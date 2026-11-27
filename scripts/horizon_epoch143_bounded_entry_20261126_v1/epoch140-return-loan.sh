@@ -2,9 +2,11 @@
 set -euo pipefail
 umask 077
 
-authority=/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-v1
+suffix=${1:-v1}
+[[ $suffix == v1 || $suffix == retry1 ]]
+authority="/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-$suffix"
 producer=horizon-epoch140-suffix-recording.service
-guard=horizon-guard-epoch140-suffix-recording-20261127-v1
+guard="horizon-guard-epoch140-suffix-recording-20261127-$suffix"
 original=horizon-qualify-170-full-metered-20261124-v1.service
 marker=/run/horizon-epoch140-epoch170-cpu-loan.active
 loan="$authority/CPU_LOAN_ACTIVE.json"

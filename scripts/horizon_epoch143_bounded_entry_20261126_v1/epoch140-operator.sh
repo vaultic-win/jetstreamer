@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-a=/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-v1
-run=/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-v1
+profile=${HORIZON140_PROFILE:-initial}
+case "$profile" in
+    initial) suffix=v1; tree_cap=25769803776; price_mode=() ;;
+    retry1) suffix=retry1; tree_cap=60129542144; price_mode=(--retry1) ;;
+    *) exit 2 ;;
+esac
+a="/var/lib/jetstreamer/horizon_runtime_data/epoch140-suffix-recording-20261127-$suffix"
+run="/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-$suffix"
 u=horizon-epoch140-suffix-recording.service
-g=horizon-guard-epoch140-suffix-recording-20261127-v1
+g="horizon-guard-epoch140-suffix-recording-20261127-$suffix"
+home_charge=$((tree_cap + 67108864))
 original=horizon-qualify-170-full-metered-20261124-v1.service
 fence_dir="/run/systemd/system/$original.d"
 fence="$fence_dir/95-epoch140-cpu-loan.conf"
@@ -12,7 +19,6 @@ marker=/run/horizon-epoch140-epoch170-cpu-loan.active
 original_bus_path=/org/freedesktop/systemd1/unit/horizon_2dqualify_2d170_2dfull_2dmetered_2d20261124_2dv1_2eservice
 guard="$a/static/guard"
 price="$a/pricing-v2/price-epoch140"
-guard_sha=f91ce8931e8c8485206e5db0d6ad30d10cab4ea96bb72b4ebbfb6cb932359bfa
 render="$(dirname "$0")/epoch140-producer-argv.sh"
 sealer=/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment
 self_sha=e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3
@@ -23,13 +29,15 @@ bsha=${4:?Pass its independently verified digest}
 
 sha() { sha256sum "$1" | cut -d ' ' -f1; }
 test "$(id -u)" = 0
+test "$(stat -c %u:%g:%a:%h "$guard")" = 0:0:555:1
+guard_sha=$(sha "$guard")
 test "$(sha "$fleet")" = "$fsha"
 test "$(sha "$booking")" = "$bsha"
 [[ $(stat -c %u:%g:%a:%h "$booking") =~ ^0:0:4(00|44):1$ ]]
-jq -e --arg f "$fleet" --arg s "$fsha" --arg unit "$u" '
+jq -e --arg f "$fleet" --arg s "$fsha" --arg unit "$u" --argjson home "$home_charge" '
   .schema=="horizon-epoch140-private-recording-booking-v1" and .fleet=={path:$f,sha256:$s}
   and .unit==$unit and .cpu_quota_micros==3000000
-  and .HOME_bytes==25836912640 and .RAM_bytes==28991029248
+  and .HOME_bytes==$home and .RAM_bytes==28991029248
   and (.runtime_max_seconds|type=="number" and .>0 and .<=1800)
   and (.must_drain_by_unix_seconds|type=="number" and floor==.)
   and .recording_authorized==true and .archive_publication_authorized==false' "$booking" >/dev/null
@@ -61,8 +69,10 @@ verify_fence() {
 
 screen() {
     local result=$1
-    "$price" "$fleet" "$fsha" > "$result"
-    jq -e '.disk_fits and .memory_fits and .incumbent_167_cap_bytes==85899345920' "$result" >/dev/null
+    "$price" "$fleet" "$fsha" "${price_mode[@]}" > "$result"
+    jq -e --argjson home "$home_charge" '
+      .disk_fits and .memory_fits and .candidate_home_bytes==$home
+      and .incumbent_167_cap_bytes==85899345920' "$result" >/dev/null
 }
 
 publish() {
@@ -147,7 +157,7 @@ jq -n --arg dest "$a/plan" --arg path "$a/PLAN_SOURCE.json" --arg sha "$plan_sha
 bound_runtime=$((drain_by - $(date +%s) - 55))
 if (( bound_runtime > booked_runtime )); then bound_runtime=$booked_runtime; fi
 (( bound_runtime >= 120 ))
-mapfile -t launch_args < <(bash "$render" "$plan_sha" | jq -r --arg bound "$bound_runtime" 'map(if startswith("--property=RuntimeMaxSec=") then "--property=RuntimeMaxSec="+$bound else . end)[]')
+mapfile -t launch_args < <(bash "$render" "$plan_sha" "$suffix" | jq -r --arg bound "$bound_runtime" 'map(if startswith("--property=RuntimeMaxSec=") then "--property=RuntimeMaxSec="+$bound else . end)[]')
 launch_attempted=1
 "${launch_args[@]}"
 iid=$(systemctl show "$u" -p InvocationID --value)
@@ -163,9 +173,9 @@ test "$(cat "/proc/$pid/cgroup")" = "0::/system.slice/$u"
 test "$(cat "/sys/fs/cgroup/system.slice/$u/memory.max")" = 27917287424
 test "$(cat "/sys/fs/cgroup/system.slice/$u/memory.swap.max")" = 0
 test "$(systemctl show "$u" -p CPUQuotaPerSecUSec --value)" = 2s
-jq -n --arg iid "$iid" --arg u "$u" --arg run "$run" --arg receipts "$a/guard-receipts" --argjson floor "$guard_floor" '{
+jq -n --arg iid "$iid" --arg u "$u" --arg run "$run" --arg receipts "$a/guard-receipts" --argjson floor "$guard_floor" --argjson cap "$tree_cap" '{
  schema:"jetstreamer-horizon-standalone-guard-plan-v1",unit:$u,invocation_id:$iid,filesystem:"/home/sol",
- minimum_free_bytes:$floor,worker_root:$run,maximum_worker_vmas:3500000,maximum_root_physical_bytes:25769803776,
+ minimum_free_bytes:$floor,worker_root:$run,maximum_worker_vmas:3500000,maximum_root_physical_bytes:$cap,
  receipt_directory:$receipts}' | publish "$a/ACTUAL_GUARD_PLAN.json"
 plan="$a/ACTUAL_GUARD_PLAN.json"
 guard_args=("$guard" "$plan" --plan-sha256 "$(sha "$plan")" --self-sha256 "$guard_sha")
@@ -180,11 +190,11 @@ for attempt in {1..30}; do
     sleep .3
 done
 test -n "$first"
-jq -e --arg iid "$iid" --arg plan_sha "$(sha "$plan")" --argjson pid "$pid" '
+jq -e --arg iid "$iid" --arg plan_sha "$(sha "$plan")" --argjson pid "$pid" --argjson cap "$tree_cap" '
   .producer_invocation_id==$iid and .producer.pid==$pid and .plan_sha256==$plan_sha
   and .producer_stop_enabled==true and .trip_reason==null
   and .root_physical_observation_error==null and .worker_observation_error==null
-  and .maximum_root_physical_bytes==25769803776
+  and .maximum_root_physical_bytes==$cap
   and .root_physical_observation.exceeds_budget==false and .workers==[]' "$first" >/dev/null
 screen "$a/HELD_POST_GUARD_SCREEN.json"
 jq -e --argjson floor "$guard_floor" '
@@ -207,7 +217,7 @@ jq -n --arg iid "$iid" --argjson pid "$pid" --argjson ticks "$ticks"   --arg boo
  inherited_fleet:{path:$fleet,sha256:$fleet_sha},booking:{path:$booking,sha256:$booking_sha},
  node_plan:{path:$nodeplan,sha256:$nodeplan_sha},recorded_unix_seconds:$now,
  cpu_quota_micros:3000000,producer_RAM_bytes:27917287424,guard_RAM_bytes:1073741824,
- guarded_HOME_bytes:25769803776,archive_publication_authorized:false}' | publish "$a/HELD_OWNER.json"
+ guarded_HOME_bytes:$cap,archive_publication_authorized:false}' | publish "$a/HELD_OWNER.json"
 jq -n --arg iid "$iid" --argjson pid "$pid" --arg path "$booking" --arg sha "$bsha"   --argjson now "$(date +%s)" --argjson duration "$bound_runtime" --argjson deadline "$drain_by" --arg fence "$fence" --arg fence_sha "$(sha "$fence")" '{
     schema:"horizon-epoch140-epoch170-cpu-loan-v1",candidate_invocation:$iid,candidate_pid:$pid,
     booking:{path:$path,sha256:$sha},recorded_unix_seconds:$now,

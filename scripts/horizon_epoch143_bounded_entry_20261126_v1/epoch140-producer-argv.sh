@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 runtime=/var/lib/jetstreamer/horizon_runtime_data
-authority="$runtime/epoch140-suffix-recording-20261127-v1"
+suffix=${2:-v1}
+[[ $suffix == v1 || $suffix == retry1 ]]
+authority="$runtime/epoch140-suffix-recording-20261127-$suffix"
 node="$runtime/epoch140-recording-build-20261122-v1/44153c667a564b36ad8feb7e7cffb5db/node/jetstreamer-node"
-run=/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-v1
+run="/home/sol/.jetstreamer-private/epoch140-suffix-recording-20261127-$suffix"
 snapshot=/home/sol/.jetstreamer-private/epoch140-snapshot-source-20261020-v1/download/snapshot-60911751-GyFbDnPnUWrFStHKfwWC98xJpmBQKjLyJ9sMf2m6MrWR.tar.zst
 worker=/usr/local/lib/jetstreamer/horizon-v1425-corrected-default-candidate-20261023-v1/jetstreamer-historical-worker-v1-4-25
 plan_digest=${1:?Pass the exact sealed node plan digest}

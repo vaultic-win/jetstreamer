@@ -9,6 +9,60 @@ mod prior;
 use prior::{command, number, property, protected, read, state, string, usage};
 
 const HOME_CAP: u64 = (24 << 30) + (64 << 20);
+const RETRY_HOME_CAP: u64 = (56 << 30) + (64 << 20);
+
+fn retry_holding(fleet: &Value, transfers: &[Value]) -> Result<(Value, u64, u64)> {
+    let start_ref = json!({
+        "path":"/var/lib/jetstreamer/horizon_runtime_data/epoch185-lanek-holding-20261125-v1/PARK_START.json",
+        "sha256":"75cb59704be9c9007b03a82553bbc69689139c046400bfafcb9339fa3da4e5fd"
+    });
+    let start = read(&start_ref)?;
+    let admission = read(&start["admission"])?;
+    let fit = read(&admission["fit"])?;
+    let old140 = &fit["epoch140"];
+    for key in ["booking", "cpu_loan", "held_owner"] {
+        read(&old140[key])?;
+    }
+    let unit = string(&admission["unit"])?;
+    let live = state(unit)?;
+    let status = property(&live, "ActiveState")?;
+    ensure!(
+        unit == "horizon-closed185-lanek-park-20261127-v1.service"
+            && admission["resource_credit_bytes"] == 0
+            && fit["resource_credit_bytes"] == 0
+            && admission["archive_staging_bytes"] == 0
+            && number(&admission["restore_overlap_bytes"])?
+                <= number(&admission["serial_restore_slot_bytes"])?
+            && admission["serial_restore_enlargement_bytes"] == 0
+            && property(&live, "InvocationID")? == string(&start["native"]["InvocationID"])?
+            && property(&live, "CPUQuotaPerSecUSec")? == "2s"
+            && property(&live, "MemoryMax")? == (2u64 << 30).to_string()
+            && property(&live, "MemorySwapMax")? == "0"
+            && matches!(status, "active" | "activating"),
+        "the exact 185 lane-K holding owner or charge changed"
+    );
+    let accepted_event = &fleet["epoch185_lanek_holding"];
+    if accepted_event.is_null() {
+        ensure!(
+            transfers.is_empty(),
+            "another holding owner changed the fleet"
+        );
+    } else {
+        let event = read(accepted_event)?;
+        ensure!(
+            event["schema"] == "horizon-epoch185-lanek-cadence-event-v1"
+                && event["result"]["holding_reservation"]["admission"] == start["admission"]
+                && event["result"]["holding_reservation"]["start"] == start_ref
+                && (transfers.is_empty() || transfers == std::slice::from_ref(accepted_event)),
+            "the writer enrolled a different holding owner"
+        );
+    }
+    Ok((
+        start_ref,
+        number(&admission["metadata_allowance_bytes"])?,
+        number(&admission["memory"])?,
+    ))
+}
 const RAM_CAP: u64 = 27 << 30;
 
 fn sample_lower(reference: &Value) -> Result<u64> {
@@ -19,15 +73,31 @@ fn sample_lower(reference: &Value) -> Result<u64> {
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    ensure!(args.len() == 2, "usage: price_epoch140 FLEET FLEET_SHA256");
+    let retry = args.len() == 3 && args[2] == "--retry1";
+    ensure!(
+        args.len() == 2 || retry,
+        "usage: price_epoch140 FLEET FLEET_SHA256 [--retry1]"
+    );
+    let home_cap = if retry { RETRY_HOME_CAP } else { HOME_CAP };
     let fleet_ref = json!({"path":args[0],"sha256":args[1]});
     let fleet = read(&fleet_ref)?;
+    let transfers = fleet["actual_active_holding_transfers"]
+        .as_array()
+        .context("missing transfer roster")?;
+    let (lane_k, extra_home, extra_ram) = if retry {
+        retry_holding(&fleet, transfers)?
+    } else {
+        ensure!(
+            transfers.is_empty(),
+            "active 185 holding requires retry pricing"
+        );
+        (Value::Null, 0, 0)
+    };
     ensure!(
         fleet["all_active_status_reports_authenticated_readback"] == true
             && fleet["all_reservation_ending_bytes"] == 0
             && fleet["resource_credit_bytes"] == 0
             && fleet["actual_active_bootstraps"] == json!([])
-            && fleet["actual_active_holding_transfers"] == json!([])
             && fleet["actual_active_retirements"] == json!([])
             && fleet["actual_active_retirement_checks"] == json!([]),
         "another transition changes the current fleet obligations"
@@ -53,10 +123,15 @@ fn main() -> Result<()> {
         "changed 167 replacement charge"
     );
     let admission_fleet = read(&base["fleet"])?;
-    let previous = &fleet["previous_Root_operational_review"];
-    let same_lineage = fleet_ref == base["fleet"]
-        || previous == &base["fleet"]
-        || read(previous)?["previous_Root_operational_review"] == base["fleet"];
+    let mut cursor = fleet["previous_Root_operational_review"].clone();
+    let mut same_lineage = fleet_ref == base["fleet"];
+    for _ in 0..if retry { 8 } else { 2 } {
+        if same_lineage || cursor == base["fleet"] {
+            same_lineage = true;
+            break;
+        }
+        cursor = read(&cursor)?["previous_Root_operational_review"].clone();
+    }
     ensure!(
         same_lineage,
         "140 quote needs the current successor of the 167 admission"
@@ -161,11 +236,13 @@ fn main() -> Result<()> {
         .checked_sub(tail_physical)
         .context("tail allocation crosses initial protected charge")?
         .checked_add(growth_loss)
+        .and_then(|bytes| bytes.checked_add(extra_home))
         .context("disk commitment overflow")?;
     let retained_required_ram = (number(&post["required_ram_bytes"])?
         + number(&base["resident_lower_bound_bytes"])?)
     .checked_sub(resident)
-    .context("resident measurement exceeds inherited RAM")?;
+    .and_then(|bytes| bytes.checked_add(extra_ram))
+    .context("resident measurement or lane-K RAM invalid")?;
     let expected = state("horizon-epoch140-suffix-recording.service")?;
     ensure!(
         matches!(property(&expected, "ActiveState")?, "inactive" | "failed")
@@ -183,9 +260,10 @@ fn main() -> Result<()> {
             "incumbent_167_paid_lower_bound_bytes":tail_physical,
             "retained_required_home_bytes":retained_required_home,"available_home_bytes":home_available,
             "retained_required_ram_bytes":retained_required_ram,"available_ram_bytes":ram_available,
-            "candidate_home_bytes": HOME_CAP,"candidate_ram_bytes":RAM_CAP,
+            "candidate_home_bytes":home_cap,"retained_185_lanek":lane_k,
+            "additional_185_lanek_home_bytes":extra_home,"additional_185_lanek_ram_bytes":extra_ram,"candidate_ram_bytes":RAM_CAP,
             "candidate_cpu_quota_micros":3_000_000,
-            "disk_fits":home_available >= retained_required_home + HOME_CAP,
+            "disk_fits":home_available >= retained_required_home + home_cap,
             "memory_fits":ram_available >= retained_required_ram + RAM_CAP,
             "cpu_admission_proven":false,"replay_launch_authorized":false,
             "resource_credit_bytes":0
