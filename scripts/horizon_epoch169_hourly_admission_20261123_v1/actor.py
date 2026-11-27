@@ -51,17 +51,22 @@ def props(unit,names):
     return row
 
 
-def before(fleet, row=None):
+def before(fleet, row=None, *, split_scratch=False):
     m=SEED.lstat()
     need(m.st_uid==0 and stat.S_ISREG(m.st_mode) and m.st_nlink==1 and not m.st_mode&0o222 and
          SEED.resolve(strict=True)==SEED, "unsafe release intent")
     raw=SEED.read_bytes(); src=json.loads(raw); ref=dict(path=str(SEED),sha256=hashlib.sha256(raw).hexdigest())
-    need(src["schema"]=="epoch169-hourly-bound-first-guard-intent-v1" and src["unit"]==UNIT and
+    schema = "epoch169-hourly-bound-first-guard-intent-v1"
+    outside, growth = FIXED, WORKSPACE - FIXED
+    if split_scratch:
+        schema = "epoch169-hourly-tmpfs-first-guard-intent-v1"
+        outside, growth = 64 << 20, 8 * G
+    need(src["schema"]==schema and src["unit"]==UNIT and
          src["previous_producer_iid"]=="0dfa0d36fbc246c28443a1c90a82c9cb" and
          src["actor_memory_bytes"]==68*G and src["guard_memory_bytes"]==G and
          src["actor_cpu_micros"]==3_000_000 and src["guard_cpu_micros"]==1_000_000 and
-         src["canonical_publication_authorized"] is False and 0<src["fixed_control_allowance"]==FIXED and
-         src["charged_worker_growth"]==WORKSPACE-FIXED,"different private producer funding")
+         src["canonical_publication_authorized"] is False and 0<src["fixed_control_allowance"]==outside and
+         src["charged_worker_growth"]==growth,"different private producer funding")
     need(src["boot_id"]==Path("/proc/sys/kernel/random/boot_id").read_text().strip(),"different machine boot")
     iid=src["producer_invocation_id"]
     n=props(UNIT,["Id","ActiveState","SubState","InvocationID","MainPID","NRestarts","Job","ControlGroup",
@@ -109,6 +114,12 @@ def before(fleet, row=None):
          plan["receipt_directory"]==str(TREE/"hourly-guard-receipts") and plan["filesystem"]=="/home/sol" and
          plan["maximum_worker_vmas"]==3_500_000 and plan["maximum_root_physical_bytes"]==
          src["prestart_physical_bytes"]+src["charged_worker_growth"],"different paid guard")
+    mount = None
+    if split_scratch:
+        import runpy
+        scope = runpy.run_path(str(Path(__file__).with_name("scratch_mount.py")))
+        mount = scope["native"](pid)
+        need(mount == src["private_scratch_mount"], "different invocation-private scratch")
     if row is not None:
         need(row["epoch"]==169 and row["unit"]["Id"]==UNIT and row["unit"]["InvocationID"]==iid and
              int(row["unit"]["MainPID"])==pid and row["hourly169_start_intent"]==ref,"unjoined private observer row")
@@ -116,8 +127,11 @@ def before(fleet, row=None):
         need(fleet["focused169_terminal"]==src["previous_terminal"]==dict(
              path="/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-terminal-20261121-v1/TERMINAL.json",
              sha256="218954bde25b9176b8063c1555dfcff29e91d5f42281198d3dbf5484ee98c6f5"),"unjoined prior closure")
-    return dict(unit=UNIT,processes=prs,held=held,intent=ref,plan=src["guard_plan"],producer_iid=iid,
-                timer_iid=t["InvocationID"],initial_physical=src["prestart_physical_bytes"])
+    binding = dict(unit=UNIT,processes=prs,held=held,intent=ref,plan=src["guard_plan"],producer_iid=iid,
+                   timer_iid=t["InvocationID"],initial_physical=src["prestart_physical_bytes"])
+    if split_scratch:
+        binding["private_scratch_mount"] = mount
+    return binding
 
 
 def public_workers(native, fleet):

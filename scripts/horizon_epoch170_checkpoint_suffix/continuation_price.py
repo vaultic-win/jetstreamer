@@ -13,7 +13,9 @@ state, read, bound, inactive, need, cmd = prior.state, prior.read, prior.bound, 
 FIRST = RT / "epoch170-from-73746882-20261127-v1"
 OPERATOR = Path(__file__).resolve().parent
 ISSUED_PRICE = FIRST/"attempt-2/issued-price-v47"
-RETRY = OPERATOR.parent == FIRST/"attempt-2" and OPERATOR.name in ("operator-v1", "operator-v2", "operator-v3", "issued-price-v47")
+FOCUSED169_PRICE = RT/"epoch169-hourly-admission-20261123-v1/issued-split-v1"
+ISSUED_PRICES = (ISSUED_PRICE, FOCUSED169_PRICE)
+RETRY = OPERATOR in ISSUED_PRICES or OPERATOR.parent == FIRST/"attempt-2" and OPERATOR.name in ("operator-v1", "operator-v2", "operator-v3")
 DEP = ATTEMPT = FIRST/"attempt-2" if RETRY else FIRST
 OLD = prior.DEP / "attempt-2"
 BRIDGE = prior.UNIT
@@ -245,9 +247,10 @@ def issued_tree_bounds(actor):
     return sample, (lower, upper)
 
 
-def price(phase):
+def price(phase, *, native169=None):
     need(phase in ("read","start","held"),"unknown continuation phase")
-    need(OPERATOR != ISSUED_PRICE or phase == "held", "issued-price-v47 only prices the live 170 worker")
+    need(native169 is None or OPERATOR == FOCUSED169_PRICE, "169 is outside this operator")
+    need(OPERATOR not in ISSUED_PRICES or phase == "held", "issued-price-v47 only prices the live 170 worker")
     prior_receipt = predecessor_exit()
     if phase != "read": compare_predecessor()
     before = prior.availability()
@@ -269,9 +272,10 @@ def price(phase):
         rs = state(rollover.UNIT)
         if rs["ActiveState"] == "active":
             replacement = guarded_hourly143(rollover, rs)
-    sample, bounds = issued_tree_bounds(actor) if OPERATOR == ISSUED_PRICE else (None, None)
+    sample, bounds = issued_tree_bounds(actor) if OPERATOR in ISSUED_PRICES else (None, None)
+    options = {"native169": native169} if native169 is not None else {}
     joint = prior.price("held" if held else "start",attempt=OLD,held_replacement=UNIT if held else None,live_tree_bounds=bounds,
-                        hourly_replacement=replacement["iid"] if replacement else None)
+                        hourly_replacement=replacement["iid"] if replacement else None, **options)
     need(joint["candidate_growth"] == 36*G and joint["producer_allowance"] == 48*G
          and joint["guard_sibling_allowance"] == G and joint["resource_credit_bytes"] == 0
          and joint["extra"]["reserved_141"]["sha256"] == "73a120db97d72a03c05c39139098a10cd6c84802f0f5472a1251f341976ce131",
@@ -350,6 +354,6 @@ def price(phase):
         spec.loader.exec_module(capacity)
         scope_for_price = None if phase == "read" else scope()[0]
         return capacity.charge(prior, result, assembly, scope_for_price)
-    if OPERATOR in (FIRST/"attempt-2/operator-v3", ISSUED_PRICE):
+    if OPERATOR in (FIRST/"attempt-2/operator-v3", *ISSUED_PRICES):
         return overlay.apply_170(result, assembly, use_phase=True)
     return overlay.apply_170(result, assembly)

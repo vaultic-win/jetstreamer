@@ -308,6 +308,11 @@ def prove_hourly_exclusion(proof, additional_booker=None):
     routes = {"booking-price-v1", "booking-price-v2", "booking-price-v3", "booking-price-v4"}
     if additional_booker is not None:
         routes.add(additional_booker.name)
+        if additional_booker == HOURLY/"booking-price-v48":
+            old = HOURLY/"booking-price-v47"
+            checksum = "f127e596ee005a8d2a1adc72561fb288bb98df03ff10a5439dc4e06bac66aa79"
+            check_phase_package(dict(path=str(old/"deployment-seal-receipt.json"),sha256=checksum),old,checksum)
+            routes.add(old.name)
     need({p.name for p in HOURLY.glob("booking-price-v*")} == routes, "unqualified 143 booking route appeared")
     for ref in [*proof["earlier_bookers"], *proof["sealed_operator_paths"], proof["available_booker"], proof["available_launcher"]]:
         path = Path(ref["path"])
@@ -332,7 +337,46 @@ def check_phase_package(reference, path, expected):
                  "phase package member changed: " + str(file))
 
 
+def phase_writer48(phase_ref, original_ref, original):
+    root = PHASE_WRITER.parent
+    old_path = root / "FAILED166_CADENCE_V47_ACTIVE.json"
+    old_ref = {"path": str(old_path), "sha256": "def64d8842984dee1835c05aefa8b5f344c52f9b97e8691db123b1cce2daca86"}
+    old = pinned(old_ref, old_path, old_ref["sha256"], mutable=True)
+    active_path = root/"FAILED166_CADENCE_V48_ACTIVE.json"
+    active_ref = {"path": str(active_path), "sha256": hashlib.sha256(active_path.read_bytes()).hexdigest()}
+    active, _ = evidence(active_path, active_ref, owner_writable=True)
+    ready, _ = evidence(Path(active["ready"]["path"]), active["ready"])
+    rebound, _ = evidence(HOURLY/"REENTRY_V48_REBOUND.json")
+    prior = ready["retained_143_v47_rebound"]
+    old_rebound = pinned(prior, HOURLY/"REENTRY_V47_REBOUND.json", "61883f8f6fd84c70a145042944ef602369d6b798decd34ade652d26e8cbf565e")
+    directory = root/"tools-cold168-retry5-failed166-v48-entry146"
+    booker = HOURLY/"booking-price-v48"
+    need(old["old"] == original and not old["producer_mutations"] and not active["producer_mutations"]
+         and active["old"] == old["new"] and active["new"]["lock"] == original["lock"]
+         and ready["old_owner"] == rebound["writer"] == old_ref
+         and ready["retained_143_listener"] == rebound["original"] == old_rebound["original"]
+         and ready["retained_143_phase"] == rebound["phase"] == old_rebound["phase"] == phase_ref
+         and old_rebound["writer"] == original_ref and ready["package"] == rebound["writer_package"]
+         and not rebound["producer_mutations"], "V48 did not inherit the original 143 booking and consumer lock")
+    check_phase_package(ready["package"], directory, ready["package"]["sha256"])
+    check_phase_package(rebound["booker_package"], booker, rebound["booker_package"]["sha256"])
+    program = directory/"watch143_versions.py"
+    listener = rebound["new"]
+    manager = native(listener["Id"])
+    fields = ("Id","MainPID","InvocationID","ActiveState","Job","ControlGroup","MemoryMax","MemorySwapMax","CPUQuotaPerSecUSec")
+    need(all(manager[k] == listener[k] for k in fields) and manager["ActiveState"] == "active" and not manager["Job"]
+         and (Path("/proc")/manager["MainPID"]/"cmdline").read_bytes().split(b"\0") == [b"/usr/bin/python3",b"-IB",os.fsencode(program),b""],
+         "different V48 143 listener")
+    route = json.loads(subprocess.check_output(["/usr/bin/python3","-IB",str(program),"--check-entry"],timeout=15))
+    need(route == dict(phase=phase_ref,version=48,writer=active_ref,package=ready["package"])
+         and active["new"]["program"] == str(directory/"status_cycle.py"), "143 listener did not resolve V48")
+    return active["new"], booker
+
+
 def phase_writer(phase_ref, original_ref, original):
+    v48 = PHASE_WRITER.with_name("FAILED166_CADENCE_V48_ACTIVE.json")
+    if os.path.lexists(v48):
+        return phase_writer48(phase_ref, original_ref, original)
     active_path = PHASE_WRITER.with_name("FAILED166_CADENCE_V47_ACTIVE.json")
     if not os.path.lexists(active_path):
         return original, None

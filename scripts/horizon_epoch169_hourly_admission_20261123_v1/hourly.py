@@ -200,7 +200,7 @@ def guard_plan(iid, floor, cap):
                 maximum_root_physical_bytes=cap,receipt_directory=str(LANE/"hourly-guard-receipts"))
 
 
-def producer_service():
+def producer_service(*, split_scratch=False):
     recipe = launch_recipe()
     lines = {}
     template = Path(__file__).resolve().parents[1] / "horizon_epoch169_focused_admission_20261120_v1/producer.service"
@@ -208,7 +208,10 @@ def producer_service():
         template=Path(__file__).resolve().with_name("g4-producer.service")
     need(sha(template) == "0cd2a78c8f67483be1af6f5fe63cbfb2b05a455fc6dfece4f9798f9ba1379fc4",
          "different predecessor service hardening")
-    binds = recipe["read_only_binds"] + [[str(CONTROL/"sealed/hourly_gate.py"),str(BIND/"hourly_gate.py")]]
+    directory = CONTROL / ("issued-split-v1" if split_scratch else "sealed")
+    binds = recipe["read_only_binds"] + [[str(directory/"hourly_gate.py"),str(BIND/"hourly_gate.py")]]
+    if split_scratch:
+        binds.append([str(directory/"scratch_mount.py"),str(BIND/"scratch_mount.py")])
     lines.update(ExecPaths=f"{NODE_ALIAS} {WORKER_ALIAS} {DEST}/scratch",ReadWritePaths=f"{DEST} {RUN}",
                  ReadOnlyPaths=" ".join(recipe["immutable_inputs"] + [str(DEST/"genesis.tar.bz2"),
                                       str(DEST/"compact-indexes/168"),str(DEST/"compact-indexes/169")]),
@@ -216,6 +219,10 @@ def producer_service():
                  Description="Guarded private epoch 169 hourly Bank reproduction",WorkingDirectory=str(DEST),
                  ExecStart=f"/usr/bin/python3 -IB {BIND}/hourly_gate.py",
                  StandardOutput=f"append:{RUN}/producer.log",StandardError=f"append:{RUN}/producer.log")
+    if split_scratch:
+        # systemd resolves ExecPaths from the host. An exact scratch entry would
+        # hide the tmpfs with a bind of the underlying HOME directory.
+        lines["ExecPaths"] = f"{NODE_ALIAS} {WORKER_ALIAS}"
     result = []
     for row in template.read_text().splitlines():
         key = row.split("=",1)[0]
@@ -223,6 +230,11 @@ def producer_service():
     need(not lines, "missing predecessor service property")
     idx=result.index("[Unit]")+1
     result[idx:idx]=["OnSuccess=horizon-169-hourly-terminal-20261123-v1.service","OnFailure=horizon-169-hourly-terminal-20261123-v1.service"]
+    if split_scratch:
+        scope = runpy.run_path(str(Path(__file__).with_name("scratch_mount.py")))
+        section = result.index("[Service]") + 1
+        result[section:section] = [f"TemporaryFileSystem={scope['SCRATCH']}:{scope['MOUNT_OPTIONS']}",
+                                   "Environment=HORIZON169_REQUIRE_SPLIT_SCRATCH=1"]
     return "\n".join(result)+"\n"
 
 

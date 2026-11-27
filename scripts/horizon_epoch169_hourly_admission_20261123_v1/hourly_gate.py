@@ -85,6 +85,13 @@ def main():
         raise TimeoutError("expired before the first guard and postguard grant")
     ticks = int(Path("/proc/self/stat").read_text().rsplit(")",1)[1].split()[19])
     verify_grant(grant,iid,os.getpid(),ticks,Path("/proc/sys/kernel/random/boot_id").read_text().strip(),time.time())
+    if os.environ.get("HORIZON169_REQUIRE_SPLIT_SCRATCH") == "1":
+        need("private_scratch_mount" in grant, "split service requires the invocation-bound tmpfs")
+    if "private_scratch_mount" in grant:
+        import runpy
+        mount_check = runpy.run_path(str(BIND / "scratch_mount.py"))
+        need(grant["private_scratch_mount"] == mount_check["native"](os.getpid()),
+             "private scratch does not match the held ancestor")
     st = SNAP.lstat()
     need(SNAP.resolve(strict=True) == SNAP and stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and
          st.st_uid == 1001 and not st.st_mode & 0o077 and

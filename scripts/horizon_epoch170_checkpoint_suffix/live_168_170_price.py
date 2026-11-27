@@ -16,6 +16,7 @@ RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ATTEMPT = RT / "epoch170-from-73746882-20261127-v1/attempt-2"
 OP = ATTEMPT / "operator-v3"
 CURRENT_PRICE = ATTEMPT / "issued-price-v47"
+FOCUSED169_PRICE = RT / "epoch169-hourly-admission-20261123-v1/issued-split-v1"
 AS = Path("/home/sol/.jetstreamer-private/epoch168-assembly-operator-20261127-v1/launch-acmxqat0")
 OP_SEAL = "0dd508ca75585705f8a01805518f9b1792be31943548f9829421bef858d5be56"
 PROGRESS = "51aaa67e0eeb7bd1da0ed85e718ade911a6ae425e21be20383cb0f715c834d02"
@@ -68,14 +69,16 @@ def assembly_roster(old, native, intent):
     need(not want, "incomplete assembly cgroup")
     return evidence
 
-def live_price():
+def live_price(*, separate_169=False):
     seal = pinned(OP / "deployment-seal-receipt.json", OP_SEAL)
     for entry in seal["members"]:
         member = OP / entry["name"]
         st = member.lstat()
         need(member.resolve(strict=True) == member and st.st_uid == 0 and not st.st_mode & 0o222
              and st.st_size == entry["bytes"] and digest(member) == entry["sha256"], "operator seal changed")
-    source = CURRENT_PRICE if Path(__file__).resolve().parent == CURRENT_PRICE else OP
+    directory = Path(__file__).resolve().parent
+    need(not separate_169 or directory == FOCUSED169_PRICE, "separate accounting outside the enrolled 169 provider")
+    source = directory if directory in (CURRENT_PRICE, FOCUSED169_PRICE) else OP
     base = runpy.run_path(str(source / "continuation_price.py"))
     old = base["prior"]
     progress, pref = old.read(ATTEMPT / "FIRST_PROTECTED_PROGRESS.json", PROGRESS)
@@ -115,9 +118,18 @@ def live_price():
         r = anon(actor["unit"], RID, [p[:2] for p in replay], 48*G)
         return dict(sample=anchor, lower170=lower, replay=replay, assembly=assembly, anon170=r, anon168=a,
                     available=old.availability())
+    focused = None
+    row169 = None
+    fleet169 = None
+    if directory == FOCUSED169_PRICE:
+        focused = runpy.run_path(str(directory / "split_actor.py"))
+        fleet169, _ = old.current_fleet()
+        row169 = focused["current"](fleet169)
     before = observe()
-    q = base["price"]("held")
+    q = base["price"]("held", native169=row169) if focused else base["price"]("held")
     after = observe()
+    if focused:
+        focused["recheck"](fleet169, row169)
     need(before["replay"] == after["replay"] and before["assembly"] == after["assembly"]
          and q["phase170_first"] and q["priced_170_invocation"] == RID and q["assembly168"]["native"]["InvocationID"] == AID
          and q["assembly168"]["state"] == "live" and q["assembly168"]["plan"] == assembly_intent["plan"]
@@ -143,7 +155,7 @@ def live_price():
     observed_168 = min(before["anon168"], after["anon168"], q["assembly168"]["incremental_ram"])
     required_ram = q["required_ram"] - observed_170 - observed_168
     disk_margin = min(q["historical_home_margin"], available_home - required_home)
-    return dict(schema="horizon-live-168-170-remaining-fleet-v1", raw=q, before=before, after=after,
+    result = dict(schema="horizon-live-168-170-remaining-fleet-v1", raw=q, before=before, after=after,
                 actor=progress["actor"], release=progress["release"], progress=pref, guard_plan=release["guard_plan"],
                 assembly_native=dict(path=str(AS/"LAUNCH_NATIVE.json"), sha256=NATIVE),
                 assembly_intent=dict(path=str(AS/"LAUNCH_INTENT.json"), sha256=INTENT),
@@ -152,3 +164,8 @@ def live_price():
                 available_home=available_home, required_home=required_home, available_ram=available_ram,
                 required_ram=required_ram, home_margin=disk_margin, ram_margin=available_ram-required_ram,
                 historical_home_margin=q["historical_home_margin"], resource_credit_bytes=0)
+    if separate_169:
+        return result, row169
+    if focused:
+        return focused["charge"](result, row169)
+    return result

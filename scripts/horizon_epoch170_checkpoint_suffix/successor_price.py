@@ -157,7 +157,7 @@ def scope(attempt=ATTEMPT):
     return interface, ref
 
 
-def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=None, hourly_replacement=None):
+def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=None, hourly_replacement=None, native169=None):
     if held_replacement is not None:
         first_replacement = "horizon-qualify-170-from-73746882-20261127-v1.service"
         next_replacement = "horizon-qualify-170-from-73766969-20261127-v1.service"
@@ -351,6 +351,23 @@ def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=Non
              and observed["CPUQuotaPerSecUSec"] == "2s" and not observed["Job"],
              "143 differs from its priced hourly replacement")
         expected.add(hourly_unit)
+    if native169 is not None and native169["phase"] != "terminal":
+        need(Path(__file__).resolve().parent in (RT/"epoch169-hourly-admission-20261123-v1/issued-split-v1",
+                   RT/"epoch143-first-hourly-20261127-v1/booking-price-v48",
+                   RT/"epoch170-from-73766969-20261127-v1/operator-v4",
+                   RT/"epoch170-from-73766969-20261127-v1/closed-reader-v3")
+             and native169["epoch"] == 169 and native169["phase"] in ("held", "bootstrap", "worker")
+             and native169["unit"]["Id"] == "horizon-qualify-169-focused-hourly-20261123-v1.service",
+             "unregistered focused 169 actor")
+        # The outer provider binds this exact receipt and process tree on both
+        # sides of this census, including the tmpfs and its independent guard.
+        observed = state(native169["unit"]["Id"])
+        need(observed["InvocationID"] == native169["binding"]["producer_iid"]
+             and int(observed["MainPID"]) == native169["processes"][0][0]
+             and observed["MemoryMax"] == str(68*G) and observed["CPUQuotaPerSecUSec"] == "3s"
+             and observed["MemorySwapMax"] == "0" and not observed["Job"],
+             "focused 169 crossed native identity")
+        expected.add(observed["Id"])
     need(units == expected, "replay owner changed: "+repr(units ^ expected))
     bound(iref)
     after = availability()
