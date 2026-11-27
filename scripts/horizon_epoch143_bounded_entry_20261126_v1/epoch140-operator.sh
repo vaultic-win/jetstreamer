@@ -19,7 +19,7 @@ marker=/run/horizon-epoch140-epoch170-cpu-loan.active
 original_bus_path=/org/freedesktop/systemd1/unit/horizon_2dqualify_2d170_2dfull_2dmetered_2d20261124_2dv1_2eservice
 guard="$a/static/guard"
 price="$a/pricing-v2/price-epoch140"
-if [[ $profile == retry1 ]]; then price="$a/pricing-v3/price-epoch140"; fi
+if [[ $profile == retry1 ]]; then price="$a/pricing-v4/price-epoch140"; fi
 render="$(dirname "$0")/epoch140-producer-argv.sh"
 sealer=/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment
 self_sha=e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3

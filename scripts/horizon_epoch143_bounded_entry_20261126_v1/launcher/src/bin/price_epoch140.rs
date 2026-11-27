@@ -1,6 +1,8 @@
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -64,6 +66,52 @@ fn retry_holding(fleet: &Value, transfers: &[Value]) -> Result<(Value, u64, u64)
         number(&admission["memory"])?,
     ))
 }
+fn lane_k_retirement_charge() -> Result<(Value, u64)> {
+    let unit = "horizon-exact-185-lanek-retirement.service";
+    let live = state(unit)?;
+    let active = property(&live, "ActiveState")?;
+    if matches!(active, "inactive" | "failed") {
+        ensure!(
+            property(&live, "MainPID")? == "0" && property(&live, "Job")?.is_empty(),
+            "lane-K retirement is changing state"
+        );
+        return Ok((Value::Null, 0));
+    }
+    let main: u32 = property(&live, "MainPID")?.parse()?;
+    ensure!(
+        active == "active"
+            && main > 1
+            && property(&live, "ControlGroup")? == format!("/system.slice/{unit}")
+            && property(&live, "MemoryMax")? == "1073741824"
+            && property(&live, "MemorySwapMax")? == "0"
+            && property(&live, "CPUQuotaPerSecUSec")? == "1s",
+        "retirement owner or complete hard limits changed"
+    );
+    let executable = "/var/lib/jetstreamer/horizon_runtime_data/epoch185-lanek-holding-20261125-v1/retirement-tools-v3/retire-lanek185";
+    let observed = fs::metadata(format!("/proc/{main}/exe"))?;
+    let selected = fs::metadata(executable)?;
+    ensure!(
+        (observed.dev(), observed.ino()) == (selected.dev(), selected.ino()),
+        "different live lane-K retirement executable"
+    );
+    let command = fs::read(format!("/proc/{main}/cmdline"))?;
+    let mut arguments = command.split(|byte| *byte == 0);
+    let requested_executable = arguments.next().context("missing lane-K executable")?;
+    let mode = arguments.next().context("missing lane-K mode")?;
+    let plan = arguments.next().context("missing lane-K plan")?;
+    ensure!(
+        requested_executable == executable.as_bytes()
+            && matches!(mode, b"holding-check-retire185-lanek" | b"holding-retire185-lanek")
+            && plan == b"/var/lib/jetstreamer/horizon_runtime_data/epoch185-lanek-holding-20261125-v1/RETIREMENT_PLAN_AFTER_CUSTODY.json"
+            && state(unit)? == live,
+        "unexpected live lane-K retirement operation"
+    );
+    Ok((
+        json!({"native":live,"mode":String::from_utf8_lossy(mode),"executable":executable}),
+        1 << 30,
+    ))
+}
+
 const RAM_CAP: u64 = 27 << 30;
 
 fn sample_lower(reference: &Value) -> Result<u64> {
@@ -129,6 +177,11 @@ fn main() -> Result<()> {
     let transfers = fleet["actual_active_holding_transfers"]
         .as_array()
         .context("missing transfer roster")?;
+    let (retirement, retirement_ram) = if retry {
+        lane_k_retirement_charge()?
+    } else {
+        (Value::Null, 0)
+    };
     let (lane_k, extra_home, extra_ram) = if retry {
         retry_holding(&fleet, transfers)?
     } else {
@@ -289,6 +342,7 @@ fn main() -> Result<()> {
         + number(&base["resident_lower_bound_bytes"])?)
     .checked_sub(resident)
     .and_then(|bytes| bytes.checked_add(extra_ram))
+    .and_then(|bytes| bytes.checked_add(retirement_ram))
     .context("resident measurement or lane-K RAM invalid")?;
     let expected = state("horizon-epoch140-suffix-recording.service")?;
     ensure!(
@@ -309,7 +363,8 @@ fn main() -> Result<()> {
             "retained_required_ram_bytes":retained_required_ram,"available_ram_bytes":ram_available,
             "candidate_home_bytes":home_cap,"retained_185_lanek":lane_k,
             "verified_cache_retirement":cache_retirement,"confirmed_reclaimed_home_bytes":confirmed_reclaimed_home,
-            "additional_185_lanek_home_bytes":extra_home,"additional_185_lanek_ram_bytes":extra_ram,"candidate_ram_bytes":RAM_CAP,
+             "additional_185_lanek_home_bytes":extra_home,"additional_185_lanek_ram_bytes":extra_ram,
+            "live_185_retirement":retirement,"additional_185_retirement_ram_bytes":retirement_ram,"candidate_ram_bytes":RAM_CAP,
             "candidate_cpu_quota_micros":3_000_000,
             "disk_fits":home_available >= retained_required_home + home_cap,
             "memory_fits":ram_available >= retained_required_ram + RAM_CAP,
