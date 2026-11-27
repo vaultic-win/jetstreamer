@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 # Pin the independent base64 getTransaction results, including the actual wire,
 # slot, instruction error, and original unmodified logMessages array.
 TARGETS = {
+    167: ("fe41e88c8105553aa38c3021f51be130648d6a0fdd1234adbc9e73269ce78baf", 143, 179),
     168: ("99006b75641f0b72e11672bcf408b3e7aff3ca8198ce983c89a6883f26a5ad61", 433, 532),
     171: ("6347d1890bfe144dafdef95eee7ce6e97067236357e383ca0f731112af9cce22", 602, 1104),
     172: ("da2f1f5228400afe251f5ba3a54d80acacfe33fa60707be78bc3fd21785fd347", 645, 984),
@@ -45,7 +46,7 @@ def signed_evidence(epoch, path):
     wire = base64.b64decode(encoded, validate=True)
     fixture_dir = Path(__file__).with_name("fixtures")
     require(wire == (fixture_dir / f"epoch{epoch}-swap.bin").read_bytes(), "signed wire fixture")
-    signers = 1 if epoch == 168 else 2
+    signers = 1 if epoch in (167, 168) else 2
     require(wire[0] == signers, "unexpected signature count")
     message = wire[1 + 64 * signers:]
     require(message[0] == signers and signers <= message[3] < 128, "legacy message header")

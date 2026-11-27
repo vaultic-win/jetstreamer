@@ -42,6 +42,7 @@ const MIN_SUPPORTED_ENTRY_SLOT: u64 = MIN_SUPPORTED_SNAPSHOT_SLOT + 1;
 const MAX_SUPPORTED_SLOT_EXCLUSIVE: u64 = 75_168_000;
 const POH_THREADS_ENV: &str = "JETSTREAMER_HISTORICAL_POH_THREADS";
 struct TraceTarget {
+    batch_index: usize,
     epoch: u64,
     ordinal: u64,
     signature: &'static str,
@@ -295,8 +296,8 @@ impl RuntimeState {
                     request.entry_index,
                     target.ordinal,
                     target.signature,
-                    results.execution_results.first().map(|result| &result.0),
-                    log_messages.first(),
+                    results.execution_results.get(target.batch_index).map(|result| &result.0),
+                    log_messages.get(target.batch_index),
                 );
             }
             if env::var_os("JETSTREAMER_HISTORICAL_TRACE").is_some() {
@@ -858,38 +859,51 @@ struct PreparedEntry {
 }
 
 fn trace_target(slot: u64, entry_index: u64, transactions: &[Transaction]) -> Option<TraceTarget> {
-    // The Bank log switch applies to the entire batch. Each recorded incident
-    // is a singleton entry, so verify its first signature before enabling it.
-    let target = match (slot, entry_index) {
+    let mut target = match (slot, entry_index) {
+        (72_512_769, 143) => TraceTarget {
+            epoch: 167,
+            ordinal: 179,
+            signature: "5t34U1SzGfQMDxmY61U3iPnydiHWViWGuZTX5Pqz5sfQMZMpLxgDtRWo3mEJffnnrgvH9rtcz865mSE3zGVEnWwZ",
+            enable_env: "JETSTREAMER_HISTORICAL_TRACE_EPOCH167",
+            batch_index: 0,
+        },
         (72_728_191, 433) => TraceTarget {
             epoch: 168,
             ordinal: 532,
             signature: "3qysw2HZ4pE11jjL3HpXA9UJ6kxqPkY2se93agYERfzDNoweP6sxqvhPGPjBkmwmD2m9SrRB96y75Vbi3mACtrpz",
             enable_env: "JETSTREAMER_HISTORICAL_TRACE_EPOCH168",
+            batch_index: 0,
         },
         (73_982_256, 602) => TraceTarget {
             epoch: 171,
             ordinal: 1104,
             signature: "3NkLmaEpD2wRUuX3VRZWpbHXLfezpw5yu4E5DQ7FAkHE23dytiwWmPbHqTsc1B12XSTsRBw6WMqBEisAoBEsyr8K",
             enable_env: "JETSTREAMER_HISTORICAL_TRACE_EPOCH171",
+            batch_index: 0,
         },
         (74_380_784, 645) => TraceTarget {
             epoch: 172,
             ordinal: 984,
             signature: "4Mc3qYm8t2AewCC1pax3hp11X7krbVmeWrAzcq8KqB2xtdut6i9fxo8XiMYU31jURU926HunHN2UZo7cQwdQ1chV",
             enable_env: "JETSTREAMER_HISTORICAL_TRACE_EPOCH172",
+            batch_index: 0,
         },
         _ => return None,
     };
-    let tx = match transactions {
-        [tx] => tx,
-        _ => return None,
-    };
-    if tx.signatures.first()?.to_string() == target.signature {
-        Some(target)
-    } else {
-        None
+    // Existing incident bindings are singleton entries. In epoch 167 the
+    // ordinal is block-relative, whereas Bank results are batch-relative.
+    if target.epoch != 167 && transactions.len() != 1 {
+        return None;
     }
+    let mut matches = transactions.iter().enumerate().filter(|(_, tx)| {
+        tx.signatures.first().map(|s| s.to_string()).as_deref() == Some(target.signature)
+    });
+    let batch_index = matches.next()?.0;
+    if matches.next().is_some() {
+        return None;
+    }
+    target.batch_index = batch_index;
+    Some(target)
 }
 
 fn prepare_entry(request: EntryRequest) -> Result<PreparedEntry, String> {
@@ -1330,6 +1344,21 @@ mod tests {
         let mut tx = Transaction::default();
         tx.signatures.push("3qysw2HZ4pE11jjL3HpXA9UJ6kxqPkY2se93agYERfzDNoweP6sxqvhPGPjBkmwmD2m9SrRB96y75Vbi3mACtrpz".parse().unwrap());
         check_trace_target(168, 72_728_191, 433, 532, tx);
+    }
+
+    #[test]
+    fn epoch167_trace_selects_the_signed_transaction_within_its_entry() {
+        let wire = include_bytes!("../tests/fixtures/epoch167-swap.bin");
+        let tx: Transaction = bincode::deserialize(wire).unwrap();
+        tx.verify().unwrap();
+        let batch = [Transaction::default(), tx.clone(), Transaction::default()];
+        let found = trace_target(72_512_769, 143, &batch).unwrap();
+        assert_eq!((found.epoch, found.ordinal, found.batch_index), (167, 179, 1));
+        assert_eq!(found.enable_env, "JETSTREAMER_HISTORICAL_TRACE_EPOCH167");
+        assert!(trace_target(72_512_769, 144, &batch).is_none());
+        assert!(trace_target(72_512_768, 143, &batch).is_none());
+        assert!(trace_target(72_512_769, 143, &[Transaction::default()]).is_none());
+        assert!(trace_target(72_512_769, 143, &[tx.clone(), tx]).is_none());
     }
 
     #[test]
