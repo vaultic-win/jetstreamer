@@ -20,6 +20,10 @@ REGISTRATIONS = {
     226: V / "horizon226-extract-v3/fleet-launch.json",
     230: V / "horizon230-middle-hourly-second-runtime-v1/cadence-registration.json",
 }
+CHECKPOINT_STATUS = {
+    230: V / "horizon230-middle-hourly-second-runtime-v1/repair-status-after-checkpoint-v1/completion.json",
+    266: V / "horizon266-hourly-checkpoint-runtime-v1/repair-status-after-checkpoint-v1/completion.json",
+}
 FIELDS = ["Id", "InvocationID", "MainPID", "ExecMainStartTimestamp", "ActiveState",
           "SubState", "Job", "NRestarts"]
 DELIVERY_SECONDS = 10 * 3600
@@ -96,6 +100,21 @@ def adopt(statuses):
             assert completed["authenticated_exact_byte_readback"]
             assert completed["key"] == f"epoch-{epoch}.epoch-status.json"
             statuses[epoch] = ref(path)
+    for epoch, path in CHECKPOINT_STATUS.items():
+        if epoch not in statuses or not path.is_file():
+            continue
+        correction = ref(path)
+        completed = bound(correction)
+        intent = bound(completed["intent"])
+        assert completed["authenticated_exact_byte_readback"] and completed["key"] == f"epoch-{epoch}.epoch-status.json"
+        assert intent["owner"]["controller"] == os.environ["CODEX_THREAD_ID"]
+        assert bound(completed["readback"]) == intent["payload"] and intent["payload"]["phase"] == "verification"
+        previous = bound(statuses[epoch])
+        if previous == bound(intent["previous"]):
+            statuses[epoch] = correction
+        else:
+            assert previous["key"] == completed["key"]
+            assert bound(previous["readback"])["sampled_at_utc"] >= intent["payload"]["sampled_at_utc"]
 
 
 def refresh(epoch, previous, sample, observer_ref, state):

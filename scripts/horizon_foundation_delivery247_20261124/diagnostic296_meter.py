@@ -124,6 +124,12 @@ def register_attempt(plan, version, ordinary_replay, include_focused):
             closed = bound(terminal)
             assert closed["launch"] == source and closed["guard_drained"]
             evidence.append(terminal)
+            if version == SECOND_HOURLY_230:
+                disposition = sealed(state / "terminal-cadence.json")
+                assert disposition["sha256"] == "209c2d85e896a9e11dd61709ff403c7da82e3920c3b4997bbc0096cb82299b2a"
+                closed = bound(disposition)
+                assert closed["terminal_receipt"] == terminal and closed["launch"] == source
+                evidence.append(disposition)
             if not ordinary_replay:
                 gate["next_action"] = closed["next_action"]
         elif not ordinary_replay:
