@@ -21,21 +21,24 @@ const UNITS: [&str; 3] = [
     "horizon-296-feature-account-protective-v4.service",
     "horizon-296-feature-account-protective-v4.timer",
 ];
-const HISTORICAL: [(&str, &str, &str); 3] = [
+const HISTORICAL: [(&str, &str, &str, &str); 3] = [
     (
         "horizon-qualify-296-loader-log-v3.service",
         "4b82bb087bc448cb815c5c0490aa7820",
         "cbe33f24624904a79c91851b71f5b5d950c1c9539a306d521b106768e04d40c1",
+        "d34ef8ff442ef7a204e22f31353fbc881e648093aac8bc21249f0178ea7b07e9",
     ),
     (
         "horizon-qualify-296-loader-upgrade-focused-v2.service",
         "3332ad36b0c747cfaa7ec854fea20b07",
         "4818b9006d7944e04a53f0ef6aad15e2b059dd6c4d68e83a6457121142845cb8",
+        "8408dba558bde76c53f490baa3927d4f8c35f9db37daefbfedf8ccfac8e209c7",
     ),
     (
         "horizon-qualify-296-loader-upgrade-focused-v1.service",
         "295f2a0c164246098113342445d0b8f4",
         "e84b9ebf65d5340748e7eb1031ac118bd803d41cf5967fbd1bef01a11616cb7f",
+        "6e9ec6c7d455e233e1d20f56b450d967a85e8c3c96ca4264e737247069d761d2",
     ),
 ];
 
@@ -50,16 +53,16 @@ fn reviewed_schedule(target: &Path) -> Result<Value> {
         .as_array()
         .context("missing staged reference census")?
     {
-        let (unit, invocation, sha) = HISTORICAL
+        let (unit, invocation, scanner_sha, unit_sha) = HISTORICAL
             .iter()
-            .find(|(unit, _, _)| row["origin"] == format!("/run/systemd/transient/{unit}"))
+            .find(|(unit, _, _, _)| row["origin"] == format!("/run/systemd/transient/{unit}"))
             .context("unexpected staged reader of the epoch 296 cache")?;
         let origin = Path::new(row["origin"].as_str().context("missing staged unit path")?);
         ensure!(
-            row["sha256"] == *sha
+            row["sha256"] == *scanner_sha
                 && row["chain"] == json!([])
                 && row["targets"] == json!([target])
-                && digest(&mut open_regular(origin)?)? == *sha,
+                && digest(&mut open_regular(origin)?)? == *unit_sha,
             "changed reference from the historical diagnostic {unit}"
         );
         let output = Command::new("/usr/bin/systemctl").args([
@@ -83,7 +86,7 @@ fn reviewed_schedule(target: &Path) -> Result<Value> {
             "historical diagnostic {unit} is executable or replaced"
         );
         closed.push(
-            json!({"reference":row,"manager":fields,"restore_required_before_any_retry":true}),
+            json!({"reference":row,"unit_file_sha256":unit_sha,"manager":fields,"restore_required_before_any_retry":true}),
         );
     }
     Ok(json!({"census":report,"closed_historical_references":closed}))
