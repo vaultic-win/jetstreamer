@@ -137,20 +137,20 @@ fn crypto_stamp(stamp: &Stamp) -> Value {
     ])
 }
 
-fn admitted_scope(unit: &str) -> Result<()> {
+pub(super) fn admitted_scope(unit: &str, memory_bytes: u64) -> Result<()> {
     let membership = fs::read_to_string("/proc/self/cgroup")?;
     let group = Path::new("/sys/fs/cgroup/system.slice").join(unit);
     ensure!(
         is_lower_hex(&env::var("INVOCATION_ID")?, 32)
             && membership.trim() == format!("0::/system.slice/{unit}")
-            && fs::read_to_string(group.join("memory.max"))?.trim() == MEMORY_BYTES.to_string()
+            && fs::read_to_string(group.join("memory.max"))?.trim() == memory_bytes.to_string()
             && fs::read_to_string(group.join("memory.swap.max"))?.trim() == "0",
-        "epoch 229 custody is outside its admitted memory scope"
+        "encrypted custody is outside its admitted memory scope"
     );
     Ok(())
 }
 
-fn tmpfs_scope(root: &Path) -> Result<()> {
+pub(super) fn tmpfs_scope(root: &Path, capacity: u64, required: u64) -> Result<()> {
     private(root)?;
     let mounts = fs::read_to_string("/proc/self/mountinfo")?;
     let mut matching = mounts.lines().filter_map(|line| {
@@ -158,8 +158,8 @@ fn tmpfs_scope(root: &Path) -> Result<()> {
         let mut fields = details.split_whitespace().skip(4);
         (Path::new(fields.next()?) == root).then(|| (fields.next(), source))
     });
-    let (flags, source) = matching.next().context("missing epoch 229 private tmpfs")?;
-    let flags = flags.context("missing epoch 229 tmpfs flags")?;
+    let (flags, source) = matching.next().context("missing encrypted custody tmpfs")?;
+    let flags = flags.context("missing encrypted custody tmpfs flags")?;
     let flags = flags.split(',').collect::<BTreeSet<_>>();
     let mut source = source.split_whitespace();
     ensure!(
@@ -172,20 +172,20 @@ fn tmpfs_scope(root: &Path) -> Result<()> {
             && source
                 .next()
                 .is_some_and(|opts| opts.split(',').any(|flag| flag == "noswap")),
-        "epoch 229 custody mount is not private bounded tmpfs"
+        "encrypted custody mount is not private bounded tmpfs"
     );
     let c_path = std::ffi::CString::new(root.as_os_str().as_encoded_bytes())?;
     let mut vfs = std::mem::MaybeUninit::<libc::statvfs>::uninit();
     ensure!(
         unsafe { libc::statvfs(c_path.as_ptr(), vfs.as_mut_ptr()) } == 0,
-        "epoch 229 tmpfs capacity read failed"
+        "encrypted custody tmpfs capacity read failed"
     );
     let vfs = unsafe { vfs.assume_init() };
     ensure!(
-        vfs.f_blocks.checked_mul(vfs.f_frsize) == Some(TMPFS_BYTES)
-            && vfs.f_bavail.saturating_mul(vfs.f_frsize) >= CLEAR_BYTES + CIPHER_OVERHEAD
+        vfs.f_blocks.checked_mul(vfs.f_frsize) == Some(capacity)
+            && vfs.f_bavail.saturating_mul(vfs.f_frsize) >= required
             && fs::read_dir(root)?.next().is_none(),
-        "epoch 229 private tmpfs is occupied or outside the qualified cap"
+        "encrypted custody tmpfs is occupied or outside the qualified cap"
     );
     Ok(())
 }
@@ -232,136 +232,32 @@ fn encrypted_manifest(key: &str, etag: &str, wire_sha: &str, length: u64) -> Val
 
 async fn park(client: &Client, plan: Plan, spec: &Bound, before: Stamp, home: &Path) -> Result<()> {
     let object_key = encrypted_object_key();
-    let existing = head_archive(client, BUCKET, &object_key).await?;
-    let key_file = openpgp::key_file(
-        Path::new(KEY_ROOT),
-        "accounts-custody.key",
-        existing.is_none(),
-    )?;
-    let (remote, wire_sha) = if let Some(remote) = existing {
-        let sha = remote
-            .metadata_sha256
-            .as_deref()
-            .context("missing encrypted custody SHA-256")?;
-        saved(&recovery_intent(spec, &object_key, sha, remote.length)?)
-            .context("existing encrypted object has no matching local intent")?;
-        claim_owner(client, host::PREFIX, &owner_bytes()?).await?;
-        let sha = sha.to_owned();
-        (remote, sha)
-    } else {
-        let file = tempfile::NamedTempFile::new_in(TMPFS)?;
-        let source = OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_NOFOLLOW)
-            .open(SOURCE)?;
-        ensure!(
-            Stamp::of(&source.metadata()?) == before,
-            "epoch 229 input changed before encryption"
-        );
-        openpgp::encrypt(openpgp::gpg(home, &key_file)?, source, file.reopen()?)?;
-        file.as_file()
-            .set_permissions(fs::Permissions::from_mode(0o400))?;
-        file.as_file().sync_all()?;
-        openpgp::verify_encrypted_file(
-            openpgp::gpg(home, &key_file)?,
-            File::open(file.path())?,
-            CLEAR_BYTES,
-            CLEAR_SHA,
-        )?;
-        ensure!(
-            validate_source(&plan)? == before,
-            "epoch 229 input changed during encryption"
-        );
-        let identity = regular_identity(file.path())?;
-        ensure!(
-            (CLEAR_BYTES..=CLEAR_BYTES + CIPHER_OVERHEAD).contains(&identity.length),
-            "epoch 229 unexpected ciphertext length"
-        );
-        let proof = hash_and_etag(file.path(), identity, DEFAULT_PART_SIZE)?;
-        let sha = &proof.sha256_hex;
-        receipt(
-            &wire_marker(spec, sha)?,
-            &intent(spec, &object_key, sha, identity.length),
-        )?;
-        claim_owner(client, host::PREFIX, &owner_bytes()?).await?;
-        let (etag, _) = upload_object(
-            client,
-            BUCKET,
-            ObjectUpload {
-                key: &object_key,
-                epoch: None,
-                path: file.path(),
-                identity,
-                length: identity.length,
-                sha256: sha,
-                format: FORMAT,
-            },
-            DEFAULT_PART_SIZE,
-            2,
-            false,
-        )
-        .await?;
-        ensure!(
-            etag == proof.multipart_etag,
-            "epoch 229 ciphertext multipart receipt differs"
-        );
-        let remote = head_archive(client, BUCKET, &object_key)
-            .await?
-            .context("epoch 229 ciphertext was not committed")?;
-        remote_matches(&remote, &object_key, identity.length, sha, Some(&etag))?;
-        native_checksum(&remote, &proof, identity.length)?;
-        (remote, sha.to_owned())
-    };
-    let length = remote.length;
-    ensure!(
-        (CLEAR_BYTES..=CLEAR_BYTES + CIPHER_OVERHEAD).contains(&length),
-        "epoch 229 remote ciphertext length differs"
-    );
-    remote_matches(&remote, &object_key, length, &wire_sha, Some(&remote.etag))?;
-    // The upload's temporary ciphertext has been dropped. Use the same
-    // bounded volume for a complete authenticated restore of the bundle.
-    let restored = tempfile::NamedTempFile::new_in(TMPFS)?;
-    let plain_file = restored.reopen()?;
-    openpgp::read_decrypted(
+    let (remote, wire_sha) = openpgp::park(
         client,
-        RemoteReadSpec {
-            bucket: BUCKET,
-            key: &object_key,
-            etag: &remote.etag,
-            expected_length: length,
-            expected_sha256: &wire_sha,
-            concurrency: 2,
+        openpgp::Park {
+            object_key: &object_key,
+            source_path: Path::new(SOURCE),
+            before: &before,
+            clear_sha: CLEAR_SHA,
+            cipher_overhead: CIPHER_OVERHEAD,
+            key_root: Path::new(KEY_ROOT),
+            key_name: "accounts-custody.key",
+            tmpfs: Path::new(TMPFS),
+            format: FORMAT,
         },
-        openpgp::gpg(home, &key_file)?,
-        move |plain| {
-            openpgp::copy_verified_plaintext(
-                plain,
-                &plain_file,
-                CLEAR_BYTES,
-                CLEAR_SHA,
-                || Ok(()),
+        home,
+        |sha, length| {
+            receipt(
+                &wire_marker(spec, sha)?,
+                &intent(spec, &object_key, sha, length),
             )?;
-            plain_file.sync_all()?;
             Ok(())
         },
+        |sha, length| recovery_intent(spec, &object_key, sha, length),
+        || validate_source(&plan),
     )
     .await?;
-    let restored_identity = regular_identity(restored.path())?;
-    let restored_proof = hash_and_etag(restored.path(), restored_identity, DEFAULT_PART_SIZE)?;
-    ensure!(
-        restored_identity.length == CLEAR_BYTES && restored_proof.sha256_hex == CLEAR_SHA,
-        "epoch 229 restored local bundle differs"
-    );
-    let final_remote = head_archive(client, BUCKET, &object_key)
-        .await?
-        .context("epoch 229 ciphertext disappeared during verification")?;
-    remote_matches(
-        &final_remote,
-        &object_key,
-        length,
-        &wire_sha,
-        Some(&remote.etag),
-    )?;
+    let length = remote.length;
     ensure!(
         validate_source(&plan)? == before,
         "epoch 229 source changed during transfer"
@@ -531,7 +427,7 @@ fn restore_floor(admission: &Value, plan: &RestorePlan, root: &Path) -> Result<(
     );
     match admission["mode"].as_str() {
         Some("tmpfs-proof") => {
-            tmpfs_scope(root)?;
+            tmpfs_scope(root, TMPFS_BYTES, CLEAR_BYTES + CIPHER_OVERHEAD)?;
             Ok((0, true))
         }
         Some("disk") => {
@@ -569,7 +465,7 @@ pub(super) async fn restore(value: Value, spec: &Bound) -> Result<()> {
         "epoch 229 restore mapping differs"
     );
     let (_, custody, _) = accepted_custody(&checks)?;
-    admitted_scope(RESTORE_UNIT)?;
+    admitted_scope(RESTORE_UNIT, MEMORY_BYTES)?;
     let root = Path::new(STATE).join("restores/accounts229");
     private(&root)?;
     let (floor, tmpfs_proof) = restore_floor(&saved(&plan.admission)?, &plan, &root)?;
@@ -667,8 +563,8 @@ pub(super) async fn run(value: Value, spec: &Bound) -> Result<()> {
     mapping(&plan.mapping)?;
     let before = validate_source(&plan)?;
     no_references(Path::new(SOURCE))?;
-    admitted_scope(UNIT)?;
-    tmpfs_scope(Path::new(TMPFS))?;
+    admitted_scope(UNIT, MEMORY_BYTES)?;
+    tmpfs_scope(Path::new(TMPFS), TMPFS_BYTES, CLEAR_BYTES + CIPHER_OVERHEAD)?;
     let home = Path::new(TMPFS).join("gpg");
     fs::DirBuilder::new().mode(0o700).create(&home)?;
     let r2 = r2_config_from_env()?;
