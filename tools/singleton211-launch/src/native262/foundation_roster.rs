@@ -1477,7 +1477,8 @@ fn measure(
         _ => "40-47",
         })?
     };
-    let cpus = units::affinity(&json!({"cpu_affinity":selected}))?;
+    let cpu_width = if private_141.is_some() { 3 } else { 8 };
+    let cpus = units::affinity_width(&json!({"cpu_affinity":selected}), cpu_width)?;
     let private_exclusive = private_141.as_ref().map(interval141::Candidate::exclusive).transpose()?;
     let exclusive = match &quote {
         Some(Quote::Replay296(replay)) => &replay.placement.exclusive_cpus,

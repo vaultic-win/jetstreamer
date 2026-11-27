@@ -25,8 +25,12 @@ pub(super) fn parse_cpu_list(raw: &str) -> Result<BTreeSet<u64>> {
     Ok(values)
 }
 pub(super) fn affinity(review: &Value) -> Result<String> {
+    affinity_width(review, 8)
+}
+
+pub(super) fn affinity_width(review: &Value, count: usize) -> Result<String> {
     let a = review["cpu_affinity"].as_array().context("CPU affinity")?;
-    ensure!(a.len() == 8, "exactly eight native CPUs required");
+    ensure!(a.len() == count, "exactly {count} native CPUs required");
     let mut seen = BTreeSet::new();
     for c in a {
         let c = c.as_u64().context("CPU integer")?;
