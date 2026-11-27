@@ -25,10 +25,10 @@ test "$(cat "$marker")" = "$(jq -er '.booking.sha256' "$loan")"
 
 drained() {
     local unit=$1 cg
-    [[ $(prop "$unit" ActiveState) =~ ^(inactive|failed)$ ]]
-    test "$(prop "$unit" MainPID)" = 0
-    test "$(prop "$unit" ControlPID)" = 0
-    test -z "$(prop "$unit" Job)"
+    [[ $(prop "$unit" ActiveState) =~ ^(inactive|failed)$ ]] || return 1
+    test "$(prop "$unit" MainPID)" = 0 || return 1
+    test "$(prop "$unit" ControlPID)" = 0 || return 1
+    test -z "$(prop "$unit" Job)" || return 1
     cg="/sys/fs/cgroup/system.slice/$unit"
     if [[ -e $cg/cgroup.events ]]; then
         grep -qx 'populated 0' "$cg/cgroup.events"

@@ -39,7 +39,11 @@ cpu_donor_exact() {
     local donor_guard=horizon-guard-170-checkpoint-suffix-20261127-v1.timer
     test "$(systemctl show "$donor_guard" -p InvocationID --value)" = 84f40c559d6b4c2eaa36e99138518948
     test "$(systemctl show "$donor_guard" -p ActiveState --value)" = active
+    [[ $(systemctl show "$original" -p ActiveState --value) =~ ^(inactive|failed)$ ]]
+    test "$(systemctl show "$original" -p ControlPID --value)" = 0
     test "$(systemctl show "$original" -p MainPID --value)" = 0
+    local original_events="/sys/fs/cgroup/system.slice/$original/cgroup.events"
+    if [[ -e $original_events ]]; then grep -qx 'populated 0' "$original_events"; fi
     test "$(systemctl show "$original" -p Job --value)" = ''
     test "$(systemctl show "$bridge" -p ActiveState --value)" = active
     test "$(systemctl show "$bridge" -p InvocationID --value)" = 3a5e311489834552ab5fda89379f9481
