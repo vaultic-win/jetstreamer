@@ -5,6 +5,7 @@ mod appendvec288;
 mod appendvec292;
 mod appendvec292_bundle;
 mod ext4_228;
+mod failed296_bundle;
 mod parked_accounts;
 #[path = "../../../scripts/horizon_standard_backfill_scratch_retirement_20261110_v1/source/process_references.rs"]
 mod process_references;
@@ -385,6 +386,25 @@ fn retire_bootstrap(
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
+    if matches!(
+        args.get(1).map(String::as_str),
+        Some("--check-held-failed-296" | "--retire-held-failed-296")
+    ) {
+        ensure!(
+            unsafe { libc::geteuid() } == 0 && args.len() == 5,
+            "usage: horizon275-scratch-retire --check-held-failed-296|--retire-held-failed-296 SELF_SHA256 RECHECK RECHECK_SHA256"
+        );
+        let mut binary = File::open("/proc/self/exe")?;
+        let metadata = binary.metadata()?;
+        ensure!(
+            metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut binary)? == args[2],
+            "unsealed retirement image"
+        );
+        return failed296_bundle::run(
+            args[1] == "--retire-held-failed-296",
+            Binding { path: args[3].clone().into(), sha256: args[4].clone() },
+        );
+    }
     if matches!(
         args.get(1).map(String::as_str),
         Some("--check-held-accounts-229" | "--retire-held-accounts-229")
