@@ -701,10 +701,17 @@ impl RuntimeState {
     /// manufacture an account update that the archive would fail to observe.
     fn maintain_accounts_storage(&mut self) -> Result<(), String> {
         let write_version = self.bank.accounts().accounts_db.next_write_version();
-        self.accounts_shrink_consumed_budget = self.bank.process_stale_slot_with_budget(
+        let next_shrink_budget = self.bank.process_stale_slot_with_budget(
             self.accounts_shrink_consumed_budget,
             ACCOUNTS_SHRINK_RECOVERY_PER_ROOT,
         );
+        // The pinned validator caps carried debt at its recovery interval.
+        // The worker recovers per root and keeps its existing recovery amount.
+        self.accounts_shrink_consumed_budget = if cfg!(feature = "capped-shrink-candidate") {
+            next_shrink_budget.min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT)
+        } else {
+            next_shrink_budget
+        };
 
         let block_height = self.bank.block_height();
         if block_height.saturating_sub(self.last_accounts_clean_block_height)
@@ -2109,6 +2116,66 @@ mod tests {
             .unwrap_err()
             .contains("refusing to replace existing snapshot archive"));
         assert!(archive_path.is_file());
+    }
+
+    #[test]
+    fn shrink_debt_profile_preserves_root_and_account_write_cursor() {
+        let (mut state, mint) = test_state(1, Some(2));
+        let recipient = Pubkey::new_from_array([42; 32]);
+        let transfer = system_transaction::transfer(
+            &mint,
+            &recipient,
+            777,
+            state.bank.last_blockhash(),
+        );
+        let entry = request_for(&state, 0, 0, 1, &[transfer]);
+        let processed = state.process_entry(entry).unwrap();
+        assert!(!processed.writes.is_empty());
+        let tick = request_for(&state, 0, 1, 1, &[]);
+        state.process_entry(tick).unwrap();
+        let checkpoint = state.freeze_checkpoint(0).unwrap();
+        assert!(checkpoint.slot_complete);
+        assert_eq!(state.bank.get_balance(&recipient), 777);
+        let mint_balance = state.bank.get_balance(&mint.pubkey());
+        let recovery = ACCOUNTS_SHRINK_RECOVERY_PER_ROOT;
+
+        for debt in &[1usize, recovery, recovery + 1, recovery * 2, recovery * 2 + 1, 25_000, usize::MAX] {
+            state.accounts_shrink_consumed_budget = *debt;
+            state.maintain_accounts_storage().unwrap();
+            let uncapped = debt.saturating_sub(recovery);
+            let expected = if cfg!(feature = "capped-shrink-candidate") {
+                uncapped.min(recovery)
+            } else {
+                uncapped
+            };
+            assert_eq!(state.accounts_shrink_consumed_budget, expected);
+            if expected != 0 {
+                state.maintain_accounts_storage().unwrap();
+                assert_eq!(
+                    state.accounts_shrink_consumed_budget,
+                    expected.saturating_sub(recovery)
+                );
+            }
+
+            assert!(state.drain_writes(None).unwrap().is_empty());
+            assert_eq!(state.write_cursor, checkpoint.next_write_version);
+            assert_eq!(
+                state.bank.accounts().accounts_db.next_write_version(),
+                checkpoint.next_write_version
+            );
+            assert_eq!(state.bank.get_balance(&recipient), 777);
+            assert_eq!(state.bank.get_balance(&mint.pubkey()), mint_balance);
+            assert_eq!(state.bank.capitalization(), checkpoint.capitalization);
+            assert_eq!(state.bank.hash().as_ref(), checkpoint.bank_hash.as_slice());
+            assert_eq!(
+                state.bank.update_accounts_hash().as_ref(),
+                checkpoint.accounts_hash.as_slice()
+            );
+            assert_eq!(
+                state.bank.last_blockhash().as_ref(),
+                checkpoint.last_blockhash.as_slice()
+            );
+        }
     }
 
     #[test]
