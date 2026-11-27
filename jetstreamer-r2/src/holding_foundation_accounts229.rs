@@ -3,6 +3,7 @@ use super::*;
 use std::os::unix::fs::DirBuilderExt;
 
 pub(super) const ACTION: &str = "holding-foundation-229-accounts-park";
+pub(super) const RECHECK: &str = "holding-foundation-229-accounts-recheck";
 const STAGE: (&str, &str) = (
     "/var/lib/jetstreamer/horizon229-v1-accounts-custody-v1/staged.json",
     "02df82d70e4dba36d440da2ab54b56381718647c120318f121b41b475217abc6",
@@ -22,6 +23,7 @@ const CLEAR_SHA: &str = "67787eef74f004504b443892637f9d30ace339e344b41793de88a36
 const CIPHER_OVERHEAD: u64 = 16 << 20;
 const UNIT: &str = "foundation-229-holding-custody-v1.service";
 const KEY_ROOT: &str = "/var/lib/jetstreamer/horizon229-holding-custody-v1";
+const PARK_PLAN: &str = "/var/lib/jetstreamer/horizon229-holding-custody-v1/park.json";
 const TMPFS: &str = "/tmp/foundation-229-custody";
 const TMPFS_BYTES: u64 = 32 << 30;
 const MEMORY_BYTES: u64 = 64 << 30;
@@ -35,6 +37,15 @@ struct Plan {
     stage: Bound,
     original_retirement: Bound,
     crypto_proof: Bound,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RecheckPlan {
+    schema: String,
+    mapping: Bound,
+    park_plan: Bound,
+    custody: Bound,
 }
 
 fn expected_receipt(binding: &Bound, scope: (&str, &str)) -> Result<Value> {
@@ -180,8 +191,21 @@ fn recovery_intent(spec: &Bound, object: &str, wire_sha: &str, length: u64) -> R
     })
 }
 
+fn encrypted_object_key() -> String {
+    format!("{SUBPREFIX}encrypted-accounts229/{CLEAR_SHA}.blob")
+}
+
+fn encrypted_manifest(key: &str, etag: &str, wire_sha: &str, length: u64) -> Value {
+    json!({
+        "schema":"foundation-epoch229-encrypted-accounts-manifest-v1","epoch":229,
+        "object_key":key,"object_etag":etag,"format":FORMAT,"length":length,
+        "sha256":wire_sha,"clear_bundle_sha256":CLEAR_SHA,"clear_bundle_length":CLEAR_BYTES,
+        "canonical_archive":false,"publication_authorized":false
+    })
+}
+
 async fn park(client: &Client, plan: Plan, spec: &Bound, before: Stamp, home: &Path) -> Result<()> {
-    let object_key = format!("{SUBPREFIX}encrypted-accounts229/{CLEAR_SHA}.blob");
+    let object_key = encrypted_object_key();
     let existing = head_archive(client, BUCKET, &object_key).await?;
     let key_file = openpgp::key_file(
         Path::new(KEY_ROOT),
@@ -317,12 +341,7 @@ async fn park(client: &Client, plan: Plan, spec: &Bound, before: Stamp, home: &P
         "epoch 229 source changed during transfer"
     );
     no_references(Path::new(SOURCE))?;
-    let manifest = json!({
-        "schema":"foundation-epoch229-encrypted-accounts-manifest-v1","epoch":229,
-        "object_key":object_key,"object_etag":remote.etag,"format":FORMAT,"length":length,
-        "sha256":wire_sha,"clear_bundle_sha256":CLEAR_SHA,"clear_bundle_length":CLEAR_BYTES,
-        "canonical_archive":false,"publication_authorized":false
-    });
+    let manifest = encrypted_manifest(&object_key, &remote.etag, &wire_sha, length);
     let bytes = serde_json::to_vec(&manifest)?;
     let manifest_sha = hex_lower(&Sha256::digest(&bytes));
     let marker = manifest_key(&manifest_sha)?;
@@ -339,6 +358,116 @@ async fn park(client: &Client, plan: Plan, spec: &Bound, before: Stamp, home: &P
         }),
     )?;
     println!("{}", result.display());
+    Ok(())
+}
+
+fn custody_manifest(custody: &Value) -> Result<(&str, &str, u64)> {
+    let manifest = &custody["manifest"];
+    let etag = manifest["object_etag"]
+        .as_str()
+        .context("missing custody ETag")?;
+    let wire_sha = manifest["sha256"]
+        .as_str()
+        .context("missing ciphertext SHA-256")?;
+    let length = manifest["length"]
+        .as_u64()
+        .context("missing ciphertext length")?;
+    let (part_digest, part_count) = etag.split_once('-').context("missing multipart ETag")?;
+    ensure!(
+        (CLEAR_BYTES..=CLEAR_BYTES + CIPHER_OVERHEAD).contains(&length)
+            && digest(wire_sha)
+            && is_lower_hex(part_digest, 32)
+            && part_count == length.div_ceil(DEFAULT_PART_SIZE).to_string()
+            && *manifest == encrypted_manifest(&encrypted_object_key(), etag, wire_sha, length),
+        "epoch 229 encrypted manifest identity differs"
+    );
+    Ok((etag, wire_sha, length))
+}
+
+pub(super) async fn recheck(value: Value, spec: &Bound) -> Result<()> {
+    let plan: RecheckPlan = serde_json::from_value(value)?;
+    ensure!(
+        plan.schema == "foundation-epoch229-encrypted-accounts-recheck-plan-v1"
+            && plan.park_plan.path == Path::new(PARK_PLAN)
+            && digest(&plan.park_plan.sha256)
+            && plan.custody.path
+                == Path::new(STATE).join("receipts").join(format!(
+                    "accounts229-custody-{}.json",
+                    plan.park_plan.sha256
+                )),
+        "foreign epoch 229 recheck plan or custody path"
+    );
+    let park_plan: Plan = serde_json::from_value(saved(&plan.park_plan)?)?;
+    ensure!(
+        park_plan.schema == "foundation-epoch229-accounts-park-v1"
+            && serde_json::to_value(&park_plan.mapping)? == serde_json::to_value(&plan.mapping)?,
+        "epoch 229 custody scope differs"
+    );
+    let before = validate_source(&park_plan)?;
+    let custody = saved(&plan.custody)?;
+    ensure!(
+        custody["schema"] == "foundation-epoch229-encrypted-accounts-custody-v1"
+            && custody["epoch"] == 229
+            && custody["bucket"] == BUCKET
+            && custody["plan"] == serde_json::to_value(&plan.park_plan)?
+            && custody["source"] == SOURCE
+            && custody["original_identity"] == serde_json::to_value(&before)?
+            && custody["stage"] == serde_json::to_value(&park_plan.stage)?
+            && custody["remote_sha256_readback"] == true
+            && custody["remote_authenticated_decryption_verified"] == true
+            && custody["restored_bundle_reread_verified"] == true
+            && custody["local_source_revalidated"] == true
+            && custody["publication_authorized"] == false
+            && custody["local_retirement_authorized"] == false,
+        "epoch 229 custody did not prove a complete authenticated restoration"
+    );
+    let (etag, wire_sha, length) = custody_manifest(&custody)?;
+    let key = encrypted_object_key();
+    let bytes = serde_json::to_vec(&custody["manifest"])?;
+    let manifest_sha = hex_lower(&Sha256::digest(&bytes));
+    let marker = manifest_key(&manifest_sha)?;
+    ensure!(
+        custody["manifest_key"] == marker && custody["manifest_sha256"] == manifest_sha,
+        "epoch 229 content-addressed manifest differs"
+    );
+    saved(&recovery_intent(&plan.park_plan, &key, wire_sha, length)?)?;
+    openpgp::key_file(Path::new(KEY_ROOT), "accounts-custody.key", false)?;
+    let r2 = r2_config_from_env()?;
+    ensure!(r2.bucket == BUCKET, "foreign epoch 229 holding bucket");
+    let client = s3_client(&r2);
+    let owner = get_mutable_object(&client, BUCKET, &format!("{}owner.json", host::PREFIX))
+        .await?
+        .context("missing Foundation holding owner")?;
+    ensure!(
+        owner.bytes == owner_bytes()?,
+        "foreign Foundation holding owner"
+    );
+    let manifest = get_mutable_object(&client, BUCKET, &marker)
+        .await?
+        .context("missing epoch 229 holding manifest")?;
+    ensure!(
+        manifest.bytes == bytes,
+        "authenticated epoch 229 manifest bytes differ"
+    );
+    let object = head_archive(&client, BUCKET, &key)
+        .await?
+        .context("missing epoch 229 ciphertext")?;
+    remote_matches(&object, &key, length, wire_sha, Some(etag))?;
+    ensure!(
+        validate_source(&park_plan)? == before,
+        "epoch 229 source changed during recheck"
+    );
+    no_references(Path::new(SOURCE))?;
+    println!(
+        "{}",
+        json!({
+            "schema":"foundation-epoch229-encrypted-accounts-recheck-v1","epoch":229,
+            "spec":spec,"custody":plan.custody,"manifest":custody["manifest"],
+            "manifest_key":marker,"manifest_sha256":manifest_sha,"source_identity":before,
+            "authenticated_manifest_and_object_match":true,"recorded_unix_seconds":clock()?,
+            "remote_mutations":false,"local_retirement_authorized":false,"publication_authorized":false
+        })
+    );
     Ok(())
 }
 
@@ -377,5 +506,26 @@ mod tests {
         let altered_sha = recovery_intent(&spec, &object, &"f".repeat(64), CLEAR_BYTES).unwrap();
         assert_ne!(valid.path, altered_sha.path);
         assert!(recovery_intent(&spec, &object, "../foreign", CLEAR_BYTES).is_err());
+    }
+
+    #[test]
+    fn recheck_requires_the_exact_content_addressed_ciphertext() {
+        let etag = format!(
+            "{}-{}",
+            "a".repeat(32),
+            CLEAR_BYTES.div_ceil(DEFAULT_PART_SIZE)
+        );
+        let mut custody = json!({"manifest": encrypted_manifest(
+            &encrypted_object_key(), &etag, CLEAR_SHA, CLEAR_BYTES
+        )});
+        assert_eq!(
+            custody_manifest(&custody).unwrap(),
+            (etag.as_str(), CLEAR_SHA, CLEAR_BYTES)
+        );
+        custody["manifest"]["object_key"] = json!("epoch-229.jet");
+        assert!(custody_manifest(&custody).is_err());
+        custody["manifest"]["object_key"] = json!(encrypted_object_key());
+        custody["manifest"]["object_etag"] = json!("W/\"weak\"");
+        assert!(custody_manifest(&custody).is_err());
     }
 }

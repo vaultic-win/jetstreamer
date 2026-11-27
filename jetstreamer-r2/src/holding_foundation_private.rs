@@ -1014,7 +1014,7 @@ async fn restore(client: &Client, p: RestoreSpec, spec: &Bound) -> Result<()> {
 }
 
 pub(super) fn command(s: &str) -> bool {
-    s == accounts229::ACTION || ext4_228::command(s) || appendvec288::command(s) || appendvec292::command(s) || matches!(
+    matches!(s, accounts229::ACTION | accounts229::RECHECK) || ext4_228::command(s) || appendvec288::command(s) || appendvec292::command(s) || matches!(
         s,
         "holding-foundation-private-inspect"
             | "holding-foundation-private-inspect-old-v2-237"
@@ -1064,6 +1064,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     }
     if action == accounts229::ACTION {
         return accounts229::run(v, spec).await;
+    }
+    if action == accounts229::RECHECK {
+        return accounts229::recheck(v, spec).await;
     }
     if appendvec288::command(action) {
         return appendvec288::run(action, v, spec).await;
