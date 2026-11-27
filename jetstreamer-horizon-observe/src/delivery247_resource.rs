@@ -548,10 +548,7 @@ impl OrdinaryEpoch {
     }
     fn image(self) -> (&'static str, &'static str) {
         match self {
-            Self::Current252 => (
-                "/var/lib/jetstreamer/horizon252-public-images-d58e4a50-v1/jetstreamer-r2",
-                "c9def1ad9a572567ccea2278c23c98758270f83e8ffc271921a8f2e867ceea3f",
-            ),
+            Self::Current252 => (staged::CURRENT252_IMAGE, staged::CURRENT252_IMAGE_SHA),
             Self::Current257 | Self::Retry257 | Self::Current261 => {
                 (staged::CURRENT257_IMAGE, staged::CURRENT257_IMAGE_SHA)
             }

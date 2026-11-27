@@ -53,6 +53,10 @@ pub const CURRENT261_MEMORY_CAP: u64 = 64 << 30;
 pub const CURRENT252_UNIT: &str = "horizon-upload-252-current-reader-v1.service";
 pub const CURRENT252_DIRECTORY: &str = "/var/lib/jetstreamer/horizon252-current-reader-delivery-v1";
 pub const CURRENT252_MEMORY_CAP: u64 = 64 << 30;
+pub const CURRENT252_IMAGE: &str =
+    "/var/lib/jetstreamer/horizon252-public-images-d58e4a50-v1/jetstreamer-r2";
+pub const CURRENT252_IMAGE_SHA: &str =
+    "c9def1ad9a572567ccea2278c23c98758270f83e8ffc271921a8f2e867ceea3f";
 pub fn validate(row: &Value) -> Result<()> {
     for (key, (path, sha)) in [
         ("booking", BOOKING),

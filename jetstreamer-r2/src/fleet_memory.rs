@@ -5,10 +5,11 @@
 mod fourth;
 use anyhow::{Context, Result, ensure};
 use jetstreamer_horizon_observe::staged247_rss::{
-    CURRENT252_DIRECTORY, CURRENT252_MEMORY_CAP, CURRENT252_UNIT,
-    CURRENT261_DIRECTORY, CURRENT261_MEMORY_CAP, CURRENT261_UNIT,
+    CURRENT252_DIRECTORY, CURRENT252_IMAGE, CURRENT252_IMAGE_SHA, CURRENT252_MEMORY_CAP,
+    CURRENT252_UNIT,
     CURRENT257_DIRECTORY, CURRENT257_IMAGE, CURRENT257_IMAGE_SHA, CURRENT257_MEMORY_CAP,
-    CURRENT257_START_TICKS, CURRENT257_UNIT, RETRY257_DIRECTORY, RETRY257_MEMORY_CAP, RETRY257_UNIT,
+    CURRENT257_START_TICKS, CURRENT257_UNIT, CURRENT261_DIRECTORY, CURRENT261_MEMORY_CAP,
+    CURRENT261_UNIT, RETRY257_DIRECTORY, RETRY257_MEMORY_CAP, RETRY257_UNIT,
 };
 use jetstreamer_horizon_observe::successor247 as successor;
 use serde_json::{Value, json};
@@ -241,8 +242,14 @@ fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> 
                 == 1,
         "ordinary delivery claim, endpoints or sample clock changed"
     );
-    let (image, image_sha, cap) = if matches!(name, CURRENT252_UNIT | CURRENT257_UNIT | RETRY257_UNIT | CURRENT261_UNIT) {
-        (CURRENT257_IMAGE, CURRENT257_IMAGE_SHA, pinned_cap.context("ordinary delivery memory cap")?)
+    let (image, image_sha, cap) = if name == CURRENT252_UNIT {
+        (CURRENT252_IMAGE, CURRENT252_IMAGE_SHA, CURRENT252_MEMORY_CAP)
+    } else if matches!(name, CURRENT257_UNIT | RETRY257_UNIT | CURRENT261_UNIT) {
+        (
+            CURRENT257_IMAGE,
+            CURRENT257_IMAGE_SHA,
+            pinned_cap.context("ordinary delivery memory cap")?,
+        )
     } else if let Some(cap) = pinned_cap {
         (PINNED_247_IMAGE, PINNED_247_IMAGE_SHA, cap)
     } else {
@@ -567,6 +574,43 @@ pub(super) fn report(o: &Value, ledger: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "uses the retained Foundation epoch 252 publisher sample and launch receipts"]
+    fn epoch252_memory_uses_its_paired_uploader_image() -> Result<()> {
+        let read = |var| -> Result<Value> {
+            Ok(serde_json::from_slice(&std::fs::read(std::env::var(var)?)?)?)
+        };
+        let mut observer = read("HORIZON_252_PUBLISHER_OBSERVER")?;
+        let fleet = read("HORIZON_252_PUBLISHER_FLEET")?;
+        let index = observer["delivery_resources"]
+            .as_array()
+            .context("delivery resources")?
+            .iter()
+            .position(|entry| entry["producer_unit"] == CURRENT252_UNIT)
+            .context("missing epoch 252 publisher")?;
+        ordinary_delivery_join(
+            &observer["delivery_resources"][index]["observation"],
+            &fleet,
+            &observer,
+            CURRENT252_UNIT,
+        )?;
+        for key in ["mapped_image_before", "mapped_image_after"] {
+            let image = &mut observer["delivery_resources"][index]["observation"][key];
+            image["executable"] = json!(CURRENT257_IMAGE);
+            image["sha256"] = json!(CURRENT257_IMAGE_SHA);
+        }
+        let error = ordinary_delivery_join(
+            &observer["delivery_resources"][index]["observation"],
+            &fleet,
+            &observer,
+            CURRENT252_UNIT,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("mapped image differs"), "{error}");
+        Ok(())
+    }
+
     #[test]
     #[ignore = "requires the sealed v221 receipts and offline seven-delivery fixture"]
     fn v221_seven_deliveries_are_charged_once_without_replay_credit() -> Result<()> {
