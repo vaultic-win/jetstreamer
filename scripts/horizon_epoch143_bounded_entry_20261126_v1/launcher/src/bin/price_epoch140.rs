@@ -53,9 +53,13 @@ fn main() -> Result<()> {
         "changed 167 replacement charge"
     );
     let admission_fleet = read(&base["fleet"])?;
+    let previous = &fleet["previous_Root_operational_review"];
+    let same_lineage = fleet_ref == base["fleet"]
+        || previous == &base["fleet"]
+        || read(previous)?["previous_Root_operational_review"] == base["fleet"];
     ensure!(
-        fleet_ref == base["fleet"] || fleet["previous_Root_operational_review"] == base["fleet"],
-        "140 quote needs the direct current successor of the 167 admission"
+        same_lineage,
+        "140 quote needs the current successor of the 167 admission"
     );
     for key in [
         "actual_executing_replays",
