@@ -259,7 +259,16 @@ def price(phase):
     # Preserve the full 140 booking throughout the comparison and the successor.
     rr["141_build"] = read(RT/"root111808-live166167170-20261127-v1/ROOT_HOURLY_141_BUILD_FIT.json")[1]
     build=bound(rr["141_build"])
-    extra_home = 4*M + build["candidate_home_bytes"] + charged140_home + 2*M
+    settlement,rr["141_build_settlement"] = read(RT/"epoch141-hourly-original-build-20261127-v1/compiler-settlement-v1/BUILD_SCRATCH_SETTLEMENT.json",
+                                               "2d9c3ace307843664887887097a0f048289502b19087d7a0b52af336cc54f51d")
+    need(settlement["booking"]==rr["141_build"] and settlement["owner"]=="/root"
+         and settlement["settled_unused_future_scratch_reservation_bytes"]==build["candidate_home_scratch_cap_bytes"]==1536*M
+         and settlement["remaining_home_scratch_reservation_bytes"]==settlement["credited_new_physical_free_bytes"]==0
+         and settlement["retained_output_allowance_bytes"]==build["candidate_home_retained_output_bytes"]==128*M
+         and settlement["ram_reservation_release_bytes"]==settlement["cpu_reservation_release_micros"]==0,
+         "different compiler settlement")
+    inactive(settlement["terminal_compiler"]["unit"])
+    extra_home = 4*M + settlement["retained_output_allowance_bytes"] + charged140_home + 2*M
     extra_ram = 3*G + 32*M + build["candidate_ram_bytes"] + charged140_ram
     successor = phase in ("start","held")
     if successor:
