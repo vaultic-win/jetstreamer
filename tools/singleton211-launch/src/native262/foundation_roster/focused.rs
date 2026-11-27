@@ -127,6 +127,24 @@ pub(super) const V1627_230: Focused = Focused {
     profile_sha: "1e300ad51ba5f75a91af2f68c80241dd90a5c6d279b630de8f92f882655b43d5",
 };
 
+pub(super) const ADJACENT_230: Focused = Focused {
+    epoch: 230,
+    unit: "horizon-qualify-230-adjacent-99445304-v1.service",
+    guard: "horizon-230-adjacent-99445304-protective-v1.service",
+    cpus: "48-55",
+    scratch_cap: 96 << 30,
+    receipt_disk: 256 << 20,
+    producer_memory: 225_000_000_000,
+    root: "/home/ubuntu/.jetstreamer-private/qualification-230-adjacent-99445304-v1",
+    first: 99_445_305,
+    last: 99_461_591,
+    kind: "epoch230-private-adjacent-99445304-window",
+    preflight_schema: "foundation-epoch230-adjacent-replay-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon230-adjacent-99445304-runtime-v1",
+    preflight_sha: "e2482b9f1a94143620adae00bc4aef749b7004fa32fd2e7671643d62f7d9470a",
+    profile_sha: "d01cf1c1a583c41e885ea74f57aea21a5e5178554e94bca16d01674a5bff1d1b",
+};
+
 const V1627_INVOCATION: &str = "6c878d138821422d8a848d6bd16d63a9";
 const V1627_LAUNCH_SHA: &str =
     "3a2f5a058c76a59707af77f98973c283d4542c8308d5a514a22ae1cb6534a7a6";
@@ -250,12 +268,13 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 12] = [
+pub(super) const SCOPES: [&Focused; 13] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
     &FIRST_7871_230,
     &V1627_230,
+    &ADJACENT_230,
     &RESTORE_258,
     &RESTORE_260,
     &OVERLAP_266,
@@ -457,7 +476,7 @@ pub(super) fn first_7871_drained(n: &mut Native) -> Result<Bound> {
             && receipt["state"] == "local-segment-committed"
             && receipt["guard_drained"] == true
             && receipt["checkpoint"]["slot"] == FIRST_7871_230.last,
-        "epoch 230 v1.6.27 requires the verified closure of its predecessor"
+        "epoch 230 checkpoint window requires the verified closure of its predecessor"
     );
     drained(n, FIRST_7871_230.unit, FIRST_7871_230.guard, invocation)?;
     Ok(reference)
@@ -697,6 +716,23 @@ impl Focused {
             receipt["replay_first_slot"] == self.first
                 && receipt["output_first_slot"] == 114_912_000
                 && receipt["profile"] == json!(profile_ref)
+                && guard["validated"] == true
+                && guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
+        } else if self.unit == ADJACENT_230.unit {
+            let custody = Bound::new(
+                "/var/lib/jetstreamer/horizon230-adjacent-input-99445304-v1/custody.json",
+                "5fa272e357fb8c8f2b939f3ea332ff3b241a3a2d2252e225ff763bd479d27ca2",
+            );
+            let source = custody.sealed()?;
+            let guard = binding(&receipt["guard_validation"])?.sealed()?;
+            receipt["first_slot"] == self.first
+                && receipt["profile"] == json!(profile_ref)
+                && receipt["bootstrap_custody"] == json!(custody)
+                && profile["bootstrap_custody"] == receipt["bootstrap_custody"]
+                && source["snapshot"]["slot"] == self.first - 1
+                && source["prepared_window"]["last_slot"] == self.last
+                && receipt["host_guard_sees_empty_placeholders"] == true
+                && receipt["worker_execution"] == false
                 && guard["validated"] == true
                 && guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
         } else {

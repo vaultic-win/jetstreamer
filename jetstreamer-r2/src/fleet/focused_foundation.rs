@@ -65,6 +65,13 @@ const SCOPES: &[Scope] = &[
         kind: "epoch230-private-v1627-window",
     },
     Scope {
+        epoch: 230,
+        unit: "horizon-qualify-230-adjacent-99445304-v1.service",
+        attempt: "adjacent-99445304-v1",
+        state: "horizon230-adjacent-99445304-runtime-v1",
+        kind: "epoch230-private-adjacent-99445304-window",
+    },
+    Scope {
         epoch: 258,
         unit: "horizon-qualify-258-native-restore-v1.service",
         attempt: "native-restore-v1",
