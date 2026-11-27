@@ -35,6 +35,27 @@ struct Profile {
     proven_skips: &'static [u64],
 }
 
+// The sealed CAR repair and finalized parent/child witnesses distinguish these
+// noncanonical compact hits from the adjacent canonical blocks it restored.
+#[cfg(feature = "epoch224-v1-6-25-qualification")]
+const EPOCH_224: Profile = Profile {
+    epoch: 224,
+    raw_sha: "4e612b21481eccbe6ece958daa49871b05297ed0007bd7e6c98ce39be40a0a5d",
+    compact_sha: "1a2f907afec9a06ef3f6cac57a791900e1bcfee19420c4cce413b35fc9d82206",
+    proven_skips: &[97_020_629, 97_026_194, 97_086_474],
+};
+
+#[cfg(feature = "epoch224-v1-6-25-qualification")]
+const EPOCH_225: Profile = Profile {
+    epoch: 225,
+    raw_sha: "cff8440bb477f4a2657fc31af29d6afce9dd616e47090fb6856854deebd23b9a",
+    compact_sha: "f071033f07b11ac59fe940c5e7907ba807001c8c672d2ad3b2315a04412ff7a7",
+    proven_skips: &[
+        97_215_396, 97_276_500, 97_293_925, 97_307_764, 97_310_892, 97_321_458,
+        97_369_792, 97_376_672, 97_469_960, 97_503_244, 97_512_733, 97_597_680,
+    ],
+};
+
 const EPOCH_199: Profile = Profile {
     epoch: 199,
     raw_sha: "ebabf661a7608e72169e85d3be3129a575ab8f5b1d2e67d2f10c95a8de79a1ae",
@@ -306,6 +327,12 @@ impl RootedSlotPresence {
         let (profile, manifest_sha) = match epoch {
             199 => (&EPOCH_199, MANIFEST_SHA),
             200 => (&EPOCH_200, MANIFEST_SHA),
+            #[cfg(feature = "epoch224-v1-6-25-qualification")]
+            224 | 225 => {
+                super::epoch224_qualification::require_rooted_manifest()?;
+                let profile = if epoch == 224 { &EPOCH_224 } else { &EPOCH_225 };
+                (profile, super::epoch224_qualification::MANIFEST_SHA256)
+            }
             257 => (&EPOCH_257, "8ee8ed720d8c7e96ebc9ada87817896b8be8ed1d7703d8ff112aec7f8d4087e7"),
             258 => (&EPOCH_258, COHORT_257_258_MANIFEST_SHA),
             261 => (&EPOCH_261, "3bd36d83a86989c8db03fcdb2c5c41950182ae99b4f16202f5bc115d4357e8f9"),
