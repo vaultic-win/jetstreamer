@@ -17,7 +17,7 @@ class IssuedPhaseTests(TestCase):
         }
         ready = {"old_owner": "prior", "retained_143_listener": "listener", "retained_143_phase": "phase"}
         with (
-            patch.object(assembly.os.path, "lexists", return_value=True),
+            patch.object(assembly.os.path, "lexists", side_effect=lambda path: path.name == "FAILED166_CADENCE_V47_ACTIVE.json"),
             patch.object(assembly, "pinned", side_effect=[active, rebound]),
             patch.object(assembly, "evidence", return_value=(ready, None)),
         ):

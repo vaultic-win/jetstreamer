@@ -157,7 +157,7 @@ def scope(attempt=ATTEMPT):
     return interface, ref
 
 
-def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=None, hourly_replacement=None, native169=None):
+def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=None, hourly_replacement=None, native169=None, native162=None):
     if held_replacement is not None:
         first_replacement = "horizon-qualify-170-from-73746882-20261127-v1.service"
         next_replacement = "horizon-qualify-170-from-73766969-20261127-v1.service"
@@ -367,6 +367,18 @@ def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=Non
              and observed["MemoryMax"] == str(68*G) and observed["CPUQuotaPerSecUSec"] == "3s"
              and observed["MemorySwapMax"] == "0" and not observed["Job"],
              "focused 169 crossed native identity")
+        expected.add(observed["Id"])
+    if native162 is not None and native162["phase"] != "terminal":
+        need(Path(__file__).resolve().parent in (RT/"epoch169-hourly-admission-20261123-v1/issued-split-v1",
+                 RT/"epoch143-first-hourly-20261127-v1/booking-price-v48",
+                 RT/"epoch170-from-73766969-20261127-v1/operator-v4", RT/"epoch170-from-73766969-20261127-v1/closed-reader-v3")
+             and native162["epoch"] == 162 and native162["phase"] in ("held","bootstrap","worker")
+             and native162["unit"]["Id"] == "horizon-qualify-162-first-hourly-completion-20261127-v2.service",
+             "unregistered split 162 actor")
+        observed = state(native162["unit"]["Id"])
+        need(observed["InvocationID"] == native162["invocation_id"] and observed["MainPID"] == native162["unit"]["MainPID"]
+             and observed["MemoryMax"] == str(62*G) and observed["CPUQuotaPerSecUSec"] == "2s"
+             and observed["MemorySwapMax"] == "0" and not observed["Job"], "162 changed during the native census")
         expected.add(observed["Id"])
     need(units == expected, "replay owner changed: "+repr(units ^ expected))
     bound(iref)

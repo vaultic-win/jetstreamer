@@ -248,9 +248,9 @@ def issued_tree_bounds(actor):
     return sample, (lower, upper)
 
 
-def price(phase, *, native169=None):
+def price(phase, *, native169=None, native162=None):
     need(phase in ("read","start","held"),"unknown continuation phase")
-    need(native169 is None or OPERATOR == FOCUSED169_PRICE, "169 is outside this operator")
+    need((native169 is None and native162 is None) or OPERATOR == FOCUSED169_PRICE, "peer is outside this operator")
     need(OPERATOR not in ISSUED_PRICES or phase == "held", "issued-price-v47 only prices the live 170 worker")
     prior_receipt = predecessor_exit()
     if phase != "read": compare_predecessor()
@@ -275,6 +275,8 @@ def price(phase, *, native169=None):
             replacement = guarded_hourly143(rollover, rs)
     sample, bounds = issued_tree_bounds(actor) if OPERATOR in ISSUED_PRICES else (None, None)
     options = {"native169": native169} if native169 is not None else {}
+    if native162 is not None:
+        options["native162"] = native162
     joint = prior.price("held" if held else "start",attempt=OLD,held_replacement=UNIT if held else None,live_tree_bounds=bounds,
                         hourly_replacement=replacement["iid"] if replacement else None, **options)
     need(joint["candidate_growth"] == 36*G and joint["producer_allowance"] == 48*G

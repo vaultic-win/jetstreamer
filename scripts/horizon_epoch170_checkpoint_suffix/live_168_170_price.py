@@ -69,7 +69,7 @@ def assembly_roster(old, native, intent):
     need(not want, "incomplete assembly cgroup")
     return evidence
 
-def live_price(*, separate_169=False):
+def live_price(*, separate_169=False, native162=None):
     seal = pinned(OP / "deployment-seal-receipt.json", OP_SEAL)
     for entry in seal["members"]:
         member = OP / entry["name"]
@@ -125,8 +125,9 @@ def live_price(*, separate_169=False):
         focused = runpy.run_path(str(directory / "split_actor.py"))
         fleet169, _ = old.current_fleet()
         row169 = focused["current"](fleet169)
+    need(native162 is None or focused is not None, "162 is outside the issued peer accounting")
     before = observe()
-    q = base["price"]("held", native169=row169) if focused else base["price"]("held")
+    q = base["price"]("held", native169=row169, native162=native162) if focused else base["price"]("held")
     after = observe()
     if focused:
         focused["recheck"](fleet169, row169)

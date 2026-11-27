@@ -28,7 +28,7 @@ def check_idle(unit, exited=None):
     group=Path("/sys/fs/cgroup/system.slice")/unit/"cgroup.procs"
     assert not group.exists() or not group.read_text().strip(),unit
     return props
-def prove(raw,books,owner169=None):
+def prove(raw,books,owner169=None,owner162=None):
     if not __debug__:
         raise RuntimeError("native booking checks require Python assertions")
     ref=[]
@@ -83,7 +83,12 @@ def prove(raw,books,owner169=None):
     assert not fleet["terminal169_resource_promise_ending_bytes"] and not fleet["terminal169_resource_credit_bytes"] and not fleet["all_reservation_ending_bytes"]
     rows=fleet["actual_executing_replays"]+fleet["actual_active_private_diagnostics"]
     own = [r for r in rows if r["epoch"] == 169]
-    assert sorted(r["epoch"] for r in rows if r["epoch"] != 169) == [146, 167, 170, 172]
+    registered162 = [r for r in rows if r["epoch"] == 162]
+    if registered162:
+        assert len(registered162) == 1 and owner162 and owner162["phase"] in ("held","bootstrap","worker")
+        assert registered162[0]["held_owner"] == owner162["held_owner"] and registered162[0]["unit"]["Id"] == owner162["unit"]["Id"]
+        assert registered162[0]["unit"]["InvocationID"] == owner162["invocation_id"]
+    assert sorted(r["epoch"] for r in rows if r["epoch"] not in (169,162)) == [146, 167, 170, 172]
     if own:
         assert owner169 and len(own) == 1 and own[0]["hourly169_start_intent"] == owner169["hourly169_start_intent"]
     if owner169:

@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PARENT = HERE.parent / "horizon_epoch143_bounded_entry_20261126_v1/writer"
 V47 = "cdeef56bc6fddb7189be65ace5a72468514ed97d08b470be5248d79da8177f55"
 BOOKER = "f127e596ee005a8d2a1adc72561fb288bb98df03ff10a5439dc4e06bac66aa79"
 ACTIVE = "def64d8842984dee1835c05aefa8b5f344c52f9b97e8691db123b1cce2daca86"
@@ -14,6 +13,9 @@ OLD = "tools-cold168-retry5-failed166-v47-entry146"
 NEW = OLD.replace("v47","v48")
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 OPERATOR = RT / "epoch169-hourly-admission-20261123-v1/issued-split-v1"
+PEER = RT / "epoch162-first-hourly-completion-20261127-v2/issued-split-v1"
+PEER_SHA = "ca5ac887bdb0ca18b607966df05e890dbbc0ba3f73fb1112c4717ab97dc9415e"
+PEER_READER = "9abbb1b8451e84e99b8b6dc81e14a78390430bfb3242f3f876a963b9fb8a62b9"
 
 
 def one(source, old, new):
@@ -27,10 +29,11 @@ def cycle(s):
     s = one(s, "        if FAILED166_VERSION == 47:\n            import transition_v47", """        if FAILED166_VERSION == 48:
             import transition_v48
             import split_status169
+            import status162
         if FAILED166_VERSION in (47, 48):
             import transition_v47""")
     s = one(s, "            if FAILED166_VERSION == 47:\n                modules +=", """            if FAILED166_VERSION == 48:
-                modules += [transition_v48, split_status169]
+                modules += [transition_v48, split_status169, status162]
             if FAILED166_VERSION in (47, 48):
                 modules +=""")
     s = one(s, "    elif FAILED166_VERSION == 47:\n        transition_v47", """    elif FAILED166_VERSION == 48:
@@ -65,27 +68,38 @@ def cycle(s):
         if split_status169.active(c.split169) and c.split169['phase'] != 'held':
             need('169' not in native_owners and 169 not in c.new_rows, 'private and canonical epoch 169 overlap')
             native_owners = dict(native_owners, hourly169=c.split169)
-        split_status169.project(c, c.split169)""")
+        split_status169.project(c, c.split169)
+        c.split162 = status162.observe(c, cycle.observed_lane)
+        if status162.active(c.split162) and c.split162['phase'] != 'held':
+            need('162' not in native_owners and 'first162' not in native_owners and 162 not in c.new_rows, 'concurrent 162 owners')
+            native_owners = dict(native_owners, split162=c.split162)
+        status162.project(c, c.split162)""")
     needle = "        hourly_population.recheck_all(c.first_hourly)"
     s = one(s,needle,needle+"""
     if FAILED166_VERSION == 48:
-        split_status169.reader()['recheck'](c.fleet, c.split169)""")
+        split_status169.reader()['recheck'](c.fleet, c.split169)
+        status162.recheck(c.fleet, c.split162)""")
     needle = "        cap[hourly_population.CAPACITY_FIELD] = hourly_population.capacity(c.first_hourly)"
     s = one(s,needle,needle+"""
     if FAILED166_VERSION == 48 and c.split169:
-        cap[split_status169.FIELD] = c.split169""")
+        cap[split_status169.FIELD] = c.split169
+    if FAILED166_VERSION == 48 and c.split162:
+        cap[status162.FIELD] = c.split162""")
     needle = "        if PRIVATE136:\n            extra.update(private136.status_fields(c,epoch))"
     s = one(s,needle,"""        if FAILED166_VERSION == 48 and epoch == 169 and c.split169:
             extra.update(split_status169.status_fields(c.split169))
+        if FAILED166_VERSION == 48 and epoch == 162 and c.split162:
+            extra.update(status162.status_fields(c.split162))
 """ + needle)
     needle = "        diagnostic_count += sum(hourly_population.active(row) for _, row in c.first_hourly)"
     s = one(s,needle,needle+"""
     if FAILED166_VERSION == 48:
-        diagnostic_count += int(split_status169.active(c.split169))""")
+        diagnostic_count += int(split_status169.active(c.split169)) + int(status162.active(c.split162))""")
     needle = "        hourly_population.install(fleet, c.first_hourly)"
     return one(s,needle,needle+"""
     if FAILED166_VERSION == 48:
-        split_status169.install(fleet, c.split169)""")
+        split_status169.install(fleet, c.split169)
+        status162.install(fleet, c.split162)""")
 
 
 def watcher(s):
@@ -184,6 +198,12 @@ def stage(old, staging, operator):
                 raise ValueError("missing V47 receiver "+name)
             add(name,value.replace(f"'{OLD}')",f"'{OLD}', '{NEW}')").encode())
         add("split169_provider.json",json.dumps(operator,sort_keys=True).encode())
+        peer_file = PEER / "deployment-seal-receipt.json"
+        peer_reader = PEER / "status162.py"
+        if hashlib.sha256(peer_file.read_bytes()).hexdigest() != PEER_SHA or hashlib.sha256(peer_reader.read_bytes()).hexdigest() != PEER_READER:
+            raise ValueError("changed 162 operator")
+        add("status162.py", peer_reader.read_bytes())
+        add("split162_provider.json", json.dumps(dict(path=str(peer_file),sha256=PEER_SHA),sort_keys=True).encode())
         for name in ("split_status169.py","transition_v48.py"):
             add(name,(HERE/name).read_bytes())
         add("cutover48.py",cutover((old/"cutover47.py").read_text()).encode())
@@ -198,22 +218,29 @@ def hourly_price(s):
     native = split_status169.reader()
     population = core.bound(dict(path=fleet,sha256=sha))
     admitted169 = native["current"](population)
+    peer162 = split_status169.peer162()
+    admitted162 = peer162["current"](population)
 ''' +needle)
-    s=one(s,'hourly_replacement=held)','hourly_replacement=held, native169=admitted169)')
+    s=one(s,'hourly_replacement=held)','hourly_replacement=held, native169=admitted169, native162=admitted162)')
     needle='    if projection:\n'
     s=one(s,needle,'''    native["recheck"](population, admitted169)
-    if admitted169 and admitted169["phase"] != "terminal":
-        disk = admitted169["disk"]
-        extra = disk["remaining"] + disk["fixed_control"]
-        protected = quote["retained_required_home_bytes"] + extra
-        required = max(protected, disk["floor"] + disk["remaining"])
+    peer162["recheck"](population, admitted162)
+    protected = [r["disk"] for r in (admitted169, admitted162) if r and r["phase"] != "terminal"]
+    if admitted162 and admitted162["phase"] == "terminal":
+        protected.append(dict(remaining=peer162["IMAGE"], fixed_control=peer162["CONTROL"], floor=0))
+    if protected:
+        controls = sum(d["fixed_control"] for d in protected)
+        growth = sum(d["remaining"] for d in protected)
+        floor = max(quote["retained_required_home_bytes"] + controls, *(d["floor"] for d in protected))
+        required = floor + growth
         quote["retained_required_home_bytes"] = required
         quote["live_home_margin"] = quote["live_available_home_bytes"] - required - TREE - EVIDENCE
-        quote["historical_home_margin"] -= extra
+        quote["historical_home_margin"] -= growth + controls
         quote["home_margin_bytes"] = min(quote["live_home_margin"], quote["historical_home_margin"])
         quote["available_home_bytes"] = required + TREE + EVIDENCE + quote["home_margin_bytes"]
         quote["disk_fits"] = quote["disk_fits"] and quote["home_margin_bytes"] >= 0 and (not own or own["floor"] >= required)
         quote["private169"] = admitted169
+        quote["private162"] = admitted162
 ''' +needle)
     return s
 

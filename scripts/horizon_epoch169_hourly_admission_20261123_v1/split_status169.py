@@ -134,3 +134,10 @@ def verification(fleet):
     reader()
     spec = runpy.run_path(str(PROVIDER / "split_capacity.py"))
     return spec["verification168"](fleet["retry9_auxiliary_commitments"])
+
+
+def peer162():
+    reader()
+    spec = runpy.run_path(str(PROVIDER / "split_capacity.py"))
+    spec["seal"]()
+    return runpy.run_path(str(PROVIDER / "peer162.py"))

@@ -36,15 +36,17 @@ def seal():
     return ref
 
 
-def native_owners(n, fleet, observed):
+def native_owners(n, fleet, observed, peer162):
     rows = fleet["actual_executing_replays"] + fleet["actual_active_bootstraps"] + fleet["actual_active_private_diagnostics"]
-    peers = [r for r in rows if r["epoch"] != 169]
+    peers = [r for r in rows if r["epoch"] not in (169, 162)]
     need(sorted(r["epoch"] for r in peers) == [146, 167, 170, 172], "the four-peer booking changed")
     enrolled = fleet.get(actor["FIELD"])
     actor["check_fleet"](fleet, enrolled, observed["binding"] if observed and observed["phase"] != "terminal" else None)
     actual = list(peers)
     if observed and observed["phase"] != "terminal":
         actual.append(observed)
+    if peer162 and peer162["phase"] != "terminal":
+        actual.append(peer162)
     need(n.active_units("horizon-qualify-*") == {r["unit"]["Id"] for r in actual}, "different native replay fleet")
     for row in actual:
         recorded = row["unit"]
@@ -179,26 +181,28 @@ def verification168(funded):
     return runpy.run_path(str(HERE / "verification_reservation.py"))["reservation"](core, funded)
 
 
-def quote(*, include_writer_overhead=0):
+def quote(*, include_writer_overhead=0, separate_162=False):
     deployment = seal()
     path = HERE / "campaign-price.py"
     need(hashlib.sha256(path.read_bytes()).hexdigest() == LEGACY_LEDGER, "auxiliary charge model changed")
     campaign = runpy.run_path(str(path))
     n = campaign["bound_tools"]()
-    before = time.time()
     prior_fleet = max(RT.glob("root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json"), key=lambda p: p.stat().st_mtime_ns)
     fleet_before, fleet_ref = actor["receipt"](prior_fleet)
+    peer = runpy.run_path(str(HERE / "peer162.py"))
+    row162 = peer["current"](fleet_before)
+    before = time.time()
     study = runpy.run_path(str(HERE/"witness-admission.py"))
     initial_paid = optional_memory(fleet_before,fleet_ref,study)
     actor_before = actor["current"](fleet_before)
     paid_before = resident(actor_before)
     provider = runpy.run_path(str(HERE / "live_168_170_price.py"))
-    base, live = provider["live_price"](separate_169=True)
+    base, live = provider["live_price"](separate_169=True, native162=row162)
     raw = base["raw"]
     need(raw["fleet"] == fleet_ref, "fleet turned over during the admission sample")
     actor["recheck"](fleet_before, actor_before)
     fleet = n.accepted_fleet(raw["fleet"])
-    population = native_owners(n, fleet, live)
+    population = native_owners(n, fleet, live, row162)
     funded = fleet["retry9_auxiliary_commitments"]
     compiler = n.compiler_reservation()
     recovery = n.recovery_reservation(compiler)
@@ -230,19 +234,23 @@ def quote(*, include_writer_overhead=0):
     ram = paid - incumbent168["additional_ram"] + rooms["post_reservation_ram_margin"] - (requested - funded["build_memory_bytes"]) - gcs["additional_ram"] - micro["witness_ram"]
     ram += extra["kernel"] + extra["audit"] + cleared["compiler_excess_ram"] + cleared["concluded_copier_ram"]
     funding = runpy.run_path(str(HERE / "split_booking.py"))
-    original = funding["prove"](base, dict(rooms=rooms), live)
+    original = funding["prove"](base, dict(rooms=rooms), live, row162)
     need(original["same_169_compute"] and holder == campaign["holding"](n) and gcs == campaign["input_cost"](n)
          and micro == campaign["micro_cost"](n) and compiler == n.compiler_reservation()
-         and recovery == n.recovery_reservation(compiler) and population == native_owners(n, fleet, live),
+         and recovery == n.recovery_reservation(compiler) and population == native_owners(n, fleet, live, row162),
          "native funding or owner crossed the quote")
     need(verification168(funded) == incumbent168, "168 verification listener changed during price")
     actor["recheck"](fleet, live)
     home = floor_and_margin(base["available_home"], disk, live)
     need(n.accepted_fleet(raw["fleet"]) == fleet, "sole fleet changed")
-    return dict(schema="horizon-169-split-current-native-price-v1", phase="postguard" if live else "prestart",
+    peer["recheck"](fleet, row162)
+    result = dict(schema="horizon-169-split-current-native-price-v1", phase="postguard" if live else "prestart",
                 native=base, fleet=raw["fleet"], provider=deployment, observed_actors=population, actor=live,
                 accounting=dict(rooms=rooms, old_six_owner_lineage=original, serial=serial, original_n=nfit,
                                 compiler=compiler, recovery=recovery, holding=holder, input170=gcs, recorder170=micro,
                                 fixed_HOME=fixed, terminal_ram=cleared, realized_incumbent_memory=extra, verification168_listener=incumbent168, writer_overhead=include_writer_overhead, funding_V47=dict(path=str(v47), sha256=SEVEN)),
                 realized_169_anonymous_and_noswap_shmem=paid, ram_margin=ram, **home, fits=ram >= 0 and home["home_margin"] >= 0,
                 resource_credit_bytes=0, started_unix_seconds=before, recorded_unix_seconds=time.time())
+    if separate_162:
+        return result, row162
+    return peer["charge"](result, row162)

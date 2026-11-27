@@ -4,6 +4,7 @@ from evidence import bound, checked, need
 from transition import clock
 import rolling170_fourth_status as rolling
 import split_status169 as focused
+import status162
 
 V47_SHA = "def64d8842984dee1835c05aefa8b5f344c52f9b97e8691db123b1cce2daca86"
 V47_SEAL = "cdeef56bc6fddb7189be65ace5a72468514ed97d08b470be5248d79da8177f55"
@@ -33,7 +34,7 @@ def ready(api, head, seal):
     rolling.retained_population(fleet, cfg)
     need(earlier["successor170_interface"] == rolling.INTERFACE
          and earlier["prior_successor170_interface"] == rolling.history.INTERFACE
-         and focused.reader()["current"](fleet) is None, "unexpected 170 assignment or previously started 169")
+         and focused.reader()["current"](fleet) is None and status162.current(fleet) is None, "unexpected 170 assignment or previously started 169")
     # All earlier receiver source references must name the exact retained member
     # in this deployment; the source path participates in the writer handoff.
     rebound = {}
@@ -44,6 +45,8 @@ def ready(api, head, seal):
                 rebound[key] = bound(current.with_name(name))
     return earlier | rebound | dict(package=seal, old_owner=oldref, fleet=head, config=cfgref,
          timer=timer, completed_sample=completed, retained_143_v47_rebound=ref143,
+         split162_reader=bound(current.with_name("status162.py")),
+         split162_provider=api["read_ref"](current.with_name("split162_provider.json")),
          split169_reader=bound(current.with_name("split_status169.py")),
          split169_provider=api["read_ref"](current.with_name("split169_provider.json")))
 

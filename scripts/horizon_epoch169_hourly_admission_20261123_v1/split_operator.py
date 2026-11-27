@@ -114,7 +114,7 @@ def writer():
     return dict(active=ref, package=ready["package"], reader=ready["split169_reader"])
 
 
-def price():
+def price(*, separate_162=False):
     # Both new package trees and their deployment metadata are charged against
     # the historical limit even after the current statvfs has seen their bytes.
     total = 0
@@ -124,7 +124,7 @@ def price():
             need(p.resolve() == p and stat.S_ISREG(st.st_mode) and st.st_uid == 0 and not st.st_mode & 0o222,
                  "unexpected deployed package member")
             total += max(st.st_blocks*512, (st.st_size+4095)//4096*4096)
-    return capacity["quote"](include_writer_overhead=total)
+    return capacity["quote"](include_writer_overhead=total, separate_162=separate_162)
 
 
 def prestart():
