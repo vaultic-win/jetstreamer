@@ -1,6 +1,7 @@
 //! Evict only the generation-pinned bootstrap of the completed epoch 296 diagnostic.
 use super::*;
 use std::{
+    collections::BTreeMap,
     ffi::CString,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -25,9 +26,38 @@ fn stamp(m: &Metadata) -> Value {
     json!({"identity":identity(m),"physical_bytes":m.blocks()*512,"mode":m.mode(),"uid":m.uid(),"links":m.nlink()})
 }
 
-fn observe(target: &Path) -> Result<(Value, process_references::Scan)> {
+fn observe(target: &Path, guard: &Value) -> Result<(Value, process_references::Scan)> {
     for unit in UNITS {
-        terminal_unit(unit)?;
+        if unit == UNITS[1] {
+            let output = Command::new("/usr/bin/systemctl")
+                .args([
+                    "show",
+                    unit,
+                    "-p",
+                    "Id,ActiveState,MainPID,ControlPID,ControlGroup,Job,InvocationID,Result",
+                ])
+                .output()?;
+            ensure!(
+                output.status.success(),
+                "could not check the retired diagnostic guard"
+            );
+            let model = String::from_utf8(output.stdout)?;
+            let fields = model
+                .lines()
+                .map(|line| line.split_once('=').context("invalid systemd row"))
+                .collect::<Result<BTreeMap<_, _>>>()?;
+            ensure!(
+                json!(fields) == *guard
+                    && matches!(guard["ActiveState"].as_str(), Some("inactive" | "failed"))
+                    && guard["MainPID"] == "0"
+                    && guard["ControlPID"] == "0"
+                    && guard["Job"] == ""
+                    && guard["ControlGroup"] == "",
+                "diagnostic guard no longer matches its drained receipt"
+            );
+        } else {
+            terminal_unit(unit)?;
+        }
         ensure!(
             !Path::new("/sys/fs/cgroup/system.slice").join(unit).exists(),
             "{unit} retains a cgroup"
@@ -178,7 +208,8 @@ pub(super) fn run(
         now.checked_sub(observed).is_some_and(|age| age <= 900),
         "GCS generation recheck is stale"
     );
-    let (scheduled, consumers) = observe(&path)?;
+    let guard = &terminal["guard_after"];
+    let (scheduled, consumers) = observe(&path, guard)?;
     let parent = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
@@ -247,7 +278,7 @@ pub(super) fn run(
             "free_before_bytes":available(Path::new(CACHE))?,"scheduled":scheduled,"consumers":consumers}),
         )?
     };
-    let (schedule, consumers) = observe(&path)?;
+    let (schedule, consumers) = observe(&path, guard)?;
     archive_state()?;
     ensure!(
         Path::new(CACHE).canonicalize()? == Path::new(CACHE)
