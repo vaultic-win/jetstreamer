@@ -411,11 +411,16 @@ fn main() -> Result<()> {
     }
     if matches!(
         args.get(1).map(String::as_str),
-        Some("--check-duplicate-index-230" | "--retire-duplicate-index-230")
+        Some(
+            "--check-duplicate-index-230"
+                | "--retire-duplicate-index-230"
+                | "--check-duplicate-index-230-second"
+                | "--retire-duplicate-index-230-second"
+        )
     ) {
         ensure!(
             unsafe { libc::geteuid() } == 0 && args.len() == 3,
-            "usage: horizon275-scratch-retire --check-duplicate-index-230|--retire-duplicate-index-230 SELF_SHA256"
+            "epoch 230 duplicate-index check or retirement requires exactly SELF_SHA256"
         );
         let mut binary = File::open("/proc/self/exe")?;
         let metadata = binary.metadata()?;
@@ -423,7 +428,12 @@ fn main() -> Result<()> {
             metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut binary)? == args[2],
             "unsealed retirement image"
         );
-        return index230::run(args[1] == "--retire-duplicate-index-230");
+        let replay = if args[1].ends_with("-second") {
+            &index230::SECOND
+        } else {
+            &index230::FIRST
+        };
+        return index230::run(replay, args[1].starts_with("--retire-"));
     }
     if matches!(
         args.get(1).map(String::as_str),
