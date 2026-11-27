@@ -1,0 +1,15 @@
+{
+  "entries": [
+    {
+      "epoch": 224,
+      "path": "/var/lib/jetstreamer/horizon224-225-rooted-ranges-v1/epoch-224-slot-ranges.repaired.raw",
+      "sha256": "4e612b21481eccbe6ece958daa49871b05297ed0007bd7e6c98ce39be40a0a5d"
+    },
+    {
+      "epoch": 225,
+      "path": "/var/lib/jetstreamer/horizon224-225-rooted-ranges-v1/epoch-225-slot-ranges.repaired.raw",
+      "sha256": "cff8440bb477f4a2657fc31af29d6afce9dd616e47090fb6856854deebd23b9a"
+    }
+  ],
+  "schema": "jetstreamer-local-slot-ranges-overrides-v1"
+}
