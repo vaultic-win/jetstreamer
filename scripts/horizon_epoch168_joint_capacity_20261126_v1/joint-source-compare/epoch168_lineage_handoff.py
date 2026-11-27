@@ -244,20 +244,29 @@ def checker_deployment():
 
 
 def completed_selection(path, deployment):
-    need(path == SELECTOR_STATE / "RESULT.stdout", "expected the original selector stdout")
+    stdout = SELECTOR_STATE / "RESULT.stdout"
     active_ref, active = bound_json(SELECTOR_STATE / "ACTIVE.json")
     need(active_ref["sha256"] == ACTIVE_SHA and active["invocation_id"] == SELECTOR_IID
          and active["unit"] == SELECTOR_UNIT, "selector invocation differs")
     intent_ref, intent = bound_json(SELECTOR_STATE / "START_INTENT.json")
     need(intent_ref == active["intent"] and intent["deployment"] == deployment
-         and "--property=StandardOutput=file:" + str(path) in intent["run_argv"],
+         and "--property=StandardOutput=file:" + str(stdout) in intent["run_argv"],
          "selector output or deployment differs from its launch")
     events = journal("_PID=1", "_UID=0", f"UNIT={SELECTOR_UNIT}",
                      f"INVOCATION_ID={SELECTOR_IID}", f"MESSAGE_ID={SUCCESS}")
     need(len(events) == 1 and terminal_ok(events[0], SELECTOR_UNIT, SELECTOR_IID),
          "waiting for the original selector's successful PID1 terminal event")
-    selected, _ = bound_json(path)
-    return selected, {"active": active_ref, "intent": intent_ref, "pid1_event": events[0]}
+    original, report = bound_json(stdout)
+    selected = original if path == stdout else bound(path, 0)[0]
+    need(selected["sha256"] == original["sha256"] and report["physical_archive_bytes_written"] == 0,
+         "selection evidence differs from the original read-only selector output")
+    meta = RETRY4.lstat()
+    need(RETRY4.resolve(strict=True) == RETRY4 and active["source_identity"] == {
+        "device": meta.st_dev, "inode": meta.st_ino, "length": meta.st_size,
+        "mtime_ns": meta.st_mtime_ns, "ctime_ns": meta.st_ctime_ns, "links": meta.st_nlink,
+    }, "closed retry4 source changed during selection")
+    return selected, {"active": active_ref, "intent": intent_ref, "stdout": original,
+                      "pid1_event": events[0]}
 
 
 def verify(launch_path, capture_path, selected_path, output_dir):
