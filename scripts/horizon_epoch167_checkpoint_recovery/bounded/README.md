@@ -10,7 +10,7 @@ Use the existing HOME-backed checkpoint input leaf. Make `bounded-72509256-72515
 
 Use `/var/lib/jetstreamer/horizon_runtime_data/epoch167-checkpoint-bounded-20261127-v1` as the root-owned mode-0700 state leaf. Create a root-owned mode-0755 `barrier` and mode-0700 `guard-receipts` there. Use a private root-owned working directory for the preparation outputs.
 
-Prepare a root-owned JSON specification with schema `horizon-epoch167-bounded-replay-spec-v1` and digest references for `terminal`, `checkpoint_generations`, `closed_input_digests`, `worker_deployment` and `worker_provenance`. The checkpoint evidence is the exact bytes of `PINNED_SNAPSHOT_GENERATIONS.json`. The existing custody artifact is `167_SOURCE_DIGESTS.json`. The worker provenance uses schema `horizon-epoch167-bounded-worker-source-v1` and binds `binary`, `source_commit`, `branch` and `remote_contains_source`. Use the worker seal installed by the controller and the exact remote source commit proved by that controller.
+Prepare a root-owned JSON specification with schema `horizon-epoch167-bounded-replay-spec-v1` and digest references for `terminal`, `checkpoint_generations`, `closed_input_digests` and `worker_deployment`. Use a root-owned copy of `PINNED_SNAPSHOT_GENERATIONS.json` and the existing `167_SOURCE_DIGESTS.json` custody artifact. The worker seal must contain the exact trace binary and native worker build receipt. The preparation checks the worker commit against `origin/account-updates`.
 
 Run `replay167.py --record PREPARED.json prepare SPEC SHA STAGING`. Its package plan seals the gate, payload and exact checkpoint list. The payload pins the node, trace worker, bootstrap, genesis and the existing qualified source range index by inode and SHA-256.
 
@@ -26,7 +26,7 @@ Run each command as root with `/usr/bin/python3 -IB /path/to/replay167.py`. Reco
 | Held producer command | `argv START_INTENT SHA` | Emits the exact systemd argv. Submit after the controller enrolls the transition and serializes admission. |
 | Fresh held admission | `--record HELD_CAPACITY.json held START_INTENT SHA` | Rechecks the complete incumbent census with the exact one-process gate and the original reservation. |
 | Invocation-bound guard | `--record ACTUAL_GUARD_PLAN.json guard-plan START_INTENT SHA HELD_CAPACITY SHA` | Binds the approved floor, cap and exact held invocation. |
-| Protective timer command | `guard-argv ACTUAL_GUARD_PLAN SHA` | Emits the exact guard timer argv. |
+| Protective timer command | `guard-argv ACTUAL_GUARD_PLAN SHA` | Runs the sealed guard's static plan validation and emits the exact timer argv. |
 | First live guard | `--record FIRST_GUARD.json first-guard START_INTENT SHA ACTUAL_GUARD_PLAN SHA SAMPLE SHA` | Checks native timer, sealed command, journal, held PID, zero workers, and both complete tree walks. |
 | Fresh post-guard admission | `--record POST_GUARD_CAPACITY.json post-guard START_INTENT SHA FIRST_GUARD SHA` | Rechecks the complete live census, guard, conservative physical measurement, HOME and RAM. |
 | Invocation permit | `release START_INTENT SHA POST_GUARD_CAPACITY SHA` | Revalidates actor, guard and fleet, writes the root release receipt, then atomically creates the exact invocation permit. |

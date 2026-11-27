@@ -42,11 +42,13 @@ CPU, GUARD_CPU = 3_000_000, 250_000
 MAX_VMAS = 3_500_000
 ORIGINAL_FLOOR = 8_594_041_336_400
 MAX_AGE = 120
-GUARD = RT / "epoch168-joint-checkpoint-reduced-run-20261126-v1/guard-tools/guard"
+GUARD = ROOT / "guard-tools/guard"
 WORKER_DIR = RT / "epoch167-source-index-rebook-20261122-v3/checkpoint-trace-20261127-v1"
 WORKER_SHA = "07b09d779706a789c668681ad9685e9ad62290a6930667c5f74a099a516d28cc"
 WORKER_COMMIT = "f6f69d9de59fe31c06ccd11e457e43b12d4e8551"
-GUARD_SHA = "b6133b6039a8658b2aff03cfe8a79646f52969f6d8a333467cd0324ffcc5b770"
+GUARD_SHA = "2448b9818aae5265f842d0a2264fad22515dd4eb5902befd335fca986eba1881"
+GUARD_SEAL_SHA = "475786f3041787d2fbeb544f7f85a2e81dd26fbfc0d74ecc43e09ce27f1de011"
+GUARD_COMMIT = "fe40ca2bbaec1720d6c1e6bac7457b049fad5b72"
 TERMINAL = {
     "path": str(RT / "epoch167-source-index-rebook-20261122-v3/EXECUTION_TERMINAL_20261127.json"),
     "sha256": "0e441ccfef45d40f2d707f6136bb76c0e4bd3b2a21bfebff9641f761dd8a27e2",
@@ -333,17 +335,36 @@ def placement(worker):
     ]
 
 
+def remote_contains(commit):
+    repo = HOME/"workspace/jetstreamer"
+    command(["/usr/bin/git", "-c", f"safe.directory={repo}", "-C", str(repo),
+             "merge-base", "--is-ancestor", commit, "refs/remotes/origin/account-updates"])
+
+
+def guard_binary():
+    seal = ref(GUARD.parent/"deployment-seal-receipt.json", GUARD_SEAL_SHA)
+    binary = present_member(seal, "guard", executable=True)
+    build = read(present_member(seal, "build.json"))
+    need(binary == ref(GUARD, GUARD_SHA) and build["binary"]["sha256"] == GUARD_SHA
+         and build["commit"] == GUARD_COMMIT, "different bounded 167 guard build")
+    remote_contains(GUARD_COMMIT)
+    return binary
+
+
 def worker_member(spec):
-    worker = present_member(spec["worker_deployment"], "jetstreamer-historical-worker-v1-5-6", executable=True)
-    need(worker == ref(WORKER_DIR/"jetstreamer-historical-worker-v1-5-6", WORKER_SHA),
-         "different signed-trace worker")
-    provenance = read(spec["worker_provenance"])
-    need(provenance["schema"] == "horizon-epoch167-bounded-worker-source-v1"
-         and provenance["binary"] == worker
-         and provenance["source_commit"] == WORKER_COMMIT
-         and provenance["branch"] == "refs/remotes/origin/account-updates"
-         and provenance["remote_contains_source"] is True,
-         "trace worker provenance is incomplete")
+    seal = ref(WORKER_DIR/"deployment-seal-receipt.json",
+               "a8473327dfc475712274b5bae1e058b498f87f55993a79f90fa01668dbda84e6")
+    need(spec["worker_deployment"] == seal, "different signed-trace worker seal")
+    worker = present_member(seal, "jetstreamer-historical-worker-v1-5-6", executable=True)
+    build = read(present_member(seal, "WORKER_BUILD.json"))
+    need(worker == ref(WORKER_DIR/"jetstreamer-historical-worker-v1-5-6", WORKER_SHA)
+         and build["schema"] == "horizon-167-trace-worker-build-v1"
+         and build["product"]["sha256"] == WORKER_SHA and build["source_commit"] == WORKER_COMMIT
+         and build["feature_cfgs"] == ["historical-per-byte-logging"]
+         and build["pid1_success"]["_PID"] == "1"
+         and "48 passed; 0 failed" in build["test_result"]["MESSAGE"],
+         "signed-trace worker build authority is incomplete")
+    remote_contains(WORKER_COMMIT)
     return worker
 
 
@@ -352,6 +373,7 @@ def verify_payload(row):
          and row["terminal"] == TERMINAL and row["overlap"] == OVERLAP and row["range"] == [START, END] and row["argv"] == node_argv()
          and row["environment"] == gate_environment() and row["guard_cap"] == CAP
          and row["worker"] == ref(WORKER_DIR/"jetstreamer-historical-worker-v1-5-6", WORKER_SHA)
+         and row["guard"] == ref(GUARD, GUARD_SHA)
          and row["producer_unit"] == UNIT and row["archive_publication_authorized"] is False,
          "wrong bounded route")
     want = placement(row["worker"])
@@ -382,6 +404,7 @@ def prepare(spec_ref, output):
          and overlap["publication_authorized"] is False and overlap["complete_prefix_verified"] is False,
          "wrong retained checkpoint overlap")
     worker = worker_member(spec)
+    guard = guard_binary()
 
     files = [dict(target=str(target), source=bind_file(source_ref, executable=executable),
                   executable=executable) for target, source_ref, executable in placement(worker)]
@@ -391,7 +414,7 @@ def prepare(spec_ref, output):
          "FR2 custody changed after digest")
     payload = dict(schema="horizon-epoch167-bounded-replay-payload-v1", epoch=167, range=[START, END],
                    terminal=TERMINAL, overlap=OVERLAP, spec=spec_ref, worker=worker, files=files, argv=node_argv(),
-                   environment=gate_environment(), guard_cap=CAP, producer_unit=UNIT,
+                   environment=gate_environment(), guard_cap=CAP, guard=guard, producer_unit=UNIT,
                    archive_publication_authorized=False)
     verify_payload(payload)
     child(output, 0, 0, 0o700)
@@ -838,6 +861,19 @@ def guard_plan(intent_ref, held_ref):
                 maximum_root_physical_bytes=CAP, receipt_directory=str(ROOT/"guard-receipts"))
 
 
+def native_static_validation(plan_ref):
+    args = [str(GUARD), plan_ref["path"], "--plan-sha256", plan_ref["sha256"],
+            "--self-sha256", GUARD_SHA, "--validate-plan-only"]
+    evidence = json.loads(command(args))
+    need(evidence == dict(schema="jetstreamer-horizon-standalone-static-plan-validation-v1",
+                          plan_sha256=plan_ref["sha256"], self_sha256=GUARD_SHA,
+                          validated=True, unit=UNIT, resource_samples_taken=0,
+                          replay_launch_authorized=False, protective_guard_proven=False,
+                          producer_signaled=False, remote_mutations=False, r2_mutations=False),
+         "sealed guard did not validate the exact plan statically")
+    return evidence
+
+
 def guard_argv(plan_ref):
     plan = read(plan_ref)
     need(Path(plan_ref["path"]) == ROOT/"ACTUAL_GUARD_PLAN.json"
@@ -848,7 +884,9 @@ def guard_argv(plan_ref):
          and plan["receipt_directory"] == str(ROOT/"guard-receipts")
          and props(UNIT, STATE)["InvocationID"] == plan["invocation_id"] and not permit_exists(),
          "guard plan does not match the held producer")
-    file_identity(GUARD, GUARD_SHA, trusted=True, executable=True)
+
+    guard_binary()
+    native_static_validation(plan_ref)
     arguments = [
         "User=root", "Group=root", "UMask=0077", "Restart=no", f"MemoryMax={GUARD_MEMORY}",
         "MemorySwapMax=0", f"CPUQuota={GUARD_CPU//10_000}%", "TasksMax=256",
