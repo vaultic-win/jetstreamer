@@ -1,5 +1,6 @@
 use super::*;
 mod exit;
+mod v1627;
 use anyhow::bail;
 use jetstreamer_horizon::archive::{BlockNotification, Consumption, EntryRecord, SlotVisitor};
 use segment_manifest::{SegmentManifestError, read_and_validate_seekable_segment_manifest};
@@ -320,11 +321,12 @@ fn unit_state(unit: &str) -> Result<UnitState> {
 fn clean_exit<'a>(
     state: &'a UnitState,
     captured: Option<&'a UnitState>,
+    unit: &str,
     invocation: &str,
     pid: u32,
     drained: bool,
 ) -> Result<&'a UnitState> {
-    clean_state(state)?;
+    clean_state(state, unit)?;
     ensure!(drained, "producer cgroup has not physically drained");
     let retained = match state.get("LoadState").map(String::as_str) {
         Some("loaded") => {
@@ -351,7 +353,7 @@ fn clean_exit<'a>(
         }
         _ => bail!("unknown producer load state"),
     };
-    clean_state(retained)?;
+    clean_state(retained, unit)?;
     ensure!(
         retained
             .get("LoadState")
@@ -381,10 +383,10 @@ fn state_timestamp(state: &UnitState, key: &str) -> Result<u64> {
     Ok(timestamp)
 }
 
-fn clean_state(state: &UnitState) -> Result<()> {
+fn clean_state(state: &UnitState, unit: &str) -> Result<()> {
     let field = |key: &str| state.get(key).map(String::as_str);
     for (key, value) in [
-        ("Id", UNIT),
+        ("Id", unit),
         ("ActiveState", "inactive"),
         ("SubState", "dead"),
         ("Result", "success"),
@@ -519,18 +521,19 @@ fn checkpoint_message(checkpoint: &SegmentCheckpointSummary) -> String {
 }
 
 fn native_events(launch: &Launch) -> Result<Vec<Value>> {
-    // A system service running as UID 1000 may log to the user's journal.
-    // The invocation, unit, boot, executable and UID checks still bind every record.
+    producer_events(&launch.unit, &launch.invocation_id, START - 1, SEGMENT_END - 1)
+}
+
+fn producer_events(unit: &str, invocation: &str, bootstrap: u64, last: u64) -> Result<Vec<Value>> {
+    // UID 1000 may log to the user's journal. Keep both exact source matches.
     journal_rows(&[
         "--lines=5",
         "--output-fields=MESSAGE,_SYSTEMD_INVOCATION_ID,_SYSTEMD_UNIT,_SYSTEMD_CGROUP,_PID,_UID,_EXE,_BOOT_ID",
         &format!(
-            "--grep=historical checkpoint slot=({}|{}) |snapshot verification complete|published verified historical segment evidence ",
-            START - 1,
-            SEGMENT_END - 1
+            "--grep=historical checkpoint slot=({bootstrap}|{last}) |snapshot verification complete|published verified historical segment evidence ",
         ),
-        &format!("_SYSTEMD_UNIT={}", launch.unit),
-        &format!("_SYSTEMD_INVOCATION_ID={}", launch.invocation_id),
+        &format!("_SYSTEMD_UNIT={unit}"),
+        &format!("_SYSTEMD_INVOCATION_ID={invocation}"),
     ])
 }
 
@@ -810,6 +813,10 @@ pub(super) fn capture_v1627_exit(launch_sha: &str, destination: &Path) -> Result
     exit::capture_v1627(launch_sha, destination)
 }
 
+pub(super) fn collect_v1627_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {
+    v1627::collect(exit, digest, destination)
+}
+
 pub(super) fn collect(
     launch_sha: &str,
     destination: &Path,
@@ -834,6 +841,7 @@ pub(super) fn collect(
     let retained = clean_exit(
         &state,
         exact_exit.as_ref(),
+        &launch.unit,
         &launch.invocation_id,
         launch.main_pid,
         producer_drained(&cgroup)?,

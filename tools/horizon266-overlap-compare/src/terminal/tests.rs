@@ -162,7 +162,7 @@ impl Fixture {
     fn verify(&self, drained: bool) -> Result<()> {
         let capture = retained_state(&self.state);
         let exit = (self.state["LoadState"] == "not-found").then_some(&capture);
-        clean_exit(&self.state, exit, INVOCATION, PID, drained)?;
+        clean_exit(&self.state, exit, UNIT, INVOCATION, PID, drained)?;
         let (start, exit) = manager_lifecycle(&self.manager, &self.launch, &self.profile, BOOT)?;
         verify_native_events(
             &self.journal,
@@ -195,10 +195,10 @@ fn retained_state(state: &UnitState) -> UnitState {
 fn natural_zero_exit_accepts_loaded_services_and_collected_services_with_exact_capture() {
     let mut f = fixture();
     f.verify(true).unwrap();
-    assert!(clean_exit(&f.state, None, INVOCATION, PID, true).is_err());
+    assert!(clean_exit(&f.state, None, UNIT, INVOCATION, PID, true).is_err());
     let mut bad_capture = retained_state(&f.state);
     bad_capture.insert("ExecMainCode".to_owned(), "2".to_owned());
-    assert!(clean_exit(&f.state, Some(&bad_capture), INVOCATION, PID, true).is_err());
+    assert!(clean_exit(&f.state, Some(&bad_capture), UNIT, INVOCATION, PID, true).is_err());
     f.state = retained_state(&f.state);
     f.verify(true).unwrap();
     f.state.insert("ExecMainCode".to_owned(), "2".to_owned());

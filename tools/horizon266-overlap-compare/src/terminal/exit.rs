@@ -101,7 +101,7 @@ fn exited(fd: &OwnedFd, timeout_ms: i32) -> Result<bool> {
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Capture {
+pub(super) struct Capture {
     schema: String,
     launch: Reference,
     boot_id: String,
@@ -235,41 +235,11 @@ pub(super) fn capture(launch_sha: &str, destination: &Path) -> Result<Value> {
 }
 
 pub(super) fn capture_v1627(launch_sha: &str, destination: &Path) -> Result<Value> {
-    const STATE: &str = "/var/lib/jetstreamer/horizon230-v1627-replay-runtime-v1";
-    const LAUNCH_SHA: &str = "3a2f5a058c76a59707af77f98973c283d4542c8308d5a514a22ae1cb6534a7a6";
-    const UNIT: &str = "horizon-qualify-230-v1627-window-v1.service";
-    const IID: &str = "6c878d138821422d8a848d6bd16d63a9";
-    const NODE: &str =
-        "/var/lib/jetstreamer/horizon230-v1627-diagnostic-318e9028-v1/jetstreamer-node";
+    use super::v1627::{IID, LAUNCH_SHA, NODE, UNIT, load_launch};
     require_root()?;
     let parent = destination_parent(destination)?;
     ensure!(launch_sha == LAUNCH_SHA, "foreign epoch 230 launch receipt");
-    let state = Path::new(STATE);
-    let reference = Reference::new(state.join("cadence-registration.json"), launch_sha);
-    let launch = reference.read()?;
-    ensure!(
-        launch["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
-            && launch["kind"] == "epoch230-private-v1627-window"
-            && launch["epoch"] == 230
-            && launch["unit"] == UNIT
-            && launch["invocation_id"] == IID
-            && launch["node_path"] == NODE
-            && launch["launched"] == true
-            && launch["canonical_epoch_publication_authorized"] == false,
-        "epoch 230 exit capture requires the exact guarded launch"
-    );
-    let pid: u32 = serde_json::from_value(launch["main_pid"].clone())?;
-    let guard: Reference = serde_json::from_value(launch["active_guard"].clone())?;
-    let sample = guard.read_guard_sample(&state.join("guard-receipts"))?;
-    ensure!(
-        pid > 1
-            && sample["producer"]["pid"] == pid
-            && sample["producer_invocation_id"] == IID
-            && sample["plan_sha256"] == launch["guard_plan"]["sha256"]
-            && sample["producer_stop_enabled"] == true
-            && sample["trip_reason"].is_null(),
-        "epoch 230 initial guard does not bind the exact producer"
-    );
+    let (reference, launch, pid) = load_launch()?;
     let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
         .trim()
         .replace('-', "");
@@ -289,7 +259,7 @@ pub(super) fn capture_v1627(launch_sha: &str, destination: &Path) -> Result<Valu
         parent,
         destination,
         &Capture {
-            schema: "foundation-epoch230-v1627-window-pid1-exit-v1".to_owned(),
+            schema: super::v1627::EXIT_SCHEMA.to_owned(),
             launch: reference,
             boot_id,
             producer_invocation: IID.to_owned(),
@@ -311,4 +281,30 @@ pub(super) fn read(reference: &Reference, admitted: &Admitted) -> Result<UnitSta
     );
     ensure_unit(&capture.properties, &Producer::from(&admitted.launch))?;
     Ok(capture.properties)
+}
+
+pub(super) fn read_v1627(
+    reference: &Reference,
+    launch: &Reference,
+    pid: u32,
+    boot: &str,
+) -> Result<UnitState> {
+    use super::v1627::{EXIT_SCHEMA, IID, NODE, UNIT};
+    let saved: Capture = serde_json::from_value(reference.read()?)?;
+    ensure!(
+        saved.schema == EXIT_SCHEMA
+            && &saved.launch == launch
+            && saved.boot_id == boot
+            && saved.producer_pid == pid
+            && saved.producer_invocation == IID,
+        "foreign epoch 230 PID1 exit capture"
+    );
+    let producer = Producer {
+        unit: UNIT,
+        invocation: IID,
+        pid,
+        node: Path::new(NODE),
+    };
+    ensure_unit(&saved.properties, &producer)?;
+    Ok(saved.properties)
 }

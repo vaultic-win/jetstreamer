@@ -363,12 +363,12 @@ fn validate_provenance<R: Read + Seek>(
     };
     let header = reader.header();
     ensure!(
-        header.epoch == EPOCH
+        header.epoch == manifest.epoch
             && header.format_version == 2
-            && header.slot_start == START
-            && header.slot_count == SEGMENT_END - START
-            && provenance.base.requested_slot_start == START
-            && provenance.base.requested_slot_count == SEGMENT_END - START
+            && header.slot_start == manifest.output_slot_start
+            && header.slot_count == manifest.output_slot_count
+            && provenance.base.requested_slot_start == manifest.output_slot_start
+            && provenance.base.requested_slot_count == manifest.output_slot_count
             && provenance.base.runtime_profile == manifest.runtime.runtime_profile
             && provenance.base.runtime_revision == manifest.runtime.runtime_revision
             && provenance.base.runtime_admission == RuntimeAdmission::Candidate
@@ -504,9 +504,13 @@ fn main() -> Result<()> {
         [command, digest, destination] if command == "capture-v1627-exit" => {
             terminal::capture_v1627_exit(digest, Path::new(destination))?
         }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, exit, digest, destination] if command == "collect-v1627-terminal" => {
+            terminal::collect_v1627_terminal(Path::new(exit), digest, Path::new(destination))?
+        }
         [command, plan, digest] if command == "compare" => compare(Path::new(plan), digest)?,
         _ => anyhow::bail!(
-            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
+            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-v1627-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
         ),
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
