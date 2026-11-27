@@ -49,6 +49,20 @@ class FollowonTest(TestCase):
                 self.funded,
             )
 
+    def test_live_compiler_image_only_offsets_the_current_disk_constraint(self):
+        budget = dict(
+            self.price,
+            available_home=292 * n.op.G,
+            historical_home_margin=95 * n.op.G,
+            home_margin=92 * n.op.G,
+        )
+        self.assertEqual(
+            n.margins(budget, self.funded, 4 * n.op.G)["remaining_home"],
+            91 * n.op.G - n.op.META,
+        )
+        with self.assertRaisesRegex(ValueError, "fixed cap"):
+            n.margins(budget, self.funded, 5 * n.op.G)
+
     def test_both_slots_refuse_if_dashboard_exhausts_ram(self):
         r = n.margins(
             dict(self.price, required_ram=100 * n.op.G, ram_margin=0), self.funded

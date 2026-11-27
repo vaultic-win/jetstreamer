@@ -6,6 +6,8 @@ import argparse
 import json
 import os
 import re
+import runpy
+import stat
 import sys
 import time
 
@@ -172,7 +174,104 @@ def serial_owner():
             )
 
 
-def margins(base, funded):
+def compiler_reservation():
+    directory = op.BASE / "epoch168-anza-reader-build-20261127.jMydZnTw"
+    launch_ref = op.fixed(
+        directory / "PAIR_BUILD_LAUNCH.json",
+        "eb28c90cc4285e40815b1eee2182bf29c7fa45d13edae0db84f1aaad1e008dc9",
+    )
+    launch = op.bound(launch_ref)
+    intent, fit = op.bound(launch["intent"]), op.bound(launch["fit"])
+    native, unit = launch["native"], launch["unit"]
+    iid = native["InvocationID"]
+    op.need(
+        unit == "horizon-168-current-anza-reader-build-20261127-v1.service"
+        and native["Id"] == unit
+        and iid == "b0c51472c443489bac4367144fb5d85c"
+        and intent["fit"] == launch["fit"]
+        and fit["fits"]
+        and fit["mode"] == "launch"
+        and fit["new_build_image"] == 4 * op.G
+        and fit["new_builder_evidence"] == fit["new_holding_evidence"] == op.META
+        and fit["serial_compiler_memory"] == fit["serial_holding_memory"] == 2 * op.G
+        and fit["dashboard_rotation_memory"] == DASHBOARD_RAM
+        and fit["raw_holding_restore"] == op.SLOT,
+        "compiler is outside the jointly funded booking",
+    )
+    op.fixed(
+        op.PROVIDER, "a8d2139c524f06d38329cb9c7ab00ab036f26f1adbba3b3b501b365511fed471"
+    )
+    provider = runpy.run_path(str(op.PROVIDER))
+    now = provider["props"](unit)
+    terminal = None
+    if now["ActiveState"] == "active":
+        op.need(
+            not now["Job"]
+            and now["ControlPID"] == "0"
+            and now["InvocationID"] == iid
+            and now["MainPID"] == native["MainPID"]
+            and now["ControlGroup"] == native["ControlGroup"]
+            and now["MemoryMax"] == str(2 * op.G)
+            and now["MemorySwapMax"] == "0"
+            and now["CPUQuotaPerSecUSec"] == "1s",
+            "compiler invocation, cgroup or hard limits changed",
+        )
+        proc = Path("/proc") / now["MainPID"]
+        group = Path("/sys/fs/cgroup" + native["ControlGroup"])
+        op.need(
+            (proc / "cgroup").read_text().strip() == "0::" + native["ControlGroup"]
+            and now["MainPID"] in (group / "cgroup.procs").read_text().split()
+            and (group / "memory.max").read_text().strip() == str(2 * op.G)
+            and (group / "memory.swap.max").read_text().strip() == "0"
+            and (group / "cpu.max").read_text().split() == ["100000", "100000"],
+            "compiler kernel reservation changed",
+        )
+    else:
+        op.need(
+            now["ActiveState"] in ("inactive", "failed")
+            and not now["Job"]
+            and now["MainPID"] == now["ControlPID"] == "0"
+            and not now["ControlGroup"],
+            "compiler did not drain",
+        )
+        terminal = provider["terminal"](unit, iid)
+        op.need(
+            terminal["invocation_id"] == iid and terminal["unit"] == unit,
+            "different compiler terminal",
+        )
+    image = directory / "compiler.ext4"
+    allocated = 0
+    if os.path.lexists(image):
+        st = image.lstat()
+        op.need(
+            image.resolve(strict=True) == image
+            and (st.st_dev, st.st_ino) == (64512, 97854169)
+            and (st.st_uid, st.st_gid, st.st_nlink, st.st_size) == (0, 0, 1, 4 * op.G)
+            and stat.S_ISREG(st.st_mode)
+            and stat.S_IMODE(st.st_mode) == 0o600,
+            "compiler fixed image was replaced",
+        )
+        allocated = min(st.st_blocks * 512, st.st_size)
+    op.need(
+        terminal is not None or allocated == 4 * op.G,
+        "active compiler image is not completely provisioned",
+    )
+    op.need(provider["props"](unit) == now, "compiler changed during price")
+    return dict(
+        launch=launch_ref,
+        intent=launch["intent"],
+        fit=launch["fit"],
+        unit=unit,
+        invocation=iid,
+        kernel=now,
+        terminal=terminal,
+        image_path=str(image),
+        image_inode=97854169,
+        image_physically_funded_bytes=allocated,
+    )
+
+
+def margins(base, funded, image_allocated=0):
     op.need(
         funded["build_and_native_qualification_serial"]
         and funded["holding_and_build_may_overlap"]
@@ -200,8 +299,16 @@ def margins(base, funded):
         funded["build_fixed_image_bytes"] + funded["build_outside_allowance_bytes"]
     )
     ram_margin = base["ram_margin"] - DASHBOARD_RAM
+    op.need(
+        0 <= image_allocated <= funded["build_fixed_image_bytes"],
+        "compiler image outside its fixed cap",
+    )
+    live_home = (
+        base["available_home"] - base["required_home"] - extra_home + image_allocated
+    )
+    historical_home = base["historical_home_margin"] - extra_home
     return dict(
-        remaining_home=disk - extra_home,
+        remaining_home=min(live_home, historical_home),
         remaining_ram=0
         if ram_margin < 0
         else funded["holding_memory_bytes"] + ram_margin,
@@ -255,7 +362,12 @@ def price():
         "the separately charged compiler slot is not retained",
     )
     serial_owner()
-    rooms = margins(base, fleet["retry9_auxiliary_commitments"])
+    compiler = compiler_reservation()
+    rooms = margins(
+        base,
+        fleet["retry9_auxiliary_commitments"],
+        compiler["image_physically_funded_bytes"],
+    )
     return dict(
         basis=base,
         utc=time.time(),
@@ -264,6 +376,7 @@ def price():
         floor=base["available_home"] - rooms["remaining_home"],
         serial_slot=op.SLOT,
         qualified_price=qualified,
+        compiler=compiler,
         resource_credit_bytes=0,
         **rooms,
     )

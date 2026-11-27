@@ -29,7 +29,7 @@ SEVEN = RT / "epoch141-foundation-seventh-bootstrap-20261127-v1"
 PREVIOUS = RT / "epoch185-lanem-main-holding-20261127-v1"
 OPLOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 TOOLS = Path(__file__).resolve().parent
-FOLLOWON = OUT / "n-tools-v2"
+FOLLOWON = OUT / "n-tools-v3"
 MAPPING = Path(
     "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json"
 )
