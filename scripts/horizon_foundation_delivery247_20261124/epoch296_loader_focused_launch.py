@@ -143,7 +143,7 @@ def current_fit(kit, roster, root, scope):
     if scope is SECOND_HOURLY_230:
         protected_cpus = set().union(*(cpus(Path(
             f"/sys/devices/system/cpu/cpu{cpu}/topology/thread_siblings_list"
-        ).read_text().strip()) for cpu in selected))
+        ).read_text().replace(",", " ")) for cpu in selected))
         assert selected <= protected_cpus
     listing = subprocess.check_output(
         ["systemctl", "list-units", "--type=service", "--state=running,activating",
