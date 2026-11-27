@@ -10,8 +10,8 @@ const GUARD: &str = "horizon-252-regional-singleton-protective-v1.service";
 const HANDOFF: &str = "/var/lib/jetstreamer/horizon252-local-delivery-handoff-v1/completion.json";
 const ARCHIVE: &str = "/home/ubuntu/.jetstreamer-private/qualification-252-regional-singleton-v1/output/epoch-252.jet";
 const PREPARATION: &str =
-    "/var/lib/jetstreamer/horizon252-current-reader-preparation-v1/preparation.json";
-const PREPARATION_SHA: &str = "072823b7e12bb1d0a2277958427f233b7789af58712ea6c867a3722429ae5d05";
+    "/var/lib/jetstreamer/horizon252-current-reader-preparation-v2/preparation.json";
+const PREPARATION_SHA: &str = "395e7ef4e8a37bab73514fe963502f1d634a08f6d1eda5ae85414ffc46331367";
 
 pub(super) fn terminal(n: &mut Native, booking: &Value) -> Result<Option<Bound>> {
     let path = Path::new(HANDOFF);

@@ -10,8 +10,8 @@ use std::{
 };
 
 const PREPARATION: &str =
-    "/var/lib/jetstreamer/horizon252-current-reader-preparation-v1/preparation.json";
-const PREPARATION_SHA: &str = "072823b7e12bb1d0a2277958427f233b7789af58712ea6c867a3722429ae5d05";
+    "/var/lib/jetstreamer/horizon252-current-reader-preparation-v2/preparation.json";
+const PREPARATION_SHA: &str = "395e7ef4e8a37bab73514fe963502f1d634a08f6d1eda5ae85414ffc46331367";
 const REGISTRATION: &str =
     "/var/lib/jetstreamer/horizon252-regional-full-guard-v1/cadence-registration.json";
 const REGISTRATION_SHA: &str = "c73710d47b6876370b332ca36369eeeeb7793cd78e3e0ed60877739efb0a921a";

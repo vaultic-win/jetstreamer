@@ -1,0 +1,15 @@
+--- a/delivery261.py
++++ b/delivery261.py
+@@ -25 +25 @@
+-            V / "horizon252-current-reader-preparation-v1",
++            V / "horizon252-current-reader-preparation-v2",
+@@ -27,2 +27,2 @@
+-            {"path": str(V / "horizon252-current-reader-plan-v1/epoch-252-plan.json"),
+-             "sha256": "6ba28009779196b5e3cfa7d899c9a671df20c79f1230770b98e90a000a3de7e7"})
++            {"path": str(V / "horizon252-current-reader-plan-v2/epoch-252-plan.json"),
++             "sha256": "b272a3372d3e6b0fd5239b50ec3eb9c4ed4b8617db8952238488b62ed456aa77"})
+@@ -82,3 +82 @@
+-        directory = V / "horizon252-delivery-fleet-v2"
+-        if not (directory / "acceptance.json").is_file():
+-            directory = V / "horizon252-delivery-fleet-v1"
++        directory = V / "horizon252-delivery-fleet-v3"

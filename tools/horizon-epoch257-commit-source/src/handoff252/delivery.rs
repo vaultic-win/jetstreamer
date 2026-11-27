@@ -5,11 +5,12 @@ use std::{collections::BTreeSet, mem::MaybeUninit, os::unix::fs::FileTypeExt, ti
 const STATE: &str = "/var/lib/jetstreamer/horizon252-current-reader-delivery-v1";
 const UNIT: &str = "horizon-upload-252-current-reader-v1.service";
 const PROFILE: &str =
-    "/var/lib/jetstreamer/horizon252-delivery-service-preparation-v1/service-profile.json";
-const PROFILE_SHA: &str = "1910d51429d25490591b775af11bcfd94eb3c5bac957480c0838727f9f2cfca2";
-const RELEASES: [&str; 2] = [
+    "/var/lib/jetstreamer/horizon252-delivery-service-preparation-v2/service-profile.json";
+const PROFILE_SHA: &str = "71ddd3444bc9fd83922ce0f971d154fdaf598022fa469c9b834e34dbb042580a";
+const RELEASES: [&str; 3] = [
     "/var/lib/jetstreamer/horizon252-delivery-fleet-v1/acceptance.json",
     "/var/lib/jetstreamer/horizon252-delivery-fleet-v2/acceptance.json",
+    "/var/lib/jetstreamer/horizon252-delivery-fleet-v3/acceptance.json",
 ];
 const FILESYSTEM: &str = "/var/lib/jetstreamer";
 const CONTROLLER: &str = "/var/lib/jetstreamer/horizon-seven-publication-controller-v222";

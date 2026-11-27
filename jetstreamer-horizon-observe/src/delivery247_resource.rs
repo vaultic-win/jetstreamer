@@ -548,7 +548,11 @@ impl OrdinaryEpoch {
     }
     fn image(self) -> (&'static str, &'static str) {
         match self {
-            Self::Current252 | Self::Current257 | Self::Retry257 | Self::Current261 => {
+            Self::Current252 => (
+                "/var/lib/jetstreamer/horizon252-public-images-d58e4a50-v1/jetstreamer-r2",
+                "c9def1ad9a572567ccea2278c23c98758270f83e8ffc271921a8f2e867ceea3f",
+            ),
+            Self::Current257 | Self::Retry257 | Self::Current261 => {
                 (staged::CURRENT257_IMAGE, staged::CURRENT257_IMAGE_SHA)
             }
             Self::Staged211
@@ -571,7 +575,7 @@ impl OrdinaryEpoch {
             Self::Epoch250 => "12e68ddf9b6d2505b6090688b5a3cfa4e720242b264cf2a6e7993b9b02f910c2",
             Self::Staged250 => "e96999d456f560fcdc1e1c2c29d11bb4fac9adde7d127542112fe77451c49aa0",
             Self::Epoch251 => "1c815780661e8b502634caff4a2b0d783e831fccc27c612d6a94c3480d00e318",
-            Self::Current252 => "6ba28009779196b5e3cfa7d899c9a671df20c79f1230770b98e90a000a3de7e7",
+            Self::Current252 => "b272a3372d3e6b0fd5239b50ec3eb9c4ed4b8617db8952238488b62ed456aa77",
             Self::Current257 => "a4a86f9d1a571c15f89e76be632c5dd69509d412cd0d46414699e82ba64abf07",
             Self::Retry257 => "8f880f488d6732da513716d1dda8073451afe773906fc761f525223567b4dc49",
             Self::Current261 => "e0b08c8ffdd57dba7d3e24cb4bb24990aae95d88d9ec2e577a4962899c5736f1",
@@ -613,8 +617,8 @@ impl OrdinaryEpoch {
                 let (source, receipts, plan) = match self {
                     Self::Current252 => (
                         "/home/ubuntu/.jetstreamer-private/qualification-252-regional-singleton-v1/output",
-                        "/var/lib/jetstreamer/horizon252-current-reader-preparation-v1/receipts",
-                        "/var/lib/jetstreamer/horizon252-current-reader-plan-v1/epoch-252-plan.json",
+                        "/var/lib/jetstreamer/horizon252-current-reader-preparation-v2/receipts",
+                        "/var/lib/jetstreamer/horizon252-current-reader-plan-v2/epoch-252-plan.json",
                     ),
                     Self::Current261 => (
                         "/home/ubuntu/.jetstreamer-private/qualification-261-singleton-v1/output",
