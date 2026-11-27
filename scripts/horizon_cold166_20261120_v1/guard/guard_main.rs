@@ -634,6 +634,9 @@ fn supported_unit(plan: &Plan) -> bool {
     if plan.unit == "horizon-qualify-141-first-hourly-20261127-v1.service" {
         return cfg!(feature = "epoch141-first-hourly");
     }
+    if plan.unit == "horizon-qualify-141-third-hourly-20261127-v1.service" {
+        return cfg!(feature = "epoch141-third-hourly");
+    }
     if plan.unit == "horizon-qualify-143-first-hourly-20261127-v1.service" {
         return cfg!(feature = "epoch143-first-hourly");
     }
@@ -697,6 +700,7 @@ fn validate_plan(plan: &Plan) -> Result<()> {
     feature = "epoch170-checkpoint-continuation",
     feature = "epoch140-suffix-recording",
     feature = "epoch141-first-hourly",
+    feature = "epoch141-third-hourly",
     feature = "epoch143-first-hourly"
 ))]
 fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
@@ -711,6 +715,20 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
             (
                 "/home/sol/.jetstreamer-private/epoch141-first-hourly-20261127-v1",
                 "/var/lib/jetstreamer/horizon_runtime_data/epoch141-first-hourly-20261127-v1/guard-receipts",
+                9_470_567_509_909,
+                TREE_CAP,
+            )
+        }
+        #[cfg(feature = "epoch141-third-hourly")]
+        "horizon-qualify-141-third-hourly-20261127-v1.service" => {
+            const TREE_CAP: u64 = 44 << 30;
+            ensure!(
+                plan.maximum_root_physical_bytes == Some(TREE_CAP),
+                "epoch 141 third hourly replay requires its 44 GiB guard cap"
+            );
+            (
+                "/home/sol/.jetstreamer-private/epoch141-third-hourly-20261127-v1",
+                "/var/lib/jetstreamer/horizon_runtime_data/epoch141-third-hourly-20261127-v1/guard-receipts",
                 9_470_567_509_909,
                 TREE_CAP,
             )
@@ -1027,6 +1045,50 @@ fn first_hourly_141_requires_its_own_tree_and_cap() {
     }
 }
 
+#[cfg(all(test, feature = "epoch141-third-hourly"))]
+#[test]
+fn third_hourly_141_requires_its_own_tree_and_cap() {
+    let plan = json!({
+        "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+        "unit": "horizon-qualify-141-third-hourly-20261127-v1.service",
+        "invocation_id": "0123456789abcdef0123456789abcdef",
+        "filesystem": "/home/sol",
+        "worker_root": "/home/sol/.jetstreamer-private/epoch141-third-hourly-20261127-v1",
+        "receipt_directory": "/var/lib/jetstreamer/horizon_runtime_data/epoch141-third-hourly-20261127-v1/guard-receipts",
+        "minimum_free_bytes": 9_470_567_509_909u64,
+        "maximum_root_physical_bytes": 44u64 << 30,
+        "maximum_worker_vmas": 3_500_000
+    });
+    let parse = |value| serde_json::from_value::<Plan>(value).unwrap();
+    let baseline = parse(plan.clone());
+    validate_plan(&baseline).unwrap();
+    validate_checkpoint_scope(&baseline).unwrap();
+    let mut higher_floor = plan.clone();
+    higher_floor["minimum_free_bytes"] = json!(9_470_567_509_910u64);
+    validate_checkpoint_scope(&parse(higher_floor)).unwrap();
+    for (key, value) in [
+        (
+            "unit",
+            json!("horizon-qualify-141-first-hourly-20261127-v1.service"),
+        ),
+        (
+            "worker_root",
+            json!("/home/sol/.jetstreamer-private/epoch141-first-hourly-20261127-v1"),
+        ),
+        (
+            "receipt_directory",
+            json!("/var/lib/jetstreamer/horizon_runtime_data"),
+        ),
+        ("minimum_free_bytes", json!(9_470_567_509_908u64)),
+        ("maximum_root_physical_bytes", json!((44u64 << 30) + 1)),
+        ("maximum_root_physical_bytes", json!((44u64 << 30) - 1)),
+    ] {
+        let mut foreign = plan.clone();
+        foreign[key] = value;
+        assert!(validate_checkpoint_scope(&parse(foreign)).is_err(), "{key}");
+    }
+}
+
 fn data_proof_trip(error: Option<&str>) -> Option<&'static str> {
     error.map(|_| "DATA-fulfillment-observation-failed")
 }
@@ -1083,6 +1145,7 @@ fn run() -> Result<()> {
         feature = "epoch170-checkpoint-continuation",
         feature = "epoch140-suffix-recording",
         feature = "epoch141-first-hourly",
+        feature = "epoch141-third-hourly",
         feature = "epoch143-first-hourly"
     ))]
     validate_checkpoint_scope(&plan)?;
@@ -1094,6 +1157,7 @@ fn run() -> Result<()> {
         feature = "epoch170-checkpoint-continuation",
         feature = "epoch140-suffix-recording",
         feature = "epoch141-first-hourly",
+        feature = "epoch141-third-hourly",
         feature = "epoch143-first-hourly"
     )))]
     ensure!(
