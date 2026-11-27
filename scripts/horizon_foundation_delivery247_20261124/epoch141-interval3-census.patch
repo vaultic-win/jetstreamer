@@ -1,6 +1,6 @@
 --- a/cycle.py
 +++ b/cycle.py
-@@ -1079,18 +1079,23 @@
+@@ -1079,18 +1079,24 @@
          plan["gates"]["296"]["next_action"] = (
              "Reassess full replay after a measured disk reservation release. "
              "The repaired production worker is sealed and the bounded failure transaction matched canonical execution.")
@@ -20,10 +20,13 @@
          current = props(private_unit, ["ActiveState", "InvocationID", "MainPID"])
          if current["ActiveState"] == "active":
              assert current["InvocationID"] == registration["invocation_id"] and int(current["MainPID"]) > 0
-+            active_private_intervals += 1
-         assert private_unit not in plan["tracked_units"]
-         plan["tracked_units"].append(private_unit)
+-        assert private_unit not in plan["tracked_units"]
+-        plan["tracked_units"].append(private_unit)
 -        cohort += "-private141"
++            active_private_intervals += 1
++        assert plan["tracked_units"].count(private_unit) <= 1
++        if private_unit not in plan["tracked_units"]:
++            plan["tracked_units"].append(private_unit)
 +        cohort += cohort_label
 +    assert active_private_intervals <= 1
      binding=record(out/f'seven-owner-plan-{cohort}.json',plan)
