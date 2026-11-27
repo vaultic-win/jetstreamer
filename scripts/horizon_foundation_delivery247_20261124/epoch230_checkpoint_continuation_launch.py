@@ -145,7 +145,7 @@ def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, de
 
 
 def activate_guarded(kit, epoch, state, tokens, producer_unit, guard_unit, guard, template, launch,
-                     props, prestart, argv):
+                     props, prestart, argv, *, on_held=None, before_release=None):
     ops, runner, startup = kit.ops, kit.replay, kit.startup
     receipts = state / 'guard-receipts'
     timer_unit = guard_unit.replace('.service', '.timer')
@@ -158,8 +158,11 @@ def activate_guarded(kit, epoch, state, tokens, producer_unit, guard_unit, guard
             return row
         return None
 
-    iid = startup.until(held, 12)['InvocationID']
+    prestart_owner = startup.until(held, 12)
+    iid = prestart_owner['InvocationID']
     assert re.fullmatch('[0-9a-f]{32}', iid)
+    if on_held is not None:
+        on_held(prestart_owner)
     plan = ops.funds.put(state / 'guard-plan.json', dict(template, invocation_id=iid))
     guard_props = ['--property=Type=oneshot', '--property=User=root', '--property=UMask=0077',
                    '--property=Restart=no', '--property=MemoryMax=1G', '--property=MemorySwapMax=0',
@@ -188,6 +191,9 @@ def activate_guarded(kit, epoch, state, tokens, producer_unit, guard_unit, guard
     (first, sample), completed = startup.until(guard_completed, 32)
     clock, next_tick = startup.until(runner.timer_ready, 10)
     assert held()['InvocationID'] == iid and sample['root_physical_observation_error'] is None
+    if before_release is not None:
+        before_release(prestart_owner, plan, sample, clock, next_tick)
+        assert held() == prestart_owner and time.monotonic_ns() // 1000 < next_tick
     token_dir = tokens / iid
     token_dir.mkdir(mode=0o755)
     token_dir.chmod(0o755)

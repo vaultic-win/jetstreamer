@@ -5,6 +5,7 @@ mod delivery252;
 mod focused;
 mod replay258;
 mod replay260;
+mod replay296;
 use focused::{
     FEATURE_296, GAP_230, HOURLY_230, LOADER_296, RESTORE_258, RESTORE_260, SCOPES, TRACE_296,
 };
@@ -103,9 +104,10 @@ const CLAIM_261: (&str, &str) = (
 );
 const UPLOAD_261_MEMORY: u64 = 64 << 30;
 const UPLOAD_261_DISK: u64 = 1 << 30;
-const REGISTERED_REPLAYS: [ReplayRegistration; 4] = [
+const REGISTERED_REPLAYS: [ReplayRegistration; 5] = [
     replay258::REGISTRATION,
     replay260::REGISTRATION,
+    replay296::REGISTRATION,
     ReplayRegistration {
         epoch: 262,
         unit: "horizon-qualify-262-singleton-v1.service",
@@ -153,6 +155,7 @@ enum Quote {
 }
 
 struct Replay296Quote {
+    placement: replay296::Placement,
     prior_fit: Bound,
     worker: Bound,
     checkpoint: Bound,
@@ -205,6 +208,8 @@ fn full_replay_quote() -> Result<FullReplayQuote> {
 }
 
 fn replay_296_quote(n: &mut Native) -> Result<Replay296Quote> {
+    let placement = replay296::placement()?;
+    replay296::verify_topology(&placement)?;
     let (worker, checkpoint) = focused::feature_296_terminal(n)?;
     let prior_fit = Bound::new(RECOVERY_296.0, RECOVERY_296.1);
     let prior = prior_fit.sealed()?;
@@ -228,6 +233,7 @@ fn replay_296_quote(n: &mut Native) -> Result<Replay296Quote> {
         "epoch 296 replay sizing or worker evidence changed"
     );
     Ok(Replay296Quote {
+        placement,
         prior_fit,
         worker,
         checkpoint,
@@ -347,30 +353,56 @@ fn live_replay(n: &mut Native, spec: &ReplayRegistration) -> Result<LiveReplay> 
         Bound::new(receipt.0, receipt.1)
     };
     let registered = reference.sealed()?;
-    let profile = binding(&registered["profile"])?.sealed()?;
+    let profile_ref = binding(&registered["profile"])?;
+    let profile = profile_ref.sealed()?;
     let admission = binding(&registered["admission"])?.sealed()?;
     let handoff = binding(&registered["handoff"])?.sealed()?;
     let admitted_fit = binding(&admission["roster"])?.sealed()?;
-    let inputs_ref = binding(&profile["inputs"])?;
-    match epoch {
-        replay258::EPOCH => replay258::check_live_binding(
+    let (node, root, cap, memory_cap, cpus) = if unit == replay296::UNIT {
+        replay296::check_live_binding(
+            n,
             &registered,
-            &profile,
             &admission,
             &admitted_fit,
-            &inputs_ref,
-        )?,
-        replay260::EPOCH => {
-            replay260::check_live_binding(&registered, &admission, &admitted_fit, &inputs_ref)?
-        }
-        _ => {}
-    }
-    let inputs = inputs_ref.sealed()?;
-    let node = binding(if epoch == replay258::EPOCH {
-        &inputs["inputs"][node_key]
+            &profile_ref,
+            &profile,
+        )?;
+        (
+            binding(&profile["node"])?,
+            &profile["run_root"],
+            num(&profile["requested_cap"], "whole_tree_bytes")?,
+            num(&profile["requested_cap"], "producer_memory_bytes")?,
+            replay296::CPUS,
+        )
     } else {
-        &inputs[node_key]
-    })?;
+        let inputs_ref = binding(&profile["inputs"])?;
+        match epoch {
+            replay258::EPOCH => replay258::check_live_binding(
+                &registered,
+                &profile,
+                &admission,
+                &admitted_fit,
+                &inputs_ref,
+            )?,
+            replay260::EPOCH => {
+                replay260::check_live_binding(&registered, &admission, &admitted_fit, &inputs_ref)?
+            }
+            _ => {}
+        }
+        let inputs = inputs_ref.sealed()?;
+        let node = binding(if epoch == replay258::EPOCH {
+            &inputs["inputs"][node_key]
+        } else {
+            &inputs[node_key]
+        })?;
+        (
+            node,
+            &profile["worker_root"],
+            num(&profile, "maximum_root_physical_bytes")?,
+            num(&profile, "maximum_memory_bytes")?,
+            text(&profile, "allowed_cpus")?,
+        )
+    };
     node.artifact()?;
     let owner = n.show_fields(unit, OWNER_FIELDS)?;
     let invocation = text(&registered, "invocation_id")?;
@@ -380,16 +412,38 @@ fn live_replay(n: &mut Native, spec: &ReplayRegistration) -> Result<LiveReplay> 
     let sealed = fs::metadata(&node.path)?;
     let sample_ref = binding(&registered["active_guard"])?;
     let sample = sample_ref.json()?;
-    let guard_plan = Bound::new(text(&sample, "plan")?, text(&sample, "plan_sha256")?).sealed()?;
+    let guard_plan_ref = Bound::new(text(&sample, "plan")?, text(&sample, "plan_sha256")?);
+    let guard_plan = guard_plan_ref.sealed()?;
+    if unit == replay296::UNIT {
+        let cg = Path::new("/sys/fs/cgroup/system.slice").join(unit);
+        ensure!(
+            units::parse_cpu_list(&fs::read_to_string(cg.join("cpuset.cpus.effective"))?)?
+                == units::parse_cpu_list(replay296::CPUS)?,
+            "epoch 296 effective producer CPUs changed"
+        );
+        let argv = profile["argv"]
+            .as_array()
+            .context("epoch 296 replay arguments")?;
+        let mut expected_argv = Vec::new();
+        for argument in argv {
+            expected_argv
+                .extend_from_slice(argument.as_str().context("epoch 296 argument")?.as_bytes());
+            expected_argv.push(0);
+        }
+        ensure!(
+            fs::read(format!("/proc/{pid}/cmdline"))? == expected_argv
+                && handoff["admission"] == registered["admission"]
+                && handoff["guard_plan"] == json!(guard_plan_ref),
+            "epoch 296 replay command or handoff differs from the bound invocation"
+        );
+    }
     let floor = num(&admission, "guard_minimum_free_bytes")?;
-    let cap = num(&profile, "maximum_root_physical_bytes")?;
-    let memory_cap = num(&profile, "maximum_memory_bytes")?;
     ensure!(
         registered["schema"] == schema
             && registered["epoch"] == epoch
             && registered["unit"] == unit
             && registered["main_pid"] == pid
-            && registered["run_root"] == profile["worker_root"]
+            && registered["run_root"] == *root
             && registered["run_root"] == guard_plan["worker_root"]
             && handoff["ready"] == false
             && handoff["producer"] == unit
@@ -403,7 +457,7 @@ fn live_replay(n: &mut Native, spec: &ReplayRegistration) -> Result<LiveReplay> 
                 == capacity::add(cap, receipt_disk)?
             && admitted_fit["capacity"]["candidate_total_memory_bytes"]
                 == capacity::add(memory_cap, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?
-            && owner["AllowedCPUs"] == profile["allowed_cpus"]
+            && owner["AllowedCPUs"] == cpus
             && (running.dev(), running.ino()) == (sealed.dev(), sealed.ino()),
         "epoch {epoch} replay booking or live invocation changed"
     );
@@ -919,6 +973,7 @@ fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
             (scoped
                 && unit != vote_boundary::GUARD_SERVICE
                 && unit != suffix226::GUARD_SERVICE
+                && unit != replay296::GUARD_SERVICE
                 && !SCOPES
                     .iter()
                     .any(|spec| unit == format!("{}.service", spec.guard))
@@ -994,11 +1049,13 @@ fn guard_binding(
             "HORIZON262_GUARD_PLAN_SHA256",
             "${HORIZON262_GUARD_PLAN_SHA256}",
         )),
-        296 if !SCOPES.iter().any(|scope| guard == scope.guard) => Some((
-            GUARD_ENV_296,
-            "HORIZON296_GUARD_PLAN_SHA256",
-            "${HORIZON296_GUARD_PLAN_SHA256}",
-        )),
+        296 if guard != replay296::GUARD && !SCOPES.iter().any(|scope| guard == scope.guard) => {
+            Some((
+                GUARD_ENV_296,
+                "HORIZON296_GUARD_PLAN_SHA256",
+                "${HORIZON296_GUARD_PLAN_SHA256}",
+            ))
+        }
         _ => None,
     };
     let plan_arg = if let Some((path, variable, argument)) = guard_environment {
@@ -1247,6 +1304,11 @@ fn measure(
                 "epoch {} full replay already owns its lane",
                 spec.epoch
             );
+            ensure!(
+                !live_replays.contains_key(&spec.epoch),
+                "epoch {} has duplicate replay owners",
+                spec.epoch
+            );
             live_replays.insert(spec.epoch, live_replay(n, spec)?);
         }
     }
@@ -1382,10 +1444,15 @@ fn measure(
         258 => RESTORE_258.cpus,
         260 => RESTORE_260.cpus,
         252 | 261 => "24-31",
+        296 if matches!(&quote, Some(Quote::Replay296(_))) => replay296::CPUS,
         296 => "56-63",
         _ => "40-47",
     })?;
     let cpus = units::affinity(&json!({"cpu_affinity":selected}))?;
+    let exclusive = match &quote {
+        Some(Quote::Replay296(replay)) => &replay.placement.exclusive_cpus,
+        _ => &selected,
+    };
     let mut recorded = BTreeMap::new();
     for unit in booked
         .iter()
@@ -1409,18 +1476,24 @@ fn measure(
             live::same_owner(prior, &owner)?;
         }
         let cap = text(&owner, "MemoryMax")?.parse()?;
-        require_disjoint_cpus(epoch, &selected, unit, &owner)?;
+        require_disjoint_cpus(epoch, exclusive, unit, &owner)?;
         let memory = live::finite_owner(&owner, unit, text(&owner, "InvocationID")?, cap)?;
         let process_start_ticks = process_ticks(text(&owner, "MainPID")?.parse()?)?;
         recorded.insert(unit.clone(), (owner, memory, process_start_ticks));
     }
     for (_, owner, memory, ticks) in active_deliveries.values() {
         let unit = text(owner, "Id")?;
-        require_disjoint_cpus(epoch, &selected, unit, owner)?;
+        require_disjoint_cpus(epoch, exclusive, unit, owner)?;
         recorded.insert(unit.to_owned(), (owner.clone(), *memory, *ticks));
     }
     for replay in live_replays.values() {
-        require_disjoint_cpus(epoch, &selected, replay.unit, &replay.owner)?;
+        require_disjoint_cpus(epoch, exclusive, replay.unit, &replay.owner)?;
+        if replay.unit == replay296::UNIT {
+            ensure!(
+                selected.is_disjoint(&replay296::placement()?.exclusive_cpus),
+                "epoch {epoch} CPUs overlap the running epoch 296 physical cores"
+            );
+        }
         recorded.insert(
             replay.unit.to_owned(),
             (replay.owner.clone(), replay.memory, replay.ticks),
@@ -1471,7 +1544,14 @@ fn measure(
                 &booking["guard_growth"][guard_epoch.to_string()],
             )
         };
-        let guard = focused.map_or(guard, |spec| spec.guard);
+        let guard = if live_replays
+            .get(&guard_epoch)
+            .is_some_and(|row| row.unit == replay296::UNIT)
+        {
+            replay296::GUARD
+        } else {
+            focused.map_or(guard, |spec| spec.guard)
+        };
         guards.insert(
             guard_epoch,
             guard_binding(n, guard_epoch, guard, guard_booking, owner, device)?,
@@ -1763,7 +1843,8 @@ fn measure(
     if let Some(Quote::Replay296(quote)) = &quote {
         evidence["replay_296_quote"] = json!({
             "prior_fit":quote.prior_fit,"repaired_worker":quote.worker,
-            "checkpoint_qualification":quote.checkpoint,
+            "checkpoint_qualification":quote.checkpoint,"placement":quote.placement.reference,
+            "candidate_cpus":selected,"exclusive_online_cpus":quote.placement.exclusive_cpus,
             "candidate_disk_bytes":quote.disk,"candidate_memory_bytes":candidate,
             "closed_audit":closed_audit.as_ref().map(|(proof, _)| proof),
             "reserved_audit_memory_bytes":reserved_audit_memory,"closed_replay":closed_replay,
