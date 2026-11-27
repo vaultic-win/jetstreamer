@@ -184,6 +184,11 @@ STATE = ("Id", "LoadState", "ActiveState", "SubState", "InvocationID", "MainPID"
 
 
 def idle(unit, states=("inactive", "failed")):
+    if unit.endswith(".timer"):
+        row = props(unit, ("Id", "LoadState", "ActiveState", "SubState", "Job"))
+        need(row["ActiveState"] in states and not row["Job"]
+             and not (KERNEL/"system.slice"/unit).exists(), f"occupied timer: {unit}")
+        return
     row = props(unit, STATE)
     need(row["ActiveState"] in states and row["MainPID"] == row["ControlPID"] == "0"
          and not row["ControlGroup"] and not row["Job"]
