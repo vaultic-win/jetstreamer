@@ -27,7 +27,10 @@ mod route {
     pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/suffix-73706460-73879004-v1";
     pub(super) const SNAPSHOT: &str =
         "snapshot-73706460-3SF9c2ZeGqa8bL3mbVzeNeGNPCBgFBZCe2yj5r9pFUX7.tar.zst";
+    #[cfg(not(epoch170_bridge))]
     pub(super) const TERMINAL_SLOT: u64 = 73_879_004;
+    #[cfg(epoch170_bridge)]
+    pub(super) const TERMINAL_SLOT: u64 = 73_726_716;
 }
 use route::*;
 #[cfg(not(epoch170_suffix))]
@@ -36,15 +39,30 @@ const RELEASE_TIMEOUT: Duration = Duration::from_secs(180);
 const RELEASE_TIMEOUT: Duration = Duration::from_secs(600);
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(60);
 
+#[cfg(all(epoch170_bridge, not(epoch170_suffix)))]
+compile_error!("the short epoch 170 bridge must use the epoch 170 suffix gate");
+
 fn replay_args() -> Vec<String> {
+    #[cfg(not(epoch170_bridge))]
+    let (hashes, output, scratch) = (
+        "canonical-hashes.txt",
+        format!("epoch-{EPOCH}.diagnostic.jet"),
+        "scratch",
+    );
+    #[cfg(epoch170_bridge)]
+    let (hashes, output, scratch) = (
+        "bridge-hashes.txt",
+        format!("epoch-{EPOCH}.bridge-{TERMINAL_SLOT}.jet"),
+        "scratch/bridge-73726716",
+    );
     vec![
         EPOCH.to_string(),
         format!("{RUN}/ledger"),
         "--verify".into(),
         format!("--snapshot-archive={ALIAS}/{SNAPSHOT}"),
-        format!("--epoch-hashes={ALIAS}/canonical-hashes.txt"),
-        format!("--horizon-output={RUN}/ledger/epoch-{EPOCH}.diagnostic.jet"),
-        format!("--replay-scratch={RUN}/scratch"),
+        format!("--epoch-hashes={ALIAS}/{hashes}"),
+        format!("--horizon-output={RUN}/ledger/{output}"),
+        format!("--replay-scratch={RUN}/{scratch}"),
         format!("--qualification-end-slot={TERMINAL_SLOT}"),
     ]
 }
@@ -154,16 +172,33 @@ mod tests {
         assert_eq!(args[0], EPOCH.to_string());
         assert_eq!(args[2], "--verify");
         assert_eq!(args[3], format!("--snapshot-archive={ALIAS}/{SNAPSHOT}"));
+        #[cfg(not(epoch170_bridge))]
         assert_eq!(
             args[5],
             format!("--horizon-output={RUN}/ledger/epoch-{EPOCH}.diagnostic.jet")
         );
+        #[cfg(epoch170_bridge)]
+        {
+            assert_eq!(args[4], format!("--epoch-hashes={ALIAS}/bridge-hashes.txt"));
+            assert_eq!(
+                args[5],
+                format!("--horizon-output={RUN}/ledger/epoch-170.bridge-73726716.jet")
+            );
+            assert_eq!(
+                args[6],
+                format!("--replay-scratch={RUN}/scratch/bridge-73726716")
+            );
+            assert_eq!(
+                (EPOCH, args[7].as_str()),
+                (170, "--qualification-end-slot=73726716")
+            );
+        }
         #[cfg(not(epoch170_suffix))]
         assert_eq!(
             (EPOCH, args[7].as_str()),
             (166, "--qualification-end-slot=72004310")
         );
-        #[cfg(epoch170_suffix)]
+        #[cfg(all(epoch170_suffix, not(epoch170_bridge)))]
         assert_eq!(
             (EPOCH, args[7].as_str()),
             (170, "--qualification-end-slot=73879004")
