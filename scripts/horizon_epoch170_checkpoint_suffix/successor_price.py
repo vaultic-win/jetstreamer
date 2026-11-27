@@ -36,7 +36,7 @@ def cmd(*argv, timeout=120):
 
 def state(unit, fields=FIELDS):
     p = subprocess.run(["/usr/bin/systemctl", "show", "--all", "-p", fields, "--", unit],
-                       text=True, capture_output=True, timeout=10)
+                       text=True, capture_output=True, timeout=30)
     record = dict(line.split("=", 1) for line in p.stdout.splitlines())
     need(p.returncode in (0, 4) and record["Id"] == unit and set(fields.split(",")) <= record.keys(),
          "cannot identify " + unit)
@@ -261,11 +261,32 @@ def price(phase):
     build=bound(rr["141_build"])
     extra_home = 4*M + build["candidate_home_bytes"] + charged140_home + 2*M
     extra_ram = 3*G + 32*M + build["candidate_ram_bytes"] + charged140_ram
+    successor = phase in ("start","held")
+    if successor:
+        budget, rr["new_170_budget"]=read(DEP/"BOUNDED_GROWTH_FROM_ORIGINAL_170.json",
+                                          "04bb488a00b2cb853d6e21cb0b4ee3b12f4033fd9ff4fb7fbbe9ace1ad68a911")
+        need(budget["successor_interface"]==iref and budget["bounded_growth_limit"]==36*G
+             and budget["margin_above_prior_peak"]>2*G and budget["original_slots"]>=budget["successor_slots"],
+             "different bounded work set")
+        profile141,rr["reserved_141"]=read(RT/"epoch141-first-hourly-20261127-v1/contract-v1/LAUNCH_PROFILE.json",
+                                         "73a120db97d72a03c05c39139098a10cd6c84802f0f5472a1251f341976ce131")
+        need(end140 and profile141["producer_CPU_quota_micros"]+profile141["guard_CPU_quota_micros"]==3000000
+             and profile141["producer_RAM_bytes"]+profile141["guard_RAM_bytes"]==31*G
+             and profile141["guarded_HOME_bytes"]==44*G and profile141["separate_evidence_HOME_bytes"]==64*M,
+             "141 reservation changed or 140 loan remains outstanding")
+        extra_home += profile141["guarded_HOME_bytes"]+profile141["separate_evidence_HOME_bytes"]
+        extra_ram += profile141["producer_RAM_bytes"]+profile141["guard_RAM_bytes"]
     units={line.split()[0] for line in cmd("/usr/bin/systemctl","list-units","--plain","--no-legend",
          "--type=service","--state=running,activating,deactivating","horizon-qualify-*").splitlines()}
     expected={r["unit"]["Id"] for r in peer_rows}|{tail}
     if phase=="live": expected.add(BRIDGE)
     if phase=="held": expected.add(UNIT)
+    if successor and profile141["unit"] in units:
+        s141=state(profile141["unit"])
+        need(s141["CPUQuotaPerSecUSec"]=="2s" and s141["MemoryMax"]==str(30*G)
+             and s141["MemorySwapMax"]=="0" and not s141["Job"] and len(s141["InvocationID"])==32,
+             "141 exceeds its full charged contract")
+        expected.add(profile141["unit"])
     need(units == expected, "replay owner changed: "+repr(units ^ expected))
     bound(iref)
     after = availability()
@@ -279,7 +300,7 @@ def price(phase):
             freed = max(0,min(result["allocated_bytes_removed"],result["measured_net_free_bytes"]))
     home = min(before[0],after[0],fleet["complete_cycle_conservative_available_DATA_bytes"]+freed)
     ram = min(before[1],after[1])
-    candidate = 40*G if phase in ("start","held") else 0
+    candidate = budget["bounded_growth_limit"] if successor else 0
     required_ram = incumbent_ram+extra_ram
     floor = max(incumbent_home+extra_home,max(bound(ref)["minimum_free_bytes"] for ref in samples.values()))
     full_cap = 384*G
