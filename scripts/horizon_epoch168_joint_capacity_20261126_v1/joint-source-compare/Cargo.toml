@@ -10,9 +10,14 @@ publish = false
 name = "horizon-epoch168-joint-compare"
 path = "prefix_index.rs"
 
+[[bin]]
+name = "horizon-168-joint-lineage"
+path = "joint_lineage.rs"
+
 [dependencies]
 jetstreamer-horizon = { path = "../../../jetstreamer-horizon" }
 libc = "0.2"
 lencode = "2.0.0"
+serde_json = "1"
 sha2 = "0.10"
 xxhash-rust = { version = "0.8", features = ["xxh64"] }
