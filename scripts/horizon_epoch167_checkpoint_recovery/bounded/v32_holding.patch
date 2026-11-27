@@ -199,7 +199,7 @@
                  )
                  && active_cadence_basis(&quote)?,
              "occupied epoch 185 requires the sealed active fleet price"
-@@ -456,6 +593,50 @@
+@@ -456,6 +593,86 @@
  #[cfg(test)]
  mod tests {
      use super::*;
@@ -242,6 +242,42 @@
 +            &q,
 +            &changed,
 +            &ready,
++            &predecessor,
++            &prior_ready
++        ));
++    }
++
++    #[test]
++    fn v33_activation_keeps_the_v32_owner_and_terminal() {
++        let v32 = json!({"invocation_id":"v32","pid":17,"start_ticks":20});
++        let v33 = json!({"invocation_id":"v33","pid":23,"start_ticks":30});
++        let terminal = json!({"path":"terminal","sha256":"digest"});
++        let q = json!({
++            "v32_cadence":{"active":"active32","ready":"ready32","cadence_seal":"seal32"},
++            "v33_cadence":{"active":"active33","ready":"ready33","cadence_seal":"seal33"},
++            "status_registration":v33,"retained_170":{"terminal":terminal},
++        });
++        let active = json!({"ready":"ready33","old":v32,"new":v33,"producer_mutations":false});
++        let ready = json!({"old_owner":"active32","package":"seal33","full170_terminal":terminal});
++        let predecessor = json!({"ready":"ready32","new":v32});
++        let prior_ready = json!({"package":"seal32","full170_terminal":terminal});
++        assert!(same_registered_successor(
++            &q,
++            "v33_cadence",
++            "v32_cadence",
++            &active,
++            &ready,
++            &predecessor,
++            &prior_ready
++        ));
++        let mut crossed = ready.clone();
++        crossed["old_owner"] = json!("active31");
++        assert!(!same_registered_successor(
++            &q,
++            "v33_cadence",
++            "v32_cadence",
++            &active,
++            &crossed,
 +            &predecessor,
 +            &prior_ready
 +        ));
