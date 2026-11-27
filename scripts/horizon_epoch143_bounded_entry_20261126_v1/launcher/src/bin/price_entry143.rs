@@ -255,9 +255,29 @@ fn closed_167(anchor: &Value, guard: &Value, processes: &Value) -> Result<Option
         return Ok(None);
     }
     let invocation = string(&actor["invocation_id"])?;
+    let unloaded = property(&props, "InvocationID")?.is_empty()
+        && property(&props, "ActiveState")? == "inactive";
+    let terminal = if unloaded {
+        let receipt = read(&json!({
+            "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch167-checkpoint-bounded-20261127-v2/BOUNDED_V2_TERMINAL.json",
+            "sha256": "402175a4e76a0ccdf0be6aa78f99276f96f6b60bf53f412dea0f730819107fca"
+        }))?;
+        ensure!(
+            receipt["guard_drained"] == true
+                && receipt["guard_plan"] == guard["plan"]
+                && receipt["schema"] == "horizon-epoch167-bounded-v2-terminal-v1"
+                && receipt["producer_invocation_id"] == invocation
+                && receipt["resource_credit_bytes"] == 0
+                && receipt["reservation_ending_bytes"] == 0,
+            "owner receipt does not prove the unloaded 167 guard drained"
+        );
+        Some(receipt["pid1_terminal_event"].clone())
+    } else {
+        None
+    };
     ensure!(
         matches!(property(&props, "ActiveState")?, "inactive" | "failed")
-            && property(&props, "InvocationID")? == invocation
+            && (unloaded || property(&props, "InvocationID")? == invocation)
             && property(&props, "MainPID")? == "0"
             && property(&props, "ControlPID")? == "0"
             && property(&props, "Job")?.is_empty(),
@@ -312,6 +332,12 @@ fn closed_167(anchor: &Value, guard: &Value, processes: &Value) -> Result<Option
         }
     }
     ensure!(matching.len() == 1, "167 lacks one PID1 terminal event");
+    if let Some(terminal) = terminal {
+        ensure!(
+            terminal == matching[0],
+            "167 owner receipt has a different native terminal"
+        );
+    }
     let plan = read(&guard["plan"])?;
     let cap = number(&guard["run_guard_cap_bytes"])?;
     ensure!(
@@ -542,6 +568,17 @@ fn main() -> Result<()> {
                 && property(&selector, "CPUQuotaPerSecUSec")? == "1s"),
         "167 retained prefix selector changed"
     );
+    let overlap = state("horizon-167-checkpoint-independent-overlap-20261127-v1.service")?;
+    let overlap_active = property(&overlap, "ActiveState")? == "active";
+    if overlap_active {
+        ensure!(
+            settled167.is_some()
+                && property(&overlap, "MemoryMax")? == (3 * GIB).to_string()
+                && property(&overlap, "MemorySwapMax")? == "0"
+                && property(&overlap, "CPUQuotaPerSecUSec")? == "500ms",
+            "independent 167 overlap limits changed"
+        );
+    }
     let fit_actor = if held {
         let lease_ref = &fleet["epoch143_bounded_entry_lease"];
         ensure!(
@@ -578,10 +615,19 @@ fn main() -> Result<()> {
     // The released 167 projection kept 782,740,762,624 bytes plus 6 GiB before
     // deducting current 146/172 residency; the bridge borrowed the existing 170 booking.
     let memory_before_residency = 782_740_762_624 + 6 * GIB;
-    let required_ram = memory_before_residency - resident + 4 * GIB + 192 * MIB + 8 * MIB;
+    let required_ram = memory_before_residency - resident
+        + 4 * GIB
+        + 192 * MIB
+        + 8 * MIB
+        + u64::from(overlap_active) * 3 * GIB;
     // No earlier disk commitments or recovered allocations become spendable here.
-    let required_home =
-        number(&native["armed_floor"])? + additional + growth167 + growth170 + 16 * MIB + 2 * MIB;
+    let required_home = number(&native["armed_floor"])?
+        + additional
+        + growth167
+        + growth170
+        + 16 * MIB
+        + 2 * MIB
+        + u64::from(overlap_active) * 64 * MIB;
     println!(
         "{}",
         json!({"schema":"horizon-incident-replay-fit-v1","phase":args[0],"fleet":fleet_ref,
