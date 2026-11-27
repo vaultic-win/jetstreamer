@@ -70,7 +70,7 @@ def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, ep
     if replacement:
         module = Path(price["path"])
         need(module.name == "price_hourly143.py" and module.parent.parent == profile.base
-             and module.parent.name in ({"booking-price-v4"} if v46 is not None else {"booking-price-v2", "booking-price-v3"})
+             and module.parent.name in ({"booking-price-v4", "booking-price-v5"} if v46 is not None else {"booking-price-v2", "booking-price-v3"})
              and Path(operator["path"]) == module.with_name("launch-first-hourly143.sh"),
              "foreign epoch 143 operator or price")
         sys.path.insert(0,str(module.parent))

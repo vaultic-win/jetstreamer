@@ -192,12 +192,19 @@ b=${1:?Pass the writer booking}
 bsha=${2:?Pass its verified SHA-256}
 exec 9<>/run/horizon-epoch171-to136-g1.operation.lock
 flock -n -x 9
-if [[ $epoch == 143 ]]; then assembly_clear; fi
+operator=$(realpath "$0")
+joint_assembly=0
+if [[ $epoch == 143 ]]; then
+    if [[ "$operator" == "$a/booking-price-v5/launch-first-hourly143.sh" ]]; then
+        joint_assembly=1
+    else
+        assembly_clear
+    fi
+fi
 test "$(realpath "$b")" = "$b"
 test "${b%/*}" = "$a"
 [[ $(stat -c %u:%g:%a:%h "$b") =~ ^0:0:4(00|44):1$ ]]
 test "$(sha "$b")" = "$bsha"
-operator=$(realpath "$0")
 jq -e --arg schema "horizon-epoch${epoch}-first-hourly-booking-v1" --argjson home "$home_charge" --argjson ram "$ram_charge" --arg path "$contract" --arg digest "$contract_sha" --arg op "$operator" --arg ops "$(sha "$operator")" \
     --arg unit "$unit" --arg writer "$writer" '
     .schema == $schema
@@ -223,6 +230,9 @@ timer_iid=$(jq -er '.sole_next_timer.invocation_id' "$b")
 price=$(jq -er '.sealed_price.path' "$b")
 reader=$(jq -er '.sealed_reader.path' "$b")
 test "$(sha "$price")" = "$(jq -er '.sealed_price.sha256' "$b")"
+if (( joint_assembly )); then
+    test "$price" = "$a/booking-price-v5/price_hourly143.py"
+fi
 test "$(sha "$reader")" = "$(jq -er '.sealed_reader.sha256' "$b")"
 runtime=$(jq -er '.runtime_max_seconds' "$b")
 latest=$(jq -er '.latest_start_unix_seconds' "$b")
@@ -345,7 +355,7 @@ if [[ $epoch == 143 ]]; then
     # Provider, custody and identity failures abort without a retry.
     for attempt in 1 2 3; do
         writer_live
-        assembly_clear
+        if (( ! joint_assembly )); then assembly_clear; fi
         test "$(value "$unit" InvocationID)" = "$iid"
         if screen "$a/POST_GUARD_SCREEN.json" "$iid"; then break; else screen_rc=$?; fi
         if (( screen_rc != 1 || attempt == 3 )); then exit "$screen_rc"; fi
@@ -358,7 +368,13 @@ jq -e --argjson floor "$floor" '
     .retained_required_home_bytes<=$floor
     and .available_home_bytes>=($floor+.candidate_home_bytes)' "$a/POST_GUARD_SCREEN.json" >/dev/null
 writer_live
-if [[ $epoch == 143 ]]; then assembly_clear; fi
+if [[ $epoch == 143 ]]; then
+    if (( joint_assembly )); then
+        "$price" --check-assembly-quote "$a/POST_GUARD_SCREEN.json" "$(sha "$a/POST_GUARD_SCREEN.json")"
+    else
+        assembly_clear
+    fi
+fi
 test "$(sha "$b")" = "$bsha"
 test "$(value "$unit" InvocationID)" = "$iid"
 test "$(value "$unit" MainPID)" = "$pid"

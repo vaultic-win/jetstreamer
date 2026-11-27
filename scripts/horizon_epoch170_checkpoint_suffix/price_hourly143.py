@@ -11,6 +11,11 @@ sys.path.insert(0,str(PACKAGE))
 import continuation_price as second
 import rollover143 as roll
 
+if PACKAGE.name == "booking-price-v5":
+    import assembly143_price
+else:
+    assembly143_price = None
+
 core = second.prior
 G, M = roll.G, roll.M
 TREE, EVIDENCE, RAM = 64*G,64*M,41*G
@@ -107,6 +112,7 @@ def price(fleet,sha,held=None,projection=False):
     else:
         core.inactive(roll.UNIT)
         own=None
+    assembly = assembly143_price.assembly.reservation() if assembly143_price else None
     before=core.availability()
     phase,peer=owner170()
     j=core.price("start" if peer is None else "held",attempt=second.OLD,
@@ -125,6 +131,10 @@ def price(fleet,sha,held=None,projection=False):
     quote=arithmetic(j,aux,peer,phase,t_res,peer_res,now,own["floor"] if own else 0)
     core.need(core.current_fleet()[1]==j["fleet"] and (not peer or core.state(peer["unit"])==peer["manager"])
               and (not own or core.state(roll.UNIT)==own["manager"]),"owner changed during 143 price")
+    if assembly is not None:
+        quote = assembly143_price.apply(quote, assembly, held, peer, TREE+EVIDENCE, RAM,
+                                        own["floor"] if own else 0)
+        assembly143_price.recheck(assembly)
     if projection:
         # No hypothetical release can be consumed by the launcher or booking writer.
         quote["projected_disk_fits"]=quote["disk_fits"]
@@ -139,6 +149,13 @@ def price(fleet,sha,held=None,projection=False):
 
 
 if __name__=="__main__":
+    if len(sys.argv) == 4 and sys.argv[1] == "--check-assembly-quote":
+        core.need(assembly143_price is not None, "epoch 143 has no reciprocal assembly pricing")
+        quote, _ = core.read(Path(sys.argv[2]), sys.argv[3])
+        core.need(quote["schema"] == "horizon-epoch143-first-hourly-replacement-fit-v1"
+                  and quote["disk_fits"] and quote["memory_fits"], "missing accepted 143 price")
+        assembly143_price.recheck(quote["assembly168"])
+        sys.exit(0)
     parser=argparse.ArgumentParser()
     parser.add_argument("fleet");parser.add_argument("sha");parser.add_argument("held",nargs="?")
     parser.add_argument("--project",action="store_true")

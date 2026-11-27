@@ -14,15 +14,16 @@ import price_hourly143 as funding
 
 def prepare(runtime, v46=None):
     core = funding.core
-    core.need(PACKAGE.parent == funding.roll.ROOT and PACKAGE.name in {"booking-price-v2", "booking-price-v3", "booking-price-v4"}
+    core.need(PACKAGE.parent == funding.roll.ROOT and PACKAGE.name in {"booking-price-v2", "booking-price-v3", "booking-price-v4", "booking-price-v5"}
               and runtime > 0, "invalid 143 booking interface")
-    core.need((PACKAGE.name == "booking-price-v4") == (v46 is not None), "143 booking writer pin is missing or unexpected")
+    core.need((PACKAGE.name in {"booking-price-v4", "booking-price-v5"}) == (v46 is not None), "143 booking writer pin is missing or unexpected")
     if PACKAGE.name in {"booking-price-v3", "booking-price-v4"}:
         assembly = "horizon-assemble-168-private-20261127-v1.service"
         state = core.state(assembly, "Id,ActiveState,MainPID,ControlPID,Job")
         core.need(state["ActiveState"] == "inactive" and state["MainPID"] == state["ControlPID"] == "0"
                   and not state["Job"] and not (Path("/sys/fs/cgroup/system.slice")/assembly).exists(),
                   "epoch 168 assembly already owns or is claiming the joint window")
+    if PACKAGE.name in {"booking-price-v3", "booking-price-v4", "booking-price-v5"}:
         reconciled, _ = core.read(funding.roll.ROOT/"failed-fa915d8326a34b589238d55833b3e846/RECONCILED.json")
         core.need(reconciled["failed_invocation"] == "fa915d8326a34b589238d55833b3e846"
                   and reconciled["release_absent"] and reconciled["resource_credit_bytes"] == 0,
