@@ -47,7 +47,7 @@ fn entry_present(path: &Path) -> Result<bool> {
         Err(e) => Err(e.into()),
     }
 }
-fn unchanged(t: &Target) -> Result<()> {
+pub(super) fn unchanged(t: &Target) -> Result<()> {
     ensure!(
         stamp(&exact(&t.path)?) == t.identity,
         "reviewed index changed: {}",
@@ -84,7 +84,7 @@ fn controls(r: &Review, tokens: &[String]) -> Result<()> {
     scan_consumers(&r.targets)
 }
 // Keep the per-index intent across a crash between unlink and the completion receipt.
-fn marker(dir: &Path, name: &str, v: &Value) -> Result<()> {
+pub(super) fn marker(dir: &Path, name: &str, v: &Value) -> Result<()> {
     let path = dir.join(name);
     if path.try_exists()? {
         let m = exact(&path)?;
@@ -203,18 +203,38 @@ pub(super) fn run(bytes: &[u8], review_sha: &str, image: &str, check_only: bool)
             "unbound historic producer"
         );
     }
-    controls(&r, &tokens)?;
-    let check = json!({"review":review_sha,"image":image,"content_sha256":INDEX_SHA,"retained_inode":r.retained.identity.ino,"targets":r.targets.iter().map(|t|t.identity.ino).collect::<Vec<_>>()});
+    retire_duplicates(
+        dir,
+        &r.retained,
+        &r.targets,
+        INDEX_SHA,
+        (review_sha, image),
+        check_only,
+        || controls(&r, &tokens),
+    )
+}
+
+pub(super) fn retire_duplicates(
+    dir: &Path,
+    retained: &Target,
+    targets: &[Target],
+    content_sha: &str,
+    (review_sha, image): (&str, &str),
+    check_only: bool,
+    controls: impl Fn() -> Result<()>,
+) -> Result<()> {
+    controls()?;
+    let check = json!({"review":review_sha,"image":image,"content_sha256":content_sha,"retained_inode":retained.identity.ino,"targets":targets.iter().map(|t|t.identity.ino).collect::<Vec<_>>()});
     if check_only {
-        for t in &r.targets {
+        for t in targets {
             unchanged(t)?;
         }
         ensure!(
-            digest(&r.retained.path)? == INDEX_SHA,
+            digest(&retained.path)? == content_sha,
             "retained index failed full readback"
         );
-        controls(&r, &tokens)?;
-        for t in &r.targets {
+        controls()?;
+        for t in targets {
             unchanged(t)?;
         }
         marker(dir, "CHECK.json", &check)?;
@@ -225,7 +245,7 @@ pub(super) fn run(bytes: &[u8], review_sha: &str, image: &str, check_only: bool)
         "independent check required"
     );
     marker(dir, "CHECK.json", &check)?;
-    for t in &r.targets {
+    for t in targets {
         let ino = t.identity.ino;
         let note = json!({"check":check,"path":t.path,"identity":t.identity});
         let intent = format!("{ino}.intent.json");
@@ -240,21 +260,21 @@ pub(super) fn run(bytes: &[u8], review_sha: &str, image: &str, check_only: bool)
                 "missing index without intent"
             );
         }
-        controls(&r, &tokens)?;
+        controls()?;
         marker(dir, &intent, &note)?;
         if exists {
             unlink_identity(&t.path, &t.identity)?;
         }
         ensure!(!entry_present(&t.path)?, "index remains");
-        unchanged(&r.retained)?;
+        unchanged(retained)?;
         marker(dir, &format!("{ino}.complete.json"), &note)?;
     }
-    controls(&r, &tokens)?;
-    let total: u64 = r.targets.iter().map(|t| t.identity.blocks * 512).sum();
+    controls()?;
+    let total: u64 = targets.iter().map(|t| t.identity.blocks * 512).sum();
     marker(
         dir,
         "COMPLETE.json",
-        &json!({"allocated_bytes_removed":total,"check":check,"retained":r.retained.path,"remote_mutations":false}),
+        &json!({"allocated_bytes_removed":total,"check":check,"retained":retained.path,"remote_mutations":false}),
     )
 }
 

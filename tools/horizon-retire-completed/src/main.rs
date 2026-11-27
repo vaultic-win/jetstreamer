@@ -34,6 +34,8 @@ use anza_closed_canaries::closed_bootstrap_cohort;
 mod anza_parked_183;
 
 #[cfg(feature = "anza-closed-canaries")]
+mod anza_156_index_copies;
+#[cfg(feature = "anza-closed-canaries")]
 mod anza_167_index_copies;
 #[cfg(feature = "anza-closed-canaries")]
 mod anza_stopped_167;
@@ -396,6 +398,35 @@ fn ready(epoch: u64, receipt: &Value, inventory: &Value) -> Result<()> {
     );
     Ok(())
 }
+fn authenticated_inventory(
+    binary: &Bound,
+    horizon: &Path,
+    receipts: &Path,
+    range: (u64, u64),
+) -> Result<Value> {
+    let bm = exact(&binary.path)?;
+    ensure!(
+        bm.uid() == 0 && bm.mode() & 0o022 == 0 && digest(&binary.path)? == binary.sha256,
+        "unqualified inventory binary"
+    );
+    let output = Command::new(&binary.path)
+        .env("TOKIO_WORKER_THREADS", "2")
+        .arg("inventory")
+        .arg(horizon)
+        .arg("--epochs")
+        .arg(format!("{}-{}", range.0, range.1))
+        .arg("--receipt-directory")
+        .arg(receipts)
+        .output()?;
+    ensure!(
+        output.status.success(),
+        "authenticated inventory failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    ensure!(output.stdout.len() <= LIMIT as usize, "oversized inventory");
+    Ok(serde_json::from_slice(&output.stdout)?)
+}
+
 fn check_target(t: &Target) -> Result<()> {
     let scope = match t.epoch {
         #[cfg(feature = "anza-closed-144-lanek")]
@@ -760,6 +791,10 @@ fn run() -> Result<()> {
         return anza_stopped_167::run(&bytes, &args[2], &args[3], check_only);
     }
     #[cfg(feature = "anza-closed-canaries")]
+    if plan_path == Path::new(anza_156_index_copies::REVIEW) {
+        return anza_156_index_copies::run(&bytes, &args[2], &args[3], check_only);
+    }
+    #[cfg(feature = "anza-closed-canaries")]
     if plan_path == Path::new(anza_167_index_copies::REVIEW) {
         return anza_167_index_copies::run(&bytes, &args[2], &args[3], check_only);
     }
@@ -901,13 +936,6 @@ fn run() -> Result<()> {
     if epochs.contains(&198) {
         closed_bootstrap_cohort::verify_scope(&p, &lock)?;
     }
-    let bm = exact(&p.inventory_binary.path)?;
-    ensure!(
-        bm.uid() == 0
-            && bm.mode() & 0o022 == 0
-            && digest(&p.inventory_binary.path)? == p.inventory_binary.sha256,
-        "unqualified inventory binary"
-    );
     inactive(&p.inactive_units)?;
     scan_consumers(&p.targets)?;
     let horizon = Path::new(HOME_ROOT).join("horizon");
@@ -930,22 +958,7 @@ fn run() -> Result<()> {
     } else {
         range
     };
-    let output = Command::new(&p.inventory_binary.path)
-        .env("TOKIO_WORKER_THREADS", "2")
-        .arg("inventory")
-        .arg(horizon)
-        .arg("--epochs")
-        .arg(format!("{}-{}", range.0, range.1))
-        .arg("--receipt-directory")
-        .arg(&receipts)
-        .output()?;
-    ensure!(
-        output.status.success(),
-        "authenticated inventory failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    ensure!(output.stdout.len() <= LIMIT as usize, "oversized inventory");
-    let inventory: Value = serde_json::from_slice(&output.stdout)?;
+    let inventory = authenticated_inventory(&p.inventory_binary, &horizon, &receipts, range)?;
     for proof in &p.proofs {
         let r: Value = serde_json::from_slice(&bound(&proof.receipt, LIMIT)?)?;
         ready(proof.epoch, &r, &inventory)?;
