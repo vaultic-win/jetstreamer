@@ -46,6 +46,12 @@ fn cache_target(schema: &str) -> Result<&'static Path> {
         }
         ubuntu_disposable::DEBUG_BUILD_PROFILE => Ok(Path::new(ubuntu_disposable::DEBUG_BUILD)),
         ubuntu_disposable::RELEASE_BUILD_PROFILE => Ok(Path::new(ubuntu_disposable::RELEASE_BUILD)),
+        ubuntu_disposable::DEMOTION_DEBUG_BUILD_PROFILE => {
+            Ok(Path::new(ubuntu_disposable::DEMOTION_DEBUG_BUILD))
+        }
+        ubuntu_disposable::DEMOTION_DEBUG_DEPS_PROFILE => {
+            Ok(Path::new(ubuntu_disposable::DEMOTION_DEBUG_DEPS))
+        }
         SOL_PROFILE => Ok(Path::new(SOL_TARGET)),
         SOL_RELEASE_DEPS_PROFILE => Ok(Path::new(SOL_RELEASE_DEPS)),
         SOL_PRIVATE_DEBUG_DEPS_PROFILE => Ok(Path::new(SOL_PRIVATE_DEBUG_DEPS)),
@@ -117,6 +123,8 @@ fn validate_plan(p: &Plan) -> Result<()> {
                     | ubuntu_disposable::INCREMENTAL_PROFILE
                     | ubuntu_disposable::DEBUG_BUILD_PROFILE
                     | ubuntu_disposable::RELEASE_BUILD_PROFILE
+                    | ubuntu_disposable::DEMOTION_DEBUG_BUILD_PROFILE
+                    | ubuntu_disposable::DEMOTION_DEBUG_DEPS_PROFILE
                     | SOL_RELEASE_DEPS_PROFILE
                     | SOL_PRIVATE_DEBUG_DEPS_PROFILE
                     | UBUNTU_DEBUG_DEPS_PROFILE
@@ -573,6 +581,8 @@ pub fn run() -> Result<()> {
             | ubuntu_disposable::INCREMENTAL_PROFILE
             | ubuntu_disposable::DEBUG_BUILD_PROFILE
             | ubuntu_disposable::RELEASE_BUILD_PROFILE
+            | ubuntu_disposable::DEMOTION_DEBUG_BUILD_PROFILE
+            | ubuntu_disposable::DEMOTION_DEBUG_DEPS_PROFILE
     ) {
         return ubuntu_disposable::run(&p, &pb, &a[5]);
     }

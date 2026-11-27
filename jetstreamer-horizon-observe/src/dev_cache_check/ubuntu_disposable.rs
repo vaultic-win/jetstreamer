@@ -17,6 +17,17 @@ pub(super) const RELEASE_BUILD_PROFILE: &str =
     "jetstreamer-horizon-ubuntu-release-build-cache-plan-v1";
 pub(super) const DEBUG_BUILD: &str = "/home/ubuntu/workspace/jetstreamer/target/debug/build";
 pub(super) const RELEASE_BUILD: &str = "/home/ubuntu/workspace/jetstreamer/target/release/build";
+pub(super) const DEMOTION_DEBUG_BUILD_PROFILE: &str =
+    "jetstreamer-horizon-epoch230-demotion-debug-build-cache-plan-v1";
+pub(super) const DEMOTION_DEBUG_DEPS_PROFILE: &str =
+    "jetstreamer-horizon-epoch230-demotion-debug-deps-cache-plan-v1";
+pub(super) const DEMOTION_DEBUG_BUILD: &str =
+    "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/debug/build";
+pub(super) const DEMOTION_DEBUG_DEPS: &str =
+    "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/debug/deps";
+const DEMOTION_DEBUG: &str =
+    "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/debug";
+const DEMOTION_SOURCE: &str = "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1";
 const LEDGER_SCHEMA: &str = "jetstreamer-horizon-ubuntu-disposable-cache-check-v2";
 const LEDGER_BOUND: u64 = 256 << 20;
 
@@ -26,6 +37,8 @@ fn target(profile: &str) -> Result<&'static Path> {
         INCREMENTAL_PROFILE => Ok(Path::new(DEBUG_INCREMENTAL)),
         DEBUG_BUILD_PROFILE => Ok(Path::new(DEBUG_BUILD)),
         RELEASE_BUILD_PROFILE => Ok(Path::new(RELEASE_BUILD)),
+        DEMOTION_DEBUG_BUILD_PROFILE => Ok(Path::new(DEMOTION_DEBUG_BUILD)),
+        DEMOTION_DEBUG_DEPS_PROFILE => Ok(Path::new(DEMOTION_DEBUG_DEPS)),
         _ => anyhow::bail!("not a closed Ubuntu disposable cache profile"),
     }
 }
@@ -36,9 +49,14 @@ pub(super) fn reference_scope_for_target(t: &Path) -> Option<&'static Path> {
         Some(Path::new(TARGET))
     } else if t == Path::new(DEBUG_INCREMENTAL) {
         Some(Path::new(DEBUG_INCREMENTAL))
+    } else if is_demotion_cache(t) {
+        Some(Path::new(DEMOTION_DEBUG))
     } else {
         None
     }
+}
+fn is_demotion_cache(t: &Path) -> bool {
+    t == Path::new(DEMOTION_DEBUG_BUILD) || t == Path::new(DEMOTION_DEBUG_DEPS)
 }
 pub(super) fn cache_reference(bytes: &[u8], scope: &Path) -> bool {
     if process_references::encoded_reference(bytes, scope.as_os_str().as_bytes(), true) {
@@ -65,16 +83,28 @@ pub(super) fn cache_reference(bytes: &[u8], scope: &Path) -> bool {
     })
 }
 fn source(p: &Plan) -> Result<()> {
+    let t = target(&p.schema)?;
+    let repo = if is_demotion_cache(t) {
+        DEMOTION_SOURCE
+    } else {
+        REPO
+    };
     ensure!(
-        git(REPO, &["rev-parse", "HEAD"])? == format!("{}\n", p.source_commit).as_bytes()
-            && git(REPO, &["status", "--porcelain", "--untracked-files=no"])?.is_empty(),
+        git(repo, &["rev-parse", "HEAD"])? == format!("{}\n", p.source_commit).as_bytes()
+            && git(repo, &["status", "--porcelain", "--untracked-files=no"])?.is_empty(),
         "cache source revision is changed/unclean"
     );
     ensure!(
-        hash_file(&Path::new(REPO).join("Cargo.lock"), 16 << 20)?.0 == p.cargo_lock_sha256,
+        hash_file(&Path::new(repo).join("Cargo.lock"), 16 << 20)?.0 == p.cargo_lock_sha256,
         "cache source Cargo.lock changed"
     );
-    let t = target(&p.schema)?;
+    if is_demotion_cache(t) {
+        ensure!(
+            !t.starts_with(repo) && !Path::new(repo).starts_with(t),
+            "demotion build cache overlaps its source checkout"
+        );
+        return Ok(());
+    }
     git(
         REPO,
         &[
@@ -295,7 +325,11 @@ fn checks(p: &Plan, t: &Path) -> Result<Value> {
         Path::new("/home/ubuntu/.config/systemd/user"),
     ];
     let mut missing = Vec::new();
-    let staged = staged_references(&roots, t, &mut missing)?;
+    let staged = if is_demotion_cache(t) {
+        staged_references_exact(&roots, scope, &mut missing, &BTreeSet::new())?
+    } else {
+        staged_references(&roots, t, &mut missing)?
+    };
     let scan = process_references::scan(Path::new("/proc"), scope)?;
     ensure!(
         staged.is_empty() && scan.references.is_empty(),
@@ -641,6 +675,8 @@ mod tests {
             INCREMENTAL_PROFILE,
             DEBUG_BUILD_PROFILE,
             RELEASE_BUILD_PROFILE,
+            DEMOTION_DEBUG_BUILD_PROFILE,
+            DEMOTION_DEBUG_DEPS_PROFILE,
         ] {
             let p = plan(profile);
             validate_plan(&p).unwrap();
@@ -701,6 +737,16 @@ mod tests {
             reference_scope_for_target(Path::new(RELEASE_BUILD)),
             Some(Path::new(RELEASE_TARGET))
         );
+        for (profile, subtree) in [
+            (DEMOTION_DEBUG_BUILD_PROFILE, DEMOTION_DEBUG_BUILD),
+            (DEMOTION_DEBUG_DEPS_PROFILE, DEMOTION_DEBUG_DEPS),
+        ] {
+            assert_eq!(target(profile).unwrap(), Path::new(subtree));
+            assert_eq!(
+                reference_scope_for_target(Path::new(subtree)),
+                Some(Path::new(DEMOTION_DEBUG))
+            );
+        }
         assert!(cache_reference(
             b"ExecStart=./target/release/tool",
             Path::new(RELEASE_TARGET)
