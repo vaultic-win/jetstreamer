@@ -60,10 +60,25 @@ fn open_ro(path: &Path) -> Result<File> {
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(path)?)
 }
-fn hash(mut f: &File) -> Result<String> {
-    let mut h = Sha256::new();
-    std::io::copy(&mut f, &mut h)?;
-    Ok(format!("{:x}", h.finalize()))
+fn hash(f: &File) -> Result<String> {
+    // Feed the same open file description to the native SHA-256 reader and keep its lease.
+    let command = Command::new("/usr/bin/sha256sum")
+        .arg("-")
+        .stdin(f.try_clone()?)
+        .output()?;
+    let output = std::str::from_utf8(&command.stdout)?;
+    let digest = output
+        .strip_suffix("  -\n")
+        .context("invalid SHA-256 result")?;
+    ensure!(
+        command.status.success()
+            && digest.len() == 64
+            && digest
+                .bytes()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+        "native SHA-256 read failed"
+    );
+    Ok(digest.to_owned())
 }
 fn pinned(path: &Path, sha: &str) -> Result<Vec<u8>> {
     let f = open_ro(path)?;
@@ -562,6 +577,21 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_reader_hashes_the_leased_inode() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("data");
+        fs::write(&path, b"abc").unwrap();
+        let id = Identity::from(&fs::symlink_metadata(&path).unwrap());
+        let f = leased(&path, id, false, libc::F_WRLCK).unwrap();
+        assert_eq!(
+            hash(&f).unwrap(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        lease_valid(&f, libc::F_WRLCK).unwrap();
+        id.check(&fs::symlink_metadata(&path).unwrap(), false)
+            .unwrap();
+    }
     #[test]
     fn changed_source_or_open_consumer_does_not_reach_unlink() {
         let dir = tempfile::tempdir().unwrap();
