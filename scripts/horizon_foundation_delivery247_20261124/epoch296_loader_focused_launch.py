@@ -323,10 +323,11 @@ def launch(kit, roster_ref, scope):
     roster = ops.bound(roster_ref)
     preflight = ops.bound(scope.preflight)
     profile = ops.bound(scope.profile)
-    for name in ("node", "worker", "guard"):
-        ops.checked_image(profile[name])
+    images = [profile[name] for name in ("node", "worker", "guard")]
+    for image in images:
+        ops.checked_image(image)
     for entry in preflight["evidence"]:
-        if entry != profile["node"]:
+        if entry not in images:
             assert ops.ref(Path(entry["path"])) == entry
     root = Path(profile["run_root"])
     writable = Path(profile["properties"]["ReadWritePaths"])
