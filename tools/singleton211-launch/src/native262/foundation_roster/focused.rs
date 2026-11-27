@@ -127,6 +127,13 @@ pub(super) const V1627_230: Focused = Focused {
     profile_sha: "1e300ad51ba5f75a91af2f68c80241dd90a5c6d279b630de8f92f882655b43d5",
 };
 
+const V1627_INVOCATION: &str = "6c878d138821422d8a848d6bd16d63a9";
+const V1627_LAUNCH_SHA: &str =
+    "3a2f5a058c76a59707af77f98973c283d4542c8308d5a514a22ae1cb6534a7a6";
+const V1627_TERMINAL: &str =
+    "/var/lib/jetstreamer/horizon230-v1627-terminal-collector-state-v1/evidence/terminal-evidence.json";
+const V1627_ARCHIVE: &str = "/home/ubuntu/.jetstreamer-private/qualification-230-v1627-window-v1/work/output/epoch-230-v1-6-27-diagnostic.jet";
+
 pub(super) const RESTORE_258: Focused = Focused {
     epoch: 258,
     unit: "horizon-qualify-258-native-restore-v1.service",
@@ -429,6 +436,120 @@ pub(super) fn first_7871_drained(n: &mut Native) -> Result<Bound> {
     );
     drained(n, FIRST_7871_230.unit, FIRST_7871_230.guard, invocation)?;
     Ok(reference)
+}
+
+fn v1627_terminal_matches(
+    row: &Value,
+    receipt: &Value,
+    terminal: &Value,
+    launch: &Bound,
+    boot: &str,
+) -> Result<()> {
+    let pid = text(&row["producer"], "MainPID")?.parse::<u64>()?;
+    ensure!(
+        row["epoch"] == V1627_230.epoch
+            && row["phase"] == "diagnostic-qualification"
+            && row["producer"]["Id"] == V1627_230.unit
+            && row["producer"]["InvocationID"] == V1627_INVOCATION
+            && row["launch_receipt"] == json!(launch.path)
+            && row["launch_receipt_sha256"] == launch.sha256
+            && receipt["schema"] == "foundation-epoch230-v1627-private-drain-v1"
+            && receipt["unit"] == V1627_230.unit
+            && receipt["invocation_id"] == V1627_INVOCATION
+            && receipt["state"] == "local-segment-committed"
+            && receipt["launch"] == json!(launch)
+            && receipt["guard_drained"] == true
+            && receipt["publication_authorized"] == false
+            && terminal["schema"] == "foundation-epoch230-v1627-private-terminal-evidence-v1"
+            && terminal["epoch"] == V1627_230.epoch
+            && terminal["unit"] == V1627_230.unit
+            && terminal["invocation_id"] == V1627_INVOCATION
+            && terminal["launch"] == json!(launch)
+            && terminal["producer_pid"] == pid
+            && terminal["boot_id"] == boot
+            && terminal["producer_drained"] == true
+            && terminal["producer_exit_status"] == 0
+            && terminal["native_manifest_complete_verified"] == true
+            && terminal["first_slot"] == V1627_230.first
+            && terminal["last_slot"] == V1627_230.last
+            && terminal["slot_count"] == V1627_230.last - V1627_230.first + 1
+            && terminal["terminal_checkpoint"]["slot"] == V1627_230.last
+            && terminal["archive"]["path"] == V1627_ARCHIVE
+            && terminal["publication_authorized"] == false,
+        "closed epoch 230 evidence does not bind the sampled v1.6.27 window"
+    );
+    Ok(())
+}
+
+pub(super) fn v1627_230_drained(n: &mut Native, row: &Value) -> Result<Option<Bound>> {
+    let state = Path::new(V1627_230.state);
+    let path = state.join("terminal.json");
+    if !path.try_exists()? {
+        return Ok(None);
+    }
+    let reference = Bound::new(&path, hash(&path)?);
+    let receipt = reference.sealed()?;
+    let launch = Bound::new(state.join("cadence-registration.json"), V1627_LAUNCH_SHA);
+    launch.sealed()?;
+    let terminal_ref = binding(&receipt["native_terminal"])?;
+    ensure!(
+        terminal_ref.path == Path::new(V1627_TERMINAL),
+        "foreign epoch 230 v1.6.27 terminal evidence"
+    );
+    let terminal = terminal_ref.sealed()?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+    v1627_terminal_matches(row, &receipt, &terminal, &launch, &boot.trim().replace('-', ""))?;
+    let archive = fs::symlink_metadata(V1627_ARCHIVE)?;
+    let identity = &terminal["archive"]["identity"];
+    ensure!(
+        archive.is_file()
+            && archive.dev() == num(identity, "device")?
+            && archive.ino() == num(identity, "inode")?
+            && archive.len() == num(identity, "length")?
+            && identity["modified_seconds"].as_i64() == Some(archive.mtime())
+            && identity["modified_nanoseconds"].as_i64() == Some(archive.mtime_nsec())
+            && identity["changed_seconds"].as_i64() == Some(archive.ctime())
+            && identity["changed_nanoseconds"].as_i64() == Some(archive.ctime_nsec()),
+        "the retained epoch 230 v1.6.27 archive changed after terminal verification"
+    );
+    drained(n, V1627_230.unit, V1627_230.guard, V1627_INVOCATION)?;
+    Ok(Some(reference))
+}
+
+#[cfg(test)]
+#[test]
+fn v1627_releases_only_the_exact_verified_private_window() {
+    let launch = Bound::new(
+        Path::new(V1627_230.state).join("cadence-registration.json"),
+        V1627_LAUNCH_SHA,
+    );
+    let boot = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    let row = json!({
+        "epoch": 230, "phase": "diagnostic-qualification", "launch_receipt": launch.path,
+        "launch_receipt_sha256": launch.sha256,
+        "producer": {"Id": V1627_230.unit, "InvocationID": V1627_INVOCATION, "MainPID": "1234"},
+    });
+    let receipt = json!({
+        "schema": "foundation-epoch230-v1627-private-drain-v1", "unit": V1627_230.unit,
+        "invocation_id": V1627_INVOCATION, "state": "local-segment-committed",
+        "guard_drained": true, "launch": launch, "publication_authorized": false,
+    });
+    let mut terminal = json!({
+        "schema": "foundation-epoch230-v1627-private-terminal-evidence-v1",
+        "epoch": 230, "unit": V1627_230.unit, "invocation_id": V1627_INVOCATION,
+        "launch": launch, "producer_pid": 1234, "boot_id": boot, "producer_drained": true,
+        "producer_exit_status": 0, "native_manifest_complete_verified": true,
+        "first_slot": 99_461_592, "last_slot": 99_468_089, "slot_count": 6_498,
+        "terminal_checkpoint": {"slot": 99_468_089},
+        "archive": {"path": V1627_ARCHIVE}, "publication_authorized": false,
+    });
+    v1627_terminal_matches(&row, &receipt, &terminal, &launch, boot).unwrap();
+    let mut undrained = receipt.clone();
+    undrained["guard_drained"] = json!(false);
+    assert!(v1627_terminal_matches(&row, &undrained, &terminal, &launch, boot).is_err());
+    assert!(v1627_terminal_matches(&row, &receipt, &terminal, &launch, "other").is_err());
+    terminal["slot_count"] = json!(6497);
+    assert!(v1627_terminal_matches(&row, &receipt, &terminal, &launch, boot).is_err());
 }
 
 pub(super) fn overlap_266_drained(n: &mut Native, row: &Value) -> Result<Option<Bound>> {
