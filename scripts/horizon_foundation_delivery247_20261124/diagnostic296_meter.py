@@ -14,6 +14,12 @@ V1627_230 = "v1627-window-v1"
 RESTORE = "native-restore-v1"
 RESTORE_260 = "native-restore-260-v1"
 OVERLAP_266 = "hourly-overlap-114929697-v1"
+PREDECESSOR_266 = "original-predecessor-v1"
+PREDECESSOR_266_PROFILE = V / "horizon266-original-predecessor-static-v1/profile.json"
+PREDECESSOR_266_PROFILE_SHA = "7ed80c05ae0e1c706a271452d9b0dcb516c651fd0f97a2ec3f1c61a477a30f21"
+PREDECESSOR_266_PREFLIGHT_SHA = "de5680f4fc6634529348c9701f639a66cf333c7296f69a7645dc97f1297bc4ae"
+PREDECESSOR_266_CUSTODY = V / "horizon266-predecessor-intake-stage-v1/custody.json"
+PREDECESSOR_266_CUSTODY_SHA = "afd03e2258229848a2878f1c2ff75b424ebf810b79fec65788c75ac5111a5959"
 TRACE = "loader-log-v3"
 FEATURE_ACCOUNTS = "feature-account-v4"
 FOCUSED = {
@@ -27,6 +33,7 @@ FOCUSED = {
     RESTORE: (258, "horizon258-native-restore-runtime-v1", "epoch258-private-native-restore"),
     RESTORE_260: (260, "horizon260-native-restore-runtime-v1", "epoch260-private-native-restore"),
     OVERLAP_266: (266, "horizon266-hourly-overlap-114929697-runtime-v1", "epoch266-private-hourly-overlap"),
+    PREDECESSOR_266: (266, "horizon266-original-predecessor-runtime-v1", "epoch266-private-original-predecessor"),
     TRACE: (296, "horizon296-loader-log-v3", "epoch296-private-loader-log-diagnostic"),
     FEATURE_ACCOUNTS: (296, "horizon296-feature-account-v4", "epoch296-private-feature-account-qualification"),
 }
@@ -48,6 +55,8 @@ def attempt_paths(version):
 
 
 def profile_path(state, version):
+    if version == PREDECESSOR_266:
+        return PREDECESSOR_266_PROFILE
     return state / ("profile.json" if version in FOCUSED else "generic-unit-profile.json")
 
 
@@ -83,11 +92,26 @@ def registration(version):
     assert guard["producer_invocation_id"] == row["invocation_id"]
     assert guard["plan_sha256"] == row["guard_plan"]["sha256"] and guard["trip_reason"] is None
     assert guard["producer_stop_enabled"] and guard["producer"]["pid"] == row["main_pid"]
-    if version == OVERLAP_266:
+    if version in (OVERLAP_266, PREDECESSOR_266):
         release = bound(row["guard_release_fit"])
         assert release["invocation_id"] == row["invocation_id"]
         assert release["roster"] == admission["roster"] and release["guard_plan"] == row["guard_plan"]
-        assert row["lossless_restore"] == profile["restore_receipt"]
+        if version == OVERLAP_266:
+            assert row["lossless_restore"] == profile["restore_receipt"]
+        else:
+            assert profile_ref["sha256"] == PREDECESSOR_266_PROFILE_SHA
+            assert profile["diagnostic_only"] and row["diagnostic_only"]
+            assert row["predecessor_native_tuple_qualified"] is False
+            assert row["cursor_normalization_qualified"] is False
+            assert admission["preflight"] == {"path": str(state / "preflight.json"),
+                                              "sha256": PREDECESSOR_266_PREFLIGHT_SHA}
+            assert release["schema"] == "foundation-epoch266-original-predecessor-guard-release-fit-v1"
+            assert release["publication_authorized"] is False
+            custody = sealed(PREDECESSOR_266_CUSTODY)
+            assert row["bootstrap_custody"] == custody
+            assert custody["sha256"] == PREDECESSOR_266_CUSTODY_SHA
+            evidence = bound(custody)
+            assert evidence["profile"] == profile_ref and evidence["actual_readonly_projection_verified"]
     return source, row
 
 
@@ -189,9 +213,16 @@ def register(plan, ordinary_replay=False, include_focused=True):
                for row in sample["replays"])
     }
     for version in ATTEMPTS:
+        if version == PREDECESSOR_266:
+            continue
         epoch = FOCUSED.get(version, (296,))[0]
         ordinary = (epoch == 296 and ordinary_replay) or epoch in ordinary_singletons
         register_attempt(plan, version, ordinary, include_focused)
+
+
+def register_predecessor_266(plan):
+    # The caller binds the matching native fleet image before adding the claim.
+    register_attempt(plan, PREDECESSOR_266, ordinary_replay=False, include_focused=True)
 
 
 def owns(row):
