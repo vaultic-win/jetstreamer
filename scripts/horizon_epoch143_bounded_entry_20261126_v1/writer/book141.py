@@ -56,8 +56,8 @@ def book(price, quote, operator, runtime, refused=None, dispatch_log=None, *, ep
     fit = checked(quote)
     if replacement:
         module = Path(price["path"])
-        need(module == profile.base/"booking-price-v1/price_hourly143.py"
-             and Path(operator["path"]) == profile.base/"booking-price-v1/launch-first-hourly143.sh",
+        need(module == profile.base/"booking-price-v2/price_hourly143.py"
+             and Path(operator["path"]) == profile.base/"booking-price-v2/launch-first-hourly143.sh",
              "foreign epoch 143 operator or price")
         sys.path.insert(0,str(module.parent))
         import rollover143, continuation_price

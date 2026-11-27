@@ -153,7 +153,7 @@ def admission_lock():
 def dispatch(stage):
     i, ir = q.scope()
     q.need(operator.q.UNIT == q.UNIT and operator.D == q.DEP, "operator is outside its sealed deployment")
-    q.need(Path(__file__).resolve().parent in (q.DEP/"operator",q.DEP/"operator-with143-v1"),"wrong dispatch executable directory")
+    q.need(Path(__file__).resolve().parent in (q.DEP/"operator",q.DEP/"operator-with143-v1",q.DEP/"operator-with143-v2"),"wrong dispatch executable directory")
     if stage == "check":
         operator.static()
         return {"interface":ir,"wait_for":str(q.DEP/"predecessor-exit/PID1_EXIT.json")}

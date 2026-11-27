@@ -11,8 +11,6 @@ G, M = 1 << 30, 1 << 20
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT = RT/"epoch143-first-hourly-20261127-v1"
 OLD = RT/"epoch141-first-hourly-20261127-v1"
-D170 = RT/"epoch170-from-73746882-20261127-v1"
-P170 = RT/"epoch170-from-73726716-20261127-v1"
 UNIT = "horizon-qualify-143-first-hourly-20261127-v1.service"
 FIRST = "horizon-qualify-141-first-hourly-20261127-v1.service"
 SHA = "84e2846e7c33a1a6b7793861f918344be2af10d8132dc380450345f59903a19f"
@@ -184,16 +182,25 @@ def auxiliary(core, fleet):
               and custody["authenticated_post_readback"]["authenticated"] and end["success"],
               "different fourth bootstrap transfer or custody")
     core.inactive(end["unit"])
-    # The transfer and its 2304 MiB mount shared the same 4 GiB allocation.
-    # Charge it until the host mount is gone and the original file is absent.
+    disposition, dr = core.read(fourth_root/"STAGING_UNMOUNT.json",
+                                "f7583a3314ac7adb6532a29f9ba581c36b47898ea19c405edc70d349d7c4df3b")
+    receiver = core.bound(disposition["receiver"])
+    census = disposition["namespaces_after"]
+    core.need(disposition["remote_custody"] == receiver["anza_remote_custody"] == dispatch["custody"]
+              and receiver["handoff"] == dispatch_ref and receiver["receiver_invocation"] == "19e647e734264a8cbcdcbd8c55c622dc"
+              and receiver["sha256"] == local["sha256"] and receiver["bytes"] == local["bytes"]
+              and disposition["original_tmpfs_fully_drained"] and disposition["local_mount_drained"]
+              and disposition["reservation_release_bytes"] == 4*G and disposition["home_archive_credit_bytes"] == 0
+              and census["observed"] == 36 and not census["bound"] and not census["inaccessible"]
+              and Path(disposition["source_mount"]) == mount, "fourth staging return was not confirmed")
     mount_rows = Path("/proc/1/mountinfo").read_text().splitlines()
     in_host = any(str(mount) == line.split()[4] or " - tmpfs horizon141-fourth-bootstrap " in line for line in mount_rows)
-    returned = (not in_host and not Path(local["destination"]).exists()
-                and (not mount.exists() or mount.stat().st_dev == mount.parent.stat().st_dev))
+    core.need(not in_host and not Path(local["destination"]).exists()
+              and (not mount.exists() or mount.stat().st_dev == mount.parent.stat().st_dev), "fourth staging is occupied again")
 
     return dict(park=pr,serial_restore_overlap_already_reserved=park["restore_overlap_bytes"],fourth=fr,
                 measured_185_m=mr,incremental_185_m_after_fleet=incremental,
-                fourth_execution_handoff=dispatch_ref,fourth_host_tmpfs_drained=returned,
-                fourth_ram=0 if returned else 4*G,parallel_controls_ram=2*G,selector_already_reserved=4*G,
+                fourth_execution_handoff=dispatch_ref,fourth_ram_return=dr,fourth_host_tmpfs_drained=True,
+                fourth_ram=0,parallel_controls_ram=2*G,selector_already_reserved=4*G,
                 controller_ram=512*M,watcher_ram=32*M,controller_home=128*M,
                 evidence_home=64*M+32*M+4*M+2*M)

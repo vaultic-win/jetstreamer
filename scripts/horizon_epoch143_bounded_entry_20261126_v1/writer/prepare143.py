@@ -14,7 +14,7 @@ import price_hourly143 as funding
 
 def prepare(runtime):
     core = funding.core
-    core.need(PACKAGE == funding.roll.ROOT/"booking-price-v1" and runtime > 0, "invalid 143 booking interface")
+    core.need(PACKAGE == funding.roll.ROOT/"booking-price-v2" and runtime > 0, "invalid 143 booking interface")
     writer = book141.PACKAGE.with_name("tools-cold168-retry5-failed166-v45-entry146")
     sys.path.insert(0, str(writer))
     import status_cycle
