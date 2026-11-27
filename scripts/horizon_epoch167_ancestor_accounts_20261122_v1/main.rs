@@ -1,4 +1,4 @@
-//! Retire private AccountsDb scratch from the two stopped historical epoch 167 runs.
+//! Retire only the AccountsDb scratch enrolled by the selected stopped-run profile.
 #[path = "../horizon_retry4_170_scratch_retire_20261118_v1/src/process_references.rs"]
 mod process_references;
 #[path = "../horizon_retry4_170_scratch_retire_20261118_v1/src/stopped_tree.rs"]
@@ -17,6 +17,16 @@ use std::{
 };
 
 #[cfg(any(
+    all(
+        feature = "retry8_167",
+        any(
+            feature = "independent166",
+            feature = "standard170",
+            feature = "metered168",
+            feature = "metered168_retry4",
+            feature = "metered170_full"
+        )
+    ),
     all(feature = "independent166", feature = "standard170"),
     all(
         feature = "metered170_full",
@@ -47,7 +57,8 @@ compile_error!("select one epoch profile");
     feature = "standard170",
     feature = "metered168",
     feature = "metered168_retry4",
-    feature = "metered170_full"
+    feature = "metered170_full",
+    feature = "retry8_167"
 )))]
 const BASE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch167-ancestor-accounts-20261122-v2";
@@ -56,11 +67,18 @@ const BASE: &str =
 mod cold166;
 #[cfg(any(feature = "independent166", feature = "standard170"))]
 use cold166 as specific;
+#[cfg(feature = "retry8_167")]
+#[path = "closed167_retry8.rs"]
+mod specific;
 #[cfg(feature = "metered168")]
 #[path = "closed168.rs"]
 mod specific;
 
-#[cfg(any(feature = "metered168_retry4", feature = "metered170_full"))]
+#[cfg(any(
+    feature = "metered168_retry4",
+    feature = "metered170_full",
+    feature = "retry8_167"
+))]
 mod retirement_evidence;
 #[cfg(feature = "metered168_retry4")]
 #[path = "closed168_retry4.rs"]
@@ -74,7 +92,8 @@ mod specific;
     feature = "standard170",
     feature = "metered168",
     feature = "metered168_retry4",
-    feature = "metered170_full"
+    feature = "metered170_full",
+    feature = "retry8_167"
 ))]
 use specific::{BASE, CHECK_SCHEMA, COMPLETE_SCHEMA, PROFILE, gates};
 #[cfg(not(any(
@@ -82,7 +101,8 @@ use specific::{BASE, CHECK_SCHEMA, COMPLETE_SCHEMA, PROFILE, gates};
     feature = "standard170",
     feature = "metered168",
     feature = "metered168_retry4",
-    feature = "metered170_full"
+    feature = "metered170_full",
+    feature = "retry8_167"
 )))]
 const PROFILE: &[u8] = include_bytes!("profiles.json");
 #[cfg(not(any(
@@ -90,7 +110,8 @@ const PROFILE: &[u8] = include_bytes!("profiles.json");
     feature = "standard170",
     feature = "metered168",
     feature = "metered168_retry4",
-    feature = "metered170_full"
+    feature = "metered170_full",
+    feature = "retry8_167"
 )))]
 const CHECK_SCHEMA: &str = "horizon167-closed-accounts-check-v1";
 #[cfg(not(any(
@@ -98,7 +119,8 @@ const CHECK_SCHEMA: &str = "horizon167-closed-accounts-check-v1";
     feature = "standard170",
     feature = "metered168",
     feature = "metered168_retry4",
-    feature = "metered170_full"
+    feature = "metered170_full",
+    feature = "retry8_167"
 )))]
 const COMPLETE_SCHEMA: &str = "horizon167-closed-accounts-complete-v1";
 
@@ -253,13 +275,13 @@ fn preserved(p: &Value) -> Result<()> {
     feature = "metered168_retry4",
     feature = "metered170_full"
 )))]
-fn gates(p: &Value, manifest: &Value) -> Result<Value> {
+fn ancestor_gates(p: &Value, manifest: &Value, allowed_attempts: &[&str]) -> Result<Value> {
     let target = Path::new(string(p, "target")?);
     let attempt = string(p, "attempt")?;
     let lane = Path::new("/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1");
     let old_run = lane.join(format!("replacement-{attempt}-20261110-v1"));
     ensure!(
-        matches!(attempt, "local3retry5" | "local3retry7")
+        allowed_attempts.contains(&attempt)
             && target.starts_with(old_run.join("private"))
             && target.file_name().is_some_and(|n| n == "accounts-state"),
         "unauthorized accounts subtree"
@@ -355,6 +377,18 @@ fn gates(p: &Value, manifest: &Value) -> Result<Value> {
         json!({"owner":p["iid"],"scope":p["target"],"retained":protected,"stop":p["stop"],"bootstrap_slot":72143703,"witness":manifest["witness"]}),
     )
 }
+#[cfg(not(any(
+    feature = "independent166",
+    feature = "standard170",
+    feature = "metered168",
+    feature = "metered168_retry4",
+    feature = "metered170_full",
+    feature = "retry8_167"
+)))]
+fn gates(p: &Value, manifest: &Value) -> Result<Value> {
+    ancestor_gates(p, manifest, &["local3retry5", "local3retry7"])
+}
+
 fn witness_disjoint(target: &Path, reference: &Value) -> Result<()> {
     let witness = bound(reference)?;
     let rows = witness["allocation"]["first"]
@@ -396,7 +430,8 @@ fn witness_disjoint(target: &Path, reference: &Value) -> Result<()> {
     feature = "standard170",
     feature = "metered168",
     feature = "metered168_retry4",
-    feature = "metered170_full"
+    feature = "metered170_full",
+    feature = "retry8_167"
 ))]
 fn appendvec_name(path: &str, directory: bool) -> bool {
     let shard = |s: &str| matches!(s, "0" | "1" | "2" | "3");
@@ -416,7 +451,8 @@ fn appendvec_name(path: &str, directory: bool) -> bool {
     feature = "standard170",
     feature = "metered168",
     feature = "metered168_retry4",
-    feature = "metered170_full"
+    feature = "metered170_full",
+    feature = "retry8_167"
 ))]
 fn check_appendvecs(
     p: &Value,
@@ -534,7 +570,11 @@ fn run() -> Result<()> {
         .custom_flags(libc::O_NOFOLLOW)
         .open("/run/horizon-epoch171-to136-g1.operation.lock")?;
     use std::os::fd::AsRawFd;
-    #[cfg(any(feature = "metered168_retry4", feature = "metered170_full"))]
+    #[cfg(any(
+        feature = "metered168_retry4",
+        feature = "metered170_full",
+        feature = "retry8_167"
+    ))]
     specific::verify_campaign_lock(&epoch_lock, &manifest)?;
     ensure!(
         unsafe { libc::flock(epoch_lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
@@ -545,14 +585,23 @@ fn run() -> Result<()> {
         feature = "standard170",
         feature = "metered168",
         feature = "metered168_retry4",
-        feature = "metered170_full"
+        feature = "metered170_full",
+        feature = "retry8_167"
     ))]
     let _leases = specific::leases(&manifest)?;
-    #[cfg(not(any(feature = "metered168_retry4", feature = "metered170_full")))]
+    #[cfg(not(any(
+        feature = "metered168_retry4",
+        feature = "metered170_full",
+        feature = "retry8_167"
+    )))]
     let anchors = gates(p, &manifest)?;
     let target = Path::new(string(p, "target")?);
     let fd = stopped_tree::open_root(target, DEVICE, p["inode"].as_u64().context("target inode")?)?;
-    #[cfg(any(feature = "metered168_retry4", feature = "metered170_full"))]
+    #[cfg(any(
+        feature = "metered168_retry4",
+        feature = "metered170_full",
+        feature = "retry8_167"
+    ))]
     let anchors = gates(p, &manifest)?;
     if mode == "inspect" {
         println!(
@@ -572,7 +621,11 @@ fn run() -> Result<()> {
         fs::read_link("/proc/self/exe")? == elf && image == sha(&fs::read("/proc/self/exe")?),
         "sealed image required"
     );
-    #[cfg(any(feature = "metered168_retry4", feature = "metered170_full"))]
+    #[cfg(any(
+        feature = "metered168_retry4",
+        feature = "metered170_full",
+        feature = "retry8_167"
+    ))]
     specific::verify_image(base, &image)?;
     let conf = sha(PROFILE);
     let dir: PathBuf = base.join("state").join(attempt);
@@ -604,7 +657,8 @@ fn run() -> Result<()> {
             feature = "standard170",
             feature = "metered168",
             feature = "metered168_retry4",
-            feature = "metered170_full"
+            feature = "metered170_full",
+            feature = "retry8_167"
         )))]
         ensure!(
             p["expected_bytes"] == allocated && p["expected_entries"] == (first.len() - 1) as u64,
@@ -615,7 +669,8 @@ fn run() -> Result<()> {
             feature = "standard170",
             feature = "metered168",
             feature = "metered168_retry4",
-            feature = "metered170_full"
+            feature = "metered170_full",
+            feature = "retry8_167"
         ))]
         specific::check_inventory(p, &manifest, &first, allocated)?;
         drop(second);
@@ -633,7 +688,8 @@ fn run() -> Result<()> {
         }
         let process = if cfg!(any(
             feature = "metered168_retry4",
-            feature = "metered170_full"
+            feature = "metered170_full",
+            feature = "retry8_167"
         )) {
             ensure!(gates(p, &manifest)? == anchors, "pre-check anchors changed");
             scan(target)?
@@ -646,7 +702,8 @@ fn run() -> Result<()> {
             feature = "standard170",
             feature = "metered168",
             feature = "metered168_retry4",
-            feature = "metered170_full"
+            feature = "metered170_full",
+            feature = "retry8_167"
         ))]
         let check = {
             let mut measured = check;
@@ -685,17 +742,29 @@ fn run() -> Result<()> {
     let current = stopped_tree::capture(&fd, DEVICE, UID, GID)?;
     stopped_tree::validate_remaining(&ledger, &current, resuming)?;
     drop(current);
-    #[cfg(not(any(feature = "metered168_retry4", feature = "metered170_full")))]
+    #[cfg(not(any(
+        feature = "metered168_retry4",
+        feature = "metered170_full",
+        feature = "retry8_167"
+    )))]
     if !resuming {
         output(&dir, "INTENT.json", &serde_json::to_vec_pretty(&intent)?)?
     }
-    #[cfg(any(feature = "metered168_retry4", feature = "metered170_full"))]
+    #[cfg(any(
+        feature = "metered168_retry4",
+        feature = "metered170_full",
+        feature = "retry8_167"
+    ))]
     ensure!(
         gates(p, &manifest)? == anchors,
         "pre-execute anchors changed"
     );
     let _ = scan(target)?;
-    #[cfg(any(feature = "metered168_retry4", feature = "metered170_full"))]
+    #[cfg(any(
+        feature = "metered168_retry4",
+        feature = "metered170_full",
+        feature = "retry8_167"
+    ))]
     if !resuming {
         output(&dir, "INTENT.json", &serde_json::to_vec_pretty(&intent)?)?
     }
@@ -707,7 +776,8 @@ fn run() -> Result<()> {
         feature = "standard170",
         feature = "metered168",
         feature = "metered168_retry4",
-        feature = "metered170_full"
+        feature = "metered170_full",
+        feature = "retry8_167"
     ))]
     let allocated = &prior["allocated_bytes"];
     #[cfg(not(any(
@@ -715,7 +785,8 @@ fn run() -> Result<()> {
         feature = "standard170",
         feature = "metered168",
         feature = "metered168_retry4",
-        feature = "metered170_full"
+        feature = "metered170_full",
+        feature = "retry8_167"
     )))]
     let allocated = &p["expected_bytes"];
     let complete = json!({"schema":COMPLETE_SCHEMA,"attempt":attempt,"scope":target,"original_iid":p["iid"],"scope_empty":true,"entries_removed_this_invocation":removed,"check_sha256":intent["check_sha256"],"intent_sha256":sha(&read(&ip,1<<20)?),"retired_tree_before_bytes":allocated,"scope_root_remaining_bytes":fd.metadata()?.blocks()*512,"archive_or_snapshot_removed":false,"resource_credit_bytes":0});
