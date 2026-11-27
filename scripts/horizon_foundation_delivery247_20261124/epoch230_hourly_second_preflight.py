@@ -32,8 +32,8 @@ def bound(document):
     return json.loads(path.read_bytes())
 
 
-def seal(name, value):
-    path = STATE / name
+def seal(name, value, state=STATE):
+    path = state / name
     data = (json.dumps(value, indent=2) + "\n").encode()
     if path.exists():
         assert path.read_bytes() == data and path.stat().st_mode & 0o777 == 0o400
@@ -45,7 +45,7 @@ def seal(name, value):
             target.flush()
             os.fsync(target.fileno())
         pending.rename(path)
-        fd = os.open(STATE, os.O_RDONLY | os.O_DIRECTORY)
+        fd = os.open(state, os.O_RDONLY | os.O_DIRECTORY)
         try:
             os.fsync(fd)
         finally:
@@ -53,7 +53,7 @@ def seal(name, value):
     return reference(path)
 
 
-def qualify_namespace(profile, bindings):
+def qualify_namespace(profile, bindings, unit="foundation-230-hourly-second-namespace-v1"):
     properties = {
         **profile["properties"],
         "BindReadOnlyPaths": " ".join(f'{row["path"]}:{row["destination"]}' for row in bindings),
@@ -78,12 +78,25 @@ probe.unlink()
 """
     result = subprocess.check_output([
         "systemd-run", "--quiet", "--wait", "--pipe", "--collect",
-        "--unit=foundation-230-hourly-second-namespace-v1",
+        f"--unit={unit}",
         *(f"--property={key}={value}" for key, value in properties.items()),
         "/usr/bin/python3", "-c", probe, profile["environment"]["JETSTREAMER_PRIVATE_RUN_ROOT"],
         *(row["destination"] for row in bindings),
     ], text=True, timeout=40)
     return result.splitlines()
+
+
+def check_readonly_bindings(profile, bindings):
+    root = Path(profile["run_root"])
+    measurements = []
+    for row in bindings:
+        path, dest = Path(row["path"]), Path(row["destination"])
+        assert path.resolve() == path and dest.resolve() == dest and dest.is_relative_to(root)
+        expected = tuple(row[key] for key in ("device", "inode", "bytes", "mtime_ns", "ctime_ns"))
+        assert identity(path.stat()) == expected and dest.stat().st_size == 0
+        assert reference(path)["sha256"] == row["sha256"] and identity(path.stat()) == expected
+        measurements.append(":".join(str(value) for value in expected[:3]))
+    return measurements
 
 
 def main():
@@ -100,15 +113,7 @@ def main():
     profile["properties"]["AllowedCPUs"] = CPUS
     profile["source_preflight"] = source
     bindings = profile["readonly_bindings"] = profile.pop("read_only_bindings")
-    root = Path(profile["run_root"])
-    measurements = []
-    for row in bindings:
-        path, dest = Path(row["path"]), Path(row["destination"])
-        assert path.resolve() == path and dest.resolve() == dest and dest.is_relative_to(root)
-        expected = tuple(row[key] for key in ("device", "inode", "bytes", "mtime_ns", "ctime_ns"))
-        assert identity(path.stat()) == expected and dest.stat().st_size == 0
-        assert reference(path)["sha256"] == row["sha256"] and identity(path.stat()) == expected
-        measurements.append(":".join(str(value) for value in expected[:3]))
+    measurements = check_readonly_bindings(profile, bindings)
     snapshot = Path(profile["bootstrap"]["path"]).stat()
     assert bindings[0]["path"] == profile["bootstrap"]["path"]
     assert reference(Path(prior["cli_log"]["path"])) == prior["cli_log"]

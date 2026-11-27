@@ -91,6 +91,24 @@ pub(super) const SECOND_HOURLY_230: Focused = Focused {
     profile_sha: "76787b9a49ef39f2ae2e7cb6053abdc4e1d075301527e72b1878f9165c9cfe38",
 };
 
+pub(super) const FIRST_7871_230: Focused = Focused {
+    epoch: 230,
+    unit: "horizon-qualify-230-first-7871-v1.service",
+    guard: "horizon-230-first-7871-protective-v1",
+    cpus: "48-55",
+    scratch_cap: 90 << 30,
+    receipt_disk: 256 << 20,
+    producer_memory: 225_000_000_000,
+    root: "/home/ubuntu/.jetstreamer-private/qualification-230-first-7871-v1",
+    first: 99_437_434,
+    last: 99_445_304,
+    kind: "epoch230-private-first-7871-window",
+    preflight_schema: "foundation-epoch230-first-7871-runtime-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon230-first-7871-runtime-v1",
+    preflight_sha: "3c0d5ac1c970cffa0473fa3c5d01ad2466f7d041b4fe25dc7cdb65039688a3ea",
+    profile_sha: "7d3a7c8bad8d3b257622800874a92a278d287a6b1cd6d377f729c2e139e9f4fd",
+};
+
 pub(super) const RESTORE_258: Focused = Focused {
     epoch: 258,
     unit: "horizon-qualify-258-native-restore-v1.service",
@@ -163,10 +181,11 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 8] = [
+pub(super) const SCOPES: [&Focused; 9] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
+    &FIRST_7871_230,
     &RESTORE_258,
     &RESTORE_260,
     &LOADER_296,
@@ -236,13 +255,16 @@ pub(super) fn feature_296_terminal(n: &mut Native) -> Result<(Bound, Bound)> {
 }
 
 pub(super) fn feature_296_drained(n: &mut Native, invocation: &str) -> Result<()> {
-    let scope = &FEATURE_296;
-    let timer = n.show_fields(&format!("{}.timer", scope.guard), "ActiveState,Job")?;
+    drained(n, FEATURE_296.unit, FEATURE_296.guard, invocation)
+}
+
+pub(super) fn drained(n: &mut Native, producer: &str, guard: &str, invocation: &str) -> Result<()> {
+    let timer = n.show_fields(&format!("{guard}.timer"), "ActiveState,Job")?;
     ensure!(
         timer["ActiveState"] == "inactive" && timer["Job"] == "",
-        "epoch 296 feature guard timer is still active"
+        "{guard} timer is still active"
     );
-    for unit in [scope.unit.to_owned(), format!("{}.service", scope.guard)] {
+    for unit in [producer.to_owned(), format!("{guard}.service")] {
         let row = n.show_fields(
             &unit,
             "ActiveState,InvocationID,MainPID,ControlPID,ControlGroup,Job,Result",
@@ -256,18 +278,41 @@ pub(super) fn feature_296_drained(n: &mut Native, invocation: &str) -> Result<()
                 && !Path::new("/sys/fs/cgroup/system.slice")
                     .join(&unit)
                     .exists(),
-            "epoch 296 feature owner {unit} has not drained"
+            "owner {unit} has not drained"
         );
-        if unit == scope.unit {
+        if unit == producer {
             ensure!(
                 row["ActiveState"] == "inactive"
                     && row["Result"] == "success"
                     && (row["InvocationID"] == "" || row["InvocationID"] == invocation),
-                "epoch 296 feature terminal invocation changed"
+                "{producer} terminal invocation changed"
             );
         }
     }
     Ok(())
+}
+
+pub(super) fn second_hourly_drained(n: &mut Native) -> Result<()> {
+    let state = Path::new(SECOND_HOURLY_230.state);
+    let terminal = Bound::new(state.join("terminal.json"),
+        "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56").sealed()?;
+    let launch = Bound::new(state.join("cadence-registration.json"),
+        "c2aea886494f66ed6e2077422894abf68f644a346181da989ac869d9aba43cac");
+    let registered = launch.sealed()?;
+    let invocation = "a0a94d2d42984804877c1a80fc934585";
+    ensure!(
+        terminal["schema"] == "foundation-epoch230-middle-hourly-second-terminal-v1"
+            && terminal["unit"] == SECOND_HOURLY_230.unit
+            && terminal["state"] == "local-segment-committed"
+            && terminal["launch"] == json!(launch)
+            && terminal["invocation_id"] == invocation
+            && terminal["checkpoint"]["slot"] == SECOND_HOURLY_230.last
+            && terminal["guard_drained"] == true
+            && registered["unit"] == SECOND_HOURLY_230.unit
+            && registered["invocation_id"] == invocation,
+        "epoch 230 replacement lacks the exact prior terminal and launch"
+    );
+    drained(n, SECOND_HOURLY_230.unit, SECOND_HOURLY_230.guard, invocation)
 }
 
 impl Focused {

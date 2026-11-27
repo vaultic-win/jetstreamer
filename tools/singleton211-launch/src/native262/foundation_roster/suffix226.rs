@@ -84,3 +84,65 @@ pub(super) fn live(n: &mut Native) -> Result<LiveReplay> {
         receipt_disk: DISK_RECEIPTS,
     })
 }
+
+pub(super) fn reserve_for_overlap(shares_suffix: bool, suffix_quote: bool, suffix_active: bool) -> bool {
+    shares_suffix && !suffix_quote && !suffix_active
+}
+
+/// Reserve the complete suffix across extraction, drain and admission. Its own active
+/// guard and cgroup take over the booking once it is running. Only a verified, drained
+/// suffix with a sealed assembly handoff can relinquish a pending booking.
+pub(super) fn pending_reservation(n: &mut Native) -> Result<(u64, u64)> {
+    let state = Path::new(SUFFIX_226_ROOT);
+    let handoff = state.join("assembly-source-handoff.json");
+    if !handoff.try_exists()? {
+        return Ok((
+            capacity::add(SUFFIX_226_CAP, DISK_RECEIPTS)?,
+            capacity::add(SUFFIX_226_CAP, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
+        ));
+    }
+    let document = Bound::new(&handoff, hash(&handoff)?).sealed()?;
+    let registration = state.join("cadence-registration.json");
+    let reference = Bound::new(&registration, hash(&registration)?);
+    let launch = reference.sealed()?;
+    let replay = binding(&document["stage"]["replay"])?.sealed()?;
+    let manifest = binding(&document["stage"]["suffix_manifest"])?.sealed()?;
+    ensure!(
+        document["schema"] == "foundation-epoch226-private-assembly-source-v1"
+            && document["epoch"] == 226
+            && document["suffix_launch"] == json!(reference)
+            && document["terminal"]["manager"]["Result"] == "success"
+            && document["stage"]["operation"] == "assemble"
+            && document["publication_authorized"] == false
+            && launch["kind"] == "epoch226-checkpoint-suffix"
+            && launch["unit"] == UNIT
+            && launch["worker_sha256"] == WORKER_SHA
+            && replay["remaining_slots_replayed"] == 535
+            && replay["suffix_complete"] == true
+            && replay["actual_native_checkpoint_matches"] == true
+            && manifest["epoch"] == 226
+            && manifest["output_slot_start"] == 98_063_465
+            && manifest["output_slot_count"] == 535
+            && manifest["terminal"]["slot"] == 98_063_999
+            && manifest["archive_sha256"] == replay["suffix_archive_sha256"],
+        "epoch 226 suffix reservation has no complete assembly handoff"
+    );
+    focused::drained(n, UNIT, GUARD, text(&launch, "invocation_id")?)?;
+    Ok((0, 0))
+}
+
+#[cfg(test)]
+mod overlap_tests {
+    use super::*;
+
+    #[test]
+    fn pending_suffix_is_charged_once_for_overlapping_users() {
+        assert!(reserve_for_overlap(true, false, false));
+        for already_charged in [(true, false), (false, true), (true, true)] {
+            assert!(!reserve_for_overlap(true, already_charged.0, already_charged.1));
+        }
+        assert!(!reserve_for_overlap(false, false, false));
+        assert_eq!(SUFFIX_226_CAP + DISK_RECEIPTS, 172_067_127_296);
+        assert_eq!(SUFFIX_226_CAP + CONTROLLER_MEMORY + (1 << 30), 173_140_869_120);
+    }
+}

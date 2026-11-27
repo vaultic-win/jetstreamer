@@ -86,6 +86,14 @@ SECOND_HOURLY_230 = Scope(
     "b7d2b77d99c3d42d6e85b9b724876ba700f6c598df75ade8bcc7db945907edda",
     225_000_000_000, 208 << 30, 256 << 20, "48-55",
 )
+FIRST_7871_230 = Scope(
+    230, V / "horizon230-first-7871-runtime-v1",
+    "horizon-qualify-230-first-7871-v1.service", "horizon-230-first-7871-protective-v1.service",
+    "epoch230-private-first-7871-window", "foundation-epoch230-first-7871-roster-binding-v1",
+    "7d3a7c8bad8d3b257622800874a92a278d287a6b1cd6d377f729c2e139e9f4fd",
+    "3c0d5ac1c970cffa0473fa3c5d01ad2466f7d041b4fe25dc7cdb65039688a3ea",
+    225_000_000_000, 90 << 30, 256 << 20, "48-55",
+)
 RESTORE_258 = Scope(
     258, V / "horizon258-native-restore-runtime-v1",
     "horizon-qualify-258-native-restore-v1.service", "horizon-258-native-restore-protective-v1.service",
@@ -122,8 +130,35 @@ FEATURE_296 = Scope(
 SCOPED_ARGS = {
     "--epoch230": GAP_230, "--epoch258": RESTORE_258, "--epoch260": RESTORE_260,
     "--hourly230": HOURLY_230, "--hourly230-second": SECOND_HOURLY_230,
-    "--trace296": TRACE_296, "--feature296": FEATURE_296,
+    "--first7871-230": FIRST_7871_230, "--trace296": TRACE_296, "--feature296": FEATURE_296,
 }
+
+
+def protected_226_fit(fit):
+    status = fit["protected_226_suffix_state"]
+    assert status in ("pending", "live", "verified-closed")
+    expected = ((160 << 30) + (256 << 20), (161 << 30) + (256 << 20)) if status == "pending" else (0, 0)
+    assert (fit["pending_suffix226_disk_bytes"], fit["pending_suffix226_memory_bytes"]) == expected
+
+
+def second_hourly_drained(ops, terminal_ref):
+    assert terminal_ref == {
+        "path": str(SECOND_HOURLY_230.state / "terminal.json"),
+        "sha256": "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56",
+    }
+    terminal = ops.bound(terminal_ref)
+    assert terminal["unit"] == SECOND_HOURLY_230.unit and terminal["guard_drained"]
+    assert terminal["invocation_id"] == "a0a94d2d42984804877c1a80fc934585"
+    assert terminal["state"] == "local-segment-committed" and terminal["checkpoint"]["slot"] == 99_516_304
+    assert ops.props(SECOND_HOURLY_230.guard.removesuffix(".service") + ".timer", ["ActiveState", "Job"]) == {
+        "ActiveState": "inactive", "Job": ""}
+    for unit in (SECOND_HOURLY_230.unit, SECOND_HOURLY_230.guard):
+        owner = ops.props(unit, ["ActiveState", "Result", "InvocationID", "Job", "MainPID", "ControlPID", "ControlGroup"])
+        assert owner["ActiveState"] in ("inactive", "failed") and not owner["Job"] and not owner["ControlGroup"]
+        assert owner["MainPID"] == owner["ControlPID"] == "0"
+        assert not (Path("/sys/fs/cgroup/system.slice") / unit).exists()
+        if unit == SECOND_HOURLY_230.unit:
+            assert owner["Result"] == "success" and owner["InvocationID"] in ("", terminal["invocation_id"])
 
 
 def current_fit(kit, roster, root, scope):
@@ -140,11 +175,16 @@ def current_fit(kit, roster, root, scope):
     selected = cpus(scope.cpus)
     assert cpus(fit["cpus"]) == selected
     protected_cpus = selected
-    if scope is SECOND_HOURLY_230:
+    if scope in (SECOND_HOURLY_230, FIRST_7871_230):
         protected_cpus = set().union(*(cpus(Path(
             f"/sys/devices/system/cpu/cpu{cpu}/topology/thread_siblings_list"
         ).read_text().replace(",", " ")) for cpu in selected))
         assert selected <= protected_cpus
+    if scope is FIRST_7871_230:
+        proof = roster["focused_230_quote"]
+        assert sorted(protected_cpus) == proof["exclusive_online_cpus"] == [*range(48, 56), *range(112, 120)]
+        protected_226_fit(fit)
+        second_hourly_drained(ops, proof["predecessor_terminal"])
     listing = subprocess.check_output(
         ["systemctl", "list-units", "--type=service", "--state=running,activating",
          "--plain", "--no-legend", "--no-pager"], text=True, timeout=10)
@@ -175,7 +215,7 @@ def current_fit(kit, roster, root, scope):
     assert fit["required_hard_memory_bytes"] <= fit["host_total_memory_bytes"]
     return {"available_disk_bytes": disk, "available_memory_bytes": available,
             "required_remaining_memory_bytes": growth, "sampled_unix_seconds": time.time(),
-            **({"protected_cpus": sorted(protected_cpus)} if scope is SECOND_HOURLY_230 else {})}
+            **({"protected_cpus": sorted(protected_cpus)} if scope in (SECOND_HOURLY_230, FIRST_7871_230) else {})}
 
 
 def prepare_hourly_tokens(ops, attempt, tokens, template, guard, hook, probe_unit):
@@ -248,9 +288,11 @@ def launch(kit, roster_ref, scope):
         tokens = V / "horizon230-middle-hourly-first-tokens-retry-v1"
     if scope is SECOND_HOURLY_230:
         tokens = V / "horizon230-middle-hourly-second-tokens-v1"
+    if scope is FIRST_7871_230:
+        tokens = V / "horizon230-first-7871-tokens-v1"
     assert not (state / "cadence-registration.json").exists()
     assert not (attempt / "admission.json").exists()
-    qualify_tokens = failed_start is not None or scope is SECOND_HOURLY_230
+    qualify_tokens = failed_start is not None or scope in (SECOND_HOURLY_230, FIRST_7871_230)
     assert qualify_tokens or not tokens.exists()
     roster = ops.bound(roster_ref)
     preflight = ops.bound(scope.preflight)
@@ -283,6 +325,9 @@ def launch(kit, roster_ref, scope):
         assert source.resolve() == source and destination.resolve() == destination
         assert destination.is_relative_to(root) and destination.stat().st_size == 0
         assert f"{info.st_dev}:{info.st_ino}:{info.st_size}" == measured
+        if scope is FIRST_7871_230:
+            assert (info.st_mtime_ns, info.st_ctime_ns) == (binding["mtime_ns"], binding["ctime_ns"])
+            assert info.st_nlink == 1 and not source.is_symlink()
         bindings.append(f"{source}:{destination}")
     snapshot = Path(bootstrap["path"]).stat()
     assert bootstrap["identity"] == (
@@ -308,6 +353,8 @@ def launch(kit, roster_ref, scope):
     if qualify_tokens:
         probe_unit = ("foundation-230-hourly-second-token-probe-v1" if scope is SECOND_HOURLY_230
                       else "foundation-230-hourly-token-probe-v1")
+        if scope is FIRST_7871_230:
+            probe_unit = "foundation-230-first-7871-token-probe-v1"
         template = prepare_hourly_tokens(ops, attempt, tokens, template, profile["guard"], hook, probe_unit)
     measured = current_fit(kit, roster, root, scope)
     properties = dict(profile["properties"], BindReadOnlyPaths=" ".join(bindings),
