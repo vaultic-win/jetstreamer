@@ -149,7 +149,12 @@ launch_attempted=1
 iid=$(systemctl show "$u" -p InvocationID --value)
 pid=$(systemctl show "$u" -p MainPID --value)
 [[ $iid =~ ^[0-9a-f]{32}$ && $pid -gt 1 ]]
-test "$(stat -Lc %d:%i "/proc/$pid/exe")" = "$(stat -Lc %d:%i "$a/static/hold-entry140")"
+gate_inode=$(stat -Lc %d:%i "$a/static/hold-entry140")
+for attempt in {1..30}; do
+    if [[ $(stat -Lc %d:%i "/proc/$pid/exe" 2>/dev/null || true) == "$gate_inode" ]]; then break; fi
+    sleep .1
+done
+test "$(stat -Lc %d:%i "/proc/$pid/exe")" = "$gate_inode"
 test "$(cat "/proc/$pid/cgroup")" = "0::/system.slice/$u"
 test "$(cat "/sys/fs/cgroup/system.slice/$u/memory.max")" = 27917287424
 test "$(cat "/sys/fs/cgroup/system.slice/$u/memory.swap.max")" = 0

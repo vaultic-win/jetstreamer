@@ -47,6 +47,6 @@ argv=(
     --setenv=RAYON_NUM_THREADS=2
     --setenv=RUST_LOG=info,solana_metrics=off
     --
-    /run/horizon140-suffix-gate/hold-entry140 "$plan_digest"
+    /usr/bin/env /run/horizon140-suffix-gate/hold-entry140 "$plan_digest"
 )
 printf '%s\n' "${argv[@]}" | jq -Rsc 'split("\n")[:-1]'
