@@ -610,12 +610,38 @@ def producer_argv(intent, payload, gate_ref, payload_ref, checkpoints):
             "--", "/usr/bin/python3", "-IB", str(ALIAS/"replay167.py"), "gate"]
 
 
+def check_joint_terminal(roster, native):
+    terminal_ref = ref(RT/"epoch168-joint-checkpoint-reduced-run-20261126-v1/TERMINAL.json",
+                       "f9ee88c1c5eb4129638a8c0351e9d6ac1ff5debf2e6859775928488c02f59faf")
+    terminal = read(terminal_ref)
+    owner = native["actor"]
+    prior = roster["actor"]
+    need(roster["phase"] in ("worker", "terminal") and native["mode"] == "terminal"
+         and native["terminal"] == terminal_ref and native["processes"] == [] and native["guard"] is None
+         and native["prestart"] == roster["prestart"]
+         and native["enrollment"] == roster["enrollment"] == terminal["enrollment"]
+         and owner["invocation_id"] == prior["producer_invocation_id"] == terminal["producer_invocation_id"]
+         and owner["pid"] == prior["producer_pid"] == terminal["producer_pid"]
+         and owner["start_ticks"] == prior["producer_start_ticks"] == terminal["producer_start_ticks"]
+         and owner["boot_id"] == prior["boot_id"]
+         and terminal["disposition"] == "checkpoint-complete" and terminal["terminal_checkpoint"]["slot"] == 73_007_829
+         and terminal["pid1_terminal_event"]["UNIT"] == PEER168
+         and terminal["pid1_terminal_event"]["INVOCATION_ID"] == owner["invocation_id"]
+         and terminal["pid1_terminal_event"]["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+         and terminal["resource_credit_bytes"] == 0 and terminal["archive_publication_authorized"] is False
+         and (roster["phase"] == "worker" or roster["terminal"] == terminal_ref),
+         "joint 168 terminal crosses the accepted fleet actor, enrollment or native exit")
+    idle(PEER168)
+
+
 def quote_population(quote, fleet, actor):
     joined = quote["joined_native_population"]
     joint_mode = quote["mode"]
     joint = fleet["current_joint168_checkpoint"]
-    need((joint_mode, joint["phase"]) in (("active", "worker"), ("terminal", "terminal")),
-         "joint 168 disposition changed")
+    if joint_mode == "terminal":
+        check_joint_terminal(joint, quote["native_joint168"])
+    else:
+        need(joint_mode == "active" and joint["phase"] == "worker", "joint 168 disposition changed")
     want = {PEER146, PEER172} | ({PEER168} if joint_mode == "active" else set()) | ({UNIT} if actor else set())
     need(want == set(joined), "incorrect phase-specific replay population")
     for key, unit in (("current_full146", PEER146), ("current_joint168_checkpoint", PEER168)):
