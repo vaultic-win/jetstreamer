@@ -20,7 +20,7 @@ def load(name):
 
 
 NEXT_DEPLOYMENT=Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73746882-20261127-v1/operator")
-q=load("continuation_price" if Path(__file__).resolve().parent == NEXT_DEPLOYMENT else "successor_price")
+q=load("continuation_price" if Path(__file__).resolve().parent in (NEXT_DEPLOYMENT, NEXT_DEPLOYMENT.with_name("operator-with143-v1")) else "successor_price")
 persist=load("closed_successor").persist
 D=q.ATTEMPT
 UNIT=q.UNIT

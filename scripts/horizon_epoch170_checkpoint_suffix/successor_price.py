@@ -157,7 +157,7 @@ def scope(attempt=ATTEMPT):
     return interface, ref
 
 
-def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=None):
+def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=None, hourly_replacement=None):
     if held_replacement is not None:
         need(phase == "held" and held_replacement == "horizon-qualify-170-from-73746882-20261127-v1.service",
              "unknown replacement actor")
@@ -327,6 +327,15 @@ def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=Non
              and s141["MemorySwapMax"]=="0" and not s141["Job"] and len(s141["InvocationID"])==32,
              "141 exceeds its full charged contract")
         expected.add(profile141["unit"])
+    if hourly_replacement is not None:
+        hourly_unit = "horizon-qualify-143-first-hourly-20261127-v1.service"
+        observed = state(hourly_unit)
+        need(successor and profile141["unit"] not in units and observed["ActiveState"] == "active"
+             and observed["InvocationID"] == hourly_replacement and len(hourly_replacement) == 32
+             and observed["MemoryMax"] == str(40*G) and observed["MemorySwapMax"] == "0"
+             and observed["CPUQuotaPerSecUSec"] == "2s" and not observed["Job"],
+             "143 differs from its priced hourly replacement")
+        expected.add(hourly_unit)
     need(units == expected, "replay owner changed: "+repr(units ^ expected))
     bound(iref)
     after = availability()
@@ -338,7 +347,8 @@ def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=Non
              and result["host_quarantine_absent"], "wrong local reclamation")
         if dt.datetime.fromisoformat(result["observed_utc"]) > dt.datetime.fromisoformat(fleet["sampled_at_utc"]):
             freed = max(0,min(result["allocated_bytes_removed"],result["measured_net_free_bytes"]))
-    home = min(before[0],after[0],fleet["complete_cycle_conservative_available_DATA_bytes"]+freed)
+    historical_home_limit = fleet["complete_cycle_conservative_available_DATA_bytes"] + freed
+    home = min(before[0],after[0],historical_home_limit)
     ram = min(before[1],after[1])
     candidate = budget["bounded_growth_limit"] if successor else 0
     required_ram = incumbent_ram+extra_ram
@@ -354,6 +364,7 @@ def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=Non
         active_140=s140,charged140_home=charged140_home,charged140_ram=charged140_ram,return140=end140,booking140=booking_ref,held140=held_ref,loan140=loan_ref,extra=rr,active185=k,
         guard_sibling_allowance=G,producer_allowance=48*G,producer_quota_micros=6000000,guard_quota_micros=1000000,
         required_home=required_home,required_ram=required_ram,available_home=home,available_ram=ram,
+        historical_home_limit=historical_home_limit,
         replaced_original_scoped_growth=old_scoped,resident_lower_bytes=residents,terminal_tree_bounds=[old_lower,old_upper],candidate_growth=candidate,
         guard_floor=floor,guard_cap=cap,home_margin=home-required_home,ram_margin=ram-required_ram,
         fits=home>=required_home and ram>=required_ram and cap>=old_upper+candidate,

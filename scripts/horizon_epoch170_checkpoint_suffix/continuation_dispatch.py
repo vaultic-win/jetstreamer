@@ -1,4 +1,5 @@
 """Dispatch the read-only comparison, protected actor and enrollment-dependent release."""
+from contextlib import contextmanager
 import ctypes
 import fcntl
 import hashlib
@@ -140,10 +141,19 @@ def await_new_fleet(previous_path):
     finally: changes.close()
 
 
+@contextmanager
+def admission_lock():
+    # Serialize each resource mutation with the 143 booker/operator. Release the
+    # host lock while awaiting the existing guard, writer and cadence events.
+    with Path("/run/horizon-epoch171-to136-g1.operation.lock").open("rb") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
 def dispatch(stage):
     i, ir = q.scope()
     q.need(operator.q.UNIT == q.UNIT and operator.D == q.DEP, "operator is outside its sealed deployment")
-    q.need(Path(__file__).resolve().parent == q.DEP/"operator","wrong dispatch executable directory")
+    q.need(Path(__file__).resolve().parent in (q.DEP/"operator",q.DEP/"operator-with143-v1"),"wrong dispatch executable directory")
     if stage == "check":
         operator.static()
         return {"interface":ir,"wait_for":str(q.DEP/"predecessor-exit/PID1_EXIT.json")}
@@ -155,11 +165,13 @@ def dispatch(stage):
         return ref
     if not (q.DEP/"SUCCESSOR_ACTOR.json").exists():
         q.need(stage=="advance","actor is not held")
-        operator.start()
+        with admission_lock():
+            operator.start()
     operator.same_actor()
     if not (q.DEP/"ACTUAL_GUARD_PLAN.json").exists():
         q.need(stage=="advance","no actual guard")
-        operator.arm()
+        with admission_lock():
+            operator.arm()
     if not (q.DEP/"WRITER_ENROLLMENT.json").exists():
         changes = Changes()
         try:
@@ -168,7 +180,8 @@ def dispatch(stage):
                 changes.events(None)
         finally: changes.close()
     wait_for_guard()
-    return operator.release()
+    with admission_lock():
+        return operator.release()
 
 
 def main():

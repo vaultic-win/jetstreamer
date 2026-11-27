@@ -10,7 +10,7 @@ import sys
 import time
 
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73746882-20261127-v1")
-OPERATOR = ROOT / "operator"
+OPERATOR = ROOT / ("operator-with143-v1" if Path(__file__).resolve().parent == ROOT/"progress-with143-v1" else "operator")
 DISPATCH_SHA = "8d3d759e44b6ab821a8d0020e8cba1a4ef26ab91f59c9fb8cb4a84f0a66c11ff"
 PROGRESS = re.compile(rb"\] progress slot (\d+)/(\d+) .*?txs=(\d+) accounts=(\d+)")
 MAX_LINE = 1 << 20
@@ -130,7 +130,8 @@ def follow(dispatch):
 def main():
     require(sys.argv[1:] in (["check"], ["advance"]), "expected check or advance")
     original = OPERATOR/"continuation_dispatch.py"
-    require(hashlib.sha256(original.read_bytes()).hexdigest() == DISPATCH_SHA, "dispatcher changed")
+    expected = "37ef972912965856076461d7e480897b2ad2696cdfae2dbfa7215605a8bc12f3" if OPERATOR.name == "operator-with143-v1" else DISPATCH_SHA
+    require(hashlib.sha256(original.read_bytes()).hexdigest() == expected, "dispatcher changed")
     sys.path.insert(0, str(OPERATOR))
     import continuation_dispatch as dispatch
     if sys.argv[1] == "check":

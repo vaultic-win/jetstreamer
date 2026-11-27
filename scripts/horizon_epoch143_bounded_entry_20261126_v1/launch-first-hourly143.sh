@@ -65,13 +65,19 @@ screen() {
     shift
     local quote
     quote=$("$price" "$fleet" "$fleet_sha" "$@")
-    printf '%s\n' "$quote" | publish "$output"
     jq -e --argjson home "$home_charge" --argjson ram "$ram_charge" --arg fleet "$fleet" --arg sha "$fleet_sha" '
         .fleet=={path:$fleet,sha256:$sha} and .disk_fits and .memory_fits
         and .resource_credit_bytes==0 and .candidate_home_bytes==$home
         and .candidate_ram_bytes==$ram and .candidate_cpu_quota_micros==3000000
         and .available_home_bytes>=.retained_required_home_bytes+.candidate_home_bytes
-        and .available_ram_bytes>=.retained_required_ram_bytes+.candidate_ram_bytes' "$output" >/dev/null
+        and .available_ram_bytes>=.retained_required_ram_bytes+.candidate_ram_bytes' <<<"$quote" >/dev/null
+    if [[ $epoch == 143 ]]; then
+        jq -e --arg iid "${1:-}" --arg path "$contract" --arg sha "$contract_sha" '
+            .schema=="horizon-epoch143-first-hourly-replacement-fit-v1" and .projection_only==false
+            and .contract=={path:$path,sha256:$sha} and (.closed141.sha256|length)==64
+            and (.held_invocation // "")==$iid and (.held_invocation==null or (.candidate_guard_sample.sha256|length)==64)' <<<"$quote" >/dev/null
+    fi
+    printf '%s\n' "$quote" | publish "$output"
 }
 
 check_staged_141() {
@@ -103,6 +109,45 @@ check_staged_141() {
     test "$(sha "$snapshot")" = "$(jq -er '.local_projection.bootstrap.sha256' "$source")"
 }
 
+check_staged_143() {
+    local receipt path digest snapshot map mode sourcepath destination checked
+    for path in "$run" "$a/barrier" "$a/guard-receipts"; do test ! -e "$path"; done
+    test "$(sha "$gate")" = "$gate_sha"
+    test "$(sha "$guard")" = "$guard_sha"
+    test "$(sha "$a/inputs-v1/canonical-hashes.txt")" = "$(jq -er '.hash_list_sha256' "$source")"
+    receipt=$(jq -er '.bootstrap.custody.path' "$source")
+    test "$(sha "$receipt")" = "$(jq -er '.bootstrap.custody.sha256' "$source")"
+    jq -en --slurpfile ref "$source" --slurpfile found "$receipt" '
+      $ref[0].bootstrap as $b | $found[0] as $c |
+      $c.epoch==143 and $c.slot==$b.slot and $c.object.sha256==$b.sha256
+      and $c.object.generation==$b.generation and $c.object.bytes==$b.size and $c.local_input.path==$b.path' >/dev/null
+    while IFS=$'\t' read -r path digest; do
+        test "$(sha "$path")" = "$digest"
+    done < <(jq -r '.images_and_genesis[]|[.path,.sha256]|@tsv' "$source")
+    map="$a/projection-v1/visible-inodes.txt"
+    test "$(sha "$map")" = c07d230f057a7b9d2f7ed220661082c501e85efc8f5ec90e0cb0ac0ddb2a2af9
+    checked=0
+    while read -r mode destination; do
+        if [[ $destination == "$view"/* ]]; then
+            sourcepath=$(jq -er --arg d "$destination" '.read_only_bind_map|to_entries[]|select(.value==$d)|.key' "$contract")
+        else
+            sourcepath=$(jq -er --arg d "$destination" '.images_and_genesis[]|select(.path==$d)|.path' "$source")
+        fi
+        test "$(stat -Lc '%d:%i:%s:%a' "$sourcepath")" = "$mode"
+        checked=$((checked+1))
+    done < "$map"
+    test "$checked" = 6
+    snapshot=$(jq -er '.bootstrap.path' "$source")
+    if [[ ${1:-} == full ]]; then
+        test "$(sha "$snapshot")" = "$(jq -er '.bootstrap.sha256' "$source")"
+    fi
+}
+
+window_ok() {
+    local latest=$1 runtime=$2 drain=$3 now=$4
+    (( runtime > 0 && now <= latest && latest + runtime + 20 <= drain ))
+}
+
 test "$(id -u)" = 0
 test "$(sha "$contract")" = "$contract_sha"
 source=$(jq -er '.source_reference.path' "$contract")
@@ -111,8 +156,13 @@ memory=$(jq -er '.producer_RAM_bytes' "$contract")
 home_charge=$(jq -er '.guarded_HOME_bytes+.separate_evidence_HOME_bytes' "$contract")
 ram_charge=$(jq -er '.producer_RAM_bytes+.guard_RAM_bytes' "$contract")
 test "$(sha "$source")" = "$(jq -er '.source_reference.sha256' "$contract")"
-if [[ $epoch == 141 && ${1:-} == --check-staged && $# == 1 ]]; then
-    check_staged_141
+if [[ ${1:-} == --check-staged && $# == 1 ]]; then
+    if [[ $epoch == 141 ]]; then check_staged_141; else check_staged_143; fi
+    exit 0
+fi
+if [[ $epoch == 143 && ${1:-} == --check-booking-window && $# == 5 ]]; then
+    for arg in "${@:2}"; do [[ $arg =~ ^[0-9]{1,11}$ ]]; done
+    window_ok "${@:2}"
     exit 0
 fi
 b=${1:?Pass the writer booking}
@@ -135,6 +185,12 @@ jq -e --arg schema "horizon-epoch${epoch}-first-hourly-booking-v1" --argjson hom
     and (.runtime_max_seconds|type=="number" and .>0 and floor==.)
     and (.latest_start_unix_seconds|type=="number" and floor==.)
     and (.must_drain_by_unix_seconds|type=="number" and floor==.)' "$b" >/dev/null
+if [[ $epoch == 143 ]]; then
+    test "$(jq -er '.native_stop_grace_seconds' "$b")" = 20
+    acceptance=$(jq -er '.closed_141.path' "$b")
+    test "$acceptance" = /var/lib/jetstreamer/horizon_runtime_data/epoch141-first-hourly-20261127-v1/terminal-capture-v1/PRIVATE_FIRST_HOURLY_ACCEPTANCE.json
+    test "$(sha "$acceptance")" = "$(jq -er '.closed_141.sha256' "$b")"
+fi
 fleet=$(jq -er '.fleet.path' "$b")
 fleet_sha=$(jq -er '.fleet.sha256' "$b")
 writer_iid=$(jq -er '.writer.invocation_id' "$b")
@@ -151,7 +207,7 @@ drain=$(jq -er '.must_drain_by_unix_seconds' "$b")
 if [[ $epoch == 141 ]]; then
     runtime=$(( runtime < drain-latest-20 ? runtime : drain-latest-20 ))
 fi
-(( runtime > 0 && $(date +%s) <= latest && latest + runtime + 20 <= drain ))
+window_ok "$latest" "$runtime" "$drain" "$(date +%s)"
 for target in "$unit" "$guard_unit.timer" "$guard_unit.service"; do
     test "$(value "$target" LoadState)" = not-found
 done
@@ -162,14 +218,7 @@ genesis=$(jq -er '.ledger_genesis.path' "$contract")
 if [[ $epoch == 141 ]]; then
     check_staged_141
 else
-    for target in "$run" "$a/barrier" "$a/guard-receipts"; do test ! -e "$target"; done
-    test "$(sha "$a/inputs-v1/canonical-hashes.txt")" = "$(jq -er '.hash_list_sha256' "$source")"
-    while IFS=$'\t' read -r path digest; do
-        test "$(sha "$path")" = "$digest"
-    done < <(jq -r '.images_and_genesis[]|[.path,.sha256]|@tsv' "$source")
-    snapshot=$(jq -er '.bootstrap.path' "$source")
-    test "$(stat -c '%d %i %s' "$snapshot")" = '64512 118554661 3714834246'
-    test "$(sha "$snapshot")" = "$(jq -er '.bootstrap.sha256' "$source")"
+    check_staged_143 full
 fi
 writer_live
 screen "$a/PRESTART_SCREEN.json"
@@ -231,9 +280,7 @@ for binding in "${bindings[@]}"; do
     input=${binding%:*}
     destination=${binding##*:}
     test "$(stat -Lc '%d:%i:%s' "$input")" = "$(stat -Lc '%d:%i:%s' "/proc/$pid/root$destination")"
-    if [[ $epoch == 141 ]]; then
-        awk -v dest="$destination" '$5==dest && $6 ~ /(^|,)ro(,|$)/ {found=1} END {exit !found}' "/proc/$pid/mountinfo"
-    fi
+    awk -v dest="$destination" '$5==dest && $6 ~ /(^|,)ro(,|$)/ {found=1} END {exit !found}' "/proc/$pid/mountinfo"
 done
 
 plan="$a/ACTUAL_GUARD_PLAN.json"

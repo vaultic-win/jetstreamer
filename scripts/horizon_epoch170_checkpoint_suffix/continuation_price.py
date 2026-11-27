@@ -131,12 +131,37 @@ def price(phase):
              and actor["producer_pid"] == int(s["MainPID"]) and s["MemoryMax"] == str(48*G)
              and s["CPUQuotaPerSecUSec"] == "6s","different held successor")
     else: inactive(UNIT)
-    joint = prior.price("held" if held else "start",attempt=OLD,held_replacement=UNIT if held else None)
+    shared = Path(__file__).with_name("rollover143.py")
+    rollover = None
+    replacement = None
+    if shared.exists():
+        shared_spec = importlib.util.spec_from_file_location("rollover143", shared)
+        rollover = importlib.util.module_from_spec(shared_spec)
+        shared_spec.loader.exec_module(rollover)
+        rs = state(rollover.UNIT)
+        if rs["ActiveState"] == "active":
+            rollover.first_closed(prior)
+            replacement = rollover.guard(prior,rollover.ROOT,rollover.UNIT,rollover.ROOT/"guard-receipts",
+                                         rs["InvocationID"],"released")
+    joint = prior.price("held" if held else "start",attempt=OLD,held_replacement=UNIT if held else None,
+                        hourly_replacement=replacement["iid"] if replacement else None)
     need(joint["candidate_growth"] == 36*G and joint["producer_allowance"] == 48*G
          and joint["guard_sibling_allowance"] == G and joint["resource_credit_bytes"] == 0
          and joint["extra"]["reserved_141"]["sha256"] == "73a120db97d72a03c05c39139098a10cd6c84802f0f5472a1251f341976ce131",
          "changed sequential producer or hourly allowance")
-    hourly, hourly_floor, hourly_growth, hourly_resident = hourly_owner()
+    hourly_ram_delta = 0
+    if replacement:
+        hourly = replacement["sample"]
+        hourly_floor = replacement["floor"]
+        hourly_growth = max(0,64*G-replacement["low"])
+        hourly_resident = anonymous(replacement["unit"],replacement["iid"],replacement["roster"],40*G)
+        hourly_ram_delta = 10*G
+    elif rollover and rollover.ACCEPT.exists():
+        rollover.first_closed(prior)
+        hourly, hourly_floor, hourly_growth, hourly_resident = None, 0, 64*G, 0
+        hourly_ram_delta = 10*G
+    else:
+        hourly, hourly_floor, hourly_growth, hourly_resident = hourly_owner()
     tail = bound(joint["charged_167"])
     intent = bound(tail["actor"]["intent"])
     need(intent["quote"]["producer_memory_bytes"] == 42*G
@@ -157,11 +182,17 @@ def price(phase):
     # The retired compiler leaves one serial 0.5-core/512-MiB control slot.
     # It can overlap the old-slot reader or the new producer only when freshly paid.
     floor += 128*M
+    aux = rollover.auxiliary(prior,joint["fleet"]) if rollover else None
+    aux_home = aux["evidence_home"] if aux else 0
+    aux_ram = aux["fourth_ram"]+aux["parallel_controls_ram"]+aux["watcher_ram"] if aux else 0
+    floor += aux_home
     required = floor+growth
-    ram_required = joint["required_ram"] - hourly_resident - tail_resident + 512*M
+    ram_required = joint["required_ram"] - hourly_resident - tail_resident + 512*M + hourly_ram_delta + aux_ram
     after = prior.availability()
     home, ram = min(before[0],after[0]), min(before[1],after[1],joint["available_ram"])
-    historical = joint["available_home"] - (joint["required_home"] - 36*G + growth + 128*M)
+    historical_home = joint["historical_home_limit"] + aux["incremental_185_m_after_fleet"] if aux else joint["available_home"]
+    historical = historical_home - (joint["required_home"] - 36*G + growth + 128*M)
+    historical -= aux_home + (20*G if hourly_ram_delta else 0)
     margin = min(historical,home-required)
     fits = margin >= 0 and ram >= ram_required and (phase=="read" or high+growth <= 384*G)
     return dict(phase=phase,fleet=joint["fleet"],joint=joint,observed=int(time.time()),fits=fits,
@@ -169,6 +200,8 @@ def price(phase):
                 tail_ram_resident=tail_resident,terminal_tree_bounds=[low,high],guard_floor=floor,
                 guard_cap=min(384*G,high+growth),available_home=home,available_ram=ram,required_home=required,
                 required_ram=ram_required,home_margin=margin,ram_margin=ram-ram_required,
-                historical_home_margin=historical,guarded_remaining_141=hourly_growth,
+                historical_home_margin=historical,guarded_hourly_remaining=hourly_growth,
+                guarded_remaining_141=0 if hourly_ram_delta else hourly_growth,
+                replacement143=replacement,auxiliary=aux,
                 dispatch_cpu_micros=500000,dispatch_memory_bytes=512*M,dispatch_home_bytes=128*M,
                 resource_credit_bytes=0,archive_publication_authorized=False)
