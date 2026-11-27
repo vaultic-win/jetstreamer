@@ -26,7 +26,7 @@ const LENGTH: u64 = 30_725_885_495;
 const ALLOCATED: u64 = 30_725_935_104;
 const DEVICE: u64 = 64_512;
 const INODE: u64 = 104_006_868;
-const UNIT: &str = "horizon-closed185-lanem-retire-20261127-v1.service";
+const UNIT: &str = "horizon-closed185-lanem-retire-20261127-v2.service";
 const STOPPED: [&str; 2] = [
     "jetstreamer-root-sweep-historical-182-200-v111-e185-185-lane-m-3.service",
     "jetstreamer-root-sweep-historical-182-200-v112-e185-185-lane-m-2.service",
@@ -133,20 +133,13 @@ fn rehash(path: &Path, original: bool) -> Result<()> {
         .custom_flags(libc::O_NOFOLLOW)
         .open(path)?;
     ensure!(source_id(&f.metadata()?, original), "opened inode changed");
-    let mut input = BufReader::with_capacity(4 << 20, f);
-    let mut h = Sha256::new();
-    loop {
-        let block = input.fill_buf()?;
-        if block.is_empty() {
-            break;
-        }
-        h.update(block);
-        let count = block.len();
-        input.consume(count);
-    }
+    let digest = Command::new("/usr/bin/sha256sum")
+        .arg("-")
+        .stdin(f)
+        .output()?;
     ensure!(
-        format!("{:x}", h.finalize()) == SHA && source_id(&input.get_ref().metadata()?, original),
-        "local archive digest/identity changed"
+        digest.status.success() && digest.stdout == format!("{SHA}  -\n").as_bytes(),
+        "local archive digest changed"
     );
     assert_identity(path, original)
 }
