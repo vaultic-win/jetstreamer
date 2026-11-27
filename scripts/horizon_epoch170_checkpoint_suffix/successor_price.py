@@ -159,7 +159,9 @@ def scope(attempt=ATTEMPT):
 
 def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=None, hourly_replacement=None):
     if held_replacement is not None:
-        need(phase == "held" and held_replacement == "horizon-qualify-170-from-73746882-20261127-v1.service",
+        first_replacement = "horizon-qualify-170-from-73746882-20261127-v1.service"
+        next_replacement = "horizon-qualify-170-from-73766969-20261127-v1.service"
+        need(phase == "held" and held_replacement in (first_replacement, next_replacement),
              "unknown replacement actor")
         incoming = RT / "epoch170-from-73746882-20261127-v1"
         release, release_ref = read(DEP / "attempt-2/SUCCESSOR_RELEASE.json",
@@ -173,6 +175,19 @@ def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=Non
              and terminal["Result"] == "success" and terminal["ExecMainCode"] == "1",
              "replacement lacks its exact clean predecessor")
         inactive(UNIT)
+        if held_replacement == next_replacement:
+            current, previous_ref = read(incoming / "attempt-2/SUCCESSOR_RELEASE.json", "a943145ddc01d4eaff76041eaf131818228e2cb484c32bc7753e84a8dc64bdef")
+            actor = bound(current["actor"])
+            following_dir = RT / "epoch170-from-73766969-20261127-v1"
+            exit_record, _ = read(following_dir / "predecessor-exit/PID1_EXIT.json")
+            native = exit_record["properties"]
+            need(exit_record["release"] == previous_ref and exit_record["actor"] == actor
+                 and native["Id"] == actor["unit"] == first_replacement
+                 and native["InvocationID"] == actor["producer_invocation_id"] == "c3ab30cfeb05428bb8f5c48a5a44822c"
+                 and native["ExecMainPID"] == str(actor["producer_pid"]) and native["Result"] == "success"
+                 and native["ExecMainCode"] == "1" and native["ExecMainStatus"] == native["ControlPID"] == native["MainPID"] == "0",
+                 "following window lacks its captured predecessor")
+            inactive(first_replacement)
     if live_tree_bounds is not None:
         lower, upper = live_tree_bounds
         need(phase == "held" and type(lower) is int and type(upper) is int and 0 < lower <= upper,
