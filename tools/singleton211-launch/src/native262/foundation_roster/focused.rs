@@ -127,6 +127,26 @@ pub(super) const RESTORE_260: Focused = Focused {
     profile_sha: "8f8b33dd3aad7a27924d22bf8c28ffa061baf0a781c68aadb8d716be50c2be23",
 };
 
+pub(super) const OVERLAP_266: Focused = Focused {
+    epoch: 266,
+    unit: "horizon-qualify-266-hourly-overlap-114929697-v1.service",
+    guard: "horizon-266-hourly-overlap-114929697-protective-v1",
+    cpus: "32-39",
+    scratch_cap: 16 << 30,
+    receipt_disk: 256 << 20,
+    producer_memory: 256 << 30,
+    root: "/home/ubuntu/.jetstreamer-private/qualification-266-hourly-overlap-114929697-v1",
+    first: 114_923_431,
+    last: 114_929_697,
+    kind: "epoch266-private-hourly-overlap",
+    preflight_schema: "foundation-epoch266-hourly-overlap-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon266-hourly-overlap-114929697-runtime-v1",
+    preflight_sha: "6fb5bee98e51ad666280e8aee0248d1078aac6739a641be0693948355c6d2e7e",
+    profile_sha: "5f12d3ba864dd64b14add832a4e8c9d441e26d097862763a0bfa74d854418964",
+};
+
+pub(super) const OVERLAP_266_EXCLUSIVE: &str = "30,32-39,94,96-103";
+
 pub(super) const TRACE_296: Focused = Focused {
     epoch: 296,
     unit: "horizon-qualify-296-loader-log-v3.service",
@@ -163,12 +183,13 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 8] = [
+pub(super) const SCOPES: [&Focused; 9] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
     &RESTORE_258,
     &RESTORE_260,
+    &OVERLAP_266,
     &LOADER_296,
     &TRACE_296,
     &FEATURE_296,
@@ -270,7 +291,73 @@ pub(super) fn feature_296_drained(n: &mut Native, invocation: &str) -> Result<()
     Ok(())
 }
 
+fn overlap_private_tmpfs(path: &str, mountinfo: &str) -> bool {
+    mountinfo.lines().any(|line| {
+        let Some((left, right)) = line.split_once(" - ") else {
+            return false;
+        };
+        let mut mount_fields = left.split_whitespace().skip(4);
+        if mount_fields.next() != Some(path)
+            || !mount_fields
+                .next()
+                .is_some_and(|options| options.split(',').any(|option| option == "rw"))
+        {
+            return false;
+        }
+        let mut superblock = right.split_whitespace();
+        superblock.next() == Some("tmpfs")
+            && superblock
+                .nth(1)
+                .is_some_and(|flags| flags.split(',').any(|flag| flag == "noswap"))
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn overlap_requires_exact_writable_no_swap_tmpfs() {
+        let line = "29 1 0:47 / /scope/work/scratch rw,nosuid,nodev - tmpfs tmpfs rw,size=134217728k,noswap";
+        assert!(overlap_private_tmpfs("/scope/work/scratch", line));
+        assert!(!overlap_private_tmpfs("/scope/work", line));
+        assert!(!overlap_private_tmpfs(
+            "/scope/work/scratch",
+            &line.replace(",noswap", "")
+        ));
+        assert!(!overlap_private_tmpfs(
+            "/scope/work/scratch",
+            &line.replace("rw,nosuid", "ro,nosuid")
+        ));
+        assert!(!overlap_private_tmpfs(
+            "/scope/work/scratch",
+            &line.replace("- tmpfs ", "- ext4 ")
+        ));
+    }
+
+    #[test]
+    fn overlap_prices_simultaneous_tmpfs_and_resident_output() {
+        assert_eq!(
+            OVERLAP_266.producer_memory + OVERLAP_266.control_memory() + (1 << 30),
+            258 << 30
+        );
+        assert_eq!(
+            OVERLAP_266.scratch_cap + OVERLAP_266.receipt_disk,
+            17_448_304_640
+        );
+        assert_eq!(OVERLAP_266.last - OVERLAP_266.first + 1, 6267);
+    }
+}
+
 impl Focused {
+    pub(super) fn control_memory(&self) -> u64 {
+        if self.unit == OVERLAP_266.unit {
+            1 << 30
+        } else {
+            CONTROLLER_MEMORY
+        }
+    }
+
     pub(super) fn quote_key(&self) -> String {
         format!("focused_{}_quote", self.epoch)
     }
@@ -354,7 +441,7 @@ impl Focused {
                 && quote["capacity"]["candidate_disk_bytes"]
                     == self.scratch_cap + self.receipt_disk
                 && quote["capacity"]["candidate_total_memory_bytes"]
-                    == self.producer_memory + CONTROLLER_MEMORY + (1 << 30)
+                    == self.producer_memory + self.control_memory() + (1 << 30)
                 && quote["capacity"]["guard_floor_bytes"] == floor
                 && body["filesystem"] == "/"
                 && body["worker_root"] == self.root
@@ -369,6 +456,26 @@ impl Focused {
             "epoch {} focused replay booking or invocation changed",
             self.epoch
         );
+        if self.unit == OVERLAP_266.unit {
+            let released = binding(&launch["guard_release_fit"])?.sealed()?;
+            let mount = format!("{}/work/scratch", self.root);
+            let mountinfo = fs::read_to_string(format!("/proc/{pid}/mountinfo"))?;
+
+            ensure!(
+                launch["diagnostic_only"] == true
+                    && launch["predecessor_native_tuple_qualified"] == false
+                    && launch["cursor_normalization_qualified"] == false
+                    && launch["lossless_restore"] == profile["restore_receipt"]
+                    && released["schema"]
+                        == "foundation-epoch266-hourly-overlap-guard-release-fit-v1"
+                    && released["invocation_id"] == invocation
+                    && released["roster"] == admission["roster"]
+                    && released["guard_plan"] == launch["guard_plan"]
+                    && released["publication_authorized"] == false
+                    && overlap_private_tmpfs(&mount, &mountinfo),
+                "epoch 266 diagnostic guard release or private tmpfs changed"
+            );
+        }
         let memory =
             super::live::finite_owner(&owner, self.unit, invocation, self.producer_memory)?;
         Ok(LiveReplay {

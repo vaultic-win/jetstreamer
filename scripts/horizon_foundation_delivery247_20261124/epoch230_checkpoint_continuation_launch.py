@@ -145,7 +145,7 @@ def start(cap, kit, producer, guard, template, inputs, fit, remote_inventory, de
 
 
 def activate_guarded(kit, epoch, state, tokens, producer_unit, guard_unit, guard, template, launch,
-                     props, prestart, argv, *, on_held=None, before_release=None):
+                     props, prestart, argv, *, on_held=None, before_release=None, guard_cpuset=None):
     ops, runner, startup = kit.ops, kit.replay, kit.startup
     receipts = state / 'guard-receipts'
     timer_unit = guard_unit.replace('.service', '.timer')
@@ -170,6 +170,8 @@ def activate_guarded(kit, epoch, state, tokens, producer_unit, guard_unit, guard
                    '--property=ProtectSystem=strict', '--property=ProtectHome=read-only', '--property=PrivateNetwork=yes',
                    '--property=NoNewPrivileges=yes', '--property=CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE',
                    '--property=AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE', f'--property=ReadWritePaths={receipts}']
+    if guard_cpuset is not None:
+        guard_props.append(f"--property=AllowedCPUs={guard_cpuset}")
     runner.PRODUCER, runner.GUARD_UNIT, runner.TIMER, runner.RECEIPTS = producer_unit, guard_unit, timer_unit, receipts
     runner.GUARD_SHA = guard['sha256']
     startup.systemd_run(guard_unit, guard_props, [guard['path'], plan['path'], '--plan-sha256', plan['sha256'],

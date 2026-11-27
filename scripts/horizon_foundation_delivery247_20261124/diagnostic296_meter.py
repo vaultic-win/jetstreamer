@@ -11,6 +11,7 @@ HOURLY_230 = "middle-hourly-first-v1"
 SECOND_HOURLY_230 = "middle-hourly-second-v1"
 RESTORE = "native-restore-v1"
 RESTORE_260 = "native-restore-260-v1"
+OVERLAP_266 = "hourly-overlap-114929697-v1"
 TRACE = "loader-log-v3"
 FEATURE_ACCOUNTS = "feature-account-v4"
 FOCUSED = {
@@ -21,6 +22,7 @@ FOCUSED = {
                         "epoch230-private-second-hourly-window"),
     RESTORE: (258, "horizon258-native-restore-runtime-v1", "epoch258-private-native-restore"),
     RESTORE_260: (260, "horizon260-native-restore-runtime-v1", "epoch260-private-native-restore"),
+    OVERLAP_266: (266, "horizon266-hourly-overlap-114929697-runtime-v1", "epoch266-private-hourly-overlap"),
     TRACE: (296, "horizon296-loader-log-v3", "epoch296-private-loader-log-diagnostic"),
     FEATURE_ACCOUNTS: (296, "horizon296-feature-account-v4", "epoch296-private-feature-account-qualification"),
 }
@@ -65,6 +67,9 @@ def registration(version):
         kind, epoch, unit, str(root))
     assert row["launched"] and not row["remote_mutations"] and not row["r2_mutations"]
     assert row["canonical_epoch_publication_authorized"] is False
+    if version == OVERLAP_266:
+        assert row["predecessor_native_tuple_qualified"] is False
+        assert row["cursor_normalization_qualified"] is False
     profile_ref = sealed(profile_path(state, version))
     profile = bound(profile_ref)
     assert row["profile"] == profile_ref and row["worker"] == profile["worker"]
@@ -74,6 +79,11 @@ def registration(version):
     assert guard["producer_invocation_id"] == row["invocation_id"]
     assert guard["plan_sha256"] == row["guard_plan"]["sha256"] and guard["trip_reason"] is None
     assert guard["producer_stop_enabled"] and guard["producer"]["pid"] == row["main_pid"]
+    if version == OVERLAP_266:
+        release = bound(row["guard_release_fit"])
+        assert release["invocation_id"] == row["invocation_id"]
+        assert release["roster"] == admission["roster"] and release["guard_plan"] == row["guard_plan"]
+        assert row["lossless_restore"] == profile["restore_receipt"]
     return source, row
 
 
