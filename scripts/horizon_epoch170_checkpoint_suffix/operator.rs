@@ -197,7 +197,9 @@ fn start_argv() -> Result<Vec<String>> {
     );
     // This earlier private audit still projects a writable HOME-backed tree under /run.
     args.push("--property=InaccessiblePaths=/run/jetstreamer-ready-bounds-20261121-v1".into());
-    args.extend(["--".into(), command_path]);
+    // systemd-run checks its first executable outside the private mount namespace.
+    // env replaces itself with the sealed gate once the namespace is installed.
+    args.extend(["--".into(), "/usr/bin/env".into(), command_path]);
     Ok(args)
 }
 fn guard_args(plan: &Value) -> Result<Vec<String>> {
@@ -396,15 +398,46 @@ fn run(args: &[String]) -> Result<Value> {
                 save("START_INTENT.json", &p)
             }
         }
-        "start" => {
-            let i = anchor()?;
-            cleared()?;
-            fresh_stamp(&i["prestart"])?;
+        "start" | "recover-start" => {
+            let i = if op == "start" {
+                let i = anchor()?;
+                cleared()?;
+                fresh_stamp(&i["prestart"])?;
+                i
+            } else {
+                ensure!(
+                    r("START_INTENT.json")?["sha256"]
+                        == "d42d139c6dd90189f0bab25732e7332b6a6fdd00f7ea131385aa0bf093b069d3",
+                    "different private bridge start intent"
+                );
+                let i = row("START_INTENT.json")?;
+                ensure!(
+                    i["operator_deployment"]
+                        == reference(&base().join("operator-v3/deployment-seal-receipt.json"))?
+                        && i["source"] == interface()?
+                        && !base().join("BRIDGE_ACTOR.json").try_exists()?,
+                    "prior bridge generation acquired an actor"
+                );
+                let current = pre(&i["request"])?;
+                ensure!(
+                    current["armed_floor"] == i["armed_floor"]
+                        && current["bounded_cap_bytes"] == i["bounded_cap_bytes"]
+                        && current["source"] == i["source"]
+                        && current["append_log"] == i["append_log"],
+                    "cannot recover the frozen 170 bridge envelope"
+                );
+                fresh_stamp(&current["prestart"])?;
+                let when = num(&current["prestart"], "recorded_unix_seconds")?;
+                save(&format!("REPRICE_START_{when}.json"), &current)?;
+                i
+            };
             let v = start_argv()?;
             command("/usr/bin/systemd-run", &v)?;
             let held = actor::actor(true)?;
             register_actor(&held)?;
-            Ok(json!({"producer_unit":UNIT,"argv":v,"intent":r("START_INTENT.json")?}))
+            Ok(
+                json!({"producer_unit":UNIT,"argv":v,"intent":r("START_INTENT.json")?,"bounded_cap_bytes":i["bounded_cap_bytes"]}),
+            )
         }
         "owner" => {
             let held = actor::actor(true)?;
