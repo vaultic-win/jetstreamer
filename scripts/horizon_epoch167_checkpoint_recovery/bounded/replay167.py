@@ -14,18 +14,22 @@ import time
 
 HOME = Path("/home/sol")
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
-ROOT = RT / "epoch167-checkpoint-bounded-20261127-v1"
+ROOT = RT / "epoch167-checkpoint-bounded-20261127-v2"
 PACKAGE = ROOT / "package"
-CAPACITY_DEPLOYMENT = RT / "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v20-joint168-v31-replace167-reserve-v2"
+PREVIOUS = RT / "epoch167-checkpoint-bounded-20261127-v1"
+PREVIOUS_UNIT = "horizon-qualify-167-checkpoint-bounded-20261127-v1.service"
+PRIOR_STOP = {"path": str(PREVIOUS / "BOOTSTRAP_GUARD_TERMINAL.json"),
+              "sha256": "c3e3aa57fb2b71bf2c9432d4378e09a3babcae7a5faa5b06292f2b457ee9d26c"}
+CAPACITY_DEPLOYMENT = RT / "incident-replay-fit-20261121-v1/tools-homefloor-170-full-metered-independent-v20-joint168-v31-replace167-reserve-v3"
 LANE = HOME / ".jetstreamer-private/epoch167-standard-lane-20261109-v1"
-RUN = LANE / "checkpoint-inputs-20261127-v1/bounded-72509256-72515090-v1"
+RUN = LANE / "checkpoint-inputs-20261127-v1/bounded-72509256-72515090-v2"
 OUTPUT = RUN / "output"
 PRIVATE = RUN / "private"
 LOG = RUN / "producer.log"
 ARCHIVE = OUTPUT / "epoch-167-checkpoint-bounded.jet"
-ALIAS = Path("/run/horizon-bounded167-checkpoints-v1")
-UNIT = "horizon-qualify-167-checkpoint-bounded-20261127-v1.service"
-TIMER = "horizon-guard-167-checkpoint-bounded-20261127-v1.timer"
+ALIAS = Path("/run/horizon-bounded167-checkpoints-v2")
+UNIT = "horizon-qualify-167-checkpoint-bounded-20261127-v2.service"
+TIMER = "horizon-guard-167-checkpoint-bounded-20261127-v2.timer"
 GUARD_SERVICE = TIMER.replace(".timer", ".service")
 CGROUP = f"/system.slice/{UNIT}"
 KERNEL = Path("/sys/fs/cgroup")
@@ -38,6 +42,7 @@ CHECKPOINTS = f"{BOOTSTRAP}\n{END_SNAPSHOT}\n".encode()
 GENESIS_SHA = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"
 GIB = 1 << 30
 CAP, MEMORY, MEMORY_HIGH, GUARD_MEMORY = 512 * GIB, 42 * GIB, 40 * GIB, GIB
+GROWTH, MAX_INITIAL_RUN = 48 * GIB, 1 << 20
 CPU, GUARD_CPU = 3_000_000, 250_000
 MAX_VMAS = 3_500_000
 ORIGINAL_FLOOR = 8_594_041_336_400
@@ -46,9 +51,9 @@ GUARD = ROOT / "guard-tools/guard"
 WORKER_DIR = RT / "epoch167-source-index-rebook-20261122-v3/checkpoint-trace-20261127-v1"
 WORKER_SHA = "07b09d779706a789c668681ad9685e9ad62290a6930667c5f74a099a516d28cc"
 WORKER_COMMIT = "f6f69d9de59fe31c06ccd11e457e43b12d4e8551"
-GUARD_SHA = "2448b9818aae5265f842d0a2264fad22515dd4eb5902befd335fca986eba1881"
-GUARD_SEAL_SHA = "475786f3041787d2fbeb544f7f85a2e81dd26fbfc0d74ecc43e09ce27f1de011"
-GUARD_COMMIT = "fe40ca2bbaec1720d6c1e6bac7457b049fad5b72"
+GUARD_SHA = "5199f032753e30c1479c3492e14030f326db6d60a53bb70d6b8d3c886e7d7e3d"
+GUARD_SEAL_SHA = "faac8c32454f5c219b0587d0c2b16af680b2325d01092414472bf8e8ddb3f247"
+GUARD_COMMIT = "7c5d56dafdfb3dd0172956654a4df17b6a460df7"
 TERMINAL = {
     "path": str(RT / "epoch167-source-index-rebook-20261122-v3/EXECUTION_TERMINAL_20261127.json"),
     "sha256": "0e441ccfef45d40f2d707f6136bb76c0e4bd3b2a21bfebff9641f761dd8a27e2",
@@ -537,6 +542,17 @@ def fleet_authority(fleet_ref, writer):
          and all(all(item["epoch"] != 167 for item in fleet[key])
                  for key in ("actual_executing_replays", "actual_active_bootstraps", "actual_active_private_diagnostics")),
          "fleet does not preserve the stopped epoch 167 booking")
+    previous = read(PRIOR_STOP)
+    retained = fleet["current_bounded167_checkpoint"]
+    need(previous["reason"] == "physical scan time bound exceeded"
+         and previous["resource_credit_bytes"] == 0 and previous["archive_created"] is False
+         and retained["phase"] == "terminal" and retained["unit"]["Id"] == PREVIOUS_UNIT
+         and retained["actor"]["producer_invocation_id"] == previous["producer_invocation_id"]
+         and retained["release"] == previous["release"] and retained["retained_cap_bytes"] == CAP,
+         "the previous bounded epoch 167 guard stop is not settled in this fleet")
+    for unit in (PREVIOUS_UNIT, PREVIOUS_UNIT.replace("qualify", "guard"),
+                 PREVIOUS_UNIT.replace("qualify", "guard").replace(".service", ".timer")):
+        idle(unit)
     seal_ref, registration = writer["seal"], writer["active"]
     cadence = RT/"survivor172-cadence-20261122-v1"
     active = read(registration)["new"]
@@ -666,6 +682,19 @@ def quote_population(quote, fleet, actor):
         need(joined[UNIT] == [actor["processes"][0][:2]], "held 167 gate was absent from capacity census")
 
 
+def split_budget(replacement, booking, growth, held):
+    outside = replacement["retained_outside_run_bytes"]
+    baseline = replacement["run_baseline_physical_bytes"]
+    leaf = replacement["measured_candidate_leaf_bytes"]
+    cap = replacement["run_guard_cap_bytes"]
+    need(0 < baseline <= MAX_INITIAL_RUN and 0 < leaf <= MAX_INITIAL_RUN and outside > 0
+         and growth == GROWTH and cap == baseline + growth
+         and booking["physical_bytes"] == outside + leaf
+         and replacement["bounded_whole_tree_cap_bytes"] == outside + cap
+         and (held or leaf == baseline), "invalid split between retained bytes and writable run")
+    return dict(retained_outside_run_bytes=outside, run_baseline_physical_bytes=baseline, run_guard_cap_bytes=cap)
+
+
 def quote_base(quote, fleet, fleet_ref, active, actor, request, first):
     pod = quote["full146"]["native_successor_quote"]
     route = quote["full146"]
@@ -750,10 +779,17 @@ def capture(request_ref, *, intent_ref=None, actor=None, first_guard_ref=None):
     need(request["capacity_deployment"]["path"] == str(CAPACITY_DEPLOYMENT/"deployment-seal-receipt.json"),
          "wrong bounded capacity provider")
     capacity = present_member(request["capacity_deployment"], "post-stop-fit")
-    read(request["full146_request"])
+    incumbent = request["full146_request"]
+    original = read(incumbent)
+    if actor:
+        current = Path(request_ref["path"]).parent / ("post-guard-146.json" if first_guard_ref else "held-146.json")
+        incumbent = ref(current, digest(current.read_bytes()))
+        refreshed = read(incumbent)
+        need(refreshed == dict(original, guard=dict(original["guard"], sample=refreshed["guard"]["sample"])),
+             "incumbent 146 renewal changed more than the guard sample")
     read(request["joint168_request"])
     args = ["/usr/bin/python3", "-IB", capacity["path"], "--full170=retained",
-            "--full146-request", request["full146_request"]["path"], request["full146_request"]["sha256"],
+            "--full146-request", incumbent["path"], incumbent["sha256"],
             "--joint168-request", request["joint168_request"]["path"], request["joint168_request"]["sha256"],
             "--replacement167-request", request["replacement167_request"]["path"], request["replacement167_request"]["sha256"]]
     if actor:
@@ -778,7 +814,9 @@ def capture(request_ref, *, intent_ref=None, actor=None, first_guard_ref=None):
     memory = min(before[1], after[1], fit["available_memory_bytes"])
     need(fit["required_available_memory_bytes"] <= memory,
          f"epoch 167 RAM shortfall {fit['required_available_memory_bytes']-memory} bytes")
-    return dict(fleet=fleet_ref, provider=request["capacity_deployment"], program=capacity, stdout_sha256=digest(raw),
+    return dict(**split_budget(repl, book, repl["run_additional_peak_bytes"], actor is not None),
+                current_full146_request=incumbent, fleet=fleet_ref, provider=request["capacity_deployment"],
+                program=capacity, stdout_sha256=digest(raw),
                 recorded_unix_seconds=quote["recorded_unix_seconds"], writer=active, writer_binding=request["writer"],
                 population=quote["joined_native_population"], booking=book, incumbent_home=fit["required_home_bytes"],
                 strongest_floor=repl["candidate_guard_counterfactual"]["required_candidate_floor_bytes"], bounded_cap=repl["bounded_whole_tree_cap_bytes"],
@@ -794,7 +832,7 @@ def prestart(prepared_ref, seal_ref, request_ref):
     child(ROOT/"barrier", 0, 0, 0o755)
     child(ROOT/"guard-receipts", 0, 0, 0o700)
     need(not permit_exists() and not (ROOT/"guard-receipts/stop-intent.json").exists(), "dirty admission state")
-    for unit in (UNIT, TIMER, GUARD_SERVICE, OLD):
+    for unit in (UNIT, TIMER, GUARD_SERVICE, OLD, PREVIOUS_UNIT):
         idle(unit)
     append = private_log()
     need(LOG.lstat().st_size == 0, "gate log is not empty")
@@ -805,7 +843,7 @@ def prestart(prepared_ref, seal_ref, request_ref):
     operator = request["operator_deployment"]
     controller = present_member(operator, "replay167.py", executable=True)
     callback = present_member(request["capacity_deployment"], "bounded167-admission.py", executable=True)
-    need(Path(controller["path"]) == ROOT/"operator-terminal-v3/replay167.py" == Path(__file__).resolve()
+    need(Path(controller["path"]) == ROOT/"operator-v1/replay167.py" == Path(__file__).resolve()
          and controller["sha256"] == callback["sha256"], "operator and provider disagree on the held census")
     price = capture(request_ref)
     cap = price["bounded_cap"]
@@ -814,7 +852,10 @@ def prestart(prepared_ref, seal_ref, request_ref):
          "candidate cap exceeds its stopped booking")
     return dict(schema="horizon-epoch167-bounded-start-intent-v1", epoch=167, terminal=TERMINAL,
                 prepared=prepared_ref, deployment=seal_ref, operator_deployment=operator, payload=payload_ref, request=request_ref,
-                prestart=price, producer_unit=UNIT, armed_floor=floor, bounded_cap_bytes=cap, required_home=required, append_log=append,
+                previous_bounded_stop=PRIOR_STOP, prestart=price, producer_unit=UNIT, armed_floor=floor,
+                bounded_cap_bytes=cap, run_guard_cap_bytes=price["run_guard_cap_bytes"],
+                run_baseline_physical_bytes=price["run_baseline_physical_bytes"],
+                retained_outside_run_bytes=price["retained_outside_run_bytes"], required_home=required, append_log=append,
                 producer_memory_bytes=MEMORY, guard_memory_bytes=GUARD_MEMORY, resource_credit_bytes=0,
                 additional_cpu_quota_micros=0, additional_booked_memory_bytes=0,
                 archive_publication_authorized=False, replay_launch_authorized=False)
@@ -881,6 +922,12 @@ def native_owner(intent_ref):
                   *(Path(item["target"]) for item in payload["files"])):
         need(any(len(mount) > 5 and mount[4] == str(guest) and "ro" in mount[5].split(",")
                  for mount in mounts), f"missing read-only bind {guest}")
+    disk = RUN.stat().st_dev
+    device = f"{os.major(disk)}:{os.minor(disk)}"
+    writable_home = [mount[4] for mount in mounts if mount[2] == device and "rw" in mount[5].split(",")]
+    need(writable_home == [str(RUN)]
+         and any(mount[4] == str(HOME) and "ro" in mount[5].split(",") for mount in mounts),
+         "the fresh run must be the only writable HOME-backed mount")
     for fd in ("1", "2"):
         meta = (process/"fd"/fd).stat()
         need([meta.st_dev, meta.st_ino] == [intent["append_log"]["device"], intent["append_log"]["inode"]],
@@ -910,7 +957,8 @@ def reprice(intent_ref, actor, guard=None):
         need(read(first) == guard, "first guard custody changed")
     current = capture(intent["request"], intent_ref=intent_ref, actor=actor, first_guard_ref=first)
     prestart = intent["prestart"]
-    for key in ("writer", "fleet", "provider", "program"):
+    for key in ("writer", "fleet", "provider", "program", "retained_outside_run_bytes",
+                "run_baseline_physical_bytes", "run_guard_cap_bytes"):
         need(prestart[key] == current[key], f"admission {key} changed between phases")
     need(prestart["population"] == {unit: rows for unit, rows in current["population"].items() if unit != UNIT}
          and native_owner(intent_ref) == actor, "peer or candidate changed during repricing")
@@ -921,7 +969,7 @@ def reprice(intent_ref, actor, guard=None):
     physical = min(book["physical_bytes"], basis["physical_bytes"])
     available = current["available_home"]
     if guard:
-        physical = min(physical, guard["physical_bytes"])
+        physical = min(physical, current["retained_outside_run_bytes"] + guard["physical_bytes"])
         available = min(available, guard["available_home"])
     floor, remaining, required = physical_budget(current, intent["bounded_cap_bytes"], physical, available,
                                                 armed=intent["armed_floor"])
@@ -946,8 +994,8 @@ def guard_plan(intent_ref, held_ref):
         idle(unit)
     return dict(schema="jetstreamer-horizon-standalone-guard-plan-v1", unit=UNIT,
                 invocation_id=actor["producer_invocation_id"], filesystem=str(HOME),
-                worker_root=str(LANE), maximum_worker_vmas=MAX_VMAS, minimum_free_bytes=intent["armed_floor"],
-                maximum_root_physical_bytes=intent["bounded_cap_bytes"], receipt_directory=str(ROOT/"guard-receipts"))
+                worker_root=str(RUN), maximum_worker_vmas=MAX_VMAS, minimum_free_bytes=intent["armed_floor"],
+                maximum_root_physical_bytes=intent["run_guard_cap_bytes"], receipt_directory=str(ROOT/"guard-receipts"))
 
 
 def native_static_validation(plan_ref):
@@ -967,15 +1015,15 @@ def guard_argv(plan_ref):
     plan = read(plan_ref)
     need(Path(plan_ref["path"]) == ROOT/"ACTUAL_GUARD_PLAN.json"
          and plan["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
-         and plan["unit"] == UNIT and plan["worker_root"] == str(LANE)
-         and plan["filesystem"] == str(HOME) and 0 < plan["maximum_root_physical_bytes"] <= CAP
+         and plan["unit"] == UNIT and plan["worker_root"] == str(RUN)
+         and plan["filesystem"] == str(HOME) and GROWTH < plan["maximum_root_physical_bytes"] <= GROWTH + MAX_INITIAL_RUN
          and plan["maximum_worker_vmas"] == MAX_VMAS and plan["minimum_free_bytes"] >= ORIGINAL_FLOOR
          and plan["receipt_directory"] == str(ROOT/"guard-receipts")
          and props(UNIT, STATE)["InvocationID"] == plan["invocation_id"] and not permit_exists(),
          "guard plan does not match the held producer")
 
     intent = read(ref(ROOT/"START_INTENT.json", digest((ROOT/"START_INTENT.json").read_bytes())))
-    need(plan["maximum_root_physical_bytes"] == intent["bounded_cap_bytes"]
+    need(plan["maximum_root_physical_bytes"] == intent["run_guard_cap_bytes"]
          and plan["minimum_free_bytes"] == intent["armed_floor"], "guard bounds differ from prestart")
     guard_binary()
     native_static_validation(plan_ref)
@@ -1006,9 +1054,9 @@ def sample_proof(plan, sample, actor, plan_ref, sample_ref, timer, service):
     need(Path(plan_ref["path"]) == ROOT/"ACTUAL_GUARD_PLAN.json"
          and plan["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
          and plan["unit"] == UNIT and plan["invocation_id"] == iid
-         and plan["worker_root"] == str(LANE) and plan["filesystem"] == str(HOME)
+         and plan["worker_root"] == str(RUN) and plan["filesystem"] == str(HOME)
          and plan["receipt_directory"] == str(ROOT/"guard-receipts")
-         and 0 < plan["maximum_root_physical_bytes"] <= CAP and plan["maximum_worker_vmas"] == MAX_VMAS
+         and GROWTH < plan["maximum_root_physical_bytes"] <= GROWTH + MAX_INITIAL_RUN and plan["maximum_worker_vmas"] == MAX_VMAS
          and plan["minimum_free_bytes"] >= ORIGINAL_FLOOR, "guard plan crossed the held actor")
     need(timer["ActiveState"] == "active" and timer["SubState"] in ("waiting", "running")
          and not timer["Job"] and IID.fullmatch(timer["InvocationID"]) and timer["Triggers"] == GUARD_SERVICE
@@ -1054,7 +1102,7 @@ def first_guard(intent_ref, plan_ref, sample_ref):
     entries = command(["/usr/bin/journalctl", "--no-pager", "-q", "-o", "json", guard_unit, invocation]).splitlines()
     need(any(json.loads(entry).get("_EXE") == str(GUARD) for entry in entries),
          "first guard has no invocation-bound native journal evidence")
-    need(proof["cap"] == intent["bounded_cap_bytes"] and proof["floor"] == intent["armed_floor"] and native_owner(intent_ref) == actor
+    need(proof["cap"] == intent["run_guard_cap_bytes"] and proof["floor"] == intent["armed_floor"] and native_owner(intent_ref) == actor
          and not (ROOT/"guard-receipts/stop-intent.json").exists(), "first guard changed before handoff")
     return dict(schema="horizon-epoch167-bounded-first-guard-v1", intent=intent_ref, actor=actor, **proof)
 
@@ -1077,7 +1125,7 @@ def release(intent_ref, post_ref):
     guard = reread_guard(intent_ref, post["first_guard"])
     intent, *_ = intent_data(intent_ref, live=True)
     disk, mem = snapshot_stamp()
-    need(guard["cap"] == intent["bounded_cap_bytes"] and guard["floor"] == intent["armed_floor"] == post["guard_floor_bytes"]
+    need(guard["cap"] == intent["run_guard_cap_bytes"] and guard["floor"] == intent["armed_floor"] == post["guard_floor_bytes"]
          and post["required_home_bytes"] == post["guard_floor_bytes"] + post["whole_tree_remaining_bytes"]
          and disk >= post["required_home_bytes"] and mem >= post["native"]["required_ram"]
          and fleet_authority(post["native"]["fleet"], post["native"]["writer_binding"])[1] == post["native"]["writer"],
