@@ -1,5 +1,6 @@
 """Preserve the drained epoch 143 gate attempt and reopen its original paths."""
 import ctypes
+import errno
 import fcntl
 import hashlib
 import json
@@ -107,13 +108,31 @@ def main():
                  f"native owner or job still present: {u}")
         need(not any((RT/p).exists() for p in ("HELD_OWNER.json", "POST_GUARD_SCREEN.json", "barrier/allow")),
              "the failed gate was released or its receipt scope changed")
+        namespaces = set()
         for proc in Path("/proc").glob("[0-9]*"):
             try:
+                # Kernel threads and completed processes have no user mount owner.
+                if not (proc/"cmdline").read_bytes():
+                    continue
+                cookie = (proc/"ns/mnt").stat().st_ino
+                if cookie in namespaces:
+                    continue
                 rows = (proc/"mountinfo").read_text().splitlines()
             except (FileNotFoundError, ProcessLookupError):
                 continue
+            except OSError as error:
+                if error.errno != errno.EINVAL:
+                    raise
+                try:
+                    task = (proc/"stat").read_text().rsplit(") ", 1)[1].split()
+                except FileNotFoundError:
+                    continue
+                need(task[0] in ("Z", "X") or int(task[6]) & 0x4,
+                     f"unavailable mountinfo for a live task {proc}")
+                continue
             need(not any("/run/horizon143-first-hourly/" in row or f" {RUN}/" in row for row in rows),
                  f"failed launch still has namespace mounts in {proc}")
+            namespaces.add(cookie)
         FAILED.mkdir(mode=0o700, exist_ok=True)
         need(FAILED.resolve() == FAILED and FAILED.stat().st_uid == 0 and FAILED.stat().st_mode & 0o777 == 0o700,
              "unsafe failed gate archive")
