@@ -175,7 +175,9 @@ def retry_writer(interface, ref):
 def dispatch(stage):
     i, ir = q.scope()
     q.need(operator.q.UNIT == q.UNIT and operator.D == q.DEP, "operator is outside its sealed deployment")
-    q.need(Path(__file__).resolve().parent in (q.DEP/"operator",q.DEP/"operator-with143-v1",q.DEP/"operator-with143-v2",q.DEP/"operator-v1" if q.RETRY else q.DEP/"operator", q.DEP/"operator-v2" if q.RETRY else q.DEP/"operator"),"wrong dispatch executable directory")
+    deployment = Path(__file__).resolve().parent
+    allowed = operator.RETRY_OPERATORS if q.RETRY else operator.CONTINUATIONS
+    q.need(deployment in allowed and deployment.parent == q.DEP, "wrong dispatch executable directory")
     if stage == "check":
         operator.static()
         return {"interface":ir,"predecessor_exit":q.predecessor_exit()}

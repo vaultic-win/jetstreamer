@@ -20,7 +20,9 @@ def load(name):
 
 
 NEXT_DEPLOYMENT=Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73746882-20261127-v1/operator")
-q=load("continuation_price" if Path(__file__).resolve().parent in (NEXT_DEPLOYMENT, NEXT_DEPLOYMENT.with_name("operator-with143-v1"), NEXT_DEPLOYMENT.with_name("operator-with143-v2"), NEXT_DEPLOYMENT.parent/"attempt-2/operator-v1", NEXT_DEPLOYMENT.parent/"attempt-2/operator-v2") else "successor_price")
+RETRY_OPERATORS = {NEXT_DEPLOYMENT.parent/"attempt-2"/name for name in ("operator-v1", "operator-v2", "operator-v3")}
+CONTINUATIONS = {NEXT_DEPLOYMENT, NEXT_DEPLOYMENT.with_name("operator-with143-v1"), NEXT_DEPLOYMENT.with_name("operator-with143-v2")}
+q=load("continuation_price" if Path(__file__).resolve().parent in CONTINUATIONS | RETRY_OPERATORS else "successor_price")
 persist=load("closed_successor").persist
 D=q.ATTEMPT
 UNIT=q.UNIT
@@ -232,6 +234,20 @@ def same_actor():
     return a,ar
 
 
+def funded_guard(fit, floor, cap):
+    low, high = fit["terminal_tree_bounds"]
+    if floor < fit["guard_floor"] or cap < high:
+        return False
+    remaining = max(0, cap - low)
+    if "assembly168" not in fit:
+        return fit["available_home"] >= floor + remaining
+    # The fresh joint fit includes outstanding assembler writes. Keep that
+    # runway separate from the constant free-space threshold enforced by 170.
+    growth = fit.get("candidate_170_growth_bytes", fit["joint"]["candidate_growth"])
+    required = fit["required_home"] + (floor - fit["guard_floor"]) + max(0, remaining - growth)
+    return fit["available_home"] >= required
+
+
 def arm():
     i,_=static()
     a,ar=same_actor()
@@ -240,7 +256,7 @@ def arm():
     # A new held tree with a higher aggregate floor may require a stronger guard before release.
     floor=max(intent["guard_floor"],fit["guard_floor"])+min(G,max(0,fit["home_margin"])//2)
     cap=intent["guard_cap"]
-    need(cap>=fit["terminal_tree_bounds"][1] and fit["available_home"]>=floor+cap-fit["terminal_tree_bounds"][0],
+    need(funded_guard(fit, floor, cap),
          "held floor/cap cannot cover remaining growth")
     held=save("SUCCESSOR_HELD_FIT.json",fit)
     plan=dict(schema="jetstreamer-horizon-standalone-guard-plan-v1",unit=UNIT,invocation_id=a["producer_invocation_id"],
@@ -295,8 +311,7 @@ def release():
          "writer replaced")
     sample,ti,plan,pr=guard()
     fit=checked_price("held")
-    need(plan["minimum_free_bytes"]>=fit["guard_floor"] and fit["available_home"]>=plan["minimum_free_bytes"]+
-         max(0,plan["maximum_root_physical_bytes"]-fit["terminal_tree_bounds"][0]),
+    need(funded_guard(fit, plan["minimum_free_bytes"], plan["maximum_root_physical_bytes"]),
          "joint postguard HOME coverage failed")
     fp=save("SUCCESSOR_POST_GUARD_FIT.json",fit)
     admission=save("SUCCESSOR_AUTHORIZED_RELEASE.json",dict(actor=ar,interface=ir,closed_comparison=closed,

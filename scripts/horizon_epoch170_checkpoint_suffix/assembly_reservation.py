@@ -260,7 +260,100 @@ def reservation():
             "incremental_home": PEAK - filled, "incremental_ram": ram, "incremental_cpu_micros": 0}
 
 
-def apply_170(base, assembly):
+RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
+HOURLY = RT/"epoch143-first-hourly-20261127-v1"
+PHASE = HOURLY/"PHASE_170_FIRST_168_LIVE.json"
+PHASE_END = HOURLY/"PHASE_170_FIRST_168_RELEASED.json"
+LOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
+PHASE_WRITER = RT/"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V46_ACTIVE.json"
+PHASE_INTERFACE = RT/"epoch170-from-73746882-20261127-v1/attempt-2/BOUNDED_SUCCESSOR_WRITER_INTERFACE.json"
+INTERLOCK_SHA = "df01198fdb69a12f67c991963ea72572ec4d45de16171b73c420e49145f29b44"
+HOURLY_UNIT = "horizon-qualify-143-first-hourly-20261127-v1.service"
+
+
+def pinned(ref, path, sha, *, mutable=False):
+    need(ref == {"path": str(path), "sha256": sha}, "foreign phase binding: " + str(path))
+    return evidence(path, ref, owner_writable=mutable)[0]
+
+
+def owns_operation_lock(identity):
+    meta = LOCK.lstat()
+    need(identity == {"dev": meta.st_dev, "ino": meta.st_ino} and stat.S_ISREG(meta.st_mode)
+         and meta.st_uid == 0 and meta.st_nlink == 1 and not meta.st_mode & 0o022, "foreign phase operation lock")
+    owner = f"{os.major(meta.st_dev):02x}:{os.minor(meta.st_dev):02x}:{meta.st_ino}"
+    rows = [line.split() for line in Path("/proc/locks").read_text().splitlines()]
+    need(any(row[1:8] == ["FLOCK", "ADVISORY", "WRITE", str(os.getpid()), owner, "0", "EOF"]
+             for row in rows), "phase pricing must execute under its own exclusive campaign lock")
+
+
+def prove_hourly_exclusion(proof):
+    native143 = native(HOURLY_UNIT)
+    guard = HOURLY_UNIT.replace("-qualify-", "-guard-")
+    guard_service = native(guard)
+    timer = subprocess.check_output(["/usr/bin/systemctl", "show", "-p", "ActiveState,Job",
+                                     "--", guard.replace(".service",".timer")], text=True)
+    for state in (native143, guard_service):
+        need(state["ActiveState"] == "inactive" and state["MainPID"] == state["ControlPID"] == "0"
+             and not state["Job"] and not state["ControlGroup"]
+             and not (Path("/sys/fs/cgroup/system.slice")/state["Id"]).exists(), "143 producer or guard is present")
+    need(dict(line.split("=",1) for line in timer.splitlines()) == {"ActiveState":"inactive", "Job":""},
+         "143 guard timer still owns the phase")
+    need(not any(os.path.lexists(HOURLY/f) for f in proof["absent_markers"]), "143 has a pending or live claim")
+    bookings = sorted(HOURLY.glob("WRITER_BOOKING_FIRST_HOURLY*.json"))
+    need(bool(bookings), "143 booking history missing")
+    for path in bookings:
+        booking, _ = evidence(path)
+        need(booking["unit"] == HOURLY_UNIT and booking["latest_start_unix_seconds"] < time.time(),
+             "143 has a second or unexpired booking")
+    need({p.name for p in HOURLY.glob("booking-price-v*")} == {"booking-price-v1", "booking-price-v2",
+         "booking-price-v3", "booking-price-v4"}, "unqualified 143 booking route appeared")
+    for ref in [*proof["earlier_bookers"], *proof["sealed_operator_paths"], proof["available_booker"], proof["available_launcher"]]:
+        path = Path(ref["path"])
+        with path.open("rb") as fd:
+            m = os.fstat(fd.fileno())
+            need(path.resolve(strict=True) == path and stat.S_ISREG(m.st_mode) and m.st_uid == 0
+                 and not m.st_mode & 0o222 and hashlib.file_digest(fd,"sha256").hexdigest() == ref["sha256"],
+                 "143 booker or launcher changed")
+    return native143
+
+
+def first_phase(base, assembly):
+    if assembly["state"] != "live" or not os.path.lexists(PHASE) or os.path.lexists(PHASE_END):
+        return None
+    doc, ref = evidence(PHASE)
+    need(stat.S_IMODE(PHASE.stat().st_mode) == 0o400 and doc["schema"] == "horizon-170-first-168-live-v1"
+         and doc["boot_id"] == Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+         and 0 < doc["recorded_unix_seconds"] <= time.time(), "invalid 170-first phase intent")
+    owns_operation_lock(doc["operation_lock"])
+    pins = doc["assembly168"]
+    need(pins == {"invocation_id":assembly["native"]["InvocationID"], "plan":assembly["plan"], "floor":assembly["floor"]}
+         and assembly["replay"]["phase143"] == "reserved" and assembly["replay"]["invocation143"] is None
+         and not base["replacement143"] and base["guarded_hourly_remaining"] == 64*GIB
+         and base["guard_floor"] >= 64*GIB+EVIDENCE and base["required_ram"] >= 41*GIB,
+         "phase does not match the live 168 or queued full 143 envelope")
+    i = pinned(doc["interface170"], PHASE_INTERFACE, "f5da8a618bfb147d98d2db1ec91526d9b711df014189c4e6485503f003e63dcd")
+    need(i["profile"]["positions"] == 20087, "different 170 route")
+    h = doc["hourly143"]
+    contract = pinned(h["contract"],HOURLY/"contract-v1/LAUNCH_PROFILE.json","84e2846e7c33a1a6b7793861f918344be2af10d8132dc380450345f59903a19f")
+    term = pinned(h["terminal"],HOURLY/"failed-fa915d8326a34b589238d55833b3e846/RECONCILED.json","f84fa716f64ec84454630a581d13f6fcb92a9abb23b581c471a702b89e4ceab6")
+    proof = pinned(h["exclusion"],Path(h["exclusion"]["path"]),INTERLOCK_SHA)
+    writer = pinned(doc["writer"], PHASE_WRITER,"657c9965f71dbff5478308c1c6a703bb4732855c6ac3d4b6daaa4dfa67907f4f",mutable=True)["new"]
+    need(proof["writer"] == doc["writer"] and term["expired_booking"] == proof["expired_booking"] and term["release_absent"]
+         and not term["archive_created"] and proof["preserved_HOME_bytes"] == contract["guarded_HOME_bytes"] + contract["separate_evidence_HOME_bytes"] == 64*GIB+EVIDENCE
+         and proof["preserved_RAM_bytes"] == contract["producer_RAM_bytes"] + contract["guard_RAM_bytes"] == 41*GIB,
+         "different retained 143 obligation")
+    manager = native(writer["unit"])
+    proc = Path("/proc")/str(writer["pid"])
+    wlock = (proc/"fd"/str(writer["lock"]["fd"])).stat()
+    need(manager["InvocationID"] == writer["invocation_id"] and manager["MainPID"] == str(writer["pid"])
+         and manager["ActiveState"] == "active" and not manager["Job"] and int((proc/"stat").read_text().rsplit(") ",1)[1].split()[19]) == writer["start_ticks"]
+         and [wlock.st_dev,wlock.st_ino] == [writer["lock"]["device"],writer["lock"]["inode"]]
+         and os.fsencode(writer["program"]) in (proc/"cmdline").read_bytes().split(b"\0"), "143 sole writer changed")
+    prove_hourly_exclusion(proof)
+    return ref
+
+
+def apply_170(base, assembly, *, use_phase=False):
     growth = base["required_home"] - base["guard_floor"]
     if assembly["state"] != "queued-or-drained":
         admitted = assembly["replay"]
@@ -273,12 +366,17 @@ def apply_170(base, assembly):
     # floor available even if 143 and 170 use all their remaining growth.
     # The 170 base floor already carries 143: add its remaining growth only
     # on the separate 168 guard constraint, never again on the 170 side.
-    live_floor = assembly["floor"] + base["guarded_hourly_remaining"] if assembly["floor"] else 0
-    floor = max(base["guard_floor"], live_floor) + assembly["incremental_home"]
+    phase = first_phase(base, assembly) if use_phase else None
+    concurrent_hourly = 0 if phase else base["guarded_hourly_remaining"]
+    live_floor = assembly["floor"] + concurrent_hourly if assembly["floor"] else 0
+    runtime_floor = max(base["guard_floor"], live_floor)
+    floor = runtime_floor if use_phase else runtime_floor + assembly["incremental_home"]
     historical = base["historical_home_margin"] - assembly["incremental_home"]
-    required = floor + growth
+    required = runtime_floor + assembly["incremental_home"] + growth
     margin = min(base["available_home"] - required, historical)
     ram = base["required_ram"] + assembly["incremental_ram"]
     return dict(base, assembly168=assembly, guard_floor=floor, required_home=required,
+                phase170_first=phase, concurrent_143_growth_bytes=concurrent_hourly, ordinary_170_guard_floor=base["guard_floor"],
+                assembly168_remaining_bytes=assembly["incremental_home"], candidate_170_growth_bytes=growth,
                 historical_home_margin=historical, home_margin=margin, required_ram=ram,
                 ram_margin=base["available_ram"]-ram, fits=base["fits"] and margin >= 0 and base["available_ram"] >= ram)

@@ -11,7 +11,8 @@ spec.loader.exec_module(prior)
 RT, TREE, B140 = prior.RT, prior.TREE, prior.B140
 state, read, bound, inactive, need, cmd = prior.state, prior.read, prior.bound, prior.inactive, prior.need, prior.cmd
 FIRST = RT / "epoch170-from-73746882-20261127-v1"
-RETRY = Path(__file__).resolve().parent in (FIRST/"attempt-2/operator-v1", FIRST/"attempt-2/operator-v2")
+OPERATOR = Path(__file__).resolve().parent
+RETRY = OPERATOR.parent == FIRST/"attempt-2" and OPERATOR.name in ("operator-v1", "operator-v2", "operator-v3")
 DEP = ATTEMPT = FIRST/"attempt-2" if RETRY else FIRST
 OLD = prior.DEP / "attempt-2"
 BRIDGE = prior.UNIT
@@ -254,4 +255,7 @@ def price(phase):
     overlay_spec = importlib.util.spec_from_file_location("assembly_reservation", overlay_path)
     overlay = importlib.util.module_from_spec(overlay_spec)
     overlay_spec.loader.exec_module(overlay)
-    return overlay.apply_170(result, overlay.reservation())
+    assembly = overlay.reservation()
+    if OPERATOR == FIRST/"attempt-2/operator-v3":
+        return overlay.apply_170(result, assembly, use_phase=True)
+    return overlay.apply_170(result, assembly)
