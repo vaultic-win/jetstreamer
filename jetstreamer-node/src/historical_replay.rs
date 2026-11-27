@@ -317,6 +317,12 @@ impl HistoricalReplay {
             .as_ref()
             .map(|verifier| verifier.legacy_checkpoint_slots().into_iter().collect())
             .unwrap_or_default();
+        #[cfg(feature = "epoch141-hourly-original-qualification")]
+        let checkpoint_slots = crate::epoch141_hourly::checkpoint_slots(
+            checkpoint_slots,
+            current_slot,
+            client.executable_sha256(),
+        )?;
         #[cfg(called_program_demotion_replay)]
         let checkpoint_slots = {
             let mut slots = checkpoint_slots;
@@ -547,7 +553,10 @@ impl HistoricalReplay {
                 return;
             }
             #[cfg(called_program_demotion_replay)]
-            if let Err(error) = self.called_program_demotion.outcomes(&entry, &processed.outcomes) {
+            if let Err(error) = self
+                .called_program_demotion
+                .outcomes(&entry, &processed.outcomes)
+            {
                 self.failure.record(error);
                 return;
             }
@@ -977,7 +986,10 @@ impl HistoricalReplay {
         }
         #[cfg(called_program_demotion_replay)]
         {
-            let client = state.client.as_mut().ok_or("missing called-program demotion candidate worker")?;
+            let client = state
+                .client
+                .as_mut()
+                .ok_or("missing called-program demotion candidate worker")?;
             let outcome = client
                 .shutdown_with_cleanup_grace(std::time::Duration::from_secs(300))
                 .map_err(|error| format!("epoch 230 candidate shutdown failed: {error}"))?;
@@ -1161,6 +1173,14 @@ impl HistoricalReplay {
         crate::epoch228_demotion::checkpoint(&checkpoint)?;
         #[cfg(called_program_demotion_replay)]
         self.called_program_demotion.checkpoint(&checkpoint)?;
+        #[cfg(feature = "epoch141-hourly-original-qualification")]
+        crate::epoch141_hourly::check_bank(
+            &checkpoint,
+            &self
+                .checkpoint_slots
+                .lock()
+                .expect("historical checkpoint set lock poisoned"),
+        )?;
         self.verify_checkpoint(&checkpoint);
         self.emit_writes(checkpoint.writes);
         state.emitted_write_versions = emitted_write_versions;

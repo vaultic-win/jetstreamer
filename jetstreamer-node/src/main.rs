@@ -86,28 +86,28 @@ mod epoch226_interior;
 compile_error!("epoch 140 suffix recording must use its dedicated build");
 #[cfg(feature = "epoch140-suffix-recording")]
 mod epoch140_suffix_recording;
-// The private suffix only needs these legacy wire and PoH modules. Compile their
-// authoritative sources directly, preserving both the normal reader's inputs
-// and the existing epoch 141 qualification dependency graph.
-#[cfg(feature = "epoch140-suffix-recording")]
+// These two private replay profiles share the authoritative legacy wire and PoH modules.
+#[cfg(standalone_original_entries)]
 #[path = "../../jetstreamer-utils/src/horizon_legacy_bundle.rs"]
 mod horizon_legacy_bundle;
-#[cfg(feature = "epoch140-suffix-recording")]
+#[cfg(standalone_original_entries)]
 #[path = "../../jetstreamer-utils/src/horizon_legacy_entry.rs"]
 mod horizon_legacy_entry;
-#[cfg(feature = "epoch140-suffix-recording")]
+#[cfg(standalone_original_entries)]
 #[path = "../../jetstreamer-utils/src/horizon_legacy_poh.rs"]
 mod horizon_legacy_poh;
-#[cfg(all(feature = "epoch140-suffix-recording", test))]
+#[cfg(all(standalone_original_entries, test))]
 #[path = "../../jetstreamer-utils/src/horizon_legacy_shred.rs"]
 mod horizon_legacy_shred;
-#[cfg(feature = "epoch140-suffix-recording")]
+#[cfg(standalone_original_entries)]
 #[path = "../../jetstreamer-utils/src/horizon_legacy_source.rs"]
 mod horizon_legacy_source;
 #[cfg(feature = "epoch141-original-entry-qualification")]
 use jetstreamer_utils::{horizon_legacy_bundle, horizon_legacy_source};
 #[cfg(all(feature = "epoch141-original-entry-qualification", test))]
 use jetstreamer_utils::{horizon_legacy_poh, horizon_legacy_shred};
+#[cfg(feature = "epoch141-hourly-original-qualification")]
+mod epoch141_hourly;
 mod epoch141_original_entry;
 mod epoch141_suffix;
 mod epoch163_first_output128;
@@ -7118,6 +7118,8 @@ fn archive_generation_profile() -> String {
     let route = "epoch140-suffix-recording-v1";
     #[cfg(feature = "epoch141-original-entry-qualification")]
     let route = "epoch141-original-entry-qualification-v1";
+    #[cfg(feature = "epoch141-hourly-original-qualification")]
+    let route = "epoch141-hourly-original-qualification-v1";
     #[cfg(not(any(
         original_entry_replay,
         feature = "epoch207-singleton-qualification",
@@ -15353,6 +15355,10 @@ fn qualification_expectations(
     #[cfg(called_program_demotion_replay)]
     if plan.epoch == called_program_demotion::EPOCH {
         return called_program_demotion::expectations(expected, plan, snapshot_archive, bootstrap);
+    }
+    #[cfg(feature = "epoch141-hourly-original-qualification")]
+    if plan.epoch == 141 {
+        epoch141_hourly::validate_roots(plan, &expected)?;
     }
     epoch141_suffix::recheck_roots(&expected)?;
     let (snapshot_slot, snapshot_expectation) =

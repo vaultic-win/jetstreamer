@@ -36,6 +36,8 @@ epochs209-212-singleton-qualification = []
 epoch141-original-entry-qualification = ["dep:jetstreamer-utils"]
 # Record the 248 private slots after the independently checked epoch 140 cut.
 epoch140-suffix-recording = []
+# Replay an adjacent pair of authenticated epoch 141 checkpoints with original shreds.
+epoch141-hourly-original-qualification = []
 # Fixed 60911751 native restore comparison; never sends replay entries.
 epoch140-native-restore-diagnostic = ["dep:chrono"]
 epoch144-native-restore-diagnostic = ["dep:chrono"]

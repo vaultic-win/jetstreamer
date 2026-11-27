@@ -57,8 +57,15 @@ fn validate_scope(
     forbidden: bool,
     private: Option<(&Path, &Path, &Path)>,
 ) -> Result<(), String> {
-    if start != 141 || end != 141 || plan != Some((60911751, 60911752, 61328765)) || forbidden {
-        return Err("original-entry qualification requires exact 141/bootstrap 60911751/terminal 61328765, no cohort/recovery/carried route".into());
+    #[cfg(feature = "epoch141-hourly-original-qualification")]
+    let registered = crate::epoch141_hourly::Interval::from_plan(plan).is_some();
+    #[cfg(not(feature = "epoch141-hourly-original-qualification"))]
+    let registered = plan == Some((60911751, 60911752, 61328765));
+    if start != 141 || end != 141 || !registered || forbidden {
+        return Err(
+            "original-entry qualification requires its registered private epoch 141 interval"
+                .into(),
+        );
     }
     let root = Path::new("/home/sol/.jetstreamer-private");
     let Some((destination, output, scratch)) = private else {
@@ -94,7 +101,10 @@ mod enabled {
 
     #[derive(Clone, Copy)]
     enum ReplayScope {
+        #[cfg(not(feature = "epoch141-hourly-original-qualification"))]
         Epoch141,
+        #[cfg(feature = "epoch141-hourly-original-qualification")]
+        Hourly(crate::epoch141_hourly::Interval),
         #[cfg(feature = "epoch140-suffix-recording")]
         Epoch140Suffix,
     }
@@ -108,6 +118,11 @@ mod enabled {
             checkpoint_restart: bool,
         ) -> bool {
             match self {
+                #[cfg(feature = "epoch141-hourly-original-qualification")]
+                Self::Hourly(interval) => {
+                    epoch == 141 && !checkpoint_restart && interval.matches(bootstrap, terminal)
+                }
+                #[cfg(not(feature = "epoch141-hourly-original-qualification"))]
                 Self::Epoch141 => {
                     (epoch, bootstrap, terminal, checkpoint_restart)
                         == (141, 60_911_751, 61_328_765, false)
@@ -145,7 +160,26 @@ mod enabled {
                 "original-entry diagnostic build requires all four explicit bundle options".into(),
             );
         };
-        install(ReplayScope::Epoch141, &index, &index_sha, &data, &data_sha)
+        #[cfg(feature = "epoch141-hourly-original-qualification")]
+        let scope = {
+            use crate::epoch141_hourly::{Interval, ORIGINAL_DATA, ORIGINAL_INDEX};
+            if index_sha != ORIGINAL_INDEX || data_sha != ORIGINAL_DATA {
+                return Err("epoch 141 hourly replay requires the complete registered original-entry bundle".into());
+            }
+            if std::env::var_os("JETSTREAMER_FORCE_LEGACY_INDEX").is_some()
+                || std::env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").as_deref()
+                    != Ok("843e0a479dcd3f7634f026ab8f0f4857fb52778e1769059397c972e605d6078c")
+                || std::env::var_os("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST").is_none()
+            {
+                return Err(
+                    "epoch 141 hourly replay requires its corrected source index manifest".into(),
+                );
+            }
+            ReplayScope::Hourly(Interval::from_plan(plan).ok_or("unregistered interval")?)
+        };
+        #[cfg(not(feature = "epoch141-hourly-original-qualification"))]
+        let scope = ReplayScope::Epoch141;
+        install(scope, &index, &index_sha, &data, &data_sha)
     }
 
     #[cfg(feature = "epoch140-suffix-recording")]
@@ -196,7 +230,22 @@ mod enabled {
             }
         })?;
         let expected = match scope {
+            #[cfg(not(feature = "epoch141-hourly-original-qualification"))]
             ReplayScope::Epoch141 => bundle.targets().collect(),
+            #[cfg(feature = "epoch141-hourly-original-qualification")]
+            ReplayScope::Hourly(interval) => {
+                let targets: HashSet<_> = bundle
+                    .targets()
+                    .filter(|&slot| interval.contains(slot))
+                    .collect();
+                if targets.len() != interval.expected_targets() {
+                    return Err(
+                        "hourly original-entry target count differs from the authenticated census"
+                            .into(),
+                    );
+                }
+                targets
+            }
             #[cfg(feature = "epoch140-suffix-recording")]
             ReplayScope::Epoch140Suffix => {
                 let expected = suffix_targets(bundle.targets())?;
@@ -793,27 +842,19 @@ mod tests {
         assert!(cli.parse("--epoch141-original-index=/tmp/index").is_err());
         assert!(cli.parse("--epoch141-original-data=").is_err());
         #[cfg(not(original_entry_replay))]
-        assert!(
-            configure(
-                cli,
-                141,
-                141,
-                Some((60911751, 60911752, 61328765)),
-                false,
-                None
-            )
-            .is_err()
-        );
+        assert!(configure(cli, 141, 141, Some(registered), false, None).is_err());
     }
     #[test]
     fn fixed_scope_rejects_ordinary_cohort_other_checkpoint_and_public_output() {
         let private = Path::new("/home/sol/.jetstreamer-private/epoch141-test");
         let paths = Some((private, private, private));
-        validate_scope(141, 141, Some((60911751, 60911752, 61328765)), false, paths).unwrap();
+        #[cfg(not(feature = "epoch141-hourly-original-qualification"))]
+        let registered = (60911751, 60911752, 61328765);
+        #[cfg(feature = "epoch141-hourly-original-qualification")]
+        let registered = (60911751, 60911752, 60921282);
+        validate_scope(141, 141, Some(registered), false, paths).unwrap();
         assert!(validate_scope(141, 141, None, false, paths).is_err());
-        assert!(
-            validate_scope(141, 141, Some((60911751, 60911752, 61328765)), true, paths).is_err()
-        );
+        assert!(validate_scope(141, 141, Some(registered), true, paths).is_err());
         assert!(
             validate_scope(141, 141, Some((60911751, 60911752, 61328764)), false, paths).is_err()
         );
@@ -821,7 +862,7 @@ mod tests {
             validate_scope(
                 141,
                 141,
-                Some((60911751, 60911752, 61328765)),
+                Some(registered),
                 false,
                 Some((
                     private,

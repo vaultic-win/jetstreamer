@@ -56,6 +56,10 @@ fn main() {
     const EPOCH230_VOTE_BOUNDARY: &str =
         "CARGO_FEATURE_EPOCH230_VOTE_BOUNDARY_DEMOTION_QUALIFICATION";
     for (feature, scope) in [
+        (
+            "CARGO_FEATURE_EPOCH141_HOURLY_ORIGINAL_QUALIFICATION",
+            "epoch 141 hourly original entries",
+        ),
         (EPOCH229, "epoch 229 continuation"),
         (EPOCH231, "epoch 231–232 continuation"),
         (EPOCH230_VOTE_BOUNDARY, "epoch 230 vote boundary"),
@@ -72,7 +76,12 @@ fn main() {
             );
         }
     }
-    let suffix_recording = env::var_os("CARGO_FEATURE_EPOCH140_SUFFIX_RECORDING").is_some();
+    let standalone_entries = env::var_os("CARGO_FEATURE_EPOCH140_SUFFIX_RECORDING").is_some()
+        || env::var_os("CARGO_FEATURE_EPOCH141_HOURLY_ORIGINAL_QUALIFICATION").is_some();
+    println!("cargo:rustc-check-cfg=cfg(standalone_original_entries)");
+    if standalone_entries {
+        println!("cargo:rustc-cfg=standalone_original_entries");
+    }
     println!("cargo:rustc-check-cfg=cfg(original_entry_replay)");
     println!("cargo:rustc-check-cfg=cfg(called_program_demotion_replay)");
     if env::var_os("CARGO_FEATURE_EPOCH229_CALLED_PROGRAM_DEMOTION_QUALIFICATION").is_some()
@@ -82,13 +91,13 @@ fn main() {
     {
         println!("cargo:rustc-cfg=called_program_demotion_replay");
     }
-    if suffix_recording
+    if standalone_entries
         || env::var_os("CARGO_FEATURE_EPOCH141_ORIGINAL_ENTRY_QUALIFICATION").is_some()
     {
         println!("cargo:rustc-cfg=original_entry_replay");
     }
     let mut source_paths = SOURCE_PATHS.to_vec();
-    if suffix_recording {
+    if standalone_entries {
         source_paths.extend([
             "jetstreamer-utils/src/horizon_legacy_bundle.rs",
             "jetstreamer-utils/src/horizon_legacy_entry.rs",
