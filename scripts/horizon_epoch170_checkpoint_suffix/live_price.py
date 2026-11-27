@@ -96,22 +96,74 @@ def protected(row,plan_ref,goal,timer_iid,when):
     return max(0,upper-lower),current_ref,lower
 
 
+def successor_fleet(release_ref, current_ref, fleet, intent, release, actor, processes):
+    if current_ref == release_ref:
+        return
+    origin = checked(release_ref)
+    sample = checked(fleet["observer"])
+    cadence = sample["cadence"]
+    need(cadence["previous_sample"] == origin["observer"]["path"]
+         and cadence["previous_sample_sha256"] == origin["observer"]["sha256"]
+         and cadence["routine_minimum_interval_enforced"] and cadence["minimum_interval_seconds"] == 1800,
+         "fleet is not the direct accepted successor of the released 167 price")
+    cfg = checked(origin["sole_next_observer"])
+    # The first cadence after launch enrolls this route in the following observer.
+    candidate = fleet[retry.FIELD]
+    need(candidate["phase"] == "worker" and candidate["actor"] == actor
+         and candidate["processes"] == processes and candidate["intent"] == intent
+         and candidate["release"] == release and candidate["observer"] == fleet["observer"]
+         and fleet["actual_active_private_diagnostics"] == [candidate]
+         and not retry.assigned(cfg) and candidate["resource_credit_bytes"] == candidate["reservation_ending_bytes"] == 0,
+         "released 167 is absent from the accepted fleet")
+    for key in ("complete_DATA_bytes","complete_projected_memory_bytes",
+                "current_full172_admission","current_full172_post_guard_fit","cold170_full_metered_guard_stop"):
+        need(fleet[key] == origin[key], "changed fleet commitment: "+key)
+    previous_holding = checked(origin["epoch185_lanel_holding"])
+    current_holding = checked(fleet["epoch185_lanel_holding"])
+    need(current_holding["schema"] == previous_holding["schema"]
+         and current_holding["result"] == previous_holding["result"]
+         and current_holding["observer"] == fleet["observer"] and current_holding["fleet"] == release_ref,
+         "185 private restore or holding commitments changed")
+    for key in ("current_joint168_checkpoint","current_bounded167_checkpoint"):
+        need(fleet[key]["phase"] == origin[key]["phase"] == "terminal"
+             and fleet[key]["actor"] == origin[key]["actor"], "changed retained producer: "+key)
+    old, current = origin["active_ready_range_audit_obligation"], fleet["active_ready_range_audit_obligation"]
+    for k in ("additional_cpu_quota_micros","additional_memory_bytes","maximum_output_allocation_bytes",
+              "cargo_growth_allowance_bytes","archive_staging_bytes"):
+        need(current[k] == old[k], "audit reservation changed: "+k)
+    def replay_owners(f):
+        return sorted((r["epoch"],r["unit"]["Id"],r["unit"]["InvocationID"],r["unit"]["MainPID"],
+                       r["start_ticks"],r["admission"]["sha256"]) for r in f["actual_executing_replays"])
+    need(replay_owners(fleet) == replay_owners(origin) and fleet["actual_active_bootstraps"] == [],
+         "fleet acquired another production owner")
+
+
 def project(request, held):
     ref=request["fleet"]
     fleet=checked(ref)
     original=checked(request["native_reference"])
     released,epoch167,post=retry.bound_release(bound(retry.INTENT))
-    need(released==request["released167"] and post["native"]["fleet"]==ref
+    need(released==request["released167"]
          and request["writer"]==post["native"]["writer_binding"] and post["native"]["provider"]==request["capacity_deployment"]
          and post["phase"]=="post-guard" and post["resource_credit_bytes"]==0 and post["archive_publication_authorized"] is False
-         and time.time()-post["native"]["recorded_unix_seconds"]<=1800 and original["mode"]=="terminal",
+         and original["mode"]=="terminal",
          "released 167 is outside the accepted pricing cycle")
     intent,payload,operator=retry.launched_intent(bound(retry.INTENT))
     manager=retry.route.props(retry.UNIT,retry.MANAGER)
     processes,worker=retry.native_owner(manager,epoch167,payload,operator)
     guard,observed=retry.current_guard(intent,epoch167,post,worker)
     need(worker and observed,"bounded 167 is missing its protected worker")
+    successor_fleet(post["native"]["fleet"], ref, fleet, bound(retry.INTENT), released, epoch167, processes)
     base=original["full146"]["native_successor_quote"]
+    original170=checked(base["retained_170"]["admission"])
+    need(base["retained_170"]["admission"] == fleet["cold170_full_metered_guard_stop"]["admission"]
+         and original170["producer_unit"] == "horizon-qualify-170-full-metered-20261124-v1.service",
+         "foreign original epoch 170 compute reservation")
+    prepared=checked(checked(original170["intent"])["prepared"])["profile"]
+    argv=prepared["actor"]["producer_argv_after_protection"]
+    need("--property=MemoryMax=73014444032" in argv and "--property=CPUQuota=900%" in argv
+         and prepared["guard"]["cap_bytes"] == 384*G and prepared["guard"]["worker_root"] == base["bookings"]["170"]["root"]
+         and prepared["guard"]["producer_unit"] == original170["producer_unit"], "epoch 170 compute envelope changed")
     old=original["replacement167_fit"]
     settlement=original["terminal168_compute_settlement"]
     compute=old["compute"]

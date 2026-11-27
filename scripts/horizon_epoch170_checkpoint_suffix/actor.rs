@@ -108,6 +108,33 @@ pub(super) fn actor(held: bool) -> Result<Value> {
             "input has no read-only projection {target}"
         );
     }
+    let dev = fs::metadata(RUN)?.dev();
+    let device = format!("{}:{}", libc::major(dev), libc::minor(dev));
+    let mut writable = Vec::new();
+    let mut readonly_home = false;
+    for line in mounts.lines() {
+        let columns: Vec<_> = line.split_whitespace().take(6).collect();
+        ensure!(columns.len() == 6, "malformed native mount record");
+        if columns[2] == device {
+            if columns[5].split(',').any(|opt| opt == "rw") {
+                writable.push(columns[4]);
+            }
+            if columns[4] == "/home/sol" && columns[5].split(',').any(|opt| opt == "ro") {
+                readonly_home = true;
+            }
+        }
+    }
+    ensure!(
+        writable == [RUN] && readonly_home,
+        "unexpected writable HOME-backed mounts: {writable:?}"
+    );
+    let log = fs::metadata(Path::new(RUN).join("producer.log"))?;
+    for fd in ["1", "2"] {
+        ensure!(
+            inode(&path.join("fd").join(fd))? == (log.dev(), log.ino()),
+            "unbound append log"
+        );
+    }
     let mut worker = Value::Null;
     let mut processes = Vec::new();
     for other in ids {

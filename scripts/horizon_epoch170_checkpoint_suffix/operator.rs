@@ -195,6 +195,8 @@ fn start_argv() -> Result<Vec<String>> {
         command_path == format!("{ALIAS}/bridge-gate"),
         "incorrect 170 gate final command"
     );
+    // This earlier private audit still projects a writable HOME-backed tree under /run.
+    args.push("--property=InaccessiblePaths=/run/jetstreamer-ready-bounds-20261121-v1".into());
     args.extend(["--".into(), command_path]);
     Ok(args)
 }
