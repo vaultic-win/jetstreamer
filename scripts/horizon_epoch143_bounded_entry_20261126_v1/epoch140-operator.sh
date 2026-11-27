@@ -35,6 +35,11 @@ guard_sha=$(sha "$guard")
 test "$(sha "$fleet")" = "$fsha"
 test "$(sha "$booking")" = "$bsha"
 [[ $(stat -c %u:%g:%a:%h "$booking") =~ ^0:0:4(00|44):1$ ]]
+if jq -e '.sealed_operator != null' "$booking" >/dev/null; then
+    operator=$(realpath "$0")
+    jq -e --arg path "$operator" --arg sha "$(sha "$operator")" '
+      .sealed_operator=={path:$path,sha256:$sha}' "$booking" >/dev/null
+fi
 jq -e --arg f "$fleet" --arg s "$fsha" --arg unit "$u" --argjson home "$home_charge" '
   .schema=="horizon-epoch140-private-recording-booking-v1" and .fleet=={path:$f,sha256:$s}
   and .unit==$unit and .cpu_quota_micros==3000000
@@ -216,14 +221,15 @@ test "$(systemctl show "$g.service" -p MemoryMax --value)" = 1073741824
 test "$(systemctl show "$g.service" -p MemorySwapMax --value)" = 0
 timer_iid=$(systemctl show "$g.timer" -p InvocationID --value)
 ticks=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).read_text().rsplit(") ",1)[1].split()[19])' "/proc/$pid/stat")
-jq -n --arg iid "$iid" --argjson pid "$pid" --argjson ticks "$ticks"   --arg boot "$(cat /proc/sys/kernel/random/boot_id)" --arg unit "$u"   --arg timer "$g.timer" --arg timer_iid "$timer_iid"   --arg plan "$plan" --arg plan_sha "$(sha "$plan")" --arg sample "$first" --arg sample_sha "$(sha "$first")"   --arg fleet "$fleet" --arg fleet_sha "$fsha" --arg booking "$booking" --arg booking_sha "$bsha"   --arg nodeplan "$a/plan/plan.json" --arg nodeplan_sha "$plan_sha" --argjson now "$(date +%s)" '{
+held_owner=$(jq -n --arg iid "$iid" --argjson pid "$pid" --argjson ticks "$ticks"   --arg boot "$(cat /proc/sys/kernel/random/boot_id)" --arg unit "$u"   --arg timer "$g.timer" --arg timer_iid "$timer_iid"   --arg plan "$plan" --arg plan_sha "$(sha "$plan")" --arg sample "$first" --arg sample_sha "$(sha "$first")"   --arg fleet "$fleet" --arg fleet_sha "$fsha" --arg booking "$booking" --arg booking_sha "$bsha"   --arg nodeplan "$a/plan/plan.json" --arg nodeplan_sha "$plan_sha" --argjson cap "$tree_cap" --argjson now "$(date +%s)" '{
  schema:"horizon-epoch140-guarded-held-owner-v1",epoch:140,unit:$unit,invocation_id:$iid,pid:$pid,start_ticks:$ticks,
  boot_id:$boot,guard_timer:$timer,guard_timer_invocation_id:$timer_iid,
  guard_plan:{path:$plan,sha256:$plan_sha},first_guard:{path:$sample,sha256:$sample_sha},
  inherited_fleet:{path:$fleet,sha256:$fleet_sha},booking:{path:$booking,sha256:$booking_sha},
  node_plan:{path:$nodeplan,sha256:$nodeplan_sha},recorded_unix_seconds:$now,
  cpu_quota_micros:3000000,producer_RAM_bytes:27917287424,guard_RAM_bytes:1073741824,
- guarded_HOME_bytes:$cap,archive_publication_authorized:false}' | publish "$a/HELD_OWNER.json"
+ guarded_HOME_bytes:$cap,archive_publication_authorized:false}')
+printf '%s\n' "$held_owner" | publish "$a/HELD_OWNER.json"
 jq -n --arg iid "$iid" --argjson pid "$pid" --arg path "$booking" --arg sha "$bsha"   --argjson now "$(date +%s)" --argjson duration "$bound_runtime" --argjson deadline "$drain_by" --arg fence "$fence" --arg fence_sha "$(sha "$fence")" '{
     schema:"horizon-epoch140-epoch170-cpu-loan-v1",candidate_invocation:$iid,candidate_pid:$pid,
     booking:{path:$path,sha256:$sha},recorded_unix_seconds:$now,
