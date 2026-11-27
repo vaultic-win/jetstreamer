@@ -678,6 +678,85 @@ fn terminal_replay_230(n: &mut Native, booking: &Value) -> Result<Option<Bound>>
     Ok(Some(proof))
 }
 
+// A producer can finish between the accepted observation and a new admission.
+// Credit only this exact, closed diagnostic on the original observation's chain.
+fn drain_first_7871(n: &mut Native, fleet: &mut Value) -> Result<Option<Bound>> {
+    const TERMINAL: (&str, &str) = (
+        "/var/lib/jetstreamer/horizon230-first-7871-runtime-v1/terminal.json",
+        "16d546332a37fccd20a7b2609908288b426276a01908c6e255db886aba6ea8d2",
+    );
+    const REGISTRATION: (&str, &str) = (
+        "/var/lib/jetstreamer/horizon230-first-7871-runtime-v1/cadence-registration.json",
+        "837bca79f370c14e6345fa1f36af77ec43e8575c111bdacbfab111b1a96d7b0e",
+    );
+    const IID: &str = "02b7dd1683d24efbabf6b5c2f8ff6a43";
+    let rows = fleet["active"].as_array_mut().context("Foundation active roster")?;
+    let Some(index) = rows.iter().position(|row| {
+        row["epoch"] == 230 && row["producer"]["Id"] == FIRST_7871_230.unit
+    }) else {
+        return Ok(None);
+    };
+    if !Path::new(TERMINAL.0).try_exists()? {
+        return Ok(None);
+    }
+    let terminal_ref = Bound::new(TERMINAL.0, TERMINAL.1);
+    let terminal = terminal_ref.sealed()?;
+    let row = &rows[index];
+    let invocation = &row["producer"]["InvocationID"];
+    ensure!(
+        row["phase"] == "diagnostic-qualification"
+            && invocation == IID
+            && row["launch_receipt"] == REGISTRATION.0
+            && row["launch_receipt_sha256"] == REGISTRATION.1
+            && terminal["schema"] == "foundation-epoch230-first-7871-terminal-v1"
+            && terminal["unit"] == FIRST_7871_230.unit
+            && terminal["invocation_id"] == IID
+            && terminal["manager_event"]["INVOCATION_ID"] == IID
+            && terminal["state"] == "local-segment-committed"
+            && terminal["guard_drained"] == true
+            && terminal["first_slot"] == 99_437_434_u64
+            && terminal["last_slot"] == 99_445_304_u64
+            && terminal["archive"]["independent_sha256"]
+                == terminal["archive"]["native_sha256"],
+        "the epoch 230 terminal phase does not bind the sampled producer"
+    );
+    let archived = &terminal["archive"];
+    let path = Path::new(text(archived, "path")?);
+    let metadata = fs::symlink_metadata(path)?;
+    ensure!(
+        metadata.is_file()
+            && metadata.len() == num(&archived["identity"], "length")?
+            && metadata.ino() == num(&archived["identity"], "inode")?
+            && metadata.dev() == num(&archived["identity"], "device")?,
+        "the retained epoch 230 segment changed after terminal verification"
+    );
+    let fields = "ActiveState,InvocationID,MainPID,ControlPID,ControlGroup,Job";
+    let producer = n.show_fields(FIRST_7871_230.unit, fields)?;
+    let guard = n.show_fields(FIRST_7871_230.guard, fields)?;
+    let timer = format!("{}.timer", FIRST_7871_230.guard.trim_end_matches(".service"));
+    let timer = n.show_fields(&timer, "ActiveState,Job")?;
+    for (name, state) in [(FIRST_7871_230.unit, &producer), (FIRST_7871_230.guard, &guard)] {
+        ensure!(
+            matches!(state["ActiveState"].as_str(), Some("inactive" | "failed"))
+                && state["MainPID"] == "0"
+                && state["ControlPID"] == "0"
+                && state["ControlGroup"] == ""
+                && state["Job"] == ""
+                && !Path::new("/sys/fs/cgroup/system.slice").join(name).try_exists()?,
+            "the closed epoch 230 scope still has a live unit or cgroup: {name}"
+        );
+    }
+    ensure!(
+        producer["ActiveState"] == "inactive"
+            && matches!(producer["InvocationID"].as_str(), Some("" | IID))
+            && timer["ActiveState"] == "inactive"
+            && timer["Job"] == "",
+        "the recorded epoch 230 producer or timer changed"
+    );
+    rows.remove(index);
+    Ok(Some(terminal_ref))
+}
+
 fn terminal_delivery_257(n: &mut Native, booking: &Value, fleet: &Value) -> Result<Option<Bound>> {
     let state = n.show_fields(
         UPLOAD_257,
@@ -1441,8 +1520,14 @@ fn measure(
             live_replays.insert(spec.epoch, spec.live(n)?);
         }
     }
+    let mut admission_fleet = fleet.clone();
+    let closed_first_7871 = if quote.is_some() {
+        drain_first_7871(n, &mut admission_fleet)?
+    } else {
+        None
+    };
     let roster = fleet_roster(
-        &fleet,
+        &admission_fleet,
         &booking,
         &released_replays,
         &active_deliveries,
@@ -1995,6 +2080,7 @@ fn measure(
         "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
         "closed_middle_replay":closed_230,
+        "closed_first_7871_replay":closed_first_7871,
         "closed_extraction_226":extraction_drain,
         "active_suffix_226_registration":live_replays.get(&226).map(|replay| &replay.reference),
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
