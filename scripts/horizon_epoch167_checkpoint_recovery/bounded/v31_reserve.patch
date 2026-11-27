@@ -240,6 +240,15 @@
      if FULL170_RETRY5:
          native.update(full170_retry5_owner=retry5_owner, full170_retry5_current=retry5_current)
          if focused168:
+@@ -2645,7 +2739,7 @@
+         native = capture_native(epoch,ref,verified_prestart if prestart136 is not None else None,
+                                 hourly170_mode,full170_mode,repro166_mode,
+                                 serial_holder_pid=serial_holder_pid)
+-        if V31_JOINT168:
++        if V31_JOINT168 and not REPLACE167:
+             followup = native["full146_census"]["proposal"]["epoch168_followup_memory_bytes"]
+             required = native["required_available_memory_bytes"] + followup + 52*G
+             available = native["available_memory_bytes"]
 @@ -2740,7 +2834,7 @@
                  joint = price.pop("joint168_census", None)
                  if joint is not None:
@@ -707,7 +716,7 @@
 +                resource_credit_bytes=0,reservation_ending_bytes=0)
 --- /dev/null
 +++ b/terminal_joint168_capacity.py
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,104 @@
 +"""Bind the accepted joint-168 terminal to its existing full reservation."""
 +import json
 +from pathlib import Path
@@ -761,8 +770,8 @@
 +    ref = request['terminal']
 +    terminal = s.bound(ref, lane['ROOT']/'TERMINAL.json')
 +    unit = lane['UNIT']
-+    s.need(row['phase'] == 'terminal' and row['terminal'] == ref
-+           and row['enrollment'] == request['enrollment'] and row['prestart'] == enrollment['prestart_quote']
++    s.need(row['enrollment'] == request['enrollment'] and row['prestart'] == enrollment['prestart_quote']
++           and row['unit']['Id'] == unit
 +           and row['actor']['producer_invocation_id'] == actor['invocation_id']
 +           and row['actor']['producer_pid'] == terminal['producer_pid'] == actor['pid']
 +           and row['actor']['producer_start_ticks'] == terminal['producer_start_ticks'] == actor['start_ticks']
@@ -772,11 +781,32 @@
 +           and terminal['schema'] == 'horizon-epoch168-joint-reduced-terminal-v1'
 +           and terminal['enrollment'] == request['enrollment']
 +           and terminal['producer_invocation_id'] == actor['invocation_id']
-+           and terminal['private_output_preserved'] is True and terminal['remote_mutations'] is False
-+           and all(item['unit']['Id'] != unit
-+                   for name in ('actual_executing_replays','actual_active_bootstraps',
-+                                'actual_active_private_diagnostics') for item in fleet[name]),
++           and terminal['private_output_preserved'] is True and terminal['remote_mutations'] is False,
 +           'terminal joint 168 differs from the sole cadence roster or paid generation')
++    census = [(name, item)
++              for name in ('actual_executing_replays','actual_active_bootstraps','actual_active_private_diagnostics')
++              for item in fleet[name] if item['unit']['Id'] == unit]
++    if row['phase'] == 'terminal':
++        s.need(row['terminal'] == ref and not census,
++               'terminal joint 168 differs from the accepted stopped census')
++    else:
++        release = s.bound(row['release'], lane['RELEASE'])
++        guard = row['guard']
++        plan = lane['read'](s, guard['plan'])
++        sample = lane['read'](s, guard['sample'])
++        native_time = int(terminal['pid1_terminal_event']['__REALTIME_TIMESTAMP'])
++        s.need(row['phase'] == 'worker' and census == [('actual_active_private_diagnostics', row)]
++               and row['unit']['InvocationID'] == actor['invocation_id']
++               and release['enrollment'] == request['enrollment']
++               and release['producer_invocation_id'] == actor['invocation_id']
++               and plan['invocation_id'] == sample['producer_invocation_id'] == actor['invocation_id']
++               and plan['minimum_free_bytes'] == guard['floor'] == quote['joint168']['guard_floor_bytes']
++               and plan['maximum_root_physical_bytes'] == quote['joint168']['whole_tree_cap_bytes']
++               and sample['plan_sha256'] == guard['plan']['sha256']
++               and sample['producer_stop_enabled'] is True and sample['trip_reason'] is None
++               and [worker[0] for worker in sample['workers']] == [row['worker']['pid']]
++               and max(fleet['recorded_unix_seconds'],sample['recorded_unix_seconds'])*1_000_000 < native_time,
++               'native joint 168 exit did not follow the last accepted protected worker')
 +    native_exit(s, unit, actor, terminal)
 +    lane['require_idle'](s)
 +    if measured is None:
@@ -787,7 +817,7 @@
 +    s.need(0 < measured <= quote['joint168']['whole_tree_cap_bytes'], 'terminal joint 168 exceeds paid whole-tree cap')
 +    lane['require_idle'](s)
 +    return dict(mode='terminal', retirement=rr, physical=measured, processes=[], worker=None,
-+                unit=row['unit'], release=None, actor=actor, terminal=ref,
++                unit=row['unit'], release=None, actor=actor, terminal=ref, fleet_phase=row['phase'],
 +                enrollment=request['enrollment'], prestart=enrollment['prestart_quote'],
 +                first_fit=quote['joint168'], guard=None, reservation_ending_bytes=0,
 +                resource_credit_bytes=0, **lane['availability']())
