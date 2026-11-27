@@ -63,10 +63,53 @@ def inactive(unit):
         raise ValueError(f"scope retains a PID: {unit}")
 
 
+def guard_drain(terminal):
+    unit = GUARD + ".service"
+    fields = (
+        "Id,ActiveState,MainPID,ControlPID,Job,InvocationID,Result,ExecMainCode,"
+        "ExecMainStatus,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic"
+    )
+    state = native_properties(unit, fields)
+    if state["Id"] != unit or state["Job"] or (state["MainPID"], state["ControlPID"]) != ("0", "0"):
+        raise ValueError(f"scope has not drained: {unit}")
+    if state["ActiveState"] == "inactive":
+        return {"unit": unit, "state": "inactive"}
+    iid = state["InvocationID"]
+    start = int(state["ExecMainStartTimestampMonotonic"])
+    end = int(state["ExecMainExitTimestampMonotonic"])
+    producer_exit = terminal["exit_timestamp_monotonic_usec"]
+    if (
+        state["ActiveState"] != "failed" or state["Result"] != "exit-code"
+        or (state["ExecMainCode"], state["ExecMainStatus"]) != ("1", "1")
+        or not re.fullmatch(r"[0-9a-f]{32}", iid) or not 0 < start <= producer_exit <= end
+    ):
+        raise ValueError("guard failure did not overlap native recorder exit")
+    journal = subprocess.check_output(
+        ["journalctl", "--no-pager", "--output=json",
+         "--output-fields=MESSAGE,_SYSTEMD_UNIT,_SYSTEMD_INVOCATION_ID",
+         f"_SYSTEMD_INVOCATION_ID={iid}"],
+        text=True,
+    )
+    events = [json.loads(line) for line in journal.splitlines()]
+    [event] = events
+    if (
+        event["_SYSTEMD_UNIT"] != unit or event["_SYSTEMD_INVOCATION_ID"] != iid
+        or event["_BOOT_ID"] != terminal["boot_id"].replace("-", "")
+        or event["MESSAGE"] != "producer identity or state changed during guard sample"
+        or not producer_exit <= int(event["__MONOTONIC_TIMESTAMP"]) <= end
+    ):
+        raise ValueError("guard journal does not bind the observed terminal race")
+    return {
+        "unit": unit, "state": "failed", "invocation_id": iid,
+        "journal_cursor": event["__CURSOR"], "event": event["MESSAGE"],
+        "sample_started_monotonic_usec": start, "sample_ended_monotonic_usec": end,
+    }
+
+
 def accept():
     if os.geteuid() != 0:
         raise ValueError("run acceptance as root")
-    for unit in (UNIT, GUARD + ".service", GUARD + ".timer"):
+    for unit in (UNIT, GUARD + ".timer"):
         inactive(unit)
     owner, owner_ref = read(AUTHORITY / "HELD_OWNER.json", 0)
     terminal, terminal_ref = read(AUTHORITY / "NATIVE_TERMINAL.json", 0)
@@ -84,6 +127,7 @@ def accept():
         or progress["slot"] <= 60911752 or progress["transactions"] <= 0
     ):
         raise ValueError("native terminal, progress, or CPU return does not match the held recorder")
+    drained_guard = guard_drain(terminal)
     guard_root = AUTHORITY / "guard-receipts"
     if (guard_root / "stop-intent.json").exists() or (guard_root / "stop-completion.json").exists():
         raise ValueError("the guard stopped this invocation")
@@ -120,7 +164,8 @@ def accept():
         "schema": "horizon-epoch140-private-suffix-acceptance-v1", "epoch": 140,
         "recorded_at": datetime.now(timezone.utc).isoformat(), "invocation_id": iid,
         "actor": owner_ref, "first_protected_progress": progress_ref, "native_terminal": terminal_ref,
-        "cpu_loan_return": returned_ref, "recorder_receipt": recorder_ref, "segment_manifest": manifest_ref,
+        "cpu_loan_return": returned_ref, "guard_drain": drained_guard,
+        "recorder_receipt": recorder_ref, "segment_manifest": manifest_ref,
         "archive": archive_ref, "archive_bytes": archive_size, "recorded_slots": 248,
         "start_slot": 60911752, "end_slot": 60911999, "pending_canonical_root_slot": 61328765,
         "canonical_root_verified": False, "publication_authorized": False,
