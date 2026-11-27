@@ -20,6 +20,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(feature = "anza-closed-144-lanek")]
+mod anza_closed_144_lanek;
 #[cfg(feature = "anza-closed-154")]
 mod anza_closed_154;
 #[cfg(feature = "anza-closed-canaries")]
@@ -37,6 +39,7 @@ mod anza_167_index_copies;
 mod anza_stopped_167;
 
 const HOME_ROOT: &str = if cfg!(any(
+    feature = "anza-closed-144-lanek",
     feature = "anza-parked-183",
     feature = "anza-closed-154",
     feature = "anza-closed-canaries"
@@ -395,6 +398,8 @@ fn ready(epoch: u64, receipt: &Value, inventory: &Value) -> Result<()> {
 }
 fn check_target(t: &Target) -> Result<()> {
     let scope = match t.epoch {
+        #[cfg(feature = "anza-closed-144-lanek")]
+        144 => anza_closed_144_lanek::is_target(t),
         #[cfg(feature = "anza-closed-canaries")]
         119 | 121 | 129 | 130 | 133 | 134 | 149 | 191..=197 => anza_closed_canaries::is_target(t),
         #[cfg(feature = "anza-closed-canaries")]
@@ -836,6 +841,11 @@ fn run() -> Result<()> {
     let _closed_index_locks = closed_owned_indexes
         .map(anza_closed_owned_indexes::lock_controllers)
         .transpose()?;
+    #[cfg(feature = "anza-closed-144-lanek")]
+    let _lane_k_lock = epochs
+        .contains(&144)
+        .then(anza_closed_144_lanek::lock_original_owner)
+        .transpose()?;
     let receipts = Path::new(HOME_ROOT).join(".jetstreamer-private/r2-receipts");
     #[cfg(feature = "anza-parked-183")]
     let parked_183 = p.targets.iter().any(anza_parked_183::is_target);
@@ -856,6 +866,10 @@ fn run() -> Result<()> {
         unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "mutation lock busy"
     );
+    #[cfg(feature = "anza-closed-144-lanek")]
+    if epochs.contains(&144) {
+        anza_closed_144_lanek::verify(&p, &lock)?;
+    }
     #[cfg(feature = "anza-parked-183")]
     if parked_183 {
         anza_parked_183::verify(&p, &lock)?;
@@ -985,6 +999,10 @@ fn run() -> Result<()> {
     File::open(p.audit.parent().unwrap())?.sync_all()?;
     let mut bytes = 0;
     for t in &p.targets {
+        #[cfg(feature = "anza-closed-144-lanek")]
+        if t.epoch == 144 {
+            anza_closed_144_lanek::check_owners()?;
+        }
         #[cfg(feature = "anza-parked-183")]
         if anza_parked_183::is_target(t) {
             anza_parked_183::check_owners()?;
