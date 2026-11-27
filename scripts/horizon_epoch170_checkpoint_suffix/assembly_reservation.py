@@ -286,7 +286,7 @@ def owns_operation_lock(identity):
              for row in rows), "phase pricing must execute under its own exclusive campaign lock")
 
 
-def prove_hourly_exclusion(proof):
+def prove_hourly_exclusion(proof, additional_booker=None):
     native143 = native(HOURLY_UNIT)
     guard = HOURLY_UNIT.replace("-qualify-", "-guard-")
     guard_service = native(guard)
@@ -305,8 +305,10 @@ def prove_hourly_exclusion(proof):
         booking, _ = evidence(path)
         need(booking["unit"] == HOURLY_UNIT and booking["latest_start_unix_seconds"] < time.time(),
              "143 has a second or unexpired booking")
-    need({p.name for p in HOURLY.glob("booking-price-v*")} == {"booking-price-v1", "booking-price-v2",
-         "booking-price-v3", "booking-price-v4"}, "unqualified 143 booking route appeared")
+    routes = {"booking-price-v1", "booking-price-v2", "booking-price-v3", "booking-price-v4"}
+    if additional_booker is not None:
+        routes.add(additional_booker.name)
+    need({p.name for p in HOURLY.glob("booking-price-v*")} == routes, "unqualified 143 booking route appeared")
     for ref in [*proof["earlier_bookers"], *proof["sealed_operator_paths"], proof["available_booker"], proof["available_launcher"]]:
         path = Path(ref["path"])
         with path.open("rb") as fd:
@@ -315,6 +317,54 @@ def prove_hourly_exclusion(proof):
                  and not m.st_mode & 0o222 and hashlib.file_digest(fd,"sha256").hexdigest() == ref["sha256"],
                  "143 booker or launcher changed")
     return native143
+
+
+def check_phase_package(reference, path, expected):
+    package = pinned(reference, path / "deployment-seal-receipt.json", expected)
+    need(package["destination"] == str(path), "phase package destination changed")
+    for member in package["members"]:
+        file = path / member["name"]
+        with file.open("rb") as stream:
+            st = os.fstat(stream.fileno())
+            need(file.resolve(strict=True) == file and stat.S_ISREG(st.st_mode) and st.st_uid == 0
+                 and not st.st_mode & 0o222 and st.st_size == member["bytes"]
+                 and hashlib.file_digest(stream, "sha256").hexdigest() == member["sha256"],
+                 "phase package member changed: " + str(file))
+
+
+def phase_writer(phase_ref, original_ref, original):
+    active_path = PHASE_WRITER.with_name("FAILED166_CADENCE_V47_ACTIVE.json")
+    if not os.path.lexists(active_path):
+        return original, None
+    active_ref = {"path": str(active_path), "sha256": "def64d8842984dee1835c05aefa8b5f344c52f9b97e8691db123b1cce2daca86"}
+    active = pinned(active_ref, active_path, active_ref["sha256"], mutable=True)
+    rebound_path = HOURLY / "REENTRY_V47_REBOUND.json"
+    rebound_ref = {"path": str(rebound_path), "sha256": "61883f8f6fd84c70a145042944ef602369d6b798decd34ade652d26e8cbf565e"}
+    rebound = pinned(rebound_ref, rebound_path, rebound_ref["sha256"])
+    ready, _ = evidence(Path(active["ready"]["path"]), active["ready"])
+    directory = PHASE_WRITER.parent / "tools-cold168-retry5-failed166-v47-entry146"
+    booker = HOURLY / "booking-price-v47"
+    need(active["old"] == original and not active["producer_mutations"] and not rebound["producer_mutations"]
+         and ready["old_owner"] == rebound["writer"] == original_ref
+         and ready["retained_143_listener"] == rebound["original"]
+         and ready["retained_143_phase"] == rebound["phase"] == phase_ref
+         and ready["package"] == rebound["writer_package"],
+         "V47 did not inherit the active 143 scheduling exclusion")
+    check_phase_package(ready["package"], directory, "cdeef56bc6fddb7189be65ace5a72468514ed97d08b470be5248d79da8177f55")
+    check_phase_package(rebound["booker_package"], booker, "f127e596ee005a8d2a1adc72561fb288bb98df03ff10a5439dc4e06bac66aa79")
+    listener = rebound["new"]
+    status = native(listener["Id"])
+    checked_fields = ("Id", "InvocationID", "MainPID", "ActiveState", "Job", "ControlGroup", "MemoryMax", "MemorySwapMax", "CPUQuotaPerSecUSec")
+    program = directory / "watch143_versions.py"
+    need(all(status[key] == listener[key] for key in checked_fields) and status["ActiveState"] == "active"
+         and not status["Job"] and (Path("/proc") / status["MainPID"] / "cmdline").read_bytes().split(b"\0")
+         == [b"/usr/bin/python3", b"-IB", os.fsencode(program), b""], "different 143 listener")
+    route = json.loads(subprocess.check_output(["/usr/bin/python3", "-IB", str(program), "--check-entry"], timeout=15))
+    writer = active["new"]
+    need(route == {"phase": phase_ref, "version": 47, "writer": active_ref, "package": ready["package"]}
+         and writer["program"] == str(directory / "status_cycle.py") and writer["lock"] == original["lock"],
+         "143 listener resolved a different writer, phase or lock")
+    return writer, booker
 
 
 def first_phase(base, assembly):
@@ -342,6 +392,7 @@ def first_phase(base, assembly):
          and not term["archive_created"] and proof["preserved_HOME_bytes"] == contract["guarded_HOME_bytes"] + contract["separate_evidence_HOME_bytes"] == 64*GIB+EVIDENCE
          and proof["preserved_RAM_bytes"] == contract["producer_RAM_bytes"] + contract["guard_RAM_bytes"] == 41*GIB,
          "different retained 143 obligation")
+    writer, additional_booker = phase_writer(ref, doc["writer"], writer)
     manager = native(writer["unit"])
     proc = Path("/proc")/str(writer["pid"])
     wlock = (proc/"fd"/str(writer["lock"]["fd"])).stat()
@@ -349,7 +400,7 @@ def first_phase(base, assembly):
          and manager["ActiveState"] == "active" and not manager["Job"] and int((proc/"stat").read_text().rsplit(") ",1)[1].split()[19]) == writer["start_ticks"]
          and [wlock.st_dev,wlock.st_ino] == [writer["lock"]["device"],writer["lock"]["inode"]]
          and os.fsencode(writer["program"]) in (proc/"cmdline").read_bytes().split(b"\0"), "143 sole writer changed")
-    prove_hourly_exclusion(proof)
+    prove_hourly_exclusion(proof, additional_booker)
     return ref
 
 

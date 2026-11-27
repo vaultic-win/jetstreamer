@@ -12,7 +12,8 @@ RT, TREE, B140 = prior.RT, prior.TREE, prior.B140
 state, read, bound, inactive, need, cmd = prior.state, prior.read, prior.bound, prior.inactive, prior.need, prior.cmd
 FIRST = RT / "epoch170-from-73746882-20261127-v1"
 OPERATOR = Path(__file__).resolve().parent
-RETRY = OPERATOR.parent == FIRST/"attempt-2" and OPERATOR.name in ("operator-v1", "operator-v2", "operator-v3")
+ISSUED_PRICE = FIRST/"attempt-2/issued-price-v47"
+RETRY = OPERATOR.parent == FIRST/"attempt-2" and OPERATOR.name in ("operator-v1", "operator-v2", "operator-v3", "issued-price-v47")
 DEP = ATTEMPT = FIRST/"attempt-2" if RETRY else FIRST
 OLD = prior.DEP / "attempt-2"
 BRIDGE = prior.UNIT
@@ -214,8 +215,39 @@ def guarded_hourly143(rollover, current):
     return guarded
 
 
+def issued_tree_bounds(actor):
+    """Use the live guard's paired scans of this exact tree and worker."""
+    progress, _ = read(DEP/"FIRST_PROTECTED_PROGRESS.json", "51aaa67e0eeb7bd1da0ed85e718ade911a6ae425e21be20383cb0f715c834d02")
+    release = bound(progress["release"])
+    plan = bound(release["guard_plan"])
+    scope = bound(release["interface"])
+    worker = progress["worker"]
+    need(progress["producer_invocation_id"] == actor["producer_invocation_id"] == release["producer_invocation_id"]
+         == "c3ab30cfeb05428bb8f5c48a5a44822c" and actor == bound(release["actor"])
+         and release["actor"] == progress["actor"] and scope["expected_producer_unit"] == plan["unit"] == UNIT
+         and plan["invocation_id"] == actor["producer_invocation_id"] and plan["worker_root"] == str(TREE)
+         and plan["filesystem"] == "/home/sol" and scope["profile"]["worker"] == worker["sha256"],
+         "different issued 170 price or guard")
+    roster = []
+    for pid, ticks, expected_exe in ((actor["producer_pid"], actor["start_ticks"], scope["profile"]["node"]["path"]),
+                                     (worker["pid"], worker["start_ticks"], worker["exe"])):
+        exe = Path("/proc")/str(pid)/"exe"
+        need(exe.samefile(expected_exe), "different issued 170 executable")
+        st = exe.stat()
+        roster.append([pid, ticks, st.st_dev, st.st_ino])
+    sample, lower, _ = prior.protected(UNIT, roster, release["guard_timer_invocation_id"], progress["native_guard"], 48*G, "6s", False)
+    census = bound(sample)
+    upper = prior.peak(census)
+    need(census["plan_sha256"] == release["guard_plan"]["sha256"]
+         and census["minimum_free_bytes"] == plan["minimum_free_bytes"]
+         and 0 < lower <= upper <= plan["maximum_root_physical_bytes"] == census["root_physical_observation"]["maximum_physical_bytes"],
+         "unprotected or out-of-bounds 170 tree")
+    return sample, (lower, upper)
+
+
 def price(phase):
     need(phase in ("read","start","held"),"unknown continuation phase")
+    need(OPERATOR != ISSUED_PRICE or phase == "held", "issued-price-v47 only prices the live 170 worker")
     prior_receipt = predecessor_exit()
     if phase != "read": compare_predecessor()
     before = prior.availability()
@@ -237,7 +269,8 @@ def price(phase):
         rs = state(rollover.UNIT)
         if rs["ActiveState"] == "active":
             replacement = guarded_hourly143(rollover, rs)
-    joint = prior.price("held" if held else "start",attempt=OLD,held_replacement=UNIT if held else None,
+    sample, bounds = issued_tree_bounds(actor) if OPERATOR == ISSUED_PRICE else (None, None)
+    joint = prior.price("held" if held else "start",attempt=OLD,held_replacement=UNIT if held else None,live_tree_bounds=bounds,
                         hourly_replacement=replacement["iid"] if replacement else None)
     need(joint["candidate_growth"] == 36*G and joint["producer_allowance"] == 48*G
          and joint["guard_sibling_allowance"] == G and joint["resource_credit_bytes"] == 0
@@ -299,6 +332,8 @@ def price(phase):
                 replacement143=replacement,auxiliary=aux,
                 dispatch_cpu_micros=500000,dispatch_memory_bytes=512*M,dispatch_home_bytes=128*M,
                 resource_credit_bytes=0,archive_publication_authorized=False)
+    if sample:
+        result["issued_tree_guard_sample"] = sample
 
     # Historical standalone read deployments predate the assembly reservation.
     overlay_path = Path(__file__).with_name("assembly_reservation.py")
@@ -315,6 +350,6 @@ def price(phase):
         spec.loader.exec_module(capacity)
         scope_for_price = None if phase == "read" else scope()[0]
         return capacity.charge(prior, result, assembly, scope_for_price)
-    if OPERATOR == FIRST/"attempt-2/operator-v3":
+    if OPERATOR in (FIRST/"attempt-2/operator-v3", ISSUED_PRICE):
         return overlay.apply_170(result, assembly, use_phase=True)
     return overlay.apply_170(result, assembly)

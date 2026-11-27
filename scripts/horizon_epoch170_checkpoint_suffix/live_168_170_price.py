@@ -15,6 +15,7 @@ sys.dont_write_bytecode = True
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ATTEMPT = RT / "epoch170-from-73746882-20261127-v1/attempt-2"
 OP = ATTEMPT / "operator-v3"
+CURRENT_PRICE = ATTEMPT / "issued-price-v47"
 AS = Path("/home/sol/.jetstreamer-private/epoch168-assembly-operator-20261127-v1/launch-acmxqat0")
 OP_SEAL = "0dd508ca75585705f8a01805518f9b1792be31943548f9829421bef858d5be56"
 PROGRESS = "51aaa67e0eeb7bd1da0ed85e718ade911a6ae425e21be20383cb0f715c834d02"
@@ -74,7 +75,8 @@ def live_price():
         st = member.lstat()
         need(member.resolve(strict=True) == member and st.st_uid == 0 and not st.st_mode & 0o222
              and st.st_size == entry["bytes"] and digest(member) == entry["sha256"], "operator seal changed")
-    base = runpy.run_path(str(OP / "continuation_price.py"))
+    source = CURRENT_PRICE if Path(__file__).resolve().parent == CURRENT_PRICE else OP
+    base = runpy.run_path(str(source / "continuation_price.py"))
     old = base["prior"]
     progress, pref = old.read(ATTEMPT / "FIRST_PROTECTED_PROGRESS.json", PROGRESS)
     actor = old.bound(progress["actor"])
