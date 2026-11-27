@@ -19,3 +19,7 @@ sha2 = "0.10"
 [[bin]]
 name = "bridge-checkpoints"
 path = "bridge_checkpoints.rs"
+
+[[bin]]
+name = "bounded-checkpoints"
+path = "bounded_checkpoints.rs"

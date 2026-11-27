@@ -1,5 +1,5 @@
 //! Retain the exact transient unit until its main-process exit status is durable.
-use super::{IID, UNIT, evidence::*};
+use super::{CAPTURE_DIR as DIR, IID, UNIT, evidence::*};
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use std::{
@@ -11,7 +11,6 @@ use std::{
     time::Duration,
 };
 
-const DIR: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73726716-20261127-v1/bridge-exit-capture-v1";
 const FIELDS: &str = "Id,ActiveState,InvocationID,MainPID,ControlPID,ExecMainPID,ExecMainCode,ExecMainStatus,ExecMainExitTimestampMonotonic,Result";
 #[link(name = "libsystemd.so.0", kind = "dylib", modifiers = "+verbatim")]
 unsafe extern "C" {
