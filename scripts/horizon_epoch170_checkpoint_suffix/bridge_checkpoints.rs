@@ -64,6 +64,33 @@ fn checkpoints(log: &str, hashes: &[&str], count: usize) -> Result<Vec<Value>> {
     }
     Ok(result)
 }
+fn compare_signed(observed: &[Value], signed: &Value) -> Result<()> {
+    let references = signed["checkpoints"]
+        .as_array()
+        .context("missing signed votes")?;
+    ensure!(
+        references.len() == 2 && signed["commitment"] == "finalized",
+        "expected both finalized votes"
+    );
+    for (&slot, canonical) in SLOTS[1..].iter().zip(references) {
+        ensure!(
+            canonical["slot"] == slot
+                && !word(canonical, "bank_hash")?.is_empty()
+                && !word(canonical, "last_blockhash")?.is_empty(),
+            "wrong signed checkpoint at {slot}"
+        );
+    }
+    for (actual, canonical) in observed.iter().skip(1).zip(references) {
+        for key in ["slot", "bank_hash", "last_blockhash"] {
+            ensure!(
+                actual[key] == canonical[key],
+                "replay field {key} differs from signed vote or finalized block at {}",
+                canonical["slot"]
+            );
+        }
+    }
+    Ok(())
+}
 fn open_artifact(p: &Path, uid: u32) -> Result<(File, Value)> {
     ensure!(p.canonicalize()? == p, "indirect artifact");
     let f = OpenOptions::new()
@@ -247,6 +274,8 @@ fn main() -> Result<()> {
         &hashes,
         if closed { 3 } else { 2 },
     )?;
+    let votes = json!({"path":"/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73726716-20261127-v1/signed-checkpoint-references-v1/SIGNED_CHECKPOINT_REFERENCES.json","sha256":"1a97981d657ced75641973e09e37b1a87061c135b71a3906cd4d5544261197ee"});
+    compare_signed(&observed, &bound(&votes)?)?;
     let archive = if closed {
         closed_segment(&interface, &observed)?
     } else {
@@ -256,7 +285,7 @@ fn main() -> Result<()> {
         "{}",
         serde_json::to_string_pretty(
             &json!({"schema":"epoch170-bridge-checkpoint-comparison-v1","mode":args[0],"release":release_ref,
-        "sample":fleet_ref,"log_prefix":log,"snapshot_list":hash_ref,"checkpoints":observed,"closed_segment":archive,"pid1_exit":exit,
+        "sample":fleet_ref,"log_prefix":log,"snapshot_list":hash_ref, "signed_vote_references":votes,"checkpoints":observed,"closed_segment":archive,"pid1_exit":exit,
         "publication_authorized":false,"resource_credit_bytes":0})
         )?
     );
@@ -269,6 +298,19 @@ mod tests {
     const SUMMARY: &str = "[time INFO  jetstreamer_node::historical_replay] historical checkpoint slot=73706460 bank_hash=B accounts_hash=A last_blockhash=L capitalization=10 transactions=2 tick_height=3 complete=true writes=0 next_write_version=1";
     const VERIFY: &str =
         "[time INFO  jetstreamer_node] verified legacy accounts hash at slot 73706460";
+    #[test]
+    fn rejects_a_bank_hash_mismatch_at_either_hourly_checkpoint() {
+        let a = json!({"slot":SLOTS[1],"bank_hash":"B","last_blockhash":"L"});
+        let b = json!({"slot":SLOTS[2],"bank_hash":"C","last_blockhash":"M"});
+        let refs = json!({"commitment":"finalized","checkpoints":[a,b]});
+        let mut checkpoints = vec![json!({"slot":SLOTS[0]}), a, b];
+        compare_signed(&checkpoints[..2], &refs).unwrap();
+        compare_signed(&checkpoints, &refs).unwrap();
+        checkpoints[2]["bank_hash"] = json!("wrong");
+        assert!(compare_signed(&checkpoints, &refs).is_err());
+        checkpoints[1]["bank_hash"] = json!("wrong");
+        assert!(compare_signed(&checkpoints[..2], &refs).is_err());
+    }
     #[test]
     fn requires_one_native_confirmation_and_the_pinned_accounts_hash() {
         let hashes = ["A", "unused", "unused"];
