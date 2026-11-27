@@ -1,0 +1,177 @@
+--- a/replay_price.rs
++++ b/replay_price.rs
+@@ -20,6 +20,9 @@
+ const CADENCE31: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v31-entry146/deployment-seal-receipt.json";
+ const READY31: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/FAILED166_CADENCE_V31_READY.json";
+ const ACTIVE31: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/FAILED166_CADENCE_V31_ACTIVE.json";
++const CADENCE32: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v32-entry146/deployment-seal-receipt.json";
++const READY32: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/FAILED166_CADENCE_V32_READY.json";
++const ACTIVE32: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/FAILED166_CADENCE_V32_ACTIVE.json";
+ const TERMINAL170: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-raised-guard-qualification-20261126-v1/TERMINAL_20261127.json";
+ const TERMINAL170_SHA: &str = "090fcf08671fbcc28314f97272832d1d8754aed4d93328c58ed81075d76a0aac";
+ const TERMINAL167: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch167-source-index-rebook-20261122-v3/EXECUTION_TERMINAL_20261127.json";
+@@ -36,7 +39,7 @@
+     let focused = &q["focused168_retry6"];
+     matches!(
+         q["status_registration"]["consumer_seal"]["path"].as_str(),
+-        Some(CADENCE24 | CADENCE25 | CADENCE26 | CADENCE29 | CADENCE30 | CADENCE31)
++        Some(CADENCE24 | CADENCE25 | CADENCE26 | CADENCE29 | CADENCE30 | CADENCE31 | CADENCE32)
+     ) && focused["terminal"] == ref_for(Path::new(FOCUSED168_TERMINAL), FOCUSED168_TERMINAL_SHA)
+         && focused["resource_credit_bytes"] == 0
+         && focused["processes"].as_array().is_some_and(Vec::is_empty)
+@@ -128,6 +131,61 @@
+             .all(|key| actor[*key] == status[*key]))
+ }
+
++fn registered32(q: &Value) -> Result<bool> {
++    let binding = &q["v32_cadence"];
++    let previous = &q["v31_cadence"];
++    let status = &q["status_registration"];
++    if binding["schema"] != "horizon-v32-joint168-capacity-generation-v1"
++        || binding["cadence_seal"] != status["consumer_seal"]
++        || binding["predecessor"] != previous["cadence_seal"]
++        || previous["cadence_seal"]["path"] != CADENCE31
++        || previous["active"]["path"] != ACTIVE31
++        || previous["ready"]["path"] != READY31
++        || binding["active"]["path"] != ACTIVE32
++        || binding["ready"]["path"] != READY32
++        || !retained167(q)?
++        || !retained170(q)?
++    {
++        return Ok(false);
++    }
++    let active = read_bound(&binding["active"])?;
++    let ready = read_bound(&binding["ready"])?;
++    let predecessor = read_bound(&previous["active"])?;
++    let predecessor_ready = read_bound(&previous["ready"])?;
++    Ok(same_registered32(
++        q,
++        &active,
++        &ready,
++        &predecessor,
++        &predecessor_ready,
++    ))
++}
++
++fn same_registered32(
++    q: &Value,
++    active: &Value,
++    ready: &Value,
++    predecessor: &Value,
++    predecessor_ready: &Value,
++) -> bool {
++    let binding = &q["v32_cadence"];
++    let previous = &q["v31_cadence"];
++    let status = &q["status_registration"];
++    let actor = &active["new"];
++    active["ready"] == binding["ready"]
++        && active["producer_mutations"] == false
++        && ready["old_owner"] == previous["active"]
++        && active["old"] == predecessor["new"]
++        && predecessor["ready"] == previous["ready"]
++        && predecessor_ready["package"] == previous["cadence_seal"]
++        && ready["package"] == binding["cadence_seal"]
++        && ready["full170_terminal"] == q["retained_170"]["terminal"]
++        && ready["full170_terminal"] == predecessor_ready["full170_terminal"]
++        && ["invocation_id", "pid", "start_ticks"]
++            .iter()
++            .all(|key| actor[*key] == status[*key])
++}
++
+ pub(super) fn active_cadence_basis(q: &Value) -> Result<bool> {
+     if q["epoch"] != 170
+         || !matches!(
+@@ -143,6 +201,7 @@
+                     | CADENCE29
+                     | CADENCE30
+                     | CADENCE31
++                    | CADENCE32
+             )
+         )
+     {
+@@ -170,6 +229,8 @@
+     let floor = amount(focus, "minimum_free_bytes")?;
+     let scope = if registration["consumer_seal"]["path"] == CADENCE31 {
+         registered31(q)?
++    } else if registration["consumer_seal"]["path"] == CADENCE32 {
++        registered32(q)?
+     } else {
+         full["stage"] == "active"
+             && actor["producer_unit"] == FULL170_UNIT
+@@ -394,7 +455,7 @@
+         );
+     }
+     let cadence_path = quote["status_registration"]["consumer_seal"]["path"].as_str();
+-    if matches!(cadence_path, Some(CADENCE30 | CADENCE31)) {
++    if matches!(cadence_path, Some(CADENCE30 | CADENCE31 | CADENCE32)) {
+         let failure = &fleet["cold167_execution_failure"];
+         ensure!(
+             failure["terminal"] == quote["retained_167"]["terminal"]
+@@ -403,7 +464,7 @@
+             "V30 retained epoch 167 settlement differs from the accepted fleet"
+         );
+     }
+-    if cadence_path == Some(CADENCE31) {
++    if matches!(cadence_path, Some(CADENCE31 | CADENCE32)) {
+         let failure = &fleet["cold170_full_metered_guard_stop"];
+         ensure!(
+             failure["terminal"] == quote["retained_170"]["terminal"]
+@@ -430,6 +491,7 @@
+                         | CADENCE29
+                         | CADENCE30
+                         | CADENCE31
++                        | CADENCE32
+                 )
+                 && active_cadence_basis(&quote)?,
+             "occupied epoch 185 requires the sealed active fleet price"
+@@ -456,6 +518,50 @@
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++
++    #[test]
++    fn v32_activation_keeps_the_v31_predecessor_and_retained_170() {
++        let old = json!({"invocation_id":"previous","pid":5,"start_ticks":2});
++        let actor = json!({"invocation_id":"current","pid":11,"start_ticks":9});
++        let terminal = json!({"path":"terminal","sha256":"digest"});
++        let q = json!({
++            "v31_cadence":{"active":"active31","ready":"ready31","cadence_seal":"seal31"},
++            "v32_cadence":{"active":"active32","ready":"ready32","cadence_seal":"seal32"},
++            "status_registration":actor,"retained_170":{"terminal":terminal},
++        });
++        let active = json!({"ready":"ready32","old":old,"new":actor,"producer_mutations":false});
++        let ready = json!({"old_owner":"active31","package":"seal32","full170_terminal":terminal});
++        let predecessor = json!({"ready":"ready31","new":old});
++        let prior_ready = json!({"package":"seal31","full170_terminal":terminal});
++        assert!(same_registered32(
++            &q,
++            &active,
++            &ready,
++            &predecessor,
++            &prior_ready
++        ));
++        for key in ["old_owner", "package", "full170_terminal"] {
++            let mut crossed = ready.clone();
++            crossed[key] = json!("unrelated");
++            assert!(!same_registered32(
++                &q,
++                &active,
++                &crossed,
++                &predecessor,
++                &prior_ready
++            ));
++        }
++        let mut changed = active.clone();
++        changed["new"]["pid"] = json!(17);
++        assert!(!same_registered32(
++            &q,
++            &changed,
++            &ready,
++            &predecessor,
++            &prior_ready
++        ));
++    }
++
+     fn active_fixture() -> (Value, Value, Value, Value) {
+         let book = json!({"serial_restore_enlargement_bytes":40,"metadata_allowance_bytes":2});
+         let review = json!({"historical_serial":{"sha256":"serial"},"metadata_allowance_bytes":2});
