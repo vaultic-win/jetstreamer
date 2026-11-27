@@ -1,4 +1,5 @@
 //! Observe the exact closed lane-l holding transfer. This command only reads host state.
+mod lanek;
 mod replay_price;
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
@@ -18,6 +19,26 @@ const MANIFEST: &str = "97ab4ad60aa6617bcdbbbceb2b91c8e4ade6c9fc69d0b66d171dc186
 const STATE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1";
 const LENGTH: u64 = 123_350_028_052;
 const GROUP: &str = "/system.slice/horizon-closed185-lanel-park-20261125-v1.service";
+
+struct HoldingLane {
+    root: &'static str,
+    unit: &'static str,
+    group: &'static str,
+    review: &'static str,
+    manifest: &'static str,
+    length: u64,
+    schema: &'static str,
+}
+
+const LANE_L: HoldingLane = HoldingLane {
+    root: ROOT,
+    unit: UNIT,
+    group: GROUP,
+    review: REVIEW,
+    manifest: MANIFEST,
+    length: LENGTH,
+    schema: "horizon-epoch185-lanel-holding-observation-v1",
+};
 
 fn ref_for(path: &Path, digest: &str) -> Value {
     json!({"path":path, "sha256":digest})
@@ -83,8 +104,8 @@ fn optional(path: &Path) -> Result<Option<(Value, Value)>> {
         }
     }
 }
-fn manager() -> Result<Value> {
-    let out=Command::new("/usr/bin/systemctl").args(["show",UNIT,"--property=Id,LoadState,ActiveState,SubState,InvocationID,Job,MainPID,ControlPID,ExecMainPID,ExecMainStartTimestampMonotonic,ExecMainStatus,Result,NRestarts,ControlGroup,FragmentPath,DropInPaths,CPUQuotaPerSecUSec,MemoryMax,MemorySwapMax,TasksMax,Restart,Type,RemainAfterExit"]).output()?;
+fn manager(unit: &str) -> Result<Value> {
+    let out=Command::new("/usr/bin/systemctl").args(["show",unit,"--property=Id,LoadState,ActiveState,SubState,InvocationID,Job,MainPID,ControlPID,ExecMainPID,ExecMainStartTimestampMonotonic,ExecMainStatus,Result,NRestarts,ControlGroup,FragmentPath,DropInPaths,CPUQuotaPerSecUSec,MemoryMax,MemorySwapMax,TasksMax,Restart,Type,RemainAfterExit"]).output()?;
     // systemctl may exit 4 for a missing unit with properties printed.
     ensure!(
         (out.status.success() || out.status.code() == Some(4)) && out.stderr.is_empty(),
@@ -100,13 +121,13 @@ fn manager() -> Result<Value> {
     }
     let m = Value::Object(result);
     ensure!(
-        m["Id"] == UNIT && (out.status.success() || m["LoadState"] == "not-found"),
+        m["Id"] == unit && (out.status.success() || m["LoadState"] == "not-found"),
         "unbound manager query"
     );
     Ok(m)
 }
-fn members() -> Result<Vec<u32>> {
-    let p = Path::new("/sys/fs/cgroup").join(GROUP.trim_start_matches('/'));
+fn members(group: &str) -> Result<Vec<u32>> {
+    let p = Path::new("/sys/fs/cgroup").join(group.trim_start_matches('/'));
     match fs::read_to_string(p.join("cgroup.procs")) {
         Ok(rows) => {
             // Delegated subgroups would escape a direct-only member census.
@@ -119,7 +140,7 @@ fn members() -> Result<Vec<u32>> {
         Err(e) => Err(e.into()),
     }
 }
-fn custody(v: &Value, plan: &Value) -> Result<()> {
+fn custody(lane: &HoldingLane, v: &Value, plan: &Value) -> Result<()> {
     let object = format!("node_02/objects/{}.blob", text(plan, "sha256")?);
     ensure!(
         v["schema"] == "jetstreamer-horizon-holding-custody-v2"
@@ -129,13 +150,13 @@ fn custody(v: &Value, plan: &Value) -> Result<()> {
             && v["source"] == plan["source"]
             && v["mapping"] == plan["mapping"]
             && v["eligibility"] == plan["eligibility"]
-            && v["length"] == LENGTH
+            && v["length"] == lane.length
             && v["sha256"] == plan["sha256"]
             && v["object_key"] == object
             && !text(v, "object_etag")?.is_empty()
-            && v["manifest_sha256"] == MANIFEST
-            && v["manifest_key"] == format!("node_02/manifests/{MANIFEST}.json")
-            && digest(&serde_json::to_vec(&v["manifest"])?) == MANIFEST
+            && v["manifest_sha256"] == lane.manifest
+            && v["manifest_key"] == format!("node_02/manifests/{}.json", lane.manifest)
+            && digest(&serde_json::to_vec(&v["manifest"])?) == lane.manifest
             && v["manifest"]["object_key"] == object
             && v["remote_sha256_readback"] == true
             && v["local_source_revalidated"] == true
@@ -151,12 +172,12 @@ fn iid_valid(s: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         && s.bytes().any(|b| b != b'0')
 }
-fn check_loaded(m: &Value, review: &Value) -> Result<()> {
+fn check_loaded(unit: &str, m: &Value, review: &Value) -> Result<()> {
     let path = Path::new(text(m, "FragmentPath")?);
     ensure!(
         [
-            Path::new("/etc/systemd/system").join(UNIT),
-            Path::new("/run/systemd/system").join(UNIT)
+            Path::new("/etc/systemd/system").join(unit),
+            Path::new("/run/systemd/system").join(unit)
         ]
         .contains(&path.to_owned())
             && digest(&trusted(path)?) == review["draft"]["sha256"]
@@ -175,7 +196,7 @@ fn check_loaded(m: &Value, review: &Value) -> Result<()> {
     );
     Ok(())
 }
-fn worker(pid: u32, argv: &Value) -> Result<u64> {
+fn worker(group: &str, pid: u32, argv: &Value) -> Result<u64> {
     let proc = Path::new("/proc").join(pid.to_string());
     let args = argv.as_array().context("park argv")?;
     let expected = args
@@ -188,7 +209,7 @@ fn worker(pid: u32, argv: &Value) -> Result<u64> {
         exe.read_link()? == image
             && stamp(&exe.metadata()?) == stamp(&image.metadata()?)
             && fs::read(proc.join("cmdline"))? == format!("{}\0", expected.join("\0")).as_bytes()
-            && fs::read_to_string(proc.join("cgroup"))?.trim_end() == format!("0::{GROUP}"),
+            && fs::read_to_string(proc.join("cgroup"))?.trim_end() == format!("0::{group}"),
         "wrong holding process"
     );
     let stat = fs::read_to_string(proc.join("stat"))?;
@@ -201,19 +222,25 @@ fn worker(pid: u32, argv: &Value) -> Result<u64> {
         .context("process ticks")?
         .parse()?)
 }
-fn observe() -> Result<Value> {
-    let root = Path::new(ROOT);
-    let review_ref = ref_for(&root.join("transfer-review/TRANSFER_REVIEW.json"), REVIEW);
+fn observe(lane: &HoldingLane) -> Result<Value> {
+    let root = Path::new(lane.root);
+    let review_ref = ref_for(
+        &root.join("transfer-review/TRANSFER_REVIEW.json"),
+        lane.review,
+    );
     let review = read_bound(&review_ref)?;
     let prepared = read_bound(&review["prepared"])?;
     let plan = read_bound(&prepared["plan"])?;
-    ensure!(plan["length"] == LENGTH, "different prepared generation");
-    let cp = Path::new(STATE).join(format!("receipts/custody-{MANIFEST}.json"));
-    let m = manager()?;
-    let pids = members()?;
+    ensure!(
+        plan["length"] == lane.length,
+        "different prepared generation"
+    );
+    let cp = Path::new(STATE).join(format!("receipts/custody-{}.json", lane.manifest));
+    let m = manager(lane.unit)?;
+    let pids = members(lane.group)?;
     let receipt = optional(&cp)?;
     if let Some((v, _)) = &receipt {
-        custody(v, &plan)?;
+        custody(lane, v, &plan)?;
     }
     let mut ticks = None;
     let stage = match (text(&m, "ActiveState")?, text(&m, "SubState")?) {
@@ -228,7 +255,7 @@ fn observe() -> Result<Value> {
                 "unreconciled inactive holding transfer"
             );
             if m["LoadState"] == "loaded" {
-                check_loaded(&m, &review)?;
+                check_loaded(lane.unit, &m, &review)?;
             } else {
                 ensure!(
                     m["LoadState"] == "not-found"
@@ -240,13 +267,13 @@ fn observe() -> Result<Value> {
             "vacant"
         }
         ("activating", "start") | ("active", "running") => {
-            check_loaded(&m, &review)?;
+            check_loaded(lane.unit, &m, &review)?;
             let pid = text(&m, "MainPID")?.parse::<u32>()?;
             ensure!(
                 pid > 0
                     && pids == [pid]
                     && m["ExecMainPID"] == m["MainPID"]
-                    && m["ControlGroup"] == GROUP
+                    && m["ControlGroup"] == lane.group
                     && iid_valid(text(&m, "InvocationID")?),
                 "ambiguous live transfer"
             );
@@ -255,11 +282,11 @@ fn observe() -> Result<Value> {
                     == review["image"]["sha256"],
                 "holding image changed"
             );
-            ticks = Some(worker(pid, &review["park_argv"])?);
+            ticks = Some(worker(lane.group, pid, &review["park_argv"])?);
             "copying"
         }
         ("active", "exited") => {
-            check_loaded(&m, &review)?;
+            check_loaded(lane.unit, &m, &review)?;
             ensure!(
                 pids.is_empty()
                     && m["Job"] == ""
@@ -281,24 +308,24 @@ fn observe() -> Result<Value> {
         ),
     };
     ensure!(
-        manager()? == m && members()? == pids && optional(&cp)? == receipt,
+        manager(lane.unit)? == m && members(lane.group)? == pids && optional(&cp)? == receipt,
         "holding changed during observation"
     );
     if let Some(before) = ticks {
         ensure!(
-            worker(pids[0], &review["park_argv"])? == before,
+            worker(lane.group, pids[0], &review["park_argv"])? == before,
             "holding PID reused"
         );
     }
     Ok(
-        json!({"schema":"horizon-epoch185-lanel-holding-observation-v1","stage":stage,"unit":UNIT,"native":m,
+        json!({"schema":lane.schema,"stage":stage,"unit":lane.unit,"native":m,
         "start_ticks":ticks,"custody":receipt.map(|(_,r)|r),"plan":prepared["plan"],"transfer_review":review_ref,
         "resource_credit_bytes":0,"local_retirement_authorized":false,"replay_launch_authorized":false}),
     )
 }
 // The start capture joins PID1 to the physical worker. Keep its invocation bound through
 // custody, including when systemd retains only ExecMainPID on the exited oneshot.
-fn generation(observed: &Value, start: &Value) -> Result<()> {
+fn generation(lane: &HoldingLane, observed: &Value, start: &Value) -> Result<()> {
     let m = &observed["native"];
     let n = &start["native"];
     for k in [
@@ -313,8 +340,8 @@ fn generation(observed: &Value, start: &Value) -> Result<()> {
         );
     }
     ensure!(
-        n["Id"] == UNIT
-            && n["ControlGroup"] == GROUP
+        n["Id"] == lane.unit
+            && n["ControlGroup"] == lane.group
             && n["ControlPID"] == "0"
             && n["MainPID"] == n["ExecMainPID"]
             && text(n, "MainPID")?.parse::<u32>()? > 0
@@ -375,8 +402,8 @@ fn rotation_cost(q: &Value, f: &Value, review: &Value) -> Result<Value> {
         "transfer_authorized":false,"resource_credit_bytes":0}),
     )
 }
-fn reconcile(observed: &Value) -> Result<Value> {
-    let root = Path::new(ROOT);
+fn reconcile(lane: &HoldingLane, observed: &Value) -> Result<Value> {
+    let root = Path::new(lane.root);
     let a = optional(&root.join("PARK_ADMISSION.json"))?;
     let s = optional(&root.join("PARK_START.json"))?;
     if a.is_none() {
@@ -392,20 +419,24 @@ fn reconcile(observed: &Value) -> Result<Value> {
     let review = read_bound(&observed["transfer_review"])?;
     ensure!(
         booking["owner"] == "primary"
-            && booking["unit"] == UNIT
+            && booking["unit"] == lane.unit
             && booking["inputs"] == review["prepared"]
             && booking["plan"] == observed["plan"]
             && booking["cpu"] == 2_000_000
             && booking["memory"] == 2u64 << 30
             && booking["tasks"] == 256
             && booking["archive_staging_bytes"] == 0
-            && booking["restore_overlap_bytes"] == LENGTH
+            && booking["restore_overlap_bytes"] == lane.length
             && booking["resource_credit_bytes"] == 0,
         "foreign holding booking"
     );
     let native_fit = read_bound(&booking["fit"])?;
     let fleet = read_bound(&booking["fleet"])?;
-    let cost = rotation_cost(&native_fit, &fleet, &review)?;
+    let cost = if lane.unit == lanek::LANE.unit {
+        lanek::booking_cost(&booking, &native_fit, &fleet, &review, observed)?
+    } else {
+        rotation_cost(&native_fit, &fleet, &review)?
+    };
     let extra = &cost["serial_restore_enlargement_bytes"];
     let metadata = &cost["metadata_allowance_bytes"];
     ensure!(
@@ -424,24 +455,24 @@ fn reconcile(observed: &Value) -> Result<Value> {
             start["admission"] == ar && stage != "vacant",
             "holding generation lost"
         );
-        generation(observed, &start)?;
+        generation(lane, observed, &start)?;
         Some(sr)
     } else {
         ensure!(stage == "vacant", "holding start capture pending");
         None
     };
-    let reservation = json!({"unit":UNIT,"invocation_id":observed["native"]["InvocationID"],"admission":ar,"start":start_ref,"cpu_quota_micros":2_000_000,"memory_bytes":2u64<<30,
-        "restore_overlap_bytes":LENGTH,"serial_restore_enlargement_bytes":extra,"metadata_allowance_bytes":metadata,"resource_credit_bytes":0});
+    let reservation = json!({"unit":lane.unit,"invocation_id":observed["native"]["InvocationID"],"admission":ar,"start":start_ref,"cpu_quota_micros":2_000_000,"memory_bytes":2u64<<30,
+        "restore_overlap_bytes":lane.length,"serial_restore_enlargement_bytes":extra,"metadata_allowance_bytes":metadata,"resource_credit_bytes":0});
     Ok(
         json!({"active_transfer":if stage=="copying" {Some(&reservation)} else {None},
         "holding_reservation":reservation,"observation":observed}),
     )
 }
-fn stable_reconciliation() -> Result<Value> {
-    let first = observe()?;
-    let r = reconcile(&first)?;
+fn stable_reconciliation(lane: &HoldingLane) -> Result<Value> {
+    let first = observe(lane)?;
+    let r = reconcile(lane, &first)?;
     ensure!(
-        observe()? == first && reconcile(&first)? == r,
+        observe(lane)? == first && reconcile(lane, &first)? == r,
         "holding changed during reconciliation"
     );
     Ok(r)
@@ -450,8 +481,9 @@ fn main() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "expected root");
     let args: Vec<_> = std::env::args().skip(1).collect();
     let result = match args.as_slice() {
-        [op] if op == "observe" => observe()?,
-        [op] if op == "reconcile" => stable_reconciliation()?,
+        [op] if op == "observe" => observe(&LANE_L)?,
+        [op] if op == "reconcile" => stable_reconciliation(&LANE_L)?,
+        [op] if op == "reconcile-k" => stable_reconciliation(&lanek::LANE)?,
         [op, lane] if op == "replay-price" => replay_price::apply(lane)?,
         [op, path, sha] if op == "cost" => {
             let qr = ref_for(Path::new(path), sha);
@@ -482,14 +514,14 @@ mod tests {
             "ExecMainStartTimestampMonotonic":"123456","ActiveState":"activating","SubState":"start"});
         let start = json!({"native":native,"start_ticks":77});
         let mut obs = json!({"native":native,"stage":"copying","start_ticks":77});
-        generation(&obs, &start).unwrap();
+        generation(&LANE_L, &obs, &start).unwrap();
         obs["start_ticks"] = json!(78);
-        assert!(generation(&obs, &start).is_err());
+        assert!(generation(&LANE_L, &obs, &start).is_err());
         obs["stage"] = json!("custody-recorded");
         obs["start_ticks"] = Value::Null;
         obs["native"]["MainPID"] = json!("0");
         obs["native"]["SubState"] = json!("exited");
-        generation(&obs, &start).unwrap();
+        generation(&LANE_L, &obs, &start).unwrap();
         for key in [
             "InvocationID",
             "ExecMainPID",
@@ -497,7 +529,7 @@ mod tests {
         ] {
             let mut foreign = obs.clone();
             foreign["native"][key] = json!("different");
-            assert!(generation(&foreign, &start).is_err());
+            assert!(generation(&LANE_L, &foreign, &start).is_err());
         }
     }
     #[test]

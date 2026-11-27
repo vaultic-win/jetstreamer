@@ -124,7 +124,7 @@ pub(super) fn apply(lane: &str) -> Result<Value> {
     ensure!(input.len() <= 2 << 20, "oversized price input");
     let mut args: Value = serde_json::from_slice(&input)?;
     let mut q = args["native"].take();
-    let state = super::stable_reconciliation()?;
+    let state = super::stable_reconciliation(&LANE_L)?;
     ensure!(
         state == args["before"],
         "holding changed during native price"

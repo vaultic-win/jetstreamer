@@ -652,7 +652,7 @@ def publish_all(c,bridge,store,vs):
          private140=refs['140'],archives_or_sidecars_changed=False))
     return bound(p),bound(complete)
 
-def install_holding185(c, fleet):
+def install_holding185(c, fleet, lane_k_tool=None):
     package = BASE / 'epoch185-lanel-holding-20261125-v1/observer-v1/tools'
     seal = checked(dict(path=str(package/'deployment-seal-receipt.json'),
                         sha256='65062d37abf03585caabe61438b3bc4e87dba3e94bf9e55167e31b09c42d8e8d'))
@@ -662,25 +662,34 @@ def install_holding185(c, fleet):
          and bound(tool)['sha256'] == member['sha256'], 'different epoch 185 holding observer')
     result = json.loads(run(tool, 'reconcile'))
     install_holding185_result(c, fleet, result)
+    if lane_k_tool is not None:
+        need(result['observation']['stage'] == 'custody-recorded'
+             and result['active_transfer'] is None, 'lane-l still owns serial holding')
+        lane_k = json.loads(run(lane_k_tool, 'reconcile-k'))
+        install_holding185_result(c, fleet, lane_k, lane='k')
 
 
-def install_holding185_result(c, fleet, result):
-    field = 'epoch185_lanel_holding'
+def install_holding185_result(c, fleet, result, lane='l'):
+    need(lane in ('l', 'k'), 'unknown epoch 185 holding lane')
+    unit_date = '20261125' if lane == 'l' else '20261127'
+    unit = f'horizon-closed185-lane{lane}-park-{unit_date}-v1.service'
+    event_schema = f'horizon-epoch185-lane{lane}-cadence-event-v1'
+    field = f'epoch185_lane{lane}_holding'
     previous = fleet.get(field)
     transfers = fleet['actual_active_holding_transfers']
     if previous is not None:
         old = checked(previous)
         need(Path(previous['path']).parent == Path(c.fleet_ref['path']).parent
-             and old['schema'] == 'horizon-epoch185-lanel-cadence-event-v1'
-             and old['result']['observation']['unit'] == 'horizon-closed185-lanel-park-20261125-v1.service',
+             and old['schema'] == event_schema
+             and old['result']['observation']['unit'] == unit,
              'different predecessor holding event')
         active = old['result']['active_transfer'] is not None
         need(transfers.count(previous) == int(active), 'different active holding list')
         if active:
             transfers.remove(previous)
     observed = result['observation']
-    need(observed['schema'] == 'horizon-epoch185-lanel-holding-observation-v1'
-         and observed['unit'] == 'horizon-closed185-lanel-park-20261125-v1.service'
+    need(observed['schema'] == f'horizon-epoch185-lane{lane}-holding-observation-v1'
+         and observed['unit'] == unit
          and observed['resource_credit_bytes'] == 0, 'unbound holding result')
     if result['holding_reservation'] is None:
         need(previous is None and result['active_transfer'] is None and observed['stage'] == 'vacant',
@@ -696,7 +705,9 @@ def install_holding185_result(c, fleet, result):
              and (prior['observation']['stage'] != 'custody-recorded' or
                   (observed['stage'] == 'custody-recorded' and prior['observation']['custody'] == observed['custody'])),
              'changed epoch 185 holding generation')
-    event = dict(schema='horizon-epoch185-lanel-cadence-event-v1', fleet=c.fleet_ref,
+    if result['active_transfer'] is not None:
+        need(not transfers, 'overlapping serial holding transfers')
+    event = dict(schema=event_schema, fleet=c.fleet_ref,
                  observer=c.sample_ref, result=result)
     key = hashlib.sha256(json.dumps(event, sort_keys=True).encode()).hexdigest()
     path = c.paths['out']/f'HOLDING185-{key}.json'
