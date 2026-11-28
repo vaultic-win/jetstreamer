@@ -107,6 +107,11 @@ FAILED_BOOTSTRAP_FLEET = "a73a1fdd37b149409a01762d9ac82024fc353681080d07646df05c
 RETRY_BOOKER_SEAL = "fa9e315142bf57e2aca0bd456444caae5921655b47d12c71095cf20919b704d3"
 RETRY_GATE_SHA = "c5656f1867ede9b8b33e12e890eae3ba97c572bcaf76d9b45b86aafd0b5cde63"
 RETRY_HISTORY = "retained_143_bootstrap_failure"
+HELD_FAILURE_HISTORY = "retained_143_unreleased_failure"
+HELD_FAILURE_IID = "c643e4e61d0f4b7eb59448824c86bc59"
+HELD_FAILURE_BOOKING = "8ea92dafc87a4279910eb160d41660badcf2edc2e57a8412c43e9bbbdc42bfed"
+V53_BOOKER_SEAL = "64ef98ccb5c3369e7b730d976983ccd9152e5f7caec9264f850092a3ca4f1c2e"
+RETRY_BOOKER_SEALS = {52: RETRY_BOOKER_SEAL, 53: V53_BOOKER_SEAL}
 
 
 def bootstrap_history(profile):
@@ -141,15 +146,19 @@ def bootstrap_history(profile):
 
 
 def retry_booking(booking, profile):
-    package = profile.base / "booking-price-v52"
-    seal = checked(dict(path=str(package / "deployment-seal-receipt.json"), sha256=RETRY_BOOKER_SEAL))
+    package = Path(booking["sealed_operator"]["path"]).parent
+    version = next((version for version in RETRY_BOOKER_SEALS
+                    if package == profile.base / f"booking-price-v{version}"), None)
+    need(version is not None, "unregistered epoch 143 retry booker")
+    seal = checked(dict(path=str(package / "deployment-seal-receipt.json"), sha256=RETRY_BOOKER_SEALS[version]))
     members = {member["name"]: member["sha256"] for member in seal["members"]}
     for field, name in (("sealed_operator", "launch-first-hourly143.sh"), ("sealed_price", "price_hourly143.py")):
         ref = dict(path=str(package / name), sha256=members[name])
         need(booking[field] == ref == bound(package / name), "143 retry changed its sealed booking member")
     writer_ref = booking["writer_active"]
-    writer_package = profile.base.parent / "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v52-entry146"
-    need(writer_ref["path"] == str(writer_package.parent / "FAILED166_CADENCE_V52_ACTIVE.json"),
+    writer_root = profile.base.parent / "survivor172-cadence-20261122-v1"
+    writer_package = writer_root / f"tools-cold168-retry5-failed166-v{version}-entry146"
+    need(writer_ref["path"] == str(writer_root / f"FAILED166_CADENCE_V{version}_ACTIVE.json"),
          "143 retry uses another cadence generation")
     active = checked(writer_ref)
     ready = checked(active["ready"])
@@ -157,6 +166,33 @@ def retry_booking(booking, profile):
          and active["new"]["program"] == str(writer_package / "status_cycle.py")
          and booking["sealed_reader"] == ready["hourly_reader"] == bound(writer_package / "first_hourly143.py"),
          "143 retry lost its exact reader or writer")
+    return version
+
+
+def v53_release(actor, booking, profile):
+    archive = profile.base / f"failed-{HELD_FAILURE_IID}"
+    history_ref = bound(archive / "RECONCILED.json")
+    history = checked(history_ref)
+    prior_booking = booking["replaces_expired_booking"]
+    need(history["schema"] == "horizon-epoch143-unreleased-gate-reconciled-v2"
+         and history["failed_invocation"] == HELD_FAILURE_IID != actor["producer_invocation_id"]
+         and history["expired_booking"] == prior_booking and prior_booking["sha256"] == HELD_FAILURE_BOOKING
+         and history["release_absent"] and not history["archive_created"] and not history["resource_credit_bytes"],
+         "epoch 143 lost the exact unreleased V52 attempt")
+    plan = checked(actor["guard_plan"])
+    post = checked(actor["post_guard_fit"])
+    sample = checked(post["candidate_guard_sample"])
+    floor = plan["minimum_free_bytes"]
+    need(post["fleet"] == booking["fleet"] and post["contract"] == profile.contract
+         and post["held_invocation"] == plan["invocation_id"] == sample["producer_invocation_id"] ==
+         actor["producer_invocation_id"]
+         and sample["plan_sha256"] == actor["guard_plan"]["sha256"]
+         and post["disk_fits"] and post["memory_fits"] and post["guard_floor_fits"]
+         and post["required_guard_floor_bytes"] <= floor == post["guard_floor_bytes"] == sample["minimum_free_bytes"]
+         and post["additional_home_charge_bytes"] == 0 and post["resource_credit_bytes"] == 0
+         and post["available_home_bytes"] >= max(floor, post["retained_required_home_bytes"])
+         + post["candidate_home_bytes"], "epoch 143 release lacks its fully charged guard floor")
+    return history_ref
 
 
 def corrected_gate(exe, actor, profile):
@@ -183,9 +219,9 @@ def live_actor(manager, actor, profile=EPOCH143):
         f"{profile.epoch} producer or hard limits changed",
     )
     exe = Path(f"/proc/{pid}/exe")
-    retry = profile.epoch == 143 and Path(checked(actor["booking"])["sealed_operator"]["path"]).parent == (
-        profile.base / "booking-price-v52"
-    )
+    retry = profile.epoch == 143 and Path(checked(actor["booking"])["sealed_operator"]["path"]).parent in {
+        profile.base / f"booking-price-v{version}" for version in RETRY_BOOKER_SEALS
+    }
     held = corrected_gate(exe, actor, profile) if retry else exe.samefile(profile.base / f"tools-v1/hold-{profile.epoch}")
     if held:
         return False
@@ -318,8 +354,13 @@ def observe(context, profile=EPOCH143):
                canonical_replay_claimed=False, archive_publication_authorized=False, resource_credit_bytes=0)
     if history is not None:
         need(actor["producer_invocation_id"] != FAILED_BOOTSTRAP_IID, "143 retry reused its failed invocation")
-        retry_booking(booking, profile)
+        version = retry_booking(booking, profile)
         row[RETRY_HISTORY] = history
+        if version == 53:
+            recovered = v53_release(actor, booking, profile)
+            need(not prior or prior.get(HELD_FAILURE_HISTORY, recovered) == recovered,
+                 "epoch 143 unreleased failure receipt changed")
+            row[HELD_FAILURE_HISTORY] = recovered
     if idle:
         need(
             manager["MainPID"] == "0" and not manager["Job"] and not process_ids(profile)
