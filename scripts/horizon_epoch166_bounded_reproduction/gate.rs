@@ -18,6 +18,7 @@ use std::{
     epoch143_second_hourly,
     epoch162_second_hourly,
     epoch162_third_hourly,
+    epoch162_fourth_hourly,
     epoch169_following_hourly
 )))]
 mod route {
@@ -68,6 +69,16 @@ mod route {
     pub(super) const SNAPSHOT: &str =
         "snapshot-69998119-Cmbv2avQ6y6D56iiii81s5Yk7tTBtPnH13G6di6DTCrd.tar.zst";
     pub(super) const TERMINAL_SLOT: u64 = 70_004_937;
+}
+#[cfg(epoch162_fourth_hourly)]
+mod route {
+    pub(super) const EPOCH: u64 = 162;
+    pub(super) const UNIT: &str = "horizon-qualify-162-fourth-replay-20261128-v1.service";
+    pub(super) const ALIAS: &str = "/run/horizon-162-fourth-replay-v1";
+    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch162-fourth-replay-20261128-v1";
+    pub(super) const SNAPSHOT: &str =
+        "snapshot-70004937-BVgorPzTqjU93J25eC7AxY4H16eC16mVeUdKPS191vBj.tar.zst";
+    pub(super) const TERMINAL_SLOT: u64 = 70_011_988;
 }
 #[cfg(epoch169_following_hourly)]
 mod route {
@@ -255,9 +266,9 @@ compile_error!("the post-floor epoch 170 hourly run requires its own continuatio
 ))]
 compile_error!("each hourly epoch 170 checkpoint requires its dedicated continuation profile");
 use route::*;
-#[cfg(not(any(epoch170_suffix, epoch170_continuation, epoch162_second_hourly, epoch162_third_hourly, epoch169_following_hourly)))]
+#[cfg(not(any(epoch170_suffix, epoch170_continuation, epoch162_second_hourly, epoch162_third_hourly, epoch162_fourth_hourly, epoch169_following_hourly)))]
 const RELEASE_TIMEOUT: Duration = Duration::from_secs(180);
-#[cfg(any(epoch170_suffix, epoch170_continuation, epoch162_second_hourly, epoch162_third_hourly, epoch169_following_hourly))]
+#[cfg(any(epoch170_suffix, epoch170_continuation, epoch162_second_hourly, epoch162_third_hourly, epoch162_fourth_hourly, epoch169_following_hourly))]
 const RELEASE_TIMEOUT: Duration = Duration::from_secs(600);
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(60);
 
@@ -548,6 +559,13 @@ mod tests {
             assert_eq!(args[3], "--snapshot-archive=/run/horizon-162-third-replay-v1/snapshot-69998119-Cmbv2avQ6y6D56iiii81s5Yk7tTBtPnH13G6di6DTCrd.tar.zst");
             assert_eq!(args[4], format!("--epoch-hashes={ALIAS}/canonical-hashes.txt"));
         }
+        #[cfg(epoch162_fourth_hourly)]
+        {
+            assert_eq!(args[0], "162");
+            assert_eq!(args[7], "--qualification-end-slot=70011988");
+            assert_eq!(args[3], "--snapshot-archive=/run/horizon-162-fourth-replay-v1/snapshot-70004937-BVgorPzTqjU93J25eC7AxY4H16eC16mVeUdKPS191vBj.tar.zst");
+            assert_eq!(args[4], format!("--epoch-hashes={ALIAS}/canonical-hashes.txt"));
+        }
         #[cfg(epoch169_following_hourly)]
         {
             assert_eq!(args[0], "169");
@@ -655,6 +673,7 @@ mod tests {
             epoch143_first_hourly,
             epoch162_second_hourly,
             epoch162_third_hourly,
+            epoch162_fourth_hourly,
             epoch169_following_hourly
         )))]
         assert_eq!(
