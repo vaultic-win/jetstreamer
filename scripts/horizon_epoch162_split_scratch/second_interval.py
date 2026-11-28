@@ -18,7 +18,9 @@ INPUT = HOME / "epoch162-second-hourly-20261128-v1"
 OLD_ALIAS = "/run/horizon-162-first-hourly-completion-v2"
 ALIAS = "/run/horizon-162-second-replay-v1"
 GATE = BASE / "static/hold-162-second"
-GATE_HASH = "2730bad2bc717006d36c5d5337cc9aabe6b40467fb04fa44163a80d80137e878"
+GATE_HASH = "1e139ba412b6c4624012ac30bf6f7e59629244f729ef5d863df19e0d3f3168b6"
+GATE_REV = "f7e904bb5ae7cef7271bf31a5289e11b75e9be16"
+GATE_SRC = "993cc6908f89d7970cbea3ad63e204d25146c8bdf2d66a29046db497ac322e42"
 GUARD = OLD / "static/guard"
 GUARD_SHA = "5be30fba437e03fc26f009247714986dfdc6670426650532b5ec166d67fc9183"
 TERMINAL_SHA = "445b05009592b381506701162673494fe3d6deb3851a33adade0f4e44d6a64ad"
@@ -206,7 +208,11 @@ def prepare(gate,commit):
     git=["/usr/bin/git","-c","safe.directory="+str(checkout),"-C",str(checkout)]
     remote=subprocess.check_output([*git,"rev-parse","origin/account-updates"],text=True).strip()
     subprocess.run([*git,"merge-base","--is-ancestor",commit,remote],check=True)
-    files=[HERE/"second_interval.py",HERE/"second_price.py",HERE/"second_wire.py",HERE.parent/"horizon_epoch166_bounded_reproduction/gate.rs"]
+    files=[HERE/"second_interval.py",HERE/"second_price.py",HERE/"second_wire.py"]
+    gate_src="scripts/horizon_epoch166_bounded_reproduction/gate.rs"
+    subprocess.run([*git,"merge-base","--is-ancestor",GATE_REV,commit],check=True)
+    need(hashlib.sha256(subprocess.check_output([*git,"show",GATE_REV+":"+gate_src])).hexdigest()==GATE_SRC,
+         "different compiled gate source")
     for p in files:
         tracked=subprocess.check_output([*git,"show",commit+":"+str(p.relative_to(checkout))])
         need(tracked==p.read_bytes(),"unpublished source "+str(p))
@@ -240,7 +246,8 @@ def prepare(gate,commit):
     origin=stage/"ORIGIN.json"
     observed=remote if not origin.exists() else json.loads(origin.read_bytes())["observed_remote"]
     subprocess.run([*git,"merge-base","--is-ancestor",commit,observed],check=True)
-    save(origin,dict(commit=commit,observed_remote=observed,first_terminal=reference(TERMINAL),scope=sr,
+    save(origin,dict(commit=commit,observed_remote=observed,gate_commit=GATE_REV,gate_source_sha256=GATE_SRC,
+                     first_terminal=reference(TERMINAL),scope=sr,
                      original_operator=reference(OLD/"issued-split-v1/deployment-seal-receipt.json"),
                      merged_inputs={str(p.relative_to(checkout)):digest(p) for p in files}))
     dest[origin.name]=origin
