@@ -115,7 +115,7 @@ def checked_roster(booking, *, held=None):
 
 def enrollment(booking):
     fleet = read(booking["fleet"], writable_state=True)
-    writer = read(booking["writer"])
+    writer = read(booking["writer"], writable_state=True)
     ready = read(writer["ready"])
     native = writer["new"]
     manager = props(native["unit"], "ActiveState", "MainPID", "InvocationID", "Job")
@@ -148,7 +148,7 @@ def native_args(contract, plan, digest, booking):
 
 
 def make_booking(contract_ref, contract, writer_ref, price_seal):
-    writer = read(writer_ref)
+    writer = read(writer_ref, writable_state=True)
     ready = read(writer["ready"])
     head = max(RT.glob("root*/ROOT_COMPLETE_OPERATIONAL_FLEET.json"), key=lambda p: p.stat().st_mtime_ns)
     fleet_ref = ref(head)
