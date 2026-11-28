@@ -31,3 +31,7 @@ path = "following_checkpoints.rs"
 [[bin]]
 name = "gap-checkpoints"
 path = "gap_checkpoints.rs"
+
+[[bin]]
+name = "ram-third-gap-checkpoints"
+path = "ram_third_gap_checkpoints.rs"
