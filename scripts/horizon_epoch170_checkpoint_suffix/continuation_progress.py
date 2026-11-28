@@ -12,12 +12,16 @@ import time
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73746882-20261127-v1")
 RETRY_ROOT = ROOT/"attempt-2"
 FOLLOWING_ROOT = ROOT.parent/"epoch170-from-73766969-20261127-v1"
+GAP_ROOT = ROOT.parent/"epoch170-from-73760367-20261128-v1"
 RETRY = Path(__file__).resolve().parent in (RETRY_ROOT/"progress-v1", RETRY_ROOT/"progress-v2", RETRY_ROOT/"progress-v3")
 if RETRY:
     ROOT = RETRY_ROOT
+elif Path(__file__).resolve().parent == GAP_ROOT/"progress-v1":
+    ROOT = GAP_ROOT
 elif Path(__file__).resolve().parent in (FOLLOWING_ROOT/"progress-v1", FOLLOWING_ROOT/"progress-v2", FOLLOWING_ROOT/"progress-v3", FOLLOWING_ROOT/"progress-v4", FOLLOWING_ROOT/"progress-v5"):
     ROOT = FOLLOWING_ROOT
 WRAPPERS = {
+    GAP_ROOT/"progress-v1": ("operator-v1", "7b5b4ea18425c1fc1ca510f83a3571805c52268e0e909167a6380f2ea0c53718"),
     FOLLOWING_ROOT/"progress-v5": ("operator-v5", "050361ba7d4b62135951451ec4b3d3a1960e5e3e1c04288bd64865c3775814d4"),
     FOLLOWING_ROOT/"progress-v4": ("operator-v4", "171dee2e56a5d1c3925f5c6b1fd4c4f52101f78757a9fca293afa9cfb2e47d5f"),
     FOLLOWING_ROOT/"progress-v3": ("operator-v3", "86a99a635bc917af6f8832112bcedb5bedb12a5b13b6ba7fc3176537f81dd032"),
@@ -102,6 +106,8 @@ def follow(dispatch):
     require(release["actor"] == actor_ref and release["interface"] == scope_ref
             and release["producer_invocation_id"] == iid and Path(scope["barrier"]).read_text() == iid
             and not release["archive_publication_authorized"], "unconfirmed successor release")
+    if ROOT == GAP_ROOT:
+        require(release["independent_checkpoint"] == q.compare_predecessor(), "different independent gap checkpoint")
     dest = ROOT/"FIRST_PROTECTED_PROGRESS.json"
     if dest.exists():
         existing, ref = q.read(dest)
@@ -148,7 +154,8 @@ def follow(dispatch):
 
 
 def main():
-    require(sys.argv[1:] in (["check"], ["advance"]), "expected check or advance")
+    observe = ROOT == GAP_ROOT and sys.argv[1:] == ["observe"]
+    require(observe or sys.argv[1:] in (["check"], ["advance"]), "unknown progress command")
     original = OPERATOR/"continuation_dispatch.py"
     require(hashlib.sha256(original.read_bytes()).hexdigest() == EXPECTED_DISPATCH, "dispatcher changed")
     sys.path.insert(0, str(OPERATOR))
@@ -156,7 +163,8 @@ def main():
     if sys.argv[1] == "check":
         print(json.dumps(dispatch.dispatch("check")), flush=True)
         return
-    dispatch.main()
+    if not observe:
+        dispatch.main()
     print(json.dumps(follow(dispatch)), flush=True)
 
 
