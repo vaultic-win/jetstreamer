@@ -7,11 +7,22 @@ from evidence import bound, checked, need
 import hourly143_status
 import second_hourly143 as second
 from transition import clock
-from transition_v62 import native_assignments
+from transition_v62 import native_assignments as incumbent_assignments
 
 
 V62_SHA = "be7681e7d92c6617147239e3e534ab008341599e198c1183cbe4f007802fc3cb"
 V62_SEAL = "7901076dbe284118014b0d37483368fc5c8b50bc340c8bc181cc33a9f4dcaf99"
+
+
+def native_assignments(fleet):
+    active, closed = incumbent_assignments(fleet)
+    first = fleet[hourly143_status.PROFILE.field]
+    second.check_prefix(first)
+    unit, invocation = hourly143_status.PROFILE.unit, first["actor"]["producer_invocation_id"]
+    need(unit not in active and closed.get(unit, invocation) == invocation,
+         "epoch 143 predecessor changed native ownership")
+    closed[unit] = invocation
+    return active, closed
 
 
 def ready(api, head, seal):
