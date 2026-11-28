@@ -246,7 +246,7 @@ fn successor_230_intake() -> Result<Bound> {
             && bootstrap["bucket"] == "mainnet-beta-ledger-europe-fr2"
             && bootstrap["name"] == "99359376/hourly/snapshot-99516304-CCpNXjpMvVkXW2xNzBHSfNSRc8efttNr3bB3ejex4Q8u.tar.zst"
             && bootstrap["generation"] == "1633495975217451"
-            && bootstrap["size"].as_str().and_then(|size| size.parse().ok()) == Some(SUCCESSOR_230_BYTES)
+            && bootstrap["size"] == SUCCESSOR_230_BYTES
             && bootstrap["crc32c_hash"] == "O2WeJw=="
             && bootstrap["md5_hash"] == "UVcwfYXNlTpu7RU9Ok6cOA=="
             && bootstrap["etag"] == "CKuS4dr+tPMCEAE="
