@@ -229,7 +229,7 @@ fn count(text: &str, label: &str) -> Result<u64> {
     Ok(cleaned.parse()?)
 }
 
-fn validate_semantics(
+pub(crate) fn validate_semantics(
     a: &Value,
     s: &Inputs,
     full: &str,
