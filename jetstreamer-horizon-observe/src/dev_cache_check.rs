@@ -61,7 +61,7 @@ fn cache_target(schema: &str) -> Result<&'static Path> {
         "jetstreamer-horizon-selected225-dev-cache-check-plan-v1" => {
             Ok(Path::new(SELECTED225_TARGET))
         }
-        _ => anyhow::bail!("unsupported fixed cache profile"),
+        _ => ubuntu_disposable::private_target(schema).context("unsupported fixed cache profile"),
     }
 }
 #[derive(Deserialize)]
@@ -116,6 +116,7 @@ fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
         p.retirement.is_none()
             || cache_target(&p.schema)? == Path::new(SELECTED225_TARGET)
+            || ubuntu_disposable::private_target(&p.schema).is_some()
             || matches!(
                 p.schema.as_str(),
                 SOL_PROFILE
@@ -575,7 +576,7 @@ pub fn run() -> Result<()> {
     };
     let p: Plan = serde_json::from_value(bound_json(&pb)?)?;
     validate_plan(&p)?;
-    if matches!(
+    if ubuntu_disposable::private_target(&p.schema).is_some() || matches!(
         p.schema.as_str(),
         ubuntu_disposable::RELEASE_PROFILE
             | ubuntu_disposable::INCREMENTAL_PROFILE

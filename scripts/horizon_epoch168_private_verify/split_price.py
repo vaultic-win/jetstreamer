@@ -4,6 +4,7 @@ from hashlib import file_digest, sha256
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import stat
 import time
@@ -11,8 +12,9 @@ import time
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT = RT / "epoch168-exact-private-verification-20261127-v1"
 ORIGINAL = ROOT / "tools-v1"
-SOURCE = ROOT / "split-price-v4"
+SOURCE = Path(__file__).resolve().parent
 ISSUER = RT / "epoch162-first-hourly-completion-20261127-v2"
+HANDBACK_SHA = "0ebd0d52c3d109a5c1b7a5c170828ab60b6e9f56f80c79601e34231769f3e0c4"
 DONOR = {"path":str(ISSUER/"SPLIT_AND_166_WATCHERS_1795819276953592886.json"),
          "sha256":"64aa76de4fb179a650488d3d53c05050aff7b4fa97ef60c61d3726e42545133c"}
 OPERATION = Path("/run/horizon-epoch171-to136-g1.operation.lock")
@@ -191,7 +193,8 @@ def controller():
 
 
 def price(fixture=False):
-    need(not fixture and os.geteuid() == 0 and __debug__ and Path(__file__).resolve().parent == SOURCE,
+    need(not fixture and os.geteuid() == 0 and __debug__ and SOURCE.parent == ROOT
+         and re.fullmatch(r"split-price-v[1-9][0-9]*", SOURCE.name),
          "use the issued private post-assembly price")
     entry = runpy.run_path(str(SOURCE/"dispatch.py"))
     registration = entry["load_published_pricing"]()
@@ -213,9 +216,12 @@ def price(fixture=False):
     unit = controller()
     own_locks()
     enrolled = entry["checked"](registration["issuer_enrollment"])
+    issuer = Path(enrolled["capacity"]["path"])
     need(enrolled["capacity"] == registration["shared_price"]["entry"] and enrolled["donor"] == DONOR
-         and enrolled["capacity"]["path"] == str(ISSUER/"issued-price-v4/capacity.py"),
+         and issuer.parent.parent == ISSUER and issuer.name == "capacity.py"
+         and registration["issuer_handback"] == dict(path=str(issuer.with_name("scan_handback.py")),sha256=HANDBACK_SHA),
          "162 is not enrolled on the unborrowed shared price")
+    checked(issuer.with_name("scan_handback.py"),HANDBACK_SHA)
     before = old["slice_admission"](api)
     start = time.monotonic()
     result = quote()
@@ -245,6 +251,7 @@ def price(fixture=False):
                 price_registration=entry["ref"](entry["pricing_registration"]()),
                 before=before,after=after,original_deployment=registration["original_deployment"],
                 phase=phase,donor_lineage=ancestry,issuer_enrollment=registration["issuer_enrollment"],
+                issuer_handback=registration["issuer_handback"],
                 resource_credit_bytes=0,home_margin=phase["home_margin"],ram_margin=phase["ram_margin"]-ENTRY_RAM,
                 guard_floor=phase["guard_floor"],
                 entry_controller=unit,entry_controller_ram=ENTRY_RAM,entry_controller_cpu_micros=250_000,

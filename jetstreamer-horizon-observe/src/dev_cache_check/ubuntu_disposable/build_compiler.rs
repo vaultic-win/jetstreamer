@@ -15,6 +15,10 @@ fn expected(policy_root: &Path, relative: &Path) -> Option<&'static str> {
             "librocksdb-sys-a545a441747427e1/out/bfe5d317b023d6cf-checkpoint_impl.o"
             | "librocksdb-sys-a53c016568a6018c/out/bfe5d317b023d6cf-checkpoint_impl.o",
         ) => Some("e6bf6a5539b644378595cd72bb03c103d485419bb753c44f8441448f58ac4d65"),
+        (
+            DEMOTION_NODE_RELEASE_BUILD | HOLDING_RELEASE_BUILD,
+            "librocksdb-sys-a53c016568a6018c/out/bfe5d317b023d6cf-checkpoint_impl.o",
+        ) => Some("e6bf6a5539b644378595cd72bb03c103d485419bb753c44f8441448f58ac4d65"),
         _ => None,
     }
 }
@@ -65,6 +69,19 @@ mod tests {
         assert!(expected(Path::new(DEMOTION_DEBUG_DEPS), relative).is_none());
         assert!(expected(Path::new(RELEASE_BUILD), relative).is_none());
         assert!(expected(Path::new(RELEASE_DEPS), relative).is_none());
+        let release_object =
+            Path::new("librocksdb-sys-a53c016568a6018c/out/bfe5d317b023d6cf-checkpoint_impl.o");
+        let other_release_object =
+            Path::new("librocksdb-sys-a545a441747427e1/out/bfe5d317b023d6cf-checkpoint_impl.o");
+        for root in [DEMOTION_NODE_RELEASE_BUILD, HOLDING_RELEASE_BUILD] {
+            assert_eq!(
+                expected(Path::new(root), release_object),
+                expected(Path::new(RELEASE_BUILD), release_object)
+            );
+            assert!(expected(Path::new(root), release_object).is_some());
+            assert!(expected(Path::new(root), other_release_object).is_none());
+            assert!(expected(Path::new(root), relative).is_none());
+        }
         for name in [
             "checkpoint_impl.o",
             "snapshot-42.tar.zst",

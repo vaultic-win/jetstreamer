@@ -28,6 +28,75 @@ pub(super) const DEMOTION_DEBUG_DEPS: &str =
 const DEMOTION_DEBUG: &str =
     "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/debug";
 const DEMOTION_SOURCE: &str = "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1";
+const DEMOTION_NODE_RELEASE_BUILD: &str =
+    "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/release/build";
+const HOLDING_RELEASE_BUILD: &str = "/home/ubuntu/.jetstreamer-private/epoch229-encrypted-custody-build.rLb9yS/target/release/build";
+
+struct PrivateCache {
+    schema: &'static str,
+    target: &'static str,
+    reference_scope: &'static str,
+    source: &'static str,
+}
+
+const PRIVATE_CACHES: &[PrivateCache] = &[
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch230-demotion-debug-incremental-cache-plan-v1",
+        target: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/debug/incremental",
+        reference_scope: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/debug/incremental",
+        source: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1",
+    },
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch230-demotion-node-release-deps-cache-plan-v1",
+        target: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/release/deps",
+        reference_scope: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/release",
+        source: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1",
+    },
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch230-demotion-node-release-build-cache-plan-v1",
+        target: DEMOTION_NODE_RELEASE_BUILD,
+        reference_scope: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/release",
+        source: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1",
+    },
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch230-demotion-worker-release-deps-cache-plan-v1",
+        target: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1-target/release/deps",
+        reference_scope: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1-target/release",
+        source: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1",
+    },
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch230-demotion-worker-release-build-cache-plan-v1",
+        target: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1-target/release/build",
+        reference_scope: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1-target/release",
+        source: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1",
+    },
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch229-holding-release-deps-cache-plan-v1",
+        target: "/home/ubuntu/.jetstreamer-private/epoch229-encrypted-custody-build.rLb9yS/target/release/deps",
+        reference_scope: "/home/ubuntu/.jetstreamer-private/epoch229-encrypted-custody-build.rLb9yS/target/release",
+        source: "/home/ubuntu/.jetstreamer-private/epoch229-encrypted-custody-source",
+    },
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch229-holding-release-build-cache-plan-v1",
+        target: HOLDING_RELEASE_BUILD,
+        reference_scope: "/home/ubuntu/.jetstreamer-private/epoch229-encrypted-custody-build.rLb9yS/target/release",
+        source: "/home/ubuntu/.jetstreamer-private/epoch229-encrypted-custody-source",
+    },
+];
+
+pub(super) fn private_target(schema: &str) -> Option<&'static Path> {
+    PRIVATE_CACHES
+        .iter()
+        .find(|profile| profile.schema == schema)
+        .map(|profile| Path::new(profile.target))
+}
+
+fn private_cache(path: &Path) -> Option<&'static PrivateCache> {
+    PRIVATE_CACHES
+        .iter()
+        .find(|profile| Path::new(profile.target) == path)
+}
+
 const LEDGER_SCHEMA: &str = "jetstreamer-horizon-ubuntu-disposable-cache-check-v2";
 const LEDGER_BOUND: u64 = 256 << 20;
 
@@ -39,7 +108,7 @@ fn target(profile: &str) -> Result<&'static Path> {
         RELEASE_BUILD_PROFILE => Ok(Path::new(RELEASE_BUILD)),
         DEMOTION_DEBUG_BUILD_PROFILE => Ok(Path::new(DEMOTION_DEBUG_BUILD)),
         DEMOTION_DEBUG_DEPS_PROFILE => Ok(Path::new(DEMOTION_DEBUG_DEPS)),
-        _ => anyhow::bail!("not a closed Ubuntu disposable cache profile"),
+        _ => private_target(profile).context("not a closed Ubuntu disposable cache profile"),
     }
 }
 pub(super) fn reference_scope_for_target(t: &Path) -> Option<&'static Path> {
@@ -52,7 +121,7 @@ pub(super) fn reference_scope_for_target(t: &Path) -> Option<&'static Path> {
     } else if is_demotion_cache(t) {
         Some(Path::new(DEMOTION_DEBUG))
     } else {
-        None
+        private_cache(t).map(|profile| Path::new(profile.reference_scope))
     }
 }
 fn is_demotion_cache(t: &Path) -> bool {
@@ -87,7 +156,7 @@ fn source(p: &Plan) -> Result<()> {
     let repo = if is_demotion_cache(t) {
         DEMOTION_SOURCE
     } else {
-        REPO
+        private_cache(t).map_or(REPO, |profile| profile.source)
     };
     ensure!(
         git(repo, &["rev-parse", "HEAD"])? == format!("{}\n", p.source_commit).as_bytes()
@@ -98,10 +167,10 @@ fn source(p: &Plan) -> Result<()> {
         hash_file(&Path::new(repo).join("Cargo.lock"), 16 << 20)?.0 == p.cargo_lock_sha256,
         "cache source Cargo.lock changed"
     );
-    if is_demotion_cache(t) {
+    if repo != REPO {
         ensure!(
             !t.starts_with(repo) && !Path::new(repo).starts_with(t),
-            "demotion build cache overlaps its source checkout"
+            "private build cache overlaps its source checkout"
         );
         return Ok(());
     }
@@ -325,7 +394,7 @@ fn checks(p: &Plan, t: &Path) -> Result<Value> {
         Path::new("/home/ubuntu/.config/systemd/user"),
     ];
     let mut missing = Vec::new();
-    let staged = if is_demotion_cache(t) {
+    let staged = if is_demotion_cache(t) || private_cache(t).is_some() {
         staged_references_exact(&roots, scope, &mut missing, &BTreeSet::new())?
     } else {
         staged_references(&roots, t, &mut missing)?
@@ -807,6 +876,25 @@ mod tests {
         );
         assert!(subset(&manifest(d.path()).unwrap(), &before).is_err());
     }
+    #[test]
+    fn private_cache_profiles_keep_configuration_outside_deletion_subtrees() {
+        for profile in PRIVATE_CACHES {
+            let path = Path::new(profile.target);
+            validate_plan(&plan(profile.schema)).unwrap();
+            assert_eq!(target(profile.schema).unwrap(), path);
+            assert_eq!(
+                reference_scope_for_target(path),
+                Some(Path::new(profile.reference_scope))
+            );
+            assert!(!path.starts_with(profile.source));
+            assert!(matches!(
+                path.file_name().and_then(|s| s.to_str()),
+                Some("deps" | "build" | "incremental")
+            ));
+        }
+        assert!(private_target("jetstreamer-horizon-epoch230-arbitrary-cache-plan-v1").is_none());
+    }
+
     #[test]
     fn links_and_directory_changes_never_hide_archive_or_lock_files() {
         if unsafe { libc::geteuid() } != 1000 {
