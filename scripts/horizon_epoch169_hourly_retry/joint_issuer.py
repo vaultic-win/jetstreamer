@@ -77,7 +77,7 @@ def jointly_funded(owner, scope, ref, *, preliminary=False):
            and new169["original_169_guard_retained"] and new169["original_170_guard_cpu_retained"]
            and new170["previous_stop"]["iid"]==quote.GAP_IID and new170["original_guard_still_budgeted"]
            and new170["original_home_growth"]==36*c.G and new170["home_growth"]==8*c.G
-           and new170["producer_memory_max"]==60*c.G and new170["scratch_tmpfs"]==40*c.G and new170["extra_ram"]==12*c.G
+           and new170["producer_memory_max"]==56*c.G and new170["scratch_tmpfs"]==40*c.G and new170["extra_ram"]==8*c.G
            and transfer["retained_159_ram"]==48*c.G and transfer["retained_guard_ram"]==c.GUARD_RAM
            and transfer["retained_169_output_bytes"]==8*c.G and native["independent_gap_funding"]["cpu_donor"]==loan["scope"]
            and "independent_retry169" in native and native["ram_gap170"] is None
