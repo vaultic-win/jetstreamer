@@ -37,6 +37,7 @@ mod retained_memory_parent;
 mod rss;
 mod singleton247_finalization;
 mod singleton247_phase;
+mod split_scratch162;
 const OUTPUT_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-v2";
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 const MAX_PREVIOUS_SAMPLE_BYTES: u64 = 4 * 1024 * 1024;
@@ -288,6 +289,8 @@ struct ReplayObservation {
     worker_before: WorkerObservation,
     scratch_path: PathBuf,
     scratch_measurement_method: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    producer_namespace_scratch: Option<split_scratch162::View>,
     scratch_pass_1: ScratchScan,
     scratch_pass_2: ScratchScan,
     conservative_observed_physical_bytes: u64,
@@ -538,6 +541,12 @@ fn validate_replay_configs(
     ensure!(
         replays.iter().all(|r| r.private_archive223.is_none()),
         "private archive parent telemetry is diagnostic only"
+    );
+    ensure!(
+        replays
+            .iter()
+            .all(|r| r.producer_unit != split_scratch162::UNIT),
+        "split 162 telemetry is diagnostic only"
     );
     let mut ranges = std::collections::BTreeSet::new();
     let mut intervals = Vec::new();
@@ -1798,8 +1807,13 @@ fn observe_replay_for_role(
         observe_worker(&replay.scratch_path, &replay.worker_executable_basename)?
     };
     let output_before = prefix_output204205::begin(replay);
-    let scratch_pass_1 = scan_scratch(&replay.scratch_path)?;
-    let scratch_pass_2 = scan_scratch(&replay.scratch_path)?;
+    let producer_namespace_scratch =
+        split_scratch162::capture(replay, &producer_before, &worker_before)?;
+    let scan_path = producer_namespace_scratch
+        .as_ref()
+        .map_or(&replay.scratch_path, |view| &view.path);
+    let scratch_pass_1 = scan_scratch(scan_path)?;
+    let scratch_pass_2 = scan_scratch(scan_path)?;
     let output_after = prefix_output204205::second(&output_before);
     let controller_after = observe_unit_for_role(
         &replay.controller_unit,
@@ -1816,6 +1830,11 @@ fn observe_replay_for_role(
     } else {
         observe_worker(&replay.scratch_path, &replay.worker_executable_basename)?
     };
+    ensure!(
+        producer_namespace_scratch
+            == split_scratch162::capture(replay, &producer_after, &worker_after)?,
+        "producer namespace scratch changed during observation"
+    );
     let producer_cgroup_counter_delta = counter_deltas(
         &producer_before.cgroup.counters,
         &producer_after.cgroup.counters,
@@ -1875,6 +1894,7 @@ fn observe_replay_for_role(
         worker_before,
         scratch_path: replay.scratch_path.clone(),
         scratch_measurement_method: "two race-tolerant non-symlink-following physical-block scans",
+        producer_namespace_scratch,
         scratch_pass_1,
         scratch_pass_2,
         conservative_observed_physical_bytes,
