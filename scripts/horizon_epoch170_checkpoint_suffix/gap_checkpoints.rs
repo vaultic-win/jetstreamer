@@ -5,6 +5,7 @@ mod bounded_report;
 mod bridge_exit;
 #[allow(dead_code)]
 mod evidence;
+mod gap_floor_stop;
 mod segment_evidence;
 
 use anyhow::{Context, Result, ensure};
@@ -112,5 +113,9 @@ fn retained_checkpoint(release: &Value) -> Result<(Value, Value)> {
 }
 
 fn main() -> Result<()> {
+    if std::env::args().skip(1).eq(["floor-stop"]) {
+        println!("{}", gap_floor_stop::report()?);
+        return Ok(());
+    }
     bounded_report::run(retained_checkpoint)
 }

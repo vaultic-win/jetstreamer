@@ -123,11 +123,17 @@ mod route {
 #[cfg(all(epoch170_continuation, epoch170_from_73760367))]
 mod route {
     pub(super) const EPOCH: u64 = 170;
+    #[cfg(not(epoch170_gap_ram_retry))]
     pub(super) const UNIT: &str = "horizon-qualify-170-from-73760367-20261128-v1.service";
+    #[cfg(epoch170_gap_ram_retry)]
+    pub(super) const UNIT: &str = "horizon-qualify-170-from-73760367-ram-20261128-v1.service";
     pub(super) const ALIAS: &str = "/run/horizon-170-from-73760367-v1";
     pub(super) const SNAPSHOT: &str =
         "snapshot-73760367-7gcF7iqN9FvU2JrCkdqX7DmeV1X1AvZaGYoJjrLkCrsF.tar.zst";
+    #[cfg(not(epoch170_gap_ram_retry))]
     pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73760367-to-73766969-v1";
+    #[cfg(epoch170_gap_ram_retry)]
+    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73760367-to-73766969-ram-v1";
     pub(super) const TERMINAL_SLOT: u64 = 73_766_969;
 }
 #[cfg(all(epoch170_continuation, epoch170_from_73766969))]
@@ -514,8 +520,16 @@ mod tests {
                 args[4],
                 "--epoch-hashes=/run/horizon-170-from-73760367-v1/canonical-hashes.txt"
             );
+            #[cfg(not(epoch170_gap_ram_retry))]
             assert!(
                 args[5].ends_with("/from-73760367-to-73766969-v1/ledger/epoch-170.diagnostic.jet")
+            );
+            #[cfg(epoch170_gap_ram_retry)]
+            assert!(
+                UNIT.contains("-73760367-ram-")
+                    && args[5].ends_with(
+                        "/from-73760367-to-73766969-ram-v1/ledger/epoch-170.diagnostic.jet"
+                    )
             );
             assert_eq!(args[7], "--qualification-end-slot=73766969");
         }
@@ -523,9 +537,15 @@ mod tests {
         {
             assert_eq!(EPOCH, 170);
             #[cfg(epoch170_after_checkpoint_gap)]
-            assert_eq!(UNIT, "horizon-qualify-170-from-73766969-gap-20261128-v1.service");
+            assert_eq!(
+                UNIT,
+                "horizon-qualify-170-from-73766969-gap-20261128-v1.service"
+            );
             #[cfg(not(epoch170_after_checkpoint_gap))]
-            assert_eq!(UNIT, "horizon-qualify-170-from-73766969-20261127-v1.service");
+            assert_eq!(
+                UNIT,
+                "horizon-qualify-170-from-73766969-20261127-v1.service"
+            );
             assert!(args[3].starts_with(
                 "--snapshot-archive=/run/horizon-170-from-73766969-v1/snapshot-73766969-"
             ));
