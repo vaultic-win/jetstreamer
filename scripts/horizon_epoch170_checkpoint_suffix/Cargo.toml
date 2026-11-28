@@ -35,3 +35,7 @@ path = "gap_checkpoints.rs"
 [[bin]]
 name = "ram-third-gap-checkpoints"
 path = "ram_third_gap_checkpoints.rs"
+
+[[bin]]
+name = "after-floor-hourly-checkpoints"
+path = "after_floor_hourly_checkpoints.rs"
