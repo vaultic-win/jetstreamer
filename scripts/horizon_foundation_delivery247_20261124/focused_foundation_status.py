@@ -53,6 +53,55 @@ if FIRST_7871_STATUS.is_file():
     CHECKPOINT_STATUS[230] = FIRST_7871_STATUS
 
 
+def closed_retry_230_comparison(intent):
+    terminal_ref = {
+        "path": str(RETRY_NEXT_V1627_REGISTRATION.parent / "terminal.json"),
+        "sha256": "5655121e77fdff95edf304705d035afc14cc12f598272af89e2e694f2f0c1cf0",
+    }
+    playback_ref = {
+        "path": str(V / "horizon230-next-v1627-retry-poh-readback-v2/receipt.json"),
+        "sha256": "7727bef43c33a7fa144e6b90100313fdc49ee7a8ecbdcf8a88d16842329ce56e",
+    }
+    closed = bound(terminal_ref)
+    launch = bound(closed["launch"])
+    native = bound(closed["native_terminal"])
+    playback = bound(playback_ref)
+    slots = (99468090, 99476782, 8693)
+    assert closed["schema"] == "foundation-epoch230-next-v1627-retry-drain-v2"
+    assert closed["guard_drained"] and closed["state"] == "local-segment-committed"
+    assert closed["publication_authorized"] is False
+    assert intent["owner"]["Id"] == launch["unit"] == closed["unit"] == RETRY_NEXT_V1627_UNIT
+    assert intent["owner"]["InvocationID"] == launch["invocation_id"] == closed["invocation_id"]
+    assert closed["launch"] in intent["evidence"] and native["launch"] == closed["launch"]
+    assert native["producer_exit_status"] == 0 and native["producer_drained"]
+    assert native["native_manifest_complete_verified"] and native["adjacent_checkpoints"]["consensus_fields_match"]
+    assert (native["first_slot"], native["last_slot"], native["slot_count"]) == slots
+    assert playback["schema"] == "foundation-epoch230-next-v1627-retry-poh-readback-v2"
+    assert playback["native_terminal"] == closed["native_terminal"]
+    assert playback["all_positions_read"] and playback["full_poh_verified"]
+    assert playback["adjacent_consensus_fields_match"] and playback["publication_authorized"] is False
+    assert (playback["first_slot"], playback["last_slot"], playback["slots"]) == slots
+    assert playback["archive_sha256"] == native["archive"]["sha256"]
+    assert playback["terminal_blockhash"] == native["terminal_checkpoint"]["last_blockhash"]
+    manager = bound(closed["pid1_exit"])["properties"]
+    assert (manager["ExecMainCode"], manager["ExecMainStatus"], manager["Result"]) == ("1", "0", "success")
+    runtime = int(manager["ExecMainExitTimestampMonotonic"]) - int(manager["ExecMainStartTimestampMonotonic"])
+    assert runtime > 0
+    forecast = intent["forecast"]
+    first, last = forecast["remaining_slot_range"]
+    retained = forecast["completed_window_positions"]
+    assert (first, last, retained, forecast["window_positions_credited"]) == (99437434, 99791404, 70178, 0)
+    remaining = last - first + 1 - retained - slots[2]
+    seconds = (math.ceil(remaining / forecast["replay_slots_per_sec"])
+               + forecast["repair_and_turnover_seconds"] + forecast["delivery_seconds"])
+    preparation = dict(phase="verification", jet_size_bytes=native["archive"]["identity"]["bytes"],
+                       elapsed_execution_millis=runtime // 1000, estimated_remaining_millis=seconds * 1000)
+    basis = ("The v1.6.27 retry verified 8,693 positions through independent PoH readback and matched "
+             "the next retained checkpoint. The estimate credits those positions at the prior "
+             "rate and retains the existing turnover and delivery allowances.")
+    return [terminal_ref, playback_ref], preparation, basis
+
+
 def registration_for_sample(epoch, sample):
     if epoch != 230:
         return REGISTRATIONS[epoch]
