@@ -11,7 +11,7 @@ mod replay258;
 mod replay260;
 mod replay296;
 use focused::{
-    ADJACENT_230, FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, NEXT_V1627_230, OVERLAP_266,
+    ADJACENT_230, FEATURE_296, FIRST_7871_230, FOLLOWING_WINDOW_266, GAP_230, HOURLY_230, LOADER_296, NEXT_V1627_230, OVERLAP_266,
     OVERLAP_266_EXCLUSIVE, PREDECESSOR_266, RESTORE_258, RESTORE_260, RETRY_NEXT_V1627_230, SCOPES, SECOND_HOURLY_230,
     SUCCESSOR_REPLAY_230, SUCCESSOR_WINDOW_266, WINDOW_266,
     TRACE_296, V1627_230,
@@ -1593,7 +1593,11 @@ fn measure(
     let next_predecessor = next_v1627_candidate
         .then(|| focused::next_v1627_predecessor(n))
         .transpose()?;
-    let following_266_drain = if matches!(&quote, Some(Quote::FollowingIntake266(_))) {
+    let following_266_replay =
+        matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == FOLLOWING_WINDOW_266.unit);
+    let following_266_drain = if following_266_replay
+        || matches!(&quote, Some(Quote::FollowingIntake266(_)))
+    {
         Some(
             focused::window_266_drained(n, &SUCCESSOR_WINDOW_266, None)?
                 .context("epoch 266 current window has not verified and drained")?,
@@ -2052,7 +2056,7 @@ fn measure(
     ];
     for replay in live_replays.values() {
         require_disjoint_cpus(epoch, exclusive, replay.unit, &replay.owner)?;
-        if [OVERLAP_266.unit, PREDECESSOR_266.unit, WINDOW_266.unit, SUCCESSOR_WINDOW_266.unit]
+        if [OVERLAP_266.unit, PREDECESSOR_266.unit, WINDOW_266.unit, SUCCESSOR_WINDOW_266.unit, FOLLOWING_WINDOW_266.unit]
             .contains(&replay.unit)
         {
             replay296::verify_cpu_group("30,32-39", &overlap_exclusive)?;
@@ -2479,7 +2483,7 @@ fn measure(
         261 => "foundation-epoch261-delivery-roster-binding-v1",
         266 if matches!(&quote, Some(Quote::SuccessorIntake266(_))) =>
             "foundation-epoch266-successor-bootstrap-intake-roster-binding-v1",
-        266 if following_266_drain.is_some() =>
+        266 if matches!(&quote, Some(Quote::FollowingIntake266(_))) =>
             "foundation-epoch266-following-bootstrap-intake-roster-binding-v1",
         266 if next_266 => "foundation-epoch266-next-bootstrap-intake-roster-binding-v1",
         266 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.is_window_266()) =>
@@ -2517,6 +2521,7 @@ fn measure(
         "active_predecessor_266_registration":live_replays.get(&266).filter(|replay| replay.unit == PREDECESSOR_266.unit).map(|replay| &replay.reference),
         "active_window_266_registration":live_replays.get(&266).filter(|replay| replay.unit == WINDOW_266.unit).map(|replay| &replay.reference),
         "active_successor_window_266_registration":live_replays.get(&266).filter(|replay| replay.unit == SUCCESSOR_WINDOW_266.unit).map(|replay| &replay.reference),
+        "active_following_window_266_registration":live_replays.get(&266).filter(|replay| replay.unit == FOLLOWING_WINDOW_266.unit).map(|replay| &replay.reference),
         "active_interval_141_launch":active_interval_141.iter().find(|interval| interval.ordinal() <= 3).map(|interval| &interval.launch),
         "active_interval_141_fourth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 4).map(|interval| &interval.launch),
         "active_interval_141_fifth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 5).map(|interval| &interval.launch),
@@ -2599,9 +2604,9 @@ fn measure(
         });
     }
     if let Some(Quote::FollowingIntake266(source)) = &quote {
-        let drain = following_266_drain.context("missing verified epoch 266 predecessor drain")?;
+        let drain = following_266_drain.as_ref().context("missing verified epoch 266 predecessor drain")?;
         ensure!(
-            focused::window_266_drained(n, &SUCCESSOR_WINDOW_266, None)?.as_ref() == Some(&drain),
+            focused::window_266_drained(n, &SUCCESSOR_WINDOW_266, None)?.as_ref() == Some(drain),
             "epoch 266 predecessor drain changed during following intake fit"
         );
         evidence["following_266_intake_quote"] = json!({
@@ -2637,6 +2642,14 @@ fn measure(
             binding["bootstrap_custody"] = json!(spec.predecessor_custody()?);
         } else if spec.is_window_266() {
             binding["bootstrap_custody"] = json!(spec.window_266_custody()?);
+            if following_266_replay {
+                let drain = following_266_drain.as_ref().context("missing following window predecessor")?;
+                ensure!(
+                    focused::window_266_drained(n, &SUCCESSOR_WINDOW_266, None)?.as_ref() == Some(drain),
+                    "epoch 266 predecessor changed during the following replay fit"
+                );
+                binding["predecessor_drain"] = json!(drain);
+            }
         }
     }
     if first_7871_candidate || successor_230_replay {
@@ -2748,6 +2761,7 @@ pub fn run() -> Result<()> {
                         | "--overlap266-quote"
                         | "--window266-quote"
                         | "--successor266-replay-quote"
+                        | "--following266-replay-quote"
                         | "--predecessor266-quote"
                         | "--adjacent230-intake-quote"
                         | "--successor230-intake-quote"
@@ -2860,6 +2874,7 @@ pub fn run() -> Result<()> {
                         | "--overlap266-quote"
                         | "--window266-quote"
                         | "--successor266-replay-quote"
+                        | "--following266-replay-quote"
                         | "--predecessor266-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
@@ -2882,6 +2897,7 @@ pub fn run() -> Result<()> {
                 Some("--overlap266-quote") => &OVERLAP_266,
                 Some("--window266-quote") => &WINDOW_266,
                 Some("--successor266-replay-quote") => &SUCCESSOR_WINDOW_266,
+                Some("--following266-replay-quote") => &FOLLOWING_WINDOW_266,
                 Some("--predecessor266-quote") => &PREDECESSOR_266,
                 Some("--trace296-quote") => &TRACE_296,
                 Some("--feature296-quote") => &FEATURE_296,
