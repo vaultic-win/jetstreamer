@@ -826,8 +826,12 @@ pub(super) fn collect_predecessor(
     predecessor::collect(launch_sha, exit_sha, destination)
 }
 
+pub(super) fn drain_failed_predecessor(launch_sha: &str) -> Result<Value> {
+    predecessor::finish(launch_sha, true)
+}
+
 pub(super) fn finish_predecessor(launch_sha: &str) -> Result<Value> {
-    predecessor::finish(launch_sha)
+    predecessor::finish(launch_sha, false)
 }
 
 pub(super) fn collect_v1627_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {

@@ -344,8 +344,105 @@ fn validate_finished_terminal(
     Ok(())
 }
 
+// This collector was qualified to compare this exact launch before releasing its
+// timer. A comparison failure allows operational closure without accepting the segment.
+const FAILED_COLLECTOR: &str = "epoch266-predecessor-terminal-collector-v1.service";
+const FAILED_COLLECTOR_IID: &str = "6d3cfaa9ae3546b6a85d31c2bc1b47c6";
+const FAILED_COLLECTOR_EXE: &str =
+    "/var/lib/jetstreamer/horizon266-predecessor-terminal-3be6a934-v1/horizon266-overlap-compare";
+const MISMATCH: &str =
+    "Error: epoch 266 predecessor prefix normalized event mismatch at slot 114912004";
+
+fn failed_verification(launch: &Reference, boot: &str, profile: &Profile) -> Result<Value> {
+    const LAUNCH_SHA: &str = "a0a4ed43667da5077aede629599b220beabd1bcf0cdae7319f42ca50db25f255";
+    const COLLECTOR_RECIPE_SHA: &str =
+        "7e1ab82702cb27fb52cc9a1f2998a64037227d9b926c46d1bdf6f2eee4570a0b";
+    ensure!(
+        launch.sha256 == LAUNCH_SHA
+            && !Path::new(TERMINAL).try_exists()?
+            && !Path::new(STATE).join("terminal.json").try_exists()?,
+        "failed verification is outside the admitted scope or has valid terminal evidence"
+    );
+    let recipe_path = Path::new("/run/systemd/transient").join(FAILED_COLLECTOR);
+    let (recipe, identity) = open(&recipe_path)?;
+    let meta = recipe.metadata()?;
+    ensure!(
+        meta.uid() == 0
+            && meta.mode() & 0o022 == 0
+            && digest(&read_small(&recipe, identity)?) == COLLECTOR_RECIPE_SHA,
+        "epoch 266 collector definition changed"
+    );
+    unchanged(&recipe_path, &recipe, identity)?;
+    let collector = unit_state(FAILED_COLLECTOR)?;
+    for (key, value) in [
+        ("Id", FAILED_COLLECTOR),
+        ("LoadState", "loaded"),
+        ("ActiveState", "failed"),
+        ("SubState", "failed"),
+        ("InvocationID", FAILED_COLLECTOR_IID),
+        ("Job", ""),
+        ("MainPID", "0"),
+        ("ControlPID", "0"),
+        ("ControlGroup", ""),
+        ("Result", "exit-code"),
+        ("Restart", "no"),
+        ("NRestarts", "0"),
+        ("ExecMainCode", "1"),
+        ("ExecMainStatus", "1"),
+    ] {
+        ensure!(
+            collector.get(key).is_some_and(|field| field == value),
+            "epoch 266 collector {key} differs from the failed invocation"
+        );
+    }
+    let scope = format!("/system.slice/{FAILED_COLLECTOR}");
+    ensure!(
+        producer_drained(&scope)?,
+        "epoch 266 collector still owns a cgroup"
+    );
+    let events = journal_rows(&[
+        "--system",
+        "--lines=32",
+        "--output-fields=MESSAGE,_EXE,_PID,_UID,_SYSTEMD_CGROUP,_SYSTEMD_UNIT,_SYSTEMD_INVOCATION_ID,_BOOT_ID",
+        &format!("_SYSTEMD_UNIT={FAILED_COLLECTOR}"),
+        &format!("_SYSTEMD_INVOCATION_ID={FAILED_COLLECTOR_IID}"),
+        &format!("_EXE={FAILED_COLLECTOR_EXE}"),
+    ])?;
+    let mismatch: Vec<_> = events
+        .iter()
+        .filter(|row| row["MESSAGE"] == MISMATCH)
+        .collect();
+    let [event] = mismatch.as_slice() else {
+        bail!("expected one authenticated comparison mismatch")
+    };
+    let stamp = timestamp(event)?;
+    let field = |key: &str| {
+        collector
+            .get(key)
+            .with_context(|| format!("missing collector {key}"))
+    };
+    ensure!(
+        event["_BOOT_ID"] == boot
+            && event["_UID"] == "0"
+            && event["_PID"] == field("ExecMainPID")?.as_str()
+            && event["_SYSTEMD_INVOCATION_ID"] == FAILED_COLLECTOR_IID
+            && event["_SYSTEMD_UNIT"] == FAILED_COLLECTOR
+            && event["_SYSTEMD_CGROUP"] == scope
+            && event["_EXE"] == FAILED_COLLECTOR_EXE
+            && field("ExecMainStartTimestampMonotonic")?.parse::<u64>()? < stamp
+            && stamp <= field("ExecMainExitTimestampMonotonic")?.parse::<u64>()?,
+        "comparison failure does not belong to the exited collector"
+    );
+    Ok(json!({
+        "collector":collector,"collector_recipe_sha256":COLLECTOR_RECIPE_SHA,"event":event,
+        "archive":{"path":profile.persistent_archive,"identity":open_source(&profile.persistent_archive)?.1},
+        "segment_manifest":{"path":profile.persistent_segment_manifest,
+            "identity":open_source(&profile.persistent_segment_manifest)?.1},
+    }))
+}
+
 /// Retire the exact producer's timer only after the independent terminal collector commits.
-pub(super) fn finish(launch_sha: &str) -> Result<Value> {
+pub(super) fn finish(launch_sha: &str, failed: bool) -> Result<Value> {
     require_root()?;
     let lock = OpenOptions::new()
         .read(true)
@@ -370,9 +467,41 @@ pub(super) fn finish(launch_sha: &str) -> Result<Value> {
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
         .trim()
         .replace('-', "");
-    let (native, terminal) = sealed_document(Path::new(TERMINAL))?;
-    validate_finished_terminal(&terminal, &launch_ref, invocation, &boot, &profile)?;
-    let exit_ref: Reference = serde_json::from_value(terminal["pid1_exit"].clone())?;
+    let (proof_key, proof, exit_ref, schema, intent_schema, mode, next_action) = if failed {
+        (
+            "verification_failure",
+            failed_verification(&launch_ref, &boot, &profile)?,
+            sealed_document(Path::new(EXIT))?.0,
+            "foundation-epoch266-private-predecessor-failed-verification-drain-v1",
+            "foundation-epoch266-private-predecessor-failed-verification-intent-v1",
+            "verification-failed-segment-retained",
+            "Compare the normalized events at slot 114912004 using both retained archives.",
+        )
+    } else {
+        let (native, terminal) = sealed_document(Path::new(TERMINAL))?;
+        validate_finished_terminal(&terminal, &launch_ref, invocation, &boot, &profile)?;
+        (
+            "native_terminal",
+            json!(native),
+            serde_json::from_value(terminal["pid1_exit"].clone())?,
+            "foundation-epoch266-private-predecessor-drain-v1",
+            "foundation-epoch266-private-predecessor-drain-intent-v1",
+            "local-segment-committed",
+            "Bind the verified predecessor and the retained overlap before admitting the next private epoch 266 interval.",
+        )
+    };
+    let validate_proof = || -> Result<()> {
+        if failed {
+            ensure!(
+                failed_verification(&launch_ref, &boot, &profile)? == proof,
+                "failed verification evidence or retained segment changed"
+            );
+        } else {
+            let native: Reference = serde_json::from_value(proof.clone())?;
+            validate_finished_terminal(&native.read()?, &launch_ref, invocation, &boot, &profile)?;
+        }
+        Ok(())
+    };
     ensure!(
         exit_ref.path == Path::new(EXIT),
         "foreign predecessor exit path"
@@ -402,12 +531,16 @@ pub(super) fn finish(launch_sha: &str) -> Result<Value> {
             && hex(timer_invocation, 32),
         "foreign predecessor guard token"
     );
-    let completion_path = state.join("terminal.json");
+    let completion_path = state.join(if failed {
+        "failed-verification-drain.json"
+    } else {
+        "terminal.json"
+    });
     if completion_path.try_exists()? {
         let (reference, done) = sealed_document(&completion_path)?;
         ensure!(
-            done["schema"] == "foundation-epoch266-private-predecessor-drain-v1"
-                && done["native_terminal"] == json!(native)
+            done["schema"] == schema
+                && done[proof_key] == proof
                 && done["launch"] == json!(launch_ref)
                 && done["guard_drained"] == true,
             "existing predecessor completion changed"
@@ -422,11 +555,16 @@ pub(super) fn finish(launch_sha: &str) -> Result<Value> {
         return Ok(json!({"terminal": reference, "already_completed": true}));
     }
 
-    let intent_path = state.join("terminal-drain-intent.json");
-    let intent = json!({"schema":"foundation-epoch266-private-predecessor-drain-intent-v1",
-        "unit":unit,"invocation_id":invocation,"launch":launch_ref,"native_terminal":native,
+    let intent_path = state.join(if failed {
+        "failed-verification-drain-intent.json"
+    } else {
+        "terminal-drain-intent.json"
+    });
+    let mut intent = json!({"schema":intent_schema,
+        "unit":unit,"invocation_id":invocation,"launch":launch_ref,
         "pid1_exit":exit_ref,"guard_plan":launch["guard_plan"],"guard_timer_invocation":timer_invocation,
         "publication_authorized":false});
+    intent[proof_key] = proof.clone();
     let timer = timer_state()?;
     let active = timer.get("ActiveState").is_some_and(|s| s == "active");
     let already_intended = intent_path.try_exists()?;
@@ -474,17 +612,16 @@ pub(super) fn finish(launch_sha: &str) -> Result<Value> {
         "epoch 266 timer has not drained"
     );
     let producer = verify_exit()?;
-    validate_finished_terminal(&native.read()?, &launch_ref, invocation, &boot, &profile)?;
-    let reference = seal_in_state(
-        &completion_path,
-        &json!({
-            "schema":"foundation-epoch266-private-predecessor-drain-v1",
-            "epoch":EPOCH,"unit":unit,"invocation_id":invocation,"launch":launch_ref,
-            "native_terminal":native,"pid1_exit":exit_ref,"intent":intent_ref,
-            "timer_after":timer_after,"guard_after":guard_after,"producer":producer,
-            "guard_drained":true,"state":"local-segment-committed","publication_authorized":false,
-            "next_action":"Bind the verified predecessor and the retained overlap before admitting the next private epoch 266 interval.",
-        }),
-    )?;
+    validate_proof()?;
+    let mut completion = json!({
+        "schema":schema,
+        "epoch":EPOCH,"unit":unit,"invocation_id":invocation,"launch":launch_ref,
+        "pid1_exit":exit_ref,"intent":intent_ref,
+        "timer_after":timer_after,"guard_after":guard_after,"producer":producer,
+        "guard_drained":true,"state":mode,"publication_authorized":false,
+        "next_action":next_action,
+    });
+    completion[proof_key] = proof;
+    let reference = seal_in_state(&completion_path, &completion)?;
     Ok(json!({"terminal": reference, "already_completed": false}))
 }
