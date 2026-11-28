@@ -50,6 +50,55 @@ fn checked_archive(value: &Value) -> Result<(PathBuf, Value)> {
     Ok((path, stamp(&meta)))
 }
 
+fn drained_guard(expected: &Value) -> Result<()> {
+    let feedback = Command::new("/usr/bin/systemctl")
+        .args(["show", GUARD, "-p", "Id,ActiveState,SubState,Result,InvocationID,MainPID,ControlPID,ControlGroup,Job,Restart,TriggeredBy"])
+        .output()?;
+    ensure!(
+        feedback.status.success(),
+        "could not inspect the recorded epoch 266 guard"
+    );
+    let status = std::str::from_utf8(&feedback.stdout)?;
+    for (key, fixed) in [
+        ("Id", GUARD),
+        ("ActiveState", "failed"),
+        ("SubState", "failed"),
+        ("Result", "exit-code"),
+        ("MainPID", "0"),
+        ("ControlPID", "0"),
+        ("ControlGroup", ""),
+        ("Job", ""),
+        ("Restart", "no"),
+        ("TriggeredBy", ""),
+    ] {
+        ensure!(
+            status.lines().any(|line| line == format!("{key}={fixed}")),
+            "epoch 266 guard does not bind the drained {key} state"
+        );
+        if key != "TriggeredBy" {
+            ensure!(
+                expected[key] == fixed,
+                "epoch 266 guard differs from its drain evidence"
+            );
+        }
+    }
+    let invocation = expected["InvocationID"]
+        .as_str()
+        .context("missing drained guard invocation")?;
+    ensure!(
+        invocation.len() == 32
+            && invocation.bytes().all(|byte| byte.is_ascii_hexdigit())
+            && status
+                .lines()
+                .any(|line| line == format!("InvocationID={invocation}"))
+            && !Path::new("/sys/fs/cgroup/system.slice")
+                .join(GUARD)
+                .try_exists()?,
+        "epoch 266 guard invocation changed or still owns a cgroup"
+    );
+    Ok(())
+}
+
 pub(super) fn run(
     apply: bool,
     self_sha: &str,
@@ -153,9 +202,10 @@ pub(super) fn run(
     };
     archive_state()?;
     let observe = || -> Result<(Value, Value)> {
-        for unit in [PRODUCER, TIMER, GUARD, COLLECTOR] {
+        for unit in [PRODUCER, TIMER, COLLECTOR] {
             terminal_unit(unit)?;
         }
+        drained_guard(&drain["guard_after"])?;
         assert_no_nested_mount(&path)?;
         let report = no_readers(Path::new(CACHE), &path, &[])?;
         Ok((report["scheduled"].clone(), report["processes"].clone()))
