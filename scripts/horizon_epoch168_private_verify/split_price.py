@@ -11,7 +11,7 @@ import time
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT = RT / "epoch168-exact-private-verification-20261127-v1"
 ORIGINAL = ROOT / "tools-v1"
-SOURCE = ROOT / "split-price-v3"
+SOURCE = ROOT / "split-price-v4"
 ISSUER = RT / "epoch162-first-hourly-completion-20261127-v2"
 DONOR = {"path":str(ISSUER/"SPLIT_AND_166_WATCHERS_1795819276953592886.json"),
          "sha256":"64aa76de4fb179a650488d3d53c05050aff7b4fa97ef60c61d3726e42545133c"}
@@ -159,7 +159,7 @@ def choose_phase(q, proof):
          and base["guard_floor"] >= base["protected_home"]+64*M
          and not {162,166,173,199,200}.intersection(row["epoch"] for row in base["observed_actors"]),
          "five-owner price omitted an issued booking")
-    if base["actor"]["phase"] != "terminal":
+    if base["actor"] and base["actor"]["phase"] != "terminal":
         disk = base["actor"]["disk"]
         need(base["guard_floor"] >= disk["floor"] and base["remaining_output"] >= disk["remaining"],
              "five-owner price omitted the epoch 169 guard or output")
@@ -213,7 +213,8 @@ def price(fixture=False):
     unit = controller()
     own_locks()
     enrolled = entry["checked"](registration["issuer_enrollment"])
-    need(enrolled["capacity"] == registration["shared_price"]["entry"] and enrolled["donor"] == DONOR,
+    need(enrolled["capacity"] == registration["shared_price"]["entry"] and enrolled["donor"] == DONOR
+         and enrolled["capacity"]["path"] == str(ISSUER/"issued-price-v4/capacity.py"),
          "162 is not enrolled on the unborrowed shared price")
     before = old["slice_admission"](api)
     start = time.monotonic()
@@ -240,6 +241,7 @@ def price(fixture=False):
     need(time.monotonic()-start < 120, "expired shared fleet price")
     return dict(schema="horizon-168-private-post-assembly-admission-price-v1",fits=fits,whole_roster=result,
                 shared_price=registration["shared_price"],contract=registration["contract"],
+                unissued_162_donor_loan=phase["mode"] == "168-before-unissued-162",
                 price_registration=entry["ref"](entry["pricing_registration"]()),
                 before=before,after=after,original_deployment=registration["original_deployment"],
                 phase=phase,donor_lineage=ancestry,issuer_enrollment=registration["issuer_enrollment"],

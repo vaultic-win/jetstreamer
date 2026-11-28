@@ -21,7 +21,7 @@ WORK = Path("/home/sol/.jetstreamer-private/epoch168-private-archive-verify-2026
 BUILD = WORK / "qualification/horizon-168-local-scan-build-1795817186264675279/BUILD.json"
 SOURCE = Path(__file__).resolve().parent
 ISSUED = PROD / "tools-v1"
-REPRICE = PROD / "split-price-v3"
+REPRICE = PROD / "split-price-v4"
 REPO = Path("/home/sol/workspace/jetstreamer")
 DEPLOYMENT = PROD / "deployment.json"
 ASSEMBLER = "horizon-assemble-168-private-20261127-v1.service"
@@ -161,7 +161,7 @@ def deployment(fixture):
 def pricing_registration():
     # Each activated roster provider has its own immutable registration; a
     # receipt from an earlier attempt must continue to resolve to its bytes.
-    name = os.environ.get("HORIZON_168_PRICE_REGISTRATION", "SPLIT_PRICE_DEPLOYMENT_V3.json")
+    name = os.environ.get("HORIZON_168_PRICE_REGISTRATION", "SPLIT_PRICE_DEPLOYMENT_V4.json")
     need(re.fullmatch(r"SPLIT_PRICE_DEPLOYMENT_V[1-9][0-9]*\.json", name),
          "invalid private verification pricing registration")
     return PROD / name
