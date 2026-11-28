@@ -522,6 +522,14 @@ fn main() -> Result<()> {
             terminal::capture_v1627_exit(digest, Path::new(destination))?
         }
         #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, launch, invocation, destination] if command == "capture-next-v1627-exit" => {
+            terminal::capture_next_v1627_exit(launch, invocation, Path::new(destination))?
+        }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, launch, invocation, exit, digest, destination] if command == "collect-next-v1627-terminal" => {
+            terminal::collect_next_v1627_terminal(launch, invocation, Path::new(exit), digest, Path::new(destination))?
+        }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
         [command, digest, destination] if command == "capture-predecessor-exit" => {
             terminal::capture_predecessor_exit(digest, Path::new(destination))?
         }
@@ -551,7 +559,7 @@ fn main() -> Result<()> {
         }
         [command, plan, digest] if command == "compare" => compare(Path::new(plan), digest)?,
         _ => anyhow::bail!(
-            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-adjacent230-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-window266-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-window266-terminal LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | finish-window266-terminal LAUNCH_SHA256 | capture-predecessor-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-predecessor-terminal LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-predecessor-account-histories LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | finish-predecessor-terminal LAUNCH_SHA256 | drain-failed-predecessor-terminal LAUNCH_SHA256 | collect-v1627-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-adjacent230-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
+            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-next-v1627-exit LAUNCH_SHA256 INVOCATION NEW_EXIT_DIRECTORY | collect-next-v1627-terminal LAUNCH_SHA256 INVOCATION EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | capture-adjacent230-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-window266-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-window266-terminal LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | finish-window266-terminal LAUNCH_SHA256 | capture-predecessor-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-predecessor-terminal LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-predecessor-account-histories LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | finish-predecessor-terminal LAUNCH_SHA256 | drain-failed-predecessor-terminal LAUNCH_SHA256 | collect-v1627-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-adjacent230-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
         ),
     };
     println!("{}", serde_json::to_string_pretty(&output)?);

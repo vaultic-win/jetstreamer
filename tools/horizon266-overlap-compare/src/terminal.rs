@@ -819,6 +819,24 @@ pub(super) fn capture_v1627_exit(launch_sha: &str, destination: &Path) -> Result
     exit::capture_v1627(launch_sha, destination)
 }
 
+pub(super) fn capture_next_v1627_exit(
+    launch_sha: &str,
+    invocation: &str,
+    destination: &Path,
+) -> Result<Value> {
+    exit::capture_next_v1627(launch_sha, invocation, destination)
+}
+
+pub(super) fn collect_next_v1627_terminal(
+    launch_sha: &str,
+    invocation: &str,
+    exit: &Path,
+    digest: &str,
+    destination: &Path,
+) -> Result<Value> {
+    window230::collect(&window230::next_v1627(launch_sha, invocation)?, exit, digest, destination)
+}
+
 pub(super) fn capture_predecessor_exit(launch_sha: &str, destination: &Path) -> Result<Value> {
     exit::capture_predecessor(launch_sha, destination)
 }

@@ -1,12 +1,12 @@
-//! Terminal acceptance for the two exact guarded Foundation epoch 230 windows.
+//! Terminal acceptance for the guarded Foundation epoch 230 windows.
 
 use super::*;
 
-pub(super) struct Window {
+pub(super) struct Window<'a> {
     pub(super) state: &'static str,
-    pub(super) launch_sha: &'static str,
+    pub(super) launch_sha: &'a str,
     pub(super) unit: &'static str,
-    pub(super) invocation: &'static str,
+    pub(super) invocation: &'a str,
     pub(super) node: &'static str,
     pub(super) exit_schema: &'static str,
     pub(super) capture_timeout_ms: i32,
@@ -21,10 +21,10 @@ pub(super) struct Window {
     bootstrap_accounts: &'static str,
     terminal_accounts: &'static str,
     terminal_block: &'static str,
-    adjacent_seams: bool,
+    profile_sha: Option<&'static str>,
 }
 
-pub(super) const V1627: Window = Window {
+pub(super) const V1627: Window<'static> = Window {
     state: "/var/lib/jetstreamer/horizon230-v1627-replay-runtime-v1",
     launch_sha: "3a2f5a058c76a59707af77f98973c283d4542c8308d5a514a22ae1cb6534a7a6",
     unit: "horizon-qualify-230-v1627-window-v1.service",
@@ -43,10 +43,10 @@ pub(super) const V1627: Window = Window {
     bootstrap_accounts: "9Hgyrxkc5h5mkAwPL7rUGASHZFMByNzE1TYmCPb4z4e7",
     terminal_accounts: "5kWV3NT4f15DCB3XkmiYSLu9a1H88XK4GYGEV54nimcQ",
     terminal_block: "4wPbVJwpgJJHqGazjcbM5CjrZFvgzXFKHtaVoNf2VWJf",
-    adjacent_seams: false,
+    profile_sha: None,
 };
 
-pub(super) const ADJACENT: Window = Window {
+pub(super) const ADJACENT: Window<'static> = Window {
     state: "/var/lib/jetstreamer/horizon230-adjacent-99445304-runtime-v1",
     launch_sha: "aeaa1889903df19f737eed77bcd38e0df66f61b268ee1b38afe834b6bb28964f",
     unit: "horizon-qualify-230-adjacent-99445304-v1.service",
@@ -65,8 +65,38 @@ pub(super) const ADJACENT: Window = Window {
     bootstrap_accounts: "2pNDSLmCHAnK2eLvMHmEBnfUmjnSDfqcQ45zak3VR9kc",
     terminal_accounts: "9Hgyrxkc5h5mkAwPL7rUGASHZFMByNzE1TYmCPb4z4e7",
     terminal_block: "3eCGmf32ft6eWrGpfgLoaLziT4Fm3215pDWwvD1DJRvq",
-    adjacent_seams: true,
+    profile_sha: Some("d01cf1c1a583c41e885ea74f57aea21a5e5178554e94bca16d01674a5bff1d1b"),
 };
+
+const NEXT_BOOTSTRAP: u64 = 99_468_089;
+const NEXT_SOURCE: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon230-next-v1627-543c2b6f-v1/source-window.json",
+    "6531da54f429164fbbb5c0a4c5ac6569b3247cc82b18ae641e7dd9de318a0a0b",
+);
+
+pub(super) fn next_v1627<'a>(launch_sha: &'a str, invocation: &'a str) -> Result<Window<'a>> {
+    ensure!(hex(launch_sha, 64) && hex(invocation, 32), "invalid epoch 230 launch identity");
+    Ok(Window {
+        state: "/var/lib/jetstreamer/horizon230-next-v1627-window-runtime-v1",
+        launch_sha,
+        unit: "horizon-qualify-230-next-v1627-99468089-v1.service",
+        invocation,
+        node: "/var/lib/jetstreamer/horizon230-next-v1627-543c2b6f-v1/jetstreamer-node",
+        exit_schema: "foundation-epoch230-next-v1627-window-pid1-exit-v1",
+        capture_timeout_ms: 14_500_000,
+        kind: "epoch230-private-next-v1627-window",
+        exit_path: "/var/lib/jetstreamer/horizon230-next-v1627-window-exit-v1/evidence/pid1-exit.json",
+        receipt_schema: "foundation-epoch230-next-v1627-private-terminal-evidence-v1",
+        bootstrap: NEXT_BOOTSTRAP,
+        last: 99_476_782,
+        archive: "/home/ubuntu/.jetstreamer-private/qualification-230-next-v1627-99468089-v1/work/output/epoch-230-slots-99468090-99476782.jet",
+        bootstrap_accounts: "5kWV3NT4f15DCB3XkmiYSLu9a1H88XK4GYGEV54nimcQ",
+        terminal_accounts: "26wibqVauVjaet3eM6o8hssvaXi4awt7ndjwCaYJZyPK",
+        terminal_block: "4YA55n2wFwsuMw7FBCDC6HVKkxjkUhikYFc5JD6dM4qt",
+        profile_sha: Some("f289cdf8e6c6d85f387a2deac22c2c7ef19fcb1b4b98bc75230162a2cbf71447"),
+        ..V1627
+    })
+}
 
 const PRECEDING_WINDOW: (&str, &str) = (
     "/var/lib/jetstreamer/horizon230-first-7871-runtime-v1/terminal.json",
@@ -114,7 +144,7 @@ fn adjacent_seams(manifest: &HistoricalSegmentManifest) -> Result<Value> {
     Ok(json!({"preceding":before,"following":after,"consensus_fields_match":true}))
 }
 
-pub(super) fn load_launch(window: &Window) -> Result<(Reference, Value, u32)> {
+pub(super) fn load_launch(window: &Window<'_>) -> Result<(Reference, Value, u32)> {
     let state = Path::new(window.state);
     let reference = Reference::new(state.join("cadence-registration.json"), window.launch_sha);
     let launch = reference.read()?;
@@ -125,12 +155,9 @@ pub(super) fn load_launch(window: &Window) -> Result<(Reference, Value, u32)> {
             && launch["unit"] == window.unit
             && launch["invocation_id"] == window.invocation
             && launch["node_path"] == window.node
-            && (!window.adjacent_seams
-                || launch["profile"]
-                    == json!(Reference::new(
-                        state.join("profile.json"),
-                        "d01cf1c1a583c41e885ea74f57aea21a5e5178554e94bca16d01674a5bff1d1b",
-                    )))
+            && window.profile_sha.is_none_or(|sha| {
+                launch["profile"] == json!(Reference::new(state.join("profile.json"), sha))
+            })
             && launch["launched"] == true
             && launch["canonical_epoch_publication_authorized"] == false,
         "epoch 230 exit capture requires the exact guarded launch"
@@ -150,7 +177,7 @@ pub(super) fn load_launch(window: &Window) -> Result<(Reference, Value, u32)> {
     Ok((reference, launch, pid))
 }
 
-fn authorize_manifest(window: &Window, manifest: &HistoricalSegmentManifest) -> Result<()> {
+fn authorize_manifest(window: &Window<'_>, manifest: &HistoricalSegmentManifest) -> Result<()> {
     ensure!(
         manifest.epoch == 230
             && manifest.output_slot_start == window.bootstrap + 1
@@ -213,7 +240,7 @@ pub(super) fn check_manager(
 }
 
 fn check_events(
-    window: &Window,
+    window: &Window<'_>,
     rows: &[Value],
     manifest: &HistoricalSegmentManifest,
     sidecar: &Path,
@@ -262,7 +289,7 @@ fn check_events(
 }
 
 pub(super) fn collect(
-    window: &Window,
+    window: &Window<'_>,
     exit_path: &Path,
     exit_digest: &str,
     destination: &Path,
@@ -329,10 +356,23 @@ pub(super) fn collect(
         "native validator opened a different epoch 230 manifest"
     );
     verify_archive_terminal(&archive, &manifest)?;
-    let seam_evidence = window
-        .adjacent_seams
-        .then(|| adjacent_seams(&manifest))
-        .transpose()?;
+    let seam_evidence = match window.bootstrap {
+        slot if slot == ADJACENT.bootstrap => Some(adjacent_seams(&manifest)?),
+        NEXT_BOOTSTRAP => {
+            let source = Reference::new(NEXT_SOURCE.0, NEXT_SOURCE.1);
+            let expected = source.read()?;
+            ensure!(
+                expected["schema"] == "foundation-epoch230-next-v1627-source-window-v1"
+                    && expected["first_slot"] == window.bootstrap + 1
+                    && expected["last_slot"] == window.last
+                    && same_checkpoint(&expected["bootstrap"], &json!(manifest.bootstrap))
+                    && same_checkpoint(&expected["terminal"], &json!(manifest.terminal)),
+                "next epoch 230 replay differs from its authenticated checkpoint seam"
+            );
+            Some(json!({"source_window": source, "consensus_fields_match": true}))
+        }
+        _ => None,
+    };
     ensure!(
         unit_state(window.unit)? == state
             && producer_drained(&group)?

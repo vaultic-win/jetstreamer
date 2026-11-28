@@ -242,6 +242,14 @@ pub(super) fn capture_adjacent230(launch_sha: &str, destination: &Path) -> Resul
     capture_window230(&window230::ADJACENT, launch_sha, destination)
 }
 
+pub(super) fn capture_next_v1627(
+    launch_sha: &str,
+    invocation: &str,
+    destination: &Path,
+) -> Result<Value> {
+    capture_window230(&window230::next_v1627(launch_sha, invocation)?, launch_sha, destination)
+}
+
 pub(super) const WINDOW266_STATE: &str =
     "/var/lib/jetstreamer/horizon266-window-114929698-114936474-runtime-v1";
 pub(super) const WINDOW266_UNIT: &str =
@@ -355,7 +363,7 @@ pub(super) fn read_window266(
 }
 
 fn capture_window230(
-    window: &window230::Window,
+    window: &window230::Window<'_>,
     launch_sha: &str,
     destination: &Path,
 ) -> Result<Value> {
@@ -504,7 +512,7 @@ pub(super) fn read(reference: &Reference, admitted: &Admitted) -> Result<UnitSta
 }
 
 pub(super) fn read_window230(
-    window: &window230::Window,
+    window: &window230::Window<'_>,
     reference: &Reference,
     launch: &Reference,
     pid: u32,
