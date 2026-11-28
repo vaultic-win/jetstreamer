@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import runpy
 import subprocess
 import sys
@@ -97,7 +98,7 @@ def boundary_manifest(source, archive):
     require(manifest["schema_version"] == 1 and manifest["epoch"] == 143 and manifest["output_slot_start"] == OUTPUT_START
             and manifest["output_slot_count"] == count and manifest["runtime"]["runtime_profile"] == source["runtime"]
             and manifest["worker_executable_sha256"] == source["images_and_genesis"]["worker"]["sha256"] == WORKER
-            and manifest["bootstrap_archive_sha256"] == source["bootstrap"]["sha256"]
+            and manifest["bootstrap_archive_sha256"] in (None, source["bootstrap"]["sha256"])
             and manifest["bootstrap"]["slot"] == source["bootstrap"]["slot"] == BOOTSTRAP
             and manifest["terminal"]["slot"] == source["terminal"]["slot"] == TERMINAL
             and manifest["terminal"]["accounts_hash"] == source["terminal"]["accounts_hash"]
@@ -105,6 +106,22 @@ def boundary_manifest(source, archive):
             and manifest["bootstrap"]["write_count"] == 0 and not os.path.lexists(archive.with_suffix(".jet.sha256")),
             "different scope, runtime, checkpoint or canonical sidecar")
     return path, manifest, ref
+
+
+def restrict_to_owner(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        info = os.fstat(fd)
+        require(stat.S_ISREG(info.st_mode) and info.st_uid == 1001 and info.st_nlink == 1
+                and info.st_mode & 0o7000 == 0 and path.stat(follow_symlinks=False).st_ino == info.st_ino,
+                "cannot restrict unexpected private source " + str(path))
+        original = stat.S_IMODE(info.st_mode)
+        if original & 0o077:
+            os.fchmod(fd, original & 0o700)
+            os.fsync(fd)
+        return dict(before=oct(original), after=oct(stat.S_IMODE(os.fstat(fd).st_mode)))
+    finally:
+        os.close(fd)
 
 
 def scan(archive, manifest_path):
@@ -133,12 +150,17 @@ def accept(scan_if_needed):
     terminal_ref, state, guard = associated_exit(actor, bindings)
     archive = Path(contract["prepared_output_file"])
     mp, manifest, manifest_ref = boundary_manifest(source, archive)
-    before = identity(archive), identity(mp)
     checkpoints, completion = journal_checkpoints(actor, state, mp)
     require(manifest["bootstrap"] == checkpoints[BOOTSTRAP]["checkpoint"]
             and manifest["terminal"] == checkpoints[TERMINAL]["checkpoint"], "manifest differs from native checkpoints")
     if not scan_if_needed:
         return dict(exit=terminal_ref, guard=guard, checkpoint=checkpoints[TERMINAL], manifest=manifest_ref)
+    boot = source["bootstrap"]
+    boot_ref, boot_length = helper.file_ref(Path(boot["path"]), 0)
+    require(boot_ref["sha256"] == boot["sha256"] and boot_length == boot["size"],
+            "original projected bootstrap payload changed")
+    modes = {str(path): restrict_to_owner(path) for path in (archive, mp)}
+    before = identity(archive), identity(mp)
     verifier = scan(archive, mp)
     proof, proof_ref = helper.read(VALIDATION, 0)
     require(proof["validation"] == "pass" and proof["archive"] == str(ALIAS)
@@ -152,7 +174,7 @@ def accept(scan_if_needed):
     helper.persist(path, dict(schema="horizon-143-private-first-hourly-acceptance-v1", epoch=143,
         producer_invocation_id=iid, native_terminal=terminal_ref, guard_drain=guard, bindings=bindings,
         archive=dict(path=str(archive), sha256=manifest["archive_sha256"]), archive_bytes=before[0][2],
-        segment_manifest=manifest_ref, verifier=verifier, independent_validation=proof_ref,
+        segment_manifest=manifest_ref, boot_payload=boot_ref, restricted_source_modes=modes, verifier=verifier, independent_validation=proof_ref,
         checkpoints=checkpoints, verified_manifest_journal_cursor=completion,
         output_slot_start=OUTPUT_START, output_slot_count=manifest["output_slot_count"],
         terminal_slot=TERMINAL, recorded_unix_seconds=time.time(), publication_authorized=False, resource_credit_bytes=0))
