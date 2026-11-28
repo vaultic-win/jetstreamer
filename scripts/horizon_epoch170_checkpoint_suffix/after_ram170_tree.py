@@ -88,3 +88,35 @@ def observe(owner, tree, bound, state, cmd):
                 guarded_physical_bytes=scans, bounds=[min(outside), max(scans)],
                 minimum_free_bytes=plan["minimum_free_bytes"], maximum_root_physical_bytes=plan["maximum_root_physical_bytes"],
                 active_run_occupancy_credit_bytes=0)
+
+
+def stopped(owner, bound):
+    """Retain the floor-stopped owner, its partial output and the full booked envelope."""
+    evidence = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73766969-20261127-v1/guard-receipts")
+    intent_ref = dict(path=str(evidence / "stop-intent.json"),
+                      sha256="824f766892a01f1754cb139ae342340be704ad9141715cbd6071320ab8976ece")
+    completion_ref = dict(path=str(evidence / "stop-completion.json"),
+                          sha256="b39a216895e15c4568468646d9054d78c6fbda47d04ac5cc352eeba065faabc6")
+    need(owner["phase"] == "terminal" and owner["actor"] == ACTOR and owner["release"] == RELEASE
+         and owner["unit"] == UNIT and owner["interface"] == SCOPE and owner["guard_plan"] == PLAN,
+         "different closed 170 owner")
+    actor, grant, plan, intent, end = (bound(ref) for ref in (ACTOR, RELEASE, PLAN, intent_ref, completion_ref))
+    event = owner["native_terminal"]
+    sample = intent["sample"]
+    iid = actor["producer_invocation_id"]
+    need(owner["invocation"] == grant["producer_invocation_id"] == plan["invocation_id"] == iid
+         and intent["producer_invocation_id"] == sample["producer"]["invocation_id"] == end["producer_invocation_id"] == iid
+         and event["INVOCATION_ID"] == end["terminal"]["invocation_id"] == iid
+         and event["_BOOT_ID"] == actor["boot_id"].replace("-", "") and event["UNIT"] == plan["unit"] == UNIT
+         and event["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+         and grant["actor"] == ACTOR and grant["guard_plan"] == PLAN and grant["interface"] == SCOPE
+         and intent["plan_sha256"] == end["plan_sha256"] == sample["plan_sha256"] == PLAN["sha256"]
+         and end["intent"] == intent_ref["path"] and end["terminal"]["active"] == "inactive" and end["terminal"]["pid"] == 0
+         and sample["producer"]["pid"] == actor["producer_pid"] == owner["pid"]
+         and intent["reason"] == sample["trip_reason"] == "filesystem-floor" and sample["producer_stop_enabled"] is True
+         and sample["available_bytes"] < sample["minimum_free_bytes"] == plan["minimum_free_bytes"]
+         and sample["root_physical_observation_error"] is None and sample["root_physical_observation"]["exceeds_budget"] is False
+         and not end["scratch_deleted"] and not end["r2_mutations"], "different 170 floor-stop evidence")
+    return dict(reason=intent["reason"], stop_intent=intent_ref, stop_completion=completion_ref, plan=PLAN,
+                available_bytes=sample["available_bytes"], minimum_free_bytes=sample["minimum_free_bytes"],
+                checkpoint_interval_completed=False, resource_credit_bytes=0)

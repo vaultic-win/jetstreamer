@@ -24,14 +24,24 @@ def members(stage, revision):
         files[name] = once(source.decode(), old, new).encode(), mode
 
     edit("capacity.py", "'second143_terminal.py','serial157_operator.py'}",
-         "'second143_terminal.py','serial157_operator.py','after_ram170_tree.py'}")
+         "'second143_terminal.py','serial157_operator.py','after_ram170_tree.py','second143_floor_terminal.py'}")
+    retry143 = HERE.parent / "horizon_epoch143_bounded_entry_20261126_v1/writer/second143_floor_terminal.py"
+    files[retry143.name] = retry143.read_bytes(), 0o444
+    edit("shared_hourly143.py",
+         '        need(not (SECOND / "HELD_OWNER.json").exists(), "second epoch 143 terminal needs reconciliation")',
+         '''        if (SECOND / "HELD_OWNER.json").exists():
+            floor_stop = runpy.run_path(str(Path(__file__).with_name("second143_floor_terminal.py")))
+            return dict(closure, second_retry_floor_terminal=floor_stop["closed"](core)), None''')
     edit("after_ram170_admission.py", "def owner(core, fleet, directory):",
          "def owner(core, fleet, directory, *, guard_evidence=None):")
     anchor = '        if seen:\n            phase = "worker"'
     edit("after_ram170_admission.py", anchor,
          '        if guard_evidence is not None:\n            guard_evidence.update(guard)\n' + anchor)
     anchor = '    return whole\n'
-    edit("after_ram170_admission.py", anchor, '''    live_tree = whole["base_169"]["native"]["raw"]["joint"].get("after_ram170_tree")
+    edit("after_ram170_admission.py", anchor, '''    if actor and actor["phase"] == "terminal":
+        stopped_tree = runpy.run_path(str(directory / "after_ram170_tree.py"))
+        whole[REG]["terminal_stop"] = stopped_tree["stopped"](actor, core.bound)
+    live_tree = whole["base_169"]["native"]["raw"]["joint"].get("after_ram170_tree")
     if live_tree:
         floor = live_tree["minimum_free_bytes"]
         whole["epoch170_installed_guard_floor"] = floor
