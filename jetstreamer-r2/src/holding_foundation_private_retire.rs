@@ -23,7 +23,7 @@ fn record(a: Artifact, sha: &str, phase: &str, op: &Value) -> Result<Value> {
     let path = Path::new(STATE).join("receipts").join(name(a, sha, phase));
     record_at(&path, op, 0)
 }
-fn record_at(path: &Path, op: &Value, required_uid: u32) -> Result<Value> {
+pub(super) fn record_at(path: &Path, op: &Value, required_uid: u32) -> Result<Value> {
     let before = regular_identity(path)?;
     let bytes = read_stable_bounded(path, 8 << 20, "private retirement record")?;
     let m = fs::symlink_metadata(path)?;
@@ -72,7 +72,7 @@ fn lifecycle(
 fn body(path: &Path, a: Artifact, sha: &str, original: bool) -> Result<Stamp> {
     body_at(path, &a.expected(), sha, original)
 }
-fn body_at(path: &Path, expected: &Stamp, sha: &str, original: bool) -> Result<Stamp> {
+pub(super) fn body_at(path: &Path, expected: &Stamp, sha: &str, original: bool) -> Result<Stamp> {
     ensure!(
         path.canonicalize()? == path,
         "aliased local retirement target"
@@ -110,7 +110,7 @@ fn child(name: &std::ffi::OsStr) -> Result<CString> {
     );
     Ok(CString::new(name.as_bytes())?)
 }
-fn rename_child(
+pub(super) fn rename_child(
     from: &File,
     old: &std::ffi::OsStr,
     to: &File,
@@ -136,7 +136,7 @@ fn rename_child(
     to.sync_all()?;
     Ok(())
 }
-fn unlink_child(dir: &File, name: &std::ffi::OsStr) -> Result<()> {
+pub(super) fn unlink_child(dir: &File, name: &std::ffi::OsStr) -> Result<()> {
     let name = child(name)?;
     ensure!(
         unsafe { libc::unlinkat(dir.as_raw_fd(), name.as_ptr(), 0) } == 0,
@@ -197,7 +197,7 @@ fn chain(a: Artifact, sha: &str, op: &Value) -> Result<()> {
     let d = record(a, sha, "unlink-intent", op)?;
     validate_chain(&a.expected(), &v, &d)
 }
-fn validate_chain(expected: &Stamp, v: &Value, d: &Value) -> Result<()> {
+pub(super) fn validate_chain(expected: &Stamp, v: &Value, d: &Value) -> Result<()> {
     let q: Stamp = serde_json::from_value(v["quarantine_stamp"].clone())?;
     ensure!(
         v["complete_local_sha256_verified"] == true

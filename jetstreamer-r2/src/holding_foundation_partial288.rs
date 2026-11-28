@@ -6,6 +6,9 @@ use horizon_singleton211_launch::native262::foundation_roster::holding288::{
 };
 use std::os::unix::fs::DirBuilderExt;
 
+#[path = "holding_foundation_partial288_retire.rs"]
+mod retire;
+
 const CHECK: &str = "holding-foundation-288-partial-check";
 const KEY: &str = "partial-custody.key";
 const FORMAT: &str = "openpgp-aes256-incomplete-epoch288-archive";
@@ -27,7 +30,7 @@ struct Plan {
 }
 
 pub(super) fn command(action: &str) -> bool {
-    matches!(action, CHECK | PARK)
+    matches!(action, CHECK | PARK) || retire::command(action)
 }
 
 fn source_proof() -> Bound {
@@ -67,7 +70,7 @@ fn source(closed: &Value) -> Result<(PathBuf, Stamp)> {
     Ok((path, stamp))
 }
 
-fn verify_closed(closed: &Value, path: &Path) -> Result<()> {
+fn verify_stopped(closed: &Value, path: &Path) -> Result<()> {
     let terminal: Bound = serde_json::from_value(closed["terminal"].clone())?;
     let stop = saved(&terminal)?;
     ensure!(
@@ -97,6 +100,11 @@ fn verify_closed(closed: &Value, path: &Path) -> Result<()> {
             "epoch 288 guard is still armed"
         );
     }
+    Ok(())
+}
+
+fn verify_closed(closed: &Value, path: &Path) -> Result<()> {
+    verify_stopped(closed, path)?;
     no_references(path)?;
     Ok(())
 }
@@ -155,6 +163,9 @@ fn intent(key: &str, sha: &str, wire_bytes: u64) -> Result<(String, Value)> {
 }
 
 pub(super) async fn run(action: &str, value: Value, spec: &Bound) -> Result<()> {
+    if retire::command(action) {
+        return retire::run(action, value, spec).await;
+    }
     let plan: Plan = serde_json::from_value(value)?;
     ensure!(
         command(action) && plan.schema == "foundation-epoch288-partial-custody-plan-v1",
