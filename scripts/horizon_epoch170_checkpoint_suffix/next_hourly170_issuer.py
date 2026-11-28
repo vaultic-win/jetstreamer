@@ -1,4 +1,4 @@
-"""Bind the existing held launcher to the next 170 scope, V37 and the sole V76 writer."""
+"""Bind the held launcher to the next 170 scope and validated shared lineage."""
 from pathlib import Path
 import runpy
 import sys
@@ -39,15 +39,30 @@ SELF = reference(OPERATOR/"deployment-seal-receipt.json")
 files = package(OPERATOR,SELF)
 BINDING = checked(dict(path=str(OPERATOR/"binding.json"),sha256=files["binding.json"]))
 PROVIDER = Path(BINDING["provider"]["path"]).parent
-need(OPERATOR == ROOT/"operator-v1" and PROVIDER.name == "issued-price-v37"
+VERSION = int(PROVIDER.name.removeprefix("issued-price-v"))
+REBOUND = OPERATOR == ROOT/"operator-v2"
+need((REBOUND and VERSION >= 39 or OPERATOR == ROOT/"operator-v1" and VERSION == 37)
      and BINDING["interface"]["path"] == str(ROOT/"NEXT_HOURLY_WRITER_INTERFACE.json"),
      "unexpected next hourly operator or provider")
 provider_files = package(PROVIDER,BINDING["provider"])
 source = checked(dict(path=str(PROVIDER/"SOURCE.json"),sha256=provider_files["SOURCE.json"]))
 need(source["next_hourly170_interface"] == BINDING["interface"]
-     and source["next_hourly170_receiver"] == BINDING["receiver"]
-     and Path(source["prior_shared_price"]["path"]).parent.name == "issued-price-v36",
-     "missing V36/V37 next hourly registration")
+     and source["next_hourly170_receiver"] == BINDING["receiver"], "missing next hourly registration")
+if REBOUND:
+    ancestor = source["prior_shared_price"]
+    for version in range(VERSION - 1, 36, -1):
+        previous = PROVIDER.with_name(f"issued-price-v{version}")
+        parts = package(previous, ancestor)
+        record = checked(dict(path=str(previous/"SOURCE.json"), sha256=parts["SOURCE.json"]))
+        need(record["next_hourly170_interface"] == BINDING["interface"]
+             and record["next_hourly170_receiver"] == BINDING["receiver"], "shared price lost the 170 registration")
+        if version == 37:
+            need(ancestor["sha256"] == "230e3cf5e73d68185bc89e097f760f89d680a11b08b953cca3af401e3374c146",
+                 "rebound 170 did not inherit its sealed V37 price")
+        ancestor = record["prior_shared_price"]
+else:
+    need(Path(source["prior_shared_price"]["path"]).parent.name == "issued-price-v36",
+         "missing V36/V37 next hourly registration")
 prior = runpy.run_path(str(PROVIDER/"continuation_price.py"))["prior"]
 read,bound,state,inactive,cmd = prior.read,prior.bound,prior.state,prior.inactive,prior.cmd
 TREE = Path(bound(BINDING["interface"])["run"])
@@ -92,10 +107,17 @@ def writer(require_registration=True):
     need(ready["after_floor170_interface"] == scope()[0]["previous_interface"],"writer lost its 170 ancestor")
     if ready.get("next_hourly170_interface") is None and not require_registration:
         return active,None
-    need(active["path"] == str(WRITERS/"FAILED166_CADENCE_V76_ACTIVE.json")
-         and ready["old_owner"] == BINDING["preceding_writer"]
-         and ready["next_hourly170_interface"] == BINDING["interface"],
-         "the exact V76 writer has not accepted the next-hourly 170 interface")
+    v76_path = WRITERS/"FAILED166_CADENCE_V76_ACTIVE.json"
+    if REBOUND:
+        v76 = checked(dict(path=str(v76_path),
+                           sha256="50c63b7091977e256d3184b59b7ebfad6a61cc98a5db6e2658d19b33fa36d3d1"))
+        initial_ready = checked(v76["ready"])
+    else:
+        need(active["path"] == str(v76_path), "the exact V76 writer has not accepted this interface")
+        initial_ready = ready
+    need(initial_ready["old_owner"] == BINDING["preceding_writer"]
+         and initial_ready["next_hourly170_interface"] == ready["next_hourly170_interface"] == BINDING["interface"],
+         "the sole writer lost the next-hourly 170 interface")
     modules = package(Path(BINDING["receiver"]["path"]).parent,BINDING["receiver"])
     writer_members = package(program.parent,ready["package"])
     need(all(writer_members.get(name) == digest for name,digest in modules.items())
