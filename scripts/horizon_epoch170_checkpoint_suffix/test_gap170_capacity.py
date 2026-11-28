@@ -91,7 +91,7 @@ class IndependentGapTests(TestCase):
             self.assertEqual(phase, "start")
             return {"fits": True, "home_margin": 20, "ram_margin": 12}
 
-        operator = Mock()
+        operator = Mock(ENTRY_FIELD="independent_checkpoint")
         operator.static.return_value = ({}, "scope")
         operator.compare.return_value = "checkpoint"
         with (patch.object(dispatch, "operator", operator),
