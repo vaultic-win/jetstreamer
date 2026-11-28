@@ -113,6 +113,38 @@ pub(super) fn retry_next_v1627<'a>(launch_sha: &'a str, invocation: &'a str) -> 
     })
 }
 
+const SUCCESSOR_BOOTSTRAP: u64 = 99_516_304;
+const SUCCESSOR_LEFT: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon230-middle-hourly-second-runtime-v1/terminal.json",
+    "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56",
+);
+const SUCCESSOR_EDGES: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon230-successor-99516304-99524336-finalized-edges-v1/edges.json",
+    "c28bfc7f39288658744b092a0841fa0a15063f018fbfeed5ee9db5ac5b4e4ce6",
+);
+
+pub(super) fn successor<'a>(launch_sha: &'a str, invocation: &'a str) -> Result<Window<'a>> {
+    ensure!(hex(launch_sha, 64) && hex(invocation, 32), "invalid epoch 230 launch identity");
+    Ok(Window {
+        state: "/var/lib/jetstreamer/horizon230-successor-99516304-runtime-v1",
+        launch_sha,
+        unit: "horizon-qualify-230-successor-99516304-v1.service",
+        invocation,
+        exit_schema: "foundation-epoch230-successor-pid1-exit-v1",
+        kind: "epoch230-private-successor-99516304-window",
+        exit_path: "/var/lib/jetstreamer/horizon230-successor-exit-v1/evidence/pid1-exit.json",
+        receipt_schema: "foundation-epoch230-successor-terminal-evidence-v1",
+        bootstrap: SUCCESSOR_BOOTSTRAP,
+        last: 99_524_336,
+        archive: "/home/ubuntu/.jetstreamer-private/qualification-230-successor-99516304-v1/work/output/epoch-230-slots-99516305-99524336.jet",
+        bootstrap_accounts: "CCpNXjpMvVkXW2xNzBHSfNSRc8efttNr3bB3ejex4Q8u",
+        terminal_accounts: "3kQLrCXHhgpA1LvzMW8rFiGpy1C6eNojUUy15j8yNuys",
+        terminal_block: "4i1Lh7C13Ns7nx3TkV9JHtAkxkDeUKbmXjQWCGKVU4ha",
+        profile_sha: Some("5a3fbf5e9cc3289a374a2cf54b6b78f3dfa859bb92d54b75625ea1f3daa204a2"),
+        ..ADJACENT
+    })
+}
+
 const PRECEDING_WINDOW: (&str, &str) = (
     "/var/lib/jetstreamer/horizon230-first-7871-runtime-v1/terminal.json",
     "16d546332a37fccd20a7b2609908288b426276a01908c6e255db886aba6ea8d2",
@@ -386,6 +418,26 @@ pub(super) fn collect(
             );
             Some(json!({"source_window": source, "consensus_fields_match": true}))
         }
+        SUCCESSOR_BOOTSTRAP => {
+            let preceding = Reference::new(SUCCESSOR_LEFT.0, SUCCESSOR_LEFT.1);
+            let edges = Reference::new(SUCCESSOR_EDGES.0, SUCCESSOR_EDGES.1);
+            let retained = preceding.read()?;
+            let finalized = edges.read()?;
+            ensure!(
+                retained["state"] == "local-segment-committed"
+                    && retained["guard_drained"] == true
+                    && retained["snapshot_verified"] == true
+                    && same_checkpoint(&retained["checkpoint"], &json!(manifest.bootstrap))
+                    && finalized["schema"] == "foundation-epoch230-successor-finalized-edges-v1"
+                    && finalized["bootstrap"]["slot"] == window.bootstrap
+                    && finalized["bootstrap"]["blockhash"] == manifest.bootstrap.last_blockhash
+                    && finalized["terminal"]["slot"] == window.last
+                    && finalized["terminal"]["blockhash"] == manifest.terminal.last_blockhash,
+                "epoch 230 successor differs from its retained checkpoint or finalized endpoint"
+            );
+            Some(json!({"preceding":preceding,"finalized_edges":edges,
+                        "bootstrap_consensus_fields_match":true,"terminal_blockhash_matches":true}))
+        }
         _ => None,
     };
     ensure!(
@@ -425,14 +477,29 @@ pub(super) fn collect(
     )
 }
 
-pub(super) fn finish_retry(window: &Window<'_>) -> Result<Value> {
-    const GUARD: &str = "horizon-230-next-v1627-99468089-protective-v2.service";
-    const TIMER: &str = "horizon-230-next-v1627-99468089-protective-v2.timer";
-    const TERMINAL: &str = "/var/lib/jetstreamer/horizon230-next-v1627-retry-terminal-collector-v2/evidence/terminal-evidence.json";
+pub(super) fn finish_window(window: &Window<'_>) -> Result<Value> {
+    let (guard, timer, terminal_path, intent_schema, drain_schema) =
+        if window.bootstrap == SUCCESSOR_BOOTSTRAP {
+            (
+                "horizon-230-successor-99516304-protective-v1.service",
+                "horizon-230-successor-99516304-protective-v1.timer",
+                "/var/lib/jetstreamer/horizon230-successor-terminal-collector-v1/evidence/terminal-evidence.json",
+                "foundation-epoch230-successor-drain-intent-v1",
+                "foundation-epoch230-successor-drain-v1",
+            )
+        } else {
+            (
+                "horizon-230-next-v1627-99468089-protective-v2.service",
+                "horizon-230-next-v1627-99468089-protective-v2.timer",
+                "/var/lib/jetstreamer/horizon230-next-v1627-retry-terminal-collector-v2/evidence/terminal-evidence.json",
+                "foundation-epoch230-next-v1627-retry-drain-intent-v2",
+                "foundation-epoch230-next-v1627-retry-drain-v2",
+            )
+        };
     require_root()?;
     let _lock = predecessor::lock_cadence()?;
     let (launch_ref, launch, pid) = load_launch(window)?;
-    let (native, terminal) = predecessor::sealed_document(Path::new(TERMINAL))?;
+    let (native, terminal) = predecessor::sealed_document(Path::new(terminal_path))?;
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim().replace('-', "");
     ensure!(
         terminal["schema"] == window.receipt_schema
@@ -445,7 +512,12 @@ pub(super) fn finish_retry(window: &Window<'_>) -> Result<Value> {
             && terminal["producer_exit_status"] == 0
             && terminal["producer_drained"] == true
             && terminal["native_manifest_complete_verified"] == true
-            && terminal["adjacent_checkpoints"]["consensus_fields_match"] == true
+            && if window.bootstrap == SUCCESSOR_BOOTSTRAP {
+                terminal["adjacent_checkpoints"]["bootstrap_consensus_fields_match"] == true
+                    && terminal["adjacent_checkpoints"]["terminal_blockhash_matches"] == true
+            } else {
+                terminal["adjacent_checkpoints"]["consensus_fields_match"] == true
+            }
             && terminal["first_slot"] == window.bootstrap + 1
             && terminal["last_slot"] == window.last
             && terminal["slot_count"] == window.last - window.bootstrap
@@ -484,28 +556,28 @@ pub(super) fn finish_retry(window: &Window<'_>) -> Result<Value> {
     let completion = state.join("terminal.json");
     let intent = state.join("terminal-drain-intent.json");
     let expected = json!({
-        "schema":"foundation-epoch230-next-v1627-retry-drain-intent-v2",
+        "schema":intent_schema,
         "unit":window.unit,"invocation_id":window.invocation,"launch":launch_ref,
         "pid1_exit":exit_ref,"native_terminal":native,"guard_plan":launch["guard_plan"],
         "guard_timer_invocation":timer_invocation,"publication_authorized":false,
     });
-    let timer = predecessor::timer_state(TIMER)?;
-    let active = timer.get("ActiveState").is_some_and(|value| value == "active");
-    ensure!(timer.get("Id").is_some_and(|value| value == TIMER)
-        && timer.get("Job").is_some_and(String::is_empty)
+    let timer_before = predecessor::timer_state(timer)?;
+    let active = timer_before.get("ActiveState").is_some_and(|value| value == "active");
+    ensure!(timer_before.get("Id").is_some_and(|value| value == timer)
+        && timer_before.get("Job").is_some_and(String::is_empty)
         && if active {
-            timer.get("Unit").is_some_and(|value| value == GUARD)
-                && timer.get("InvocationID").is_some_and(|value| value == timer_invocation)
+            timer_before.get("Unit").is_some_and(|value| value == guard)
+                && timer_before.get("InvocationID").is_some_and(|value| value == timer_invocation)
         } else {
-            timer.get("ActiveState").is_some_and(|value| value == "inactive")
+            timer_before.get("ActiveState").is_some_and(|value| value == "inactive")
         }, "epoch 230 retry guard timer ownership changed");
     if completion.try_exists()? {
         let (reference, done) = predecessor::sealed_document(&completion)?;
-        ensure!(!active && done["schema"] == "foundation-epoch230-next-v1627-retry-drain-v2"
+        ensure!(!active && done["schema"] == drain_schema
             && done["launch"] == json!(launch_ref) && done["native_terminal"] == json!(native)
             && done["invocation_id"] == window.invocation && done["guard_drained"] == true,
             "existing epoch 230 retry closure changed");
-        predecessor::guard_drained(GUARD)?;
+        predecessor::guard_drained(guard)?;
         return Ok(json!({"terminal":reference,"already_completed":true}));
     }
     let intent = if intent.try_exists()? {
@@ -517,20 +589,20 @@ pub(super) fn finish_retry(window: &Window<'_>) -> Result<Value> {
         predecessor::seal_in_state(&intent, &expected)?
     };
     if active {
-        command("/usr/bin/systemctl", &["--system", "stop", TIMER])?;
+        command("/usr/bin/systemctl", &["--system", "stop", timer])?;
     }
-    let timer_after = predecessor::timer_state(TIMER)?;
+    let timer_after = predecessor::timer_state(timer)?;
     ensure!(timer_after.get("ActiveState").is_some_and(|value| value == "inactive")
         && timer_after.get("Job").is_some_and(String::is_empty),
         "epoch 230 retry guard timer has not drained");
-    let mut guard_after = predecessor::guard_drained(GUARD);
+    let mut guard_after = predecessor::guard_drained(guard);
     for _ in 0..12 {
         if guard_after.is_ok() { break; }
         std::thread::sleep(std::time::Duration::from_millis(250));
-        guard_after = predecessor::guard_drained(GUARD);
+        guard_after = predecessor::guard_drained(guard);
     }
     let terminal = predecessor::seal_in_state(&completion, &json!({
-        "schema":"foundation-epoch230-next-v1627-retry-drain-v2","epoch":230,
+        "schema":drain_schema,"epoch":230,
         "unit":window.unit,"invocation_id":window.invocation,"launch":launch_ref,
         "pid1_exit":exit_ref,"native_terminal":native,"intent":intent,"timer_after":timer_after,
         "guard_after":guard_after?,"producer":verify()?,"guard_drained":true,

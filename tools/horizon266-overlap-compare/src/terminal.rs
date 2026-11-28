@@ -811,6 +811,22 @@ pub(super) fn capture_exit(launch_sha: &str, destination: &Path) -> Result<Value
     exit::capture(launch_sha, destination)
 }
 
+pub(super) fn capture_successor230_exit(
+    launch_sha: &str, invocation: &str, destination: &Path,
+) -> Result<Value> {
+    exit::capture_window230(&window230::successor(launch_sha, invocation)?, launch_sha, destination)
+}
+
+pub(super) fn collect_successor230_terminal(
+    launch_sha: &str, invocation: &str, exit: &Path, digest: &str, destination: &Path,
+) -> Result<Value> {
+    window230::collect(&window230::successor(launch_sha, invocation)?, exit, digest, destination)
+}
+
+pub(super) fn finish_successor230_terminal(launch_sha: &str, invocation: &str) -> Result<Value> {
+    window230::finish_window(&window230::successor(launch_sha, invocation)?)
+}
+
 pub(super) fn capture_adjacent230_exit(launch_sha: &str, destination: &Path) -> Result<Value> {
     exit::capture_adjacent230(launch_sha, destination)
 }
@@ -902,7 +918,7 @@ pub(super) fn finish_window266_terminal(launch_sha: &str, successor: bool) -> Re
 }
 
 pub(super) fn finish_retry_next_v1627_terminal(launch_sha: &str, invocation: &str) -> Result<Value> {
-    window230::finish_retry(&window230::retry_next_v1627(launch_sha, invocation)?)
+    window230::finish_window(&window230::retry_next_v1627(launch_sha, invocation)?)
 }
 
 pub(super) fn collect_window266_terminal(

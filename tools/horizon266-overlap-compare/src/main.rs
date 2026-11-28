@@ -550,6 +550,22 @@ fn main() -> Result<()> {
             terminal::collect_retry_next_v1627_terminal(launch, invocation, Path::new(exit), digest, Path::new(destination))?
         }
         #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, launch, invocation, destination] if command == "capture-successor230-exit" => {
+            terminal::capture_successor230_exit(launch, invocation, Path::new(destination))?
+        }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, launch, invocation, exit, digest, destination]
+            if command == "collect-successor230-terminal" =>
+        {
+            terminal::collect_successor230_terminal(
+                launch, invocation, Path::new(exit), digest, Path::new(destination),
+            )?
+        }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, launch, invocation] if command == "finish-successor230-terminal" => {
+            terminal::finish_successor230_terminal(launch, invocation)?
+        }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
         [command, digest, destination] if command == "capture-predecessor-exit" => {
             terminal::capture_predecessor_exit(digest, Path::new(destination))?
         }
