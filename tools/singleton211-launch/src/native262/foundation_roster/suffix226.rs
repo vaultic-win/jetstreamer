@@ -89,6 +89,41 @@ pub(super) fn reserve_for_overlap(shares_suffix: bool, suffix_quote: bool, suffi
     shares_suffix && !suffix_quote && !suffix_active
 }
 
+/// Bind a newly guarded suffix to the accepted sample that funded its launch.
+pub(super) fn launched_since_sample(
+    replay: &LiveReplay,
+    fleet: &Bound,
+    observer: &Bound,
+    booking: &Bound,
+    drain: &Bound,
+) -> Result<Bound> {
+    let launch = replay.reference.sealed()?;
+    let admission = binding(&launch["admission"])?.sealed()?;
+    let reference = binding(&admission["capacity"])?;
+    ensure!(
+        reference.path == Path::new(SUFFIX_226_ROOT).join("accepted-capacity.json")
+            && admission["operation"] == "replay"
+            && admission["actual_guard_and_owner_qualified"] == true
+            && admission["complete_fleet_and_century_floor_bound"] == true,
+        "epoch 226 suffix has no exact reserved capacity transition"
+    );
+    let capacity = reference.sealed()?;
+    let preceding = &capacity["roster"];
+    ensure!(
+        capacity["epoch"] == 226
+            && capacity["resource_fit"] == true
+            && capacity["candidate_cap_bytes"] == SUFFIX_226_CAP
+            && capacity["candidate_memory_max_bytes"] == SUFFIX_226_CAP
+            && capacity["extraction226_terminal"]["completion"] == json!(drain)
+            && preceding["fleet"] == json!(fleet)
+            && preceding["observer"] == json!(observer)
+            && preceding["booking"] == json!(booking)
+            && preceding["active_suffix_226_registration"].is_null(),
+        "epoch 226 suffix launch did not consume this accepted fleet reservation"
+    );
+    Ok(reference)
+}
+
 /// Reserve the complete suffix across extraction, drain and admission. Its own active
 /// guard and cgroup take over the booking once it is running. Only a verified, drained
 /// suffix with a sealed assembly handoff can relinquish a pending booking.

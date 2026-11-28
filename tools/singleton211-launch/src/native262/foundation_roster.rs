@@ -1784,11 +1784,23 @@ fn measure(
     };
     let mut closed_v1627_230 = None;
     let mut closed_retry_next_v1627_230 = None;
+    let mut closed_successor_230 = None;
     let mut closed_adjacent_230 = None;
     let mut closed_overlap_266 = None;
     let mut closed_predecessor_266 = None;
     let mut closed_window_266 = None;
     let rows = admission_fleet["active"].as_array_mut().context("Foundation active roster")?;
+    let suffix_226_transition = if let Some(replay) = live_replays.get(&226)
+        && !rows.iter().any(|row| row["epoch"] == 226)
+    {
+        let drain = extraction_drain.as_ref().context("epoch 226 extraction drain missing")?;
+        let reference =
+            suffix226::launched_since_sample(replay, &fleet_ref, &observer_ref, &booking_ref, drain)?;
+        rows.push(json!({"epoch":226,"phase":"diagnostic-qualification","producer":replay.owner}));
+        Some(reference)
+    } else {
+        None
+    };
     if quote.is_some() && !live_replays.contains_key(&230)
         && let Some(index) = rows.iter().position(|row| {
             row["epoch"] == 230 && row["producer"]["Id"] == V1627_230.unit
@@ -1801,9 +1813,17 @@ fn measure(
         && let Some(index) = rows.iter().position(|row| {
             row["epoch"] == 230 && row["producer"]["Id"] == RETRY_NEXT_V1627_230.unit
         })
-        && let Some(proof) = focused::retry_next_v1627_230_drained(n, &rows[index])?
+        && let Some(proof) = focused::window_230_drained(n, &rows[index])?
     {
         closed_retry_next_v1627_230 = Some((rows.remove(index), proof));
+    }
+    if quote.is_some() && !live_replays.contains_key(&230)
+        && let Some(index) = rows.iter().position(|row| {
+            row["epoch"] == 230 && row["producer"]["Id"] == SUCCESSOR_REPLAY_230.unit
+        })
+        && let Some(proof) = focused::window_230_drained(n, &rows[index])?
+    {
+        closed_successor_230 = Some((rows.remove(index), proof));
     }
     if quote.is_some() && !live_replays.contains_key(&230)
         && let Some(index) = rows.iter().position(|row| {
@@ -2196,10 +2216,13 @@ fn measure(
             "epoch 230 v1.6.27 terminal changed during roster binding"
         );
     }
-    if let Some((row, proof)) = &closed_retry_next_v1627_230 {
+    for (row, proof) in [&closed_retry_next_v1627_230, &closed_successor_230]
+        .into_iter()
+        .flatten()
+    {
         ensure!(
-            focused::retry_next_v1627_230_drained(n, row)?.as_ref() == Some(proof),
-            "epoch 230 retry terminal changed during roster binding"
+            focused::window_230_drained(n, row)?.as_ref() == Some(proof),
+            "epoch 230 window terminal changed during roster binding"
         );
     }
     if let Some((row, proof)) = &closed_adjacent_230 {
@@ -2503,12 +2526,14 @@ fn measure(
         "closed_first_7871_replay":closed_first_7871,
         "closed_v1627_230_replay":closed_v1627_230.map(|(_, proof)| proof),
         "closed_retry_next_v1627_230_replay":closed_retry_next_v1627_230.map(|(_, proof)| proof),
+        "closed_successor_230_replay":closed_successor_230.map(|(_, proof)| proof),
         "closed_adjacent_230_replay":closed_adjacent_230.map(|(_, proof)| proof),
         "closed_overlap_266_replay":closed_overlap_266.map(|(_, proof)| proof),
         "closed_predecessor_266_replay":closed_predecessor_266.map(|(_, proof)| proof),
         "closed_window_266_replay":closed_window_266.map(|(_, _, proof)| proof),
         "closed_extraction_226":extraction_drain,
         "active_suffix_226_registration":live_replays.get(&226).map(|replay| &replay.reference),
+        "accepted_suffix_226_transition":suffix_226_transition,
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
         "active_restore_258_registration":live_replays.get(&258).filter(|r| r.unit == RESTORE_258.unit).map(|r| &r.reference),
         "active_replay_258_registration":live_replays.get(&258).filter(|r| r.unit == replay258::UNIT).map(|r| &r.reference),
