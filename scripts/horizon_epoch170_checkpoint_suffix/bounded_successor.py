@@ -32,11 +32,12 @@ FOLLOWING_READERS = {FOLLOWING_READER, FOLLOWING_READER.with_name("closed-reader
 CONTINUATIONS = ENROLLING_OPERATORS | {FOLLOWING_DEPLOYMENT, NEXT_DEPLOYMENT, NEXT_DEPLOYMENT.with_name("operator-with143-v1"), NEXT_DEPLOYMENT.with_name("operator-with143-v2")}
 GAP_DEPLOYMENT = NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-20261128-v1/operator-v1"
 RAM_GAP_DEPLOYMENT = NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-ram-20261128-v1/operator-v1"
-RAM_GAP = Path(__file__).resolve().parent == RAM_GAP_DEPLOYMENT
+SECOND_RAM_GAP = Path(__file__).resolve().parent == NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-ram-20261128-v2/operator-v1"
+RAM_GAP = SECOND_RAM_GAP or Path(__file__).resolve().parent == RAM_GAP_DEPLOYMENT
 GAP = RAM_GAP or Path(__file__).resolve().parent == GAP_DEPLOYMENT
 ENTRY_FIELD = "independent_checkpoint" if GAP else "closed_comparison"
 if RAM_GAP:
-    q = load("ram170_price")
+    q = load("ram170_second_price" if SECOND_RAM_GAP else "ram170_price")
     workspace = load("ram170_workspace")
 elif GAP:
     q = load("gap170_price")
@@ -283,13 +284,17 @@ def arm():
     a,ar=same_actor()
     intent,_=current("SUCCESSOR_START_INTENT.json")
     fit=checked_price("held")
-    # A new held tree with a higher aggregate floor may require a stronger guard before release.
-    floor=max(intent["guard_floor"],fit["guard_floor"])
-    if RAM_GAP:
-        remaining = max(0, fit["home_margin"] - (floor-fit["guard_floor"]))
-        floor += min(4*G, remaining//2)
+    if SECOND_RAM_GAP:
+        # The locked held fit already measures outstanding peer growth. The
+        # release step rechecks this floor against its new complete-fleet fit.
+        floor=fit["guard_floor"]
     else:
-        floor += min(G, max(0,fit["home_margin"])//2)
+        floor=max(intent["guard_floor"],fit["guard_floor"])
+        if RAM_GAP:
+            remaining = max(0, fit["home_margin"] - (floor-fit["guard_floor"]))
+            floor += min(4*G, remaining//2)
+        else:
+            floor += min(G, max(0,fit["home_margin"])//2)
     cap=intent["guard_cap"]
     need(funded_guard(fit, floor, cap),
          "held floor/cap cannot cover remaining growth")
