@@ -1,6 +1,6 @@
 //! Release a closed epoch 230 bootstrap whose immutable GCS generation is still available.
 use super::{
-    appendvec292::failed::{no_readers, StoppedReference},
+    appendvec292::failed::{StoppedReference, no_readers},
     snapshot296::{BoundCache, evict_cache},
     *,
 };
@@ -168,6 +168,7 @@ pub(super) fn run(
             state,
             path: &path,
             size: SIZE,
+            owner: 1000,
             sha: SHA,
             restore: &restore,
             proof: &proof,

@@ -256,6 +256,7 @@ pub(super) fn run(
             state,
             path: &path,
             size: SIZE,
+            owner: 1000,
             sha: SHA,
             restore: &restore,
             proof: &proof,
@@ -275,6 +276,7 @@ pub(super) struct BoundCache<'a> {
     pub state: &'a Path,
     pub path: &'a Path,
     pub size: u64,
+    pub owner: u32,
     pub sha: &'a str,
     pub restore: &'a Value,
     pub proof: &'a Value,
@@ -292,6 +294,7 @@ pub(super) fn evict_cache(
         state,
         path,
         size,
+        owner,
         sha,
         restore,
         proof,
@@ -337,7 +340,7 @@ pub(super) fn evict_cache(
             let mut file = open_regular(path)?;
             ensure!(
                 meta.is_file()
-                    && meta.uid() == 1000
+                    && meta.uid() == owner
                     && meta.nlink() == 1
                     && meta.mode() & 0o022 == 0
                     && meta.len() == size
