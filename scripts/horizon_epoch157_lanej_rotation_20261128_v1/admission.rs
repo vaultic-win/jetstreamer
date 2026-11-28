@@ -32,7 +32,7 @@ pub(super) fn intake(phase: &str, unit: &str) -> Result<PathBuf> {
         phase.to_uppercase()
     )))
 }
-fn whole(path: &str, sha: &str) -> Result<Value> {
+fn whole(path: &str, sha: &str, phase: &str) -> Result<Value> {
     let p = Path::new(path);
     let dir = p.parent().context("provider directory")?;
     ensure!(
@@ -56,14 +56,13 @@ fn whole(path: &str, sha: &str) -> Result<Value> {
     );
     let seal = pinned(p, sha);
     let cmd = member(&seal, "capacity.py")?;
+    let pricing = format!(
+        "{}\nimport runpy,sys\nq=runpy.run_path(sys.argv[1])['whole_roster']()\nif sys.argv[2] != 'restore': q['epoch157_scoped_candidate']=project(q,sys.argv[2])\nprint(json.dumps(q))",
+        include_str!("reclamation_price.py")
+    );
     let q: Value = serde_json::from_str(&command(
         "/usr/bin/python3",
-        &[
-            "-IB",
-            "-c",
-            "import json,runpy,sys; print(json.dumps(runpy.run_path(sys.argv[1])['whole_roster']()))",
-            cmd.to_str().unwrap(),
-        ],
+        &["-IB", "-c", &pricing, cmd.to_str().unwrap(), phase],
     )?)?;
     ensure!(
         q["package"] == seal
@@ -78,32 +77,45 @@ fn whole(path: &str, sha: &str) -> Result<Value> {
     bound(&q["writer"])?;
     Ok(q)
 }
+fn active_units(patterns: &[&str]) -> Result<Vec<String>> {
+    let mut args = vec![
+        "list-units",
+        "--no-pager",
+        "--plain",
+        "--no-legend",
+        "--type=service",
+        "--state=running,activating,deactivating,reloading",
+    ];
+    args.extend_from_slice(patterns);
+    Ok(command("/usr/bin/systemctl", &args)?
+        .lines()
+        .filter_map(|s| s.split_whitespace().next().map(str::to_string))
+        .collect())
+}
 fn active_holding() -> Result<Vec<String>> {
-    Ok(command(
-        "/usr/bin/systemctl",
-        &[
-            "list-units",
-            "--no-pager",
-            "--plain",
-            "--no-legend",
-            "--type=service",
-            "--state=running,activating,deactivating,reloading",
-            "horizon-closed186-*",
-            "horizon-*park*",
-            "horizon-*holding*",
-            "horizon-*retire*",
-            "horizon-*restore*",
-        ],
-    )?
-    .lines()
-    .filter_map(|s| s.split_whitespace().next().map(str::to_string))
-    .collect())
+    active_units(&[
+        "horizon-closed186-*",
+        "horizon-*park*",
+        "horizon-*holding*",
+        "horizon-*retire*",
+        "horizon-*restore*",
+    ])
 }
 pub(super) fn holder(unit: &str) -> Result<Value> {
-    let phase = if unit.starts_with("horizon-closed157-retire-lanej-") {
-        "retire"
+    let phase = ["fixture", "census", "custody", "retire", "restore"]
+        .into_iter()
+        .find(|p| intake(p, unit).is_ok())
+        .context("foreign 157 unit")?;
+    let serial = matches!(phase, "retire" | "restore");
+    let slice = if serial {
+        "system.slice"
     } else {
-        "restore"
+        "horizonaudit.slice"
+    };
+    let roster = if serial {
+        active_holding()?
+    } else {
+        active_units(&["horizon-157-lanej-*"])?
     };
     let path = intake(phase, unit)?;
     let admission = reference(&path)?;
@@ -113,12 +125,12 @@ pub(super) fn holder(unit: &str) -> Result<Value> {
         a["operator_seal"] == seal
             && a["phase"] == phase
             && a["unit"] == unit
-            && a["serial_holding_slot"] == true
+            && a["serial_holding_slot"] == serial
             && a["fits"] == true
             && a["resource_credit_bytes"] == 0
             && a["restore_bytes"] == LENGTH + META
             && a["serial_slot_bytes"] == 123350028052u64
-            && active_holding()? == [unit],
+            && roster == [unit],
         "foreign paid holding transition"
     );
     let s = props(
@@ -146,10 +158,17 @@ pub(super) fn holder(unit: &str) -> Result<Value> {
             && s["Id"] == unit
             && s["Job"].is_empty()
             && s["ControlPID"] == "0"
-            && s["ControlGroup"] == format!("/system.slice/{unit}")
+            && s["ControlGroup"] == format!("/{slice}/{unit}")
             && s["MemoryMax"] == mem.to_string()
             && s["MemorySwapMax"] == "0"
-            && s["CPUQuotaPerSecUSec"] == if phase == "retire" { "1s" } else { "2s" },
+            && s["CPUQuotaPerSecUSec"]
+                == match cpu {
+                    250000 => "250ms",
+                    500000 => "500ms",
+                    1000000 => "1s",
+                    2000000 => "2s",
+                    _ => anyhow::bail!("unexpected CPU envelope"),
+                },
         "holding scope limits changed"
     );
     let proc = PathBuf::from(format!("/proc/{pid}"));
@@ -162,7 +181,7 @@ pub(super) fn holder(unit: &str) -> Result<Value> {
         (actual.dev(), actual.ino()) == (target.dev(), target.ino()) && cmd == desired.as_bytes(),
         "wrong actual holding command"
     );
-    let g = PathBuf::from(format!("/sys/fs/cgroup/system.slice/{unit}"));
+    let g = PathBuf::from(format!("/sys/fs/cgroup/{slice}/{unit}"));
     let kernel = fs::read_to_string(g.join("cpu.max"))?;
     let v = kernel
         .split_whitespace()
@@ -186,7 +205,11 @@ pub(super) fn dispatch(phase: &str, provider: &str, sha: &str) -> Result<Value> 
     let (mem, cpu) = limits(phase)?;
     let seal = ours()?;
     let _lock = global()?;
-    let q = whole(provider, sha)?;
+    ensure!(
+        active_units(&["horizon-157-lanej-*"])?.is_empty(),
+        "the 157 metadata sublease has another native owner"
+    );
+    let q = whole(provider, sha, phase)?;
     let serial = matches!(phase, "retire" | "restore");
     let floor0 = num(&q, "guard_floor")?;
     let required = num(&q, "required_home")?;
@@ -218,8 +241,26 @@ pub(super) fn dispatch(phase: &str, provider: &str, sha: &str) -> Result<Value> 
             "previously paid share is occupied"
         );
     }
+    let admitted = if phase == "restore" {
+        q["fits"] == true
+    } else {
+        let scoped = &q["epoch157_scoped_candidate"];
+        ensure!(
+            scoped["phase"] == phase
+                && scoped["provider"] == q["package"]
+                && scoped["home_bytes"] == META
+                && scoped["ram_bytes"] == mem
+                && scoped["cpu_micros"] == cpu
+                && scoped["resource_credit_bytes"] == 0
+                && scoped["planned_retirement_credit_bytes"] == 0
+                && scoped["general_admission"] == false,
+            "different restricted reclamation quote"
+        );
+        floor = num(scoped, "floor")?;
+        scoped["fits"] == true
+    };
     ensure!(
-        q["fits"] == true && free >= floor.checked_add(budget).context("capacity overflow")?,
+        admitted && free >= floor.checked_add(budget).context("capacity overflow")?,
         "fresh roster refuses {phase}: HOME margin {}, RAM margin {}, HOME above callback floor {}",
         q["home_margin"],
         q["ram_margin"],

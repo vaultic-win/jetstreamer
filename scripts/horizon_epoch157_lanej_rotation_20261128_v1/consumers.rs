@@ -160,21 +160,48 @@ fn material(p: &Path) -> bool {
         .iter()
         .any(|r| name.to_ascii_lowercase().contains(r))
 }
-fn artifacts<'a>(
-    s: &str,
-    cache: &'a mut BTreeMap<PathBuf, (Vec<&'static str>, Vec<PathBuf>)>,
-) -> Result<Vec<(PathBuf, Vec<&'static str>)>> {
+fn follows(p: &Path) -> bool {
+    if matches!(
+        p.extension().and_then(|s| s.to_str()),
+        Some("py" | "sh" | "service" | "timer" | "path" | "socket")
+    ) {
+        return true;
+    }
+    let name = p
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_ascii_lowercase();
+    [
+        "plan",
+        "config",
+        "contract",
+        "launch",
+        "profile",
+        "manifest",
+        "settings",
+        "observer",
+        "authority",
+        "dispatch",
+    ]
+    .iter()
+    .any(|term| name.contains(term))
+}
+#[derive(Default)]
+struct PlanCache {
+    entries: BTreeMap<PathBuf, (Vec<&'static str>, Vec<PathBuf>)>,
+    estimated_bytes: usize,
+    examined: usize,
+}
+fn artifacts(s: &str, cache: &mut PlanCache) -> Result<Vec<(PathBuf, Vec<&'static str>)>> {
     let mut hits = Vec::new();
-    let mut queue: VecDeque<_> = tokens(s)
+    let mut seen: BTreeSet<PathBuf> = tokens(s)
         .map(PathBuf::from)
         .filter(|p| material(p))
         .collect();
-    let mut seen = BTreeSet::new();
+    let mut queue: VecDeque<PathBuf> = seen.iter().cloned().collect();
     while let Some(p) = queue.pop_front() {
-        if !seen.insert(p.clone()) {
-            continue;
-        }
-        if !cache.contains_key(&p) {
+        if !cache.entries.contains_key(&p) {
             let a = match fs::metadata(&p) {
                 Ok(x) => x,
                 Err(e)
@@ -190,46 +217,40 @@ fn artifacts<'a>(
             }
             let raw = fs::read(&p)?;
             let text = String::from_utf8_lossy(&raw);
-            let children = tokens(&text)
-                .map(PathBuf::from)
-                .filter(|p| material(p))
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .collect();
-            cache.insert(p.clone(), (terms(&text), children));
+            // Evidence leaves still receive a complete text check. Their historical links are never executed.
+            let children: Vec<PathBuf> = if follows(&p) {
+                tokens(&text)
+                    .map(PathBuf::from)
+                    .filter(|p| material(p))
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            if cache.estimated_bytes >= 48 << 20 {
+                cache.entries.clear();
+                cache.estimated_bytes = 0;
+            }
+            cache.estimated_bytes += 320
+                + p.as_os_str().len()
+                + children
+                    .iter()
+                    .map(|c| 96 + c.as_os_str().len())
+                    .sum::<usize>();
+            cache.examined += 1;
+            cache.entries.insert(p.clone(), (terms(&text), children));
         }
-        let (t, c) = &cache[&p];
-        if !t.is_empty() {
-            hits.push((p.clone(), t.clone()))
+        let (terms, children) = &cache.entries[&p];
+        if !terms.is_empty() {
+            hits.push((p, terms.clone()));
         }
-        // Follow executable plans. Ledgers and receipts describe prior owners rather than launching them.
-        let mut name = p
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_ascii_lowercase();
-        if matches!(
-            p.extension().and_then(|s| s.to_str()),
-            Some("py" | "sh" | "service" | "timer" | "path" | "socket")
-        ) {
-            name.push_str(" launch")
-        }
-        if [
-            "plan",
-            "config",
-            "contract",
-            "launch",
-            "profile",
-            "manifest",
-            "settings",
-            "observer",
-            "authority",
-            "dispatch",
-        ]
-        .iter()
-        .any(|t| name.contains(t))
-        {
-            queue.extend(c.iter().cloned())
+        for child in children {
+            // Enqueue each unique path once. Many plans share the same underlying evidence.
+            if !seen.contains(child) {
+                seen.insert(child.clone());
+                queue.push_back(child.clone());
+            }
         }
     }
     Ok(hits)
@@ -422,10 +443,11 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
             (!matches!(state, "inactive" | "failed")).then_some(name)
         })
         .collect();
-    let mut cache = BTreeMap::new();
+    let mut cache = PlanCache::default();
     let mut matches = Vec::new();
     let mut hits = Vec::new();
-    for slice in potential.chunks(120) {
+    let mut plan_catalog: BTreeMap<PathBuf, (usize, Vec<&'static str>)> = BTreeMap::new();
+    for (batch, slice) in potential.chunks(32).enumerate() {
         for plan in native_plans(slice)? {
             if matches!(plan.state.as_str(), "inactive" | "failed" | "gone") {
                 continue;
@@ -455,18 +477,31 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
                             || t.contains("expected")
                     })
                 });
-            let row = json!({"unit":unit,"state":plan.state,"sub":plan.sub,"direct":direct,"plans":nested,"terminal_validator":unit==VUNIT,"ledger_only":historical});
+            let mut ids = Vec::with_capacity(nested.len());
+            for (path, terms) in nested {
+                let next_id = plan_catalog.len();
+                let entry = plan_catalog.entry(path).or_insert((next_id, terms));
+                ids.push(entry.0);
+            }
+            let row = json!({"unit":unit,"state":plan.state,"sub":plan.sub,"direct":direct,"plans":ids,"terminal_validator":unit==VUNIT,"ledger_only":historical});
             if !owned && !historical {
-                hits.push(row.clone())
+                hits.push(matches.len())
             }
             matches.push(row);
+        }
+        if (batch + 1) % 16 == 0 {
+            eprintln!(
+                "examined {} native units and {} plan files",
+                (batch + 1) * 32,
+                cache.examined
+            );
         }
     }
     if !hits.is_empty() {
         let (_, iid) = role()?;
         let evidence = receipt(
             &root(&format!("CENSUS_BLOCKS_{iid}.json")),
-            &json!({"unresolved":hits,"definitions":definitions,"checked":potential.len()}),
+            &json!({"unresolved_indices":hits,"contributing_units":matches,"plan_catalog":plan_catalog,"definitions":definitions,"checked":potential.len()}),
         )?;
         anyhow::bail!(
             "{} unresolved staged consumers, evidence {}",
@@ -476,7 +511,7 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
     }
     let live = kernel(own)?;
     Ok(
-        json!({"operator_seal":o,"original_static_and_producer":known,"parked_original_reserve":reserve,"stopped_original_timer":timer,"original_validator":v,"preserved":validation,"systemd_units_seen":listing.lines().count(),"runnable_units":potential.len(),"resolved_material":cache.len(),"checked_definitions":definitions,"runnable_matches":matches,"kernel":live}),
+        json!({"operator_seal":o,"original_static_and_producer":known,"parked_original_reserve":reserve,"stopped_original_timer":timer,"original_validator":v,"preserved":validation,"systemd_units_seen":listing.lines().count(),"runnable_units":potential.len(),"resolved_material":cache.examined,"checked_definitions":definitions,"runnable_matches":matches,"plan_catalog":plan_catalog,"kernel":live}),
     )
 }
 #[cfg(test)]
