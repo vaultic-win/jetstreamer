@@ -243,16 +243,8 @@ FOLLOWING_266_RETRY = replace(
     profile_sha="b930774d546a33409b81273b413a6833e2220eabc3e9eb8f1b5cfae1dec35cfa",
     preflight_sha="5d44090c466c4ed15251b784b35cbd0aebf34f679cbd77da3c5f693b2e3d5bf7",
 )
-FOLLOWING_266_RETRY_TOKEN_PROBE = {
-    "path": str(FOLLOWING_266_RETRY.state / "evidence/prestart-token-probe.json"),
-    "sha256": "00873ab77119efa638ff0db47b768b4cda30b47072eeb9281e992b25ae315b",
-}
 FOLLOWING_266_RETRY_FLEET = V / "horizon266-following-window-fleet-v2/acceptance.json"
 FOLLOWING_266_RETRY_PLAN = V / "horizon266-following-window-admitted-v2"
-FOLLOWING_266_RETRY_FAILURE = {
-    "path": str(FOLLOWING_266_RETRY.state / "evidence/failed-v1-terminal.json"),
-    "sha256": "65d57227b4f9af9eeead1351acd49cdf63276629cedf53a879338f1df9c14367",
-}
 WINDOW_266_NODE_CREATED_PATHS = ("output", "receipts", "ledger/genesis.tar.bz2")
 
 TRACE_296 = Scope(
@@ -505,10 +497,12 @@ def predecessor_namespace(ops, scope, preflight, profile):
 def launch_window_266(kit, roster_ref, scope):
     """Use the existing invocation-bound startup for the sealed continuation."""
     ops = kit.ops
+    preflight = ops.bound(scope.preflight)
     if scope is FOLLOWING_266_RETRY:
         fleet = FOLLOWING_266_RETRY_FLEET
         plan_path = FOLLOWING_266_RETRY_PLAN
-        token_probe = FOLLOWING_266_RETRY_TOKEN_PROBE
+        token_probe = preflight["prestart_token_probe"]
+        assert token_probe["path"] == str(scope.state / "evidence/prestart-token-probe.json")
         release_schema = "foundation-epoch266-following-window-fleet-release-v2"
     elif scope is FOLLOWING_266:
         fleet = FOLLOWING_266_FLEET
@@ -544,7 +538,6 @@ def launch_window_266(kit, roster_ref, scope):
     for name in ("node", "worker", "guard"):
         ops.checked_image(profile[name])
     hook = ops.checked_image(HOOK)
-    preflight = ops.bound(scope.preflight)
     mount = ops.bound(preflight["mount_preflight"])
     assert preflight["profile"] == scope.profile and preflight["worker_execution"] is False
     assert mount["all_input_mounts_readonly"] and mount["scratch_noswap"]
@@ -591,8 +584,9 @@ def launch_window_266(kit, roster_ref, scope):
     assert not any((root / "scratch").iterdir())
     assert {p.name for p in (root / "ledger").iterdir()} == {"compact-indexes"}
     if scope is FOLLOWING_266_RETRY:
-        assert preflight["prior_failed_start"] == FOLLOWING_266_RETRY_FAILURE
-        failed = ops.bound(FOLLOWING_266_RETRY_FAILURE)
+        failure = preflight["prior_failed_start"]
+        assert failure["path"] == str(state / "evidence/failed-v1-terminal.json")
+        failed = ops.bound(failure)
         assert failed["failed_unit"] == FOLLOWING_266.unit and failed["failure_before_first_bank"]
         assert failed["guard_drained"] and failed["pid1"]["ExecMainStatus"] == "1"
         assert preflight["producer_created_paths_absent"] == list(WINDOW_266_NODE_CREATED_PATHS)
