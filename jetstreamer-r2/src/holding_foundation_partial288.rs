@@ -33,7 +33,7 @@ pub(super) fn command(action: &str) -> bool {
     matches!(action, CHECK | PARK) || retire::command(action)
 }
 
-fn source_proof() -> Bound {
+pub(super) fn source_proof() -> Bound {
     Bound {
         path: Path::new(ROOT).join("closed-source-binding.json"),
         sha256: SOURCE_PROOF.into(),
@@ -70,7 +70,7 @@ fn source(closed: &Value) -> Result<(PathBuf, Stamp)> {
     Ok((path, stamp))
 }
 
-fn verify_stopped(closed: &Value, path: &Path) -> Result<()> {
+pub(super) fn verify_stopped(closed: &Value, path: &Path) -> Result<()> {
     let terminal: Bound = serde_json::from_value(closed["terminal"].clone())?;
     let stop = saved(&terminal)?;
     ensure!(

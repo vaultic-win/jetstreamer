@@ -36,7 +36,7 @@ pub(crate) fn require_read_only(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn require_no_xattrs(path: &Path) -> Result<()> {
+pub(crate) fn require_no_xattrs(path: &Path) -> Result<()> {
     let path = CString::new(path.as_os_str().as_encoded_bytes())?;
     let size = unsafe { libc::llistxattr(path.as_ptr(), std::ptr::null_mut(), 0) };
     if size < 0 {
@@ -67,7 +67,7 @@ fn verify_directory(path: &Path, expected: &Value) -> Result<fs::Metadata> {
     Ok(m)
 }
 
-fn appendvec_name(name: &str) -> bool {
+pub(crate) fn appendvec_name(name: &str) -> bool {
     name.split_once('.').is_some_and(|(slot, id)| {
         !slot.is_empty()
             && !id.is_empty()
@@ -171,7 +171,7 @@ pub(crate) fn verify_tools() -> Result<()> {
     Ok(())
 }
 
-fn compare_payload(bundle: &Path, source: &Path, expected: FileIdentity) -> Result<()> {
+pub(crate) fn compare_payload(bundle: &Path, source: &Path, expected: FileIdentity) -> Result<()> {
     verify_tools()?;
     let bundle = OpenOptions::new()
         .read(true)

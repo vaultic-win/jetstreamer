@@ -9,6 +9,8 @@ mod appendvec288;
 mod appendvec292;
 #[path = "holding_foundation_accounts229.rs"]
 mod accounts229;
+#[path = "holding_foundation_accounts288.rs"]
+mod accounts288;
 #[path = "holding_foundation_canary224.rs"]
 mod canary224;
 #[path = "holding_foundation_ext4_228.rs"]
@@ -1020,7 +1022,7 @@ async fn restore(client: &Client, p: RestoreSpec, spec: &Bound) -> Result<()> {
 }
 
 pub(super) fn command(s: &str) -> bool {
-    if partial288::command(s) {
+    if partial288::command(s) || accounts288::command(s) {
         return true;
     }
     matches!(s, accounts229::ACTION | accounts229::RECHECK | accounts229::RESTORE | failed296::CHECK | failed296::ACTION | failed296::RECHECK) || canary224::command(s) || ext4_228::command(s) || appendvec288::command(s) || appendvec292::command(s) || matches!(
@@ -1041,6 +1043,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     host::validate_host_mapping()?;
     let supplied_mapping: Bound = serde_json::from_value(v["mapping"].clone())?;
     mapping(&supplied_mapping)?;
+    if action == accounts288::CHECK {
+        return accounts288::check(v);
+    }
     if action == appendvec292::CHECK_TREE {
         return appendvec292::check_tree(v, spec);
     }
@@ -1070,6 +1075,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     );
     if appendvec292::command(action) {
         return appendvec292::run(action, v, spec).await;
+    }
+    if action == accounts288::PARK {
+        return accounts288::park(v, spec).await;
     }
     if partial288::command(action) {
         return partial288::run(action, v, spec).await;

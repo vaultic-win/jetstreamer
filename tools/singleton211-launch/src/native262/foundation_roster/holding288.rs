@@ -2,6 +2,12 @@
 use super::*;
 
 pub const UNIT: &str = "foundation-288-closed-partial-custody-v1.service";
+pub const ACCOUNTS_UNIT: &str = "foundation-288-accounts-custody-v1.service";
+pub const ACCOUNTS_ROOT: &str =
+    "/var/lib/jetstreamer/horizon288-full-accounts-custody-preparation-v1";
+pub const ACCOUNTS_CENSUS_SHA: &str =
+    "4f479c60f59e89625cd271428d62c621906eb6aebc8e273253f238ec589f921c";
+pub const ACCOUNTS_ROSTER_SCHEMA: &str = "foundation-epoch288-shard-custody-roster-v1";
 pub const ROOT: &str = "/var/lib/jetstreamer/horizon288-full-partial-custody-hash-v1";
 pub const SOURCE_PROOF: &str = "7b57d40aeeb8103218477a00525e6bf32b771eaa16cbbe8e77da5a6b7de45d75";
 pub const TMPFS: &str = "/tmp/foundation-288-closed-custody";
@@ -31,6 +37,45 @@ pub(super) fn preparation() -> Result<Bound> {
             && row["retirement_authorized"] == false
             && row["publication_authorized"] == false,
         "foreign or complete epoch 288 source"
+    );
+    Ok(source)
+}
+
+pub(super) fn shard_preparation() -> Result<Bound> {
+    let root = Path::new(ACCOUNTS_ROOT);
+    let selection = root.join("selected-inspection.json");
+    let selected = Bound::new(&selection, hash(&selection)?).sealed()?;
+    let source = binding(&selected["inspection"])?;
+    let shard = selected["shard"]
+        .as_u64()
+        .context("missing epoch 288 shard selection")?;
+    let census = Bound::new(root.join("shard-census.json"), ACCOUNTS_CENSUS_SHA);
+    let original = census.sealed()?;
+    let inspected = source.sealed()?;
+    let expected = &original["shards"][usize::try_from(shard)?];
+    let path = Path::new(text(&original, "source")?).join(shard.to_string());
+    let meta = path.symlink_metadata()?;
+    ensure!(
+        selected["schema"] == "foundation-epoch288-selected-shard-inspection-v1"
+            && shard < 4
+            && source.path == root.join(format!("shard-{shard}-inspection.json"))
+            && inspected["schema"] == "foundation-epoch288-closed-shard-inspection-v1"
+            && inspected["epoch"] == 288
+            && inspected["shard"] == shard
+            && inspected["source_census"] == json!(census)
+            && inspected["source"] == json!(path)
+            && inspected["entries"] == expected["entries"]
+            && inspected["logical_bytes"] == expected["logical_bytes"]
+            && inspected["allocated_bytes"] == expected["allocated_file_bytes"]
+            && hex(text(&inspected, "ordered_member_identity_sha256")?, 64)
+            && inspected["remote_mutations"] == false
+            && inspected["retirement_authorized"] == false
+            && inspected["publication_authorized"] == false
+            && path.canonicalize()? == path
+            && meta.is_dir()
+            && inspected["directory_identity"]["device"] == meta.dev()
+            && inspected["directory_identity"]["inode"] == meta.ino(),
+        "epoch 288 shard inspection scope differs"
     );
     Ok(source)
 }
