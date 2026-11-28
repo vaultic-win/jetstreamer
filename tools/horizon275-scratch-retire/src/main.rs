@@ -486,6 +486,7 @@ fn main() -> Result<()> {
             | "--check-bootstrap-230-99437433" | "--retire-bootstrap-230-99437433"
             | "--check-bootstrap-230-99445304" | "--retire-bootstrap-230-99445304"
             | "--check-bootstrap-230-99461591" | "--retire-bootstrap-230-99461591"
+            | "--check-bootstrap-230-99468089" | "--retire-bootstrap-230-99468089"
             | "--check-bootstrap-230-99476782" | "--retire-bootstrap-230-99476782")
     ) {
         ensure!(

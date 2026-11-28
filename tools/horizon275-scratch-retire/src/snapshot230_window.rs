@@ -87,6 +87,35 @@ const V1627: Window = Window {
     unit: "horizon-qualify-230-v1627-window-v1.service",
     timer: "horizon-230-v1627-window-protective-v1.timer",
 };
+const RETRY: Window = Window {
+    slot: 99_468_089,
+    end: 99_476_782,
+    cache: "/home/ubuntu/.jetstreamer-private/epoch230-next-v1627.tgZPOmPP/bootstrap-intake-v2",
+    name: "snapshot-99468089-5kWV3NT4f15DCB3XkmiYSLu9a1H88XK4GYGEV54nimcQ.tar.zst",
+    size: 10_339_812_734,
+    owner: 0,
+    sha: "a1dcd477a8bd99c7ff52876e8b268d4392b31207bc99f2799f46c732644fb45d",
+    generation: 1_633_487_072_511_006,
+    bucket: "mainnet-beta-ledger-asia-sg1",
+    prefix: "99360209/hourly",
+    crc32c: "0ytaXA==",
+    md5: "xGz6AqdYdlwtnUrgbLgeyA==",
+    etag: "CJ6Iz8XdtPMCEAE=",
+    restore_sha: "61757b6c214626971341c293396e670f2df4eef2d2f1af6d54bfb9d4f3d1b49e",
+    closure: (
+        "/var/lib/jetstreamer/horizon230-next-v1627-retry-runtime-v2/terminal.json",
+        "5655121e77fdff95edf304705d035afc14cc12f598272af89e2e694f2f0c1cf0",
+        "foundation-epoch230-next-v1627-retry-drain-v2",
+    ),
+    native: Some((
+        "/var/lib/jetstreamer/horizon230-next-v1627-retry-terminal-collector-v2/evidence/terminal-evidence.json",
+        "9274fff35b66cf777d124950f2edebfeedce172ef40fd30a4d4a73135a9546ca",
+    )),
+    playback: "/var/lib/jetstreamer/horizon230-next-v1627-retry-poh-readback-v2/receipt.json",
+    archive_sha: "b1ee3bb4d487b67db309a9fa43004077301ee169c573d476db4e94d9fa4c8da5",
+    unit: "horizon-qualify-230-next-v1627-99468089-v2.service",
+    timer: "horizon-230-next-v1627-99468089-protective-v2.timer",
+};
 const SECOND: Window = Window {
     slot: 99_476_782,
     end: 99_516_304,
@@ -152,6 +181,7 @@ pub(super) fn for_command(command: &str) -> Option<&'static Window> {
         "--check-bootstrap-230-99430284" | "--retire-bootstrap-230-99430284" => Some(&VOTE),
         "--check-bootstrap-230-99445304" | "--retire-bootstrap-230-99445304" => Some(&ADJACENT),
         "--check-bootstrap-230-99461591" | "--retire-bootstrap-230-99461591" => Some(&V1627),
+        "--check-bootstrap-230-99468089" | "--retire-bootstrap-230-99468089" => Some(&RETRY),
         "--check-bootstrap-230-99476782" | "--retire-bootstrap-230-99476782" => Some(&SECOND),
         _ => None,
     }
@@ -300,8 +330,18 @@ pub(super) fn run(
     );
     let played: Value = read_bound(&reader.path, &reader.sha256, JSON_LIMIT)?;
     let (archive, edge) = terminal(window, &played)?;
+    let retry = window.slot == RETRY.slot;
+    let playback_schema = if retry {
+        ensure!(
+            played["adjacent_consensus_fields_match"] == true,
+            "epoch 230 retry playback lacks the verified next checkpoint"
+        );
+        "foundation-epoch230-next-v1627-retry-poh-readback-v2"
+    } else {
+        "foundation-epoch230-closed-window-full-poh-v1"
+    };
     ensure!(
-        played["schema"] == "foundation-epoch230-closed-window-full-poh-v1"
+        played["schema"] == playback_schema
             && played["first_slot"] == window.slot + 1
             && played["last_slot"] == window.end
             && played["slots"] == window.end - window.slot
@@ -314,22 +354,30 @@ pub(super) fn run(
             && played["publication_authorized"] == false,
         "independent epoch 230 playback is incomplete"
     );
-    let (replacement_path, replacement_sha) = if window.slot == ADJACENT.slot {
+    let (replacement_path, replacement_sha, binding_count) = if retry {
+        (
+            "/var/lib/jetstreamer/horizon230-middle-hourly-second-runtime-v1/profile.json",
+            "76787b9a49ef39f2ae2e7cb6053abdc4e1d075301527e72b1878f9165c9cfe38",
+            2,
+        )
+    } else if window.slot == ADJACENT.slot {
         (
             "/var/lib/jetstreamer/horizon230-next-v1627-window-runtime-v1/profile.json",
             "f289cdf8e6c6d85f387a2deac22c2c7ef19fcb1b4b98bc75230162a2cbf71447",
+            4,
         )
     } else {
         (
             "/var/lib/jetstreamer/horizon230-adjacent-99445304-runtime-v1/profile.json",
             "d01cf1c1a583c41e885ea74f57aea21a5e5178554e94bca16d01674a5bff1d1b",
+            4,
         )
     };
     let replacement: Value = read_bound(Path::new(replacement_path), replacement_sha, JSON_LIMIT)?;
     ensure!(
         replacement["readonly_bindings"]
             .as_array()
-            .is_some_and(|rows| rows.len() == 4
+            .is_some_and(|rows| rows.len() == binding_count
                 && rows
                     .iter()
                     .all(|row| row["path"].as_str().is_some_and(|p| Path::new(p) != path))),
@@ -380,6 +428,26 @@ pub(super) fn run(
                 VOTE_FAILED_READER,
                 "b02e106a069b4cc080bdc5b8a948fe55",
                 StoppedReference::Direct(VOTE_FAILED_SCAN_SHA),
+            )]
+        } else if retry {
+            const OLD_UNIT: &str = "horizon-qualify-230-next-v1627-99468089-v1.service";
+            terminal_unit("horizon-230-next-v1627-99468089-protective-v1.timer")?;
+            let fragment = Path::new("/run/systemd/transient").join(OLD_UNIT);
+            if fragment.try_exists()? {
+                let mut recipe = open_regular(&fragment)?;
+                let meta = recipe.metadata()?;
+                ensure!(
+                    meta.uid() == 0
+                        && meta.mode() & 0o022 == 0
+                        && digest(&mut recipe)? == "e2e01cc9d108560f0e1e34968297b0cc6229d696caec1b0d2b4e128c61936027"
+                        && identity(&meta) == identity(&fragment.symlink_metadata()?),
+                    "changed failed epoch 230 retry reader definition"
+                );
+            }
+            &[(
+                OLD_UNIT,
+                "f6cc2515791d43f9991ef0247dbc3e9d",
+                StoppedReference::Direct("c2f9dfa6b4a488a7d9058895e0cb98cb1448b72a297952b889d1a123a711c03c"),
             )]
         } else {
             &[]
