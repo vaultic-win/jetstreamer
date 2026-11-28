@@ -4,7 +4,7 @@ import fcntl
 import json
 import os
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 import subprocess
 import sys
@@ -125,8 +125,22 @@ NEXT_V1627_230 = Scope(
     "c54b1b9fc120a920e23d220b3d223565b7e0a5cd92f6206103c426b545431c48",
     225_000_000_000, 96 << 30, 256 << 20, "48-55",
 )
-BRIDGE_230 = (FIRST_7871_230, V1627_230, ADJACENT_230, NEXT_V1627_230)
+RETRY_NEXT_V1627_230 = replace(
+    NEXT_V1627_230, state=V / "horizon230-next-v1627-retry-runtime-v2",
+    unit="horizon-qualify-230-next-v1627-99468089-v2.service",
+    guard="horizon-230-next-v1627-99468089-protective-v2.service",
+    kind="epoch230-private-next-v1627-worker-retry", roster_schema="foundation-epoch230-next-v1627-retry-roster-binding-v2",
+    profile_sha="eaaff300d82fe6576331b49876b910e5f296efb61e19a5239505554ac209c95e",
+    preflight_sha="c091acc448841a3051c5954347f478d749d1c9766ce0f8dfca88bea39cbe1cd9",
+)
+NEXT_V1627_SCOPES = (NEXT_V1627_230, RETRY_NEXT_V1627_230)
+BRIDGE_230 = (FIRST_7871_230, V1627_230, ADJACENT_230, *NEXT_V1627_SCOPES)
 NEXT_V1627_230_FLEET = V / "horizon230-next-v1627-fleet-v1/acceptance.json"
+RETRY_NEXT_V1627_230_FLEET = V / "horizon230-next-v1627-retry-fleet-v2/acceptance.json"
+NEXT_V1627_FAILED_START = {
+    "path": str(NEXT_V1627_230.state / "terminal.json"),
+    "sha256": "a97fc5e092e642ac61b3fca84e983d8b70c49a635392b60e3549e99c34f98852",
+}
 RESTORE_258 = Scope(
     258, V / "horizon258-native-restore-runtime-v1",
     "horizon-qualify-258-native-restore-v1.service", "horizon-258-native-restore-protective-v1.service",
@@ -203,6 +217,7 @@ SCOPED_ARGS = {
     "--predecessor266": PREDECESSOR_266,
     "--adjacent230": ADJACENT_230,
     "--next-v1627-230": NEXT_V1627_230,
+    "--retry-next-v1627-230": RETRY_NEXT_V1627_230,
     "--first7871-230": FIRST_7871_230, "--v1627-230": V1627_230, "--trace296": TRACE_296, "--feature296": FEATURE_296,
 }
 
@@ -270,11 +285,18 @@ def current_fit(kit, roster, root, scope, *, held=False):
         protected_226_fit(fit)
         if scope is FIRST_7871_230:
             second_hourly_drained(ops, proof["predecessor_terminal"])
-        elif scope is NEXT_V1627_230:
+        elif scope in NEXT_V1627_SCOPES:
             require_230_drained(ops, proof["predecessor_terminal"], V1627_230, {
                 "path": str(V1627_230.state / "terminal.json"),
                 "sha256": "db618cf906b39ffe64f80b7a0c90febaa4d54054cac4a74e2fed12cea772846e",
             }, "6c878d138821422d8a848d6bd16d63a9", 99_468_089)
+            if scope is RETRY_NEXT_V1627_230:
+                assert proof["failed_predecessor_terminal"] == NEXT_V1627_FAILED_START
+                failed = ops.bound(NEXT_V1627_FAILED_START)
+                assert failed["state"] == "worker-startup-rejected" and failed["guard_drained"]
+                assert failed["invocation_id"] == "f6cc2515791d43f9991ef0247dbc3e9d"
+                prior_timer = NEXT_V1627_230.guard.removesuffix(".service") + ".timer"
+                assert ops.props(prior_timer, ["ActiveState", "Job"]) == {"ActiveState": "inactive", "Job": ""}
         else:
             require_230_drained(ops, proof["predecessor_terminal"], FIRST_7871_230, {
                 "path": str(FIRST_7871_230.state / "terminal.json"),
@@ -594,6 +616,8 @@ def launch(kit, roster_ref, scope):
         tokens = V / "horizon230-adjacent-99445304-tokens-v1"
     if scope is NEXT_V1627_230:
         tokens = V / "horizon230-next-v1627-window-tokens-v1"
+    if scope is RETRY_NEXT_V1627_230:
+        tokens = V / "horizon230-next-v1627-retry-tokens-v2"
     assert not (state / "cadence-registration.json").exists()
     assert not (attempt / "admission.json").exists()
     if scope is OVERLAP_266:
@@ -621,7 +645,7 @@ def launch(kit, roster_ref, scope):
     assert profile["unit"] == scope.unit and profile["properties"]["AllowedCPUs"] == scope.cpus
     assert int(profile["properties"]["MemoryMax"]) == scope.ram
     assert profile["guarded_whole_tree_cap_bytes"] == scope.cap
-    if scope is NEXT_V1627_230:
+    if scope in NEXT_V1627_SCOPES:
         current_fit(kit, roster, root, scope)
     if scope is OVERLAP_266:
         epoch266_overlap.validate_sources()
@@ -630,12 +654,23 @@ def launch(kit, roster_ref, scope):
     hook = ops.checked_image(HOOK)
     if scope is PREDECESSOR_266:
         namespace, bootstrap = predecessor_namespace(ops, scope, preflight, profile)
-    elif scope is NEXT_V1627_230:
+    elif scope in NEXT_V1627_SCOPES:
         assert preflight["profile"] == scope.profile and preflight["worker_execution"] is False
         assert preflight["bootstrap_custody"] == profile["bootstrap_custody"]
         assert preflight["readonly_bindings_validated"] and preflight["writable_private_state_validated"]
-        acceptance = ops.bound(ops.ref(NEXT_V1627_230_FLEET))
-        assert acceptance["schema"] == "foundation-epoch230-next-v1627-fleet-release-v1"
+        if scope is RETRY_NEXT_V1627_230:
+            assert profile["prior_failed_start"] == preflight["prior_failed_start"] == NEXT_V1627_FAILED_START
+            worker = ops.bound(profile["worker_build"])
+            assert preflight["worker_build"] == profile["worker_build"]
+            assert worker["artifact_sha256"] == profile["worker"]["sha256"]
+            assert worker["bootstrap"] == 99_468_089 and worker["last_slot"] == 99_476_782
+            acceptance_path = RETRY_NEXT_V1627_230_FLEET
+            acceptance_schema = "foundation-epoch230-next-v1627-retry-fleet-release-v2"
+        else:
+            acceptance_path = NEXT_V1627_230_FLEET
+            acceptance_schema = "foundation-epoch230-next-v1627-fleet-release-v1"
+        acceptance = ops.bound(ops.ref(acceptance_path))
+        assert acceptance["schema"] == acceptance_schema
         assert acceptance["preflight"] == scope.preflight and acceptance["admission_authorized"] is False
         ops.checked_image(acceptance["fleet"])
         for key, actual in (("adapter", CONTROL / ADAPTER), ("cycle", CONTROL / "cycle.py"),
@@ -720,8 +755,9 @@ def launch(kit, roster_ref, scope):
             probe_unit = "foundation-230-v1627-token-probe-v1"
         elif scope is ADJACENT_230:
             probe_unit = "foundation-230-adjacent-99445304-token-probe-v1"
-        elif scope is NEXT_V1627_230:
-            probe_unit = "foundation-230-next-v1627-token-probe-v1"
+        elif scope in NEXT_V1627_SCOPES:
+            probe_unit = ("foundation-230-next-v1627-retry-token-probe-v2"
+                          if scope is RETRY_NEXT_V1627_230 else "foundation-230-next-v1627-token-probe-v1")
         elif scope is OVERLAP_266:
             probe_unit = "foundation-266-overlap-token-probe-v1"
         elif scope is PREDECESSOR_266:

@@ -98,6 +98,21 @@ pub(super) fn next_v1627<'a>(launch_sha: &'a str, invocation: &'a str) -> Result
     })
 }
 
+pub(super) fn retry_next_v1627<'a>(launch_sha: &'a str, invocation: &'a str) -> Result<Window<'a>> {
+    Ok(Window {
+        state: "/var/lib/jetstreamer/horizon230-next-v1627-retry-runtime-v2",
+        unit: "horizon-qualify-230-next-v1627-99468089-v2.service",
+        exit_schema: "foundation-epoch230-next-v1627-retry-pid1-exit-v2",
+        kind: "epoch230-private-next-v1627-worker-retry",
+        exit_path: "/var/lib/jetstreamer/horizon230-next-v1627-retry-exit-v2/evidence/pid1-exit.json",
+        receipt_schema: "foundation-epoch230-next-v1627-retry-terminal-evidence-v2",
+        archive: "/home/ubuntu/.jetstreamer-private/qualification-230-next-v1627-99468089-v2/work/output/epoch-230-slots-99468090-99476782.jet",
+        worker_sha: "4deff048e3837f9f7f1fa1121f764e78b9fe1fc67084ea8edde75b0d078bfeb2",
+        profile_sha: Some("eaaff300d82fe6576331b49876b910e5f296efb61e19a5239505554ac209c95e"),
+        ..next_v1627(launch_sha, invocation)?
+    })
+}
+
 const PRECEDING_WINDOW: (&str, &str) = (
     "/var/lib/jetstreamer/horizon230-first-7871-runtime-v1/terminal.json",
     "16d546332a37fccd20a7b2609908288b426276a01908c6e255db886aba6ea8d2",

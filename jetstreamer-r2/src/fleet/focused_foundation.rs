@@ -45,6 +45,13 @@ const NEXT_V1627_230_PROFILE_SHA: &str =
 const NEXT_V1627_230_PREFLIGHT_SHA: &str =
     "c54b1b9fc120a920e23d220b3d223565b7e0a5cd92f6206103c426b545431c48";
 
+const RETRY_NEXT_V1627_230_UNIT: &str = "horizon-qualify-230-next-v1627-99468089-v2.service";
+const RETRY_NEXT_V1627_230_STATE: &str = "horizon230-next-v1627-retry-runtime-v2";
+const RETRY_NEXT_V1627_230_PROFILE_SHA: &str =
+    "eaaff300d82fe6576331b49876b910e5f296efb61e19a5239505554ac209c95e";
+const RETRY_NEXT_V1627_230_PREFLIGHT_SHA: &str =
+    "c091acc448841a3051c5954347f478d749d1c9766ce0f8dfca88bea39cbe1cd9";
+
 const SCOPES: &[Scope] = &[
     Scope {
         epoch: 230,
@@ -94,6 +101,13 @@ const SCOPES: &[Scope] = &[
         attempt: "next-v1627-99468089-v1",
         state: NEXT_V1627_230_STATE,
         kind: "epoch230-private-next-v1627-window",
+    },
+    Scope {
+        epoch: 230,
+        unit: RETRY_NEXT_V1627_230_UNIT,
+        attempt: "next-v1627-99468089-v2",
+        state: RETRY_NEXT_V1627_230_STATE,
+        kind: "epoch230-private-next-v1627-worker-retry",
     },
     Scope {
         epoch: 258,
@@ -259,17 +273,24 @@ pub(super) fn check_bindings(claim: &DiagnosticClaim, launch: &Value) -> Result<
             && guard["trip_reason"].is_null(),
         "focused Foundation launch and admission bindings differ"
     );
-    if claim.unit == NEXT_V1627_230_UNIT {
-        let state = format!("/var/lib/jetstreamer/{NEXT_V1627_230_STATE}");
+    if [NEXT_V1627_230_UNIT, RETRY_NEXT_V1627_230_UNIT].contains(&claim.unit.as_str()) {
+        let (directory, profile_sha, preflight_sha, profile_schema) = if claim.unit == NEXT_V1627_230_UNIT {
+            (NEXT_V1627_230_STATE, NEXT_V1627_230_PROFILE_SHA, NEXT_V1627_230_PREFLIGHT_SHA,
+             "foundation-epoch230-next-v1627-profile-v1")
+        } else {
+            (RETRY_NEXT_V1627_230_STATE, RETRY_NEXT_V1627_230_PROFILE_SHA, RETRY_NEXT_V1627_230_PREFLIGHT_SHA,
+             "foundation-epoch230-next-v1627-retry-profile-v2")
+        };
+        let state = format!("/var/lib/jetstreamer/{directory}");
         ensure!(
             launch["profile"]["path"] == format!("{state}/profile.json")
-                && launch["profile"]["sha256"] == NEXT_V1627_230_PROFILE_SHA
-                && profile["schema"] == "foundation-epoch230-next-v1627-profile-v1"
+                && launch["profile"]["sha256"] == profile_sha
+                && profile["schema"] == profile_schema
                 && profile["replay_bounds"]["first_slot"] == 99_468_090
                 && profile["replay_bounds"]["last_slot"] == 99_476_782
                 && admission["schema"] == "foundation-epoch230-focused-admission-v1"
                 && admission["preflight"]["path"] == format!("{state}/preflight.json")
-                && admission["preflight"]["sha256"] == NEXT_V1627_230_PREFLIGHT_SHA
+                && admission["preflight"]["sha256"] == preflight_sha
                 && plan["receipt_directory"] == format!("{state}/guard-receipts"),
             "epoch 230 v1.6.27 continuation bindings differ"
         );

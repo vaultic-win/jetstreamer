@@ -15,6 +15,9 @@ ADJACENT_230 = "adjacent-99445304-v1"
 NEXT_V1627_230 = "next-v1627-99468089-v1"
 NEXT_V1627_230_PROFILE_SHA = "f289cdf8e6c6d85f387a2deac22c2c7ef19fcb1b4b98bc75230162a2cbf71447"
 NEXT_V1627_230_PREFLIGHT_SHA = "c54b1b9fc120a920e23d220b3d223565b7e0a5cd92f6206103c426b545431c48"
+RETRY_NEXT_V1627_230 = "next-v1627-99468089-v2"
+RETRY_NEXT_V1627_230_PROFILE_SHA = "eaaff300d82fe6576331b49876b910e5f296efb61e19a5239505554ac209c95e"
+RETRY_NEXT_V1627_230_PREFLIGHT_SHA = "c091acc448841a3051c5954347f478d749d1c9766ce0f8dfca88bea39cbe1cd9"
 RESTORE = "native-restore-v1"
 RESTORE_260 = "native-restore-260-v1"
 OVERLAP_266 = "hourly-overlap-114929697-v1"
@@ -41,6 +44,7 @@ FOCUSED = {
     V1627_230: (230, "horizon230-v1627-replay-runtime-v1", "epoch230-private-v1627-window"),
     ADJACENT_230: (230, "horizon230-adjacent-99445304-runtime-v1", "epoch230-private-adjacent-99445304-window"),
     NEXT_V1627_230: (230, "horizon230-next-v1627-window-runtime-v1", "epoch230-private-next-v1627-window"),
+    RETRY_NEXT_V1627_230: (230, "horizon230-next-v1627-retry-runtime-v2", "epoch230-private-next-v1627-worker-retry"),
     RESTORE: (258, "horizon258-native-restore-runtime-v1", "epoch258-private-native-restore"),
     RESTORE_260: (260, "horizon260-native-restore-runtime-v1", "epoch260-private-native-restore"),
     OVERLAP_266: (266, "horizon266-hourly-overlap-114929697-runtime-v1", "epoch266-private-hourly-overlap"),
@@ -126,10 +130,13 @@ def registration(version):
             assert custody["sha256"] == PREDECESSOR_266_CUSTODY_SHA
             evidence = bound(custody)
             assert evidence["profile"] == profile_ref and evidence["actual_readonly_projection_verified"]
-    if version == NEXT_V1627_230:
-        assert profile_ref["sha256"] == NEXT_V1627_230_PROFILE_SHA
-        assert admission["preflight"] == {"path": str(state / "preflight.json"),
-                                          "sha256": NEXT_V1627_230_PREFLIGHT_SHA}
+    if version in (NEXT_V1627_230, RETRY_NEXT_V1627_230):
+        profile_sha, preflight_sha = (
+            (NEXT_V1627_230_PROFILE_SHA, NEXT_V1627_230_PREFLIGHT_SHA) if version == NEXT_V1627_230 else
+            (RETRY_NEXT_V1627_230_PROFILE_SHA, RETRY_NEXT_V1627_230_PREFLIGHT_SHA)
+        )
+        assert profile_ref["sha256"] == profile_sha
+        assert admission["preflight"] == {"path": str(state / "preflight.json"), "sha256": preflight_sha}
         assert admission["schema"] == "foundation-epoch230-focused-admission-v1"
     if version == WINDOW_266:
         release = bound(row["guard_release_fit"])
@@ -246,7 +253,7 @@ def register(plan, ordinary_replay=False, include_focused=True):
                for row in sample["replays"])
     }
     for version in ATTEMPTS:
-        if version in (PREDECESSOR_266, ADJACENT_230, WINDOW_266, NEXT_V1627_230):
+        if version in (PREDECESSOR_266, ADJACENT_230, WINDOW_266, NEXT_V1627_230, RETRY_NEXT_V1627_230):
             continue
         epoch = FOCUSED.get(version, (296,))[0]
         ordinary = (epoch == 296 and ordinary_replay) or epoch in ordinary_singletons
@@ -268,6 +275,10 @@ def register_window_266(plan):
 
 def register_next_v1627_230(plan):
     register_attempt(plan, NEXT_V1627_230, ordinary_replay=False, include_focused=True)
+
+
+def register_retry_next_v1627_230(plan):
+    register_attempt(plan, RETRY_NEXT_V1627_230, ordinary_replay=False, include_focused=True)
 
 
 def owns(row):

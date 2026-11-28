@@ -837,6 +837,26 @@ pub(super) fn collect_next_v1627_terminal(
     window230::collect(&window230::next_v1627(launch_sha, invocation)?, exit, digest, destination)
 }
 
+pub(super) fn capture_retry_next_v1627_exit(
+    launch_sha: &str,
+    invocation: &str,
+    destination: &Path,
+) -> Result<Value> {
+    let window = window230::retry_next_v1627(launch_sha, invocation)?;
+    exit::capture_window230(&window, launch_sha, destination)
+}
+
+pub(super) fn collect_retry_next_v1627_terminal(
+    launch_sha: &str,
+    invocation: &str,
+    exit: &Path,
+    digest: &str,
+    destination: &Path,
+) -> Result<Value> {
+    let window = window230::retry_next_v1627(launch_sha, invocation)?;
+    window230::collect(&window, exit, digest, destination)
+}
+
 pub(super) fn capture_predecessor_exit(launch_sha: &str, destination: &Path) -> Result<Value> {
     exit::capture_predecessor(launch_sha, destination)
 }

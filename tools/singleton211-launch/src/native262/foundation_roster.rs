@@ -12,7 +12,7 @@ mod replay260;
 mod replay296;
 use focused::{
     ADJACENT_230, FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, NEXT_V1627_230, OVERLAP_266,
-    OVERLAP_266_EXCLUSIVE, PREDECESSOR_266, RESTORE_258, RESTORE_260, SCOPES, SECOND_HOURLY_230,
+    OVERLAP_266_EXCLUSIVE, PREDECESSOR_266, RESTORE_258, RESTORE_260, RETRY_NEXT_V1627_230, SCOPES, SECOND_HOURLY_230,
     WINDOW_266,
     TRACE_296, V1627_230,
 };
@@ -1431,7 +1431,12 @@ fn measure(
     let first_7871_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == FIRST_7871_230.unit);
     let v1627_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == V1627_230.unit);
     let adjacent_replay_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == ADJACENT_230.unit);
-    let next_v1627_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == NEXT_V1627_230.unit);
+    let retry_next_v1627 = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == RETRY_NEXT_V1627_230.unit);
+    let next_v1627_candidate = retry_next_v1627
+        || matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == NEXT_V1627_230.unit);
+    let failed_predecessor = retry_next_v1627
+        .then(|| focused::next_v1627_failed_start_drained(n))
+        .transpose()?;
     let checkpoint_predecessor = (v1627_candidate || adjacent_replay_candidate)
         .then(|| focused::first_7871_drained(n))
         .transpose()?;
@@ -1870,7 +1875,7 @@ fn measure(
         require_disjoint_cpus(epoch, exclusive, unit, owner)?;
         recorded.insert(unit.to_owned(), (owner.clone(), *memory, *ticks));
     }
-    let bridge_windows = [FIRST_7871_230.unit, V1627_230.unit, ADJACENT_230.unit, NEXT_V1627_230.unit];
+    let bridge_windows = [FIRST_7871_230.unit, V1627_230.unit, ADJACENT_230.unit, NEXT_V1627_230.unit, RETRY_NEXT_V1627_230.unit];
     for replay in live_replays.values() {
         require_disjoint_cpus(epoch, exclusive, replay.unit, &replay.owner)?;
         if [OVERLAP_266.unit, PREDECESSOR_266.unit, WINDOW_266.unit].contains(&replay.unit) {
@@ -2043,6 +2048,9 @@ fn measure(
     }
     if let Some(expected) = &checkpoint_predecessor {
         ensure!(&focused::first_7871_drained(n)? == expected, "epoch 230 predecessor changed");
+    }
+    if let Some(expected) = &failed_predecessor {
+        ensure!(&focused::next_v1627_failed_start_drained(n)? == expected, "epoch 230 failed-start evidence changed");
     }
     if let Some(expected) = &next_predecessor {
         ensure!(&focused::next_v1627_predecessor(n)? == expected, "epoch 230 v1.6.27 predecessor changed");
@@ -2263,6 +2271,7 @@ fn measure(
         230 if first_7871_candidate => "foundation-epoch230-first-7871-roster-binding-v1",
         230 if adjacent_replay_candidate => "foundation-epoch230-adjacent-replay-roster-binding-v1",
         230 if v1627_candidate => "foundation-epoch230-v1627-window-roster-binding-v1",
+        230 if retry_next_v1627 => "foundation-epoch230-next-v1627-retry-roster-binding-v2",
         230 if next_v1627_candidate => "foundation-epoch230-next-v1627-roster-binding-v1",
         230 => "foundation-epoch230-short-gap-roster-binding-v1",
         252 => "foundation-epoch252-delivery-roster-binding-v1",
@@ -2406,6 +2415,9 @@ fn measure(
         let binding = &mut evidence[spec.quote_key()];
         binding["exclusive_online_cpus"] = json!(bridge_group);
         binding["predecessor_terminal"] = json!(predecessor);
+        if let Some(failed) = failed_predecessor {
+            binding["failed_predecessor_terminal"] = json!(failed);
+        }
     }
     deny_authority(&mut evidence);
     Ok(evidence)
@@ -2496,6 +2508,7 @@ pub fn run() -> Result<()> {
                         | "--first7871-230-quote"
                         | "--v1627-230-quote"
                         | "--next-v1627-230-quote"
+                        | "--retry-next-v1627-230-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--overlap266-quote"
@@ -2525,7 +2538,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --first7871-230-quote, --v1627-230-quote, --next-v1627-230-quote, --focused258-quote, --focused260-quote, --overlap266-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote, --interval141-fourth-quote, --interval141-fifth-quote, --interval141-sixth-quote or --interval141-seventh-quote"
+            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --first7871-230-quote, --v1627-230-quote, --next-v1627-230-quote, --retry-next-v1627-230-quote, --focused258-quote, --focused260-quote, --overlap266-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote, --interval141-fourth-quote, --interval141-fifth-quote, --interval141-sixth-quote or --interval141-seventh-quote"
         ),
     };
     let synchronize = match args.next() {
@@ -2594,6 +2607,7 @@ pub fn run() -> Result<()> {
                         | "--first7871-230-quote"
                         | "--v1627-230-quote"
                         | "--next-v1627-230-quote"
+                        | "--retry-next-v1627-230-quote"
                         | "--adjacent230-replay-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
@@ -2613,6 +2627,7 @@ pub fn run() -> Result<()> {
                 Some("--first7871-230-quote") => &FIRST_7871_230,
                 Some("--v1627-230-quote") => &V1627_230,
                 Some("--next-v1627-230-quote") => &NEXT_V1627_230,
+                Some("--retry-next-v1627-230-quote") => &RETRY_NEXT_V1627_230,
                 Some("--adjacent230-replay-quote") => &ADJACENT_230,
                 Some("--focused258-quote") => &RESTORE_258,
                 Some("--focused260-quote") => &RESTORE_260,

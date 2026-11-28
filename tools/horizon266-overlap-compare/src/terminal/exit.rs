@@ -362,7 +362,7 @@ pub(super) fn read_window266(
     Ok(capture.properties)
 }
 
-fn capture_window230(
+pub(super) fn capture_window230(
     window: &window230::Window<'_>,
     launch_sha: &str,
     destination: &Path,

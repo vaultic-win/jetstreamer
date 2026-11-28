@@ -159,6 +159,65 @@ pub(super) const NEXT_V1627_230: Focused = Focused {
     ..ADJACENT_230
 };
 
+pub(super) const RETRY_NEXT_V1627_230: Focused = Focused {
+    unit: "horizon-qualify-230-next-v1627-99468089-v2.service",
+    guard: "horizon-230-next-v1627-99468089-protective-v2",
+    root: "/home/ubuntu/.jetstreamer-private/qualification-230-next-v1627-99468089-v2",
+    kind: "epoch230-private-next-v1627-worker-retry",
+    preflight_schema: "foundation-epoch230-next-v1627-retry-runtime-preflight-v2",
+    state: "/var/lib/jetstreamer/horizon230-next-v1627-retry-runtime-v2",
+    preflight_sha: "c091acc448841a3051c5954347f478d749d1c9766ce0f8dfca88bea39cbe1cd9",
+    profile_sha: "eaaff300d82fe6576331b49876b910e5f296efb61e19a5239505554ac209c95e",
+    ..NEXT_V1627_230
+};
+
+fn next_v1627_failed_start() -> Bound {
+    Bound::new(
+        Path::new(NEXT_V1627_230.state).join("terminal.json"),
+        "a97fc5e092e642ac61b3fca84e983d8b70c49a635392b60e3549e99c34f98852",
+    )
+}
+
+pub(super) fn next_v1627_failed_start_drained(n: &mut Native) -> Result<Bound> {
+    let reference = next_v1627_failed_start();
+    let failed = reference.sealed()?;
+    let invocation = "f6cc2515791d43f9991ef0247dbc3e9d";
+    let launch = binding(&failed["launch"])?;
+    let capture = binding(&failed["pid1_exit"])?.sealed()?;
+    ensure!(
+        failed["schema"] == "foundation-epoch230-next-v1627-failed-start-terminal-v1"
+            && failed["state"] == "worker-startup-rejected"
+            && failed["invocation_id"] == invocation
+            && failed["unit"] == NEXT_V1627_230.unit
+            && failed["guard_drained"] == true
+            && failed["useful_replay_started"] == false
+            && failed["archive_created"] == false
+            && failed["publication_authorized"] == false
+            && launch.sha256 == "49cfa9635cc01f94fe97bf5df23dc9794a1c2e8990f5495f648b9e3d1ef49c0c"
+            && capture["launch"] == json!(launch)
+            && capture["producer_invocation"] == invocation
+            && capture["properties"]["ExecMainStatus"] == "1",
+        "the exact rejected epoch 230 invocation has no verified closure"
+    );
+    let timer = n.show_fields(&format!("{}.timer", NEXT_V1627_230.guard), "ActiveState,Job")?;
+    ensure!(timer["ActiveState"] == "inactive" && timer["Job"] == "", "prior epoch 230 guard timer remains armed");
+    for unit in [NEXT_V1627_230.unit.to_owned(), format!("{}.service", NEXT_V1627_230.guard)] {
+        let owner = n.show_fields(&unit, "ActiveState,InvocationID,MainPID,ControlPID,ControlGroup,Job,Result")?;
+        ensure!(
+            matches!(owner["ActiveState"].as_str(), Some("inactive" | "failed"))
+                && owner["MainPID"] == "0" && owner["ControlPID"] == "0"
+                && owner["ControlGroup"] == "" && owner["Job"] == ""
+                && !Path::new("/sys/fs/cgroup/system.slice").join(&unit).exists(),
+            "prior epoch 230 owner {unit} has not drained"
+        );
+        if unit == NEXT_V1627_230.unit && owner["InvocationID"] != "" {
+            ensure!(owner["InvocationID"] == invocation && owner["Result"] == "exit-code",
+                    "prior epoch 230 producer changed after the startup rejection");
+        }
+    }
+    Ok(reference)
+}
+
 const V1627_INVOCATION: &str = "6c878d138821422d8a848d6bd16d63a9";
 const V1627_LAUNCH_SHA: &str =
     "3a2f5a058c76a59707af77f98973c283d4542c8308d5a514a22ae1cb6534a7a6";
@@ -304,7 +363,7 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 15] = [
+pub(super) const SCOPES: [&Focused; 16] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
@@ -312,6 +371,7 @@ pub(super) const SCOPES: [&Focused; 15] = [
     &V1627_230,
     &ADJACENT_230,
     &NEXT_V1627_230,
+    &RETRY_NEXT_V1627_230,
     &RESTORE_258,
     &RESTORE_260,
     &OVERLAP_266,
@@ -1125,7 +1185,7 @@ impl Focused {
                 && receipt["profile"] == json!(profile_ref)
                 && guard["validated"] == true
                 && guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
-        } else if self.unit == NEXT_V1627_230.unit {
+        } else if [NEXT_V1627_230.unit, RETRY_NEXT_V1627_230.unit].contains(&self.unit) {
             let custody = binding(&receipt["bootstrap_custody"])?;
             // This copy receipt is sealed in the private HOME staging namespace.
             ensure!(
@@ -1142,6 +1202,23 @@ impl Focused {
             let mount = binding(&receipt["mount_preflight"])?.sealed()?;
             let image = binding(&profile["node"])?;
             image.artifact()?;
+            if self.unit == RETRY_NEXT_V1627_230.unit {
+                let failed = next_v1627_failed_start();
+                failed.sealed()?;
+                let worker = binding(&profile["worker"])?;
+                let build = binding(&receipt["worker_build"])?;
+                let worker_build = build.sealed()?;
+                worker.artifact()?;
+                ensure!(
+                    receipt["prior_failed_start"] == json!(failed)
+                        && profile["prior_failed_start"] == json!(failed)
+                        && profile["worker_build"] == json!(build)
+                        && worker_build["artifact_sha256"] == worker.sha256
+                        && worker_build["bootstrap"] == self.first - 1
+                        && worker_build["last_slot"] == self.last,
+                    "epoch 230 worker retry differs from its sealed build and prior closure"
+                );
+            }
             receipt["first_slot"] == self.first
                 && receipt["profile"] == json!(profile_ref)
                 && receipt["worker_execution"] == false
