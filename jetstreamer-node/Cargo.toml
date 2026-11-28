@@ -9,6 +9,7 @@ documentation.workspace = true
 keywords.workspace = true
 
 [features]
+epoch162-stock-order-derivation = []
 default = []
 # Guard the historical worker before loading the epoch 136 diagnostic snapshot.
 epoch136-actual-input-diagnostic = []
@@ -124,6 +125,11 @@ required-features = ["epoch140-native-restore-diagnostic"]
 name = "jetstreamer-epoch144-native-restore-probe"
 path = "src/bin/jetstreamer-epoch144-native-restore-probe.rs"
 required-features = ["epoch144-native-restore-diagnostic"]
+
+[[bin]]
+name = "jetstreamer-epoch162-stock-order"
+path = "src/bin/jetstreamer-epoch162-stock-order.rs"
+required-features = ["epoch162-stock-order-derivation"]
 
 [dependencies]
 chrono = { version = "=0.4.44", default-features = false, features = ["std"], optional = true }

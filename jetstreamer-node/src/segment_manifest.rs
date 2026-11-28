@@ -367,7 +367,10 @@ pub fn read_and_validate_segment_manifest_from(
 /// Validates a segment carried by a seekable transport. Every opener must bind
 /// the same immutable object identity, including its complete length. The
 /// caller owns that binding and authentication of the separately held manifest.
-#[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+#[cfg(any(
+    feature = "epoch162-stock-order-derivation",
+    feature = "epoch226-checkpoint-continuation-diagnostic"
+))]
 pub fn read_and_validate_seekable_segment_manifest<R: Read + Seek>(
     archive_label: &Path,
     manifest_path: &Path,
