@@ -8,7 +8,7 @@ from derive143_bootstrap_retry import change, read_package
 from derive143_v53 import member_plan
 from derive143_build_preparation import BASE, BUILD
 
-NEW = BASE / "preparation-build-v3"
+NEW = BASE / "preparation-build-v4"
 OLD_COMMIT = "645aeaac6465e30dd599d591702f6e25b4ac8307"
 OLD_PRICE = "c1d09d2382e6dfb6d9eb7520d910ddefac252e713575c21e6df8f47bc10e488e"
 TERMINAL = "e3337993ebc5ff75dd39c26a462bc8b4757a914289a2770ae221784535175daa"
@@ -21,9 +21,9 @@ def derive(stage, old_seal, revision, price, price_sha):
     s = source.decode()
     for before, after in (
         (BUILD.name, NEW.name),
-        ("hourly-build-20261128-v1", "hourly-build-20261128-v2"),
+        ("horizon-guard-143-hourly-build-20261128-v1", "horizon-guard-143-hourly-build-20261128-v3"),
         ('"build-guard-v1"', '"build-guard-v2"'),
-        ('"BUILD_ADMISSION_V2.json"', '"BUILD_ADMISSION_V3.json"'),
+        ('"BUILD_ADMISSION_V2.json"', '"BUILD_ADMISSION_V4.json"'),
         ('/prepare143_second_gate.py build"', '/prepare143_second_gate.py build-v2"'),
         ('f"build-{iid}.json"', 'f"build-v2-{iid}.json"'),
         ("issued-price-v19", price),
@@ -48,7 +48,7 @@ def derive(stage, old_seal, revision, price, price_sha):
     gate = gate.decode().replace('"build","fixture"', '"build","build-v2","fixture"')
     anchor = '    if Path("/proc/self/cgroup").read_text().strip()'
     gate = change(gate, anchor, '''    if action == "build-v2":
-        unit = "horizon-prepare-143-hourly-build-20261128-v2.service"
+        unit = "horizon-prepare-143-hourly-build-20261128-v1.service"
 ''' + anchor)
     files["prepare143_second_gate.py"] = (gate.encode(),mode)
     files["SOURCE.json"] = ((json.dumps(dict(
