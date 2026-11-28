@@ -326,6 +326,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         }
         let comparable = !bounded_mismatch_trace
             && !super::fleet::focused_foundation::resource_only(name)
+            && !super::fleet::extract226::assembly::resource_only(name)
             && matches!(
                 active["phase"].as_str(),
                 Some(

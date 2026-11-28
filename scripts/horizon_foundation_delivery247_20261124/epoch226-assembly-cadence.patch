@@ -1,0 +1,36 @@
+--- cycle.py
++++ cycle.py
+@@ -175,2 +175,3 @@
+ import diagnostic226_suffix
++import diagnostic226_assembly
+ import diagnostic296_meter
+@@ -377,2 +378,3 @@
+ cfg['diagnostic_replays'] += diagnostic226_suffix.configuration()
++cfg['diagnostic_replays'] += diagnostic226_assembly.configuration()
+ cfg['diagnostic_replays'] += diagnostic296_meter.configuration()
+@@ -666,2 +668,4 @@
+         cohort += '-observed296-focused'
++    if any(item['producer_unit'] == diagnostic226_assembly.UNIT for item in cfg['diagnostic_replays']):
++        cohort += '-assembly226'
+     ordinary_296 = 296 in guarded_replays.by_epoch(cfg['replays'])
+@@ -1290,2 +1294,14 @@
+         add(plan["gates"]["266"], release_ref, release["preflight"], failed_start)
++    assembly_226_release = V / "horizon226-assembly-fleet-v1/acceptance.json"
++    if assembly_226_release.is_file():
++        assembly_ref = sealed_226_file(assembly_226_release)
++        assembly_fleet = bound(assembly_ref)
++        assert assembly_fleet["schema"] == "foundation-epoch226-private-assembly-fleet-release-v1"
++        assert assembly_fleet["assembly_only_no_replay"] and not assembly_fleet["publication_authorized"]
++        assert assembly_fleet["predecessor"] == sealed_226_file(following_266_retry_release)
++        prior_assembly_image = bound(assembly_fleet["predecessor"])["fleet"]
++        assert publication_handoff.checked_image(prior_assembly_image) == str(fleet_image)
++        fleet_image = Path(publication_handoff.checked_image(assembly_fleet["fleet"]))
++        diagnostic226_assembly.register(plan)
++        add(plan["gates"]["226"], assembly_ref, assembly_fleet["preflight"])
+     active_private_intervals = set()
+@@ -1327,3 +1343,4 @@
+     ordinary = [r for r in f['active'] if r['phase'] != EXTRACTION226_PHASE and not diagnostic229.owns(r) and not diagnostic229_bounded.owns(r) and not diagnostic229_bounded_retry.owns(r) and not diagnostic271_trace.owns(r) and not diagnostic271_europe.owns(r) and not diagnostic271_boundary.owns(r) and not diagnostic271_reward_tuples.owns(r) and not diagnostic271_stake_inputs.owns(r) and not diagnostic230_slot_hashes.owns(r) and not diagnostic230_bank_trace.owns(r) and not diagnostic229_slot_hash_ram.owns(r) and not diagnostic288_shrink_debt.owns(r) and not diagnostic230_program_demotion_ram.owns(r) and not diagnostic229_bank_delta.owns(r)
+-                and not diagnostic226_suffix.owns(r) and not diagnostic230_checkpoint_continuation.owns(r)
++                and not diagnostic226_suffix.owns(r) and not diagnostic226_assembly.owns(r)
++                and not diagnostic230_checkpoint_continuation.owns(r)
+                 and not diagnostic296_meter.owns(r) and not native262_cadence.owns(r)]

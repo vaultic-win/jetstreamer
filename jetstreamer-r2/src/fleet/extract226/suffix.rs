@@ -14,8 +14,8 @@ const ROOT: &str = "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-22
 const UNIT: &str = "horizon-qualify-226-checkpoint-continuation-suffix-v1.service";
 const GUARD: &str = "horizon-guard-226-checkpoint-continuation-suffix-v1.service";
 const TIMER: &str = "horizon-guard-226-checkpoint-continuation-suffix-v1.timer";
-const CADENCE: &str = "foundation-publication-cadence-v222.service";
-const CADENCE_TIMER: &str = "foundation-publication-cadence-v222.timer";
+pub(super) const CADENCE: &str = "foundation-publication-cadence-v222.service";
+pub(super) const CADENCE_TIMER: &str = "foundation-publication-cadence-v222.timer";
 const STATIC_SHA: &str = "ccaf287e2b82530f10d150c718b3a809171dbdcb2d09a58f8e60dd66d42145a6";
 const CADENCE_SHA: &str = "a2c236119326ba07abb8ec3d00dff5a6f9389c586f82374224b92eb72f8c36d2";
 const NODE: &str = "/run/foundation-epoch226-release.y35rokj7/jetstreamer-node";
@@ -23,17 +23,17 @@ const NODE_SHA: &str = "7e17105ad9429fccbeb53dcd38650adb3f469bc1d3fe797360afff2c
 const WORKER_SHA: &str = "7a831420bb1498ddb0268309ce69f615c7f0c6d90cfab940896a03dc38b5336a";
 const QUOTE: &str = "/var/lib/jetstreamer/horizon226-suffix-v1/capacity-epoch229-demotion-v2.py";
 const QUOTE_SHA: &str = "660da318035766590447436f12e8088efcc9c13044082218f79177df05763333";
-const THREAD: &str = "01a1f8f4-293b-7a91-a36e-2e7658bba721";
+pub(super) const THREAD: &str = "01a1f8f4-293b-7a91-a36e-2e7658bba721";
 
 fn path(name: &str) -> PathBuf {
     Path::new(BASE).join(name)
 }
 
-fn document(p: &Path) -> Result<Value> {
+pub(super) fn document(p: &Path) -> Result<Value> {
     sealed_json(&private157::file_binding(p)?, p)
 }
 
-fn bytes(reference: &Value, expected: &Path, limit: u64) -> Result<Vec<u8>> {
+pub(super) fn bytes(reference: &Value, expected: &Path, limit: u64) -> Result<Vec<u8>> {
     ensure!(
         reference["path"].as_str() == expected.to_str() && expected.canonicalize()? == expected,
         "epoch 226 sealed input path changed"
@@ -52,17 +52,17 @@ fn bytes(reference: &Value, expected: &Path, limit: u64) -> Result<Vec<u8>> {
     Ok(raw)
 }
 
-fn reference(p: &Path, raw: &[u8]) -> Value {
+pub(super) fn reference(p: &Path, raw: &[u8]) -> Value {
     json!({"path":p,"sha256":hex_lower(&Sha256::digest(raw))})
 }
 
-fn encode(value: &Value) -> Result<Vec<u8>> {
+pub(super) fn encode(value: &Value) -> Result<Vec<u8>> {
     let mut raw = serde_json::to_vec_pretty(value)?;
     raw.push(b'\n');
     Ok(raw)
 }
 
-fn write(p: &Path, raw: &[u8], mode: u32) -> Result<Value> {
+pub(super) fn write(p: &Path, raw: &[u8], mode: u32) -> Result<Value> {
     let parent = p.parent().context("suffix receipt parent")?;
     ensure!(
         parent.canonicalize()? == parent
@@ -81,7 +81,7 @@ fn write(p: &Path, raw: &[u8], mode: u32) -> Result<Value> {
     Ok(reference(p, raw))
 }
 
-fn record(p: &Path, value: &Value) -> Result<Value> {
+pub(super) fn record(p: &Path, value: &Value) -> Result<Value> {
     write(p, &encode(value)?, 0o400)
 }
 
@@ -279,7 +279,7 @@ fn quote(extraction: &drain::Source, completion: &Value) -> Result<Value> {
     Ok(serde_json::from_slice(&output.stdout)?)
 }
 
-fn start(args: &[String]) -> Result<()> {
+pub(super) fn start(args: &[String]) -> Result<()> {
     ensure!(
         ProcessCommand::new("/usr/bin/systemd-run")
             .arg("--quiet")
@@ -323,7 +323,7 @@ fn make_root() -> Result<()> {
     Ok(())
 }
 
-fn monotonic_usec() -> Result<u64> {
+pub(super) fn monotonic_usec() -> Result<u64> {
     let mut time: libc::timespec = unsafe { std::mem::zeroed() };
     ensure!(
         unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut time) } == 0,
@@ -332,7 +332,7 @@ fn monotonic_usec() -> Result<u64> {
     Ok(u64::try_from(time.tv_sec)? * 1_000_000 + u64::try_from(time.tv_nsec)? / 1000)
 }
 
-fn next_timer(name: &str) -> Result<u64> {
+pub(super) fn next_timer(name: &str) -> Result<u64> {
     let object = format!(
         "/org/freedesktop/systemd1/unit/{}",
         name.replace('-', "_2d").replace('.', "_2e")
@@ -358,7 +358,7 @@ fn next_timer(name: &str) -> Result<u64> {
         .parse()?)
 }
 
-fn wait<T>(
+pub(super) fn wait<T>(
     seconds: u64,
     description: &str,
     mut check: impl FnMut() -> Result<Option<T>>,
@@ -377,7 +377,12 @@ fn wait<T>(
 }
 
 fn newest_sample(iid: &str, guard_plan: &Value, sub: &str, pid: u64) -> Result<Option<Value>> {
-    let directory = path("guard-receipts");
+    guard_sample(&path("guard-receipts"), iid, guard_plan, sub, pid)
+}
+
+pub(super) fn guard_sample(
+    directory: &Path, iid: &str, guard_plan: &Value, sub: &str, pid: u64,
+) -> Result<Option<Value>> {
     for file in fs::read_dir(&directory)? {
         let p = file?.path();
         let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
@@ -418,14 +423,18 @@ fn iid_is_valid(value: &str) -> bool {
 }
 
 fn dormant() -> Result<Option<Value>> {
-    let unit = drain::show(UNIT)?;
+    dormant_owner(UNIT)
+}
+
+pub(super) fn dormant_owner(name: &str) -> Result<Option<Value>> {
+    let unit = drain::show(name)?;
     if unit["ActiveState"] == "activating"
         && unit["SubState"] == "start-pre"
         && unit["MainPID"] == "0"
     {
         ensure!(
             iid(&unit["InvocationID"])
-                && unit["ControlGroup"] == format!("/system.slice/{UNIT}")
+                && unit["ControlGroup"] == format!("/system.slice/{name}")
                 && unit["ControlPID"]
                     .as_str()
                     .and_then(|s| s.parse::<u64>().ok())
@@ -437,7 +446,7 @@ fn dormant() -> Result<Option<Value>> {
     Ok(None)
 }
 
-fn check_cgroup(owner: &Value, memory_max: u64) -> Result<()> {
+pub(super) fn check_cgroup(owner: &Value, memory_max: u64) -> Result<()> {
     let group = owner["ControlGroup"].as_str().context("suffix cgroup")?;
     let cg = Path::new("/sys/fs/cgroup").join(group.trim_start_matches('/'));
     for (key, expect) in [
@@ -465,8 +474,14 @@ fn check_cgroup(owner: &Value, memory_max: u64) -> Result<()> {
 }
 
 fn start_guard(guard_plan: &Value) -> Result<()> {
+    arm_guard(BASE, GUARD, None, guard_plan)
+}
+
+pub(super) fn arm_guard(
+    base: &str, unit: &str, cpus: Option<&str>, guard_plan: &Value,
+) -> Result<()> {
     let mut args = vec![
-        format!("--unit={GUARD}"),
+        format!("--unit={unit}"),
         "--on-active=1s".into(),
         "--on-unit-inactive=60s".into(),
         "--timer-property=AccuracySec=1s".into(),
@@ -491,12 +506,15 @@ fn start_guard(guard_plan: &Value) -> Result<()> {
     ] {
         args.push(format!("--property={prop}"));
     }
-    args.push(format!("--property=ReadWritePaths={BASE}/guard-receipts"));
+    if let Some(cpus) = cpus {
+        args.push(format!("--property=AllowedCPUs={cpus}"));
+    }
+    args.push(format!("--property=ReadWritePaths={base}/guard-receipts"));
     args.extend(
         [
             "--",
             drain::GUARD_IMAGE,
-            &format!("{BASE}/guard-plan.json"),
+            &format!("{base}/guard-plan.json"),
             "--plan-sha256",
             guard_plan["sha256"]
                 .as_str()

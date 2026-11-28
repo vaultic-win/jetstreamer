@@ -1616,6 +1616,9 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if extract226::assembly::namespace(claim) || extract226::assembly::matches_schema(receipt) {
+        return extract226::assembly::validate_launch(claim, receipt);
+    }
     if extract226::namespace(claim) || receipt["schema"] == extract226::SCHEMA {
         return extract226::launch(claim, receipt);
     }
@@ -3803,6 +3806,9 @@ pub(super) async fn run() -> Result<()> {
             }
             if assembly144::namespace(claim) {
                 assembly144::validate_live(claim, current)?;
+            }
+            if extract226::assembly::namespace(claim) {
+                extract226::assembly::validate_live(claim, current)?;
             }
             if retained220::namespace(claim) {
                 retained220::validate_live(claim, current)?;

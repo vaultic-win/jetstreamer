@@ -1,6 +1,8 @@
 //! Bind the live Foundation cohort for replay funding and guard qualification.
 use super::*;
 mod allocation;
+pub mod assembly226;
+mod capture266;
 mod delivery252;
 mod focused;
 mod holding296;
@@ -165,6 +167,7 @@ enum Quote {
     Interval141(u8),
     Suffix226(Bound),
     Suffix226Preview,
+    Assembly226(Bound),
     Delivery252,
     Delivery261(Bound),
     AdjacentIntake230(Bound),
@@ -1370,6 +1373,7 @@ fn listed_owners(n: &mut Native) -> Result<BTreeSet<String>> {
             (scoped
                 && unit != vote_boundary::GUARD_SERVICE
                 && unit != suffix226::GUARD_SERVICE
+                && unit != assembly226::GUARD_SERVICE
                 && unit != replay296::GUARD_SERVICE
                 && !interval141::is_guard(unit)
                 && !SCOPES
@@ -1697,9 +1701,14 @@ fn measure(
         .contains(restore266::UNIT)
         .then(|| restore266::active(n))
         .transpose()?;
+    let active_capture_266 = before
+        .contains(capture266::UNIT)
+        .then(|| capture266::active(n))
+        .transpose()?;
     let auxiliary = [
         (holding296::UNIT, active_holding_296.as_ref()),
         (restore266::UNIT, active_restore_266.as_ref()),
+        (capture266::UNIT, active_capture_266.as_ref()),
     ];
     let active_interval_141 = interval141::enrolled(n, &before)?;
     let private_141 = match &quote {
@@ -1727,7 +1736,7 @@ fn measure(
     let epoch = match &quote {
         Some(Quote::Interval141(_)) => 141,
         Some(Quote::FullReplay(full)) => full.epoch,
-        Some(Quote::Suffix226(_) | Quote::Suffix226Preview) => 226,
+        Some(Quote::Suffix226(_) | Quote::Suffix226Preview | Quote::Assembly226(_)) => 226,
         Some(Quote::Delivery252) => 252,
         Some(Quote::Delivery261(_)) => 261,
         Some(Quote::AdjacentIntake230(_) | Quote::SuccessorIntake230(_)) => 230,
@@ -1743,6 +1752,13 @@ fn measure(
             "epoch 226 suffix overlaps an existing booking"
         );
         live_replays.insert(226, suffix226::live(n)?);
+    }
+    if before.contains(assembly226::UNIT) {
+        ensure!(
+            extraction_drain.is_some() && epoch != 226 && !live_replays.contains_key(&226),
+            "epoch 226 assembly overlaps another booking"
+        );
+        live_replays.insert(226, assembly226::live(n)?);
     }
     for spec in &REGISTERED_REPLAYS {
         if before.contains(spec.unit) {
@@ -1791,6 +1807,7 @@ fn measure(
     let mut closed_window_266 = None;
     let rows = admission_fleet["active"].as_array_mut().context("Foundation active roster")?;
     let suffix_226_transition = if let Some(replay) = live_replays.get(&226)
+        && replay.unit == suffix226::UNIT
         && !rows.iter().any(|row| row["epoch"] == 226)
     {
         let drain = extraction_drain.as_ref().context("epoch 226 extraction drain missing")?;
@@ -1798,6 +1815,16 @@ fn measure(
             suffix226::launched_since_sample(replay, &fleet_ref, &observer_ref, &booking_ref, drain)?;
         rows.push(json!({"epoch":226,"phase":"diagnostic-qualification","producer":replay.owner}));
         Some(reference)
+    } else {
+        None
+    };
+    let assembly_226_transition = if let Some(replay) = live_replays.get(&226)
+        && replay.unit == assembly226::UNIT
+        && !rows.iter().any(|row| row["epoch"] == 226)
+    {
+        let transition = assembly226::launched_since_sample(replay, &fleet_ref, &observer_ref, &booking_ref)?;
+        rows.push(json!({"epoch":226,"phase":"diagnostic-qualification","producer":replay.owner}));
+        Some(transition)
     } else {
         None
     };
@@ -1991,11 +2018,16 @@ fn measure(
     let cpu_width = if copy_230 || next_266 { 1 } else if private_141.is_some() { 3 } else { 8 };
     let cpus = units::affinity_width(&json!({"cpu_affinity":selected}), cpu_width)?;
     let private_exclusive = private_141.as_ref().map(interval141::Candidate::exclusive).transpose()?;
+    let assembly_exclusive = units::parse_cpu_list(assembly226::EXCLUSIVE)?;
     let overlap_exclusive = units::parse_cpu_list(OVERLAP_266_EXCLUSIVE)?;
     let bridge_group = units::parse_cpu_list("48-55,112-119")?;
     let adjacent_copy_group = units::parse_cpu_list("48,112")?;
     let next_266_group = units::parse_cpu_list(NEXT_266_EXCLUSIVE)?;
     let exclusive = match &quote {
+        Some(Quote::Assembly226(_)) => {
+            replay296::verify_cpu_group("14,16-23", &assembly_exclusive)?;
+            &assembly_exclusive
+        }
         Some(Quote::NextIntake266(_) | Quote::SuccessorIntake266(_) | Quote::FollowingIntake266(_)) => {
             replay296::verify_cpu_group(NEXT_266_CPU, &next_266_group)?;
             &next_266_group
@@ -2095,6 +2127,13 @@ fn measure(
                 "epoch {epoch} CPUs overlap the running epoch 296 physical cores"
             );
         }
+        if replay.unit == assembly226::UNIT {
+            replay296::verify_cpu_group("14,16-23", &assembly_exclusive)?;
+            ensure!(
+                exclusive.is_disjoint(&assembly_exclusive),
+                "epoch {epoch} overlaps epoch 226 assembly physical cores"
+            );
+        }
         recorded.insert(
             replay.unit.to_owned(),
             (replay.owner.clone(), replay.memory, replay.ticks),
@@ -2104,12 +2143,17 @@ fn measure(
     for (guard_epoch, guard) in KNOWN_GUARDS {
         if guard_epoch == 226 && extraction_drain.is_some() {
             if let Some(replay) = live_replays.get(&226) {
+                let guard = if replay.unit == assembly226::UNIT {
+                    assembly226::GUARD
+                } else {
+                    suffix226::GUARD
+                };
                 guards.insert(
                     226,
                     guard_binding(
                         n,
                         226,
-                        suffix226::GUARD,
+                        guard,
                         &replay.guard_booking,
                         &replay.owner,
                         device,
@@ -2331,7 +2375,7 @@ fn measure(
         || live_replays.get(&230).is_some_and(|replay| bridge_windows.contains(&replay.unit))
         || live_replays.contains_key(&266);
     let suffix_quote = matches!(&quote, Some(Quote::Suffix226(_) | Quote::Suffix226Preview));
-    let suffix_active = live_replays.contains_key(&226);
+    let suffix_active = live_replays.get(&226).is_some_and(|lane| lane.unit == suffix226::UNIT);
     let (pending_suffix_disk, pending_suffix_memory) = if suffix226::reserve_for_overlap(shares_suffix, suffix_quote, suffix_active) {
         ensure!(before.contains(EXTRACT_226) || extraction_drain.is_some(),
             "epoch 226 extraction or exact drain is required for the protected suffix");
@@ -2361,6 +2405,10 @@ fn measure(
         Some(Quote::Suffix226(_) | Quote::Suffix226Preview) => (
             capacity::add(SUFFIX_226_CAP, DISK_RECEIPTS)?,
             capacity::add(SUFFIX_226_CAP, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
+        ),
+        Some(Quote::Assembly226(_)) => (
+            capacity::add(assembly226::CAP, assembly226::RECEIPTS)?,
+            capacity::add(assembly226::MEMORY, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
         ),
         Some(Quote::Delivery252) => (
             UPLOAD_261_DISK,
@@ -2425,7 +2473,12 @@ fn measure(
     )?;
     let periodic_reserve = capacity::add(
         periodic_reserve,
-        live_replays.get(&266).map_or(0, |_| OVERLAP_266.control_memory()),
+        live_replays.get(&266).map_or(0, |_| {
+            // The watcher is part of the control allowance. Its exact cgroup
+            // cap is already included in recorded owners when it is running.
+            OVERLAP_266.control_memory()
+                - active_capture_266.as_ref().map_or(0, |_| capture266::MEMORY)
+        }),
     )?;
     let guard_141_memory = active_interval_141.len() as u64 * interval141::GUARD_MEMORY;
     let restore_allowance = active_restore_266.as_ref().map_or(0, |_| restore266::ADDITIONAL_MEMORY);
@@ -2481,6 +2534,7 @@ fn measure(
     let private_schema = private_141.as_ref().map(interval141::Candidate::schema);
     let schema = match epoch {
         141 => private_schema.as_deref().context("private 141 schema")?,
+        226 if matches!(&quote, Some(Quote::Assembly226(_))) => assembly226::ROSTER_SCHEMA,
         226 => "foundation-epoch226-suffix-roster-binding-v1",
         230 if adjacent_230 => "foundation-epoch230-adjacent-intake-roster-binding-v1",
         230 if copy_230 => "foundation-epoch230-successor-intake-roster-binding-v1",
@@ -2532,8 +2586,10 @@ fn measure(
         "closed_predecessor_266_replay":closed_predecessor_266.map(|(_, proof)| proof),
         "closed_window_266_replay":closed_window_266.map(|(_, _, proof)| proof),
         "closed_extraction_226":extraction_drain,
-        "active_suffix_226_registration":live_replays.get(&226).map(|replay| &replay.reference),
+        "active_suffix_226_registration":live_replays.get(&226).filter(|r| r.unit == suffix226::UNIT).map(|r| &r.reference),
+        "active_assembly_226_registration":live_replays.get(&226).filter(|r| r.unit == assembly226::UNIT).map(|r| &r.reference),
         "accepted_suffix_226_transition":suffix_226_transition,
+        "accepted_assembly_226_transition":assembly_226_transition,
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
         "active_restore_258_registration":live_replays.get(&258).filter(|r| r.unit == RESTORE_258.unit).map(|r| &r.reference),
         "active_replay_258_registration":live_replays.get(&258).filter(|r| r.unit == replay258::UNIT).map(|r| &r.reference),
@@ -2542,6 +2598,7 @@ fn measure(
         "closed_delivery_257":closed_257,
         "active_holding_296_launch":active_holding_296.as_ref().map(|holding| &holding.launch),
         "active_restore_266_launch":active_restore_266.as_ref().map(|restore| &restore.launch),
+        "active_capture_266_producer":active_capture_266.as_ref().map(|capture| &capture.launch),
         "active_overlap_266_registration":live_replays.get(&266).filter(|replay| replay.unit == OVERLAP_266.unit).map(|replay| &replay.reference),
         "active_predecessor_266_registration":live_replays.get(&266).filter(|replay| replay.unit == PREDECESSOR_266.unit).map(|replay| &replay.reference),
         "active_window_266_registration":live_replays.get(&266).filter(|replay| replay.unit == WINDOW_266.unit).map(|replay| &replay.reference),
@@ -2558,6 +2615,15 @@ fn measure(
         "active_replay_296_registration":live_replays.get(&296).map(|replay| &replay.reference)});
     if let Some(candidate) = &private_141 {
         evidence["private_interval_141_candidate"] = candidate.inputs.clone();
+    }
+    if let Some(Quote::Assembly226(preflight)) = &quote {
+        evidence["assembly_226_quote"] = json!({
+            "preflight":preflight,
+            "sources":Bound::new(assembly226::SOURCES.0,assembly226::SOURCES.1),
+            "producer_unit":assembly226::UNIT,"assembly_only_no_replay":true,
+            "candidate_cap_bytes":assembly226::CAP,"candidate_memory_max_bytes":assembly226::MEMORY,
+            "candidate_cpus":selected,"exclusive_online_cpus":assembly_exclusive,
+        });
     }
     if let Some(Quote::FullReplay(quote)) = &quote {
         evidence["full_replay_quote"] = json!({"sizing_reference":quote.reference,"inputs":quote.inputs,
@@ -2696,26 +2762,37 @@ fn measure(
 }
 
 /// Price the layered Foundation suffix while the caller holds the fleet cadence lock.
-pub fn quote_226_suffix(drain_path: &Path, drain_sha256: &str) -> Result<Value> {
+fn witness_226(root: &Path) -> Result<Native> {
     use std::os::unix::fs::DirBuilderExt;
-
     ensure!(
-        unsafe { libc::geteuid() } == 0 && drain_path == Path::new(DRAIN_226),
-        "epoch 226 suffix quote scope"
+        unsafe { libc::geteuid() } == 0,
+        "epoch 226 quote requires the Foundation operator"
     );
-    let proof = Bound::new(drain_path, drain_sha256);
-    let root = Path::new(SUFFIX_226_ROOT).join(format!(
+    let root = root.join(format!(
         "capacity-witness-{}-{}",
         std::process::id(),
         mono()?
     ));
     trusted_parents(&root)?;
     fs::DirBuilder::new().mode(0o700).create(&root)?;
-    let mut native = Native {
+    Ok(Native {
         root,
         counter: 0,
         deadline: Some(capacity::add(mono()?, 60_000_000)?),
-    };
+    })
+}
+
+/// The operator holds the shared cadence lock from measurement through admission.
+pub fn quote_226_assembly() -> Result<Value> {
+    let mut native = witness_226(Path::new(assembly226::STATE))?;
+    let preparation = assembly226::preparation(&mut native)?;
+    measure(&mut native, None, Some(Quote::Assembly226(preparation)))
+}
+
+pub fn quote_226_suffix(drain_path: &Path, drain_sha256: &str) -> Result<Value> {
+    ensure!(drain_path == Path::new(DRAIN_226), "epoch 226 suffix quote scope");
+    let proof = Bound::new(drain_path, drain_sha256);
+    let mut native = witness_226(Path::new(SUFFIX_226_ROOT))?;
     let roster = measure(&mut native, None, Some(Quote::Suffix226(proof.clone())))?;
     let fit = &roster["capacity"];
     let suffix = &roster["suffix_quote"];
@@ -2800,6 +2877,7 @@ pub fn run() -> Result<()> {
                         | "--trace296-quote"
                         | "--feature296-quote"
                         | "--suffix226-preview"
+                        | "--assembly226-quote"
                         | "--interval141-third-quote"
                         | "--interval141-fourth-quote"
                         | "--interval141-fifth-quote"
@@ -2937,6 +3015,8 @@ pub fn run() -> Result<()> {
         Some(flag) if flag == "--suffix226-preview" => {
             measure(&mut native, None, Some(Quote::Suffix226Preview))
         }
+        Some(flag) if flag == "--assembly226-quote" => assembly226::preparation(&mut native)
+            .and_then(|proof| measure(&mut native, None, Some(Quote::Assembly226(proof)))),
         Some(flag) if flag == "--interval141-third-quote" => measure(&mut native, None, Some(Quote::Interval141(3))),
         Some(flag) if flag == "--interval141-fourth-quote" => measure(&mut native, None, Some(Quote::Interval141(4))),
         Some(flag) if flag == "--interval141-fifth-quote" => measure(&mut native, None, Some(Quote::Interval141(5))),
