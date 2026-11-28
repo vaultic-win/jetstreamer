@@ -13,6 +13,9 @@ pub(super) struct NativeConfig {
 }
 impl NativeConfig {
     fn validate(&self) -> Result<()> {
+        if self.epoch == 288 {
+            return holding288::validate(self);
+        }
         let tuple = match self.epoch {
             207 => (
                 "archive-207-v1616-native-input-actual-v1.service",
@@ -167,6 +170,9 @@ fn identity(u: &UnitObservation, n: &NativeConfig) -> Result<()> {
         "native input MainPID/cgroup changed"
     );
     let rss = serde_json::to_value(&u.rss)?;
+    if n.epoch == 288 {
+        return holding288::processes(&rss, n);
+    }
     ensure!(
         rss["census_stable"] == true
             && rss["error"].is_null()
@@ -411,8 +417,9 @@ fn observe(n: &NativeConfig) -> Result<Value> {
         "native input scratch noncanonical"
     );
     let root = fs::symlink_metadata(&n.scratch_path)?;
+    let scratch_uid = if n.epoch == 288 { 0 } else { 1000 };
     ensure!(
-        root.is_dir() && root.uid() == 1000 && root.mode() & 0o077 == 0,
+        root.is_dir() && root.uid() == scratch_uid && root.mode() & 0o077 == 0,
         "native input scratch owner/mode differs"
     );
     let (first, first_bytes) = scratch_sample(n)?;
@@ -464,6 +471,9 @@ fn observe(n: &NativeConfig) -> Result<Value> {
         "entry_replay":false,"native_input_qualified":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )
 }
+
+#[path = "native_input_holding288.rs"]
+mod holding288;
 fn row(n: &NativeConfig, result: Result<Value>) -> Value {
     let (status, observation, error) = match result {
         Ok(v) => ("observed", Some(v), None),

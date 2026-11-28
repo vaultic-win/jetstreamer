@@ -1,0 +1,35 @@
+--- cycle.py
++++ cycle.py
+@@ -190,0 +191 @@
++import holding288_resource
+@@ -260,0 +262,10 @@
++def holding_rss_release():
++    root = V / "horizon288-custody-resource-v1"
++    release = bound(sealed_226_file(root / "acceptance.json"))
++    assert release["schema"] == "foundation-epoch288-custody-resource-release-v1"
++    assert release["controller"] == sealed_226_file(Path(__file__))
++    assert release["configuration"] == sealed_226_file(Path(holding288_resource.__file__))
++    assert release["observer"]["path"] == str(root / "jetstreamer-horizon-observe")
++    assert release["fleet"]["path"] == str(root / "jetstreamer-r2")
++    return release
++
+@@ -265 +276,3 @@
+-    assert release["controller"] == sealed_226_file(Path(__file__))
++    holding_release = holding_rss_release()
++    assert holding_release["predecessor_assembly_rss"] == sealed_226_file(root / "acceptance.json")
++    assert holding_release["previous_controller"] == release["controller"]
+@@ -270,0 +284,2 @@
++    if any(row["unit"] == holding288_resource.UNIT for row in cfg.get("native_input_diagnostics", [])):
++        return Path(publication_handoff.checked_image(holding_rss_release()["observer"]))
+@@ -466,3 +481,3 @@
+-    assembly_rss = diagnostic226_assembly.configuration()
+-    if assembly_rss:
+-        cfg.setdefault("native_input_diagnostics", []).extend(assembly_rss)
++    native_resources = diagnostic226_assembly.configuration() + holding288_resource.configuration()
++    if native_resources:
++        cfg.setdefault("native_input_diagnostics", []).extend(native_resources)
+@@ -1351,0 +1367,4 @@
++    if holding288_resource.register(plan):
++        holding_release = holding_rss_release()
++        assert publication_handoff.checked_image(holding_release["predecessor_fleet"]) == str(fleet_image)
++        fleet_image = Path(publication_handoff.checked_image(holding_release["fleet"]))
