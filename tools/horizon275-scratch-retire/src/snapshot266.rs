@@ -1,4 +1,4 @@
-//! Retire one reproducible GCS intake after the verified private 266 seam.
+//! Retire reproducible GCS intakes after their private epoch 266 replays close.
 
 use super::{
     appendvec292::failed::no_readers,
@@ -337,6 +337,131 @@ pub(super) fn retire_overlap(
             proof: &proof, metadata_sha,
             context: json!({"source":path,"source_sha256":SHA,"seam_sha256":SEAM.1,
                 "drain_sha256":DRAIN.1,"restore_sha256":RESTORE_SHA,"tool_sha256":self_sha,"generation":object}),
+        },
+        observe, archive_state,
+    )
+}
+
+pub(super) fn retire_window(
+    apply: bool,
+    self_sha: &str,
+    proof_path: &Path,
+    metadata_sha: &str,
+) -> Result<()> {
+    const SLOT: u64 = 114_929_697;
+    const END: u64 = 114_936_474;
+    const SIZE: u64 = 15_514_070_431;
+    const GENERATION: u64 = 1_641_767_198_731_933;
+    const SHA: &str = "6712b4359e3513c9fd76751e85e2fad23fb73bc55e034dec60bc77ade27c6d10";
+    const ACCOUNTS: &str = "BevfHbX1MRE8ySXdbzp8WZB5i4W1spPhbsZ8UEUhU7di";
+    const NAME: &str = "snapshot-114929697-BevfHbX1MRE8ySXdbzp8WZB5i4W1spPhbsZ8UEUhU7di.tar.zst";
+    const CACHE: &str = "/home/ubuntu/.jetstreamer-private/epoch266-next-114929697-intake-v1";
+    const STATE: &str = "/var/lib/jetstreamer/horizon266-bootstrap-114929697-retirement-v1";
+    const INTAKE: (&str, &str) = (
+        "/var/lib/jetstreamer/horizon266-next-114929697-intake-v2/custody.json",
+        "98c28740a2bdb0f707624a07046fa8a316dd37ea225f31770cf410d5fd0b7001",
+    );
+    const RESTORE: (&str, &str) = (
+        "/var/lib/jetstreamer/horizon266-next-114929697-intake-v2/gcs-restore.json",
+        "e6f87aa491d8ffa7ee9ed9eee7a031cf705cd52dea97f8b619f0526e28800ca6",
+    );
+    const DRAIN: (&str, &str) = (
+        "/var/lib/jetstreamer/horizon266-window-114929698-114936474-runtime-v1/terminal.json",
+        "ec1433f0a7055e5aff543e988cbf7837317761d9a846a9e41a0498a830c61a24",
+    );
+    const NATIVE: (&str, &str) = (
+        "/var/lib/jetstreamer/horizon266-window-terminal-collector-v1/evidence/terminal-evidence.json",
+        "bfba93cb5a22dc00a3d826c28348dc528e4f14b0e071072fb522630ad2235d54",
+    );
+    const PRODUCER: &str = "horizon-qualify-checkpoint-continuation-266-window-114936474-v1.service";
+    const TIMER: &str = "horizon-266-window-114936474-protective-v1.timer";
+    const GUARD: &str = "horizon-266-window-114936474-protective-v1.service";
+
+    let state = Path::new(STATE);
+    let metadata = state.symlink_metadata()?;
+    ensure!(
+        state.canonicalize()? == state && metadata.is_dir() && metadata.uid() == 0
+            && metadata.mode() & 0o077 == 0
+            && proof_path == state.join("generation-recheck-114929697.json"),
+        "unsafe epoch 266 checkpoint retirement evidence paths"
+    );
+
+    let proof: Value = read_bound(proof_path, metadata_sha, JSON_LIMIT)?;
+    let object = &proof["object"];
+    let cache = Path::new(CACHE);
+    let path = cache.join(NAME);
+    let name = format!("114910768/hourly/{NAME}");
+    let uri = format!("gs://mainnet-beta-ledger-us-ny5/{name}#{GENERATION}");
+    let restore: Value = read_bound(Path::new(RESTORE.0), RESTORE.1, JSON_LIMIT)?;
+    let intake: Value = read_bound(Path::new(INTAKE.0), INTAKE.1, JSON_LIMIT)?;
+    ensure!(
+        proof["schema"] == "foundation-epoch266-bootstrap-114929697-generation-recheck-v1"
+            && proof["snapshot_sha256"] == SHA
+            && object["bucket"] == "mainnet-beta-ledger-us-ny5"
+            && object["name"] == name && object["generation"] == GENERATION.to_string()
+            && object["size"] == SIZE && object["crc32c_hash"] == "exIgJw=="
+            && object["md5_hash"] == "8VhGHIp7ijX7haXULetQ0A=="
+            && object["etag"] == "CJ3dvLXbpfUCEAE="
+            && restore["versioned_uri"] == uri && restore["generation"] == GENERATION
+            && restore["snapshot_slot"] == SLOT && restore["destination"] == json!(path)
+            && restore["file"]["size"] == SIZE && restore["file"]["sha256"] == SHA
+            && restore["file"]["crc32c_base64"] == object["crc32c_hash"]
+            && restore["file"]["md5_base64"] == object["md5_hash"]
+            && intake["copy_drained"] == true && intake["whole_file_sha256_rechecked"] == true
+            && intake["restore"] == json!({"path":RESTORE.0,"sha256":RESTORE.1})
+            && intake["input"]["path"] == json!(path) && intake["input"]["sha256"] == SHA
+            && intake["input"]["device"] == restore["file"]["device"]
+            && intake["input"]["inode"] == restore["file"]["inode"],
+        "epoch 266 closed window bootstrap differs from its authenticated generation"
+    );
+
+    let drain: Value = read_bound(Path::new(DRAIN.0), DRAIN.1, JSON_LIMIT)?;
+    let terminal: Value = read_bound(Path::new(NATIVE.0), NATIVE.1, JSON_LIMIT)?;
+    ensure!(
+        drain["schema"] == "foundation-epoch266-private-window-drain-v1"
+            && drain["state"] == "local-segment-committed"
+            && drain["guard_drained"] == true && drain["unit"] == PRODUCER
+            && drain["timer_after"]["Id"] == TIMER && drain["guard_after"]["Id"] == GUARD
+            && drain["launch"] == terminal["launch"] && drain["pid1_exit"] == terminal["pid1_exit"]
+            && drain["native_terminal"] == json!({"path":NATIVE.0, "sha256":NATIVE.1})
+            && drain["invocation_id"] == terminal["invocation_id"]
+            && terminal["schema"] == "foundation-epoch266-private-window-terminal-evidence-v1"
+            && terminal["unit"] == PRODUCER && terminal["producer_drained"] == true
+            && terminal["producer_exit_status"] == 0
+            && terminal["native_manifest_complete_verified"] == true
+            && terminal["predecessor_consensus_fields_match"] == true
+            && terminal["first_slot"] == SLOT + 1 && terminal["last_slot"] == END
+            && terminal["slot_count"] == END - SLOT
+            && terminal["bootstrap_checkpoint"]["slot"] == SLOT
+            && terminal["bootstrap_checkpoint"]["accounts_hash"] == ACCOUNTS
+            && terminal["terminal_checkpoint"]["slot"] == END
+            && terminal["publication_authorized"] == false,
+        "epoch 266 closed window lacks full native segment and drain evidence"
+    );
+    let inputs = [checked_archive(&terminal["archive"])?, checked_archive(&terminal["segment_manifest"])?];
+    let archive_state = || -> Result<()> {
+        for (path, expected) in &inputs {
+            ensure!(stamp(&open_regular(path)?.metadata()?) == *expected,
+                    "retained epoch 266 window changed: {}", path.display());
+        }
+        Ok(())
+    };
+    let observe = || -> Result<(Value, Value)> {
+        terminal_unit(PRODUCER)?;
+        terminal_unit(TIMER)?;
+        terminal_unit(GUARD)?;
+        assert_no_nested_mount(&path)?;
+        let report = no_readers(cache, &path, &[])?;
+        Ok((report["scheduled"].clone(), report["processes"].clone()))
+    };
+    archive_state()?;
+    evict_cache(
+        BoundCache {
+            apply, state, path: &path, size: SIZE, owner: 0, sha: SHA, restore: &restore,
+            proof: &proof, metadata_sha,
+            context: json!({"source":path,"source_sha256":SHA,"drain_sha256":DRAIN.1,
+                "native_terminal_sha256":NATIVE.1,"restore_sha256":RESTORE.1,
+                "tool_sha256":self_sha,"generation":object}),
         },
         observe, archive_state,
     )
