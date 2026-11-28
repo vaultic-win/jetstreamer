@@ -77,7 +77,7 @@ const FOLLOWING_WINDOW: (&str, &str) = (
     "f040aafc2b2d182e11f6baf2df911957ecc301609fc329932fa724a56c344f56",
 );
 
-fn same_checkpoint(left: &Value, right: &Value) -> bool {
+pub(super) fn same_checkpoint(left: &Value, right: &Value) -> bool {
     // Write-version cursors are local to their replay and the restored worker.
     [
         "slot",
@@ -169,10 +169,16 @@ fn authorize_manifest(window: &Window, manifest: &HistoricalSegmentManifest) -> 
     Ok(())
 }
 
-fn check_manager(window: &Window, rows: &[Value], boot: &str, exit: u64) -> Result<()> {
+pub(super) fn check_manager(
+    unit: &str,
+    invocation: &str,
+    rows: &[Value],
+    boot: &str,
+    exit: u64,
+) -> Result<()> {
     let from = rows
         .iter()
-        .position(|event| event["INVOCATION_ID"] == window.invocation)
+        .position(|event| event["INVOCATION_ID"] == invocation)
         .context("PID1 lacks the original producer start")?;
     let (started, terminal) = match &rows[from..] {
         [starting, started, terminal] | [starting, started, terminal, _]
@@ -187,20 +193,20 @@ fn check_manager(window: &Window, rows: &[Value], boot: &str, exit: u64) -> Resu
         rows[from..].iter().all(|row| row["_PID"] == "1"
             && row["_UID"] == "0"
             && row["_BOOT_ID"] == boot
-            && row["UNIT"] == window.unit
-            && row["INVOCATION_ID"] == window.invocation)
+            && row["UNIT"] == unit
+            && row["INVOCATION_ID"] == invocation)
             && started["MESSAGE_ID"] == UNIT_STARTED
             && terminal["MESSAGE_ID"] == UNIT_SUCCESS
-            && terminal["MESSAGE"] == format!("{}: Deactivated successfully.", window.unit)
+            && terminal["MESSAGE"] == format!("{unit}: Deactivated successfully.")
             && timestamp(started)? < exit
             && exit <= timestamp(terminal)?,
-        "PID1 does not prove a unique successful epoch 230 invocation"
+        "PID1 does not prove a unique successful invocation for {unit}"
     );
     if let Some(resources) = rows[from..].get(3) {
         ensure!(
             resources["MESSAGE_ID"] == UNIT_RESOURCES
                 && timestamp(terminal)? < timestamp(resources)?,
-            "unexpected manager event after epoch 230 exit"
+            "unexpected manager event after {unit} exit"
         );
     }
     Ok(())
@@ -287,7 +293,7 @@ pub(super) fn collect(
     let start = state_timestamp(finished, "ExecMainStartTimestampMonotonic")?;
     let end = state_timestamp(finished, "ExecMainExitTimestampMonotonic")?;
     let manager = manager_events(window.unit)?;
-    check_manager(window, &manager, &boot, end)?;
+    check_manager(window.unit, window.invocation, &manager, &boot, end)?;
     let archive_path = Path::new(window.archive);
     let manifest_path = PathBuf::from(format!("{}.segment.json", window.archive));
     let (archive, archive_id) = open_source(archive_path)?;

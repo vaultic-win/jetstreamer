@@ -242,14 +242,17 @@ pub(super) fn capture_adjacent230(launch_sha: &str, destination: &Path) -> Resul
     capture_window230(&window230::ADJACENT, launch_sha, destination)
 }
 
-pub(super) fn capture_window266(launch_sha: &str, destination: &Path) -> Result<Value> {
-    const STATE: &str = "/var/lib/jetstreamer/horizon266-window-114929698-114936474-runtime-v1";
-    const UNIT: &str = "horizon-qualify-checkpoint-continuation-266-window-114936474-v1.service";
-    const NODE: &str = "/var/lib/jetstreamer/horizon266-window-node-10fe8f2f-v1/jetstreamer-node";
+pub(super) const WINDOW266_STATE: &str =
+    "/var/lib/jetstreamer/horizon266-window-114929698-114936474-runtime-v1";
+pub(super) const WINDOW266_UNIT: &str =
+    "horizon-qualify-checkpoint-continuation-266-window-114936474-v1.service";
+pub(super) const WINDOW266_NODE: &str =
+    "/var/lib/jetstreamer/horizon266-window-node-10fe8f2f-v1/jetstreamer-node";
+const WINDOW266_EXIT_SCHEMA: &str = "foundation-epoch266-private-window-pid1-exit-v1";
+
+pub(super) fn window266_launch(launch_sha: &str) -> Result<(Reference, Value, u32)> {
     const PROFILE_SHA: &str = "f7562054a31277bc38747652f9a79e6967b393d8713499e6998841390cb4c5d6";
-    require_root()?;
-    let parent = destination_parent(destination)?;
-    let state = Path::new(STATE);
+    let state = Path::new(WINDOW266_STATE);
     let reference = Reference::new(state.join("cadence-registration.json"), launch_sha);
     let launch = reference.read()?;
     let invocation = string(&launch, "invocation_id")?;
@@ -263,8 +266,8 @@ pub(super) fn capture_window266(launch_sha: &str, destination: &Path) -> Result<
         launch["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
             && launch["kind"] == "epoch266-private-hourly-window"
             && launch["epoch"] == 266
-            && launch["unit"] == UNIT
-            && launch["node_path"] == NODE
+            && launch["unit"] == WINDOW266_UNIT
+            && launch["node_path"] == WINDOW266_NODE
             && launch["profile"] == json!(Reference::new(state.join("profile.json"), PROFILE_SHA))
             && launch["launched"] == true
             && launch["diagnostic_only"] == true
@@ -286,15 +289,23 @@ pub(super) fn capture_window266(launch_sha: &str, destination: &Path) -> Result<
             && sample["trip_reason"].is_null(),
         "foreign epoch 266 window launch or live guard"
     );
+    Ok((reference, launch, pid))
+}
+
+pub(super) fn capture_window266(launch_sha: &str, destination: &Path) -> Result<Value> {
+    require_root()?;
+    let parent = destination_parent(destination)?;
+    let (reference, launch, pid) = window266_launch(launch_sha)?;
+    let invocation = string(&launch, "invocation_id")?;
     let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
         .trim()
         .replace('-', "");
     ensure!(hex(&boot_id, 32), "invalid running boot ID");
     let producer = Producer {
-        unit: UNIT,
+        unit: WINDOW266_UNIT,
         invocation,
         pid,
-        node: Path::new(NODE),
+        node: Path::new(WINDOW266_NODE),
     };
     let (_held, properties) = capture_properties(&producer, 7_300_000)?;
     ensure!(
@@ -305,7 +316,7 @@ pub(super) fn capture_window266(launch_sha: &str, destination: &Path) -> Result<
         parent,
         destination,
         &Capture {
-            schema: "foundation-epoch266-private-window-pid1-exit-v1".to_owned(),
+            schema: WINDOW266_EXIT_SCHEMA.to_owned(),
             launch: reference,
             boot_id,
             producer_invocation: invocation.to_owned(),
@@ -313,6 +324,34 @@ pub(super) fn capture_window266(launch_sha: &str, destination: &Path) -> Result<
             properties,
         },
     )
+}
+
+pub(super) fn read_window266(
+    reference: &Reference,
+    launch: &Reference,
+    invocation: &str,
+    pid: u32,
+    boot: &str,
+) -> Result<UnitState> {
+    let capture: Capture = serde_json::from_value(reference.read()?)?;
+    ensure!(
+        capture.schema == WINDOW266_EXIT_SCHEMA
+            && &capture.launch == launch
+            && capture.boot_id == boot
+            && capture.producer_invocation == invocation
+            && capture.producer_pid == pid,
+        "foreign epoch 266 window PID1 exit capture"
+    );
+    ensure_unit(
+        &capture.properties,
+        &Producer {
+            unit: WINDOW266_UNIT,
+            invocation,
+            pid,
+            node: Path::new(WINDOW266_NODE),
+        },
+    )?;
+    Ok(capture.properties)
 }
 
 fn capture_window230(

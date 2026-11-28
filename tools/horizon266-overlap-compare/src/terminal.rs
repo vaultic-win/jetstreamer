@@ -2,6 +2,7 @@ use super::*;
 mod exit;
 mod predecessor;
 mod window230;
+mod window266;
 use anyhow::bail;
 use jetstreamer_horizon::archive::{BlockNotification, Consumption, EntryRecord, SlotVisitor};
 use segment_manifest::{SegmentManifestError, read_and_validate_seekable_segment_manifest};
@@ -852,6 +853,14 @@ pub(super) fn collect_adjacent230_terminal(exit: &Path, digest: &str, destinatio
 
 pub(super) fn capture_window266_exit(launch_sha: &str, destination: &Path) -> Result<Value> {
     exit::capture_window266(launch_sha, destination)
+}
+
+pub(super) fn collect_window266_terminal(
+    launch_sha: &str,
+    exit_sha: &str,
+    destination: &Path,
+) -> Result<Value> {
+    window266::collect(launch_sha, exit_sha, destination)
 }
 
 pub(super) fn collect_v1627_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {
