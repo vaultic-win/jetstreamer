@@ -11,7 +11,7 @@ from derive63 import ROOT, SOURCE, one
 from derive143_bootstrap_retry import read_package
 
 OLD = ROOT / "tools-cold168-retry5-failed166-v68-entry146"
-NEW = OLD.with_name(OLD.name.replace("-v68-", "-v69-"))
+NEW = OLD.with_name("tools-cold168-retry5-failed166-v69-entry146-r2")
 SEAL = "290592e137b70208701f11a6dbaba10a0c84551991cd0233024bacc0a60a687f"
 ACTIVE = "747c3740e5beb31f4cc0a87fad47a143fc2337d664922535d156e75da5527355"
 V3 = ROOT.parent / "epoch143-second-hourly-20261128-v3"
@@ -30,6 +30,8 @@ def following_block(source, anchor, lines):
 def cycle(source):
     normal, commands = source.split("def main():", 1)
     normal = normal.replace(", 68)", ", 68, 69)")
+    normal = one(normal, '    if version == 46:\n        return name + "-entry146-r2"',
+                 '    if version in (46, 69):\n        return name + "-entry146-r2"')
     for line in normal.splitlines():
         if line.strip().startswith(("68: (transition_v68.", "68: 'fb9db4e77")):
             normal = one(normal,line,line + "\n" + line.replace("68:", "69:", 1).replace("transition_v68.V67","transition_v69.V68"))
@@ -120,6 +122,8 @@ def stage(directory, contract_sha, guard_timer):
                '                 and actor["terminal"] == route.third.native_end(route.third.api(), actor["actor"])')
     add("transition_v68.py",prev)
     cutover = re.sub(r"(cutover|[vV])(67|68)",lambda m: m[1] + str(int(m[2]) + 1),original("cutover68.py"))
+    cutover = one(cutover, 'NEW = BASE / "tools-cold168-retry5-failed166-v69-entry146"',
+                  f'NEW = BASE / "{NEW.name}"')
     cutover = one(cutover, "44451395c11f4de72d6768818e58bd00ac298191746e5167516a375cf24eb3b5", SEAL)
     cutover = one(cutover, "4748bd09457b12e876763e012bb67371142bc1194349df7def25301ef5967c83", ACTIVE)
     add("cutover69.py",cutover)
