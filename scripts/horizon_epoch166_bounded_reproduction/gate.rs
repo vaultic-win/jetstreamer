@@ -80,7 +80,7 @@ mod route {
         "snapshot-70004937-BVgorPzTqjU93J25eC7AxY4H16eC16mVeUdKPS191vBj.tar.zst";
     pub(super) const TERMINAL_SLOT: u64 = 70_011_988;
 }
-#[cfg(epoch169_following_hourly)]
+#[cfg(all(epoch169_following_hourly, not(epoch169_from_73252243)))]
 mod route {
     pub(super) const EPOCH: u64 = 169;
     pub(super) const UNIT: &str = "horizon-qualify-169-from-73245218-20261128-v1.service";
@@ -90,6 +90,18 @@ mod route {
         "snapshot-73245218-5aXCD1ZXBe3fPYtrxvFkDvSvz8x68XiRmWfoEnLVLPif.tar.zst";
     pub(super) const TERMINAL_SLOT: u64 = 73_252_243;
 }
+#[cfg(all(epoch169_following_hourly, epoch169_from_73252243))]
+mod route {
+    pub(super) const EPOCH: u64 = 169;
+    pub(super) const UNIT: &str = "horizon-qualify-169-from-73252243-20261128-v1.service";
+    pub(super) const ALIAS: &str = "/run/horizon-169-from-73252243-v1";
+    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch169-from-73252243-20261128-v1";
+    pub(super) const SNAPSHOT: &str =
+        "snapshot-73252243-3k1wreU6k4yh6YtwL3FkSrHYEnveNKWqmdjrAcrtdpaR.tar.zst";
+    pub(super) const TERMINAL_SLOT: u64 = 73_259_077;
+}
+#[cfg(all(epoch169_from_73252243, not(epoch169_following_hourly)))]
+compile_error!("the epoch 169 route from 73252243 requires epoch169_following_hourly");
 #[cfg(epoch170_suffix)]
 mod route {
     pub(super) const EPOCH: u64 = 170;
@@ -597,11 +609,18 @@ mod tests {
             assert_eq!(args[3], "--snapshot-archive=/run/horizon-162-fourth-replay-v1/snapshot-70004937-BVgorPzTqjU93J25eC7AxY4H16eC16mVeUdKPS191vBj.tar.zst");
             assert_eq!(args[4], format!("--epoch-hashes={ALIAS}/canonical-hashes.txt"));
         }
-        #[cfg(epoch169_following_hourly)]
+        #[cfg(all(epoch169_following_hourly, not(epoch169_from_73252243)))]
         {
             assert_eq!(args[0], "169");
             assert_eq!(args[7], "--qualification-end-slot=73252243");
             assert_eq!(args[3], "--snapshot-archive=/run/horizon-169-from-73245218-v1/snapshot-73245218-5aXCD1ZXBe3fPYtrxvFkDvSvz8x68XiRmWfoEnLVLPif.tar.zst");
+            assert_eq!(args[4], format!("--epoch-hashes={ALIAS}/canonical-hashes.txt"));
+        }
+        #[cfg(all(epoch169_following_hourly, epoch169_from_73252243))]
+        {
+            assert_eq!(args[0], "169");
+            assert_eq!(args[7], "--qualification-end-slot=73259077");
+            assert_eq!(args[3], "--snapshot-archive=/run/horizon-169-from-73252243-v1/snapshot-73252243-3k1wreU6k4yh6YtwL3FkSrHYEnveNKWqmdjrAcrtdpaR.tar.zst");
             assert_eq!(args[4], format!("--epoch-hashes={ALIAS}/canonical-hashes.txt"));
         }
         #[cfg(epoch162_second_hourly)]

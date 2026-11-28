@@ -656,6 +656,9 @@ fn supported_unit(plan: &Plan) -> bool {
     if plan.unit == "horizon-qualify-169-from-73245218-20261128-v1.service" {
         return cfg!(feature = "epoch169-following-hourly");
     }
+    if plan.unit == "horizon-qualify-169-from-73252243-20261128-v1.service" {
+        return cfg!(feature = "epoch169-from-73252243");
+    }
     if plan.unit == "horizon-qualify-162-second-replay-20261128-v3.service" {
         return cfg!(feature = "epoch162-second-reserved");
     }
@@ -733,7 +736,8 @@ fn validate_plan(plan: &Plan) -> Result<()> {
     feature = "epoch162-second-reserved",
     feature = "epoch162-third-hourly",
     feature = "epoch162-fourth-hourly",
-    feature = "epoch169-following-hourly"
+    feature = "epoch169-following-hourly",
+    feature = "epoch169-from-73252243"
 ))]
 fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
     let (worker_root, receipts, minimum_floor, maximum_tree_bytes) = match plan.unit.as_str() {
@@ -769,6 +773,13 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
         "horizon-qualify-169-from-73245218-20261128-v1.service" => (
             "/home/sol/.jetstreamer-private/epoch169-from-73245218-20261128-v1",
             "/var/lib/jetstreamer/horizon_runtime_data/epoch169-from-73245218-20261128-v1/guard-receipts",
+            9_605_558_988_436,
+            (4u64 << 30) + (64u64 << 20),
+        ),
+        #[cfg(feature = "epoch169-from-73252243")]
+        "horizon-qualify-169-from-73252243-20261128-v1.service" => (
+            "/home/sol/.jetstreamer-private/epoch169-from-73252243-20261128-v1",
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch169-from-73252243-20261128-v1/guard-receipts",
             9_605_558_988_436,
             (4u64 << 30) + (64u64 << 20),
         ),
@@ -1420,7 +1431,8 @@ fn run() -> Result<()> {
         feature = "epoch162-second-reserved",
         feature = "epoch162-third-hourly",
         feature = "epoch162-fourth-hourly",
-        feature = "epoch169-following-hourly"
+        feature = "epoch169-following-hourly",
+        feature = "epoch169-from-73252243"
     ))]
     validate_checkpoint_scope(&plan)?;
     if args.get(6).is_some_and(|a| a == "--measure-root-only") {
@@ -1458,7 +1470,8 @@ fn run() -> Result<()> {
         feature = "epoch162-second-reserved",
         feature = "epoch162-third-hourly",
         feature = "epoch162-fourth-hourly",
-        feature = "epoch169-following-hourly"
+        feature = "epoch169-following-hourly",
+        feature = "epoch169-from-73252243"
     )))]
     ensure!(
         plan.unit == data_fulfillment::COLD_UNIT
