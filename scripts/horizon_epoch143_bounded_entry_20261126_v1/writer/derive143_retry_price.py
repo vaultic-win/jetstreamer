@@ -8,9 +8,9 @@ from derive143_bootstrap_retry import change, read_package
 from derive143_v53 import member_plan
 from derive143_shared_price_v21 import NEW as V21
 
-OLD = V21.with_name("issued-price-v22")
-NEW = OLD.with_name("issued-price-v23")
-SEAL = "e8d13381e4089ab239c9dd1b2bf5025fc297ab1f9ba654e3fc8f1aeaf2c202ee"
+OLD = V21.with_name("issued-price-v23")
+NEW = OLD.with_name("issued-price-v24")
+SEAL = "4b4a9986959abd95503fa78812cc9bec72825cf25ac7fb0f15ca71fc4048e1ca"
 OLD_UNIT = "horizon-qualify-143-second-hourly-20261128-v1.service"
 UNIT = "horizon-qualify-143-second-hourly-20261128-v2.service"
 
@@ -21,7 +21,7 @@ def derive(stage, revision):
         raw, mode = files[name]
         source = raw.decode()
         if source.count(str(OLD)) != count:
-            raise ValueError("different V22 self references for " + name)
+            raise ValueError("different V23 self references for " + name)
         files[name] = (source.replace(str(OLD), str(NEW)).encode(), mode)
 
     raw, mode = files["successor_price.py"]
