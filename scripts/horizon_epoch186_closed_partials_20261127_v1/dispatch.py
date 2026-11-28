@@ -129,6 +129,9 @@ def dispatch(phase, lane):
         op.need(
             re.fullmatch("[0-9a-f]{32}", iid) is not None, "missing native invocation"
         )
+        if op.TOOLS == op.M12:
+            import m12_admission
+            m12_admission.arm(d,phase,runid,unit,iid,start,rbytes)
     terminal = ops["terminal"](unit, iid, int(state["MainPID"]))
     op.save(d / ("TERMINAL_" + phase + "_" + runid + ".json"), terminal)
     op.need(terminal["success"], "failed phase, see " + str(err))
@@ -167,6 +170,6 @@ if __name__ == "__main__":
     p.add_argument(
         "phase", choices=["fixture", "precheck", "park", "retire", "restore"]
     )
-    p.add_argument("lane", choices=["m", "n"])
+    p.add_argument("lane", choices=["m", "n", "m12"])
     a = p.parse_args()
     print(json.dumps(dispatch(a.phase, a.lane)), flush=True)

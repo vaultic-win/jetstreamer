@@ -646,6 +646,116 @@ pub(super) fn overlap_266_drained(n: &mut Native, row: &Value) -> Result<Option<
     Ok(Some(reference))
 }
 
+fn validate_predecessor_266_drain(
+    row: &Value,
+    launch_ref: &Bound,
+    launch: &Value,
+    receipt: &Value,
+    native: &Value,
+    boot: &str,
+) -> Result<()> {
+    let invocation = text(launch, "invocation_id")?;
+    let pid = text(&row["producer"], "MainPID")?.parse::<u64>()?;
+    ensure!(
+        row["epoch"] == 266
+            && row["phase"] == "diagnostic-qualification"
+            && row["producer"]["Id"] == PREDECESSOR_266.unit
+            && row["producer"]["InvocationID"] == invocation
+            && row["launch_receipt"] == json!(launch_ref.path)
+            && row["launch_receipt_sha256"] == launch_ref.sha256
+            && launch["main_pid"] == pid
+            && launch["unit"] == PREDECESSOR_266.unit
+            && receipt["schema"] == "foundation-epoch266-private-predecessor-drain-v1"
+            && receipt["epoch"] == 266
+            && receipt["unit"] == PREDECESSOR_266.unit
+            && receipt["invocation_id"] == invocation
+            && receipt["launch"] == json!(launch_ref)
+            && receipt["guard_drained"] == true
+            && receipt["state"] == "local-segment-committed"
+            && receipt["publication_authorized"] == false
+            && native["schema"] == "foundation-epoch266-private-predecessor-terminal-evidence-v1"
+            && native["epoch"] == 266
+            && native["unit"] == PREDECESSOR_266.unit
+            && native["launch"] == json!(launch_ref)
+            && native["invocation_id"] == invocation
+            && native["boot_id"] == boot
+            && native["producer_drained"] == true
+            && native["producer_exit_status"] == 0
+            && native["replay_first_slot"] == PREDECESSOR_266.first
+            && native["first_slot"] == 114_912_000
+            && native["last_slot"] == PREDECESSOR_266.last
+            && native["positions"] == PREDECESSOR_266.last - 114_912_000 + 1
+            && native["native_manifest_complete_verified"] == true
+            && native["full_prefix_normalized_match"] == true
+            && native["terminal_consensus_fields_match"] == true
+            && native["publication_authorized"] == false,
+        "closed epoch 266 evidence does not bind the sampled predecessor"
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+#[test]
+fn predecessor_drain_cannot_release_an_unverified_or_replaced_owner() {
+    let launch_ref = Bound::new("/launch.json", "a".repeat(64));
+    let iid = "b".repeat(32);
+    let boot = "c".repeat(32);
+    let unit = PREDECESSOR_266.unit;
+    let row = json!({
+        "epoch":266, "phase":"diagnostic-qualification",
+        "producer":{"Id":unit, "InvocationID":iid, "MainPID":"123"},
+        "launch_receipt":launch_ref.path, "launch_receipt_sha256":launch_ref.sha256,
+    });
+    let launch = json!({"main_pid":123, "unit":unit, "invocation_id":iid});
+    let mut receipt = json!({
+        "schema":"foundation-epoch266-private-predecessor-drain-v1",
+        "epoch":266, "unit":unit, "invocation_id":iid, "launch":launch_ref,
+        "guard_drained":true, "state":"local-segment-committed", "publication_authorized":false,
+    });
+    let mut native = json!({
+        "schema":"foundation-epoch266-private-predecessor-terminal-evidence-v1",
+        "epoch":266, "unit":unit, "launch":launch_ref, "invocation_id":iid, "boot_id":boot,
+        "producer_drained":true, "producer_exit_status":0,
+        "replay_first_slot":PREDECESSOR_266.first, "first_slot":114_912_000,
+        "last_slot":PREDECESSOR_266.last, "positions":11_431,
+        "native_manifest_complete_verified":true, "full_prefix_normalized_match":true,
+        "terminal_consensus_fields_match":true, "publication_authorized":false,
+    });
+    let check = |receipt: &Value, native: &Value, boot: &str| {
+        validate_predecessor_266_drain(&row, &launch_ref, &launch, receipt, native, boot)
+    };
+    check(&receipt, &native, &boot).unwrap();
+    assert!(check(&receipt, &native, "replaced-boot").is_err());
+    native["full_prefix_normalized_match"] = json!(false);
+    assert!(check(&receipt, &native, &boot).is_err());
+    native["full_prefix_normalized_match"] = json!(true);
+    receipt["guard_drained"] = json!(false);
+    assert!(check(&receipt, &native, &boot).is_err());
+}
+
+pub(super) fn predecessor_266_drained(n: &mut Native, row: &Value) -> Result<Option<Bound>> {
+    let state = Path::new(PREDECESSOR_266.state);
+    let path = state.join("terminal.json");
+    if !path.try_exists()? {
+        return Ok(None);
+    }
+    let reference = Bound::new(&path, hash(&path)?);
+    let receipt = reference.sealed()?;
+    let launch_ref = binding(&receipt["launch"])?;
+    let native = binding(&receipt["native_terminal"])?;
+    ensure!(
+        launch_ref.path == state.join("cadence-registration.json")
+            && native.path == Path::new("/var/lib/jetstreamer/horizon266-predecessor-terminal-collector-state-v1/evidence/terminal-evidence.json"),
+        "foreign epoch 266 predecessor drain paths"
+    );
+    let launch = launch_ref.sealed()?;
+    let native = native.sealed()?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim().replace('-', "");
+    validate_predecessor_266_drain(row, &launch_ref, &launch, &receipt, &native, &boot)?;
+    drained(n, PREDECESSOR_266.unit, PREDECESSOR_266.guard, text(&launch, "invocation_id")?)?;
+    Ok(Some(reference))
+}
+
 impl Focused {
     pub(super) fn control_memory(&self) -> u64 {
         if self.epoch == 266 {

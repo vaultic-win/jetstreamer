@@ -826,6 +826,10 @@ pub(super) fn collect_predecessor(
     predecessor::collect(launch_sha, exit_sha, destination)
 }
 
+pub(super) fn finish_predecessor(launch_sha: &str) -> Result<Value> {
+    predecessor::finish(launch_sha)
+}
+
 pub(super) fn collect_v1627_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {
     v1627::collect(exit, digest, destination)
 }
