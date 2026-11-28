@@ -20,6 +20,15 @@ BRIDGE = "horizon-qualify-170-from-73760367-ram-20261128-v3.service"
 ALIAS = "/run/horizon-170-from-73766969-v1"
 ENROLL_OPTION = "--enroll-after-ram-170"
 RETRY = FOLLOWING = False
+HOURLY_ROOT = RT / "epoch170-from-73766969-ram-20261128-v1"
+HOURLY = Path(__file__).resolve().parent == HOURLY_ROOT / "operator-v1"
+if HOURLY:
+    DEP = ATTEMPT = HOURLY_ROOT
+    OPERATOR = DEP / "operator-v1"
+    BRIDGE = UNIT
+    UNIT = "horizon-qualify-170-from-73766969-ram-20261128-v1.service"
+    ENROLL_OPTION = "--enroll-after-floor-170"
+    PRODUCER_MEMORY = 56 << 30
 
 
 def need(ok, reason):
@@ -56,7 +65,8 @@ def binding():
          and source["destination"] == str(OPERATOR), "uninstalled after-RAM issuer")
     item, = [item for item in source["members"] if item["name"] == "binding.json"]
     result = json.loads(member(OPERATOR / "binding.json", item["sha256"]))
-    need(result["current_writer"] == V64 and result["scope"]["path"] == str(DEP / "AFTER_RAM_WRITER_INTERFACE.json")
+    name = "AFTER_FLOOR_WRITER_INTERFACE.json" if HOURLY else "AFTER_RAM_WRITER_INTERFACE.json"
+    need(result["current_writer"] == V64 and result["scope"]["path"] == str(DEP / name)
          and not result["publication_authorized"], "unexpected installed scope or writer")
     return result
 
@@ -82,7 +92,7 @@ def shared_chain(directory, ref):
 shared_chain(PROVIDER, BINDING["provider"])
 prior = runpy.run_path(str(PROVIDER / "continuation_price.py"))["prior"]
 read, bound, state, inactive, cmd, TREE = prior.read, prior.bound, prior.state, prior.inactive, prior.cmd, prior.TREE
-shared = runpy.run_path(str(PROVIDER / "after_ram170_admission.py"))
+shared = runpy.run_path(str(PROVIDER / ("after_floor170_price.py" if HOURLY else "after_ram170_admission.py")))
 callback = shared["receiver"](prior, PROVIDER)
 need(shared["SCOPE"] == callback.INTERFACE == BINDING["scope"] and callback.UNIT == UNIT,
      "unregistered issuer receiver")
@@ -93,6 +103,8 @@ def scope():
 
 
 def compare_predecessor():
+    if HOURLY:
+        return callback.contract.checkpoint(scope()[0])
     return callback.contract.closed_comparison(scope()[0])
 
 
@@ -107,7 +119,28 @@ def predecessor_drained():
     return comparison
 
 
-def writer():
+def latest_hourly_provider():
+    """Follow only sealed descendants of the admitted hourly provider that keep this issuer registered."""
+    trusted = BINDING["provider"]
+    member_digest = package(PROVIDER,trusted)["after_floor170_price.py"]["sha256"]
+    version = int(PROVIDER.name.removeprefix("issued-price-v"))
+    observed = sorted(int(p.name.removeprefix("issued-price-v")) for p in PROVIDER.parent.glob("issued-price-v*")
+                      if p.name.removeprefix("issued-price-v").isdigit() and int(p.name.removeprefix("issued-price-v"))>version)
+    directory = PROVIDER
+    for expected, found in enumerate(observed,version+1):
+        need(found==expected,"missing hourly provider predecessor")
+        directory = PROVIDER.with_name(f"issued-price-v{expected}")
+        receipt = directory/"deployment-seal-receipt.json"
+        ref = dict(path=str(receipt),sha256=sha256(receipt.read_bytes()).hexdigest())
+        members = package(directory,ref)
+        history = json.loads(member(directory/"SOURCE.json",members["SOURCE.json"]["sha256"]))
+        need(history["prior_shared_price"] == trusted and history["after_floor170_interface"] == callback.INTERFACE
+             and members["after_floor170_price.py"]["sha256"] == member_digest, "different hourly receiver or provider lineage")
+        trusted = ref
+    return directory, trusted
+
+
+def writer(require_registration=True):
     need(bound(V64)["new"]["program"] == str(WRITER_ROOT / "tools-cold168-retry5-failed166-v64-entry146/status_cycle.py"),
          "unrecognized V64 owner")
     peers = runpy.run_path(str(PROVIDER / "following_peers.py"))
@@ -116,11 +149,18 @@ def writer():
     actor = bound(active)
     ready = bound(actor["ready"])
     program = Path(actor["new"]["program"])
-    receiver = package(shared["RECEIVER"],dict(path=str(shared["RECEIVER"] / "deployment-seal-receipt.json"),sha256=shared["SEAL"]))
+    if HOURLY:
+        need(ready["after_ram170_interface"] == scope()[0]["preceding_disk_interface"], "writer lost the floor-stopped owner")
+        if not require_registration and "after_floor170_interface" not in ready:
+            return active, None
+        key, digest = "after_floor170_interface", shared["RECEIVER_DIGEST"]
+    else:
+        need(ready["third_ram_gap170_interface"] == scope()[0]["prior_ram_interface"], "writer lost the RAM predecessor")
+        key, digest = "after_ram170_interface", shared["SEAL"]
+    receiver = package(shared["RECEIVER"],dict(path=str(shared["RECEIVER"] / "deployment-seal-receipt.json"),sha256=digest))
     installed = bound(ready["package"])
     rows = {item["name"]: item["sha256"] for item in installed["members"]}
-    need(ready.get("after_ram170_interface") == callback.INTERFACE
-         and ready["third_ram_gap170_interface"] == scope()[0]["prior_ram_interface"]
+    need(ready.get(key) == callback.INTERFACE
          and installed["destination"] == str(program.parent)
          and all(rows.get(name) == item["sha256"] for name, item in receiver.items())
          and ENROLL_OPTION.encode() in member(program, rows[program.name]), "writer has not installed the successor")
@@ -131,7 +171,14 @@ def price(phase, *, preliminary=False):
     need(Path(__file__).resolve().parent == OPERATOR and phase in ("start","held"),
          "different staged issuer or phase")
     old = predecessor_drained()
-    active, _ = writer()
+    active, program = writer(require_registration=not preliminary)
+    if HOURLY:
+        latest, provider_ref = latest_hourly_provider()
+        capacity = runpy.run_path(str(latest / "capacity.py"))
+        result = capacity["after_floor170_roster"](phase)
+        need(result["whole_roster"]["package"] == provider_ref and result["writer"] == active
+             and result["closed_comparison"] == old and not result["resource_credit_bytes"], "different hourly admission")
+        return dict(result, writer_ready=program is not None, preliminary=preliminary)
     whole = runpy.run_path(str(PROVIDER / "capacity.py"))["whole_roster"]()
     need(whole["package"] == BINDING["provider"] and whole["writer"] == active
          and not whole["resource_credit_bytes"] and not whole["preparation_only"], "inconsistent shared owner or authority")

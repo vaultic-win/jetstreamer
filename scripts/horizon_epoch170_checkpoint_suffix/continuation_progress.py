@@ -15,6 +15,9 @@ FOLLOWING_ROOT = ROOT.parent/"epoch170-from-73766969-20261127-v1"
 GAP_ROOT = ROOT.parent/"epoch170-from-73760367-20261128-v1"
 RAM_ROOT = ROOT.parent/"epoch170-from-73760367-ram-20261128-v1"
 AFTER_RAM_ROOT = ROOT.parent/"epoch170-from-73766969-gap-20261128-v1"
+HOURLY_RAM_ROOT = ROOT.parent/"epoch170-from-73766969-ram-20261128-v1"
+if Path(__file__).resolve().parent == HOURLY_RAM_ROOT/"operator-v1":
+    AFTER_RAM_ROOT = HOURLY_RAM_ROOT
 SECOND_RAM_ROOT = ROOT.parent/"epoch170-from-73760367-ram-20261128-v2"
 THIRD_RAM_ROOT = ROOT.parent/"epoch170-from-73760367-ram-20261128-v3"
 for candidate in (SECOND_RAM_ROOT, THIRD_RAM_ROOT):
@@ -99,7 +102,7 @@ def worker_sample(dispatch, scope, actor, release):
     timer = dispatch.q.state(scope["expected_guard_timer"], "ActiveState,Id,InvocationID,Job,Triggers")
     require(timer["ActiveState"] == "active" and not timer["Job"] and timer["Triggers"] == scope["expected_guard_unit"]
             and timer["InvocationID"] == release["guard_timer_invocation_id"], "different protective timer")
-    if ROOT == RAM_ROOT:
+    if ROOT in (RAM_ROOT,HOURLY_RAM_ROOT):
         matched = dispatch.operator.workspace.worker(pid, actor["producer_pid"], Path(scope["run"])/"scratch",
                                                     scope["profile"]["worker"],"/system.slice/"+actor["unit"])
         require(dispatch.operator.actor(False)==actor and ticks()==start, "private worker or actor changed")

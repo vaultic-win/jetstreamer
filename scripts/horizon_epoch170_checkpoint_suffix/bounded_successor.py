@@ -36,10 +36,14 @@ SECOND_RAM_GAP = Path(__file__).resolve().parent == NEXT_DEPLOYMENT.parent.paren
 THIRD_RAM_GAP = Path(__file__).resolve().parent == NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-ram-20261128-v3/operator-v1"
 RAM_GAP = THIRD_RAM_GAP or SECOND_RAM_GAP or Path(__file__).resolve().parent == RAM_GAP_DEPLOYMENT
 AFTER_RAM = Path(__file__).resolve().parent == NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73766969-gap-20261128-v1/operator-v1"
+HOURLY_RAM = Path(__file__).resolve().parent == NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73766969-ram-20261128-v1/operator-v1"
+AFTER_RAM = AFTER_RAM or HOURLY_RAM
 GAP = RAM_GAP or Path(__file__).resolve().parent == GAP_DEPLOYMENT
 ENTRY_FIELD = "independent_checkpoint" if GAP else "closed_comparison"
 if AFTER_RAM:
     q = load("after_ram170_issuer")
+    if HOURLY_RAM:
+        workspace = load("ram170_workspace")
 elif RAM_GAP:
     if THIRD_RAM_GAP:
         q = load("ram170_third_price")
@@ -133,7 +137,7 @@ def actor(held=True):
     i,ir=q.scope()
     s=q.state(UNIT)
     iid=s["InvocationID"];pid=int(s["MainPID"]);proc=Path("/proc")/str(pid)
-    memory = q.PRODUCER_MEMORY if RAM_GAP else 48*G
+    memory = q.PRODUCER_MEMORY if RAM_GAP or HOURLY_RAM else 48*G
     need(re.fullmatch("[0-9a-f]{32}",iid) and iid!="0"*32 and s["ActiveState"]=="active"
          and not s["Job"] and s["ControlPID"]=="0" and s["MemoryMax"]==str(memory) and s["MemorySwapMax"]=="0"
          and s["CPUQuotaPerSecUSec"]=="6s" and s["ControlGroup"]=="/system.slice/"+UNIT,"foreign producer")
@@ -154,7 +158,7 @@ def actor(held=True):
         need([m.st_dev,m.st_ino,m.st_size,m.st_mtime_ns,m.st_ctime_ns][:len(identity)]==identity
              and os.statvfs(f).f_flag & os.ST_RDONLY, "foreign or writable projection "+dst)
     run=Path(i["run"])
-    if RAM_GAP:
+    if RAM_GAP or HOURLY_RAM:
         workspace.mount(pid, run / "scratch")
     dev=run.stat().st_dev
     major_minor=f"{os.major(dev)}:{os.minor(dev)}"
@@ -307,7 +311,7 @@ def arm():
     a,ar=same_actor()
     intent,_=current("SUCCESSOR_START_INTENT.json")
     fit=checked_price("held")
-    if SECOND_RAM_GAP or THIRD_RAM_GAP:
+    if SECOND_RAM_GAP or THIRD_RAM_GAP or HOURLY_RAM:
         # The locked held fit already measures outstanding peer growth. The
         # release step rechecks this floor against its new complete-fleet fit.
         floor=fit["guard_floor"]
