@@ -720,10 +720,13 @@ mod tests {
         let test = r#"
 u=dict(Id="old.timer",UnitFileState="static",Transient=False,ActiveState="active",SubState="elapsed",Job=[0],TriggeredBy=[],Triggers=["old.service"],OnSuccess=[],OnFailure=[])
 t=dict(Unit="old.service",RemainAfterElapse=True,Persistent=False,OnClockChange=False,OnTimezoneChange=False,LastTriggerUSec=1792176600219944,LastTriggerUSecMonotonic=100,NextElapseUSecRealtime=2**64-1,NextElapseUSecMonotonic=2**64-1,TimersMonotonic=[],TimersCalendar=[("OnCalendar","2026-10-16 18:50:00 UTC",0)])
-up=dict(UnitFileState="static",ActiveState="inactive",SubState="dead",Job=[0],TriggeredBy=["old.timer"])
-sp=dict(MainPID=0,ControlPID=0,ControlGroup="",Restart="no",Result="success",ExecMainStatus=0,ExecMainExitTimestampMonotonic=101,ExecMainExitTimestamp=1792176601219944)
+up=dict(UnitFileState="static",ActiveState="inactive",SubState="dead",Job=[0],TriggeredBy=["old.timer"],OnSuccess=[],OnFailure=[])
+sp=dict(MainPID=0,ControlPID=0,ControlGroup="",Restart="no",Result="success",ExecMainCode=1,NRestarts=0,ExecMainStatus=0,ExecMainExitTimestampMonotonic=101,ExecMainExitTimestamp=1792176601219944)
 def fetch(n,k):return up,sp
 assert consumed_static_calendar(u,t,fetch)
+assert consumed_static_calendar(dict(u,UnitFileState="linked"),t,lambda n,k:(dict(up,UnitFileState="linked"),sp))
+assert consumed_static_calendar(u,t,lambda n,k:(dict(up,ActiveState="failed",SubState="failed"),dict(sp,Result="exit-code",ExecMainStatus=1)))
+assert not consumed_static_calendar(u,t,lambda n,k:(dict(up,ActiveState="failed",SubState="failed",OnFailure=["recover.service"]),dict(sp,Result="exit-code",ExecMainStatus=1)))
 assert not consumed_static_calendar(u,dict(t,OnClockChange=True),fetch)
 assert not consumed_static_calendar(u,dict(t,NextElapseUSecRealtime=10),fetch)
 assert not consumed_static_calendar(u,dict(t,TimersCalendar=[("OnCalendar","daily",0)]),fetch)

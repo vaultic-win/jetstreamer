@@ -70,7 +70,7 @@ def exited_service(common, svc):
 def consumed_static_calendar(common, timer, fetch):
     never = (1 << 64) - 1
     target = str(timer["Unit"])
-    if not (common["UnitFileState"] == "static" and not common["Transient"]
+    if not (common["UnitFileState"] in ("static","linked") and not common["Transient"]
             and common["ActiveState"] == "active" and common["SubState"] == "elapsed"
             and not common["Job"][0] and not common["TriggeredBy"]
             and list(common["Triggers"]) == [target] and target.endswith(".service")
@@ -90,14 +90,16 @@ def consumed_static_calendar(common, timer, fetch):
     if time.timestamp() > timer["LastTriggerUSec"] / 1e6 + 1:
         return None
     up, sp = fetch(target, "Service")
-    if not (up["UnitFileState"] == "static" and up["ActiveState"] == "inactive" and up["SubState"] == "dead"
+    successful = (up["ActiveState"] == "inactive" and up["SubState"] == "dead" and sp["Result"] == "success" and sp["ExecMainStatus"] == 0)
+    failed = (up["ActiveState"] == up["SubState"] == "failed" and sp["Result"] == "exit-code" and sp["ExecMainStatus"] > 0)
+    if not (up["UnitFileState"] in ("static","linked") and (successful or failed)
             and not up["Job"][0] and list(up["TriggeredBy"]) == [common["Id"]]
             and not sp["MainPID"] and not sp["ControlPID"] and not sp["ControlGroup"] and sp["Restart"] == "no"
-            and sp["Result"] == "success" and sp["ExecMainStatus"] == 0
+            and not up["OnSuccess"] and not up["OnFailure"] and sp["ExecMainCode"] == 1 and sp["NRestarts"] == 0
             and sp["ExecMainExitTimestampMonotonic"] >= timer["LastTriggerUSecMonotonic"]):
         return None
     return {"timer":str(common["Id"]),"service":target,"consumed_static_calendar":str(spec),
-            "last_trigger_usec":int(timer["LastTriggerUSec"]),"exit_usec":int(sp["ExecMainExitTimestamp"])}
+            "last_trigger_usec":int(timer["LastTriggerUSec"]),"exit_usec":int(sp["ExecMainExitTimestamp"]),"exit_status":int(sp["ExecMainStatus"])}
 
 def closed_activation(kind, common, detail, fetch):
     if kind == "Service" and common["SubState"] == "exited":
