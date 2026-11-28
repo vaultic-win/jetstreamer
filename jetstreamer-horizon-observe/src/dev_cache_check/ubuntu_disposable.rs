@@ -39,7 +39,42 @@ struct PrivateCache {
     source: &'static str,
 }
 
+const V1627_CACHE: &str =
+    "/home/ubuntu/.jetstreamer-private/epoch230-v1627-source.AmUY7Aaw/check-target";
+const V1627_SOURCE: &str =
+    "/home/ubuntu/.jetstreamer-private/epoch230-v1627-source.AmUY7Aaw/tree/historical-runtime/v1_6_27";
+
 const PRIVATE_CACHES: &[PrivateCache] = &[
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch230-v1627-debug-deps-cache-plan-v1",
+        target: "/home/ubuntu/.jetstreamer-private/epoch230-v1627-source.AmUY7Aaw/check-target/debug/deps",
+        reference_scope: V1627_CACHE,
+        source: V1627_SOURCE,
+    },
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch230-v1627-debug-build-cache-plan-v1",
+        target: "/home/ubuntu/.jetstreamer-private/epoch230-v1627-source.AmUY7Aaw/check-target/debug/build",
+        reference_scope: V1627_CACHE,
+        source: V1627_SOURCE,
+    },
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch230-v1627-debug-incremental-cache-plan-v1",
+        target: "/home/ubuntu/.jetstreamer-private/epoch230-v1627-source.AmUY7Aaw/check-target/debug/incremental",
+        reference_scope: V1627_CACHE,
+        source: V1627_SOURCE,
+    },
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch230-v1627-release-deps-cache-plan-v1",
+        target: "/home/ubuntu/.jetstreamer-private/epoch230-v1627-source.AmUY7Aaw/check-target/release/deps",
+        reference_scope: V1627_CACHE,
+        source: V1627_SOURCE,
+    },
+    PrivateCache {
+        schema: "jetstreamer-horizon-epoch230-v1627-release-build-cache-plan-v1",
+        target: "/home/ubuntu/.jetstreamer-private/epoch230-v1627-source.AmUY7Aaw/check-target/release/build",
+        reference_scope: V1627_CACHE,
+        source: V1627_SOURCE,
+    },
     PrivateCache {
         schema: "jetstreamer-horizon-epoch230-demotion-debug-incremental-cache-plan-v1",
         target: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/debug/incremental",
