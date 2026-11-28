@@ -469,7 +469,18 @@ pub(super) fn retire_window(
             );
         }
         let report = no_readers(cache, &path, &[
-            (FAILED_COPY, FAILED_COPY_IID, StoppedReference::Direct(RECIPE_SHA)),
+            (
+                FAILED_COPY, FAILED_COPY_IID,
+                StoppedReference::Direct("5664449ca595dc92e91e2ac0db017ee68fc4ea65d323e624e05b16eabc90b609"),
+            ),
+            (
+                FAILED_COPY, FAILED_COPY_IID,
+                StoppedReference::GuardPlan {
+                    recipe_sha256: RECIPE_SHA,
+                    path: "/home/ubuntu/.jetstreamer-private/epoch266-next-114929697-intake-v1/restore.json",
+                    plan_sha256: RESTORE.1,
+                },
+            ),
         ])?;
         Ok((report["scheduled"].clone(), report["processes"].clone()))
     };
