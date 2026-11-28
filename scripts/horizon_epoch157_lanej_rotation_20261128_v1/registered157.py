@@ -6,11 +6,11 @@ import re
 import stat
 
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch157-lanej-rotation-20261128-v1")
-DIRECTORY = BASE / "turnover-tools-v5"
+DIRECTORY = BASE / "turnover-tools-v6"
 IMAGE = DIRECTORY / "rotation"
 SEAL = dict(path=str(DIRECTORY / "deployment-seal-receipt.json"),
-            sha256="409008cf366a5cc28c41088b3b1a9dd7cd89cb0a273b8162ecbe24b4ce70fe60")
-IMAGE_SHA = "7205d260bddd40612b5ecd2f004491c02f6d3d2e895aeca207ee020b20b8a56b"
+            sha256="94fe051881b376b124131805a8269aa9b2e119dc845b0091467886b13dcb453e")
+IMAGE_SHA = "94a374986b008dc46958c9d97421779ef0477e8450e0c9f503825a8766f43975"
 FAMILY = re.compile(r"horizon-closed157-(retire|restore)-lanej-([0-9]+)\.service")
 AUX = re.compile(r"horizon-157-lanej-(fixture|census|custody)-([0-9]+)\.service")
 META = 16 << 20
