@@ -21,7 +21,9 @@ OPERATION = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 SERIAL = Path("/run/lock/horizon-epoch140-suffix-compiler.lock")
 G = 1 << 30
 M = 1 << 20
-ENTRY_RAM = 128*M
+# The complete post-stop price traverses several native fleet receipts in one
+# process. The admission pays this cap in addition to the independent listener.
+ENTRY_RAM = 384*M
 
 
 def need(condition, message):
