@@ -842,7 +842,14 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
             let receipts = if plan.unit == "horizon-qualify-143-second-hourly-20261128-v1.service" {
                 "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v1/guard-receipts"
             } else {
-                #[cfg(feature = "epoch143-second-hourly-floor-successor")]
+                #[cfg(feature = "epoch143-second-hourly-held-successor")]
+                {
+                    "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v4/guard-receipts"
+                }
+                #[cfg(all(
+                    feature = "epoch143-second-hourly-floor-successor",
+                    not(feature = "epoch143-second-hourly-held-successor")
+                ))]
                 {
                     "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v3/guard-receipts"
                 }
@@ -1306,7 +1313,7 @@ fn run() -> Result<()> {
             || (args.len() == 7
                 && matches!(
                     args[6].as_str(),
-                    "--root-capability-only" | "--validate-plan-only"
+                    "--root-capability-only" | "--validate-plan-only" | "--measure-root-only"
                 )))
             && args[2] == "--plan-sha256"
             && args[4] == "--self-sha256",
@@ -1357,6 +1364,25 @@ fn run() -> Result<()> {
         feature = "epoch169-following-hourly"
     ))]
     validate_checkpoint_scope(&plan)?;
+    if args.get(6).is_some_and(|a| a == "--measure-root-only") {
+        ensure!(
+            cfg!(feature = "epoch143-second-hourly-held-successor")
+                && plan.unit == "horizon-qualify-143-second-hourly-20261128-v2.service",
+            "root measurement requires the epoch 143 held successor"
+        );
+        let observed = root_budget::observe(
+            &plan.worker_root,
+            plan.maximum_root_physical_bytes
+                .context("missing root cap")?,
+        )?;
+        println!(
+            "{}",
+            json!({"schema":"horizon-epoch143-dormant-tree-measurement-v1",
+                "unit":plan.unit,"root":plan.worker_root,"plan_sha256":args[3],
+                "self_sha256":args[5],"observation":observed})
+        );
+        return Ok(());
+    }
     #[cfg(not(any(
         feature = "incident-recovery",
         feature = "epoch168-joint-reduced",
