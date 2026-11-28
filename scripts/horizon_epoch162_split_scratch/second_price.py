@@ -21,7 +21,10 @@ def geometry(native, retained, observed_home, available_ram, floor170, held_floo
     # allowance on terminal. Keep it intact and debit this image independently.
     # In RAM a second producer replaces the drained first in its existing booking.
     required_ram=max(native["required_ram"],retained["whole_roster"]["required_ram"])
-    floor=max(native["required_home"]+control,retained["whole_roster"]["required_home"]+control,
+    booked=native["prospective_162_interval_two"]
+    if booked["additional_output"]!=3*G or booked["additional_control"]!=control or booked["additional_home"]!=3*G+control:
+        raise ValueError("joint 162 disk booking differs")
+    floor=max(native["required_home"]-booked["additional_output"],retained["whole_roster"]["required_home"]+control,
               retained["armed_floor"],floor170,held_floor)
     free=min(native["available_home"],observed_home)
     return dict(guard_floor=floor,required_home=floor+remaining,remaining=remaining,
@@ -32,7 +35,7 @@ def geometry(native, retained, observed_home, available_ram, floor170, held_floo
 def quote(phase,held_invocation,profile,enrollment):
     l=runpy.run_path(str(HERE/"layout.py"))
     need=l["need"]
-    need(HERE==BASE/"issued-split-v1" and os.geteuid()==0 and __debug__, "use the sealed second price")
+    need(HERE==BASE/"issued-split-v2" and os.geteuid()==0 and __debug__, "use the sealed second price")
     scope=l["scope"]()
     first=l["bound"](scope["previous"])
     need(scope["previous"]["sha256"]==EXPECTED and first["manager_drain"]["MainPID"]=="0" and first["source_files_preserved"]
@@ -48,6 +51,10 @@ def quote(phase,held_invocation,profile,enrollment):
     need(native["package"]==spec["whole_roster"] and not native["resource_credit_bytes"] and native["writer"]==spec["writer_active"],
          "writer or joint price changed")
     old=native["existing_162"]
+    booked=native["prospective_162_interval_two"]
+    need(booked["first_producer"]=="e08ac6700a714ea0bf2d08a40516fc7e" and booked["interval"]==[69991077,69998119]
+         and booked["additional_compute"]==0 and booked["producer_and_guard_already_charged"]
+         and booked["retained_first_image_allowance"]==8*G,"missing explicit joint 162 successor reservation")
     need(old["phase"]=="terminal" and old["invocation_id"]=="e08ac6700a714ea0bf2d08a40516fc7e"
          and old["realized_ram"]==0 and old["profile"]["combined_ram"]==profile["combined_ram"]==63*G
          and old["profile"]["home_image"]==8*G and profile==l["profile"](36) and profile["home_image"]==3*G,

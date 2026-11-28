@@ -25,6 +25,7 @@ def progress(module):
     if code.count(OLD_UNIT)!=1 or code.count("69_984_000")>1:
         raise ValueError("different private 162 progress protocol")
     code=code.replace(OLD_UNIT,UNIT).replace("epoch162-first-hourly-completion-20261127-v2/scratch",str(RUN/"scratch"))
+    code=code.replace("5be30fba437e03fc26f009247714986dfdc6670426650532b5ec166d67fc9183","55f4db7ab1e892f193704af39d7f3ace9f8fe5179983f10f1fcf18ac50919053")
     code=code.replace("69_984_000","69_991_077").replace("69_991_076","69_998_119").replace("69_983_761","69_991_077")
     receiver=types.ModuleType("second162_progress");exec(compile(code,str(module.__file__),"exec"),receiver.__dict__)
     return receiver

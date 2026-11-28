@@ -13,16 +13,17 @@ RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 HOME = Path("/home/sol/.jetstreamer-private")
 OLD = RT / "epoch162-first-hourly-completion-20261127-v2"
 BASE = RT / "epoch162-second-replay-20261128-v1"
-PKG = BASE / "issued-split-v1"
+PKG = BASE / "issued-split-v2"
 INPUT = HOME / "epoch162-second-hourly-20261128-v1"
 OLD_ALIAS = "/run/horizon-162-first-hourly-completion-v2"
 ALIAS = "/run/horizon-162-second-replay-v1"
-GATE = BASE / "static/hold-162-second"
+GATE = BASE / "static-v2/hold-162-second"
 GATE_HASH = "1e139ba412b6c4624012ac30bf6f7e59629244f729ef5d863df19e0d3f3168b6"
 GATE_REV = "f7e904bb5ae7cef7271bf31a5289e11b75e9be16"
 GATE_SRC = "993cc6908f89d7970cbea3ad63e204d25146c8bdf2d66a29046db497ac322e42"
-GUARD = OLD / "static/guard"
-GUARD_SHA = "5be30fba437e03fc26f009247714986dfdc6670426650532b5ec166d67fc9183"
+GUARD = BASE / "static-v2/guard"
+GUARD_SHA = "55f4db7ab1e892f193704af39d7f3ace9f8fe5179983f10f1fcf18ac50919053"
+GUARD_SRC = "b4be17030e40366154e2d4e0d8184fefda8ad6bca602f8d6836e11c1f50c4fcf"
 TERMINAL_SHA = "445b05009592b381506701162673494fe3d6deb3851a33adade0f4e44d6a64ad"
 TERMINAL = OLD / "SPLIT162_FIRST_DERIVED_SEGMENT_VERIFIED.json"
 OLD_SEAL = "ca5ac887bdb0ca18b607966df05e890dbbc0ba3f73fb1112c4717ab97dc9415e"
@@ -122,13 +123,15 @@ def native_scope():
 
 
 def adapt(name, old, scope_hash):
-    text=old.replace("162-first-hourly-completion-20261127-v2","162-second-replay-20261128-v1")
+    text=(old.replace("162-first-hourly-completion-20261127-v2","162-second-replay-20261128-v1")
+             .replace("issued-split-v1","issued-split-v2"))
     if name=="layout.py":
-        text=exact(text,'HANDOFF = SUPPORT / "LOCAL_OPERATOR_HANDOFF.json"','HANDOFF = BASE / "SCOPE.json"')
+        text=exact(text,'HANDOFF = SUPPORT / "LOCAL_OPERATOR_HANDOFF.json"','HANDOFF = BASE / "SCOPE-V2.json"')
         text=exact(text,'daceecc4a7f4f6502c43fbcf989da229d561098deb2cccf95b2067f7185d047e',scope_hash)
         text=exact(text,'DONOR = BASE /','DONOR = RT / "'+OLD.name+'" /')
-        text=exact(text,'GATE = BASE / "static/hold-162-completion"','GATE = BASE / "static/hold-162-second"')
+        text=exact(text,'GATE = BASE / "static/hold-162-completion"','GATE = Path("'+str(GATE)+'")')
         text=exact(text,'GUARD = BASE / "static/guard"','GUARD = Path("'+str(GUARD)+'")')
+        text=exact(text,'5be30fba437e03fc26f009247714986dfdc6670426650532b5ec166d67fc9183',GUARD_SHA)
         text=exact(text,'RuntimeMaxSec=6300','RuntimeMaxSec=14400')
         return exact(text,'HOME_IMAGE = 8 * G','HOME_IMAGE = 3 * G')
     if name=="status162.py":
@@ -198,17 +201,20 @@ def seal(stage_contents,dest,save):
     return reference(receipt)
 
 
-def prepare(gate,commit):
+def prepare(gate,guard,commit):
     old_op=load(OLD/"issued-split-v1/deployment-seal-receipt.json",OLD_SEAL)
     local=runpy.run_path(str(OLD/"issued-split-v1/layout.py")); save=local["save"]
-    need(os.getuid()==0 and __debug__ and gate.is_file() and digest(gate)==GATE_HASH,"wrong second compiled gate")
+    need(os.getuid()==0 and __debug__ and gate.is_file() and digest(gate)==GATE_HASH
+         and guard.is_file() and digest(guard)==GUARD_SHA,"wrong second compiled gate or guard")
     BASE.mkdir(exist_ok=True,mode=0o700)
     need(BASE.resolve()==BASE and BASE.stat().st_uid==0 and BASE.stat().st_mode & 0o077==0 and BASE.stat().st_dev==HOME.stat().st_dev,"unsafe destination")
     checkout=HERE.parents[1]
     git=["/usr/bin/git","-c","safe.directory="+str(checkout),"-C",str(checkout)]
     remote=subprocess.check_output([*git,"rev-parse","origin/account-updates"],text=True).strip()
     subprocess.run([*git,"merge-base","--is-ancestor",commit,remote],check=True)
-    files=[HERE/"second_interval.py",HERE/"second_price.py",HERE/"second_wire.py"]
+    files=[HERE/"second_interval.py",HERE/"second_price.py",HERE/"second_wire.py",
+           HERE.parent/"horizon_cold166_20261120_v1/guard/Cargo.toml",HERE.parent/"horizon_cold166_20261120_v1/guard/guard_main.rs"]
+    need(digest(files[-1])==GUARD_SRC,"compiled guard source changed")
     gate_src="scripts/horizon_epoch166_bounded_reproduction/gate.rs"
     subprocess.run([*git,"merge-base","--is-ancestor",GATE_REV,commit],check=True)
     need(hashlib.sha256(subprocess.check_output([*git,"show",GATE_REV+":"+gate_src])).hexdigest()==GATE_SRC,
@@ -216,19 +222,22 @@ def prepare(gate,commit):
     for p in files:
         tracked=subprocess.check_output([*git,"show",commit+":"+str(p.relative_to(checkout))])
         need(tracked==p.read_bytes(),"unpublished source "+str(p))
-    stage=BASE/"second-source"
+    stage=BASE/"second-source-v2"
     stage.mkdir(mode=0o700,exist_ok=True)
     need(stage.resolve()==stage and stage.stat().st_uid==0 and stage.stat().st_mode & 0o077==0,"unsafe source directory")
     static=stage/"hold-162-second"
     if not static.exists(): save(static,gate.read_bytes(),0o555)
     need(digest(static)==GATE_HASH,"changed gate")
-    gate_seal=seal({static.name:(static,0o555)},BASE/"static",save)
+    protective=stage/"guard"
+    if not protective.exists(): save(protective,guard.read_bytes(),0o555)
+    need(digest(protective)==GUARD_SHA,"changed protective guard")
+    gate_seal=seal({static.name:(static,0o555),protective.name:(protective,0o555)},BASE/"static-v2",save)
     scope=native_scope()
     custody=bind(scope["bootstrap"]["verified_local_custody"])
     need(digest(Path(custody["destination"]))==scope["bootstrap"]["archive_sha256"], "bootstrap payload recheck failed")
     scope["gate_deployment"]=gate_seal
     scope["source_commit"]=commit
-    sr=save(BASE/"SCOPE.json",scope,0o400)
+    sr=save(BASE/"SCOPE-V2.json",scope,0o400)
     dest={}
     for member in old_op["members"]:
         name=member["name"]
@@ -260,6 +269,7 @@ def prepare(gate,commit):
 if __name__=="__main__":
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("gate",type=Path)
+    ap.add_argument("guard",type=Path)
     ap.add_argument("commit")
     arguments=ap.parse_args()
-    print(json.dumps(prepare(arguments.gate,arguments.commit),indent=2,sort_keys=True))
+    print(json.dumps(prepare(arguments.gate,arguments.guard,arguments.commit),indent=2,sort_keys=True))
