@@ -101,6 +101,28 @@ def compare_samples(before, after):
     return max(before["remaining"], after["remaining"])
 
 
+def apply_resident(base, final, before, after):
+    compare_samples(before,after)
+    measured = [s["resident"] for s in (before,after)]
+    need("third162_producer_residency" not in final and final["second_162_accounting"]["phase"] == "terminal"
+         and final["second_162_accounting"]["resident_lower_bytes"] == final["realized_162_ram"] == 0
+         and all(type(v) is int and 0 <= v <= 62*G for v in measured), "repeated third-162 RAM charge")
+    lower = min(measured)
+    if any(measured):
+        owner = before["owner"]
+        need(before["phase"] == "worker" and owner["phase"] == "worker" and owner["unit"]["Id"] == UNIT
+             and owner["actor"] and owner["release"] and owner["worker"] and owner["guard_plan"],
+             "resident pages are not in the issued third worker")
+    floors = (base["home_margin"],final["home_margin"])
+    amounts = (base["ram_margin"],final["ram_margin"])
+    need(base["fits"] == (min(floors[0],amounts[0]) >= 0) and final["fits"] == (min(*floors,*amounts) >= 0),
+         "unknown gate before native third-162 residency")
+    final["ram_margin"] += lower
+    final["fits"] = min(*floors,min(amounts)+lower) >= 0
+    final["third162_producer_residency"] = dict(observed_bytes=measured,realized_bytes=lower,
+        held_owner=before["owner"]["actor"] if before["owner"] else None,producer_cap=62*G)
+
+
 def reserve(quote, before, after, prospective):
     remaining = compare_samples(before,after)
     previous = quote["second_162_accounting"]
@@ -116,7 +138,8 @@ def reserve(quote, before, after, prospective):
     quote["third_162_accounting"] = dict(phase=after["phase"], owner=after["owner"], writer_enrolled=after["enrolled"],
         enrollment=booked, prospective=bool(prospective and not booked), previous=after["custody"], charged=charged,
         maximum_output=OUTPUT, retained_control=CONTROL, remaining_output=remaining, additional_home=cost,
-        observed_floor=after["floor"], additional_ram=0, additional_cpu=0, resident_credit=0)
+        observed_floor=after["floor"], additional_ram=0, additional_cpu=0,
+        resident_credit=quote["third162_producer_residency"]["realized_bytes"])
     quote["required_home"] += cost
     quote["home_margin"] -= cost
     quote["fits"] = quote["fits"] and quote["home_margin"] >= 0

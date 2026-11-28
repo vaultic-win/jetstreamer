@@ -2,18 +2,19 @@
 from copy import deepcopy
 import unittest
 
-from third162_account import CONTROL, G, OUTPUT, compare_samples, occupant, protect_hourly_170, protect_live, reserve
+from third162_account import CONTROL, G, OUTPUT, UNIT, apply_resident, compare_samples, occupant, protect_hourly_170, protect_live, reserve
 from third162_price import MEASURED, geometry
 
 
 def snapshot(booked=None):
-    return dict(phase="precharged",owner=None,enrolled=True,floor=0,enrollment=booked,
+    return dict(phase="precharged",owner=None,enrolled=True,floor=0,enrollment=booked,resident=0,
                 custody=dict(terminal="second",archived_failures="two failed gates"),remaining=OUTPUT)
 
 
 def whole():
     ready = 800*G
-    return dict(second_162_accounting=dict(phase="terminal",remaining_output=OUTPUT,retained_control=CONTROL,
+    return dict(third162_producer_residency=dict(realized_bytes=0),
+                second_162_accounting=dict(phase="terminal",remaining_output=OUTPUT,retained_control=CONTROL,
                                             unreleased_predecessor="two failed gates"),
                 prospective_162_interval_two=dict(additional_home=OUTPUT+CONTROL),resource_credit_bytes=0,
                 donor_compute=dict(usable_166_ram=63*G,usable_166_cpu_micros=5_750_000),
@@ -108,6 +109,21 @@ class Third162(unittest.TestCase):
         q["available_home"] -= 1
         q["home_margin"] -= 1
         self.assertFalse(priced(q)["fits"])
+
+    def test_only_live_confirmed_162_pages_can_restore_the_ram_margin(self):
+        row = dict(snapshot("booking"),phase="worker",owner=dict(phase="worker",unit=dict(Id=UNIT),actor="actor",
+                worker="stable worker",release="grant",guard_plan="native guard"),resident=11*G)
+        base = dict(fits=False,home_margin=G,ram_margin=-10*G)
+        final = dict(base,realized_162_ram=0,second_162_accounting=dict(phase="terminal",resident_lower_bytes=0))
+        apply_resident(base,final,row,dict(row,resident=12*G))
+        self.assertTrue(final["fits"])
+        self.assertEqual(final["ram_margin"],G)
+        self.assertEqual(final["third162_producer_residency"]["realized_bytes"],11*G)
+        with self.assertRaisesRegex(ValueError,"repeated"):
+            apply_resident(base,final,row,row)
+        del final["third162_producer_residency"]
+        with self.assertRaisesRegex(ValueError,"issued"):
+            apply_resident(base,final,dict(snapshot(),resident=G),dict(snapshot(),resident=G))
 
 
 if __name__ == "__main__":

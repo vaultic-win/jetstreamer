@@ -97,7 +97,7 @@ def second_view(peer, fleet):''')
     third = second['third_peer']()
     later_third = third['sample'](peer,fleet,base['writer'],after)
     early_third = base['native']['third_162_before']
-    third['compare_samples'](early_third,later_third)''')
+    third['apply_resident'](base,final,early_third,later_third)''')
     anchor = "    return runpy.run_path(str(STOPPED.parent / 'price143_floor_retry.py'))['protect'](core, custody)"
     edit("capacity.py",anchor,"    third['reserve'](custody,early_third,later_third,third162)\n"+
          anchor.replace("return ","protected = ")+"\n    return third['protect_live'](protected)")
