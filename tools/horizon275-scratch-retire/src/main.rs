@@ -14,6 +14,7 @@ mod process_references;
 mod selective_accounts;
 mod snapshot230;
 mod snapshot230_window;
+mod snapshot266;
 mod snapshot288;
 mod snapshot296;
 mod stopped_bootstrap;
@@ -478,6 +479,7 @@ fn main() -> Result<()> {
     if matches!(
         args.get(1).map(String::as_str),
         Some("--check-bootstrap-296" | "--retire-bootstrap-296"
+            | "--check-bootstrap-266-114910768" | "--retire-bootstrap-266-114910768"
             | "--check-bootstrap-230-99430284" | "--retire-bootstrap-230-99430284"
             | "--check-bootstrap-230-99437433" | "--retire-bootstrap-230-99437433"
             | "--check-bootstrap-230-99461591" | "--retire-bootstrap-230-99461591"
@@ -493,6 +495,9 @@ fn main() -> Result<()> {
             metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut binary)? == args[2],
             "unsealed retirement image"
         );
+        if args[1].ends_with("-266-114910768") {
+            return snapshot266::run(args[1].starts_with("--retire-"), &args[2], Path::new(&args[3]), &args[4]);
+        }
         if args[1].ends_with("-230-99437433") {
             return snapshot230::run(args[1].starts_with("--retire-"), &args[2], Path::new(&args[3]), &args[4]);
         }

@@ -42,7 +42,7 @@ const HISTORICAL: [(&str, &str, &str, &str); 3] = [
     ),
 ];
 
-fn stamp(m: &Metadata) -> Value {
+pub(super) fn stamp(m: &Metadata) -> Value {
     json!({"identity":identity(m),"physical_bytes":m.blocks()*512,"mode":m.mode(),"uid":m.uid(),"links":m.nlink()})
 }
 
