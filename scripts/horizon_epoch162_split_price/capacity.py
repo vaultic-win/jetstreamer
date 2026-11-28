@@ -16,6 +16,8 @@ SELF = ROOT / 'issued-price-v1/capacity.py'
 AFTER = ROOT / 'issued-price-v2/capacity.py'
 LATEST = ROOT / 'issued-price-v3/capacity.py'
 HANDOFF = ROOT / 'issued-price-v4/capacity.py'
+STOPPED = ROOT / 'issued-price-v5/capacity.py'
+HANDOFF_DIGEST = '5eb9f6dfe17695d0052d2b85a163538ebb81a373e0b0bc3e07070a4ef5e5c359'
 LATEST_DIGEST = 'b0d9af7ad12bcba23bd3b5bcc39ba178c4c489b77add365cee46f49d6c62924d'
 LATEST_SEAL = 'f431f64b7b51dc24d6427fbf2e42e98f749d27e2fc382bb9fb743376042e5f56'
 AFTER_DIGEST = '8b9921b184692531bf92240f250f233c6529bdb7002fef13f65368fe474c2d80'
@@ -50,7 +52,8 @@ def software(peer, enrollment, *, read_only=False):
          and (spec['capacity']['path'] == str(Path(__file__).resolve()) or
               read_only and spec['capacity'] in ({'path':str(SELF), 'sha256':FIRST_DIGEST},
                                                  {'path':str(AFTER), 'sha256':AFTER_DIGEST},
-                                                 {'path':str(LATEST), 'sha256':LATEST_DIGEST})), 'different 162 enrollment')
+                                                 {'path':str(LATEST), 'sha256':LATEST_DIGEST},
+                                                 {'path':str(HANDOFF), 'sha256':HANDOFF_DIGEST})), 'different 162 enrollment')
     immutable(Path(spec['capacity']['path']), spec['capacity']['sha256'])
     status, _ = peer['package'](spec)
     ready = peer['bound'](peer['bound'](spec['writer_active'])['ready'])
@@ -159,6 +162,8 @@ def sealed_after(peer, directory):
     immutable(Path(ref['path']),ref['sha256'])
     members = {m['name']:m for m in seal['members']}
     names = {'capacity.py','scan_handback.py'} if directory == HANDOFF.parent else MODULES
+    if directory == STOPPED.parent:
+        names = MODULES | {'after_stop.py','scan_handback.py'}
     need(seal['destination'] == str(directory) and len(members) == len(seal['members'])
          and set(members) in (names, names | {'SOURCE.json'}), 'incomplete post-assembly package')
     for name, member in members.items():
@@ -170,8 +175,8 @@ def sealed_after(peer, directory):
 
 def common(enrollment, *, read_only=False):
     entry = Path(__file__).resolve()
-    need(os.geteuid() == 0 and __debug__ and entry in (SELF, AFTER, LATEST, HANDOFF)
-         and (not read_only or entry in (AFTER, LATEST, HANDOFF)), 'use an issued 162 price')
+    need(os.geteuid() == 0 and __debug__ and entry in (SELF, AFTER, LATEST, HANDOFF, STOPPED)
+         and (not read_only or entry != SELF), 'use an issued 162 price')
     module = DIRECTORY169/'peer162.py'
     immutable(module, PEER_DIGEST)
     peer = runpy.run_path(str(module))
@@ -181,14 +186,14 @@ def common(enrollment, *, read_only=False):
     proof = peer['bound'](peer['DONOR'])
     before = donor_observation(peer, proof)
     own = None
-    if entry in (AFTER, LATEST, HANDOFF):
+    if entry in (AFTER, LATEST, HANDOFF, STOPPED):
         own = sealed_after(peer,entry.parent)
         directory = entry.parent
         if entry == HANDOFF:
             directory = LATEST.parent
             need(sealed_after(peer,directory)['sha256'] == LATEST_SEAL, 'different native six-owner price')
         helper = runpy.run_path(str(directory/'following_peers.py'))
-        after = runpy.run_path(str(directory/'after_assembly.py'))
+        after = runpy.run_path(str(directory/('after_stop.py' if entry == STOPPED else 'after_assembly.py')))
         base, row = after['price'](helper,directory)
         need(read_only or base['writer'] == writer_ref, '162 enrollment refers to another cadence writer')
     else:
@@ -224,9 +229,11 @@ def quote(*, phase, held_invocation, profile, enrollment):
     need(profile == layout.profile(36) and profile['combined_ram'] == 63*G
          and profile['producer_cpu_micros'] + profile['guard_cpu_micros'] == 3_000_000, 'different 162 profile')
     amounts = calculate(peer, base, row, phase, held_invocation, layout.MIN_FLOOR, fleet)
-    if Path(__file__).resolve() == HANDOFF:
-        scan = runpy.run_path(str(HANDOFF.with_name('scan_handback.py')))
-        core = runpy.run_path(str(LATEST.with_name('continuation_price.py')))['prior']
+    if Path(__file__).resolve() in (HANDOFF, STOPPED):
+        entry = Path(__file__).resolve()
+        scan = runpy.run_path(str(entry.with_name('scan_handback.py')))
+        prior_entry = LATEST if entry == HANDOFF else STOPPED
+        core = runpy.run_path(str(prior_entry.with_name('continuation_price.py')))['prior']
         amounts['epoch168_donor_handback'] = scan['check'](core,immutable,base)
         need(core.current_fleet()[1] == base['fleet'], 'fleet changed during 168 donor handback')
     peer['recheck'](fleet,row)

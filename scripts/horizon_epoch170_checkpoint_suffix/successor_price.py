@@ -375,6 +375,7 @@ def price(phase, *, attempt=ATTEMPT, live_tree_bounds=None, held_replacement=Non
         need(Path(__file__).resolve().parent in (RT/"epoch169-hourly-admission-20261123-v1/issued-split-v1",
                  RT/"epoch162-first-hourly-completion-20261127-v2/issued-price-v2",
                  RT/"epoch162-first-hourly-completion-20261127-v2/issued-price-v3",
+                 RT/"epoch162-first-hourly-completion-20261127-v2/issued-price-v5",
                  RT/"epoch170-from-73766969-20261127-v1/operator-v5",RT/"epoch170-from-73766969-20261127-v1/closed-reader-v4",
                  RT/"epoch143-first-hourly-20261127-v1/booking-price-v48",
                  RT/"epoch170-from-73766969-20261127-v1/operator-v4", RT/"epoch170-from-73766969-20261127-v1/closed-reader-v3")
