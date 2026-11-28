@@ -480,6 +480,7 @@ fn main() -> Result<()> {
         args.get(1).map(String::as_str),
         Some("--check-bootstrap-296" | "--retire-bootstrap-296"
             | "--check-bootstrap-266-114910768" | "--retire-bootstrap-266-114910768"
+            | "--check-bootstrap-266-114923430" | "--retire-bootstrap-266-114923430"
             | "--check-bootstrap-230-99430284" | "--retire-bootstrap-230-99430284"
             | "--check-bootstrap-230-99437433" | "--retire-bootstrap-230-99437433"
             | "--check-bootstrap-230-99461591" | "--retire-bootstrap-230-99461591"
@@ -497,6 +498,9 @@ fn main() -> Result<()> {
         );
         if args[1].ends_with("-266-114910768") {
             return snapshot266::run(args[1].starts_with("--retire-"), &args[2], Path::new(&args[3]), &args[4]);
+        }
+        if args[1].ends_with("-266-114923430") {
+            return snapshot266::retire_overlap(args[1].starts_with("--retire-"), &args[2], Path::new(&args[3]), &args[4]);
         }
         if args[1].ends_with("-230-99437433") {
             return snapshot230::run(args[1].starts_with("--retire-"), &args[2], Path::new(&args[3]), &args[4]);
