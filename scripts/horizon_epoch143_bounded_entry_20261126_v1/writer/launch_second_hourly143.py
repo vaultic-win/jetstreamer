@@ -171,14 +171,14 @@ def make_booking(contract_ref, contract, writer_ref, price_seal):
     )
 
 
-def launch(contract_ref, writer_ref, price_seal):
+def launch(contract_ref, writer_ref, price_seal, guard_seal):
     contract = read(contract_ref)
     need(contract["unit"] == UNIT and contract["guarded_HOME_bytes"] == TREE
          and contract["producer_RAM_bytes"] == MEMORY and contract["separate_evidence_HOME_bytes"] == EVIDENCE
          and contract["guard_RAM_bytes"] == GIB, "unexpected 143 contract resource scope")
     tools = contract["tools_seal"]
     gate = member(BASE / "tools-v1", "hold-143", tools)
-    guard = member(BASE / "tools-v1", "guard", tools)
+    guard = member(BASE / "guard-v2", "guard", guard_seal)
     need(contract["node"] == member(BASE / "node-v1", "jetstreamer-node", contract["node_seal"]),
          "native node was not sealed")
     custody = read(contract["snapshot_custody"])
@@ -197,6 +197,7 @@ def launch(contract_ref, writer_ref, price_seal):
     for unit in (UNIT, GUARD + ".service", GUARD + ".timer"):
         need(props(unit, "LoadState")["LoadState"] == "not-found", "native unit already exists " + unit)
     booking = make_booking(contract_ref, contract, writer_ref, price_seal)
+    booking["guard_seal"] = guard_seal
     enrollment(booking)
     quote = checked_roster(booking)
     need(0 < quote["guard_floor"] <= quote["required_home"] < quote["available_home"],
@@ -294,7 +295,7 @@ def launch(contract_ref, writer_ref, price_seal):
 
 
 if __name__ == "__main__":
-    need(os.geteuid() == 0 and len(sys.argv) == 7, "supply the three sealed contract, writer and quote references")
+    need(os.geteuid() == 0 and len(sys.argv) == 9, "supply the sealed contract, writer, quote and guard references")
     values = [dict(path=path, sha256=digest) for path, digest in zip(sys.argv[1::2], sys.argv[2::2])]
     with LOCK.open("rb") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

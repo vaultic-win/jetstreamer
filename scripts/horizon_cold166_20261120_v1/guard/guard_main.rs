@@ -640,6 +640,9 @@ fn supported_unit(plan: &Plan) -> bool {
     if plan.unit == "horizon-qualify-143-first-hourly-20261127-v1.service" {
         return cfg!(feature = "epoch143-first-hourly");
     }
+    if plan.unit == "horizon-qualify-143-second-hourly-20261128-v1.service" {
+        return cfg!(feature = "epoch143-second-hourly");
+    }
     if plan.unit == "horizon-qualify-162-second-replay-20261128-v3.service" {
         return cfg!(feature = "epoch162-second-reserved");
     }
@@ -711,6 +714,7 @@ fn validate_plan(plan: &Plan) -> Result<()> {
     feature = "epoch141-first-hourly",
     feature = "epoch141-third-hourly",
     feature = "epoch143-first-hourly",
+    feature = "epoch143-second-hourly",
     feature = "epoch162-second-hourly",
     feature = "epoch162-second-retry",
     feature = "epoch162-second-reserved"
@@ -794,6 +798,20 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
             9_470_567_509_909,
             64_u64 << 30,
         ),
+        #[cfg(feature = "epoch143-second-hourly")]
+        "horizon-qualify-143-second-hourly-20261128-v1.service" => {
+            const TREE_CAP: u64 = 64 << 30;
+            ensure!(
+                plan.maximum_root_physical_bytes == Some(TREE_CAP),
+                "epoch 143 second hourly replay requires its 64 GiB guard cap"
+            );
+            (
+                "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1",
+                "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v1/guard-receipts",
+                9_470_567_509_909,
+                TREE_CAP,
+            )
+        }
         #[cfg(feature = "epoch140-suffix-recording")]
         "horizon-epoch140-suffix-recording.service"
             if plan.worker_root
@@ -1273,6 +1291,7 @@ fn run() -> Result<()> {
         feature = "epoch141-first-hourly",
         feature = "epoch141-third-hourly",
         feature = "epoch143-first-hourly",
+        feature = "epoch143-second-hourly",
         feature = "epoch162-second-hourly",
         feature = "epoch162-second-retry",
         feature = "epoch162-second-reserved"
@@ -1288,6 +1307,7 @@ fn run() -> Result<()> {
         feature = "epoch141-first-hourly",
         feature = "epoch141-third-hourly",
         feature = "epoch143-first-hourly",
+        feature = "epoch143-second-hourly",
         feature = "epoch162-second-hourly",
         feature = "epoch162-second-retry",
         feature = "epoch162-second-reserved"
