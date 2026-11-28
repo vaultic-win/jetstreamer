@@ -30,7 +30,7 @@ PREVIOUS = RT / "epoch185-lanem-main-holding-20261127-v1"
 OPLOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 TOOLS = Path(__file__).resolve().parent
 FOLLOWON = OUT / "n-tools-v5"
-M12 = OUT / "m12-tools-v1"
+M12 = OUT / "m12-tools-v2"
 MAPPING = Path(
     "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json"
 )
