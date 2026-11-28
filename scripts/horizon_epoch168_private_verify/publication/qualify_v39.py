@@ -21,7 +21,7 @@ RT = f.ROOT
 PUBLICATION = RT / "epoch168-exact-publication-v1/admission-tools-v3/publication"
 DELIVERY = RT / "epoch172-current-delivery-20261121-v1"
 FIXTURE = DELIVERY / "ORIGINAL_172_V39_FIXTURE.json"
-PLAN = DELIVERY / "SHARED_PRICE_V39_PLAN.json"
+PLAN = DELIVERY / "SHARED_PRICE_V39_R2_PLAN.json"
 LOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 
 

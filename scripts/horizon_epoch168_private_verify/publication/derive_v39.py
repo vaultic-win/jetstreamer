@@ -64,6 +64,7 @@ def members(directory, revision):
     if raw['replacement143']:''')
     files["after_stop.py"] = code.encode(), 0o444
     code = files["capacity.py"][0].decode()
+    code = change(code, "'fourth162_price.py','compact169_residency.py'}", "'fourth162_price.py','compact169_residency.py','finalizing172.py'}")
     code = change(code, '    native = Path(\'/var/lib/jetstreamer/horizon_runtime_data/epoch168-exact-publication-v1/admission-tools-v3/publication\')',
                   '''    registered["original_172_accounting"] = base["native"]["raw"]["joint"]["original_172_accounting"]
     native = Path('/var/lib/jetstreamer/horizon_runtime_data/epoch168-exact-publication-v1/admission-tools-v3/publication')''')
