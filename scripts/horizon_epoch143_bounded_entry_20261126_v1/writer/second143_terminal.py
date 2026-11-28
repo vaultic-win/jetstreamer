@@ -40,7 +40,7 @@ def closed(core):
     cgroups = Path("/sys/fs/cgroup/system.slice")
     need(not (cgroups / UNIT).exists(), "epoch 143 terminal has a cgroup")
     for name, expected in terminal["guard_drain"].items():
-        need(name in (GUARD + ".timer", GUARD + ".service") and state(name, "ActiveState,Job") == expected
+        need(name in (GUARD + ".timer", GUARD + ".service") and state(name, "Id,ActiveState,Job") == dict(expected, Id=name)
              and expected == dict(ActiveState="inactive", Job="") and not (cgroups / name).exists(),
              "epoch 143 terminal guard has not drained")
     return receipt
