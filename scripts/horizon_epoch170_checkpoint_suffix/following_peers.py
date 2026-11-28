@@ -2,6 +2,7 @@
 
 from hashlib import sha256
 import os
+import re
 from pathlib import Path
 import runpy
 import stat
@@ -17,13 +18,32 @@ GRANT169 = 'be995ac49dab5db580957c3a45a659c7399db404b6bfa2f8453bd72b7ea5e5cd'
 V48 = '9ca6211354be131c738c83edb2aaf4d0439423455d7dffca7950f76e84c32eb6'
 
 
+def version_numbers(directory, pattern, first):
+    """Discover only ordinary numbered entries for this sole writer and its booker."""
+    regex = re.compile(pattern)
+    return sorted(int(m[1]) for path in directory.iterdir() if (m := regex.fullmatch(path.name)) and int(m[1]) >= first)
+
+
+def writer_versions(directory, first):
+    versions = version_numbers(directory, r'FAILED166_CADENCE_V([1-9][0-9]*)_ACTIVE\.json', first)
+    if versions and versions != list(range(first, versions[-1]+1)):
+        raise ValueError('noncontiguous cadence writer succession')
+    return versions
+
+
 def package_home():
     new_170 = RT/'epoch170-from-73766969-20261127-v1'
     price = RT/'epoch162-first-hourly-completion-20261127-v2'
-    dirs = [price/'issued-price-v1', price/'issued-price-v2',
-            new_170/'operator-v4', new_170/'closed-reader-v3', new_170/'progress-v4',
-            RT/'survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v49-entry146',
-            RT/'epoch143-first-hourly-20261127-v1/booking-price-v49']
+    writer = RT/'survivor172-cadence-20261122-v1'
+    booker = RT/'epoch143-first-hourly-20261127-v1'
+    verify = RT/'epoch168-exact-private-verification-20261127-v1'
+    dirs = [price/f'issued-price-v{v}' for v in version_numbers(price,r'issued-price-v([1-9][0-9]*)',1)]
+    for template, first in [('operator-v',4),('closed-reader-v',3),('progress-v',4)]:
+        dirs.extend(new_170/f'{template}{v}' for v in version_numbers(new_170,template+r'([1-9][0-9]*)',first))
+    dirs.extend(writer/f'tools-cold168-retry5-failed166-v{v}-entry146' for v in
+                version_numbers(writer,r'tools-cold168-retry5-failed166-v([1-9][0-9]*)-entry146',49))
+    dirs.extend(booker/f'booking-price-v{v}' for v in version_numbers(booker,r'booking-price-v([1-9][0-9]*)',49))
+    dirs.extend(verify/f'split-price-v{v}' for v in version_numbers(verify,r'split-price-v([1-9][0-9]*)',1))
     total = 0
     for directory in dirs:
         if not directory.exists():
@@ -44,15 +64,21 @@ def current_writer(core, provider):
     directory = RT/'survivor172-cadence-20261122-v1'
     original, reference = core.read(directory/'FAILED166_CADENCE_V48_ACTIVE.json', V48)
     owner = original['new']
-    next_file = directory/'FAILED166_CADENCE_V49_ACTIVE.json'
     active = original
-    if next_file.exists():
-        active, next_ref = core.read(next_file)
+    anchor = core.bound(original['ready'])
+    for version in writer_versions(directory,49):
+        active, next_ref = core.read(directory/f'FAILED166_CADENCE_V{version}_ACTIVE.json')
         ready = core.bound(active['ready'])
+        following = active['new']
         core.need(ready['old_owner'] == reference and active['old'] == owner and
-                  all(active['new']['lock'][k] == owner['lock'][k] for k in ('path','device','inode'))
-                  and active['new']['unit'] == owner['unit'], 'V49 did not inherit V48')
-        owner, reference = active['new'], next_ref
+                  active['schema'] == original['schema'] and not active['producer_mutations'] and
+                  all(following['lock'][k] == owner['lock'][k] for k in ('path','device','inode')) and
+                  following['unit'] == owner['unit'] and
+                  all(ready[k] == anchor[k] for k in ('successor170_interface','prior_successor170_interface',
+                      'split169_provider','split162_provider')) and
+                  Path(following['program']) == directory/f'tools-cold168-retry5-failed166-v{version}-entry146'/'status_cycle.py',
+                  f'V{version} did not inherit the roster and lock from its predecessor')
+        owner, reference = following, next_ref
     ready = core.bound(active['ready'])
     program = Path(owner['program'])
     pkg = core.bound(ready['package'])
@@ -110,6 +136,40 @@ def snapshot(core):
               'unfunded new 169')
     return dict(fleet=fref, paid169=price['resident'](a), row169=a, row162=b, writer=writer,
                 provider=sr, grant=gr, post=pr, observed=time.time()), (other, peer169, peer162)
+
+
+def holding(core, support, previous):
+    """Price M attempt 12 within the restored serial holding envelope if it is issued."""
+    units = support.active_units('horizon-closed186-*','horizon-*park*','horizon-*holding*','horizon-*retire*','horizon-*restore*')
+    return m12_owner(core,units) if any('-m12-' in name for name in units) else previous()
+
+
+def m12_owner(core, units):
+    selected = [(name,match) for name in units if
+                (match := re.fullmatch(r'horizon-closed186-(park|retire|restore)-m12-([0-9]+)\.service',name))]
+    core.need(len(units) == len(selected) == 1, 'several owners claim the holding reservation')
+    name, match = selected[0]
+    phase, token = match.groups()
+    directory = RT/'epoch186-closed-partial-rotation-20261127-v1/m12'
+    expected, identity = core.read(directory/'expected.json','ea1623bdbf4a9b54fc5e7d167152877288976642f2baa55bf240fb8ecdfa0b06')
+    admitted, receipt = core.read(directory/f'ADMISSION_{phase}_{token}.json')
+    s = core.state(name)
+    limit, quota = {'park':(2*G,'2s'),'retire':(G,'1s'),'restore':(2*G,'1s')}[phase]
+    core.need(admitted['unit'] == name and admitted['phase'] == phase and admitted['invocation'] == s['InvocationID']
+              and admitted['expected'] == identity and admitted['restore_slot'] == expected['retained_shared_serial_slot'] == 123350028052
+              and admitted['restore_peak'] == expected['single_copy_peak'] == 43308884790
+              and expected['length'] == 43292107574 and expected['sha256'] == '3cc39b3562d257f266d5c430fd7b115dfac5450ad1bd0785a61c5039ec6724ac'
+              and not admitted['canonical_publication'] and s['MemoryMax'] == str(limit) and admitted['ram'] == limit
+              and s['MemorySwapMax'] == str(admitted['swap']) == '0' and s['CPUQuotaPerSecUSec'] == quota
+              and s['ActiveState'] == 'active' and not s['Job'] and int(s['MainPID']) > 0
+              and s['ControlGroup'] == '/system.slice/'+name, 'M12 is outside its admitted serial envelope')
+    group = Path('/sys/fs/cgroup'+s['ControlGroup'])
+    core.need(s['MainPID'] in (group/'cgroup.procs').read_text().split()
+              and (group/'memory.max').read_text().strip() == str(limit)
+              and (group/'memory.swap.max').read_text().strip() == '0'
+              and (group/'cpu.max').read_text().split() == [('200000' if quota=='2s' else '100000'),'100000'],
+              'M12 kernel envelope changed')
+    return dict(phase=phase,admission=receipt,native=s,expected=identity,resource_credit_bytes=0)
 
 
 def peer_disk(row, absent_maximum):

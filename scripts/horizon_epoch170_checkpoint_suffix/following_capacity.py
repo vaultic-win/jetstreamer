@@ -36,6 +36,10 @@ def load_holding(core):
 def holding_owner(core, provider):
     units = provider.active_units("horizon-*park*", "horizon-*holding*", "horizon-*retire*",
                                   "horizon-*restore*", "horizon-closed186-*")
+    if any(name.startswith(('horizon-closed186-park-m12-','horizon-closed186-retire-m12-','horizon-closed186-restore-m12-')) for name in units):
+        import runpy
+        shared = runpy.run_path(str(Path(__file__).with_name('following_peers.py')))
+        return shared['m12_owner'](core,units)
     if not units:
         return None
     core.need(len(units) == 1, "multiple serial holding owners")

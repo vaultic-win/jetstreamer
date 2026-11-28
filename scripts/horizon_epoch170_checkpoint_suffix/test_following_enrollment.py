@@ -142,6 +142,30 @@ class EnrollmentWriterTests(TestCase):
             with self.assertRaisesRegex(ValueError,"V49 did not inherit"):
                 dispatch.enrollment_writer(self.interface,self.current)
 
+    def test_new_operator_keeps_the_same_interfaces_across_v50(self):
+        previous, owner = None, None
+        for version in range(47,51):
+            program = self.stage(version)
+            path = self.base / f"FAILED166_CADENCE_V{version}_ACTIVE.json"
+            path.touch()
+            ref = {"path": str(path)}
+            row = self.docs[str(path)]
+            row["new"]["lock"] = {"path":"/tmp/fixture", "device":12, "inode":25, "fd":3}
+            key = f"qualified{version}"
+            self.docs[key] = self.docs["ready"].copy()
+            row["ready"] = {"path":key}
+            if version == 47:
+                self.docs[str(dispatch.operator.CHAIN_FOLLOWING/"binding.json")] = {"writer_active":ref}
+            else:
+                self.docs[key]["old_owner"] = previous
+                row["old"] = owner
+            owner, previous = row["new"], ref
+        with patch.object(self.q,"OPERATOR",dispatch.operator.CHAIN_FOLLOWING):
+            self.assertEqual(dispatch.enrollment_writer(self.interface,self.current),program)
+            self.docs["qualified50"]["successor170_interface"] = self.prior
+            with self.assertRaisesRegex(ValueError,"not accepted"):
+                dispatch.enrollment_writer(self.interface,self.current)
+
 
 if __name__ == "__main__":
     main()

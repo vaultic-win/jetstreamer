@@ -14,6 +14,8 @@ ROOT = RT / 'epoch162-first-hourly-completion-20261127-v2'
 DIRECTORY169 = RT / 'epoch169-hourly-admission-20261123-v1/issued-split-v1'
 SELF = ROOT / 'issued-price-v1/capacity.py'
 AFTER = ROOT / 'issued-price-v2/capacity.py'
+LATEST = ROOT / 'issued-price-v3/capacity.py'
+AFTER_DIGEST = '8b9921b184692531bf92240f250f233c6529bdb7002fef13f65368fe474c2d80'
 MODULES = {'capacity.py','after_assembly.py','following_peers.py','continuation_price.py',
            'successor_price.py','rollover143.py','assembly_reservation.py'}
 FIRST_DIGEST = '3853af915b2c9b58a790ed9c686770631fe2be1cb1a2575cbc1ad34db748e07b'
@@ -43,7 +45,8 @@ def software(peer, enrollment, *, read_only=False):
     need(enrollment['path'] == str(peer['ENROLL']) and spec['donor'] == peer['DONOR']
          and spec['operator'] == dict(path=str(peer['PACKAGE']/'deployment-seal-receipt.json'), sha256=OPERATOR_DIGEST)
          and (spec['capacity']['path'] == str(Path(__file__).resolve()) or
-              read_only and spec['capacity'] == {'path':str(SELF), 'sha256':FIRST_DIGEST}), 'different 162 enrollment')
+              read_only and spec['capacity'] in ({'path':str(SELF), 'sha256':FIRST_DIGEST},
+                                                 {'path':str(AFTER), 'sha256':AFTER_DIGEST})), 'different 162 enrollment')
     immutable(Path(spec['capacity']['path']), spec['capacity']['sha256'])
     status, _ = peer['package'](spec)
     ready = peer['bound'](peer['bound'](spec['writer_active'])['ready'])
@@ -147,8 +150,7 @@ def calculate(peer, base, row, phase, held, min_floor, fleet):
                 peers={'169':report169(base['actor'])})
 
 
-def sealed_after(peer):
-    directory = AFTER.parent
+def sealed_after(peer, directory):
     seal, ref = peer['read'](directory/'deployment-seal-receipt.json')
     immutable(Path(ref['path']),ref['sha256'])
     members = {m['name']:m for m in seal['members']}
@@ -163,8 +165,8 @@ def sealed_after(peer):
 
 def common(enrollment, *, read_only=False):
     entry = Path(__file__).resolve()
-    need(os.geteuid() == 0 and __debug__ and entry in (SELF, AFTER)
-         and (not read_only or entry == AFTER), 'use an issued 162 price')
+    need(os.geteuid() == 0 and __debug__ and entry in (SELF, AFTER, LATEST)
+         and (not read_only or entry in (AFTER, LATEST)), 'use an issued 162 price')
     module = DIRECTORY169/'peer162.py'
     immutable(module, PEER_DIGEST)
     peer = runpy.run_path(str(module))
@@ -174,11 +176,11 @@ def common(enrollment, *, read_only=False):
     proof = peer['bound'](peer['DONOR'])
     before = donor_observation(peer, proof)
     own = None
-    if entry == AFTER:
-        own = sealed_after(peer)
-        helper = runpy.run_path(str(AFTER.with_name('following_peers.py')))
-        after = runpy.run_path(str(AFTER.with_name('after_assembly.py')))
-        base, row = after['price'](helper, AFTER.parent)
+    if entry in (AFTER, LATEST):
+        own = sealed_after(peer,entry.parent)
+        helper = runpy.run_path(str(entry.with_name('following_peers.py')))
+        after = runpy.run_path(str(entry.with_name('after_assembly.py')))
+        base, row = after['price'](helper, entry.parent)
         need(read_only or base['writer'] == writer_ref, '162 enrollment refers to another cadence writer')
     else:
         other = runpy.run_path(str(DIRECTORY169/'split_operator.py'))

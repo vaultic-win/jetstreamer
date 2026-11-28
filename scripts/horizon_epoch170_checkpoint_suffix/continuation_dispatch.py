@@ -199,6 +199,8 @@ def enrollment_writer(interface, ref):
         q.need(expected["path"] == str(base/"FAILED166_CADENCE_V47_ACTIVE.json"), "different fourth-window writer")
         active = q.bound(expected)
         versions = (48,49) if q.OPERATOR == operator.SPLIT_FOLLOWING else (48,) if q.OPERATOR == operator.RECONCILED_FOLLOWING else ()
+        if q.OPERATOR == operator.CHAIN_FOLLOWING:
+            versions = load("following_peers").writer_versions(base,48)
         for successor_version in versions:
             successor = base / f"FAILED166_CADENCE_V{successor_version}_ACTIVE.json"
             if not successor.exists():
@@ -210,8 +212,8 @@ def enrollment_writer(interface, ref):
                    and all(next_active["new"]["lock"][k] == active["new"]["lock"][k] for k in ("path", "device", "inode")),
                    f"V{successor_version} did not inherit the previous writer and its cadence lock")
             active, expected, version = next_active, next_ref, successor_version
-        if q.OPERATOR == operator.SPLIT_FOLLOWING:
-            q.need(version in (48,49), "missing split-actor writer")
+        if q.OPERATOR in (operator.SPLIT_FOLLOWING,operator.CHAIN_FOLLOWING):
+            q.need(version >= 48, "missing split-actor writer")
         prior_interface = q.bound(interface["old_release"])["interface"]
     else:
         q.need(q.RETRY, "this operator has no writer enrollment command")

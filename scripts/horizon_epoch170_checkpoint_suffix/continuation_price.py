@@ -15,7 +15,8 @@ OPERATOR = Path(__file__).resolve().parent
 ISSUED_PRICE = FIRST/"attempt-2/issued-price-v47"
 FOCUSED169_PRICE = RT/"epoch169-hourly-admission-20261123-v1/issued-split-v1"
 SPLIT162_PRICE = RT/"epoch162-first-hourly-completion-20261127-v2/issued-price-v2"
-ISSUED_PRICES = (ISSUED_PRICE, FOCUSED169_PRICE, SPLIT162_PRICE)
+CHAIN162_PRICE = SPLIT162_PRICE.with_name("issued-price-v3")
+ISSUED_PRICES = (ISSUED_PRICE, FOCUSED169_PRICE, SPLIT162_PRICE, CHAIN162_PRICE)
 RETRY = OPERATOR in ISSUED_PRICES or OPERATOR.parent == FIRST/"attempt-2" and OPERATOR.name in ("operator-v1", "operator-v2", "operator-v3")
 DEP = ATTEMPT = FIRST/"attempt-2" if RETRY else FIRST
 OLD = prior.DEP / "attempt-2"
@@ -28,7 +29,8 @@ READ_UNIT = "horizon-170-73746882-closed-read-20261127-v1.service"
 CHECKER = "bounded-checkpoints"
 PREVIOUS_SLOTS = [73726716, 73746882]
 NEXT_DIRECTORY = RT / "epoch170-from-73766969-20261127-v1"
-SPLIT_PEERS = OPERATOR in (NEXT_DIRECTORY / "operator-v4", NEXT_DIRECTORY / "closed-reader-v3")
+SPLIT_PEERS = OPERATOR in (NEXT_DIRECTORY / "operator-v4", NEXT_DIRECTORY / "closed-reader-v3",
+                           NEXT_DIRECTORY / "operator-v5", NEXT_DIRECTORY / "closed-reader-v4")
 RECONCILED = SPLIT_PEERS or OPERATOR in (NEXT_DIRECTORY / "operator-v3", NEXT_DIRECTORY / "closed-reader-v2")
 FOLLOWING = RECONCILED or OPERATOR in (NEXT_DIRECTORY / "operator-v1", NEXT_DIRECTORY / "operator-v2", NEXT_DIRECTORY / "closed-reader-v1")
 if FOLLOWING:
@@ -252,7 +254,7 @@ def issued_tree_bounds(actor):
 
 def price(phase, *, native169=None, native162=None):
     need(phase in ("read","start","held"),"unknown continuation phase")
-    need((native169 is None and native162 is None) or OPERATOR in (FOCUSED169_PRICE, SPLIT162_PRICE), "peer is outside this operator")
+    need((native169 is None and native162 is None) or OPERATOR in (FOCUSED169_PRICE, SPLIT162_PRICE, CHAIN162_PRICE), "peer is outside this operator")
     need(OPERATOR not in ISSUED_PRICES or phase == "held", "issued-price-v47 only prices the live 170 worker")
     if SPLIT_PEERS:
         peers_spec = importlib.util.spec_from_file_location("following_peers", OPERATOR / "following_peers.py")
