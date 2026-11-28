@@ -114,7 +114,7 @@ def scan(archive, manifest_path):
     projection = [(archive, ALIAS), (manifest_path, alias_manifest)]
     cmd = ["/usr/bin/systemd-run", "--wait", "--pipe", "--quiet", "--unit=" + VERIFIER_UNIT,
            "--property=Type=oneshot", "--property=TimeoutStartSec=35min", "--property=Restart=no",
-           "--property=MemoryMax=4G", "--property=MemorySwapMax=0", "--property=CPUQuota=100%",
+           "--setenv=RAYON_NUM_THREADS=1", "--property=MemoryMax=4G", "--property=MemorySwapMax=0", "--property=CPUQuota=100%",
            "--property=TasksMax=32", "--property=ProtectSystem=strict", "--property=ProtectHome=read-only",
            "--property=PrivateTmp=yes", "--property=PrivateNetwork=yes", "--property=NoNewPrivileges=yes",
            "--property=ReadWritePaths=" + str(dest)]
