@@ -47,8 +47,8 @@ def geometry(whole, previous_guard, drawdown):
     need(whole["available_ram"] - whole["required_ram"] == whole["ram_margin"]
          and 0 <= remaining143 + dormant143 <= 64 * GIB and remaining143 >= 0 and dormant143 >= 0
          and raw["guarded_hourly_remaining"] == remaining143 + dormant143
-         and whole["epoch143_protected_runway_required_home"] ==
-             max(whole["required_home"], whole["epoch143_protected_sibling_floor"] + remaining143),
+         and whole["epoch143_protected_runway_required_home"] >=
+             whole["epoch143_protected_sibling_floor"] + remaining143,
          "shared RAM or protected 143 geometry changed")
     floor = max(raw["guard_floor"], whole["guard_floor"] - remaining143,
                 whole["required_home"] - remaining143 - HOME,

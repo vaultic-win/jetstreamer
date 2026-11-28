@@ -40,7 +40,7 @@ files = package(OPERATOR,SELF)
 BINDING = checked(dict(path=str(OPERATOR/"binding.json"),sha256=files["binding.json"]))
 PROVIDER = Path(BINDING["provider"]["path"]).parent
 VERSION = int(PROVIDER.name.removeprefix("issued-price-v"))
-REBOUND = OPERATOR == ROOT/"operator-v2"
+REBOUND = OPERATOR in (ROOT/"operator-v2", ROOT/"operator-v3")
 need((REBOUND and VERSION >= 39 or OPERATOR == ROOT/"operator-v1" and VERSION == 37)
      and BINDING["interface"]["path"] == str(ROOT/"NEXT_HOURLY_WRITER_INTERFACE.json"),
      "unexpected next hourly operator or provider")

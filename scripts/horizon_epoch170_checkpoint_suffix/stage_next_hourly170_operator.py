@@ -58,13 +58,13 @@ def source_members(destination):
     issuer = once(issuer,"import sys\n","import sys\nimport time\n")
     progress = once(text("continuation_progress.py"),"epoch170-from-73766969-ram-20261128-v1",
                     "epoch170-from-73773645-ram-20261128-v1")
-    if destination.name == "operator-v2":
-        operator = once(operator, f'{ROOT.name}/operator-v1', f'{ROOT.name}/operator-v2')
-        progress = once(progress, 'HOURLY_RAM_ROOT/"operator-v1"', 'HOURLY_RAM_ROOT/"operator-v2"')
+    if destination.name != "operator-v1":
+        operator = once(operator, f'{ROOT.name}/operator-v1', f'{ROOT.name}/{destination.name}')
+        progress = once(progress, 'HOURLY_RAM_ROOT/"operator-v1"', f'HOURLY_RAM_ROOT/"{destination.name}"')
         progress = once(progress, 'if Path(__file__).resolve().parent == AFTER_RAM_ROOT/"operator-v1":',
-                        'if Path(__file__).resolve().parent in (AFTER_RAM_ROOT/"operator-v1", HOURLY_RAM_ROOT/"operator-v2"):')
+                        f'if Path(__file__).resolve().parent in (AFTER_RAM_ROOT/"operator-v1", HOURLY_RAM_ROOT/"{destination.name}"):')
         progress = once(progress, 'OPERATOR = ROOT/OPERATOR_NAME',
-                        'OPERATOR = ROOT/("operator-v2" if ROOT == HOURLY_RAM_ROOT else OPERATOR_NAME)')
+                        f'OPERATOR = ROOT/("{destination.name}" if ROOT == HOURLY_RAM_ROOT else OPERATOR_NAME)')
         progress = once(progress, '    directory = ROOT/"operator-v1" if ROOT in (RAM_ROOT,AFTER_RAM_ROOT) else OPERATOR',
                         '    directory = ROOT/"operator-v1" if ROOT in (RAM_ROOT,AFTER_RAM_ROOT) and ROOT != HOURLY_RAM_ROOT else OPERATOR')
     return {"bounded_successor.py":operator.encode(),"next_hourly170_issuer.py":issuer.encode(),
@@ -74,7 +74,7 @@ def source_members(destination):
             "closed_successor.py":text("closed_successor.py").encode()}
 
 
-def stage(provider,writer):
+def stage(provider,writer,revision_number):
     repo = HERE.parents[1]
     revision = git(repo,"rev-parse","HEAD").decode().strip()
     git(repo,"merge-base","--is-ancestor",revision,"origin/account-updates")
@@ -91,7 +91,7 @@ def stage(provider,writer):
          and writer["path"].endswith("/FAILED166_CADENCE_V75_ACTIVE.json")
          and active["new"]["program"].endswith("/tools-cold168-retry5-failed166-v75-entry146/status_cycle.py"),
          "different V37 and V75 lineage")
-    generation = 1 if version == 37 else 2
+    generation = 1 if version == 37 else revision_number
     destination = ROOT/f"operator-v{generation}"
     stage = ROOT/f"operator-source-v{generation}"
     stage.mkdir(mode=0o700,exist_ok=True)
@@ -107,7 +107,7 @@ def stage(provider,writer):
         persist(path,raw)
         files[name] = path,0o444
     files["binding.json"] = Path(bindings["path"]),0o444
-    plan = "OPERATOR_PLAN.json" if generation == 1 else "REBOUND_OPERATOR_PLAN.json"
+    plan = {1: "OPERATOR_PLAN.json", 2: "REBOUND_OPERATOR_PLAN.json", 3: "OPERATOR_V3_PLAN.json"}[generation]
     return seal(destination,files,ROOT/plan)
 
 
@@ -116,8 +116,9 @@ if __name__ == "__main__":
     parser.add_argument("provider_sha256")
     parser.add_argument("v75_owner_sha256")
     parser.add_argument("--price-version", type=int, default=37)
+    parser.add_argument("--operator-revision", type=int, choices=(2,3), default=2)
     args = parser.parse_args()
     base = RT/f"epoch162-first-hourly-completion-20261127-v2/issued-price-v{args.price_version}"
     writer = RT/"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V75_ACTIVE.json"
     print(json.dumps(stage(dict(path=str(base/"deployment-seal-receipt.json"),sha256=args.provider_sha256),
-        dict(path=str(writer),sha256=args.v75_owner_sha256)),sort_keys=True))
+        dict(path=str(writer),sha256=args.v75_owner_sha256),args.operator_revision),sort_keys=True))
