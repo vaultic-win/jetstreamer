@@ -6,6 +6,7 @@ mod bridge_exit;
 #[allow(dead_code)]
 mod evidence;
 mod gap_floor_stop;
+mod ram_gap_drain;
 mod segment_evidence;
 
 use anyhow::{Context, Result, ensure};
@@ -114,7 +115,21 @@ fn retained_checkpoint(release: &Value) -> Result<(Value, Value)> {
 
 fn main() -> Result<()> {
     if std::env::args().skip(1).eq(["floor-stop"]) {
-        println!("{}", gap_floor_stop::report()?);
+        println!("{}", gap_floor_stop::report(false)?);
+        return Ok(());
+    }
+    if let Some(action @ ("ram-floor-stop" | "ram-drain-check" | "ram-drain")) = std::env::args()
+        .skip(1)
+        .collect::<Vec<_>>()
+        .as_slice()
+        .first()
+        .map(String::as_str)
+    {
+        ensure!(
+            std::env::args().count() == 2,
+            "unexpected RAM closure argument"
+        );
+        println!("{}", ram_gap_drain::run(action)?);
         return Ok(());
     }
     bounded_report::run(retained_checkpoint)
