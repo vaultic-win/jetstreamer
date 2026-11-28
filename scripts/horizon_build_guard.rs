@@ -258,6 +258,7 @@ fn parse(args: &[String]) -> Result<Config> {
         receipt.starts_with("/var/lib/jetstreamer"),
         "receipt must use private Root state"
     );
+    #[cfg(not(anza143_hourly_prep))]
     require!(
         [
             "/home/ubuntu/workspace",
@@ -268,6 +269,12 @@ fn parse(args: &[String]) -> Result<Config> {
         .iter()
         .any(|p| root.starts_with(*p) && root != Path::new(*p)),
         "worker root outside admitted private namespaces"
+    );
+    #[cfg(anza143_hourly_prep)]
+    require!(
+        root == Path::new("/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1/input")
+            || root == Path::new("/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1/build"),
+        "worker root outside the paid second epoch 143 preparation"
     );
     let uid = u32::try_from(number(get("--root-uid")?)?).map_err(|_| "uid overflow")?;
     let config = Config {
@@ -1409,8 +1416,13 @@ mod tests {
         }
     }
     fn args() -> Vec<String> {
+        #[cfg(not(anza143_hourly_prep))]
+        let (unit, root) = ("horizon-qualify-234-arena-tests-v3.service", "/home/ubuntu/workspace/private-build");
+        #[cfg(anza143_hourly_prep)]
+        let (unit, root) = ("horizon-prepare-143-hourly-copy-20261128-v1.service",
+                            "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1/input");
         let pairs = [
-            ("--unit", "horizon-qualify-234-arena-tests-v3.service"),
+            ("--unit", unit),
             (
                 "--expected-invocation-id",
                 "11111111111111111111111111111111",
@@ -1419,7 +1431,7 @@ mod tests {
                 "--self-sha256",
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             ),
-            ("--root", "/home/ubuntu/workspace/private-build"),
+            ("--root", root),
             ("--root-uid", "1000"),
             ("--root-device", "1"),
             ("--root-inode", "2"),
@@ -1474,6 +1486,7 @@ mod tests {
             assert!(parse(&replace(args(), "--minimum-free-bytes", bad)).is_err());
         }
     }
+    #[cfg(not(anza143_hourly_prep))]
     #[test]
     fn scan203_retirement_requires_its_exact_state_and_resource_profile() {
         let mut a = args();
