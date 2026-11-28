@@ -501,6 +501,10 @@ fn main() -> Result<()> {
             terminal::capture_exit(digest, Path::new(destination))?
         }
         #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, digest, destination] if command == "capture-adjacent230-exit" => {
+            terminal::capture_adjacent230_exit(digest, Path::new(destination))?
+        }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
         [command, digest, destination] if command == "capture-v1627-exit" => {
             terminal::capture_v1627_exit(digest, Path::new(destination))?
         }
@@ -526,7 +530,7 @@ fn main() -> Result<()> {
         }
         [command, plan, digest] if command == "compare" => compare(Path::new(plan), digest)?,
         _ => anyhow::bail!(
-            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-predecessor-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-predecessor-terminal LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | finish-predecessor-terminal LAUNCH_SHA256 | drain-failed-predecessor-terminal LAUNCH_SHA256 | collect-v1627-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
+            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-adjacent230-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-predecessor-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-predecessor-terminal LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | finish-predecessor-terminal LAUNCH_SHA256 | drain-failed-predecessor-terminal LAUNCH_SHA256 | collect-v1627-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
         ),
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
