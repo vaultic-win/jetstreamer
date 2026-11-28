@@ -37,6 +37,14 @@ def extend(name, source):
         unit = "horizon-qualify-162-second-replay-20261128-v1.service"
         f.need(source.count(unit) == 1, "unexpected V12 second 162 native membership")
         source = source.replace(unit, unit.replace("-v1.service", "-v2.service"))
+    if name == "after_assembly.py":
+        marker = "    paid169 = min(snapshot['paid169'], cap['resident'](later))"
+        f.need(source.count(marker) == 1, "different original 169 charge computation")
+        source = source.replace(marker, "    runpy.run_path(str(Path(__file__).with_name('frozen169_output.py')))['reconcile'](core, native, a, later, amounts)\n" + marker)
+    if name == "capacity.py":
+        marker = "'frozen162_image.py','second162_peer.py'}"
+        f.need(source.count(marker) == 1, "different roster membership validator")
+        source = source.replace(marker, "'frozen162_image.py','second162_peer.py','frozen169_output.py'}")
     return source
 
 
@@ -45,7 +53,8 @@ def build(staging, commit, observed):
     f.git(repo, "merge-base", "--is-ancestor", commit, observed)
     f.need(f.git(repo, "rev-parse", "origin/account-updates").decode().strip() == observed,
            "different observed campaign revision")
-    inputs = (Path(__file__).resolve(), PEER, PEER162, HERE / "derive_third169_price.py",
+    frozen = HERE / "frozen169_output.py"
+    inputs = (Path(__file__).resolve(), PEER, PEER162, frozen, HERE / "derive_third169_price.py",
               HERE / "following_prepare.py", HERE / "derive_gap_price.py", HERE / "closed_successor.py")
     sources = {}
     for file in inputs:
@@ -72,6 +81,7 @@ def build(staging, commit, observed):
         dest = staging / name
         dest.write_text(code)
         files[name] = (dest, 0o444)
+    files[frozen.name] = (frozen, 0o444)
     original = f.read(f.reference(OLD / "SOURCE.json"))
     manifest = staging / "SOURCE.json"
     f.save(manifest, dict(original, revision=commit, remote_observed=observed, v12_provider=pinned,
