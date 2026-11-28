@@ -14,7 +14,8 @@ use std::{
     epoch140_suffix,
     epoch141_first_hourly,
     epoch141_third_hourly,
-    epoch143_first_hourly
+    epoch143_first_hourly,
+    epoch162_second_hourly
 )))]
 mod route {
     pub(super) const EPOCH: u64 = 166;
@@ -25,6 +26,17 @@ mod route {
     pub(super) const SNAPSHOT: &str =
         "snapshot-71998051-6GepGUiRjT1G4UpKJKDbCahrzyTeZLPqgZzw7g9td7jm.tar.zst";
     pub(super) const TERMINAL_SLOT: u64 = 72_004_310;
+}
+#[cfg(epoch162_second_hourly)]
+mod route {
+    pub(super) const EPOCH: u64 = 162;
+    pub(super) const UNIT: &str = "horizon-qualify-162-second-replay-20261128-v1.service";
+    pub(super) const ALIAS: &str = "/run/horizon-162-second-replay-v1";
+    pub(super) const RUN: &str =
+        "/home/sol/.jetstreamer-private/epoch162-second-replay-20261128-v1";
+    pub(super) const SNAPSHOT: &str =
+        "snapshot-69991076-H5hYSmFbbrjDMXyakVgeaDseLNC4t6NEYgsuJ8SYnE8F.tar.zst";
+    pub(super) const TERMINAL_SLOT: u64 = 69_998_119;
 }
 #[cfg(epoch170_suffix)]
 mod route {
@@ -167,9 +179,9 @@ mod route {
 ))]
 compile_error!("each hourly epoch 170 checkpoint requires its dedicated continuation profile");
 use route::*;
-#[cfg(not(any(epoch170_suffix, epoch170_continuation)))]
+#[cfg(not(any(epoch170_suffix, epoch170_continuation, epoch162_second_hourly)))]
 const RELEASE_TIMEOUT: Duration = Duration::from_secs(180);
-#[cfg(any(epoch170_suffix, epoch170_continuation))]
+#[cfg(any(epoch170_suffix, epoch170_continuation, epoch162_second_hourly))]
 const RELEASE_TIMEOUT: Duration = Duration::from_secs(600);
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(60);
 
@@ -401,6 +413,16 @@ mod tests {
         assert_eq!(args[0], EPOCH.to_string());
         assert_eq!(args[2], "--verify");
         assert_eq!(args[3], format!("--snapshot-archive={ALIAS}/{SNAPSHOT}"));
+        #[cfg(epoch162_second_hourly)]
+        {
+            assert_eq!(args[0], "162");
+            assert_eq!(
+                args[4],
+                format!("--epoch-hashes={ALIAS}/canonical-hashes.txt")
+            );
+            assert_eq!(args[7], "--qualification-end-slot=69998119");
+            assert!(args[3].contains("snapshot-69991076-"));
+        }
         #[cfg(not(any(
             epoch170_bridge,
             epoch141_first_hourly,
@@ -488,7 +510,8 @@ mod tests {
             epoch170_continuation,
             epoch141_first_hourly,
             epoch141_third_hourly,
-            epoch143_first_hourly
+            epoch143_first_hourly,
+            epoch162_second_hourly
         )))]
         assert_eq!(
             (EPOCH, args[7].as_str()),
