@@ -905,16 +905,27 @@ pub(super) fn collect_adjacent230_terminal(exit: &Path, digest: &str, destinatio
     window230::collect(&window230::ADJACENT, exit, digest, destination)
 }
 
-fn window266_scope(successor: bool) -> &'static window266::Window {
-    if successor { &window266::SUCCESSOR } else { &window266::WINDOW }
+fn window266_scope(command: &str) -> Result<&'static window266::Window> {
+    match command {
+        "capture-window266-exit" | "collect-window266-terminal" | "finish-window266-terminal" => {
+            Ok(&window266::WINDOW)
+        }
+        "capture-successor266-exit" | "collect-successor266-terminal" | "finish-successor266-terminal" => {
+            Ok(&window266::SUCCESSOR)
+        }
+        "capture-following266-exit" | "collect-following266-terminal" | "finish-following266-terminal" => {
+            Ok(&window266::FOLLOWING)
+        }
+        _ => bail!("unsupported epoch 266 terminal command"),
+    }
 }
 
-pub(super) fn capture_window266_exit(launch_sha: &str, destination: &Path, successor: bool) -> Result<Value> {
-    exit::capture_window266(window266_scope(successor), launch_sha, destination)
+pub(super) fn capture_window266_exit(launch_sha: &str, destination: &Path, command: &str) -> Result<Value> {
+    exit::capture_window266(window266_scope(command)?, launch_sha, destination)
 }
 
-pub(super) fn finish_window266_terminal(launch_sha: &str, successor: bool) -> Result<Value> {
-    window266::finish(window266_scope(successor), launch_sha)
+pub(super) fn finish_window266_terminal(launch_sha: &str, command: &str) -> Result<Value> {
+    window266::finish(window266_scope(command)?, launch_sha)
 }
 
 pub(super) fn finish_retry_next_v1627_terminal(launch_sha: &str, invocation: &str) -> Result<Value> {
@@ -925,9 +936,9 @@ pub(super) fn collect_window266_terminal(
     launch_sha: &str,
     exit_sha: &str,
     destination: &Path,
-    successor: bool,
+    command: &str,
 ) -> Result<Value> {
-    window266::collect(window266_scope(successor), launch_sha, exit_sha, destination)
+    window266::collect(window266_scope(command)?, launch_sha, exit_sha, destination)
 }
 
 pub(super) fn collect_v1627_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {

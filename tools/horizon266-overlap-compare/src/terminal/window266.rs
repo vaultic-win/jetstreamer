@@ -52,6 +52,23 @@ pub(super) const SUCCESSOR: Window = Window {
     snapshot_sha: "95acb06384414d38adb6d576a4de1e4f5233a654521fc0f18b5c1a530af6d444",
 };
 
+pub(super) const FOLLOWING: Window = Window {
+    state: "/var/lib/jetstreamer/horizon266-window-114943136-114949777-runtime-v1",
+    unit: "horizon-qualify-checkpoint-continuation-266-window-114949777-v1.service",
+    node: "/var/lib/jetstreamer/horizon266-following-window-node-42f2a7c3-v1/jetstreamer-node",
+    profile_sha: "4709cbc3baf7d27acc46e2ea6d2aec7a658bf4ecc23a70f0f571c27ba61068f6",
+    root: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114949777-v1",
+    pid1_exit: "/var/lib/jetstreamer/horizon266-following-window-pid1-exit-v1/evidence/pid1-exit.json",
+    terminal: "/var/lib/jetstreamer/horizon266-following-window-terminal-collector-v1/evidence/terminal-evidence.json",
+    guard: "horizon-266-window-114949777-protective-v1.service",
+    timer: "horizon-266-window-114949777-protective-v1.timer",
+    bootstrap: 114_943_135,
+    last: 114_949_777,
+    bootstrap_accounts: SUCCESSOR.terminal_accounts,
+    terminal_accounts: "2P1wpm3BgAxTEZ13B5dFR6iWvqiN63LLNV6Yf61Qw9Zd",
+    snapshot_sha: "7ea9fcd83d72dc205719ecc683c2394076746505795227bec1312216590d07c2",
+};
+
 impl Window {
     fn archive(&self) -> PathBuf {
         Path::new(self.root).join(format!(

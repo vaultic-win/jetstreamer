@@ -507,21 +507,21 @@ fn main() -> Result<()> {
         }
         #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
         [command, digest, destination]
-            if matches!(command.as_str(), "capture-window266-exit" | "capture-successor266-exit") =>
+            if matches!(command.as_str(), "capture-window266-exit" | "capture-successor266-exit" | "capture-following266-exit") =>
         {
-            terminal::capture_window266_exit(digest, Path::new(destination), command == "capture-successor266-exit")?
+            terminal::capture_window266_exit(digest, Path::new(destination), command)?
         }
         #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
         [command, launch, exit, destination]
-            if matches!(command.as_str(), "collect-window266-terminal" | "collect-successor266-terminal") =>
+            if matches!(command.as_str(), "collect-window266-terminal" | "collect-successor266-terminal" | "collect-following266-terminal") =>
         {
-            terminal::collect_window266_terminal(launch, exit, Path::new(destination), command == "collect-successor266-terminal")?
+            terminal::collect_window266_terminal(launch, exit, Path::new(destination), command)?
         }
         #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
         [command, launch]
-            if matches!(command.as_str(), "finish-window266-terminal" | "finish-successor266-terminal") =>
+            if matches!(command.as_str(), "finish-window266-terminal" | "finish-successor266-terminal" | "finish-following266-terminal") =>
         {
-            terminal::finish_window266_terminal(launch, command == "finish-successor266-terminal")?
+            terminal::finish_window266_terminal(launch, command)?
         }
         #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
         [command, digest, destination] if command == "capture-v1627-exit" => {
