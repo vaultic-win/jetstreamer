@@ -43,6 +43,9 @@ NEXT_V1627_UNIT = "horizon-qualify-230-next-v1627-99468089-v1.service"
 
 RETRY_NEXT_V1627_REGISTRATION = V / "horizon230-next-v1627-retry-runtime-v2/cadence-registration.json"
 RETRY_NEXT_V1627_UNIT = "horizon-qualify-230-next-v1627-99468089-v2.service"
+SUCCESSOR_230_REGISTRATION = V / "horizon230-successor-99516304-runtime-v1/cadence-registration.json"
+SUCCESSOR_230_UNIT = "horizon-qualify-230-successor-99516304-v1.service"
+
 NEXT_V1627_REGISTRATIONS = {
     NEXT_V1627_UNIT: NEXT_V1627_REGISTRATION,
     RETRY_NEXT_V1627_UNIT: RETRY_NEXT_V1627_REGISTRATION,
@@ -106,6 +109,11 @@ def registration_for_sample(epoch, sample):
     if epoch != 230:
         return REGISTRATIONS[epoch]
     units = {row["producer_unit"] for row in sample["diagnostic_replays"]}
+    if SUCCESSOR_230_UNIT in units:
+        assert SUCCESSOR_230_REGISTRATION.is_file()
+        assert units.isdisjoint((*NEXT_V1627_REGISTRATIONS, ADJACENT_UNIT, V1627_UNIT, FIRST_7871_UNIT,
+                                "horizon-qualify-230-middle-hourly-second-v1.service"))
+        return SUCCESSOR_230_REGISTRATION
     next_units = units.intersection(NEXT_V1627_REGISTRATIONS)
     if next_units:
         next_unit, = next_units
@@ -173,8 +181,11 @@ def placement(epoch, sample):
                  "sha256": "52d1e4fb7ab373cebba7994a7a0b4cdb2f0b27570b00a32d081833131bc3d9ff"}
     first, last = bound(remaining)["remaining_replay"]
     profile = bound(launch["profile"])
-    window = profile if registration == ADJACENT_REGISTRATION else profile["replay_bounds"]
-    window_start, window_end = window["first_slot"], window["last_slot"]
+    if registration == SUCCESSOR_230_REGISTRATION:
+        window_start, window_end = profile["range"]
+    else:
+        window = profile if registration == ADJACENT_REGISTRATION else profile["replay_bounds"]
+        window_start, window_end = window["first_slot"], window["last_slot"]
     retained = 0
     if registration == FIRST_7871_REGISTRATION:
         assert launch["unit"] == FIRST_7871_UNIT and (window_start, window_end) == (99437434, 99445304)
@@ -186,9 +197,12 @@ def placement(epoch, sample):
         retained = closed["last_slot"] - closed["first_slot"] + 1
         assert retained == closed["slot_count"] == 39522
         evidence.append(closed_ref)
-    elif registration in NEXT_V1627_REGISTRATIONS.values():
-        assert registration == NEXT_V1627_REGISTRATIONS[launch["unit"]]
-        assert (window_start, window_end) == (99468090, 99476782)
+    elif registration in (*NEXT_V1627_REGISTRATIONS.values(), SUCCESSOR_230_REGISTRATION):
+        if registration == SUCCESSOR_230_REGISTRATION:
+            assert launch["unit"] == SUCCESSOR_230_UNIT and (window_start, window_end) == (99516305, 99524336)
+        else:
+            assert registration == NEXT_V1627_REGISTRATIONS[launch["unit"]]
+            assert (window_start, window_end) == (99468090, 99476782)
         for registration_path, digest, bounds in (
             (FIRST_7871_REGISTRATION, "16d546332a37fccd20a7b2609908288b426276a01908c6e255db886aba6ea8d2",
              (99437434, 99445304)),
@@ -210,6 +224,17 @@ def placement(epoch, sample):
             assert closed["slot_count"] == bounds[1] - bounds[0] + 1
             retained += closed["slot_count"]
             evidence.append(closed_ref)
+        if registration == SUCCESSOR_230_REGISTRATION:
+            retry_ref = {"path": str(RETRY_NEXT_V1627_REGISTRATION.parent / "terminal.json"),
+                         "sha256": "5655121e77fdff95edf304705d035afc14cc12f598272af89e2e694f2f0c1cf0"}
+            retry = bound(retry_ref)
+            native = bound(retry["native_terminal"])
+            assert retry["guard_drained"] and retry["state"] == "local-segment-committed"
+            assert native["native_manifest_complete_verified"] and native["producer_drained"]
+            assert native["adjacent_checkpoints"]["consensus_fields_match"]
+            assert (native["first_slot"], native["last_slot"], native["slot_count"]) == (99468090, 99476782, 8693)
+            evidence.extend((retry_ref, retry["native_terminal"]))
+            retained += native["slot_count"]
     elif registration in (V1627_REGISTRATION, ADJACENT_REGISTRATION):
         if registration == ADJACENT_REGISTRATION:
             assert launch["unit"] == ADJACENT_UNIT and (window_start, window_end) == (99445305, 99461591)
@@ -239,7 +264,9 @@ def placement(epoch, sample):
             phase = "replay"
     rate = 1.6
     allowance = 12 * 3600
-    canonical_credit = 0 if registration in (V1627_REGISTRATION, ADJACENT_REGISTRATION, *NEXT_V1627_REGISTRATIONS.values()) else accepted
+    private_uncredited = (V1627_REGISTRATION, ADJACENT_REGISTRATION, *NEXT_V1627_REGISTRATIONS.values(),
+                          SUCCESSOR_230_REGISTRATION)
+    canonical_credit = 0 if registration in private_uncredited else accepted
     seconds = math.ceil((last - first + 1 - retained - canonical_credit) / rate) + allowance + DELIVERY_SECONDS
     path = Path(next(arg.split("=", 1)[1] for arg in profile["argv"] if arg.startswith("--horizon-output=")))
     assert path.is_relative_to(root / "work/output")

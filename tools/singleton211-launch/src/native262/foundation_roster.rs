@@ -2046,7 +2046,10 @@ fn measure(
         require_disjoint_cpus(epoch, exclusive, unit, owner)?;
         recorded.insert(unit.to_owned(), (owner.clone(), *memory, *ticks));
     }
-    let bridge_windows = [FIRST_7871_230.unit, V1627_230.unit, ADJACENT_230.unit, NEXT_V1627_230.unit, RETRY_NEXT_V1627_230.unit];
+    let bridge_windows = [
+        FIRST_7871_230.unit, SUCCESSOR_REPLAY_230.unit, V1627_230.unit, ADJACENT_230.unit,
+        NEXT_V1627_230.unit, RETRY_NEXT_V1627_230.unit,
+    ];
     for replay in live_replays.values() {
         require_disjoint_cpus(epoch, exclusive, replay.unit, &replay.owner)?;
         if [OVERLAP_266.unit, PREDECESSOR_266.unit, WINDOW_266.unit, SUCCESSOR_WINDOW_266.unit]

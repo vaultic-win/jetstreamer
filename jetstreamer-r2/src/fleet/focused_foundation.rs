@@ -83,7 +83,21 @@ const RETRY_NEXT_V1627_230_PROFILE_SHA: &str =
 const RETRY_NEXT_V1627_230_PREFLIGHT_SHA: &str =
     "c091acc448841a3051c5954347f478d749d1c9766ce0f8dfca88bea39cbe1cd9";
 
+const SUCCESSOR_230_UNIT: &str = "horizon-qualify-230-successor-99516304-v1.service";
+const SUCCESSOR_230_STATE: &str = "horizon230-successor-99516304-runtime-v1";
+const SUCCESSOR_230_PROFILE_SHA: &str =
+    "5a3fbf5e9cc3289a374a2cf54b6b78f3dfa859bb92d54b75625ea1f3daa204a2";
+const SUCCESSOR_230_PREFLIGHT_SHA: &str =
+    "a91b6d9623091e5e4e830f9889fc3d4d4f814947b804d5e01d5070845c594d0e";
+
 const SCOPES: &[Scope] = &[
+    Scope {
+        epoch: 230,
+        unit: SUCCESSOR_230_UNIT,
+        attempt: "successor-99516304-v1",
+        state: SUCCESSOR_230_STATE,
+        kind: "epoch230-private-successor-99516304-window",
+    },
     Scope {
         epoch: 230,
         unit: "horizon-qualify-230-short-gap-v1.service",
@@ -317,6 +331,21 @@ pub(super) fn check_bindings(claim: &DiagnosticClaim, launch: &Value) -> Result<
             && guard["trip_reason"].is_null(),
         "focused Foundation launch and admission bindings differ"
     );
+    if claim.unit == SUCCESSOR_230_UNIT {
+        let state = format!("/var/lib/jetstreamer/{SUCCESSOR_230_STATE}");
+        ensure!(
+            launch["profile"]["path"] == format!("{state}/profile.json")
+                && launch["profile"]["sha256"] == SUCCESSOR_230_PROFILE_SHA
+                && profile["schema"] == "foundation-epoch230-successor-runtime-profile-v1"
+                && profile["range"] == serde_json::json!([99_516_305, 99_524_336])
+                && profile["guarded_whole_tree_cap_bytes"] == (90_u64 << 30)
+                && admission["schema"] == "foundation-epoch230-focused-admission-v1"
+                && admission["preflight"]["path"] == format!("{state}/preflight.json")
+                && admission["preflight"]["sha256"] == SUCCESSOR_230_PREFLIGHT_SHA
+                && plan["receipt_directory"] == format!("{state}/guard-receipts"),
+            "epoch 230 successor continuation bindings differ"
+        );
+    }
     if [NEXT_V1627_230_UNIT, RETRY_NEXT_V1627_230_UNIT].contains(&claim.unit.as_str()) {
         let (directory, profile_sha, preflight_sha, profile_schema) = if claim.unit == NEXT_V1627_230_UNIT {
             (NEXT_V1627_230_STATE, NEXT_V1627_230_PROFILE_SHA, NEXT_V1627_230_PREFLIGHT_SHA,

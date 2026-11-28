@@ -100,6 +100,16 @@ FIRST_7871_230 = Scope(
     "3c0d5ac1c970cffa0473fa3c5d01ad2466f7d041b4fe25dc7cdb65039688a3ea",
     225_000_000_000, 90 << 30, 256 << 20, "48-55",
 )
+SUCCESSOR_REPLAY_230 = replace(
+    FIRST_7871_230,
+    state=V / "horizon230-successor-99516304-runtime-v1",
+    unit="horizon-qualify-230-successor-99516304-v1.service",
+    guard="horizon-230-successor-99516304-protective-v1.service",
+    kind="epoch230-private-successor-99516304-window",
+    roster_schema="foundation-epoch230-successor-replay-roster-binding-v1",
+    profile_sha="5a3fbf5e9cc3289a374a2cf54b6b78f3dfa859bb92d54b75625ea1f3daa204a2",
+    preflight_sha="a91b6d9623091e5e4e830f9889fc3d4d4f814947b804d5e01d5070845c594d0e",
+)
 V1627_230 = Scope(
     230, V / "horizon230-v1627-replay-runtime-v1",
     "horizon-qualify-230-v1627-window-v1.service", "horizon-230-v1627-window-protective-v1.service",
@@ -134,7 +144,7 @@ RETRY_NEXT_V1627_230 = replace(
     preflight_sha="c091acc448841a3051c5954347f478d749d1c9766ce0f8dfca88bea39cbe1cd9",
 )
 NEXT_V1627_SCOPES = (NEXT_V1627_230, RETRY_NEXT_V1627_230)
-BRIDGE_230 = (FIRST_7871_230, V1627_230, ADJACENT_230, *NEXT_V1627_SCOPES)
+BRIDGE_230 = (FIRST_7871_230, SUCCESSOR_REPLAY_230, V1627_230, ADJACENT_230, *NEXT_V1627_SCOPES)
 NEXT_V1627_230_FLEET = V / "horizon230-next-v1627-fleet-v1/acceptance.json"
 RETRY_NEXT_V1627_230_FLEET = V / "horizon230-next-v1627-retry-fleet-v2/acceptance.json"
 NEXT_V1627_FAILED_START = {
@@ -233,6 +243,7 @@ SCOPED_ARGS = {
     "--adjacent230": ADJACENT_230,
     "--next-v1627-230": NEXT_V1627_230,
     "--retry-next-v1627-230": RETRY_NEXT_V1627_230,
+    "--successor-replay-230": SUCCESSOR_REPLAY_230,
     "--first7871-230": FIRST_7871_230, "--v1627-230": V1627_230, "--trace296": TRACE_296, "--feature296": FEATURE_296,
 }
 
@@ -298,7 +309,7 @@ def current_fit(kit, roster, root, scope, *, held=False):
         proof = roster["focused_230_quote"]
         assert sorted(protected_cpus) == proof["exclusive_online_cpus"] == [*range(48, 56), *range(112, 120)]
         protected_226_fit(fit)
-        if scope is FIRST_7871_230:
+        if scope in (FIRST_7871_230, SUCCESSOR_REPLAY_230):
             second_hourly_drained(ops, proof["predecessor_terminal"])
         elif scope in NEXT_V1627_SCOPES:
             require_230_drained(ops, proof["predecessor_terminal"], V1627_230, {
@@ -638,6 +649,8 @@ def launch(kit, roster_ref, scope):
         tokens = V / "horizon230-middle-hourly-second-tokens-v1"
     if scope is FIRST_7871_230:
         tokens = V / "horizon230-first-7871-tokens-v1"
+    if scope is SUCCESSOR_REPLAY_230:
+        tokens = V / "horizon230-successor-99516304-tokens-v1"
     if scope is V1627_230:
         tokens = V / "horizon230-v1627-tokens-v1"
     if scope is ADJACENT_230:
@@ -722,7 +735,16 @@ def launch(kit, roster_ref, scope):
     else:
         namespace = ops.bound(ops.ref(state / "namespace.json"))
         bootstrap = ops.bound(ops.ref(state / "bootstrap-recheck.json"))["bootstrap"]
-        if scope is ADJACENT_230:
+        if scope is SUCCESSOR_REPLAY_230:
+            assert preflight["profile"] == scope.profile and preflight["worker_execution"] is False
+            assert preflight["private_namespace_validated"]
+            assert preflight["bootstrap_custody"] == profile["bootstrap_custody"]
+            custody = ops.bound(profile["bootstrap_custody"])
+            assert custody["copy_drained"] and custody["whole_file_sha256_rechecked"]
+            assert all(bootstrap[key] == custody["input"][key] for key in ("path", "sha256"))
+            assert ops.bound(preflight["guard_validation"])["plan_sha256"] == profile["static_guard_plan"]["sha256"]
+            assert ops.ref(Path(profile["epoch_hashes"]["path"])) == profile["epoch_hashes"]
+        elif scope is ADJACENT_230:
             assert preflight["profile"] == scope.profile
             assert namespace["mounted_device_inode_size"] == preflight["readonly_mounted_device_inode_size"]
             assert preflight["host_guard_sees_empty_placeholders"] and not preflight["worker_execution"]
@@ -779,6 +801,8 @@ def launch(kit, roster_ref, scope):
                       else "foundation-230-hourly-token-probe-v1")
         if scope is FIRST_7871_230:
             probe_unit = "foundation-230-first-7871-token-probe-v1"
+        elif scope is SUCCESSOR_REPLAY_230:
+            probe_unit = "foundation-230-successor-99516304-token-probe-v1"
         elif scope is V1627_230:
             probe_unit = "foundation-230-v1627-token-probe-v1"
         elif scope is ADJACENT_230:

@@ -395,11 +395,12 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 17] = [
+pub(super) const SCOPES: [&Focused; 18] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
     &FIRST_7871_230,
+    &SUCCESSOR_REPLAY_230,
     &V1627_230,
     &ADJACENT_230,
     &NEXT_V1627_230,
