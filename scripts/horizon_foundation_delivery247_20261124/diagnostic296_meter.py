@@ -21,6 +21,11 @@ PREDECESSOR_266_PROFILE_SHA = "7ed80c05ae0e1c706a271452d9b0dcb516c651fd0f97a2ec3
 PREDECESSOR_266_PREFLIGHT_SHA = "de5680f4fc6634529348c9701f639a66cf333c7296f69a7645dc97f1297bc4ae"
 PREDECESSOR_266_CUSTODY = V / "horizon266-predecessor-intake-stage-v1/custody.json"
 PREDECESSOR_266_CUSTODY_SHA = "afd03e2258229848a2878f1c2ff75b424ebf810b79fec65788c75ac5111a5959"
+WINDOW_266 = "window-114936474-v1"
+WINDOW_266_UNIT = "horizon-qualify-checkpoint-continuation-266-window-114936474-v1.service"
+WINDOW_266_ROOT = Path("/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114936474-v1")
+WINDOW_266_PROFILE_SHA = "f7562054a31277bc38747652f9a79e6967b393d8713499e6998841390cb4c5d6"
+WINDOW_266_PREFLIGHT_SHA = "9043e168fd2322c6c5e098bee42a40f69507fa9db7afd791ad59577354f3bed1"
 TRACE = "loader-log-v3"
 FEATURE_ACCOUNTS = "feature-account-v4"
 FOCUSED = {
@@ -36,6 +41,7 @@ FOCUSED = {
     RESTORE_260: (260, "horizon260-native-restore-runtime-v1", "epoch260-private-native-restore"),
     OVERLAP_266: (266, "horizon266-hourly-overlap-114929697-runtime-v1", "epoch266-private-hourly-overlap"),
     PREDECESSOR_266: (266, "horizon266-original-predecessor-runtime-v1", "epoch266-private-original-predecessor"),
+    WINDOW_266: (266, "horizon266-window-114929698-114936474-runtime-v1", "epoch266-private-hourly-window"),
     TRACE: (296, "horizon296-loader-log-v3", "epoch296-private-loader-log-diagnostic"),
     FEATURE_ACCOUNTS: (296, "horizon296-feature-account-v4", "epoch296-private-feature-account-qualification"),
 }
@@ -47,6 +53,8 @@ def attempt_paths(version):
     assert version in ATTEMPTS
     if version in FOCUSED:
         epoch, directory, _ = FOCUSED[version]
+        if version == WINDOW_266:
+            return WINDOW_266_UNIT, V / directory, WINDOW_266_ROOT
         suffix = RESTORE if version == RESTORE_260 else version
         return (f"horizon-qualify-{epoch}-{suffix}.service", V / directory,
                 Path(f"/home/ubuntu/.jetstreamer-private/qualification-{epoch}-{suffix}"))
@@ -114,6 +122,20 @@ def registration(version):
             assert custody["sha256"] == PREDECESSOR_266_CUSTODY_SHA
             evidence = bound(custody)
             assert evidence["profile"] == profile_ref and evidence["actual_readonly_projection_verified"]
+    if version == WINDOW_266:
+        release = bound(row["guard_release_fit"])
+        plan = bound(row["node_plan"])
+        assert profile_ref["sha256"] == WINDOW_266_PROFILE_SHA and profile["private"]
+        assert row["bootstrap_custody"] == profile["bootstrap_custody"]
+        assert admission["preflight"] == {"path": str(state / "preflight.json"),
+                                          "sha256": WINDOW_266_PREFLIGHT_SHA}
+        assert admission["schema"] == "foundation-epoch266-private-window-admission-v1"
+        assert plan == dict(profile["node_plan_inputs"], admission=row["admission"],
+                            minimum_free_bytes=admission["minimum_free_bytes"])
+        assert release["schema"] == "foundation-epoch266-private-window-guard-release-fit-v1"
+        assert release["invocation_id"] == row["invocation_id"] and release["node_plan"] == row["node_plan"]
+        assert release["roster"] == admission["roster"] and release["guard_plan"] == row["guard_plan"]
+        assert release["publication_authorized"] is False
     return source, row
 
 
@@ -215,7 +237,7 @@ def register(plan, ordinary_replay=False, include_focused=True):
                for row in sample["replays"])
     }
     for version in ATTEMPTS:
-        if version in (PREDECESSOR_266, ADJACENT_230):
+        if version in (PREDECESSOR_266, ADJACENT_230, WINDOW_266):
             continue
         epoch = FOCUSED.get(version, (296,))[0]
         ordinary = (epoch == 296 and ordinary_replay) or epoch in ordinary_singletons
@@ -229,6 +251,10 @@ def register_predecessor_266(plan):
 
 def register_adjacent_230(plan):
     register_attempt(plan, ADJACENT_230, ordinary_replay=False, include_focused=True)
+
+
+def register_window_266(plan):
+    register_attempt(plan, WINDOW_266, ordinary_replay=False, include_focused=True)
 
 
 def owns(row):

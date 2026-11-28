@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import time
 
 
@@ -152,6 +153,21 @@ PREDECESSOR_CUSTODY = {
     "path": str(V / "horizon266-predecessor-intake-stage-v1/custody.json"),
     "sha256": "afd03e2258229848a2878f1c2ff75b424ebf810b79fec65788c75ac5111a5959",
 }
+WINDOW_266 = Scope(
+    266, V / "horizon266-window-114929698-114936474-runtime-v1",
+    "horizon-qualify-checkpoint-continuation-266-window-114936474-v1.service",
+    "horizon-266-window-114936474-protective-v1.service",
+    "epoch266-private-hourly-window", "foundation-epoch266-private-window-roster-binding-v1",
+    "f7562054a31277bc38747652f9a79e6967b393d8713499e6998841390cb4c5d6",
+    "9043e168fd2322c6c5e098bee42a40f69507fa9db7afd791ad59577354f3bed1",
+    epoch266_overlap.PRODUCER_RAM, epoch266_overlap.HOME, epoch266_overlap.RECEIPTS, epoch266_overlap.CPU,
+)
+WINDOW_266_TOKEN_PROBE = {
+    "path": str(WINDOW_266.state / "evidence/prestart-token-probe.json"),
+    "sha256": "6a6bcfc6d9e317fd73c9e7b6b6b4222726ba3cb9db7d2439c1b65b498cb0f57f",
+}
+WINDOW_266_FLEET = V / "horizon266-window-fleet-v1/acceptance.json"
+WINDOW_266_PLAN = V / "horizon266-window-admitted-v1"
 TRACE_296 = Scope(
     296, V / "horizon296-loader-log-v3",
     "horizon-qualify-296-loader-log-v3.service", "horizon-296-loader-log-protective-v3.service",
@@ -169,6 +185,7 @@ FEATURE_296 = Scope(
     173_207_977_984, 112 << 30, 64 << 20, "56-63",
 )
 SCOPED_ARGS = {
+    "--window266": WINDOW_266,
     "--epoch230": GAP_230, "--epoch258": RESTORE_258, "--epoch260": RESTORE_260,
     "--hourly230": HOURLY_230, "--hourly230-second": SECOND_HOURLY_230,
     "--overlap266": OVERLAP_266,
@@ -378,7 +395,159 @@ def predecessor_namespace(ops, scope, preflight, profile):
     }
 
 
+def launch_window_266(kit, roster_ref):
+    """Use the existing invocation-bound startup for the sealed continuation."""
+    ops = kit.ops
+    scope = WINDOW_266
+    state = scope.state
+    roster = ops.bound(roster_ref)
+    profile = ops.bound(scope.profile)
+    root = Path(profile["run_root"])
+    current_fit(kit, roster, root, scope)
+    assert not (state / "cadence-registration.json").exists() and not WINDOW_266_PLAN.exists()
+    acceptance = ops.bound(ops.ref(WINDOW_266_FLEET))
+    assert acceptance["schema"] == "foundation-epoch266-window-fleet-release-v1"
+    assert acceptance["preflight"] == scope.preflight and acceptance["fleet_reconcile_only"]
+    assert acceptance["admission_authorized"] is False and acceptance["publication_authorized"] is False
+    ops.checked_image(acceptance["fleet"])
+    for name in ("adapter", "cycle"):
+        saved = acceptance[name]
+        filename = ADAPTER if name == "adapter" else "cycle.py"
+        assert ops.ref(Path(saved["path"])) == saved
+        assert (CONTROL / filename).read_bytes() == Path(saved["path"]).read_bytes()
+    for name in ("node", "worker", "guard"):
+        ops.checked_image(profile[name])
+    hook = ops.checked_image(HOOK)
+    preflight = ops.bound(scope.preflight)
+    mount = ops.bound(preflight["mount_preflight"])
+    assert preflight["profile"] == scope.profile and preflight["worker_execution"] is False
+    assert mount["all_input_mounts_readonly"] and mount["scratch_noswap"]
+    custody = profile["bootstrap_custody"]
+    ops.bound(custody)
+    assert roster["focused_266_quote"]["bootstrap_custody"] == custody
+    tokens = state / "tokens"
+    probe = ops.bound(WINDOW_266_TOKEN_PROBE)
+    assert probe["token_root"] == str(tokens) and probe["prestart_hook"] == HOOK
+    assert probe["qualification_only"] and probe["same_hook_reached_projected_token"]
+    assert set(tokens.iterdir()) == {tokens / "qualification"}
+    assert not any((state / "guard-receipts").iterdir())
+    views = mount["snapshot_and_index_views"]
+    bindings = []
+    for view, expected in zip(profile["readonly_bindings"], views, strict=True):
+        source, target = Path(view["path"]), Path(view["target"])
+        info = source.lstat()
+        assert all(view[key] == expected[key] for key in ("path", "target", "sha256"))
+        assert source.resolve() == source and target.resolve() == target
+        assert stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and info.st_uid == 0 and not info.st_mode & 0o222
+        assert (info.st_dev, info.st_ino, info.st_size) == tuple(expected[key] for key in ("device", "inode", "bytes"))
+        assert target.lstat().st_size == 0
+        bindings.append(f"{source}:{target}")
+    for unit in (scope.unit, scope.guard, scope.guard.removesuffix(".service") + ".timer"):
+        assert ops.props(unit, ["LoadState", "ActiveState", "Job"]) == {
+            "LoadState": "not-found", "ActiveState": "inactive", "Job": ""}
+    assert not any((root / "scratch").iterdir())
+    assert {p.name for p in (root / "ledger").iterdir()} == {"compact-indexes"}
+    remote = inventory(kit, epoch=266, unit="foundation-266-window-inventory-v1")
+    measured = current_fit(kit, roster, root, scope)
+    floor = roster["capacity"]["guard_floor_bytes"]
+    node = profile["node"]["path"]
+    with tempfile.TemporaryDirectory(dir=state / "evidence") as staging:
+        stage = Path(staging)
+        admission_draft = ops.funds.put(stage / "admission.json", {
+            "schema": "foundation-epoch266-private-window-admission-v1", "epoch": 266,
+            "recorded_unix_seconds": int(time.time()), "producer_unit": scope.unit,
+            "run_root": str(root), "node_sha256": profile["node"]["sha256"],
+            "minimum_free_bytes": floor, "source_window_sha256": profile["node_plan_inputs"]["source_window"]["sha256"],
+            "profile": scope.profile, "preflight": scope.preflight, "roster": roster_ref,
+            "fit": measured, "inventory": remote, "admitted": True,
+            "complete_fleet_and_century_floor_bound": True, "startup_guard_qualified": True,
+            "publication_authorized": False,
+        })
+        admission = dict(admission_draft, path=str(WINDOW_266_PLAN / "admission.json"))
+        draft = ops.funds.put(stage / "node_plan.json", dict(
+            profile["node_plan_inputs"], admission=admission, minimum_free_bytes=floor))
+        node_plan = dict(draft, path=str(WINDOW_266_PLAN / "node_plan.json"))
+        deployment = ops.funds.put(stage / "deployment.json", {
+            "schema": "jetstreamer-sealed-deployment-plan-v1", "destination": str(WINDOW_266_PLAN),
+            "members": [dict(source=item["path"], name=Path(item["path"]).name,
+                             sha256=item["sha256"], mode=0o444) for item in (admission_draft, draft)],
+        })
+        sealer = {"path": str(V / "horizon251-published-sealer-20261118-v1/horizon251-sealer"),
+                  "sha256": "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a"}
+        subprocess.run([ops.checked_image(sealer), deployment["path"], "--plan-sha256", deployment["sha256"],
+                        "--self-sha256", sealer["sha256"]], check=True, timeout=20, umask=0o022)
+    assert ops.ref(Path(node_plan["path"])) == node_plan and ops.ref(Path(admission["path"])) == admission
+    prior = ops.bound(OVERLAP_266.profile)
+    private_state = root / "state"
+    if not private_state.exists():
+        private_state.mkdir(mode=0o700)
+        os.chown(private_state, 1000, 1000)
+    metadata = private_state.lstat()
+    assert private_state.resolve() == private_state and stat.S_ISDIR(metadata.st_mode)
+    assert metadata.st_uid == 1000 and metadata.st_mode & 0o777 == 0o700 and not any(private_state.iterdir())
+    env = dict(prior["environment"], JETSTREAMER_PRIVATE_RUN_ROOT=str(private_state),
+               TMPDIR=str(root / "scratch"), CLOUDSDK_CONFIG=str(root / "scratch/isolated-empty-gcloud"))
+    assert env["JETSTREAMER_HISTORICAL_WORKER_V1_8_11"] == profile["worker"]["path"]
+    properties = dict(profile["properties"], BindReadOnlyPaths=" ".join(bindings),
+                      ReadOnlyPaths=f"{tokens} {WINDOW_266_PLAN}", OOMPolicy="kill",
+                      TimeoutStartSec="180",
+                      UnsetEnvironment="HORIZON_S3_ENDPOINT HORIZON_ACCESS_KEY_ID HORIZON_SECRET_ACCESS_KEY HORIZON_PUBLIC_BASE_URL")
+    props = [f"--property={key}={value}" for key, value in properties.items()]
+    props.extend(f"--setenv={key}={value}" for key, value in env.items())
+    argv = [node, "266", str(root / "ledger"), "--verify",
+            "--checkpoint-continuation-plan=" + node_plan["path"],
+            "--checkpoint-continuation-plan-sha256=" + node_plan["sha256"]]
+    template = ops.bound(profile["static_guard_plan"])
+    assert template["minimum_free_bytes"] == floor and template["receipt_directory"] == str(state / "guard-receipts")
+
+    def confirm_held(held, plan, sample, clock, next_tick):
+        assert sample["producer_invocation_id"] == held["InvocationID"]
+        assert sample["plan_sha256"] == plan["sha256"] and sample["trip_reason"] is None
+        assert clock["ActiveState"] == "active" and next_tick > time.monotonic_ns() // 1000
+        assert ops.props(scope.guard, ["AllowedCPUs", "MemoryMax"]) == {
+            "AllowedCPUs": "30", "MemoryMax": str(profile["guard_memory_bytes"])}
+        process = Path("/proc") / held["ControlPID"]
+        namespace = process / "root"
+        for view in views:
+            opened = namespace / Path(view["target"]).relative_to("/")
+            info = opened.stat()
+            assert os.statvfs(opened).f_flag & os.ST_RDONLY
+            assert (info.st_dev, info.st_ino, info.st_size) == tuple(view[key] for key in ("device", "inode", "bytes"))
+        scratch = root / "scratch"
+        mounted, = (line.split(" - ", 1)[1].split()
+                    for line in (process / "mountinfo").read_text().splitlines()
+                    if line.split()[4] == str(scratch))
+        assert mounted[0] == "tmpfs" and "noswap" in mounted[2].split(",")
+        stats = os.statvfs(namespace / scratch.relative_to("/"))
+        assert stats.f_frsize * stats.f_blocks == profile["scratch_tmpfs_bytes"]
+        confirmation = current_fit(kit, roster, root, scope, held=True)
+        ops.funds.put(state / "guard-release-fit.json", {
+            "schema": "foundation-epoch266-private-window-guard-release-fit-v1",
+            "invocation_id": held["InvocationID"], "roster": roster_ref, "guard_plan": plan,
+            "node_plan": node_plan, "fit": confirmation, "publication_authorized": False,
+        })
+
+    owner, plan, token, guard = activate_guarded(
+        kit, 266, state, tokens, scope.unit, scope.guard, profile["guard"], template, admission,
+        props, f"ExecStartPre=/usr/bin/bash {hook} 60 {tokens}", argv,
+        guard_cpuset="30", before_release=confirm_held)
+    return ops.funds.put(state / "cadence-registration.json", {
+        "schema": "jetstreamer-historical-performance-launch-receipt-v1",
+        "kind": scope.kind, "epoch": 266, "unit": scope.unit, "run_root": str(root),
+        "invocation_id": owner["invocation_id"], "main_pid": owner["main_pid"],
+        "node_path": node, "worker": profile["worker"], "profile": scope.profile,
+        "admission": admission, "node_plan": node_plan, "bootstrap_custody": custody,
+        "guard_plan": plan, "active_guard": guard, "launch_token": token,
+        "guard_release_fit": ops.ref(state / "guard-release-fit.json"), "evidence": {"units": [owner]},
+        "launched": True, "diagnostic_only": True, "predecessor_native_tuple_qualified": False,
+        "cursor_normalization_qualified": False, "canonical_epoch_publication_authorized": False,
+        "remote_mutations": False, "r2_mutations": False,
+    })
+
+
 def launch(kit, roster_ref, scope):
+    if scope is WINDOW_266:
+        return launch_window_266(kit, roster_ref)
     ops = kit.ops
     state = scope.state
     attempt = state
