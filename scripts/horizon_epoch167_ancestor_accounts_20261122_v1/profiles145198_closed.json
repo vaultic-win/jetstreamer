@@ -1,0 +1,172 @@
+{
+  "profiles": {
+    "accounts145": {
+      "boundaries": [
+        {
+          "path": "/var/lib/jetstreamer/horizon_runtime_data/closed145198-input-retirement-20261128-v1/evidence/BOUNDARY144145.json",
+          "sha256": "3de422c09db56102dcd376fa7dc32056a31cf5deef1557bd37c8fd7dc3a0eec1"
+        }
+      ],
+      "delivery": {
+        "path": "/home/sol/.jetstreamer-private/horizon-completed-deliveries-20261126-v1/145/completion.json",
+        "sha256": "6eb3ae2f0d463c3b2b0bcda478242d3d95478980c7f3858add0c29fdd60b9d52"
+      },
+      "epoch": 145,
+      "expected_bytes": 12987297792,
+      "expected_entries": 367472,
+      "fleet": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/root114808-live166167170-20261128-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json",
+        "sha256": "0724020fbc324d52621592dd189fec5867623e882f41614578f9af2928f39614"
+      },
+      "iid": "128b9c382fcb492c817ea9baf0432f70",
+      "inode": 99549330,
+      "input_seal": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch145-retained-inputs-20261101-v1/deployment-seal-receipt.json",
+        "sha256": "d643321231da2f1b47af61d3a085edf5a439a8792a101ef77796c5782ab0edbb"
+      },
+      "snapshot": {
+        "gid": 0,
+        "identity": [
+          2304,
+          8288860,
+          2569233422,
+          1793492837001840306,
+          1793492837002840311
+        ],
+        "links": 1,
+        "mode": "0o444",
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch145-retained-inputs-20261101-v1/snapshot-62639490-59bAQjc2c1VqNWqGoCacp3tnyNyie3EYx4bjttvJhgeT.tar.zst",
+        "sha256": "f170976b2bc3f2d55dd0fbb5a415bfeae8d0903a0ad69334d8aa993b5cab35ae",
+        "uid": 0
+      },
+      "target": "/home/sol/.jetstreamer-private/epoch145-no-worker-plan-20261101-v1/scratch/.historical-runtime/jetstreamer-historical-parent-yj3eTI/jetstreamer-historical-v1.4.25-wC3uLj/unpacked/accounts",
+      "terminal": {
+        "path": "/home/sol/.jetstreamer-private/epoch145-no-worker-plan-20261101-v1/PLANNING_CAPABILITY_RESULT.json",
+        "sha256": "0dc09ec4755a470cc59ca7669ddb453abd34100b78d4b2d1091ded942e27b9b9"
+      },
+      "terminal_schema": "horizon-epoch145-retained-parent-bounded-plan-observation-v1"
+    },
+    "indexes145": {
+      "boundaries": [
+        {
+          "path": "/var/lib/jetstreamer/horizon_runtime_data/closed145198-input-retirement-20261128-v1/evidence/BOUNDARY144145.json",
+          "sha256": "3de422c09db56102dcd376fa7dc32056a31cf5deef1557bd37c8fd7dc3a0eec1"
+        }
+      ],
+      "delivery": {
+        "path": "/home/sol/.jetstreamer-private/horizon-completed-deliveries-20261126-v1/145/completion.json",
+        "sha256": "6eb3ae2f0d463c3b2b0bcda478242d3d95478980c7f3858add0c29fdd60b9d52"
+      },
+      "epoch": 145,
+      "expected_bytes": 5652271104,
+      "expected_entries": 2,
+      "fleet": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/root114808-live166167170-20261128-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json",
+        "sha256": "0724020fbc324d52621592dd189fec5867623e882f41614578f9af2928f39614"
+      },
+      "iid": null,
+      "indexes": {
+        "epoch-145-bafyreidbzfkpeouysxwcc3pzziozgnax5bmhlq4kqhrwtvqfyordhpvuyq-mainnet-cid-to-offset-and-size.index": {
+          "blocks": 11009904,
+          "inode": 100859945,
+          "length": 5637059766
+        },
+        "epoch-145-bafyreidbzfkpeouysxwcc3pzziozgnax5bmhlq4kqhrwtvqfyordhpvuyq-mainnet-slot-to-cid.index": {
+          "blocks": 29680,
+          "inode": 100859944,
+          "length": 15193817
+        }
+      },
+      "inode": 100859942,
+      "reproducible_indexes": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/closed145198-input-retirement-20261128-v1/evidence/INDEX_ORIGINS.json",
+        "sha256": "2b4734663efc33e4087d1c11d60ab649d59ce1fd707f841c0531d67421f2d6bc"
+      },
+      "target": "/home/sol/.jetstreamer-private/epoch145-cached-b2a09f57de39c384/work/ledger/compact-indexes/145",
+      "terminal": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch145-original-diagnostic-retirement-20261126-v1/RETIREMENT_COMPLETE.json",
+        "sha256": "b21896fdf1299ae60dd292139c2231f01d1605367b25b37ef707573dd48640d3"
+      },
+      "terminal_schema": "horizon-epoch145-cross-boundary-diagnostic-retirement-v1"
+    },
+    "indexes198": {
+      "boundaries": [
+        {
+          "path": "/home/sol/.jetstreamer-private/epoch198-boundary-retirement-20261126.ALQM3wEf/boundaries/boundary-197-198.ok",
+          "sha256": "52546564da5960dc2d11179c57ce4f30a16241bbf105f1c2044ec56ccf42867e"
+        },
+        {
+          "path": "/home/sol/.jetstreamer-private/epoch198-boundary-retirement-20261126.ALQM3wEf/boundaries/boundary-198-199.ok",
+          "sha256": "5eb571572364dec08efbcec246611b53b3e05b7b3593c59eb16fe39082d45f97"
+        }
+      ],
+      "delivery": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/closed145198-input-retirement-20261128-v1/evidence/DELIVERY198.json",
+        "sha256": "81470e448a855612c57c2727e11f08dbb9b52a19bbe6168cea440fe1b17ae1f3"
+      },
+      "epoch": 198,
+      "expected_bytes": 4860358656,
+      "expected_entries": 2,
+      "fleet": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/root114808-live166167170-20261128-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json",
+        "sha256": "0724020fbc324d52621592dd189fec5867623e882f41614578f9af2928f39614"
+      },
+      "iid": null,
+      "indexes": {
+        "epoch-198-bafyreihf256azp64o4pim62ghmwgssavtdtdyselzzcm3d27y46twiooda-mainnet-cid-to-offset-and-size.index": {
+          "blocks": 9468032,
+          "inode": 98566151,
+          "length": 4847625982
+        },
+        "epoch-198-bafyreihf256azp64o4pim62ghmwgssavtdtdyselzzcm3d27y46twiooda-mainnet-slot-to-cid.index": {
+          "blocks": 24848,
+          "inode": 98566150,
+          "length": 12722018
+        }
+      },
+      "inode": 98566148,
+      "reproducible_indexes": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/closed145198-input-retirement-20261128-v1/evidence/INDEX_ORIGINS.json",
+        "sha256": "2b4734663efc33e4087d1c11d60ab649d59ce1fd707f841c0531d67421f2d6bc"
+      },
+      "target": "/home/sol/.jetstreamer-private/epoch198-readerfix-singleton-20261019-v1/lane-a/output/compact-indexes/198",
+      "terminal": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/closed196198-bootstrap-retirement-20261126-v1/ABSENCE_AND_CAPACITY.json",
+        "sha256": "93d25a85ee5cc0c7de131a3d9e88176a31d0042efe0166bf237040c6416e380e"
+      },
+      "terminal_schema": null
+    }
+  },
+  "scope": {
+    "leases": {
+      "global_operation": {
+        "gid": 0,
+        "identity": [
+          26,
+          3453440,
+          0,
+          1795169932336156440,
+          1795169932336156440
+        ],
+        "links": 1,
+        "mode": "0o600",
+        "path": "/run/horizon-epoch171-to136-g1.operation.lock",
+        "uid": 0
+      },
+      "local_mutation": {
+        "gid": 1003,
+        "identity": [
+          64512,
+          101135013,
+          0,
+          1791494730459052358,
+          1791494730459052358
+        ],
+        "links": 1,
+        "mode": "0o600",
+        "path": "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock",
+        "uid": 1001
+      }
+    }
+  }
+}

@@ -74,8 +74,11 @@ const BASE: &str =
 mod cold166;
 #[cfg(any(feature = "independent166", feature = "standard170"))]
 use cold166 as specific;
-#[cfg(feature = "floor_143")]
+#[cfg(all(feature = "floor_143", not(feature = "closed_145_198")))]
 #[path = "closed143_floor.rs"]
+mod specific;
+#[cfg(feature = "closed_145_198")]
+#[path = "closed145198_inputs.rs"]
 mod specific;
 #[cfg(feature = "floor_170")]
 #[path = "closed170_floor.rs"]
@@ -593,6 +596,10 @@ fn run() -> Result<()> {
     let p = manifest["profiles"]
         .get(attempt)
         .context("unknown attempt")?;
+    #[cfg(feature = "closed_145_198")]
+    let (uid, gid) = specific::owner(p)?;
+    #[cfg(not(feature = "closed_145_198"))]
+    let (uid, gid) = (UID, GID);
     let epoch_lock = OpenOptions::new()
         .read(true)
         .write(true)
@@ -685,8 +692,8 @@ fn run() -> Result<()> {
             .next()
             .context("missing allocation")?
             .parse::<u64>()?;
-        let first = stopped_tree::capture(&fd, DEVICE, UID, GID)?;
-        let second = stopped_tree::capture(&fd, DEVICE, UID, GID)?;
+        let first = stopped_tree::capture(&fd, DEVICE, uid, gid)?;
+        let second = stopped_tree::capture(&fd, DEVICE, uid, gid)?;
         ensure!(
             first == second && first.contains_key(""),
             "old accounts inventory changed"
@@ -786,7 +793,7 @@ fn run() -> Result<()> {
     if resuming {
         ensure!(evidence(&ip)? == intent, "prior intent differs")
     }
-    let current = stopped_tree::capture(&fd, DEVICE, UID, GID)?;
+    let current = stopped_tree::capture(&fd, DEVICE, uid, gid)?;
     stopped_tree::validate_remaining(&ledger, &current, resuming)?;
     drop(current);
     #[cfg(not(any(
@@ -821,7 +828,7 @@ fn run() -> Result<()> {
     if !resuming {
         output(&dir, "INTENT.json", &serde_json::to_vec_pretty(&intent)?)?
     }
-    let removed = stopped_tree::remove_contents(&fd, &ledger, DEVICE, UID, GID)?;
+    let removed = stopped_tree::remove_contents(&fd, &ledger, DEVICE, uid, gid)?;
     let after = gates(p, &manifest)?;
     ensure!(after == anchors, "post-retirement bindings changed");
     #[cfg(any(
