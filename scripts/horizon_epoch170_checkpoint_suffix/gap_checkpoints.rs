@@ -6,6 +6,7 @@ mod bridge_exit;
 #[allow(dead_code)]
 mod evidence;
 mod gap_floor_stop;
+mod ram_bootstrap_stop;
 mod ram_gap_drain;
 mod segment_evidence;
 
@@ -118,7 +119,14 @@ fn main() -> Result<()> {
         println!("{}", gap_floor_stop::report(false)?);
         return Ok(());
     }
-    if let Some(action @ ("ram-floor-stop" | "ram-drain-check" | "ram-drain")) = std::env::args()
+    if let Some(
+        action @ ("ram-floor-stop"
+        | "ram-drain-check"
+        | "ram-drain"
+        | "ram-second-floor-stop"
+        | "ram-second-drain-check"
+        | "ram-second-drain"),
+    ) = std::env::args()
         .skip(1)
         .collect::<Vec<_>>()
         .as_slice()
