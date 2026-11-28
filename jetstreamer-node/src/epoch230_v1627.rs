@@ -1,16 +1,55 @@
-//! Scope of the private upstream v1.6.27 comparison around the epoch 230 vote.
-use crate::{
-    BankHashExpectation, QualificationPlan, compatibility, require_existing_private_directory,
-};
+//! Exact private epoch 230 windows using the upstream v1.6.27 worker.
+use crate::{BankHashExpectation, QualificationPlan, require_existing_private_directory};
 use std::{collections::BTreeMap, path::Path};
 
-use compatibility::{
-    EPOCH230_V1627_BOOTSTRAP as BOOTSTRAP, EPOCH230_V1627_TERMINAL as TERMINAL,
-    is_epoch230_v1627_range,
+use crate::compatibility::{
+    EPOCH230_V1627_BOOTSTRAP as BOOTSTRAP, EPOCH230_V1627_NEXT_TERMINAL as NEXT_TERMINAL,
+    EPOCH230_V1627_TERMINAL as TERMINAL,
 };
 const BOOTSTRAP_HASH: &str = "9Hgyrxkc5h5mkAwPL7rUGASHZFMByNzE1TYmCPb4z4e7";
 const TERMINAL_HASH: &str = "5kWV3NT4f15DCB3XkmiYSLu9a1H88XK4GYGEV54nimcQ";
 const OUTPUT: &str = "epoch-230-v1-6-27-diagnostic.jet";
+const NEXT_TERMINAL_HASH: &str = "26wibqVauVjaet3eM6o8hssvaXi4awt7ndjwCaYJZyPK";
+const NEXT_OUTPUT: &str = "epoch-230-slots-99468090-99476782.jet";
+
+struct Window {
+    bootstrap: u64,
+    terminal: u64,
+    bootstrap_hash: &'static str,
+    terminal_hash: &'static str,
+    output: &'static str,
+}
+
+const WINDOWS: [Window; 2] = [
+    Window {
+        bootstrap: BOOTSTRAP,
+        terminal: TERMINAL,
+        bootstrap_hash: BOOTSTRAP_HASH,
+        terminal_hash: TERMINAL_HASH,
+        output: OUTPUT,
+    },
+    Window {
+        bootstrap: TERMINAL,
+        terminal: NEXT_TERMINAL,
+        bootstrap_hash: TERMINAL_HASH,
+        terminal_hash: NEXT_TERMINAL_HASH,
+        output: NEXT_OUTPUT,
+    },
+];
+
+fn window_for_plan(plan: QualificationPlan) -> Result<&'static Window, String> {
+    WINDOWS
+        .iter()
+        .find(|window| {
+            plan.epoch == 230
+                && plan.bootstrap_slot == window.bootstrap
+                && plan.replay_start == window.bootstrap + 1
+                && plan.output_runtime_range() == (window.bootstrap + 1..window.terminal + 1)
+        })
+        .ok_or_else(|| {
+            "the epoch 230 v1.6.27 diagnostic requires an exact bootstrap and replay span".into()
+        })
+}
 
 // Restrict the standalone build before it can dispatch an unrelated helper.
 pub(crate) fn validate_entrypoint(args: &[String]) -> Result<(), String> {
@@ -30,7 +69,13 @@ pub(crate) fn validate_entrypoint(args: &[String]) -> Result<(), String> {
             0
         } else if let Some((option, value)) = arg.split_once('=') {
             match option {
-                "--qualification-end-slot" if value.parse::<u64>() == Ok(TERMINAL) => 1,
+                "--qualification-end-slot"
+                    if value
+                        .parse::<u64>()
+                        .is_ok_and(|end| WINDOWS.iter().any(|window| end == window.terminal)) =>
+                {
+                    1
+                }
                 "--snapshot-archive" if Path::new(value).is_absolute() => 2,
                 "--epoch-hashes" if Path::new(value).is_absolute() => 3,
                 "--horizon-output" if Path::new(value).is_absolute() => 4,
@@ -56,17 +101,11 @@ pub(crate) fn validate_launch(
     output: Option<&Path>,
     scratch: Option<&Path>,
 ) -> Result<(), String> {
-    if !qualification.is_some_and(|p| {
-        p.epoch == 230
-            && p.bootstrap_slot == BOOTSTRAP
-            && is_epoch230_v1627_range(&p.output_runtime_range())
-    }) {
-        return Err(
-            "the epoch 230 v1.6.27 diagnostic requires its exact bootstrap and replay span".into(),
-        );
-    }
+    let window = window_for_plan(
+        qualification.ok_or("the epoch 230 v1.6.27 diagnostic requires a qualification span")?,
+    )?;
     let scratch = scratch.ok_or("the epoch 230 v1.6.27 diagnostic requires private scratch")?;
-    if output != Some(ledger.join(OUTPUT).as_path()) || scratch == ledger {
+    if output != Some(ledger.join(window.output).as_path()) || scratch == ledger {
         return Err("the epoch 230 v1.6.27 diagnostic requires its named private output and separate scratch".into());
     }
     for directory in [ledger, scratch] {
@@ -86,9 +125,14 @@ pub(crate) fn validate_launch(
 }
 
 pub(crate) fn validate_expectations(
+    plan: QualificationPlan,
     expected: &BTreeMap<u64, BankHashExpectation>,
 ) -> Result<(), String> {
-    for (slot, hash) in [(BOOTSTRAP, BOOTSTRAP_HASH), (TERMINAL, TERMINAL_HASH)] {
+    let window = window_for_plan(plan)?;
+    for (slot, hash) in [
+        (window.bootstrap, window.bootstrap_hash),
+        (window.terminal, window.terminal_hash),
+    ] {
         let binding =
             BankHashExpectation::LegacyAccountsHash(hash.parse().expect("fixed accounts hash"));
         if expected.get(&slot) != Some(&binding) {
@@ -103,31 +147,56 @@ pub(crate) fn validate_expectations(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compatibility;
+
+    fn plan(window: &Window) -> QualificationPlan {
+        QualificationPlan {
+            epoch: 230,
+            bootstrap_slot: window.bootstrap,
+            replay_start: window.bootstrap + 1,
+            output_slot_start: window.bootstrap + 1,
+            end_inclusive: window.terminal,
+        }
+    }
 
     #[test]
     fn selects_only_the_exact_private_range() {
-        let span = BOOTSTRAP + 1..TERMINAL + 1;
-        let selected =
-            compatibility::select_focused_qualification_runtime(span.clone(), true).unwrap();
-        assert_eq!(selected.descriptor.identity.name, "solana-v1.6.27");
-        let ordinary = compatibility::select_runtime(span.clone(), true).unwrap();
-        assert_ne!(ordinary.descriptor.identity.name, "solana-v1.6.27");
-        for other in [
-            BOOTSTRAP..TERMINAL + 1,
-            BOOTSTRAP + 1..TERMINAL,
-            BOOTSTRAP + 1..TERMINAL + 2,
-        ] {
+        for window in &WINDOWS {
+            let plan = plan(window);
+            let span = plan.output_runtime_range();
             let selected =
-                compatibility::select_focused_qualification_runtime(other, true).unwrap();
-            assert_ne!(selected.descriptor.identity.name, "solana-v1.6.27");
+                compatibility::select_focused_qualification_runtime(span.clone(), true).unwrap();
+            assert_eq!(selected.descriptor.identity.name, "solana-v1.6.27");
+            let ordinary = compatibility::select_runtime(span.clone(), true).unwrap();
+            assert_ne!(ordinary.descriptor.identity.name, "solana-v1.6.27");
+            for other in [
+                window.bootstrap..span.end,
+                span.start..window.terminal,
+                span.start..span.end + 1,
+            ] {
+                let selected =
+                    compatibility::select_focused_qualification_runtime(other, true).unwrap();
+                assert_ne!(selected.descriptor.identity.name, "solana-v1.6.27");
+            }
+            assert!(
+                compatibility::select_focused_qualification_runtime(span.clone(), false).is_err()
+            );
+            assert!(
+                compatibility::select_focused_qualification_runtime_with_snapshot_warmup(
+                    window.bootstrap,
+                    span,
+                    true
+                )
+                .is_err()
+            );
+            assert!(
+                window_for_plan(QualificationPlan {
+                    replay_start: window.bootstrap,
+                    ..plan
+                })
+                .is_err()
+            );
         }
-        assert!(compatibility::select_focused_qualification_runtime(span.clone(), false).is_err());
-        assert!(
-            compatibility::select_focused_qualification_runtime_with_snapshot_warmup(
-                BOOTSTRAP, span, true
-            )
-            .is_err()
-        );
     }
 
     #[test]
@@ -145,6 +214,11 @@ mod tests {
         .map(str::to_owned)
         .to_vec();
         assert!(validate_entrypoint(&args).is_ok());
+        args[3] = "--qualification-end-slot=99476782".into();
+        assert!(validate_entrypoint(&args).is_ok());
+        args[3] = "--qualification-end-slot=99476783".into();
+        assert!(validate_entrypoint(&args).is_err());
+        args[3] = "--qualification-end-slot=99476782".into();
         assert!(validate_entrypoint(&args[..2]).is_err());
         for option in [
             "--root-checkpoint-cohort",
@@ -159,28 +233,28 @@ mod tests {
 
     #[test]
     fn binds_both_accounts_checkpoints() {
-        let bootstrap = BankHashExpectation::LegacyAccountsHash(BOOTSTRAP_HASH.parse().unwrap());
-        let terminal = BankHashExpectation::LegacyAccountsHash(TERMINAL_HASH.parse().unwrap());
-        assert!(
-            validate_expectations(&BTreeMap::from([
-                (BOOTSTRAP, bootstrap),
-                (TERMINAL, terminal)
-            ]))
-            .is_ok()
-        );
-        assert!(
-            validate_expectations(&BTreeMap::from([
-                (BOOTSTRAP, bootstrap),
-                (TERMINAL, bootstrap)
-            ]))
-            .is_err()
-        );
-        assert!(
-            validate_expectations(&BTreeMap::from([
-                (BOOTSTRAP, terminal),
-                (TERMINAL, terminal)
-            ]))
-            .is_err()
-        );
+        for (index, window) in WINDOWS.iter().enumerate() {
+            let parse = |hash: &str| BankHashExpectation::LegacyAccountsHash(hash.parse().unwrap());
+            let bootstrap = parse(window.bootstrap_hash);
+            let terminal = parse(window.terminal_hash);
+            let bound =
+                BTreeMap::from([(window.bootstrap, bootstrap), (window.terminal, terminal)]);
+            assert!(validate_expectations(plan(window), &bound).is_ok());
+            assert!(validate_expectations(plan(&WINDOWS[1 - index]), &bound).is_err());
+            assert!(
+                validate_expectations(
+                    plan(window),
+                    &BTreeMap::from([(window.bootstrap, bootstrap), (window.terminal, bootstrap)])
+                )
+                .is_err()
+            );
+            assert!(
+                validate_expectations(
+                    plan(window),
+                    &BTreeMap::from([(window.bootstrap, terminal), (window.terminal, terminal)])
+                )
+                .is_err()
+            );
+        }
     }
 }

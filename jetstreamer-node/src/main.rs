@@ -15386,7 +15386,7 @@ fn qualification_expectations(
     epoch141_suffix::recheck_roots(&expected)?;
     #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
     if plan.epoch == 230 {
-        epoch230_v1627::validate_expectations(&expected)?;
+        epoch230_v1627::validate_expectations(plan, &expected)?;
     }
     let (snapshot_slot, snapshot_expectation) =
         snapshot_path_expectation(snapshot_archive, bootstrap)?;
@@ -21415,10 +21415,17 @@ async fn main() {
     }
     #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
     {
-        let checkpoints = epoch_hashes.as_deref().expect("v1.6.27 requires explicit checkpoints");
+        let checkpoints = epoch_hashes
+            .as_deref()
+            .expect("v1.6.27 requires explicit checkpoints");
         if let Err(error) =
             read_epoch_hashes_file(checkpoints, compatibility::SOLANA_V1_6_27_RUNTIME.bootstrap)
-                .and_then(|expected| epoch230_v1627::validate_expectations(&expected))
+                .and_then(|expected| {
+                    epoch230_v1627::validate_expectations(
+                        qualification.expect("v1.6.27 requires a checked qualification span"),
+                        &expected,
+                    )
+                })
         {
             eprintln!("error: {error}");
             exit(2);

@@ -1320,6 +1320,8 @@ pub(crate) const EPOCH230_V1627_BOOTSTRAP: Slot = 99_461_591;
 #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
 pub(crate) const EPOCH230_V1627_TERMINAL: Slot = 99_468_089;
 #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+pub(crate) const EPOCH230_V1627_NEXT_TERMINAL: Slot = 99_476_782;
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
 pub static SOLANA_V1_6_27_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
     backend: RuntimeBackend::SolanaV1_6_20,
     identity: RuntimeIdentity {
@@ -1347,8 +1349,19 @@ static EPOCH230_V1627_ERA: RuntimeEra = RuntimeEra {
 };
 
 #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
-pub(crate) fn is_epoch230_v1627_range(range: &Range<Slot>) -> bool {
-    *range == (EPOCH230_V1627_BOOTSTRAP + 1..EPOCH230_V1627_TERMINAL + 1)
+static EPOCH230_V1627_NEXT_ERA: RuntimeEra = RuntimeEra {
+    name: "solana-v1.6.27-epoch230-next-hourly-diagnostic",
+    start_slot: EPOCH230_V1627_TERMINAL + 1,
+    end_slot_exclusive: Some(EPOCH230_V1627_NEXT_TERMINAL + 1),
+    backend: EraBackend::Available(&SOLANA_V1_6_27_RUNTIME),
+    admission: AdmissionLevel::Candidate,
+};
+
+#[cfg(feature = "epoch230-v1-6-27-diagnostic")]
+fn epoch230_v1627_era(range: &Range<Slot>) -> Option<&'static RuntimeEra> {
+    [&EPOCH230_V1627_ERA, &EPOCH230_V1627_NEXT_ERA]
+        .into_iter()
+        .find(|era| era.start_slot == range.start && era.end_slot_exclusive == Some(range.end))
 }
 
 pub static SOLANA_V1_7_13_RUNTIME: RuntimeDescriptor = RuntimeDescriptor {
@@ -2451,8 +2464,10 @@ fn runtime_at_for_plan(
     _range: &Range<Slot>,
 ) -> Result<&'static RuntimeEra, String> {
     #[cfg(feature = "epoch230-v1-6-27-diagnostic")]
-    if matches!(scope, RuntimePlanningScope::FocusedQualification) && is_epoch230_v1627_range(_range) {
-        return Ok(&EPOCH230_V1627_ERA);
+    if matches!(scope, RuntimePlanningScope::FocusedQualification)
+        && let Some(era) = epoch230_v1627_era(_range)
+    {
+        return Ok(era);
     }
     runtime_at_for_scope(slot, scope)
 }
