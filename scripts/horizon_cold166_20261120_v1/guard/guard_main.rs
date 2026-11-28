@@ -640,6 +640,9 @@ fn supported_unit(plan: &Plan) -> bool {
     if plan.unit == "horizon-qualify-143-first-hourly-20261127-v1.service" {
         return cfg!(feature = "epoch143-first-hourly");
     }
+    if plan.unit == "horizon-qualify-162-second-replay-20261128-v2.service" {
+        return cfg!(feature = "epoch162-second-retry");
+    }
     if plan.unit == "horizon-qualify-162-second-replay-20261128-v1.service" {
         return cfg!(feature = "epoch162-second-hourly");
     }
@@ -735,6 +738,20 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
                 "/var/lib/jetstreamer/horizon_runtime_data/epoch141-third-hourly-20261127-v1/guard-receipts",
                 9_470_567_509_909,
                 TREE_CAP,
+            )
+        }
+        #[cfg(feature = "epoch162-second-retry")]
+        "horizon-qualify-162-second-replay-20261128-v2.service" => {
+            const CAP: u64 = (3 << 30) + (64 << 20);
+            ensure!(
+                plan.maximum_root_physical_bytes == Some(CAP),
+                "unexpected second 162 image cap"
+            );
+            (
+                "/home/sol/.jetstreamer-private/epoch162-second-replay-20261128-v2",
+                "/var/lib/jetstreamer/horizon_runtime_data/epoch162-second-replay-20261128-v2/guard-receipts",
+                9_470_567_509_909,
+                CAP,
             )
         }
         #[cfg(feature = "epoch162-second-hourly")]
