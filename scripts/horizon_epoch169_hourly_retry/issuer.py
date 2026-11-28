@@ -214,6 +214,20 @@ def first(held,plan,gr,timer_id):
     raise TimeoutError("no invocation-bound first guard before gate timeout")
 
 
+def startup_floor(price):
+    # The reconstructed protected floor moves while peer trees and the
+    # conservative fleet availability are sampled. Use the existing margin
+    # to cover that movement while preserving the full candidate output.
+    return price["guard_floor"] + max(0,price["home_margin"]) * 3 // 4
+
+
+def guarded_margin(price, armed, output):
+    available = price["whole_roster"]["available_home"]
+    protected = price["guard_floor"]
+    c.need(available - protected - output == price["home_margin"], "inconsistent native HOME geometry")
+    return available - max(protected, armed) - output
+
+
 def launch():
     scope,sr=c.read(c.CONTROL/"SCOPE.json")
     c.need(not any((c.CONTROL/n).exists() for n in ("PRESTART.json","HELD_GATE.json","START_INTENT.json","GRANT.json",
@@ -234,10 +248,9 @@ def launch():
     producer,held=held_process()
     hr=c.recorded(c.CONTROL/"HELD_GATE.json",held)
     iid,pid=held["invocation_id"],held["pid"]
-    cushion=min(512*c.M,max(0,initial["home_margin"])//5)
     plan=dict(schema="jetstreamer-horizon-standalone-guard-plan-v1",unit=c.UNIT,invocation_id=iid,filesystem=str(c.HOME),
         worker_root=str(c.RETRY),receipt_directory=str(c.RETRY/"hourly-guard-receipts"),maximum_worker_vmas=3_500_000,
-        minimum_free_bytes=initial["guard_floor"]+cushion,maximum_root_physical_bytes=physical+c.HOME_OUTPUT)
+        minimum_free_bytes=startup_floor(initial),maximum_root_physical_bytes=physical+c.HOME_OUTPUT)
     gr=c.recorded(c.CONTROL/"GUARD_PLAN.json",plan)
     command=guard_command(plan,gr)
     subprocess.run([*command[-6:],"--validate-plan-only"],check=True)
@@ -254,13 +267,16 @@ def launch():
     c.recorded(c.CONTROL/"START_INTENT.json",intent,0o444)
     post=funded(scope,sr)
     peer=post["whole_roster"]["base_169"]["native"]["independent_retry169"]
-    c.need(post["fits"] and post["stage"]=="native-postguard" and peer["invocation"]==iid and peer["phase"]=="held"
-           and peer["guard_plan"]==gr and post["writer"]==initial["writer"] and post["whole_roster"]["fleet"]==initial["whole_roster"]["fleet"]
-           and post["guard_floor"]<=plan["minimum_free_bytes"] and
-           post["home_margin"] >= plan["minimum_free_bytes"]-post["guard_floor"] and
-           held_process()[1]==held and watcher()==watch and checked_inputs(scope)==bank,
-           "held retry crossed funding, guard floor, cadence, namespace or input generation")
-    post.update(armed_floor=plan["minimum_free_bytes"],armed_home_margin=post["home_margin"]-(plan["minimum_free_bytes"]-post["guard_floor"]))
+    armed=plan["minimum_free_bytes"]
+    margin=guarded_margin(post,armed,c.HOME_OUTPUT)
+    checks=dict(fits=post["fits"],native_held=post["stage"]=="native-postguard" and peer and
+                peer["invocation"]==iid and peer["phase"]=="held", guard_plan=peer and peer["guard_plan"]==gr,
+                cadence=post["writer"]==initial["writer"], fleet=post["whole_roster"]["fleet"]==initial["whole_roster"]["fleet"],
+                protected_floor=post["guard_floor"]<=armed, funded_output=margin>=0, namespace=held_process()[1]==held,
+                watcher=watcher()==watch, inputs=checked_inputs(scope)==bank)
+    post.update(armed_floor=armed,armed_home_margin=margin,postguard_checks=checks)
+    c.recorded(c.CONTROL/"POST_GUARD_SCREEN.json",post)
+    c.need(all(checks.values()),"held retry refused: "+", ".join(k for k,v in checks.items() if not v))
     pr=c.recorded(c.CONTROL/"POST_GUARD_PRICE.json",post)
     log=observe.LOG.lstat()
     c.need(log.st_size==0 and log.st_nlink==1 and os.path.samestat(log,(Path("/proc")/str(pid)/"fd/1").stat()),
