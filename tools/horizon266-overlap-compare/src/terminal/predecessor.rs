@@ -56,7 +56,7 @@ fn checkpoint(manifest: &HistoricalSegmentManifest) -> Result<NativeRestore> {
     Ok(native)
 }
 
-fn normalize_prefix(file: &File) -> Result<Overlap> {
+fn normalize_prefix(file: &File, account_histories: bool) -> Result<Overlap> {
     let mut archive = ArchiveReader::open(BufReader::new(file))?;
     let header = archive.header();
     ensure!(
@@ -68,6 +68,9 @@ fn normalize_prefix(file: &File) -> Result<Overlap> {
     archive.verify_chain = true;
     let range = FIRST..LAST + 1;
     let mut visitor = Overlap::new(EPOCH, range.clone(), ANCHOR, Some(range)).with_epoch_events();
+    if account_histories {
+        visitor = visitor.with_boundary_account_histories();
+    }
     let count = archive.read_slots(FIRST, LAST - FIRST + 1, &mut visitor)?;
     visitor.validate(count, true)?;
     ensure!(
@@ -77,7 +80,12 @@ fn normalize_prefix(file: &File) -> Result<Overlap> {
     Ok(visitor)
 }
 
-pub(super) fn collect(launch_sha: &str, exit_sha: &str, destination: &Path) -> Result<Value> {
+pub(super) fn collect(
+    launch_sha: &str,
+    exit_sha: &str,
+    destination: &Path,
+    account_histories: bool,
+) -> Result<Value> {
     require_root()?;
     let parent = destination_parent(destination)?;
     let unit = exit::PREDECESSOR_UNIT;
@@ -187,8 +195,24 @@ pub(super) fn collect(launch_sha: &str, exit_sha: &str, destination: &Path) -> R
     );
     (&dense).seek(SeekFrom::Start(0))?;
     (&archive).seek(SeekFrom::Start(0))?;
-    let old = normalize_prefix(&dense)?;
-    let new = normalize_prefix(&archive)?;
+    let old = normalize_prefix(&dense, account_histories)?;
+    let new = normalize_prefix(&archive, account_histories)?;
+    let boundary = if account_histories {
+        let kept = old
+            .boundary_account_digest()
+            .context("missing retained account history digest")?;
+        ensure!(
+            new.boundary_account_digest() == Some(kept),
+            "epoch 266 boundary account histories differ"
+        );
+        Some(json!({
+            "slot":crate::boundary::SLOT, "pre_account_updates":crate::boundary::WRITES,
+            "per_account_order_and_content_match":true, "relative_write_version_extent_matches":true,
+            "sha256":sha256_hex_string(&kept),
+        }))
+    } else {
+        None
+    };
     let normalized = normalized::compare("epoch 266 predecessor prefix", &old, &new)?;
     ensure!(
         old.versions.next_raw == Some(OLD_CURSOR)
@@ -212,23 +236,29 @@ pub(super) fn collect(launch_sha: &str, exit_sha: &str, destination: &Path) -> R
         "producer evidence changed during predecessor verification"
     );
     let stage = stage_package(parent)?;
-    let evidence = write_sealed(
-        &stage.path().join("terminal-evidence.json"),
-        &json!({
-            "schema":"foundation-epoch266-private-predecessor-terminal-evidence-v1",
-            "epoch":EPOCH,"unit":unit,"invocation_id":invocation,"boot_id":boot,"launch":launch_ref,
-            "pid1_exit":exit_ref,"producer_drained":true,"producer_exit_status":0,
-            "replay_first_slot":BOOTSTRAP + 1,"first_slot":FIRST,"last_slot":LAST,"positions":LAST-FIRST+1,
-            "archive":{"path":profile.persistent_archive,"sha256":sha256_hex_string(&manifest.archive_sha256),"identity":archive_id},
-            "segment_manifest":{"path":profile.persistent_segment_manifest,"sha256":digest(&manifest_bytes),"identity":manifest_id},
-            "terminal_checkpoint":manifest.terminal,"native_manifest_complete_verified":true,
-            "retained_prefix_sha256":PREFIX_SHA,"retained_poh":{"path":POH.0,"sha256":POH.1},
-            "normalized_sha256":sha256_hex_string(&normalized),"full_prefix_normalized_match":true,
-            "retained_cursor":old.versions.next_raw,"predecessor_cursor":new.versions.next_raw,
-            "independent_restore_cursor":restored.next_write_version,"terminal_consensus_fields_match":true,
-            "producer_messages":producer,"publication_authorized":false,
-        }),
-    )?;
+    let mut evidence = json!({
+        "schema":"foundation-epoch266-private-predecessor-terminal-evidence-v1",
+        "epoch":EPOCH,"unit":unit,"invocation_id":invocation,"boot_id":boot,"launch":launch_ref,
+        "pid1_exit":exit_ref,"producer_drained":true,"producer_exit_status":0,
+        "replay_first_slot":BOOTSTRAP + 1,"first_slot":FIRST,"last_slot":LAST,"positions":LAST-FIRST+1,
+        "archive":{"path":profile.persistent_archive,"sha256":sha256_hex_string(&manifest.archive_sha256),"identity":archive_id},
+        "segment_manifest":{"path":profile.persistent_segment_manifest,"sha256":digest(&manifest_bytes),"identity":manifest_id},
+        "terminal_checkpoint":manifest.terminal,"native_manifest_complete_verified":true,
+        "retained_prefix_sha256":PREFIX_SHA,"retained_poh":{"path":POH.0,"sha256":POH.1},
+        "normalized_sha256":sha256_hex_string(&normalized),"full_prefix_normalized_match":true,
+        "retained_cursor":old.versions.next_raw,"predecessor_cursor":new.versions.next_raw,
+        "independent_restore_cursor":restored.next_write_version,"terminal_consensus_fields_match":true,
+        "producer_messages":producer,"publication_authorized":false,
+    });
+    if let Some(boundary) = boundary {
+        evidence["schema"] =
+            json!("foundation-epoch266-private-predecessor-account-history-evidence-v1");
+        evidence["full_prefix_normalized_match"] = json!(false);
+        evidence["ordered_frames_excluding_boundary_batch_match"] = json!(true);
+        evidence["boundary_pre_account_histories"] = boundary;
+        evidence["assembly_prefix"] = json!({"path":DENSE,"sha256":PREFIX_SHA});
+    }
+    let evidence = write_sealed(&stage.path().join("terminal-evidence.json"), &evidence)?;
     persist_package(stage, destination, parent)?;
     Ok(
         json!({"terminal_evidence":Reference::new(destination.join("terminal-evidence.json"), &evidence.sha256)}),

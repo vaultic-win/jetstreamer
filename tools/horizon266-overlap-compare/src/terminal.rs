@@ -822,12 +822,20 @@ pub(super) fn capture_predecessor_exit(launch_sha: &str, destination: &Path) -> 
     exit::capture_predecessor(launch_sha, destination)
 }
 
+pub(super) fn collect_predecessor_account_histories(
+    launch_sha: &str,
+    exit_sha: &str,
+    destination: &Path,
+) -> Result<Value> {
+    predecessor::collect(launch_sha, exit_sha, destination, true)
+}
+
 pub(super) fn collect_predecessor(
     launch_sha: &str,
     exit_sha: &str,
     destination: &Path,
 ) -> Result<Value> {
-    predecessor::collect(launch_sha, exit_sha, destination)
+    predecessor::collect(launch_sha, exit_sha, destination, false)
 }
 
 pub(super) fn drain_failed_predecessor(launch_sha: &str) -> Result<Value> {

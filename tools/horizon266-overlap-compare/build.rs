@@ -125,6 +125,7 @@ fn main() {
             self.digest.on_epoch(&normalized);
         }"#,
     );
+    let visitor = retain_boundary_account_histories(visitor);
     let tests = one_replace(
         code[code.find(first_test).unwrap()..].to_owned(),
         "let slot = BOOTSTRAP + 1;",
@@ -137,6 +138,75 @@ fn main() {
     );
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("normalized.rs");
     fs::write(out, format!("{IMPORTS}\n{visitor}\n{COMPARE}\n{tests}")).unwrap();
+}
+
+// Keep the strict visitor as the default. The boundary witness separately
+// compares pre-account histories while retaining the raw continuity checks.
+fn retain_boundary_account_histories(mut visitor: String) -> String {
+    for (old, new) in [
+        (
+            "    compare_epoch_events: bool,",
+            "    compare_epoch_events: bool,\n    boundary_batch: Option<crate::boundary::PreAccountBatch>,\n    boundary_hash: Option<[u8; 32]>,",
+        ),
+        (
+            "            compare_epoch_events: false,",
+            "            compare_epoch_events: false,\n            boundary_batch: None,\n            boundary_hash: None,",
+        ),
+        (
+            "    fn update_version(&mut self, raw: u64) -> u64 {",
+            r#"    pub(crate) fn with_boundary_account_histories(mut self) -> Self {
+        self.boundary_batch = Some(crate::boundary::PreAccountBatch::default());
+        self
+    }
+
+    pub(crate) fn boundary_account_digest(&self) -> Option<[u8; 32]> {
+        self.boundary_hash
+    }
+
+    fn update_version(&mut self, raw: u64) -> u64 {"#,
+        ),
+        (
+            "        self.envelope_count += 1;",
+            r#"        if self.boundary_batch.is_some()
+            && (self.current != crate::boundary::SLOT || value.updates.iter().next().is_some())
+        {
+            self.error.get_or_insert("epoch envelope differs from the boundary witness");
+        }
+        self.envelope_count += 1;"#,
+        ),
+        (
+            "        self.digest.on_pre_account_update(slot, &normalized);",
+            r#"        if slot == crate::boundary::SLOT
+            && let Some(batch) = self.boundary_batch.as_mut()
+        {
+            if !batch.push(normalized.write_version, &normalized) {
+                self.error.get_or_insert("invalid boundary pre-account update");
+            }
+            return;
+        }
+        self.digest.on_pre_account_update(slot, &normalized);"#,
+        ),
+        (
+            "        if let BlockNotification::Block(b) = block {",
+            r#"        if block.slot() == crate::boundary::SLOT
+            && let Some(batch) = self.boundary_batch.take()
+        {
+            self.boundary_hash = batch.seal();
+            if self.boundary_hash.is_none()
+                || self.envelope_count != 1
+                || self.parent_slot != self.range.start - 1
+                || !matches!(block, BlockNotification::Block(b) if b.executed_transaction_count == 0)
+                || entries.iter().any(|entry| entry.tx_count != 0)
+            {
+                self.error.get_or_insert("invalid transaction-free epoch boundary block");
+            }
+        }
+        if let BlockNotification::Block(b) = block {"#,
+        ),
+    ] {
+        visitor = one_replace(visitor, old, new);
+    }
+    visitor
 }
 
 const IMPORTS: &str = r#"

@@ -3,6 +3,7 @@
 #[allow(dead_code)]
 #[path = "../../../jetstreamer-node/src/archive_checksum.rs"]
 mod archive_checksum;
+mod boundary;
 mod normalized {
     include!(concat!(env!("OUT_DIR"), "/normalized.rs"));
 }
@@ -513,6 +514,10 @@ fn main() -> Result<()> {
             terminal::capture_predecessor_exit(digest, Path::new(destination))?
         }
         #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
+        [command, launch, exit, destination] if command == "collect-predecessor-account-histories" => {
+            terminal::collect_predecessor_account_histories(launch, exit, Path::new(destination))?
+        }
+        #[cfg(feature = "epoch226-checkpoint-continuation-diagnostic")]
         [command, launch, exit, destination] if command == "collect-predecessor-terminal" => {
             terminal::collect_predecessor(launch, exit, Path::new(destination))?
         }
@@ -530,7 +535,7 @@ fn main() -> Result<()> {
         }
         [command, plan, digest] if command == "compare" => compare(Path::new(plan), digest)?,
         _ => anyhow::bail!(
-            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-adjacent230-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-predecessor-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-predecessor-terminal LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | finish-predecessor-terminal LAUNCH_SHA256 | drain-failed-predecessor-terminal LAUNCH_SHA256 | collect-v1627-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
+            "usage: horizon266-overlap-compare retained | capture-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-v1627-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-adjacent230-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | capture-predecessor-exit LAUNCH_SHA256 NEW_EXIT_DIRECTORY | collect-predecessor-terminal LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-predecessor-account-histories LAUNCH_SHA256 EXIT_SHA256 NEW_OUTPUT_DIRECTORY | finish-predecessor-terminal LAUNCH_SHA256 | drain-failed-predecessor-terminal LAUNCH_SHA256 | collect-v1627-terminal EXIT_RECEIPT EXIT_SHA256 NEW_OUTPUT_DIRECTORY | collect-terminal LAUNCH_SHA256 NEW_OUTPUT_DIRECTORY [EXIT_RECEIPT EXIT_SHA256] | compare PLAN PLAN_SHA256"
         ),
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
