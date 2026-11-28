@@ -69,6 +69,14 @@ def after_floor170_roster(phase):
         edit("after_stop.py",anchor,anchor.replace("gap170 or live_successor","gap170 or effective"))
     edit("after_stop.py","    native['after_ram170'] = successor",
          "    native['after_ram170'] = successor\n    native['after_floor170'] = hourly")
+    anchor = "    resident_before = residency['sample'](core, live, gap170)"
+    edit("after_stop.py",anchor,anchor + """
+    hourly_view = {'receiver': lambda actual: hourly170['receiver'](actual,directory)}
+    hourly_before = residency['sample'](core,hourly_view,hourly)""")
+    anchor = "    residency['apply'](core, native, resident_before, resident_after)"
+    edit("after_stop.py",anchor,anchor + """
+    hourly_after = residency['sample'](core,hourly_view,hourly)
+    hourly170['apply_residency'](core,native,residency,hourly_before,hourly_after)""")
     edit("after_stop.py","    core.need(receiver['census'](fleet)==retry169",
          "    core.need(hourly170['stable'](hourly170['owner'](core,fleet,directory))==hourly170['stable'](hourly)\n              and receiver['census'](fleet)==retry169")
     anchor = '        if gap170 and gap170["unit"] == "horizon-qualify-170-from-73766969-20261127-v1.service"'

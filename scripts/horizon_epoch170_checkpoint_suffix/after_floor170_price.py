@@ -116,6 +116,21 @@ def stable(owner):
     return dict(owner,tree_guard=guard)
 
 
+def apply_residency(core, native, helper, first, last):
+    """Use the two native worker samples around availability exactly once for this replacement."""
+    need("after_floor170_residency" not in native and native["ram_gap170"] is None
+         and native["ram170_residency"]["realized_bytes"] == native["ram_retry_cost"]["resident_ram_credit"] == 0,
+         "competing 170 resident credit")
+    probe = dict(raw=native["raw"],resource_credit_bytes=native["resource_credit_bytes"],
+                 ram_gap170=native["after_floor170"],realized_170_anon=native["realized_170_anon"],
+                 required_ram=native["required_ram"],available_ram=native["available_ram"],
+                 ram_retry_cost=dict(native["ram_retry_cost"]))
+    helper["apply"](core,probe,first,last)
+    native["after_floor170_residency"] = probe["ram170_residency"]
+    native["required_ram"] = probe["required_ram"]
+    native["ram_margin"] = probe["ram_margin"]
+
+
 def booking(core, scope):
     path = ROOT/"SUCCESSOR_START_INTENT.json"
     if not os.path.lexists(path):
@@ -148,9 +163,12 @@ def select(core, whole, directory, projection):
          and cost["resident_ram_credit"] == native["ram170_residency"]["realized_bytes"] == 0
          and native["raw"]["joint"]["guard_sibling_allowance"] == G, "different base RAM booking")
     applied = bool(intent) or projection
+    paid = native["after_floor170_residency"]["realized_bytes"]
+    need(not paid or (intent and active and active["phase"] == "worker" and not projection),
+         "residency without a booked hourly 170 worker")
     whole["after_floor170_accounting"] = dict(scope=SCOPE,actor=active,intent=intent,replacement_selected=applied,
         prospective=bool(projection and not intent),home_growth=HOME,producer_memory=RAM,guard_memory=G,
-        previous_home_growth=36*G,previous_producer_memory=48*G,resident_credit=0,additional_inputs=0)
+        previous_home_growth=36*G,previous_producer_memory=48*G,resident_credit=paid,additional_inputs=0)
     return applied
 
 

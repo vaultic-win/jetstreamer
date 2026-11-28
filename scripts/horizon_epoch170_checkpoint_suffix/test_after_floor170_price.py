@@ -5,7 +5,9 @@ import sys
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from after_floor170_price import geometry, G, HOME, CONTROL
+from types import SimpleNamespace
+from after_floor170_price import apply_residency, geometry, need, G, HOME, CONTROL
+import ram170_residency
 
 DRAWDOWN = 20_011_974_656
 
@@ -22,6 +24,22 @@ def roster():
 
 
 class GuardGeometry(unittest.TestCase):
+    def test_measured_residency_only_reduces_the_hourly_lease_once(self):
+        native = dict(raw=dict(priced_170_invocation=None),ram_gap170=None,realized_170_anon=0,resource_credit_bytes=0,
+                      ram170_residency=dict(realized_bytes=0),required_ram=150*G,available_ram=180*G,
+                      ram_retry_cost=dict(producer_memory_max=56*G,scratch_tmpfs=40*G,original_guard_still_budgeted=True,resident_ram_credit=0))
+        row=dict(actor="actor",release="release",invocation="iid",processes=[[11],[12]],guard_plan="plan",phase="worker")
+        native["after_floor170"] = row
+        first=dict(row,scope="scope",mount="mount",guard=dict(plan="plan",timer_invocation_id="timer"),realized_bytes=18*G)
+        last=dict(first,realized_bytes=16*G)
+        core=SimpleNamespace(need=need)
+        apply_residency(core,native,vars(ram170_residency),first,last)
+        self.assertEqual((native["required_ram"],native["ram_margin"]),(134*G,46*G))
+        self.assertEqual(native["ram_retry_cost"]["resident_ram_credit"],0)
+        self.assertEqual(native["after_floor170_residency"]["nonresident_commitment"],40*G)
+        with self.assertRaisesRegex(ValueError,"competing"):
+            apply_residency(core,native,vars(ram170_residency),first,last)
+
     def test_both_working_sets_and_drawdown_remain_available(self):
         whole=roster()
         original=deepcopy(whole)
