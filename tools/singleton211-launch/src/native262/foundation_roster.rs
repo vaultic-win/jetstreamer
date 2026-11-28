@@ -169,6 +169,7 @@ enum Quote {
     Delivery261(Bound),
     AdjacentIntake230(Bound),
     NextIntake266(Bound),
+    SuccessorIntake266(Bound),
     Replay296(Replay296Quote),
     Focused(&'static focused::Focused, Bound),
 }
@@ -245,6 +246,56 @@ fn next_266_intake() -> Result<Bound> {
         "epoch 266 next bootstrap metadata differs from the verified private handoff"
     );
     Ok(seam_ref)
+}
+
+const SUCCESSOR_266_BOOTSTRAP: u64 = 114_936_474;
+const SUCCESSOR_266_LAST: u64 = 114_943_135;
+const SUCCESSOR_266_PAYLOAD: u64 = 15_568_220_095;
+const SUCCESSOR_266_SOURCE: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon266-window-114936475-114943135-sources-v1/source-window.json",
+    "7da6654f186299cd5911e89ecd84c026c87562c4e95d801d9cffab611529b36a",
+);
+const SUCCESSOR_266_METADATA: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon266-window-114936475-114943135-sources-v1/bootstrap-114936474.json",
+    "dda3aa43c81acbfb39a11421fda9f0610440f18e005b0e95818919a40dae9f75",
+);
+
+fn successor_266_intake() -> Result<Bound> {
+    let source_ref = Bound::new(SUCCESSOR_266_SOURCE.0, SUCCESSOR_266_SOURCE.1);
+    let source = source_ref.sealed()?;
+    let metadata_ref = Bound::new(SUCCESSOR_266_METADATA.0, SUCCESSOR_266_METADATA.1);
+    let metadata = metadata_ref.sealed()?;
+    let terminal_ref = binding(&source["predecessor_terminal"])?;
+    let terminal = terminal_ref.sealed()?;
+    let drain = binding(&source["predecessor_drain"])?.sealed()?;
+    ensure!(
+        source["schema"] == "foundation-epoch266-contiguous-private-window-source-v1"
+            && source["epoch"] == 266
+            && source["bootstrap_slot"] == SUCCESSOR_266_BOOTSTRAP
+            && source["first_slot"] == SUCCESSOR_266_BOOTSTRAP + 1
+            && source["last_slot"] == SUCCESSOR_266_LAST
+            && source["slot_positions"] == SUCCESSOR_266_LAST - SUCCESSOR_266_BOOTSTRAP
+            && source["original_epoch_root_still_required"] == true
+            && source["publication_authorized"] == false
+            && source["bootstrap_metadata"] == json!(metadata_ref)
+            && source["bootstrap_generation"] == 1_641_767_207_323_715_u64
+            && source["terminal_generation"] == 1_641_767_202_392_427_u64
+            && drain["native_terminal"] == json!(terminal_ref)
+            && drain["guard_drained"] == true && drain["state"] == "local-segment-committed"
+            && terminal["invocation_id"] == drain["invocation_id"]
+            && terminal["producer_drained"] == true
+            && terminal["native_manifest_complete_verified"] == true
+            && terminal["terminal_checkpoint"]["slot"] == SUCCESSOR_266_BOOTSTRAP
+            && terminal["terminal_checkpoint"]["accounts_hash"] == "GqAWTNQiWMCFTZLC1N3SXe2NmykFDcMQdn4Saj4ALSCA"
+            && metadata["bucket"] == "mainnet-beta-ledger-us-ny5"
+            && metadata["name"] == "114910768/hourly/snapshot-114936474-GqAWTNQiWMCFTZLC1N3SXe2NmykFDcMQdn4Saj4ALSCA.tar.zst"
+            && metadata["generation"] == "1641767207323715"
+            && metadata["size"] == SUCCESSOR_266_PAYLOAD
+            && metadata["crc32c_hash"] == "6Y4RtQ==" && metadata["md5_hash"] == "/rST1KqnZcalFjgY/Dz72A=="
+            && metadata["etag"] == "CMOQybnbpfUCEAE=",
+        "epoch 266 successor intake differs from its verified window and pinned source"
+    );
+    Ok(source_ref)
 }
 
 struct Replay296Quote {
@@ -1569,7 +1620,7 @@ fn measure(
         Some(Quote::Delivery252) => 252,
         Some(Quote::Delivery261(_)) => 261,
         Some(Quote::AdjacentIntake230(_)) => 230,
-        Some(Quote::NextIntake266(_)) => 266,
+        Some(Quote::NextIntake266(_) | Quote::SuccessorIntake266(_)) => 266,
         Some(Quote::Replay296(_)) => 296,
         Some(Quote::Focused(spec, _)) => spec.epoch,
         _ => EPOCH,
@@ -1770,7 +1821,7 @@ fn measure(
     };
     let resources_before = live::resources_at(Path::new(FILESYSTEM))?;
     let adjacent_230 = matches!(&quote, Some(Quote::AdjacentIntake230(_)));
-    let next_266 = matches!(&quote, Some(Quote::NextIntake266(_)));
+    let next_266 = matches!(&quote, Some(Quote::NextIntake266(_) | Quote::SuccessorIntake266(_)));
     let selected = if let Some(candidate) = &private_141 {
         candidate.cpus()
     } else {
@@ -1801,7 +1852,7 @@ fn measure(
     let adjacent_copy_group = units::parse_cpu_list("48,112")?;
     let next_266_group = units::parse_cpu_list(NEXT_266_EXCLUSIVE)?;
     let exclusive = match &quote {
-        Some(Quote::NextIntake266(_)) => {
+        Some(Quote::NextIntake266(_) | Quote::SuccessorIntake266(_)) => {
             replay296::verify_cpu_group(NEXT_266_CPU, &next_266_group)?;
             &next_266_group
         }
@@ -2168,6 +2219,10 @@ fn measure(
             capacity::add(NEXT_266_PAYLOAD, BOOTSTRAP_COPY_OVERHEAD)?,
             BOOTSTRAP_COPY_MEMORY,
         ),
+        Some(Quote::SuccessorIntake266(_)) => (
+            capacity::add(SUCCESSOR_266_PAYLOAD, BOOTSTRAP_COPY_OVERHEAD)?,
+            BOOTSTRAP_COPY_MEMORY,
+        ),
         Some(Quote::AdjacentIntake230(_)) => (
             capacity::add(ADJACENT_230_BYTES, BOOTSTRAP_COPY_OVERHEAD)?,
             BOOTSTRAP_COPY_MEMORY,
@@ -2281,6 +2336,8 @@ fn measure(
         260 if matches!(&quote, Some(Quote::FullReplay(_))) => replay260::ROSTER_SCHEMA,
         260 => "foundation-epoch260-native-restore-roster-binding-v1",
         261 => "foundation-epoch261-delivery-roster-binding-v1",
+        266 if matches!(&quote, Some(Quote::SuccessorIntake266(_))) =>
+            "foundation-epoch266-successor-bootstrap-intake-roster-binding-v1",
         266 if next_266 => "foundation-epoch266-next-bootstrap-intake-roster-binding-v1",
         266 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == WINDOW_266.unit) =>
             "foundation-epoch266-private-window-roster-binding-v1",
@@ -2385,6 +2442,15 @@ fn measure(
             "bootstrap_slot":NEXT_266_BOOTSTRAP,"payload_bytes":NEXT_266_PAYLOAD,
             "stage_peak_bytes":candidate_disk,"memory_bytes":candidate,"candidate_cpu":32,
             "exclusive_online_cpus":next_266_group,"single_payload_copy":true,
+        });
+    }
+    if let Some(Quote::SuccessorIntake266(source)) = &quote {
+        evidence["successor_266_intake_quote"] = json!({
+            "source_window":source,"metadata":Bound::new(SUCCESSOR_266_METADATA.0,SUCCESSOR_266_METADATA.1),
+            "bootstrap_slot":SUCCESSOR_266_BOOTSTRAP,"last_slot":SUCCESSOR_266_LAST,
+            "payload_bytes":SUCCESSOR_266_PAYLOAD,"stage_peak_bytes":candidate_disk,
+            "memory_bytes":candidate,"candidate_cpu":32,"exclusive_online_cpus":next_266_group,
+            "single_payload_copy":true,
         });
     }
     if let Some(Quote::AdjacentIntake230(source)) = &quote {
@@ -2516,6 +2582,7 @@ pub fn run() -> Result<()> {
                         | "--predecessor266-quote"
                         | "--adjacent230-intake-quote"
                         | "--next266-intake-quote"
+                        | "--successor266-intake-quote"
                         | "--adjacent230-replay-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
@@ -2595,6 +2662,8 @@ pub fn run() -> Result<()> {
             .and_then(|quote| measure(&mut native, None, Some(Quote::Replay296(quote)))),
         Some(flag) if flag == "--next266-intake-quote" => next_266_intake()
             .and_then(|seam| measure(&mut native, None, Some(Quote::NextIntake266(seam)))),
+        Some(flag) if flag == "--successor266-intake-quote" => successor_266_intake()
+            .and_then(|source| measure(&mut native, None, Some(Quote::SuccessorIntake266(source)))),
         Some(flag) if flag == "--adjacent230-intake-quote" => adjacent_230_intake()
             .and_then(|source| measure(&mut native, None, Some(Quote::AdjacentIntake230(source)))),
         Some(flag)
