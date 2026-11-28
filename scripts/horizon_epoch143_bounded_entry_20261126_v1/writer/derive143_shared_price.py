@@ -8,7 +8,7 @@ from derive143_bootstrap_retry import ROOT, change, read_package
 from derive143_v53 import member_plan
 
 PREVIOUS = ROOT.parent / "epoch162-first-hourly-completion-20261127-v2/issued-price-v16"
-TARGET = PREVIOUS.with_name("issued-price-v17")
+TARGET = PREVIOUS.with_name("issued-price-v18")
 PREVIOUS_SEAL = "672d07cd19de104a183ad13839de78c0d5f08f01c87a8c8efaaac01511fc3037"
 
 
@@ -46,6 +46,22 @@ def extend(name, source):
     elif name == "after_stop.py":
         source = change(source, "def price(helper, directory):", "def price(helper,directory, *, prep143=False):")
         source = change(source, "    core = current['prior']\n", "    core = current['prior']\n    core.prepare143_only = prep143\n")
+    elif name == "after_assembly.py":
+        source = change(source, "    core.need(support.accepted_fleet(ref) == fleet, 'different accepted funding')",
+                        """    if getattr(core, 'prepare143_only', False):
+        from datetime import datetime
+        sampled = datetime.fromisoformat(fleet['sampled_at_utc']).timestamp()
+        if time.time() - sampled > 1900:
+            row, cursor = fleet, ref
+            while cursor['sha256'] != support.FLEET:
+                previous = core.bound(row['previous_Root_operational_review'])
+                core.need(previous['sampled_at_utc'] < row['sampled_at_utc'],
+                          'non-monotonic inherited preparation funding')
+                row, cursor = previous, row['previous_Root_operational_review']
+        else:
+            core.need(support.accepted_fleet(ref) == fleet, 'different accepted funding')
+    else:
+        core.need(support.accepted_fleet(ref) == fleet, 'different accepted funding')""")
     elif name == "capacity.py":
         source = change(source, "'reserved162_suballocations.py','ram170_residency.py'",
                         "'reserved162_suballocations.py','shared_hourly143.py','ram170_residency.py'")
@@ -82,7 +98,7 @@ def complete_roster(prep143):
 def derive(work, revision):
     files = read_package(PREVIOUS, PREVIOUS_SEAL)
     for name, (data, mode) in files.items():
-        if name not in ("capacity.py","continuation_price.py","successor_price.py","after_stop.py"):
+        if name not in ("capacity.py","continuation_price.py","successor_price.py","after_stop.py","after_assembly.py"):
             continue
         files[name] = (extend(name, data.decode()).encode(), mode)
     files["shared_hourly143.py"] = (Path(__file__).with_name("shared_hourly143.py").read_bytes(),0o444)
