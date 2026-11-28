@@ -30,7 +30,15 @@ CHAIN_FOLLOWING = FOLLOWING_DEPLOYMENT.with_name("operator-v5")
 ENROLLING_OPERATORS = {ENROLLING_FOLLOWING, RECONCILED_FOLLOWING, SPLIT_FOLLOWING, CHAIN_FOLLOWING}
 FOLLOWING_READERS = {FOLLOWING_READER, FOLLOWING_READER.with_name("closed-reader-v2"), FOLLOWING_READER.with_name("closed-reader-v3"), FOLLOWING_READER.with_name("closed-reader-v4")}
 CONTINUATIONS = ENROLLING_OPERATORS | {FOLLOWING_DEPLOYMENT, NEXT_DEPLOYMENT, NEXT_DEPLOYMENT.with_name("operator-with143-v1"), NEXT_DEPLOYMENT.with_name("operator-with143-v2")}
-q=load("continuation_price" if Path(__file__).resolve().parent in CONTINUATIONS | RETRY_OPERATORS | FOLLOWING_READERS else "successor_price")
+GAP_DEPLOYMENT = NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-20261128-v1/operator-v1"
+GAP = Path(__file__).resolve().parent == GAP_DEPLOYMENT
+ENTRY_FIELD = "independent_checkpoint" if GAP else "closed_comparison"
+if GAP:
+    q = load("gap170_price")
+elif Path(__file__).resolve().parent in CONTINUATIONS | RETRY_OPERATORS | FOLLOWING_READERS:
+    q = load("continuation_price")
+else:
+    q = load("successor_price")
 persist=load("closed_successor").persist
 D=q.ATTEMPT
 UNIT=q.UNIT
@@ -155,14 +163,17 @@ def start():
     old_guard=q.bound(i["handoff"])["live_guard"]
     old_timer=q.BRIDGE.replace("-qualify-","-guard-").replace(".service",".timer")
     st=q.state(old_timer,"Id,ActiveState,InvocationID,Job")
-    if st["ActiveState"]=="active":
+    if GAP:
+        q.retained_guard(st, old_guard)
+    elif st["ActiveState"]=="active":
         loan=q.B140/"CPU_LOAN_RETURN.json"
         need(loan.exists() and q.read(loan)[0]["producer_and_guard_drained"]
              and st["InvocationID"]==old_guard["timer_invocation_id"],"old guard still protects active CPU loan")
         q.inactive(q.BRIDGE)
         subprocess.run(["/usr/bin/systemctl","stop",old_timer],check=True)
     q.inactive(q.BRIDGE)
-    q.inactive(old_timer.replace(".timer",".service"))
+    if not GAP:
+        q.inactive(old_timer.replace(".timer",".service"))
     q.inactive(UNIT)
     q.inactive(GUARD)
     need(q.state(TIMER,"Id,ActiveState,Job")["ActiveState"]=="inactive","successor guard already active")
@@ -205,7 +216,7 @@ def start():
             subprocess.run(["/usr/bin/systemctl","reset-failed",GUARD],check=True)
     fit=checked_price("start")
     fref=save("SUCCESSOR_START_FIT.json",fit)
-    save("SUCCESSOR_START_INTENT.json",dict(interface=ir,closed_comparison=closed,price=fref,
+    save("SUCCESSOR_START_INTENT.json",dict({ENTRY_FIELD: closed},interface=ir,price=fref,
         producer_unit=UNIT,guard_unit=GUARD,guard_floor=fit["guard_floor"],guard_cap=fit["guard_cap"],
         resource_credit_bytes=0,archive_publication_authorized=False))
     unit=Path(q.bound(i["layout"])["service"]["path"])
@@ -310,7 +321,7 @@ def release():
     closed=compare()
     a,ar=same_actor()
     e,er=current("WRITER_ENROLLMENT.json")
-    need(e["enrolled"] and not e["publication_authorized"] and e["actor"]==ar and e["closed_comparison"]==closed
+    need(e["enrolled"] and not e["publication_authorized"] and e["actor"]==ar and e[ENTRY_FIELD]==closed
          and e["interface"]==ir,"different writer enrollment")
     writer=q.bound(e["writer_active"])["new"]
     ws=q.state(writer["unit"])
@@ -322,13 +333,13 @@ def release():
     need(funded_guard(fit, plan["minimum_free_bytes"], plan["maximum_root_physical_bytes"]),
          "joint postguard HOME coverage failed")
     fp=save("SUCCESSOR_POST_GUARD_FIT.json",fit)
-    admission=save("SUCCESSOR_AUTHORIZED_RELEASE.json",dict(actor=ar,interface=ir,closed_comparison=closed,
+    admission=save("SUCCESSOR_AUTHORIZED_RELEASE.json",dict({ENTRY_FIELD: closed},actor=ar,interface=ir,
                    writer_enrollment=er,guard_plan=pr,post_guard_capacity=fp,first_guard_sample=sample,
                    producer_invocation_id=a["producer_invocation_id"],archive_publication_authorized=False))
     sr=save("SUCCESSOR_RELEASE.json",dict(schema="horizon-epoch170-bounded-successor-release-v1",actor=ar,
                interface=ir,producer_invocation_id=a["producer_invocation_id"],guard_plan=pr,first_guard_sample=sample,
                guard_timer_invocation_id=ti,admission=admission,resource_credit_bytes=0,archive_publication_authorized=False,
-               closed_comparison=closed,writer_enrollment=er,post_guard_capacity=fp))
+               writer_enrollment=er,post_guard_capacity=fp,**{ENTRY_FIELD:closed}))
     current_guard,again,_,_=guard()
     need(again==ti and q.state(writer["unit"])==ws and time.time()-fit["observed"]<=90,"release bindings expired")
     # The stage helper creates ordinary receipts at 0400. The unprivileged native gate needs 0444 at first visibility.

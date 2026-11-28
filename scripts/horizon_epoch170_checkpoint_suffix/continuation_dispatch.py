@@ -22,8 +22,8 @@ def load(name):
     return module
 
 
-q = load("continuation_price")
 operator = load("bounded_successor")
+q = operator.q if operator.GAP else load("continuation_price")
 persist = load("closed_successor").persist
 
 
@@ -239,7 +239,47 @@ def enrollment_writer(interface, ref):
     return program
 
 
+def gap_dispatch(stage):
+    scope, interface = operator.static()
+    checkpoint = operator.compare()
+    _, program = q.writer()
+    if stage == "check":
+        with admission_lock():
+            quote = q.price("start")
+        return dict(interface=interface, independent_checkpoint=checkpoint, fits=quote["fits"],
+                    home_margin=quote["home_margin"], ram_margin=quote["ram_margin"], whole_roster=quote)
+    q.need(stage in ("advance", "release"), "unknown gap stage")
+    if (q.DEP/"SUCCESSOR_RELEASE.json").exists():
+        release, ref = q.read(q.DEP/"SUCCESSOR_RELEASE.json")
+        iid = release["producer_invocation_id"]
+        q.need(release["interface"] == interface and release["independent_checkpoint"] == checkpoint
+               and Path(scope["barrier"]).read_text() == iid and q.bound(release["actor"])["producer_invocation_id"] == iid,
+               "gap release is incomplete or belongs to another actor")
+        return ref
+    if not (q.DEP/"SUCCESSOR_ACTOR.json").exists():
+        q.need(stage == "advance", "no held gap")
+        with admission_lock():
+            operator.start()
+    operator.same_actor()
+    if not (q.DEP/"ACTUAL_GUARD_PLAN.json").exists():
+        q.need(stage == "advance", "no actual gap guard")
+        with admission_lock():
+            operator.arm()
+    wait_for_guard()
+    with admission_lock():
+        operator.guard()
+        if not (q.DEP/"WRITER_ENROLLMENT.json").exists():
+            _, head = q.prior.current_fleet()
+            _, current = q.writer()
+            q.need(current == program, "gap writer changed")
+            subprocess.run(["/usr/bin/python3","-IB",str(program),"--enroll-gap-170",
+                            head["path"],head["sha256"]],check=True,timeout=70)
+        return operator.release()
+
+
 def dispatch(stage):
+    if operator.GAP:
+        return gap_dispatch(stage)
     if stage == "check-capture":
         q.need(q.FOLLOWING, "capture check requires its following-window reader")
     if q.FOLLOWING and stage in ("check-capture", "close"):
@@ -319,7 +359,7 @@ def main():
                        dict(stage=stage,error=message,observed=int(time.time()),fleet_at_attempt=str(basis),
                             retry_on_new_accepted_fleet=retry,archive_publication_authorized=False))
                 if not retry: raise
-                if (q.RETRY or q.OPERATOR in operator.ENROLLING_OPERATORS) and (q.DEP/"SUCCESSOR_ACTOR.json").exists():
+                if (operator.GAP or q.RETRY or q.OPERATOR in operator.ENROLLING_OPERATORS) and (q.DEP/"SUCCESSOR_ACTOR.json").exists():
                     operator.same_actor()
                     # The native pre-release gate expires in ten minutes; reprice within its lifetime.
                     time.sleep(20)
