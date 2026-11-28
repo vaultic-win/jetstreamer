@@ -109,6 +109,20 @@ pub(super) const FIRST_7871_230: Focused = Focused {
     profile_sha: "7d3a7c8bad8d3b257622800874a92a278d287a6b1cd6d377f729c2e139e9f4fd",
 };
 
+pub(super) const SUCCESSOR_REPLAY_230: Focused = Focused {
+    unit: "horizon-qualify-230-successor-99516304-v1.service",
+    guard: "horizon-230-successor-99516304-protective-v1",
+    root: "/home/ubuntu/.jetstreamer-private/qualification-230-successor-99516304-v1",
+    first: 99_516_305,
+    last: 99_524_336,
+    kind: "epoch230-private-successor-99516304-window",
+    preflight_schema: "foundation-epoch230-successor-runtime-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon230-successor-99516304-runtime-v1",
+    preflight_sha: "a91b6d9623091e5e4e830f9889fc3d4d4f814947b804d5e01d5070845c594d0e",
+    profile_sha: "5a3fbf5e9cc3289a374a2cf54b6b78f3dfa859bb92d54b75625ea1f3daa204a2",
+    ..FIRST_7871_230
+};
+
 pub(super) const V1627_230: Focused = Focused {
     epoch: 230,
     unit: "horizon-qualify-230-v1627-window-v1.service",
@@ -1384,6 +1398,39 @@ impl Focused {
                 && metadata.dev() == num(bootstrap, "device")?
                 && metadata.ino() == num(bootstrap, "inode")?
                 && metadata.len() == num(bootstrap, "size")?
+        } else if self.unit == SUCCESSOR_REPLAY_230.unit {
+            let custody = binding(&receipt["bootstrap_custody"])?;
+            let held = custody.sealed()?;
+            let bootstrap = &held["input"];
+            let snapshot = Path::new(text(bootstrap, "path")?);
+            let metadata = fs::symlink_metadata(snapshot)?;
+            let guard_plan = binding(&profile["static_guard_plan"])?.sealed()?;
+            let guard = binding(&receipt["guard_validation"])?.sealed()?;
+            receipt["first_slot"] == self.first
+                && receipt["profile"] == json!(profile_ref)
+                && receipt["worker_execution"] == false
+                && receipt["private_namespace_validated"] == true
+                && receipt["writable_private_state_validated"] == true
+                && profile["bootstrap_custody"] == receipt["bootstrap_custody"]
+                && profile["source_window"] == receipt["source_window"]
+                && held["schema"] == "foundation-epoch230-successor-bootstrap-private-custody-v1"
+                && held["bootstrap_slot"] == self.first - 1
+                && held["source_window"] == receipt["source_window"]
+                && held["copy_drained"] == true
+                && held["whole_file_sha256_rechecked"] == true
+                && held["copy_count"] == 1
+                && guard["validated"] == true
+                && guard["unit"] == self.unit
+                && guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
+                && guard_plan["maximum_root_physical_bytes"] == self.scratch_cap
+                && metadata.is_file()
+                && metadata.nlink() == 1
+                && metadata.uid() == 0
+                && metadata.mode() & 0o222 == 0
+                && metadata.dev() == num(bootstrap, "device")?
+                && metadata.ino() == num(bootstrap, "inode")?
+                && metadata.len() == num(bootstrap, "bytes")?
+                && snapshot.canonicalize()? == snapshot
         } else if self.unit == ADJACENT_230.unit {
             let custody = Bound::new(
                 "/var/lib/jetstreamer/horizon230-adjacent-input-99445304-v1/custody.json",

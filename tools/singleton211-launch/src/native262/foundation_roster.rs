@@ -13,7 +13,7 @@ mod replay296;
 use focused::{
     ADJACENT_230, FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, NEXT_V1627_230, OVERLAP_266,
     OVERLAP_266_EXCLUSIVE, PREDECESSOR_266, RESTORE_258, RESTORE_260, RETRY_NEXT_V1627_230, SCOPES, SECOND_HOURLY_230,
-    SUCCESSOR_WINDOW_266, WINDOW_266,
+    SUCCESSOR_REPLAY_230, SUCCESSOR_WINDOW_266, WINDOW_266,
     TRACE_296, V1627_230,
 };
 mod suffix226;
@@ -1577,6 +1577,8 @@ fn measure(
     quote: Option<Quote>,
 ) -> Result<Value> {
     let first_7871_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == FIRST_7871_230.unit);
+    let successor_230_replay =
+        matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == SUCCESSOR_REPLAY_230.unit);
     let v1627_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == V1627_230.unit);
     let adjacent_replay_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == ADJACENT_230.unit);
     let retry_next_v1627 = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == RETRY_NEXT_V1627_230.unit);
@@ -1978,7 +1980,7 @@ fn measure(
             replay296::verify_cpu_group("48", &adjacent_copy_group)?;
             &adjacent_copy_group
         }
-        Some(Quote::Focused(_, _)) if first_7871_candidate => {
+        Some(Quote::Focused(_, _)) if first_7871_candidate || successor_230_replay => {
             focused::second_hourly_drained(n)?;
             replay296::verify_cpu_group(FIRST_7871_230.cpus, &bridge_group)?;
             &bridge_group
@@ -2220,7 +2222,7 @@ fn measure(
     if let Some(proof) = &extraction_drain {
         terminal_extract_226(n, &booking, proof)?;
     }
-    if first_7871_candidate {
+    if first_7871_candidate || successor_230_replay {
         focused::second_hourly_drained(n)?;
     }
     if let Some(expected) = &checkpoint_predecessor {
@@ -2458,6 +2460,7 @@ fn measure(
         230 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == SECOND_HOURLY_230.unit) => {
             "foundation-epoch230-hourly-second-roster-binding-v1"
         }
+        230 if successor_230_replay => "foundation-epoch230-successor-replay-roster-binding-v1",
         230 if first_7871_candidate => "foundation-epoch230-first-7871-roster-binding-v1",
         230 if adjacent_replay_candidate => "foundation-epoch230-adjacent-replay-roster-binding-v1",
         230 if v1627_candidate => "foundation-epoch230-v1627-window-roster-binding-v1",
@@ -2633,7 +2636,7 @@ fn measure(
             binding["bootstrap_custody"] = json!(spec.window_266_custody()?);
         }
     }
-    if first_7871_candidate {
+    if first_7871_candidate || successor_230_replay {
         evidence[FIRST_7871_230.quote_key()]["exclusive_online_cpus"] = json!(bridge_group);
         evidence[FIRST_7871_230.quote_key()]["predecessor_terminal"] = json!(Bound::new(
             Path::new("/var/lib/jetstreamer/horizon230-middle-hourly-second-runtime-v1/terminal.json"),
@@ -2749,6 +2752,7 @@ pub fn run() -> Result<()> {
                         | "--successor266-intake-quote"
                         | "--following266-intake-quote"
                         | "--adjacent230-replay-quote"
+                        | "--successor230-replay-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
                         | "--feature296-quote"
@@ -2847,6 +2851,7 @@ pub fn run() -> Result<()> {
                         | "--next-v1627-230-quote"
                         | "--retry-next-v1627-230-quote"
                         | "--adjacent230-replay-quote"
+                        | "--successor230-replay-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--overlap266-quote"
@@ -2868,6 +2873,7 @@ pub fn run() -> Result<()> {
                 Some("--next-v1627-230-quote") => &NEXT_V1627_230,
                 Some("--retry-next-v1627-230-quote") => &RETRY_NEXT_V1627_230,
                 Some("--adjacent230-replay-quote") => &ADJACENT_230,
+                Some("--successor230-replay-quote") => &SUCCESSOR_REPLAY_230,
                 Some("--focused258-quote") => &RESTORE_258,
                 Some("--focused260-quote") => &RESTORE_260,
                 Some("--overlap266-quote") => &OVERLAP_266,
