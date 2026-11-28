@@ -1,0 +1,22 @@
+--- cycle.py
++++ cycle.py
+@@ -260,0 +261,9 @@
++def assembly_rss_release():
++    root = V / "horizon226-assembly-rss-v1"
++    release = bound(sealed_226_file(root / "acceptance.json"))
++    assert release["schema"] == "foundation-epoch226-assembly-rss-release-v1"
++    assert release["controller"] == sealed_226_file(Path(__file__))
++    assert release["configuration"] == sealed_226_file(Path(diagnostic226_assembly.__file__))
++    assert release["observer"]["path"] == str(root / "jetstreamer-horizon-observe")
++    return release
++
+@@ -261,0 +271,2 @@
++    if any(row["unit"] == diagnostic226_assembly.UNIT for row in cfg.get("native_input_diagnostics", [])):
++        return Path(publication_handoff.checked_image(assembly_rss_release()["observer"]))
+@@ -454,0 +466,3 @@
++    assembly_rss = diagnostic226_assembly.configuration()
++    if assembly_rss:
++        cfg.setdefault("native_input_diagnostics", []).extend(assembly_rss)
+@@ -1335 +1349 @@
+-            assert telemetry["installation"]["cycle"] == sealed_226_file(Path(__file__))
++            assert assembly_rss_release()["predecessor_telemetry"] == telemetry_ref

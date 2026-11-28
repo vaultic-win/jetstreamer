@@ -36,9 +36,9 @@ def configuration():
     assert live["InvocationID"] == row["invocation_id"] and int(live["MainPID"]) == row["main_pid"]
     assert live["ControlGroup"] == "/system.slice/" + UNIT and live["NRestarts"] == "0"
     assert (Path("/proc") / live["MainPID"] / "exe").samefile(row["node_path"])
-    return [dict(range="226-226", controller_unit=UNIT, expected_controller_invocation_id=row["invocation_id"],
-                 producer_unit=UNIT, expected_producer_invocation_id=row["invocation_id"],
-                 scratch_path=ROOT, worker_executable_basename="historical-worker")]
+    return [dict(epoch=226, unit=UNIT, expected_invocation_id=row["invocation_id"],
+                 main_pid=row["main_pid"], scratch_path=ROOT, executable=row["node_path"],
+                 executable_sha256=row["node_sha256"])]
 
 
 def register(plan):

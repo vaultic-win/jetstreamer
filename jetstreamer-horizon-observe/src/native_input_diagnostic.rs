@@ -38,6 +38,12 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
                 "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6",
             ),
+            226 => (
+                "horizon-qualify-226-checkpoint-continuation-assemble-v1.service",
+                "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-226-assemble-v1",
+                "/run/foundation-epoch226-release.y35rokj7/jetstreamer-node",
+                "7e17105ad9429fccbeb53dcd38650adb3f469bc1d3fe797360afff2cc7379ded",
+            ),
             257 => (
                 "horizon-257-native-input-20261120-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1",
@@ -477,6 +483,21 @@ mod tests {
     use std::os::unix::fs::{PermissionsExt, symlink};
     fn config() -> NativeConfig {
         serde_json::from_value(serde_json::json!({"epoch":227,"unit":"horizon-native-input-227-capped-710f6523-v1.service","expected_invocation_id":"a".repeat(32),"main_pid":42,"scratch_path":"/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1/scratch","executable":"/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test","executable_sha256":"1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3"})).unwrap()
+    }
+    #[test]
+    fn epoch226_assembly_accepts_only_the_workerless_assembler_tuple() {
+        let mut n = config();
+        n.epoch = 226;
+        n.unit = "horizon-qualify-226-checkpoint-continuation-assemble-v1.service".into();
+        n.scratch_path = "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-226-assemble-v1".into();
+        n.executable = "/run/foundation-epoch226-release.y35rokj7/jetstreamer-node".into();
+        n.executable_sha256 = "7e17105ad9429fccbeb53dcd38650adb3f469bc1d3fe797360afff2cc7379ded".into();
+        n.validate().unwrap();
+        let unavailable = row(&n, Err(anyhow!("assembler ended")));
+        assert_eq!(unavailable["status"], "unavailable");
+        assert_eq!(unavailable["ordinary_replay_claim"], false);
+        n.unit = "horizon-qualify-226-checkpoint-continuation-extract-v3.service".into();
+        assert!(n.validate().is_err());
     }
     #[test]
     fn native257_owns_only_its_registered_bootstrap_tuple() {
