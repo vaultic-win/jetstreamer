@@ -13,6 +13,7 @@ mod parked_accounts;
 mod process_references;
 mod selective_accounts;
 mod snapshot230;
+mod snapshot230_window;
 mod snapshot288;
 mod snapshot296;
 mod stopped_bootstrap;
@@ -477,11 +478,13 @@ fn main() -> Result<()> {
     if matches!(
         args.get(1).map(String::as_str),
         Some("--check-bootstrap-296" | "--retire-bootstrap-296"
-            | "--check-bootstrap-230-99437433" | "--retire-bootstrap-230-99437433")
+            | "--check-bootstrap-230-99437433" | "--retire-bootstrap-230-99437433"
+            | "--check-bootstrap-230-99461591" | "--retire-bootstrap-230-99461591"
+            | "--check-bootstrap-230-99476782" | "--retire-bootstrap-230-99476782")
     ) {
         ensure!(
             unsafe { libc::geteuid() } == 0 && args.len() == 5,
-            "usage: horizon275-scratch-retire --check-bootstrap-296|--retire-bootstrap-296|--check-bootstrap-230-99437433|--retire-bootstrap-230-99437433 SELF_SHA256 GENERATION_RECHECK METADATA_SHA256"
+            "usage: horizon275-scratch-retire --check-bootstrap-296|--retire-bootstrap-296|--check-bootstrap-230-SLOT|--retire-bootstrap-230-SLOT SELF_SHA256 GENERATION_RECHECK METADATA_SHA256"
         );
         let mut binary = File::open("/proc/self/exe")?;
         let metadata = binary.metadata()?;
@@ -491,6 +494,10 @@ fn main() -> Result<()> {
         );
         if args[1].ends_with("-230-99437433") {
             return snapshot230::run(args[1].starts_with("--retire-"), &args[2], Path::new(&args[3]), &args[4]);
+        }
+        if let Some(window) = snapshot230_window::for_command(&args[1]) {
+            return snapshot230_window::run(window, args[1].starts_with("--retire-"),
+                &args[2], Path::new(&args[3]), &args[4]);
         }
         return snapshot296::run(
             args[1] == "--retire-bootstrap-296",
