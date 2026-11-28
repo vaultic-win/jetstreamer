@@ -15,8 +15,11 @@ FOLLOWING_ROOT = ROOT.parent/"epoch170-from-73766969-20261127-v1"
 GAP_ROOT = ROOT.parent/"epoch170-from-73760367-20261128-v1"
 RAM_ROOT = ROOT.parent/"epoch170-from-73760367-ram-20261128-v1"
 SECOND_RAM_ROOT = ROOT.parent/"epoch170-from-73760367-ram-20261128-v2"
-if Path(__file__).resolve().parent == SECOND_RAM_ROOT/"operator-v1":
-    RAM_ROOT = SECOND_RAM_ROOT
+THIRD_RAM_ROOT = ROOT.parent/"epoch170-from-73760367-ram-20261128-v3"
+for candidate in (SECOND_RAM_ROOT, THIRD_RAM_ROOT):
+    if Path(__file__).resolve().parent == candidate/"operator-v1":
+        RAM_ROOT = candidate
+        break
 RAM_OPERATOR = RAM_ROOT/"operator-v1"
 RETRY = Path(__file__).resolve().parent in (RETRY_ROOT/"progress-v1", RETRY_ROOT/"progress-v2", RETRY_ROOT/"progress-v3")
 if RETRY:
