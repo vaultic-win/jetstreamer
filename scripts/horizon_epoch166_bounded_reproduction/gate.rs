@@ -174,7 +174,12 @@ mod route {
 
 #[cfg(all(
     epoch170_continuation,
-    not(any(epoch170_from_73746882, epoch170_from_73760367, epoch170_from_73766969))
+    not(any(
+        epoch170_from_73746882,
+        epoch170_from_73760367,
+        epoch170_from_73766969,
+        epoch170_from_73773645
+    ))
 ))]
 mod route {
     pub(super) const EPOCH: u64 = 170;
@@ -247,13 +252,28 @@ mod route {
     #[cfg(epoch170_after_floor_hourly)]
     pub(super) const TERMINAL_SLOT: u64 = 73_773_645;
 }
+#[cfg(all(epoch170_continuation, epoch170_from_73773645))]
+mod route {
+    pub(super) const EPOCH: u64 = 170;
+    pub(super) const UNIT: &str = "horizon-qualify-170-from-73773645-ram-20261128-v1.service";
+    pub(super) const ALIAS: &str = "/run/horizon-170-from-73773645-v1";
+    pub(super) const SNAPSHOT: &str =
+        "snapshot-73773645-GEvQZbTmrNhrdazo7Ps8NB53WoMujqmsgQtrdCtEEhtG.tar.zst";
+    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73773645-to-73780397-ram-v1";
+    pub(super) const TERMINAL_SLOT: u64 = 73_780_397;
+}
 #[cfg(all(
     epoch170_after_floor_hourly,
     any(not(all(epoch170_continuation, epoch170_from_73766969)), epoch170_after_checkpoint_gap)
 ))]
 compile_error!("the post-floor epoch 170 hourly run requires its own continuation profile");
 #[cfg(all(
-    any(epoch170_from_73746882, epoch170_from_73760367, epoch170_from_73766969),
+    any(
+        epoch170_from_73746882,
+        epoch170_from_73760367,
+        epoch170_from_73766969,
+        epoch170_from_73773645
+    ),
     any(
         not(epoch170_continuation),
         epoch170_continuation_short,
@@ -261,7 +281,18 @@ compile_error!("the post-floor epoch 170 hourly run requires its own continuatio
             epoch170_from_73746882,
             any(epoch170_from_73760367, epoch170_from_73766969)
         ),
-        all(epoch170_from_73760367, epoch170_from_73766969)
+        all(epoch170_from_73760367, epoch170_from_73766969),
+        all(
+            epoch170_from_73773645,
+            any(
+                epoch170_from_73746882,
+                epoch170_from_73760367,
+                epoch170_from_73766969,
+                epoch170_after_checkpoint_gap,
+                epoch170_after_floor_hourly,
+                epoch170_bridge
+            )
+        )
     )
 ))]
 compile_error!("each hourly epoch 170 checkpoint requires its dedicated continuation profile");
@@ -773,9 +804,23 @@ mod tests {
                 assert_eq!(args[7], "--qualification-end-slot=73773645");
             }
         }
+        #[cfg(epoch170_from_73773645)]
+        {
+            assert_eq!(UNIT, "horizon-qualify-170-from-73773645-ram-20261128-v1.service");
+            assert_eq!(args[0], "170");
+            assert_eq!(args[3], "--snapshot-archive=/run/horizon-170-from-73773645-v1/snapshot-73773645-GEvQZbTmrNhrdazo7Ps8NB53WoMujqmsgQtrdCtEEhtG.tar.zst");
+            assert_eq!(args[4], "--epoch-hashes=/run/horizon-170-from-73773645-v1/canonical-hashes.txt");
+            assert_eq!(args[6], format!("--replay-scratch={RUN}/scratch"));
+            assert_eq!(args[7], "--qualification-end-slot=73780397");
+        }
         #[cfg(all(
             epoch170_continuation,
-            not(any(epoch170_from_73746882, epoch170_from_73760367, epoch170_from_73766969))
+            not(any(
+                epoch170_from_73746882,
+                epoch170_from_73760367,
+                epoch170_from_73766969,
+                epoch170_from_73773645
+            ))
         ))]
         {
             assert_eq!(EPOCH, 170);

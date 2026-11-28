@@ -996,6 +996,13 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
             384_u64 << 30,
         ),
         #[cfg(feature = "epoch170-checkpoint-continuation")]
+        "horizon-qualify-170-from-73773645-ram-20261128-v1.service" => (
+            "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73773645-to-73780397-ram-v1",
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73773645-ram-20261128-v1/guard-receipts",
+            8_958_105_897_878,
+            8_u64 << 30,
+        ),
+        #[cfg(feature = "epoch170-checkpoint-continuation")]
         "horizon-qualify-170-from-73766969-gap-20261128-v1.service" => (
             "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
             "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73766969-gap-20261128-v1/guard-receipts",
@@ -1207,6 +1214,32 @@ fn check_170_scope(unit: &str, receipts: &str) {
         let mut modified = initial.clone();
         modified[key] = value;
         assert!(validate_checkpoint_scope(&serde_json::from_value(modified).unwrap()).is_err());
+    }
+}
+
+#[cfg(all(test, feature = "epoch170-checkpoint-continuation"))]
+#[test]
+fn next_170_hourly_guard_binds_its_own_run_and_cap() {
+    let plan = serde_json::json!({
+        "schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+        "unit":"horizon-qualify-170-from-73773645-ram-20261128-v1.service",
+        "invocation_id":"0123456789abcdef0123456789abcdef",
+        "filesystem":"/home/sol",
+        "worker_root":"/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73773645-to-73780397-ram-v1",
+        "receipt_directory":"/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73773645-ram-20261128-v1/guard-receipts",
+        "minimum_free_bytes":8_958_105_897_878_u64,
+        "maximum_root_physical_bytes":8_u64 << 30,
+        "maximum_worker_vmas":3_500_000
+    });
+    validate_checkpoint_scope(&serde_json::from_value(plan.clone()).unwrap()).unwrap();
+    for (key, value) in [
+        ("maximum_root_physical_bytes", serde_json::json!((8_u64 << 30) + 1)),
+        ("worker_root", serde_json::json!("/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1")),
+        ("receipt_directory", serde_json::json!("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73766969-ram-20261128-v1/guard-receipts")),
+    ] {
+        let mut changed = plan.clone();
+        changed[key] = value;
+        assert!(validate_checkpoint_scope(&serde_json::from_value(changed).unwrap()).is_err());
     }
 }
 
