@@ -25,8 +25,8 @@ def members(directory, revision):
     for name, (body, mode) in list(files.items()):
         if name.endswith(".py"):
             files[name] = body.replace(bytes(OLD), bytes(NEW)), mode
-    helper = (HERE / "finalizing172.py").read_bytes()
-    files["finalizing172.py"] = helper, 0o444
+    for filename in ("finalizing172.py", "closed143_original.py"):
+        files[filename] = (HERE / filename).read_bytes(), 0o444
     code = files["successor_price.py"][0].decode()
     code = change(code,
         '    peer_rows = fleet["actual_executing_replays"]\n'
@@ -63,8 +63,15 @@ def members(directory, revision):
         native[172] = dict(Id=owner172["producer_unit"], InvocationID=owner172["invocation_id"])
     if raw['replacement143']:''')
     files["after_stop.py"] = code.encode(), 0o444
+    code = files["shared_hourly143.py"][0].decode()
+    code = change(code, '             and not (SECOND / "HELD_OWNER.json").exists(), "next epoch 143 requires an independent floor terminal")',
+                  '''             , "second 143 is still draining")
+        if (SECOND / "HELD_OWNER.json").exists():
+            proof = runpy.run_path(str(Path(__file__).with_name("closed143_original.py")))["check"]
+            closure = dict(closure, original_second_success=proof(core,SECOND,fleet))''')
+    files["shared_hourly143.py"] = code.encode(), 0o444
     code = files["capacity.py"][0].decode()
-    code = change(code, "'fourth162_price.py','compact169_residency.py'}", "'fourth162_price.py','compact169_residency.py','finalizing172.py'}")
+    code = change(code, "'fourth162_price.py','compact169_residency.py'}", "'fourth162_price.py','compact169_residency.py','finalizing172.py','closed143_original.py'}")
     code = change(code, '    native = Path(\'/var/lib/jetstreamer/horizon_runtime_data/epoch168-exact-publication-v1/admission-tools-v3/publication\')',
                   '''    registered["original_172_accounting"] = base["native"]["raw"]["joint"]["original_172_accounting"]
     native = Path('/var/lib/jetstreamer/horizon_runtime_data/epoch168-exact-publication-v1/admission-tools-v3/publication')''')

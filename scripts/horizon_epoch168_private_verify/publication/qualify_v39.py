@@ -21,14 +21,14 @@ RT = f.ROOT
 PUBLICATION = RT / "epoch168-exact-publication-v1/admission-tools-v3/publication"
 DELIVERY = RT / "epoch172-current-delivery-20261121-v1"
 FIXTURE = DELIVERY / "ORIGINAL_172_V39_FIXTURE.json"
-PLAN = DELIVERY / "SHARED_PRICE_V39_R2_PLAN.json"
+PLAN = DELIVERY / "SHARED_PRICE_V39_R3_PLAN.json"
 LOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 
 
 def verify_source(repo):
     revision = f.git(repo, "rev-parse", "HEAD").decode().strip()
     f.git(repo, "merge-base", "--is-ancestor", revision, "refs/remotes/origin/account-updates")
-    for name in ("derive_v39.py", "finalizing172.py", Path(__file__).name):
+    for name in ("derive_v39.py", "finalizing172.py", "closed143_original.py", Path(__file__).name):
         source = HERE / name
         f.need(source.read_bytes() == f.git(repo, "show", revision + ":" + str(source.relative_to(repo))),
                "source changed: " + name)
@@ -109,8 +109,16 @@ def exercise(result):
     projected = copy.deepcopy(fleet)
     for group in ("actual_executing_replays", "actual_active_bootstraps", "actual_active_private_diagnostics"):
         projected[group] = [r for r in projected[group] if r["epoch"] != 172]
-    projected["current_full172_finalization"] = {"phase":"finalizing", "archive_result":ref}
-    adapter["fleet_identity"](projected,ref)
+    if detail["phase"] == "finalizing":
+        if "current_full172_finalization" not in projected:
+            peer, = (r for r in fleet["actual_executing_replays"] if r["epoch"] == 172)
+            projected["current_full172_finalization"] = dict(phase="finalizing", archive_result=ref,
+                identity=dict(admission=live["admission"],unit=peer["unit"],timer=peer["guard_timer"]),
+                guard=dict(proof=dict(timer=peer["guard_timer"],producer=peer["unit"],receipt=detail["guard_sample"])))
+        adapter["fleet_identity"](core, projected,ref,live)
+        foreign = copy.deepcopy(projected)
+        foreign["current_full172_finalization"]["guard"]["proof"]["timer"]["InvocationID"] = "0" * 32
+        refusals.append(refuses(lambda:adapter["fleet_identity"](core,foreign,ref,live), "foreign cadence guard"))
     if detail["phase"] == "finalizing":
         manager = core["state"](unit,core["FIELDS"] + ",SubState,NRestarts")
         original_live = copy.deepcopy(live)

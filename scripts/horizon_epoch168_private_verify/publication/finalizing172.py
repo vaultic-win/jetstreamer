@@ -91,7 +91,7 @@ def validate_files(core, fleet, roster, anchor):
     return final, ref, live, plan
 
 
-def fleet_identity(fleet, final_ref):
+def fleet_identity(core, fleet, final_ref, live):
     rows = [r for group in ("actual_executing_replays", "actual_active_private_diagnostics", "actual_active_bootstraps")
             for r in fleet[group] if r["epoch"] == 172]
     need(len(rows) <= 1, "duplicate incumbent")
@@ -101,8 +101,21 @@ def fleet_identity(fleet, final_ref):
              and rows[0]["admission"] == fleet["current_full172_admission"], "foreign cadence owner")
     finalizing = fleet.get("current_full172_finalization")
     if finalizing:
-        need(finalizing["phase"] == "finalizing" and finalizing["archive_result"] == final_ref
-             and not rows, "different cadence finalization")
+        need(finalizing["archive_result"] == final_ref and not rows, "different cadence finalization")
+        if finalizing["phase"] == "committed":
+            need(finalizing["identity"] is None and finalizing["terminal"] == fleet["full172_local_commit"]
+                 and finalizing["guard_retirement"] == fleet["full172_guard_retirement"], "different cadence terminal")
+        else:
+            parent = finalizing["identity"]
+            guard = finalizing["guard"]["proof"]
+            history = core["bound"](guard["receipt"])
+            need(finalizing["phase"] == "finalizing" and parent["admission"] == live["admission"]
+                 and all(parent["unit"][key] == live["native"]["manager"][key] for key in
+                         ("Id", "InvocationID", "MainPID", "ControlGroup", "CPUQuotaPerSecUSec", "MemoryMax"))
+                 and parent["timer"]["InvocationID"] == guard["timer"]["InvocationID"] == TIMER_IID
+                 and guard["producer"]["Id"] == UNIT and guard["producer"]["InvocationID"] == IID
+                 and history["producer_invocation_id"] == IID and history["workers"] == []
+                 and history["plan_sha256"] == live["actual_guard_plan"]["sha256"], "different cadence actor or guard")
     need(bool(rows) or bool(finalizing) or bool(fleet.get("full172_local_commit")),
          "cadence lost the 172 reservation")
 
@@ -194,7 +207,7 @@ def terminal(core, delivery, final, live, plan, row, fleet):
 def observe(core, fleet, rosters, anchors):
     anchor = anchors[UNIT]
     final, ref, live, plan = validate_files(core, fleet, rosters[UNIT], anchor)
-    fleet_identity(fleet, ref)
+    fleet_identity(core, fleet, ref, live)
     row = core["state"](UNIT, core["FIELDS"] + ",SubState,NRestarts")
     detail = dict(finalization=ref, admission=final["admission"], first_worker=final["first_worker"],
                   producer_unit=UNIT, invocation_id=IID, parent_pid=live["native"]["parent"]["pid"],
