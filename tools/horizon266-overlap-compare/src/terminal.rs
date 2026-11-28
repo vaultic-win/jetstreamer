@@ -889,20 +889,25 @@ pub(super) fn collect_adjacent230_terminal(exit: &Path, digest: &str, destinatio
     window230::collect(&window230::ADJACENT, exit, digest, destination)
 }
 
-pub(super) fn capture_window266_exit(launch_sha: &str, destination: &Path) -> Result<Value> {
-    exit::capture_window266(launch_sha, destination)
+fn window266_scope(successor: bool) -> &'static window266::Window {
+    if successor { &window266::SUCCESSOR } else { &window266::WINDOW }
 }
 
-pub(super) fn finish_window266_terminal(launch_sha: &str) -> Result<Value> {
-    window266::finish(launch_sha)
+pub(super) fn capture_window266_exit(launch_sha: &str, destination: &Path, successor: bool) -> Result<Value> {
+    exit::capture_window266(window266_scope(successor), launch_sha, destination)
+}
+
+pub(super) fn finish_window266_terminal(launch_sha: &str, successor: bool) -> Result<Value> {
+    window266::finish(window266_scope(successor), launch_sha)
 }
 
 pub(super) fn collect_window266_terminal(
     launch_sha: &str,
     exit_sha: &str,
     destination: &Path,
+    successor: bool,
 ) -> Result<Value> {
-    window266::collect(launch_sha, exit_sha, destination)
+    window266::collect(window266_scope(successor), launch_sha, exit_sha, destination)
 }
 
 pub(super) fn collect_v1627_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {

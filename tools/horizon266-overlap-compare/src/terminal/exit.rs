@@ -250,17 +250,10 @@ pub(super) fn capture_next_v1627(
     capture_window230(&window230::next_v1627(launch_sha, invocation)?, launch_sha, destination)
 }
 
-pub(super) const WINDOW266_STATE: &str =
-    "/var/lib/jetstreamer/horizon266-window-114929698-114936474-runtime-v1";
-pub(super) const WINDOW266_UNIT: &str =
-    "horizon-qualify-checkpoint-continuation-266-window-114936474-v1.service";
-pub(super) const WINDOW266_NODE: &str =
-    "/var/lib/jetstreamer/horizon266-window-node-10fe8f2f-v1/jetstreamer-node";
 const WINDOW266_EXIT_SCHEMA: &str = "foundation-epoch266-private-window-pid1-exit-v1";
 
-pub(super) fn window266_launch(launch_sha: &str) -> Result<(Reference, Value, u32)> {
-    const PROFILE_SHA: &str = "f7562054a31277bc38747652f9a79e6967b393d8713499e6998841390cb4c5d6";
-    let state = Path::new(WINDOW266_STATE);
+pub(super) fn window266_launch(scope: &super::window266::Window, launch_sha: &str) -> Result<(Reference, Value, u32)> {
+    let state = Path::new(scope.state);
     let reference = Reference::new(state.join("cadence-registration.json"), launch_sha);
     let launch = reference.read()?;
     let invocation = string(&launch, "invocation_id")?;
@@ -274,9 +267,9 @@ pub(super) fn window266_launch(launch_sha: &str) -> Result<(Reference, Value, u3
         launch["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
             && launch["kind"] == "epoch266-private-hourly-window"
             && launch["epoch"] == 266
-            && launch["unit"] == WINDOW266_UNIT
-            && launch["node_path"] == WINDOW266_NODE
-            && launch["profile"] == json!(Reference::new(state.join("profile.json"), PROFILE_SHA))
+            && launch["unit"] == scope.unit
+            && launch["node_path"] == scope.node
+            && launch["profile"] == json!(Reference::new(state.join("profile.json"), scope.profile_sha))
             && launch["launched"] == true
             && launch["diagnostic_only"] == true
             && launch["canonical_epoch_publication_authorized"] == false
@@ -300,20 +293,20 @@ pub(super) fn window266_launch(launch_sha: &str) -> Result<(Reference, Value, u3
     Ok((reference, launch, pid))
 }
 
-pub(super) fn capture_window266(launch_sha: &str, destination: &Path) -> Result<Value> {
+pub(super) fn capture_window266(scope: &super::window266::Window, launch_sha: &str, destination: &Path) -> Result<Value> {
     require_root()?;
     let parent = destination_parent(destination)?;
-    let (reference, launch, pid) = window266_launch(launch_sha)?;
+    let (reference, launch, pid) = window266_launch(scope, launch_sha)?;
     let invocation = string(&launch, "invocation_id")?;
     let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
         .trim()
         .replace('-', "");
     ensure!(hex(&boot_id, 32), "invalid running boot ID");
     let producer = Producer {
-        unit: WINDOW266_UNIT,
+        unit: scope.unit,
         invocation,
         pid,
-        node: Path::new(WINDOW266_NODE),
+        node: Path::new(scope.node),
     };
     let (_held, properties) = capture_properties(&producer, 7_300_000)?;
     ensure!(
@@ -335,6 +328,7 @@ pub(super) fn capture_window266(launch_sha: &str, destination: &Path) -> Result<
 }
 
 pub(super) fn read_window266(
+    scope: &super::window266::Window,
     reference: &Reference,
     launch: &Reference,
     invocation: &str,
@@ -353,10 +347,10 @@ pub(super) fn read_window266(
     ensure_unit(
         &capture.properties,
         &Producer {
-            unit: WINDOW266_UNIT,
+            unit: scope.unit,
             invocation,
             pid,
-            node: Path::new(WINDOW266_NODE),
+            node: Path::new(scope.node),
         },
     )?;
     Ok(capture.properties)
