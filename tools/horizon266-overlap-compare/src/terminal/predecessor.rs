@@ -234,3 +234,257 @@ pub(super) fn collect(launch_sha: &str, exit_sha: &str, destination: &Path) -> R
         json!({"terminal_evidence":Reference::new(destination.join("terminal-evidence.json"), &evidence.sha256)}),
     )
 }
+
+const STATE: &str = "/var/lib/jetstreamer/horizon266-original-predecessor-runtime-v1";
+const TERMINAL: &str = "/var/lib/jetstreamer/horizon266-predecessor-terminal-collector-state-v1/evidence/terminal-evidence.json";
+const GUARD: &str = "horizon-266-original-predecessor-protective-v1.service";
+const TIMER: &str = "horizon-266-original-predecessor-protective-v1.timer";
+const CADENCE_LOCK: &str =
+    "/var/lib/jetstreamer/horizon-seven-publication-controller-v222/cycle.lock";
+
+fn sealed_document(path: &Path) -> Result<(Reference, Value)> {
+    let (file, identity) = open(path)?;
+    let reference = Reference::new(path, &digest(&read_small(&file, identity)?));
+    let document = reference.read()?;
+    unchanged(path, &file, identity)?;
+    Ok((reference, document))
+}
+
+fn seal_in_state(path: &Path, value: &Value) -> Result<Reference> {
+    let parent = path.parent().context("epoch 266 evidence parent")?;
+    let stage = stage_package(parent)?;
+    let staged = stage.path().join("receipt.json");
+    let reference = write_sealed(&staged, value)?;
+    install_package(&staged, path)?;
+    File::open(parent)?.sync_all()?;
+    Ok(Reference::new(path, &reference.sha256))
+}
+
+fn timer_state() -> Result<UnitState> {
+    let output = command(
+        "/usr/bin/systemctl",
+        &[
+            "--system",
+            "show",
+            TIMER,
+            "--property=Id,ActiveState,Job,InvocationID,Unit",
+        ],
+    )?;
+    Ok(std::str::from_utf8(&output)?
+        .lines()
+        .filter_map(|line| line.split_once('='))
+        .map(|(name, value)| (name.to_owned(), value.to_owned()))
+        .collect())
+}
+
+fn guard_drained() -> Result<UnitState> {
+    let guard = unit_state(GUARD)?;
+    ensure!(
+        guard
+            .get("ActiveState")
+            .is_some_and(|s| matches!(s.as_str(), "inactive" | "failed"))
+            && guard.get("MainPID").is_some_and(|s| s == "0")
+            && guard.get("ControlPID").is_some_and(|s| s == "0")
+            && guard.get("ControlGroup").is_some_and(String::is_empty)
+            && guard.get("Job").is_some_and(String::is_empty)
+            && producer_drained(&format!("/system.slice/{GUARD}"))?,
+        "epoch 266 guard process has not drained"
+    );
+    Ok(guard)
+}
+
+fn validate_finished_terminal(
+    terminal: &Value,
+    launch: &Reference,
+    invocation: &str,
+    boot: &str,
+    profile: &Profile,
+) -> Result<()> {
+    let restored: NativeRestore = serde_json::from_value(bound_json(JOURNAL, JOURNAL_SHA)?)?;
+    let checkpoint = &terminal["terminal_checkpoint"];
+    ensure!(
+        terminal["schema"] == "foundation-epoch266-private-predecessor-terminal-evidence-v1"
+            && terminal["epoch"] == EPOCH
+            && terminal["unit"] == exit::PREDECESSOR_UNIT
+            && terminal["launch"] == json!(launch)
+            && terminal["invocation_id"] == invocation
+            && terminal["boot_id"] == boot
+            && terminal["producer_drained"] == true
+            && terminal["producer_exit_status"] == 0
+            && terminal["replay_first_slot"] == BOOTSTRAP + 1
+            && terminal["first_slot"] == FIRST
+            && terminal["last_slot"] == LAST
+            && terminal["positions"] == LAST - FIRST + 1
+            && terminal["native_manifest_complete_verified"] == true
+            && terminal["full_prefix_normalized_match"] == true
+            && terminal["terminal_consensus_fields_match"] == true
+            && terminal["retained_prefix_sha256"] == PREFIX_SHA
+            && hex(string(terminal, "normalized_sha256")?, 64)
+            && terminal["archive"]["path"] == json!(profile.persistent_archive)
+            && terminal["segment_manifest"]["path"] == json!(profile.persistent_segment_manifest)
+            && terminal["publication_authorized"] == false
+            && checkpoint["slot"] == LAST
+            && checkpoint["bank_hash"] == restored.bank_hash
+            && checkpoint["accounts_hash"] == restored.accounts_hash
+            && checkpoint["last_blockhash"] == restored.last_blockhash
+            && checkpoint["capitalization"] == restored.capitalization
+            && checkpoint["transaction_count"] == restored.transactions_at_root
+            && checkpoint["tick_height"] == restored.tick_height
+            && checkpoint["slot_complete"] == true,
+        "epoch 266 predecessor terminal does not bind the verified native prefix"
+    );
+    for key in ["archive", "segment_manifest"] {
+        let identity: FileIdentity = serde_json::from_value(terminal[key]["identity"].clone())?;
+        let path = Path::new(string(&terminal[key], "path")?);
+        ensure!(
+            open_source(path)?.1 == identity && hex(string(&terminal[key], "sha256")?, 64),
+            "epoch 266 predecessor {key} changed after verification"
+        );
+    }
+    Ok(())
+}
+
+/// Retire the exact producer's timer only after the independent terminal collector commits.
+pub(super) fn finish(launch_sha: &str) -> Result<Value> {
+    require_root()?;
+    let lock = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(CADENCE_LOCK)?;
+    ensure!(
+        lock.metadata()?.uid() == 0 && lock.metadata()?.mode() & 0o022 == 0,
+        "unsafe Foundation cadence lock"
+    );
+    // SAFETY: the lock file remains open until this operation completes.
+    ensure!(
+        unsafe { libc::flock(std::os::fd::AsRawFd::as_raw_fd(&lock), libc::LOCK_EX) } == 0,
+        "cannot lock Foundation cadence"
+    );
+
+    let state = Path::new(STATE);
+    let unit = exit::PREDECESSOR_UNIT;
+    let (launch_ref, launch, pid) = exit::predecessor_launch(launch_sha)?;
+    let invocation = string(&launch, "invocation_id")?;
+    let profile_ref: Reference = serde_json::from_value(launch["profile"].clone())?;
+    let profile: Profile = serde_json::from_value(profile_ref.read()?)?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    let (native, terminal) = sealed_document(Path::new(TERMINAL))?;
+    validate_finished_terminal(&terminal, &launch_ref, invocation, &boot, &profile)?;
+    let exit_ref: Reference = serde_json::from_value(terminal["pid1_exit"].clone())?;
+    ensure!(
+        exit_ref.path == Path::new(EXIT),
+        "foreign predecessor exit path"
+    );
+    let captured = exit::read_predecessor(&exit_ref, &launch_ref, invocation, pid, &boot)?;
+    let verify_exit = || -> Result<UnitState> {
+        let current = unit_state(unit)?;
+        clean_exit(
+            &current,
+            Some(&captured),
+            unit,
+            invocation,
+            pid,
+            producer_drained(&format!("/system.slice/{unit}"))?,
+        )?;
+        Ok(current)
+    };
+    verify_exit()?;
+
+    let token_ref: Reference = serde_json::from_value(launch["launch_token"].clone())?;
+    let token = token_ref.read()?;
+    let timer_invocation = string(&token, "guard_timer_invocation")?;
+    ensure!(
+        token["unit"] == unit
+            && token["invocation_id"] == invocation
+            && token["guard_plan"] == launch["guard_plan"]
+            && hex(timer_invocation, 32),
+        "foreign predecessor guard token"
+    );
+    let completion_path = state.join("terminal.json");
+    if completion_path.try_exists()? {
+        let (reference, done) = sealed_document(&completion_path)?;
+        ensure!(
+            done["schema"] == "foundation-epoch266-private-predecessor-drain-v1"
+                && done["native_terminal"] == json!(native)
+                && done["launch"] == json!(launch_ref)
+                && done["guard_drained"] == true,
+            "existing predecessor completion changed"
+        );
+        ensure!(
+            timer_state()?
+                .get("ActiveState")
+                .is_some_and(|s| s == "inactive"),
+            "epoch 266 timer is active again"
+        );
+        guard_drained()?;
+        return Ok(json!({"terminal": reference, "already_completed": true}));
+    }
+
+    let intent_path = state.join("terminal-drain-intent.json");
+    let intent = json!({"schema":"foundation-epoch266-private-predecessor-drain-intent-v1",
+        "unit":unit,"invocation_id":invocation,"launch":launch_ref,"native_terminal":native,
+        "pid1_exit":exit_ref,"guard_plan":launch["guard_plan"],"guard_timer_invocation":timer_invocation,
+        "publication_authorized":false});
+    let timer = timer_state()?;
+    let active = timer.get("ActiveState").is_some_and(|s| s == "active");
+    let already_intended = intent_path.try_exists()?;
+    ensure!(
+        timer.get("Id").is_some_and(|s| s == TIMER)
+            && timer.get("Job").is_some_and(String::is_empty)
+            && if active {
+                timer.get("Unit").is_some_and(|s| s == GUARD)
+                    && timer
+                        .get("InvocationID")
+                        .is_some_and(|s| s == timer_invocation)
+            } else {
+                already_intended && timer.get("ActiveState").is_some_and(|s| s == "inactive")
+            },
+        "epoch 266 timer is foreign or its stop is unrecorded"
+    );
+    let intent_ref = if already_intended {
+        let (reference, recorded) = sealed_document(&intent_path)?;
+        ensure!(recorded == intent, "predecessor drain intent changed");
+        reference
+    } else {
+        seal_in_state(&intent_path, &intent)?
+    };
+    if active {
+        command("/usr/bin/systemctl", &["--system", "stop", TIMER])?;
+    }
+    // The timer cannot start another guard. Allow any current guard to exit on its own.
+    let guard_after = {
+        let mut drained = guard_drained();
+        for _ in 0..12 {
+            if drained.is_ok() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            drained = guard_drained();
+        }
+        drained?
+    };
+    let timer_after = timer_state()?;
+    ensure!(
+        timer_after
+            .get("ActiveState")
+            .is_some_and(|s| s == "inactive")
+            && timer_after.get("Job").is_some_and(String::is_empty),
+        "epoch 266 timer has not drained"
+    );
+    let producer = verify_exit()?;
+    validate_finished_terminal(&native.read()?, &launch_ref, invocation, &boot, &profile)?;
+    let reference = seal_in_state(
+        &completion_path,
+        &json!({
+            "schema":"foundation-epoch266-private-predecessor-drain-v1",
+            "epoch":EPOCH,"unit":unit,"invocation_id":invocation,"launch":launch_ref,
+            "native_terminal":native,"pid1_exit":exit_ref,"intent":intent_ref,
+            "timer_after":timer_after,"guard_after":guard_after,"producer":producer,
+            "guard_drained":true,"state":"local-segment-committed","publication_authorized":false,
+            "next_action":"Bind the verified predecessor and the retained overlap before admitting the next private epoch 266 interval.",
+        }),
+    )?;
+    Ok(json!({"terminal": reference, "already_completed": false}))
+}
