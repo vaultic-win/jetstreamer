@@ -89,6 +89,8 @@ def project(whole, provider, terminal):
                *(whole["available_home"] - floor for floor in floors if floor is not None))
     ram = min(row["ram_margin"] for row in checks.values())
     fits = nominal or home >= CONTROL and ram >= 0
+    if nominal:
+        home, ram = whole["home_margin"], whole["ram_margin"]
     return dict(schema="horizon-170-private-closed-reader-funded-exchange-v1", fits=fits, nominal=nominal,
                 provider=provider, writer=whole["writer"], fleet=whole["fleet"], actor=binding["actor"],
                 terminal=terminal["pid1"], original_intent=budget["intent"], original_price=intent["price"],
