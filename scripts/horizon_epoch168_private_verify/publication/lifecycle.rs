@@ -465,12 +465,23 @@ pub(super) fn enter(a: &Bound) -> Result<Value> {
     drop(guard);
     Err(Command::new(&args[0]).args(&args[1..]).exec().into())
 }
+pub(super) fn root_snapshot(binding: &Bound) -> Result<Value> {
+    let (observed, doc) = read_finished(&binding.path)?;
+    ensure!(
+        observed == *binding,
+        "root snapshot changed: {}",
+        binding.path.display()
+    );
+    Ok(doc)
+}
+
 fn read_finished(path: &Path) -> Result<(Bound, Value)> {
     let before = fs::symlink_metadata(path)?;
     ensure!(
         path.canonicalize()? == path
             && before.is_file()
             && before.uid() == 0
+            && before.gid() == 0
             && before.nlink() == 1
             && before.mode() & 0o022 == 0
             && before.len() > 0
@@ -561,6 +572,20 @@ pub(super) fn finish() -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn accepts_the_authenticated_native_fleet_and_writer_permissions() {
+        let fixture = tempfile::tempdir().unwrap();
+        let p = fixture.path().join("root-fleet.json");
+        fs::write(&p, b"{\"owner\":\"/root\"}").unwrap();
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
+        let binding = fixed(&p, &custody::digest(&fs::read(&p).unwrap()));
+        assert_eq!(root_snapshot(&binding).unwrap()["owner"], "/root");
+        fs::write(&p, b"{}").unwrap();
+        assert!(root_snapshot(&binding).is_err());
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o660)).unwrap();
+        assert!(read_finished(&p).is_err());
+    }
+
     #[test]
     fn only_a_vacant_or_failed_drained_owner_can_restart() {
         for phase in [

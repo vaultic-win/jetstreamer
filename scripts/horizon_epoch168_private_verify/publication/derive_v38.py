@@ -14,7 +14,7 @@ from derive143_bootstrap_retry import read_package
 PRICES = f.ROOT / "epoch162-first-hourly-completion-20261127-v2"
 OLD = PRICES / "issued-price-v37"
 NEW = PRICES / "issued-price-v38"
-OP = f.ROOT / "epoch168-exact-publication-v1/admission-tools-v1"
+OP = f.ROOT / "epoch168-exact-publication-v1/admission-tools-v2"
 
 
 def members(directory, revision, predecessor, operator):

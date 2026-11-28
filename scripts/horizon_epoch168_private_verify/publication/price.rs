@@ -203,10 +203,10 @@ fn provider(ref_: &Bound) -> Result<Value> {
             && w["preparation_only"] == false
             && w["resource_credit_bytes"] == 0
             && w["publication168_allocation"]["operator"] == serde_json::to_value(own_seal()?)?
-            && reference(&w, "fleet")?.json()?["owner"] == "/root",
+            && super::lifecycle::root_snapshot(&reference(&w, "fleet")?)?["owner"] == "/root",
         "changed provider or fleet"
     );
-    reference(&w, "writer")?.json()?;
+    super::lifecycle::root_snapshot(&reference(&w, "writer")?)?;
     Ok(w)
 }
 
