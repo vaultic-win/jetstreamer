@@ -1,4 +1,4 @@
-"""Issue and qualify the single epoch 167 donor return after the V40 complete roster."""
+"""Issue and qualify the single epoch 167 donor return after the independent epoch 143 compute return."""
 
 import argparse
 import ast
@@ -20,16 +20,16 @@ from derive_v39 import change
 from qualify_v39 import isolate, refuses, LOCK, PUBLICATION
 import released167_ram as ledger
 
-OLD, NEW = PRICES / "issued-price-v40", PRICES / "issued-price-v41"
-PRIOR = "4ffdbb56b8c7bb0ff2a7662987b2fc423327797545678bd9cb3c7e6659eb8d34"
+OLD, NEW = PRICES / "issued-price-v41", PRICES / "issued-price-v42"
+PRIOR = "00476c63988d0e01b524f47b3e83cabb4680da944d817d0741a76caa545c304e"
 STATE = ledger.ASSEMBLY
-FIXTURE = STATE / "V41_RETURNED_167_RAM_FIXTURE.json"
-PLAN = STATE / "V41_RETURNED_167_RAM_PLAN.json"
+FIXTURE = STATE / "V42_RETURNED_167_RAM_FIXTURE.json"
+PLAN = STATE / "V42_RETURNED_167_RAM_PLAN.json"
 
 
 def members(stage, revision):
     prior = f.reference(OLD / "deployment-seal-receipt.json")
-    f.need(prior["sha256"] == PRIOR, "different V40 predecessor")
+    f.need(prior["sha256"] == PRIOR, "different V41 predecessor")
     files = read_package(OLD,PRIOR)
     for name,(body,mode) in list(files.items()):
         if name.endswith(".py"):
@@ -109,14 +109,14 @@ def main():
     repo=HERE.parents[2]
     revision=f.git(repo,"rev-parse","HEAD").decode().strip()
     f.git(repo,"merge-base","--is-ancestor",revision,"refs/remotes/origin/account-updates")
-    for filename in ("derive_v41.py","released167_ram.py"):
+    for filename in ("derive_v42.py","released167_ram.py"):
         path=HERE/filename
         f.need(path.read_bytes()==f.git(repo,"show",revision+":"+str(path.relative_to(repo))),"unmerged return code")
     latest=max((int(p.name.removeprefix("issued-price-v")),p) for p in PRICES.glob("issued-price-v[0-9]*")
                if p.name.removeprefix("issued-price-v").isdigit() and (p/"deployment-seal-receipt.json").is_file())[1]
     f.need(latest==OLD and not os.path.lexists(NEW),"shared provider already advanced")
     if args.phase=="plan":
-        stage=Path(tempfile.mkdtemp(dir=args.stage,prefix="167-v41-members-"))
+        stage=Path(tempfile.mkdtemp(dir=args.stage,prefix="167-v42-members-"))
         items=members(stage,revision)
         plan=dict(schema="jetstreamer-sealed-deployment-plan-v1",destination=str(NEW),
                   members=[dict(name=name,source=str(path),mode=mode,sha256=f.reference(path)["sha256"])
@@ -129,7 +129,7 @@ def main():
     f.need(source["revision"]==revision and source["prior_shared_price"]["sha256"]==PRIOR
            and plan["destination"]==str(NEW),"different handback plan")
     if args.phase=="fixture":
-        stage=Path(tempfile.mkdtemp(dir=args.stage,prefix="167-v41-ns-"))
+        stage=Path(tempfile.mkdtemp(dir=args.stage,prefix="167-v42-ns-"))
         isolate(stage)
     else:
         proof=f.read(f.reference(FIXTURE))
@@ -141,19 +141,22 @@ def main():
                "competing provider under lock")
         f.need(f.reference(f.SEALER)["sha256"]==f.SEALER_SHA,"different membership sealer")
         raw=subprocess.check_output([str(f.SEALER),str(PLAN),"--plan-sha256",pref["sha256"],"--self-sha256",f.SEALER_SHA])
-        f.need(json.loads(raw)["outcome"]=="created","V41 provider already exists")
+        f.need(json.loads(raw)["outcome"]=="created","V42 provider already exists")
     seal=f.reference(NEW/"deployment-seal-receipt.json")
     q=json.loads(subprocess.check_output([str(PUBLICATION),"quote",seal["path"],seal["sha256"]]))
     whole=q["whole_roster"]
     f.need(whole["package"]==seal and whole[ledger.FIELD]["returned_bytes"]==ledger.RETURN and
            whole["guard_floor"]>0 and whole["closed_167_suballocations"]["remaining_producer_ram"]==42*(1<<30)-ledger.RETURN,
            "live release absent")
+    retained143 = whole["closed143_compute_return"]
+    f.need(retained143["returned_ram"] == 36 << 30 and retained143["retained_ram"] == 5 << 30,
+           "independent epoch 143 return changed")
     checks=None
     if args.phase=="fixture":
         core=runpy.run_path(str(NEW/"continuation_price.py"))["prior"]
         checks=suite(core,whole)
     report=dict(plan=pref,revision=revision,seal=seal,checks=checks,quote=q)
-    dest=FIXTURE if args.phase=="fixture" else STATE/"V41_RETURNED_167_RAM_LIVE_QUOTE.json"
+    dest=FIXTURE if args.phase=="fixture" else STATE/"V42_RETURNED_167_RAM_LIVE_QUOTE.json"
     res=f.save(dest,report)
     print(json.dumps(dict(receipt=res,plan=pref,seal=seal,home_margin=q["home_margin"],ram_margin=q["ram_margin"],
                           fits=q["fits"],returned_bytes=ledger.RETURN,revision=revision)))
