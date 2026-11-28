@@ -43,6 +43,82 @@ const WINDOW: QualificationPlan = QualificationPlan {
     end_inclusive: END,
 };
 
+struct RetainedSegment {
+    first: u64,
+    last: u64,
+    accounts_hash: &'static str,
+    bytes: u64,
+    archive_digest: &'static str,
+    manifest_digest: &'static str,
+    terminal_digest: &'static str,
+}
+
+const OVERLAP: RetainedSegment = RetainedSegment {
+    first: SEAM + 1,
+    last: BOOT,
+    accounts_hash: BOOT_ACCOUNTS,
+    bytes: 2_645_271_492,
+    archive_digest: PREDECESSOR,
+    manifest_digest: MANIFEST,
+    terminal_digest: TERMINAL,
+};
+
+struct WindowSpec {
+    bounds: QualificationPlan,
+    source_digest: &'static str,
+    bootstrap_accounts: &'static str,
+    terminal_accounts: &'static str,
+    snapshot_name: &'static str,
+    snapshot_bytes: u64,
+    predecessor: &'static RetainedSegment,
+    requires_custody: bool,
+}
+
+const FIRST_WINDOW: WindowSpec = WindowSpec {
+    bounds: WINDOW,
+    source_digest: SCOPE,
+    bootstrap_accounts: BOOT_ACCOUNTS,
+    terminal_accounts: END_ACCOUNTS,
+    snapshot_name: "snapshot-114929697-BevfHbX1MRE8ySXdbzp8WZB5i4W1spPhbsZ8UEUhU7di.tar.zst",
+    snapshot_bytes: SNAPSHOT_BYTES,
+    predecessor: &OVERLAP,
+    requires_custody: false,
+};
+
+const REPLAYED_WINDOW: RetainedSegment = RetainedSegment {
+    first: BOOT + 1,
+    last: END,
+    accounts_hash: END_ACCOUNTS,
+    bytes: 3_087_503_716,
+    archive_digest: "692aa7415f995fa5a74b342dee2d5d977d0417f3af4d72f491a05393b48ee1a1",
+    manifest_digest: "85f91782c4a0a604aa01c8a1963b415c253c239fb868016c88a5c1d44bd117df",
+    terminal_digest: "bfba93cb5a22dc00a3d826c28348dc528e4f14b0e071072fb522630ad2235d54",
+};
+
+const SUCCESSOR_WINDOW: WindowSpec = WindowSpec {
+    bounds: QualificationPlan {
+        epoch: EPOCH,
+        bootstrap_slot: END,
+        replay_start: END + 1,
+        output_slot_start: END + 1,
+        end_inclusive: 114_943_135,
+    },
+    source_digest: "7da6654f186299cd5911e89ecd84c026c87562c4e95d801d9cffab611529b36a",
+    bootstrap_accounts: END_ACCOUNTS,
+    terminal_accounts: "6yDbxQ1pi5QgyLa7byJ7SnRRbh3ekSHeYkSVUDCnbyDt",
+    snapshot_name: "snapshot-114936474-GqAWTNQiWMCFTZLC1N3SXe2NmykFDcMQdn4Saj4ALSCA.tar.zst",
+    snapshot_bytes: 15_568_220_095,
+    predecessor: &REPLAYED_WINDOW,
+    requires_custody: true,
+};
+
+fn window_for(source_digest: &str) -> Result<&'static WindowSpec, String> {
+    [&FIRST_WINDOW, &SUCCESSOR_WINDOW]
+        .into_iter()
+        .find(|spec| spec.source_digest == source_digest)
+        .ok_or_else(|| "epoch 266 source is outside the two pinned windows".to_owned())
+}
+
 const INDEXES: [(&str, &str, u64); 3] = [
     (
         "265/epoch-265-bafyreibgf4smruua7seioyolngrziiqsgeae3d4zmcvptg7m4xwzyafqwu-mainnet-slot-to-cid.index",
@@ -76,6 +152,8 @@ struct Plan {
     predecessor_manifest: Evidence,
     predecessor_terminal: Evidence,
     snapshot: Evidence,
+    #[serde(default)]
+    bootstrap_custody: Option<Evidence>,
     worker: Evidence,
     genesis: Evidence,
 }
@@ -110,7 +188,7 @@ pub(crate) fn validate_cli(
     )
 }
 
-fn validate_plan(plan: &Plan, destination: &Path) -> Result<(), String> {
+fn validate_plan(plan: &Plan, spec: &WindowSpec, destination: &Path) -> Result<(), String> {
     let leaf = plan
         .run_root
         .file_name()
@@ -124,16 +202,16 @@ fn validate_plan(plan: &Plan, destination: &Path) -> Result<(), String> {
             && plan.producer_unit == format!("horizon-qualify-{leaf}.service")
             && destination == plan.run_root.join("ledger")
             && sha(&plan.node_sha256)? != [0; 32]
-            && plan.minimum_free_bytes >= MIN_GUARD_FLOOR,
+            && plan.minimum_free_bytes >= MIN_GUARD_FLOOR
+            && plan.bootstrap_custody.is_some() == spec.requires_custody,
         "epoch 266 plan has a foreign runtime, root or reserve floor",
     )?;
     for (input, expected) in [
-        (&plan.source_window, SCOPE),
+        (&plan.source_window, spec.source_digest),
         (&plan.prefix, PREFIX),
-        (&plan.predecessor, PREDECESSOR),
-        (&plan.predecessor_manifest, MANIFEST),
-        (&plan.predecessor_terminal, TERMINAL),
-        (&plan.snapshot, SNAPSHOT),
+        (&plan.predecessor, spec.predecessor.archive_digest),
+        (&plan.predecessor_manifest, spec.predecessor.manifest_digest),
+        (&plan.predecessor_terminal, spec.predecessor.terminal_digest),
         (&plan.worker, WORKER),
         (&plan.genesis, GENESIS),
     ] {
@@ -149,8 +227,15 @@ fn validate_plan(plan: &Plan, destination: &Path) -> Result<(), String> {
             .path
             .file_name()
             .and_then(|name| name.to_str())
-            == Some("snapshot-114929697-BevfHbX1MRE8ySXdbzp8WZB5i4W1spPhbsZ8UEUhU7di.tar.zst"),
-        "epoch 266 snapshot filename does not match the authenticated hourly checkpoint",
+            == Some(spec.snapshot_name)
+            && plan.snapshot.path.is_absolute()
+            && !plan.snapshot.path.starts_with(&plan.run_root)
+            && if spec.requires_custody {
+                sha(&plan.snapshot.sha256)? != [0; 32]
+            } else {
+                plan.snapshot.sha256 == SNAPSHOT
+            },
+        "epoch 266 snapshot identity does not match the authenticated hourly checkpoint",
     )
 }
 
@@ -158,7 +243,7 @@ fn read_json(evidence: &Evidence) -> Result<Value, String> {
     serde_json::from_slice(&sealed_bytes(evidence, 1 << 20)?).map_err(|err| err.to_string())
 }
 
-fn validate_admission(plan: &Plan) -> Result<(), String> {
+fn validate_admission(plan: &Plan, spec: &WindowSpec) -> Result<(), String> {
     let receipt = read_json(&plan.admission)?;
     let age = receipt["recorded_unix_seconds"].as_u64().and_then(|at| {
         std::time::SystemTime::now()
@@ -174,7 +259,7 @@ fn validate_admission(plan: &Plan) -> Result<(), String> {
             && receipt["node_sha256"] == plan.node_sha256
             && receipt["producer_unit"] == plan.producer_unit
             && receipt["run_root"] == json!(plan.run_root)
-            && receipt["source_window_sha256"] == SCOPE
+            && receipt["source_window_sha256"] == spec.source_digest
             && receipt["minimum_free_bytes"] == plan.minimum_free_bytes
             && receipt["complete_fleet_and_century_floor_bound"] == true
             && receipt["startup_guard_qualified"] == true
@@ -196,6 +281,43 @@ fn check_readonly(file: &std::fs::File) -> Result<(), String> {
         meta.uid() == 0 && meta.mode() & 0o222 == 0 && stats.f_flag & libc::ST_RDONLY != 0,
         "epoch 266 runtime input is not sealed and projected read-only",
     )
+}
+
+fn validate_snapshot(plan: &Plan, spec: &WindowSpec) -> Result<[u8; 32], String> {
+    require_retained_input(&plan.snapshot.path, spec.snapshot_bytes)?;
+    let snapshot = open_regular_nofollow(&plan.snapshot.path).map_err(|err| err.to_string())?;
+    check_readonly(&snapshot)?;
+    if let Some(custody_ref) = &plan.bootstrap_custody {
+        require(
+            custody_ref.path
+                == Path::new(
+                    "/var/lib/jetstreamer/horizon266-window-114936475-114943135-static-inputs-v1/bootstrap-custody.json",
+                ),
+            "epoch 266 successor uses a foreign custody receipt",
+        )?;
+        let custody = read_json(custody_ref)?;
+        let input = &custody["input"];
+        let metadata = snapshot.metadata().map_err(|err| err.to_string())?;
+        let nanos = |sec, frac| i128::from(sec) * 1_000_000_000 + i128::from(frac);
+        require(
+            custody["schema"] == "foundation-epoch266-successor-bootstrap-private-custody-v1"
+                && custody["epoch"] == EPOCH
+                && custody["bootstrap_slot"] == spec.bounds.bootstrap_slot
+                && custody["source_window"]["sha256"] == spec.source_digest
+                && custody["copy_drained"] == true
+                && custody["whole_file_sha256_rechecked"] == true
+                && custody["publication_authorized"] == false
+                && input["sha256"] == plan.snapshot.sha256
+                && input["generation"] == "1641767207323715"
+                && input["bytes"] == metadata.len()
+                && input["device"] == metadata.dev()
+                && input["inode"] == metadata.ino()
+                && input["mtime_ns"] == json!(nanos(metadata.mtime(), metadata.mtime_nsec()))
+                && input["ctime_ns"] == json!(nanos(metadata.ctime(), metadata.ctime_nsec())),
+            "epoch 266 successor snapshot does not match its authenticated custody",
+        )?;
+    }
+    sha(&plan.snapshot.sha256)
 }
 
 fn validate_indexes(ledger: &Path, shutdown: &AtomicBool) -> Result<(), String> {
@@ -228,7 +350,11 @@ impl SlotVisitor for PrefixVisitor {
     }
 }
 
-fn read_prefix(plan: &Plan, shutdown: &AtomicBool) -> Result<SegmentCheckpointSummary, String> {
+fn read_prefix(
+    plan: &Plan,
+    spec: &WindowSpec,
+    shutdown: &AtomicBool,
+) -> Result<SegmentCheckpointSummary, String> {
     require_retained_input(&plan.prefix.path, 5_060_736_774)?;
     require_no_checksum(&plan.prefix.path)?;
     let prefix = open_regular_nofollow(&plan.prefix.path).map_err(|err| err.to_string())?;
@@ -266,47 +392,78 @@ fn read_prefix(plan: &Plan, shutdown: &AtomicBool) -> Result<SegmentCheckpointSu
         "epoch 266 retained prefix failed its independent dense reread",
     )?;
 
-    require_retained_input(&plan.predecessor.path, 2_645_271_492)?;
-    require_no_checksum(&plan.predecessor.path)?;
+    let prior = read_segment(
+        &plan.predecessor,
+        &plan.predecessor_manifest,
+        &plan.predecessor_terminal,
+        spec.predecessor,
+    )?;
+    if spec.requires_custody {
+        let middle = read_segment(
+            &Evidence {
+                path: "/home/ubuntu/.jetstreamer-private/qualification-266-hourly-overlap-114929697-v1/work/output/epoch-266-slots-114923431-114929697.jet".into(),
+                sha256: PREDECESSOR.into(),
+            },
+            &Evidence {
+                path: "/var/lib/jetstreamer/horizon266-window-114929698-114936474-static-inputs-v1/prior-segment.json".into(),
+                sha256: MANIFEST.into(),
+            },
+            &Evidence {
+                path: "/var/lib/jetstreamer/horizon266-window-114929698-114936474-static-inputs-v1/prior-terminal.json".into(),
+                sha256: TERMINAL.into(),
+            },
+            &OVERLAP,
+        )?;
+        checkpoint_matches(&middle.terminal, &prior.bootstrap)?;
+    }
+    Ok(prior.terminal)
+}
+
+fn read_segment(
+    archive: &Evidence,
+    manifest: &Evidence,
+    terminal: &Evidence,
+    spec: &RetainedSegment,
+) -> Result<HistoricalSegmentManifest, String> {
+    require_retained_input(&archive.path, spec.bytes)?;
+    require_no_checksum(&archive.path)?;
     let sealed: HistoricalSegmentManifest =
-        serde_json::from_slice(&sealed_bytes(&plan.predecessor_manifest, 1 << 20)?)
-            .map_err(|err| err.to_string())?;
-    let validated = read_and_validate_segment_manifest_from(
-        &plan.predecessor.path,
-        &plan.predecessor_manifest.path,
-    )
-    .map_err(|err| err.to_string())?;
-    let terminal = read_json(&plan.predecessor_terminal)?;
+        serde_json::from_slice(&sealed_bytes(manifest, 1 << 20)?).map_err(|err| err.to_string())?;
+    let validated = read_and_validate_segment_manifest_from(&archive.path, &manifest.path)
+        .map_err(|err| err.to_string())?;
+    let terminal = read_json(terminal)?;
     require(
         validated == sealed
             && validated.epoch == EPOCH
-            && validated.output_slot_start == SEAM + 1
-            && validated.output_slot_count == BOOT - SEAM
-            && validated.archive_sha256 == sha(PREDECESSOR)?
+            && validated.output_slot_start == spec.first
+            && validated.output_slot_count == spec.last - spec.first + 1
+            && validated.archive_sha256 == sha(spec.archive_digest)?
             && validated.worker_executable_sha256 == sha(WORKER)?
-            && validated.terminal.slot == BOOT
-            && validated.terminal.accounts_hash == BOOT_ACCOUNTS
+            && validated.terminal.slot == spec.last
+            && validated.terminal.accounts_hash == spec.accounts_hash
             && terminal["producer_drained"] == true
             && terminal["native_manifest_complete_verified"] == true
             && terminal["terminal_checkpoint"] == json!(validated.terminal),
         "epoch 266 predecessor no longer matches its verified terminal",
     )?;
-    Ok(validated.terminal)
+    Ok(validated)
 }
 
 struct VerifiedRestart {
     terminal: SegmentCheckpointSummary,
     snapshot: PathBuf,
+    snapshot_digest: [u8; 32],
+    spec: &'static WindowSpec,
     verified: AtomicBool,
 }
 
 impl RestartProof for VerifiedRestart {
     fn snapshot_sha256(&self) -> [u8; 32] {
-        sha(SNAPSHOT).expect("literal digest")
+        self.snapshot_digest
     }
 
     fn snapshot_size(&self) -> u64 {
-        SNAPSHOT_BYTES
+        self.spec.snapshot_bytes
     }
 
     fn covers_trusted_root(&self, _: u64, _: u64, _: u64, _: u64) -> bool {
@@ -316,7 +473,11 @@ impl RestartProof for VerifiedRestart {
     fn restored_verification(&self) -> Result<historical_replay::RestoredCheckpointTrust, String> {
         // Verify the restored accounts and keep the independently authenticated
         // future accounts checkpoint pending until this worker reaches it.
-        Ok(historical_replay::RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(END))
+        Ok(
+            historical_replay::RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(
+                self.spec.bounds.end_inclusive,
+            ),
+        )
     }
 
     fn validate_invocation(
@@ -341,7 +502,13 @@ impl RestartProof for VerifiedRestart {
                         p.replay_start,
                         p.output_slot_start,
                         p.end_inclusive,
-                    ) == (EPOCH, BOOT, BOOT + 1, BOOT + 1, END)
+                    ) == (
+                        EPOCH,
+                        self.spec.bounds.bootstrap_slot,
+                        self.spec.bounds.replay_start,
+                        self.spec.bounds.output_slot_start,
+                        self.spec.bounds.end_inclusive,
+                    )
                 }),
             "epoch 266 native restart is confined to its exact private window",
         )
@@ -368,7 +535,10 @@ impl RestartProof for VerifiedRestart {
             !self.verified.swap(true, Ordering::SeqCst),
             "epoch 266 restart checked twice",
         )?;
-        info!("verified epoch 266 native restart at slot {BOOT} before replay entries");
+        info!(
+            "verified epoch 266 native restart at slot {} before replay entries",
+            self.spec.bounds.bootstrap_slot
+        );
         Ok(())
     }
 }
@@ -387,7 +557,11 @@ pub(crate) async fn run(
     };
     let plan: Plan = serde_json::from_slice(&sealed_bytes(&plan_evidence, 1 << 20)?)
         .map_err(|err| err.to_string())?;
-    validate_plan(&plan, &destination)?;
+    let spec = window_for(&plan.source_window.sha256)?;
+    let bounds = spec.bounds;
+    let boot = bounds.bootstrap_slot;
+    let end = bounds.end_inclusive;
+    validate_plan(&plan, spec, &destination)?;
     require(
         unsafe { libc::geteuid() } == 1000,
         "epoch 266 requires isolated UID 1000",
@@ -420,24 +594,23 @@ pub(crate) async fn run(
         },
         256 << 20,
     )?;
-    validate_admission(&plan)?;
+    validate_admission(&plan, spec)?;
     let scope = read_json(&plan.source_window)?;
     require(
-        scope["bootstrap_slot"] == BOOT
-            && scope["first_slot"] == BOOT + 1
-            && scope["last_slot"] == END
+        scope["bootstrap_slot"] == boot
+            && scope["first_slot"] == bounds.replay_start
+            && scope["last_slot"] == end
             && scope["original_epoch_root_still_required"] == true,
         "epoch 266 source window or root obligation differs",
     )?;
-    require_retained_input(&plan.snapshot.path, SNAPSHOT_BYTES)?;
-    check_readonly(&open_regular_nofollow(&plan.snapshot.path).map_err(|err| err.to_string())?)?;
+    let snapshot_digest = validate_snapshot(&plan, spec)?;
     validate_indexes(&destination, &shutdown)?;
-    let terminal = read_prefix(&plan, &shutdown)?;
+    let terminal = read_prefix(&plan, spec, &shutdown)?;
     sealed_bytes(&plan.worker, 128 << 20)?;
     let genesis = sealed_bytes(&plan.genesis, 1 << 20)?;
     let execution = select_runtime_with_snapshot_warmup_for_invocation(
-        BOOT + 1,
-        BOOT + 1..END + 1,
+        bounds.replay_start,
+        bounds.output_runtime_range(),
         true,
         true,
     )?;
@@ -456,20 +629,26 @@ pub(crate) async fn run(
     let proof = VerifiedRestart {
         terminal,
         snapshot: plan.snapshot.path,
+        snapshot_digest,
+        spec,
         verified: AtomicBool::new(false),
     };
-    let hashes = [(BOOT, BOOT_ACCOUNTS), (END, END_ACCOUNTS)]
-        .into_iter()
-        .map(|(slot, hash)| {
-            hash.parse::<Hash>()
-                .map(|hash| (slot, BankHashExpectation::LegacyAccountsHash(hash)))
-                .map_err(|err| err.to_string())
-        })
-        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let hashes = [
+        (boot, spec.bootstrap_accounts),
+        (end, spec.terminal_accounts),
+    ]
+    .into_iter()
+    .map(|(slot, hash)| {
+        hash.parse::<Hash>()
+            .map(|hash| (slot, BankHashExpectation::LegacyAccountsHash(hash)))
+            .map_err(|err| err.to_string())
+    })
+    .collect::<Result<BTreeMap<_, _>, _>>()?;
     let verifier = Arc::new(SnapshotVerifier::new(hashes, Some(shutdown.clone())));
-    let output = plan
-        .run_root
-        .join("output/epoch-266-slots-114929698-114936474.jet");
+    let output = plan.run_root.join(format!(
+        "output/epoch-266-slots-{}-{end}.jet",
+        bounds.output_slot_start
+    ));
     let replay = run_geyser_replay(
         EPOCH,
         true,
@@ -481,7 +660,7 @@ pub(crate) async fn run(
         tracker,
         Some(verifier.clone()),
         output.clone(),
-        Some(WINDOW),
+        Some(bounds),
         None,
         None,
         None,
@@ -499,11 +678,11 @@ pub(crate) async fn run(
         "epoch 266 replay interrupted or missed the actual native restart barrier",
     )?;
     verifier.finish()?;
-    let segment = publish_historical_segment_manifest(EPOCH, WINDOW, &output, &replay)?;
+    let segment = publish_historical_segment_manifest(EPOCH, bounds, &output, &replay)?;
     require(
-        segment.bootstrap_archive_sha256 == Some(sha(SNAPSHOT)?)
-            && segment.terminal.slot == END
-            && segment.terminal.accounts_hash == END_ACCOUNTS
+        segment.bootstrap_archive_sha256 == Some(snapshot_digest)
+            && segment.terminal.slot == end
+            && segment.terminal.accounts_hash == spec.terminal_accounts
             && segment.worker_executable_sha256 == sha(WORKER)?,
         "epoch 266 completed manifest differs from the verified scope",
     )?;
@@ -511,7 +690,7 @@ pub(crate) async fn run(
     require_no_checksum(&output)?;
     let receipt = json!({
         "schema":"foundation-epoch266-private-window-result-v1", "epoch":EPOCH,
-        "invocation_id":invocation, "plan":plan_evidence, "first_slot":BOOT+1, "last_slot":END,
+        "invocation_id":invocation, "plan":plan_evidence, "first_slot":bounds.output_slot_start, "last_slot":end,
         "archive":output, "archive_sha256":sha256_hex_string(&segment.archive_sha256),
         "predecessor_terminal":proof.terminal, "native_bootstrap":segment.bootstrap,
         "native_terminal":segment.terminal, "whole_prefix_reread":true,
@@ -551,6 +730,8 @@ mod tests {
         let proof = VerifiedRestart {
             terminal: predecessor,
             snapshot: "/tmp/snapshot.tar.zst".into(),
+            snapshot_digest: sha(SNAPSHOT).unwrap(),
+            spec: &FIRST_WINDOW,
             verified: AtomicBool::new(false),
         };
         let archive = ReplayBootstrap::SnapshotArchive(proof.snapshot.clone());
@@ -574,6 +755,32 @@ mod tests {
                 )
                 .is_err()
         );
+        let successor = VerifiedRestart {
+            terminal: proof.terminal.clone(),
+            snapshot: proof.snapshot.clone(),
+            snapshot_digest: [3; 32],
+            spec: window_for(SUCCESSOR_WINDOW.source_digest).unwrap(),
+            verified: AtomicBool::new(false),
+        };
+        assert!(
+            successor
+                .validate_invocation(
+                    EPOCH,
+                    &archive,
+                    Some(SUCCESSOR_WINDOW.bounds),
+                    false,
+                    false,
+                    false
+                )
+                .is_ok()
+        );
+        assert!(
+            successor
+                .validate_invocation(EPOCH, &archive, Some(WINDOW), false, false, false)
+                .is_err()
+        );
+        assert_eq!(successor.snapshot_sha256(), [3; 32]);
+        assert!(window_for(&"0".repeat(64)).is_err());
         assert!(!proof.covers_trusted_root(EPOCH, BOOT, BOOT + 1, END));
         assert!(matches!(
             proof.restored_verification().unwrap(),
