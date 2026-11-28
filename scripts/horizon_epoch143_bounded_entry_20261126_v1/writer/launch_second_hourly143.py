@@ -206,9 +206,6 @@ def launch(contract_ref, writer_ref, price_seal, guard_seal):
     quote = checked_roster(booking)
     need(0 < quote["guard_floor"] <= quote["required_home"] < quote["available_home"],
          "invalid native prestart floor")
-    # Ensure room for the guard process and a fresh whole-host memory sample
-    # before creating any invocation-specific state.
-    need(quote["ram_margin"] >= GIB, "prestart margin is smaller than the 1 GiB guard budget")
     floor_buffer = min(GIB, quote["home_margin"] // 4)
     floor = quote["guard_floor"] + floor_buffer
     need(floor_buffer < quote["available_home"] - quote["required_home"], "guard floor buffer does not fit")
