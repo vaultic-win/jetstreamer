@@ -482,6 +482,7 @@ fn main() -> Result<()> {
             | "--check-bootstrap-266-114910768" | "--retire-bootstrap-266-114910768"
             | "--check-bootstrap-266-114923430" | "--retire-bootstrap-266-114923430"
             | "--check-bootstrap-266-114929697" | "--retire-bootstrap-266-114929697"
+            | "--check-bootstrap-266-114936474" | "--retire-bootstrap-266-114936474"
             | "--check-bootstrap-230-99430284" | "--retire-bootstrap-230-99430284"
             | "--check-bootstrap-230-99437433" | "--retire-bootstrap-230-99437433"
             | "--check-bootstrap-230-99445304" | "--retire-bootstrap-230-99445304"
@@ -505,8 +506,11 @@ fn main() -> Result<()> {
         if args[1].ends_with("-266-114923430") {
             return snapshot266::retire_overlap(args[1].starts_with("--retire-"), &args[2], Path::new(&args[3]), &args[4]);
         }
-        if args[1].ends_with("-266-114929697") {
-            return snapshot266::retire_window(args[1].starts_with("--retire-"), &args[2], Path::new(&args[3]), &args[4]);
+        let successor_266 = args[1].ends_with("-266-114936474");
+        if successor_266 || args[1].ends_with("-266-114929697") {
+            return snapshot266::retire_window(
+                successor_266, args[1].starts_with("--retire-"), &args[2], Path::new(&args[3]), &args[4],
+            );
         }
         if args[1].ends_with("-230-99437433") {
             return snapshot230::run(args[1].starts_with("--retire-"), &args[2], Path::new(&args[3]), &args[4]);
