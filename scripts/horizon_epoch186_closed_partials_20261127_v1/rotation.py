@@ -30,6 +30,7 @@ PREVIOUS = RT / "epoch185-lanem-main-holding-20261127-v1"
 OPLOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 TOOLS = Path(__file__).resolve().parent
 FOLLOWON = OUT / "n-tools-v5"
+M12 = OUT / "m12-tools-v1"
 MAPPING = Path(
     "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json"
 )
@@ -144,6 +145,9 @@ def avail(p):
 
 
 def source(lane):
+    if lane == "m12":
+        import m12_admission
+        return m12_admission.profile()
     p = OUT / lane / "profile.json"
     row = bound(ref(p))
     ino, n, h = PINNED[lane]
@@ -271,13 +275,15 @@ def locked(p, identity=None):
 
 
 def deployment(phase, lane):
-    if TOOLS == FOLLOWON:
+    if TOOLS == M12:
+        need(lane == "m12" and phase in ("park", "retire", "restore"), "M12 package has a single rotation")
+    elif TOOLS == FOLLOWON:
         need(
             lane == "n" and phase in ("park", "retire", "restore"),
             "this follow-on holds only the lane N serial rotation",
         )
     else:
-        need(TOOLS == OUT / "tools", "use the deployed rotation operator")
+        need(TOOLS == OUT / "tools" and lane in ("m","n"), "use the deployed rotation operator")
 
 
 @contextlib.contextmanager
@@ -295,6 +301,9 @@ def phase_quote(phase, disk, ram):
 
 
 def recent_price():
+    if TOOLS == M12:
+        import m12_admission
+        return m12_admission.price()
     if TOOLS == FOLLOWON:
         import n_admission
 
@@ -348,6 +357,9 @@ def recent_price():
 
 
 def owners(quote):
+    if TOOLS == M12:
+        import m12_admission
+        return m12_admission.owners(quote)
     if TOOLS == FOLLOWON:
         import n_admission
 
@@ -546,6 +558,9 @@ def native_scope(phase, lane):
 
 
 def serial_handoff():
+    if TOOLS == M12:
+        import m12_admission
+        return m12_admission.serial_handoff()
     prior = bound(ref(PREVIOUS / "SERIAL_RETURN.json"))
     ret = bound(prior["reclamation"])
     need(
@@ -695,10 +710,15 @@ def retire(row, a, d, active, iid):
     )
 
 
+def m12_pins():
+    import m12_admission
+    return m12_admission.PINS
+
+
 def restore(row, expected, remote, client, q):
     src = Path(row["source"])
     n = expected["length"]
-    pins = PINNED[row["lane"]]
+    pins = (m12_pins() if row.get("rotation_lane") == "m12" else PINNED[row["lane"]])
     need(pins[1:] == (n, expected["sha256"]), "restore profile changed")
     last = [0.0]
 
@@ -778,6 +798,10 @@ def execute(phase, lane):
     members = read(TOOLS / "deployment-seal-receipt.json")["members"]
     for member in members:
         fixed(TOOLS / member["name"], member["sha256"])
+    if TOOLS == M12:
+        import m12_admission
+        m12_admission.wait_arm(d / ("ADMISSION_" + phase + "_" + stamp_id + ".json"))
+        m12_admission.validate_arm(d, phase, stamp_id, unit, iid, hard)
     if phase == "fixture":
         return fixture()
     if phase == "precheck":
@@ -808,8 +832,12 @@ def execute(phase, lane):
             )
             now = time.time()
             need(now - fleet_price["utc"] <= 15, "quote exceeded admission window")
+            name = ("NATIVE_ENTRY_" if TOOLS == M12 else "ADMISSION_") + phase + "_" + stamp_id + ".json"
+            if TOOLS == M12:
+                import m12_admission
+                m12_admission.validate_arm(d, phase, stamp_id, unit, iid, hard)
             a = save(
-                d / ("ADMISSION_" + phase + "_" + stamp_id + ".json"),
+                d / name,
                 dict(
                     unit=unit,
                     invocation=iid,
@@ -914,6 +942,6 @@ if __name__ == "__main__":
     p.add_argument(
         "phase", choices=["fixture", "precheck", "park", "retire", "restore"]
     )
-    p.add_argument("lane", choices=["m", "n"])
+    p.add_argument("lane", choices=["m", "n", "m12"])
     args = p.parse_args()
     print(json.dumps(execute(args.phase, args.lane), sort_keys=True), flush=True)
