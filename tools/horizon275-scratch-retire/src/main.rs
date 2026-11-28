@@ -4,6 +4,7 @@ mod appendvec229;
 mod appendvec288;
 mod appendvec292;
 mod appendvec292_bundle;
+mod canary224;
 mod ext4_228;
 mod failed296_bundle;
 mod index230;
@@ -456,6 +457,16 @@ fn main() -> Result<()> {
             args[1] == "--retire-held-failed-296",
             Binding { path: args[3].clone().into(), sha256: args[4].clone() },
         );
+    }
+    if matches!(args.get(1).map(String::as_str), Some("--check-held-canary-224" | "--retire-held-canary-224")) {
+        ensure!(unsafe { libc::geteuid() } == 0 && args.len() == 5,
+            "usage: horizon275-scratch-retire --check-held-canary-224|--retire-held-canary-224 SELF_SHA256 RECHECK RECHECK_SHA256");
+        let mut binary = File::open("/proc/self/exe")?;
+        let metadata = binary.metadata()?;
+        ensure!(metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut binary)? == args[2],
+            "unsealed retirement image");
+        return canary224::run(args[1] == "--retire-held-canary-224",
+            Binding { path: args[3].clone().into(), sha256: args[4].clone() });
     }
     if matches!(
         args.get(1).map(String::as_str),
