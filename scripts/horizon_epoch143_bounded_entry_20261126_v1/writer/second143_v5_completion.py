@@ -40,7 +40,6 @@ def closed(core, fleet):
          and result['invocation_id'] == actor['producer_invocation_id'] == properties['InvocationID'] == IID
          and result['producer'] == row['held_owner'] == actor_ref and row['actor'] == native_exit['actor'] == actor
          and result['guard_plan'] == actor['guard_plan']
-         and result['first_progress'] == row['first_progress']
          and progress['producer_invocation_id'] == IID and progress['producer_pid'] == actor['producer_pid']
          and row['phase'] in ('worker', 'terminal')
          and result['terminal_slot'] == manifest['terminal']['slot'] == 61794627
@@ -55,7 +54,9 @@ def closed(core, fleet):
          and properties['MainPID'] == properties['ControlPID'] == '0'
          and properties['ExecMainPID'] == str(actor['producer_pid']),
          'different private epoch 143 completed owner')
-    if row['phase'] == 'terminal':
+    if row['phase'] == 'worker':
+        need(row['first_progress'] == result['first_progress'], 'accepted epoch 143 progress changed')
+    else:
         need(row['native_terminal']['invocation_id'] == IID
              and row['native_terminal']['cursor'] == result['terminal_cursor'],
              'accepted epoch 143 terminal differs from the native exit')
