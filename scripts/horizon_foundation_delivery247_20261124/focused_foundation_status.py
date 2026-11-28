@@ -105,6 +105,49 @@ def closed_retry_230_comparison(intent):
     return [terminal_ref, playback_ref], preparation, basis
 
 
+def closed_successor_230_comparison(intent):
+    terminal_ref = {
+        "path": str(SUCCESSOR_230_REGISTRATION.parent / "terminal.json"),
+        "sha256": "bfbe32883090db61ddefdd7965b3a5ec0b1f5f719510f3f9abb5da45c6f08b5f",
+    }
+    closed = bound(terminal_ref)
+    launch = bound(closed["launch"])
+    native = bound(closed["native_terminal"])
+    assert closed["schema"] == "foundation-epoch230-successor-drain-v1"
+    assert closed["state"] == "local-segment-committed" and closed["guard_drained"]
+    assert closed["publication_authorized"] is native["publication_authorized"] is False
+    assert intent["owner"]["Id"] == launch["unit"] == closed["unit"] == native["unit"] == SUCCESSOR_230_UNIT
+    assert intent["owner"]["InvocationID"] == launch["invocation_id"] == closed["invocation_id"] == native["invocation_id"]
+    assert closed["launch"] in intent["evidence"] and native["launch"] == closed["launch"]
+    assert native["pid1_exit"] == closed["pid1_exit"]
+    assert native["producer_exit_status"] == 0 and native["producer_drained"]
+    assert native["native_manifest_complete_verified"]
+    edges = native["adjacent_checkpoints"]
+    assert edges["bootstrap_consensus_fields_match"] and edges["terminal_blockhash_matches"]
+    assert (native["first_slot"], native["last_slot"], native["slot_count"]) == (99516305, 99524336, 8032)
+    assert native["terminal_checkpoint"]["slot"] == 99524336 and native["terminal_checkpoint"]["slot_complete"]
+    manager = bound(closed["pid1_exit"])["properties"]
+    assert (manager["ExecMainCode"], manager["ExecMainStatus"], manager["Result"]) == ("1", "0", "success")
+    assert manager["Id"] == SUCCESSOR_230_UNIT and manager["InvocationID"] == closed["invocation_id"]
+    runtime = int(manager["ExecMainExitTimestampMonotonic"]) - int(manager["ExecMainStartTimestampMonotonic"])
+    assert runtime > 0
+
+    forecast = intent["forecast"]
+    first, last = forecast["remaining_slot_range"]
+    retained = forecast["completed_window_positions"]
+    assert (first, last, retained, forecast["window_positions_credited"]) == (99437434, 99791404, 78871, 0)
+    assert first + retained == native["first_slot"]
+    remaining = last - native["last_slot"]
+    seconds = (math.ceil(remaining / forecast["replay_slots_per_sec"])
+               + forecast["repair_and_turnover_seconds"] + forecast["delivery_seconds"])
+    preparation = dict(phase="verification", jet_size_bytes=native["archive"]["identity"]["bytes"],
+                       elapsed_execution_millis=runtime // 1000, estimated_remaining_millis=seconds * 1000)
+    basis = ("The successor verified 8,032 positions through slot 99,524,336 and exited cleanly. "
+             "The estimate credits the checkpoint-bound window and retains the measured replay rate "
+             "and the existing allowances for input acquisition, turnover, verification and delivery.")
+    return [terminal_ref, closed["native_terminal"], closed["pid1_exit"], edges["finalized_edges"]], preparation, basis
+
+
 def registration_for_sample(epoch, sample):
     if epoch != 230:
         return REGISTRATIONS[epoch]

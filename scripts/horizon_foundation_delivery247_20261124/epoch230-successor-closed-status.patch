@@ -1,0 +1,14 @@
+--- seven_status.py
++++ seven_status.py
+@@ -10,5 +10,10 @@
+ def closed_230_comparison(intent):
+-    from focused_foundation_status import RETRY_NEXT_V1627_UNIT, closed_retry_230_comparison
++    from focused_foundation_status import (
++        RETRY_NEXT_V1627_UNIT, SUCCESSOR_230_UNIT, closed_retry_230_comparison,
++        closed_successor_230_comparison,
++    )
+     if intent['owner']['Id'] == RETRY_NEXT_V1627_UNIT:
+         return closed_retry_230_comparison(intent)
++    if intent['owner']['Id'] == SUCCESSOR_230_UNIT:
++        return closed_successor_230_comparison(intent)
+     adjacent = intent['owner']['Id'] == 'horizon-qualify-230-adjacent-99445304-v1.service'
