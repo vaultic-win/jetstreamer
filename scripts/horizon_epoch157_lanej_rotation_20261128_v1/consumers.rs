@@ -172,7 +172,7 @@ fn artifacts<'a>(
     }
     Ok(hits)
 }
-fn direct_sources() -> Result<Vec<Value>> {
+fn direct_sources(own: Option<&str>) -> Result<Vec<Value>> {
     let dirs = [
         "/etc/systemd/system",
         "/run/systemd/transient",
@@ -218,6 +218,18 @@ fn direct_sources() -> Result<Vec<Value>> {
         let bytes = fs::read(p)?;
         let sha = digest(&bytes);
         let name = p.file_name().unwrap_or_default().to_string_lossy();
+        if Some(name.as_ref()) == own && p.parent() == Some(Path::new("/run/systemd/transient")) {
+            let (self_unit, _) = role()?;
+            ensure!(
+                self_unit == name
+                    && self_unit.starts_with("horizon-closed157-retire-lanej-")
+                    && String::from_utf8_lossy(&bytes)
+                        .contains(package("rotation")?.to_str().unwrap()),
+                "foreign mutable path declaration"
+            );
+            hits.push(json!({"path":p,"sha256":sha,"owned_retirement":true}));
+            continue;
+        }
         let fixed = match name.as_ref() {
             RESERVE => Some("78300d905a50e76d81a61cb9510ac26e2099e0f59c9492157b291f4a0b5735c2"),
             CONTROLLER => Some("e0ac59c3ae96d1219a26c43202805ab1b1d4c5866bfb09a06ef2673fc295ab32"),
@@ -326,7 +338,7 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
             && v["Job"].is_empty(),
         "original retained validator no longer terminal"
     );
-    let definitions = direct_sources()?;
+    let definitions = direct_sources(own)?;
     let listing = command(
         "/usr/bin/systemctl",
         &[

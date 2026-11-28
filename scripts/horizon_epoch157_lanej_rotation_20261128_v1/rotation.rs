@@ -19,6 +19,7 @@ mod evidence;
 use evidence::{
     available, bound, command, digest, member, now, num, props, receipt, reference, word,
 };
+mod admission;
 mod consumers;
 mod transport;
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch157-lanej-rotation-20261128-v1";
@@ -43,8 +44,21 @@ const FAIL: &str = "be02cf6855d2428ba40df7e9d022f03d";
 fn root(p: &str) -> PathBuf {
     Path::new(ROOT).join(p)
 }
-fn package(p: &str) -> PathBuf {
-    root("turnover-tools-v1").join(p)
+fn package(p: &str) -> Result<PathBuf> {
+    let me = fs::read_link("/proc/self/exe")?;
+    let dir = me.parent().context("sealed deployment")?;
+    ensure!(
+        me.file_name().is_some_and(|n| n == "rotation")
+            && dir.parent() == Some(Path::new(ROOT))
+            && dir
+                .file_name()
+                .and_then(|x| x.to_str())
+                .and_then(|x| x.strip_prefix("turnover-tools-v"))
+                .and_then(|v| v.parse::<u64>().ok())
+                .is_some_and(|v| v >= 1),
+        "unsealed 157 working image"
+    );
+    Ok(dir.join(p))
 }
 fn pinned(p: &Path, sha: &str) -> Value {
     json!({"path":p,"sha256":sha})
@@ -59,7 +73,7 @@ fn stable(p: &Path, v: &Value) -> Result<Value> {
     }
 }
 fn ours() -> Result<Value> {
-    let s = reference(&package("deployment-seal-receipt.json"))?;
+    let s = reference(&package("deployment-seal-receipt.json")?)?;
     let p = member(&s, "rotation")?;
     let m = fs::metadata(p)?;
     let a = fs::metadata("/proc/self/exe")?;
@@ -296,10 +310,8 @@ fn role() -> Result<(String, String)> {
 }
 fn profile(phase: &str) -> Result<Value> {
     let (unit, id) = role()?;
-    let r = bound(&pinned(
-        &root(&format!("{}_ADMISSION.json", phase.to_uppercase())),
-        &std::env::var("HORIZON157_ADMISSION_SHA")?,
-    ))?;
+    let spec = admission::intake(phase, &unit)?;
+    let r = bound(&pinned(&spec, &std::env::var("HORIZON157_ADMISSION_SHA")?))?;
     ensure!(
         r["unit"] == unit
             && r["phase"] == phase
@@ -310,7 +322,7 @@ fn profile(phase: &str) -> Result<Value> {
         "unmatched local admission"
     );
     let age = now()? as f64 - r["issued"].as_f64().context("issuance time")?;
-    ensure!((0.0..=300.0).contains(&age), "stale entry");
+    ensure!((-1.0..=300.0).contains(&age), "stale entry");
     let c = fs::read_to_string("/proc/self/cgroup")?;
     let g =
         Path::new("/sys/fs/cgroup").join(c.trim().strip_prefix("0::/").context("kernel cgroup")?);
@@ -330,7 +342,7 @@ fn profile(phase: &str) -> Result<Value> {
     );
     stable(
         &root(&format!("{}_NATIVE_ENTRY_{id}.json", phase.to_uppercase())),
-        &json!({"unit":unit,"invocation":id,"admission":reference(&root(&format!("{}_ADMISSION.json",phase.to_uppercase())))?,"command":std::env::args().collect::<Vec<_>>(),"price":r["provider"]}),
+        &json!({"unit":unit,"invocation":id,"admission":reference(&spec)?,"command":std::env::args().collect::<Vec<_>>(),"price":r["provider"]}),
     )?;
     Ok(r)
 }
@@ -383,6 +395,10 @@ fn retire() -> Result<Value> {
     let original = &s["source_stat"];
     let retire = root("RETIRED.json");
     if retire.exists() {
+        ensure!(
+            !src.try_exists()? && !q.try_exists()?,
+            "a recorded retirement has a visible file"
+        );
         return reference(&retire);
     }
     let prior = preserved()?;
@@ -481,20 +497,42 @@ fn main() -> Result<()> {
             let _ = profile("census")?;
             consumers::census(None)?
         }
+        [c, phase, path, sha] if c == "dispatch" => admission::dispatch(phase, path, sha)?,
+        [c, unit] if c == "live-holder" => admission::holder(unit)?,
         [c] if c == "custody" => {
-            let _ = ours()?;
+            let _ = profile("custody")?;
             custody()?
         }
         [c] if c == "retire" => retire()?,
         [c] if c == "restore" => {
             let q = profile("restore")?;
-            let _ = local_locks()?;
+            let _locks = local_locks()?;
             ensure!(root("RETIRED.json").is_file(), "missing private retirement");
+            let dst = Path::new(SRC);
+            let completed = root("RESTORED.json");
+            let prior = if completed.try_exists()? {
+                let prior = reference(&completed)?;
+                ensure!(dst.try_exists()?, "recorded restoration is missing");
+                Some((bound(&prior)?, prior))
+            } else {
+                None
+            };
             let e = expected()?;
             let _ = preserved()?;
             let _ = custody()?;
-            let v = transport::restore_file(Path::new(SRC), &e, num(&q, "floor")?)?;
-            stable(&root("RESTORED.json"), &v)?
+            let v = transport::restore_file(dst, &e, num(&q, "floor")?)?;
+            if let Some((previous, receipt)) = prior {
+                ensure!(
+                    v["already_restored"] == true
+                        && previous["source"] == v["source"]
+                        && previous["sha256"] == v["sha256"]
+                        && previous["identity"] == v["identity"],
+                    "previous restoration differs"
+                );
+                receipt
+            } else {
+                receipt(&completed, &v)?
+            }
         }
         _ => anyhow::bail!("expected fixture | census | custody | retire | restore"),
     };
