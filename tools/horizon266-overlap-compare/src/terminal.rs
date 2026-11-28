@@ -916,6 +916,9 @@ fn window266_scope(command: &str) -> Result<&'static window266::Window> {
         "capture-following266-exit" | "collect-following266-terminal" | "finish-following266-terminal" => {
             Ok(&window266::FOLLOWING)
         }
+        "capture-following266-retry-exit"
+        | "collect-following266-retry-terminal"
+        | "finish-following266-retry-terminal" => Ok(&window266::FOLLOWING_RETRY),
         _ => bail!("unsupported epoch 266 terminal command"),
     }
 }

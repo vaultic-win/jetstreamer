@@ -69,6 +69,18 @@ pub(super) const FOLLOWING: Window = Window {
     snapshot_sha: "7ea9fcd83d72dc205719ecc683c2394076746505795227bec1312216590d07c2",
 };
 
+pub(super) const FOLLOWING_RETRY: Window = Window {
+    state: "/var/lib/jetstreamer/horizon266-window-114943136-114949777-runtime-v2",
+    unit: "horizon-qualify-checkpoint-continuation-266-window-114949777-v2.service",
+    profile_sha: "b930774d546a33409b81273b413a6833e2220eabc3e9eb8f1b5cfae1dec35cfa",
+    root: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114949777-v2",
+    pid1_exit: "/var/lib/jetstreamer/horizon266-following-window-pid1-exit-v2/evidence/pid1-exit.json",
+    terminal: "/var/lib/jetstreamer/horizon266-following-window-terminal-collector-v2/evidence/terminal-evidence.json",
+    guard: "horizon-266-window-114949777-protective-v2.service",
+    timer: "horizon-266-window-114949777-protective-v2.timer",
+    ..FOLLOWING
+};
+
 impl Window {
     fn archive(&self) -> PathBuf {
         Path::new(self.root).join(format!(
