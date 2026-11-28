@@ -6,7 +6,7 @@ import gap170_contract as contract
 import gap170_native as gap
 
 FIELD, INTERFACE, UNIT = gap.FIELD, gap.INTERFACE, gap.UNIT
-active, project, recheck = gap.active, gap.project, gap.recheck
+active, recheck = gap.active, gap.recheck
 interface = contract.interface
 
 
@@ -31,10 +31,30 @@ def observe(context, prior, observed_lane):
     return gap.observe(context, prior, observed_lane)
 
 
+def project(context, row):
+    context.next_cfg["diagnostic_replays"] = [
+        item for item in context.next_cfg["diagnostic_replays"] if item["producer_unit"] != UNIT
+    ]
+    gap.project(context, row)
+
+
+def status_fields(row):
+    return dict(private170_gap_phase=row["phase"], private170_gap_actor=row["actor_ref"],
+                private170_gap_guard=row.get("guard"), private170_gap_terminal=row.get("native_terminal"),
+                private_transaction_progress=row["transaction_replay_claimed"],
+                private170_canonical_progress=False)
+
+
 def install(fleet, row):
     contract.stopped_owner(fleet)
     if row:
         gap.install(fleet, row)
+        entry, = (record for record in fleet["epochs"] if record["epoch"] == 170)
+        entry.update(current_private_diagnostic=row,
+                     current_status_scope="Private epoch 170 checkpoint gap " + row["phase"] + ".")
+        if active(row):
+            entry.update(no_live_producer_claimed=False, current_repair_owner="/root",
+                         state="executing" if row["phase"] == "worker" else "verification")
 
 
 def enroll(api, head, writer_ref):
