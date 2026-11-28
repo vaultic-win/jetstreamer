@@ -29,6 +29,9 @@ const SIZE: u64 = 5_757_171_434;
 const RETAINED_INODE: u64 = 118_555_036;
 const DEAD: &str = "jetstreamer-holding-scratch185-execute-0946-20261024-v2.service";
 const DEAD_HASH: &str = "a0aff45bab4df5b3be53d4eddec3d5d97e2acadfd1ceac9c24e2896e480802a9";
+mod lane_cache;
+
+#[derive(Clone, Copy)]
 struct Owner {
     name: &'static str,
     destination: &'static str,
@@ -315,10 +318,14 @@ fn staged() -> Result<Value> {
     )
 }
 
-fn kernel() -> Result<Vec<Value>> {
+fn kernel(owners: &[Owner; 6], lane_scope: bool) -> Result<Vec<Value>> {
     let mut results = Vec::new();
-    for owner in &OWNERS[..2] {
-        let root = owner_path(owner);
+    for owner in &owners[..2] {
+        let root = if lane_scope {
+            owner_path(owner).join("output/compact-indexes/157")
+        } else {
+            owner_path(owner)
+        };
         let scan = process_references::scan(Path::new("/proc"), &root)?;
         ensure!(
             scan.references.is_empty(),
@@ -329,9 +336,17 @@ fn kernel() -> Result<Vec<Value>> {
         results.push(json!({"root":root,"processes":scan.inspected_processes}));
     }
     // A subdirectory or file bind rooted under a qualification tree can conceal its host path.
-    let ids: Vec<PathBuf> = OWNERS[..2]
+    let ids: Vec<PathBuf> = owners[..2]
         .iter()
-        .map(|p| Path::new("/").join(owner_path(p).strip_prefix("/home/sol").unwrap()))
+        .map(|p| {
+            let base = owner_path(p);
+            let root = if lane_scope {
+                base.join("output/compact-indexes/157")
+            } else {
+                base
+            };
+            Path::new("/").join(root.strip_prefix("/home/sol").unwrap())
+        })
         .collect();
     let mut namespaces = BTreeSet::new();
     for proc in fs::read_dir("/proc")? {
@@ -350,7 +365,7 @@ fn kernel() -> Result<Vec<Value>> {
             for fd in fs::read_dir(p.join("fd"))? {
                 match fs::metadata(fd?.path()) {
                     Ok(m)
-                        if m.dev() == 64512 && OWNERS.iter().any(|o| o.index_inode == m.ino()) =>
+                        if m.dev() == 64512 && owners.iter().any(|o| o.index_inode == m.ino()) =>
                     {
                         return Err(std::io::Error::other("an epoch 157 index is open"));
                     }
@@ -372,7 +387,7 @@ fn kernel() -> Result<Vec<Value>> {
                     if device == "fc:00"
                         && inode
                             .parse::<u64>()
-                            .is_ok_and(|i| OWNERS.iter().any(|o| o.index_inode == i))
+                            .is_ok_and(|i| owners.iter().any(|o| o.index_inode == i))
                     {
                         return Err(std::io::Error::other("an epoch 157 index is mapped"));
                     }
@@ -410,11 +425,35 @@ fn free() -> Result<u64> {
 }
 fn run(mode: &str) -> Result<Value> {
     ensure!(
-        matches!(mode, "check" | "retire") && unsafe { libc::geteuid() } == 0,
+        matches!(mode, "check" | "retire" | "check-lanes" | "retire-lanes")
+            && unsafe { libc::geteuid() } == 0,
         "use check or retire through the sealed root operator"
     );
-    let base = Path::new(RUNTIME).join(DIR);
-    let seal = evidence::reference(&base.join("tools/deployment-seal-receipt.json"))?;
+    let lane_scope = matches!(mode, "check-lanes" | "retire-lanes");
+    let owners = if lane_scope {
+        lane_cache::owners()
+    } else {
+        OWNERS
+    };
+    let base = Path::new(RUNTIME).join(if lane_scope { lane_cache::DIR } else { DIR });
+    let exe = fs::read_link("/proc/self/exe")?;
+    let deployment = if lane_scope {
+        let package = exe.parent().context("runtime package")?;
+        ensure!(
+            package.parent() == Some(base.as_path())
+                && package
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .and_then(|n| n.strip_prefix("tools-v"))
+                    .and_then(|v| v.parse::<u32>().ok())
+                    .is_some_and(|v| v > 0),
+            "unsealed lane retirement package"
+        );
+        package.to_path_buf()
+    } else {
+        base.join("tools")
+    };
+    let seal = evidence::reference(&deployment.join("deployment-seal-receipt.json"))?;
     ensure!(
         fs::read_link("/proc/self/exe")? == evidence::member(&seal, "retire")?,
         "use the sealed image"
@@ -431,28 +470,54 @@ fn run(mode: &str) -> Result<Value> {
             101135013,
         )?,
     ];
-    for owner in &OWNERS {
+    let fence = if lane_scope {
+        Some(lane_cache::Fences::acquire()?)
+    } else {
+        None
+    };
+    for owner in &owners {
         let path = owner_path(owner)
-            .join(".jetstreamer-private")
+            .join(if lane_scope && owner.index_inode != RETAINED_INODE {
+                "private"
+            } else {
+                ".jetstreamer-private"
+            })
             .join(format!("destination-{}", owner.destination))
             .join("locks/epoch-157.lock");
         locks.push(lock(&path, 64512, owner.lock_inode)?);
     }
-    let manifests = lineage()?;
-    let definition = staged()?;
+    let manifests = if lane_scope {
+        lane_cache::lineage()?
+    } else {
+        lineage()?
+    };
     let checked = base.join("CHECKED.json");
     let done = base.join("COMPLETE.json");
-    let retained = hash_index(&OWNERS[2])?;
-    for kept in &OWNERS[2..] {
-        ensure!(index_stamp(kept)? == retained, "retained aliases changed")
+    let retained = hash_index(&owners[2])?;
+    for kept in &owners[2..] {
+        ensure!(index_stamp(kept)? == retained, "retained aliases changed");
+        if lane_scope {
+            lane_cache::survey(kept, &retained)?;
+        }
     }
     let flag = base.join("INTENT.json");
-    if mode == "check" {
-        let targets = OWNERS[..2]
+    if matches!(mode, "check" | "check-lanes") {
+        let targets = owners[..2]
             .iter()
             .map(hash_index)
             .collect::<Result<Vec<_>>>()?;
-        let scan = kernel()?;
+        let definition = if lane_scope {
+            for (owner, target) in owners[..2].iter().zip(&targets) {
+                lane_cache::survey(owner, target)?;
+            }
+            lane_cache::staged()?
+        } else {
+            staged()?
+        };
+        if let Some(v) = &fence {
+            v.check()?;
+        }
+        let scan = kernel(&owners, lane_scope)?;
         let proof = json!({"operator":seal,"retained":retained,"targets":targets,"sha256":HASH,"closed_segments":manifests,"staged":definition,"kernel":scan});
         if checked.try_exists()? {
             let old = evidence::bound(&evidence::reference(&checked)?)?;
@@ -475,13 +540,21 @@ fn run(mode: &str) -> Result<Value> {
             && proof["sha256"] == HASH,
         "invalid prior check"
     );
-    let scan = kernel()?;
+    let definition = if lane_scope {
+        lane_cache::staged()?
+    } else {
+        staged()?
+    };
+    if let Some(v) = &fence {
+        v.check()?;
+    }
+    let scan = kernel(&owners, lane_scope)?;
     if done.try_exists()? {
-        ensure!(OWNERS[..2].iter().all(|o|matches!(fs::symlink_metadata(index_path(o)),Err(e) if e.kind()==ErrorKind::NotFound)),"recreated target");
+        ensure!(owners[..2].iter().all(|o|matches!(fs::symlink_metadata(index_path(o)),Err(e) if e.kind()==ErrorKind::NotFound)),"recreated target");
         return evidence::reference(&done);
     }
     if !flag.try_exists()? {
-        for (i, o) in OWNERS[..2].iter().enumerate() {
+        for (i, o) in owners[..2].iter().enumerate() {
             ensure!(
                 index_stamp(o)? == proof["targets"][i],
                 "changed qualified target"
@@ -498,7 +571,7 @@ fn run(mode: &str) -> Result<Value> {
         "different retirement intent"
     );
     let mut removed = 0;
-    for (i, owner) in OWNERS[..2].iter().enumerate() {
+    for (i, owner) in owners[..2].iter().enumerate() {
         let path = index_path(owner);
         let receipt = base.join(format!("REMOVED_{}.json", owner.index_inode));
         if receipt.try_exists()? {
@@ -510,9 +583,12 @@ fn run(mode: &str) -> Result<Value> {
                 let stamp = index_stamp(owner)?;
                 ensure!(stamp == proof["targets"][i], "changed selected inode");
                 ensure!(
-                    index_stamp(&OWNERS[2])? == retained,
+                    index_stamp(&owners[2])? == retained,
                     "changed retained inode"
                 );
+                if let Some(v) = &fence {
+                    v.check()?;
+                }
                 let allocation = stamp[4].as_u64().context("blocks")? * 512;
                 fs::remove_file(&path)?;
                 File::open(path.parent().context("parent")?)?.sync_all()?;
@@ -532,23 +608,35 @@ fn run(mode: &str) -> Result<Value> {
         }
     }
     let mut details = Vec::new();
-    for o in &OWNERS[..2] {
+    for o in &owners[..2] {
         let r = evidence::reference(&base.join(format!("REMOVED_{}.json", o.index_inode)))?;
         let row = evidence::bound(&r)?;
         removed += row["unlinked_allocation"].as_u64().context("removal")?;
         details.push(r);
     }
     let after = free()?;
+    if lane_scope {
+        ensure!(
+            manifests == lane_cache::lineage()?,
+            "preserved material changed"
+        );
+        for kept in &owners[2..] {
+            ensure!(index_stamp(kept)? == retained, "retained name changed");
+        }
+    }
     let before = intent["before"].as_u64().context("before")?;
     evidence::receipt(
         &done,
-        &json!({"intent":evidence::reference(&flag)?,"removed":details,"retained_paths":OWNERS[2..].iter().map(index_path).collect::<Vec<_>>(),"sha256":HASH,"allocated_bytes_removed":removed,"available_before":before,"available_after":after,"conservative_credit":removed.min(after.saturating_sub(before))}),
+        &json!({"intent":evidence::reference(&flag)?,"removed":details,"retained_paths":owners[2..].iter().map(index_path).collect::<Vec<_>>(),"sha256":HASH,"allocated_bytes_removed":removed,"available_before":before,"available_after":after,"conservative_credit":removed.min(after.saturating_sub(before))}),
     )
 }
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
-    ensure!(args.len() == 2, "usage: retire check|retire");
+    ensure!(
+        args.len() == 2,
+        "usage: retire check|retire|check-lanes|retire-lanes"
+    );
     println!("{}", run(&args[1])?);
     Ok(())
 }
