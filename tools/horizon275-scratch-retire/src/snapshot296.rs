@@ -247,11 +247,61 @@ pub(super) fn run(
         "full epoch 296 replay depends on this cache"
     );
 
-    let _cycle = lock(CYCLE_LOCK)?;
-    let _mutation = lock(LOCAL_LOCK)?;
     let context = json!({"source":path,"source_sha256":SHA,"terminal_sha256":TERMINAL_SHA,
             "verified_archive_sha256":VERIFICATION_SHA,"restore_sha256":RESTORE_SHA,
             "tool_sha256":self_sha,"generation":object});
+    evict_cache(
+        BoundCache {
+            apply,
+            state,
+            path: &path,
+            size: SIZE,
+            sha: SHA,
+            restore: &restore,
+            proof: &proof,
+            metadata_sha,
+            context,
+        },
+        || {
+            let (scheduled, consumers) = observe(&path, &terminal["guard_after"])?;
+            Ok((scheduled, json!(consumers)))
+        },
+        archive_state,
+    )
+}
+
+pub(super) struct BoundCache<'a> {
+    pub apply: bool,
+    pub state: &'a Path,
+    pub path: &'a Path,
+    pub size: u64,
+    pub sha: &'a str,
+    pub restore: &'a Value,
+    pub proof: &'a Value,
+    pub metadata_sha: &'a str,
+    pub context: Value,
+}
+
+pub(super) fn evict_cache(
+    cache: BoundCache<'_>,
+    observe: impl Fn() -> Result<(Value, Value)>,
+    archive_state: impl Fn() -> Result<()>,
+) -> Result<()> {
+    let BoundCache {
+        apply,
+        state,
+        path,
+        size,
+        sha,
+        restore,
+        proof,
+        metadata_sha,
+        context,
+    } = cache;
+    let dir = path.parent().context("cache parent directory")?;
+    let name = path.file_name().context("cache filename")?;
+    let _cycle = lock(CYCLE_LOCK)?;
+    let _mutation = lock(LOCAL_LOCK)?;
     let intent_path = state.join("intent.json");
     let check_path = state.join("check.json");
     let done_path = state.join("completion.json");
@@ -274,24 +324,23 @@ pub(super) fn run(
         now.checked_sub(observed).is_some_and(|age| age <= 900),
         "GCS generation recheck is stale"
     );
-    let guard = &terminal["guard_after"];
-    let (scheduled, consumers) = observe(&path, guard)?;
+    let (scheduled, consumers) = observe()?;
     let parent = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
-        .open(CACHE)?;
+        .open(dir)?;
     let parent_identity = identity(&parent.metadata()?);
-    let relative = PathBuf::from(format!("/proc/self/fd/{}", parent.as_raw_fd())).join(NAME);
+    let relative = PathBuf::from(format!("/proc/self/fd/{}", parent.as_raw_fd())).join(name);
     let pending = snapshot288::lookup_receipt(&intent_path)?;
     let current = match relative.symlink_metadata() {
         Ok(meta) => {
-            let mut file = open_regular(&path)?;
+            let mut file = open_regular(path)?;
             ensure!(
                 meta.is_file()
                     && meta.uid() == 1000
                     && meta.nlink() == 1
                     && meta.mode() & 0o022 == 0
-                    && meta.len() == SIZE
+                    && meta.len() == size
                     && restore["file"]["device"] == meta.dev()
                     && restore["file"]["inode"] == meta.ino()
                     && restore["file"]["mtime_ns"]
@@ -300,7 +349,7 @@ pub(super) fn run(
                                 + i128::from(meta.mtime_nsec())
                         )
                     && stamp(&file.metadata()?) == stamp(&meta)
-                    && digest(&mut file)? == SHA
+                    && digest(&mut file)? == sha
                     && stamp(&file.metadata()?) == stamp(&meta),
                 "diagnostic snapshot identity or SHA-256 changed"
             );
@@ -341,14 +390,13 @@ pub(super) fn run(
         write_json(
             &intent_path,
             &json!({"scope":context,"check":check_ref,"metadata_sha256":metadata_sha,
-            "free_before_bytes":available(Path::new(CACHE))?,"scheduled":scheduled,"consumers":consumers}),
+            "free_before_bytes":available(dir)?,"scheduled":scheduled,"consumers":consumers}),
         )?
     };
-    let (schedule, consumers) = observe(&path, guard)?;
+    let (schedule, consumers) = observe()?;
     archive_state()?;
     ensure!(
-        Path::new(CACHE).canonicalize()? == Path::new(CACHE)
-            && identity(&fs::symlink_metadata(CACHE)?) == parent_identity,
+        dir.canonicalize()? == dir && identity(&dir.symlink_metadata()?) == parent_identity,
         "cache parent replaced"
     );
     if let Some(stable) = current {
@@ -356,7 +404,7 @@ pub(super) fn run(
             stamp(&relative.symlink_metadata()?) == stable,
             "cache changed before retirement"
         );
-        let name = CString::new(NAME)?;
+        let name = CString::new(std::os::unix::ffi::OsStrExt::as_bytes(name))?;
         ensure!(
             unsafe { libc::unlinkat(parent.as_raw_fd(), name.as_ptr(), 0) } == 0,
             "could not retire bound cache: {}",
@@ -373,7 +421,7 @@ pub(super) fn run(
     let receipt = write_json(
         &done_path,
         &json!({"scope":context,"intent":intent,"allocated_bytes_removed":released,
-        "free_after_bytes":available(Path::new(CACHE))?,"scheduled":schedule,"consumers":consumers,
+        "free_after_bytes":available(dir)?,"scheduled":schedule,"consumers":consumers,
         "archive_preserved":true,"source_restorable_by_pinned_generation":true,"r2_mutations":false,"remote_mutations":false}),
     );
     println!("{}", serde_json::to_string(&receipt?)?);
