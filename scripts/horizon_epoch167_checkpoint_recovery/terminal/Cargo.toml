@@ -19,3 +19,7 @@ sha2 = "0.10"
 [[bin]]
 name = "horizon-167-overlap-operator"
 path = "overlap_operator.rs"
+
+[[bin]]
+name = "horizon-167-assembly-turnover"
+path = "assembly_turnover.rs"
