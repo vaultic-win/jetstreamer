@@ -183,7 +183,7 @@ def launch(contract_ref, writer_ref, price_seal, guard_seal):
     tools = contract["tools_seal"]
     gate = member(BASE / "tools-v1", "hold-143", tools)
     guard = member(BASE / "guard-v2", "guard", guard_seal)
-    need(contract["node"] == member(BASE / "node-v1", "jetstreamer-node", contract["node_seal"]),
+    need(contract["node"] == member(RT / "epoch143-second-hourly-20261128-v2/node-v1", "jetstreamer-node", contract["node_seal"]),
          "native node was not sealed")
     custody = read(contract["snapshot_custody"])
     need(ref(Path(custody["snapshot"]["path"])) == custody["snapshot"], "bootstrap payload changed")
