@@ -614,6 +614,22 @@ fn registration(prestart: &Value, token: &Value) -> Result<Value> {
     )
 }
 
+pub(super) fn cadence_lock() -> Result<File> {
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(drain::CYCLE_LOCK)?;
+    let stat = lock.metadata()?;
+    ensure!(
+        stat.uid() == 0
+            && stat.nlink() == 1
+            && stat.mode() & 0o077 == 0
+            && unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+        "fleet cadence is busy"
+    );
+    Ok(lock)
+}
+
 pub(crate) fn run() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
     ensure!(
@@ -646,18 +662,7 @@ pub(crate) fn run() -> Result<()> {
         env::var("CODEX_THREAD_ID").as_deref() == Ok(THREAD),
         "epoch 226 campaign controller changed"
     );
-    let lock = fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(drain::CYCLE_LOCK)?;
-    let stat = lock.metadata()?;
-    ensure!(
-        stat.uid() == 0
-            && stat.nlink() == 1
-            && stat.mode() & 0o077 == 0
-            && unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-        "fleet cadence is busy"
-    );
+    let _lock = cadence_lock()?;
     if path("cadence-registration.json").exists() {
         let registration = document(&path("cadence-registration.json"))?;
         ensure!(

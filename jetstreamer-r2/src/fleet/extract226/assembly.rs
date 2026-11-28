@@ -412,7 +412,7 @@ pub(crate) fn run() -> Result<()> {
         env::var("CODEX_THREAD_ID").as_deref() == Ok(suffix::THREAD),
         "Foundation controller changed"
     );
-    let _lock = foundation_roster::cadence_lock()?;
+    let _lock = suffix::cadence_lock()?;
     installed()?;
     let registration = path("cadence-registration.json");
     if registration.try_exists()? {
