@@ -35,9 +35,12 @@ RAM_GAP_DEPLOYMENT = NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-ram
 SECOND_RAM_GAP = Path(__file__).resolve().parent == NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-ram-20261128-v2/operator-v1"
 THIRD_RAM_GAP = Path(__file__).resolve().parent == NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-ram-20261128-v3/operator-v1"
 RAM_GAP = THIRD_RAM_GAP or SECOND_RAM_GAP or Path(__file__).resolve().parent == RAM_GAP_DEPLOYMENT
+AFTER_RAM = Path(__file__).resolve().parent == NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73766969-gap-20261128-v1/operator-v1"
 GAP = RAM_GAP or Path(__file__).resolve().parent == GAP_DEPLOYMENT
 ENTRY_FIELD = "independent_checkpoint" if GAP else "closed_comparison"
-if RAM_GAP:
+if AFTER_RAM:
+    q = load("after_ram170_issuer")
+elif RAM_GAP:
     if THIRD_RAM_GAP:
         q = load("ram170_third_price")
     elif SECOND_RAM_GAP:
@@ -65,6 +68,13 @@ def save(name,v):
     p=D/name
     persist(p,(json.dumps(v,indent=2)+"\n").encode())
     return q.read(p)[1]
+
+
+def save_fit(name, document):
+    # Keep a finished fit if the original one-shot stopped before recording its next step.
+    if AFTER_RAM and (D/name).exists():
+        name = Path(name).stem + "_" + str(time.time_ns()) + ".json"
+    return save(name, document)
 
 
 def current(name):
@@ -175,20 +185,25 @@ def actor(held=True):
 def start():
     i,ir=static()
     closed=compare()
-    old_guard=q.bound(i["handoff"])["live_guard"]
-    old_timer=q.BRIDGE.replace("-qualify-","-guard-").replace(".service",".timer")
-    st=q.state(old_timer,"Id,ActiveState,InvocationID,Job")
-    if GAP:
-        q.retained_guard(st, old_guard)
-    elif st["ActiveState"]=="active":
-        loan=q.B140/"CPU_LOAN_RETURN.json"
-        need(loan.exists() and q.read(loan)[0]["producer_and_guard_drained"]
-             and st["InvocationID"]==old_guard["timer_invocation_id"],"old guard still protects active CPU loan")
+    if AFTER_RAM:
+        q.predecessor_drained()
+        if (D/"SUCCESSOR_START_INTENT.json").exists():
+            return q.recover_start(actor, save, ir, closed)
+    else:
+        old_guard=q.bound(i["handoff"])["live_guard"]
+        old_timer=q.BRIDGE.replace("-qualify-","-guard-").replace(".service",".timer")
+        st=q.state(old_timer,"Id,ActiveState,InvocationID,Job")
+        if GAP:
+            q.retained_guard(st, old_guard)
+        elif st["ActiveState"]=="active":
+            loan=q.B140/"CPU_LOAN_RETURN.json"
+            need(loan.exists() and q.read(loan)[0]["producer_and_guard_drained"]
+                 and st["InvocationID"]==old_guard["timer_invocation_id"],"old guard still protects active CPU loan")
+            q.inactive(q.BRIDGE)
+            subprocess.run(["/usr/bin/systemctl","stop",old_timer],check=True)
         q.inactive(q.BRIDGE)
-        subprocess.run(["/usr/bin/systemctl","stop",old_timer],check=True)
-    q.inactive(q.BRIDGE)
-    if not GAP:
-        q.inactive(old_timer.replace(".timer",".service"))
+        if not GAP:
+            q.inactive(old_timer.replace(".timer",".service"))
     q.inactive(UNIT)
     q.inactive(GUARD)
     need(q.state(TIMER,"Id,ActiveState,Job")["ActiveState"]=="inactive","successor guard already active")
@@ -233,8 +248,8 @@ def start():
     if RAM_GAP:
         q.transfer_guard(save)
         fit=checked_price("start")
-    fref=save("SUCCESSOR_START_FIT.json",fit)
-    save("SUCCESSOR_START_INTENT.json",dict({ENTRY_FIELD: closed},interface=ir,price=fref,
+    fref=save_fit("SUCCESSOR_START_FIT.json",fit)
+    intent_ref=save("SUCCESSOR_START_INTENT.json",dict({ENTRY_FIELD: closed},interface=ir,price=fref,
         producer_unit=UNIT,guard_unit=GUARD,guard_floor=fit["guard_floor"],guard_cap=fit["guard_cap"],
         resource_credit_bytes=0,archive_publication_authorized=False))
     unit=Path(q.bound(i["layout"])["service"]["path"])
@@ -251,6 +266,8 @@ def start():
             line = "StandardOutput=append:"+i["log"]
         props+=["--property",line]
     props+=["--property","InaccessiblePaths=-/run/jetstreamer-ready-bounds-20261121-v1"]
+    if AFTER_RAM:
+        props.extend(["--property", "Environment=HORIZON_170_START_INTENT_SHA256=" + intent_ref["sha256"]])
     need(time.time()-fit["observed"]<60, "priced start expired")
     subprocess.run(["/usr/bin/systemd-run","--quiet","--service-type=exec","--unit="+UNIT,*props,"--",
                     "/usr/bin/env",ALIAS+"/gate"],check=True)
@@ -304,11 +321,16 @@ def arm():
     cap=intent["guard_cap"]
     need(funded_guard(fit, floor, cap),
          "held floor/cap cannot cover remaining growth")
-    held=save("SUCCESSOR_HELD_FIT.json",fit)
+    held=save_fit("SUCCESSOR_HELD_FIT.json",fit)
     plan=dict(schema="jetstreamer-horizon-standalone-guard-plan-v1",unit=UNIT,invocation_id=a["producer_invocation_id"],
               filesystem="/home/sol",worker_root=str(q.TREE),receipt_directory=i["guard_receipts"],
               maximum_worker_vmas=3500000,minimum_free_bytes=floor,maximum_root_physical_bytes=cap)
     pr=save("ACTUAL_GUARD_PLAN.json",plan)
+    start_guard(i, pr)
+    return dict(actor=ar,plan=pr,held_price=held)
+
+
+def start_guard(i, pr):
     exe=Path(i["guard_seal"]["path"]).with_name("guard");argv=[str(exe),pr["path"],"--plan-sha256",pr["sha256"],"--self-sha256",i["guard_sha"]]
     validate=json.loads(q.cmd(*argv,"--validate-plan-only"))
     need(validate["validated"] and validate["resource_samples_taken"]==0 and digest(exe)==i["guard_sha"],"invalid guard")
@@ -322,7 +344,6 @@ def arm():
         args.extend(["--property",prop])
     same_actor()
     subprocess.run([*args,"--",*argv],check=True)
-    return dict(actor=ar,plan=pr,held_price=held)
 
 
 def guard():
@@ -359,8 +380,8 @@ def release():
     fit=checked_price("held")
     need(funded_guard(fit, plan["minimum_free_bytes"], plan["maximum_root_physical_bytes"]),
          "joint postguard HOME coverage failed")
-    fp=save("SUCCESSOR_POST_GUARD_FIT.json",fit)
-    admission=save("SUCCESSOR_AUTHORIZED_RELEASE.json",dict({ENTRY_FIELD: closed},actor=ar,interface=ir,
+    fp=save_fit("SUCCESSOR_POST_GUARD_FIT.json",fit)
+    admission=save_fit("SUCCESSOR_AUTHORIZED_RELEASE.json",dict({ENTRY_FIELD: closed},actor=ar,interface=ir,
                    writer_enrollment=er,guard_plan=pr,post_guard_capacity=fp,first_guard_sample=sample,
                    producer_invocation_id=a["producer_invocation_id"],archive_publication_authorized=False))
     sr=save("SUCCESSOR_RELEASE.json",dict(schema="horizon-epoch170-bounded-successor-release-v1",actor=ar,
@@ -369,12 +390,17 @@ def release():
                writer_enrollment=er,post_guard_capacity=fp,**{ENTRY_FIELD:closed}))
     current_guard,again,_,_=guard()
     need(again==ti and q.state(writer["unit"])==ws and time.time()-fit["observed"]<=90,"release bindings expired")
-    # The stage helper creates ordinary receipts at 0400. The unprivileged native gate needs 0444 at first visibility.
-    path=Path(i["barrier"])
-    tmp=path.parent/(".permit-"+a["producer_invocation_id"])
+    publish_permit(Path(i["barrier"]), a["producer_invocation_id"])
+    return dict(released=sr,guard_at_commit=current_guard)
+
+
+def publish_permit(path, invocation):
+    # The unprivileged gate must see a complete, readable invocation at first visibility.
+    tmp=path.parent/(".permit-"+invocation+("-"+str(time.time_ns()) if AFTER_RAM else ""))
     fd=os.open(tmp,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o400)
     try:
-        os.write(fd,a["producer_invocation_id"].encode())
+        data = invocation.encode()
+        need(os.write(fd,data) == len(data), "incomplete permit write")
         os.fchmod(fd,0o444)
         os.fsync(fd)
     finally:
@@ -386,7 +412,6 @@ def release():
     fd=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY)
     try: os.fsync(fd)
     finally: os.close(fd)
-    return dict(released=sr,guard_at_commit=current_guard)
 
 
 if __name__=="__main__":

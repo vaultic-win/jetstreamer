@@ -14,6 +14,7 @@ RETRY_ROOT = ROOT/"attempt-2"
 FOLLOWING_ROOT = ROOT.parent/"epoch170-from-73766969-20261127-v1"
 GAP_ROOT = ROOT.parent/"epoch170-from-73760367-20261128-v1"
 RAM_ROOT = ROOT.parent/"epoch170-from-73760367-ram-20261128-v1"
+AFTER_RAM_ROOT = ROOT.parent/"epoch170-from-73766969-gap-20261128-v1"
 SECOND_RAM_ROOT = ROOT.parent/"epoch170-from-73760367-ram-20261128-v2"
 THIRD_RAM_ROOT = ROOT.parent/"epoch170-from-73760367-ram-20261128-v3"
 for candidate in (SECOND_RAM_ROOT, THIRD_RAM_ROOT):
@@ -22,7 +23,9 @@ for candidate in (SECOND_RAM_ROOT, THIRD_RAM_ROOT):
         break
 RAM_OPERATOR = RAM_ROOT/"operator-v1"
 RETRY = Path(__file__).resolve().parent in (RETRY_ROOT/"progress-v1", RETRY_ROOT/"progress-v2", RETRY_ROOT/"progress-v3")
-if RETRY:
+if Path(__file__).resolve().parent == AFTER_RAM_ROOT/"operator-v1":
+    ROOT = AFTER_RAM_ROOT
+elif RETRY:
     ROOT = RETRY_ROOT
 elif Path(__file__).resolve().parent == RAM_OPERATOR:
     ROOT = RAM_ROOT
@@ -121,6 +124,8 @@ def follow(dispatch):
     require(release["actor"] == actor_ref and release["interface"] == scope_ref
             and release["producer_invocation_id"] == iid and Path(scope["barrier"]).read_text() == iid
             and not release["archive_publication_authorized"], "unconfirmed successor release")
+    if ROOT == AFTER_RAM_ROOT:
+        require(release["closed_comparison"] == q.compare_predecessor(), "different retained RAM checkpoint")
     if ROOT in (GAP_ROOT,RAM_ROOT):
         require(release["independent_checkpoint"] == q.compare_predecessor(), "different independent gap checkpoint")
     dest = ROOT/"FIRST_PROTECTED_PROGRESS.json"
@@ -169,12 +174,12 @@ def follow(dispatch):
 
 
 def main():
-    observe = ROOT in (GAP_ROOT,RAM_ROOT) and sys.argv[1:] == ["observe"]
+    observe = ROOT in (GAP_ROOT,RAM_ROOT,AFTER_RAM_ROOT) and sys.argv[1:] == ["observe"]
     require(observe or sys.argv[1:] in (["check"], ["advance"]), "unknown progress command")
-    directory = RAM_OPERATOR if ROOT == RAM_ROOT else OPERATOR
+    directory = ROOT/"operator-v1" if ROOT in (RAM_ROOT,AFTER_RAM_ROOT) else OPERATOR
     original = directory/"continuation_dispatch.py"
     expected = EXPECTED_DISPATCH
-    if ROOT == RAM_ROOT:
+    if ROOT in (RAM_ROOT,AFTER_RAM_ROOT):
         require(observe, "use the registered RAM retry dispatcher to advance")
         seal = json.loads((directory/"deployment-seal-receipt.json").read_bytes())
         require(seal["destination"]==str(directory), "different RAM retry operator")
