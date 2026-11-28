@@ -42,7 +42,7 @@ struct PrivateCache {
 const V1627_CACHE: &str =
     "/home/ubuntu/.jetstreamer-private/epoch230-v1627-source.AmUY7Aaw/check-target";
 const V1627_SOURCE: &str =
-    "/home/ubuntu/.jetstreamer-private/epoch230-v1627-source.AmUY7Aaw/tree/historical-runtime/v1_6_27";
+    "/home/ubuntu/.jetstreamer-private/epoch230-v1627-source.AmUY7Aaw/tree";
 
 const PRIVATE_CACHES: &[PrivateCache] = &[
     PrivateCache {
@@ -198,8 +198,13 @@ fn source(p: &Plan) -> Result<()> {
             && git(repo, &["status", "--porcelain", "--untracked-files=no"])?.is_empty(),
         "cache source revision is changed/unclean"
     );
+    let lock = if repo == V1627_SOURCE {
+        "historical-runtime/v1_6_27/Cargo.lock"
+    } else {
+        "Cargo.lock"
+    };
     ensure!(
-        hash_file(&Path::new(repo).join("Cargo.lock"), 16 << 20)?.0 == p.cargo_lock_sha256,
+        hash_file(&Path::new(repo).join(lock), 16 << 20)?.0 == p.cargo_lock_sha256,
         "cache source Cargo.lock changed"
     );
     if repo != REPO {
