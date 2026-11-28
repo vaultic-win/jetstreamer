@@ -1,7 +1,7 @@
 //! Retire reproducible GCS intakes after their private epoch 266 replays close.
 
 use super::{
-    appendvec292::failed::no_readers,
+    appendvec292::failed::{StoppedReference, no_readers},
     snapshot296::{BoundCache, evict_cache, stamp},
     *,
 };
@@ -451,7 +451,26 @@ pub(super) fn retire_window(
         terminal_unit(TIMER)?;
         terminal_unit(GUARD)?;
         assert_no_nested_mount(&path)?;
-        let report = no_readers(cache, &path, &[])?;
+        // The first intake's failed transient definition still names this path.
+        // Bind that one drained attempt without allowing new scheduled references.
+        const FAILED_COPY: &str = "foundation-266-next-114929697-input-stage-v1.service";
+        const FAILED_COPY_IID: &str = "e38ce913300d4a96b69997c774df4cca";
+        const RECIPE_SHA: &str =
+            "516fd17668acac454f59a695b6123e4628d305003e01442fea85978dc5c11d04";
+        let fragment = Path::new("/run/systemd/transient").join(FAILED_COPY);
+        if fragment.try_exists()? {
+            let mut recipe = open_regular(&fragment)?;
+            let metadata = recipe.metadata()?;
+            ensure!(
+                metadata.uid() == 0 && metadata.mode() & 0o022 == 0
+                    && digest(&mut recipe)? == RECIPE_SHA
+                    && identity(&metadata) == identity(&fragment.symlink_metadata()?),
+                "changed failed epoch 266 intake definition"
+            );
+        }
+        let report = no_readers(cache, &path, &[
+            (FAILED_COPY, FAILED_COPY_IID, StoppedReference::Direct(RECIPE_SHA)),
+        ])?;
         Ok((report["scheduled"].clone(), report["processes"].clone()))
     };
     archive_state()?;
