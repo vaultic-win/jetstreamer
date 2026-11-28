@@ -10,7 +10,7 @@ from derive143_v53 import member_plan
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v1")
 COPY = BASE/"preparation-tools-v2"
 COPY_SEAL = "c5ed0f0ef7dc9c86936023ed686ff8f9ddfec23c05b2d4489557231e1eb3f3ed"
-BUILD = BASE/"preparation-build-v1"
+BUILD = BASE/"preparation-build-v2"
 WORKTREE = Path("/home/sol/.jetstreamer-private/epoch143-hourly-closure-20261128.BYOcX2fH/source")
 CUSTODY_SHA = "29bae456ca9d5e7c14a0b96a6ba4709556da62079028b6a8b5687fc315d3134c"
 COPY_UNIT = "horizon-prepare-143-hourly-copy-20261128-v2.service"
@@ -23,7 +23,7 @@ def derive(work, revision, price_version, price_sha):
     s = s.replace("preparation-tools-v2", BUILD.name)
     s = s.replace("horizon-prepare-143-hourly-copy-20261128-v2","horizon-prepare-143-hourly-build-20261128-v1")
     s = s.replace("horizon-guard-143-hourly-copy-20261128-v2","horizon-guard-143-hourly-build-20261128-v1")
-    s = s.replace('"copy-guard-v2"','"build-guard-v1"').replace('"COPY_ADMISSION_V2.json"','"BUILD_ADMISSION.json"')
+    s = s.replace('"copy-guard-v2"','"build-guard-v1"').replace('"COPY_ADMISSION_V2.json"','"BUILD_ADMISSION_V2.json"')
     s = change(s,'INPUT = RUN / "input"', 'INPUT = RUN / "build"')
     s = s.replace("issued-price-v18",f"issued-price-v{price_version}")
     s = s.replace("8c326db152e86c7723771501a225607de66012c6cc6f619e9da452335c627e4a",price_sha)
@@ -40,7 +40,7 @@ def derive(work, revision, price_version, price_sha):
              "build source differs from the merged revision")''')
     # This read-only root checkout uses the sol-owned shared Git directory.
     s = s.replace('"/usr/bin/git","-C",str(checkout)',
-                  '"/usr/bin/runuser","-u","sol","--","/usr/bin/git","-C",str(checkout)')
+                  '"/usr/sbin/runuser","-u","sol","--","/usr/bin/git","-C",str(checkout)')
     s = change(s, '"--property=CPUQuota=50%"', '"--property=CPUQuota=200%"')
     s = change(s, '"--property=TasksMax=128"', '"--property=TasksMax=512"')
     a = s.index('                f"--property=ReadWritePaths=')
