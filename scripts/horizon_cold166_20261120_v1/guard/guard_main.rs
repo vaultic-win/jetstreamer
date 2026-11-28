@@ -842,7 +842,14 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
             let receipts = if plan.unit == "horizon-qualify-143-second-hourly-20261128-v1.service" {
                 "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v1/guard-receipts"
             } else {
-                #[cfg(feature = "epoch143-second-hourly-held-successor")]
+                #[cfg(feature = "epoch143-second-hourly-held-ram-successor")]
+                {
+                    "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v5/guard-receipts"
+                }
+                #[cfg(all(
+                    feature = "epoch143-second-hourly-held-successor",
+                    not(feature = "epoch143-second-hourly-held-ram-successor")
+                ))]
                 {
                     "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v4/guard-receipts"
                 }
