@@ -63,6 +63,12 @@ const OVERLAP: RetainedSegment = RetainedSegment {
     terminal_digest: TERMINAL,
 };
 
+struct SnapshotCustody {
+    path: &'static str,
+    schema: &'static str,
+    generation: &'static str,
+}
+
 struct WindowSpec {
     bounds: QualificationPlan,
     source_digest: &'static str,
@@ -71,7 +77,7 @@ struct WindowSpec {
     snapshot_name: &'static str,
     snapshot_bytes: u64,
     predecessor: &'static RetainedSegment,
-    requires_custody: bool,
+    custody: Option<SnapshotCustody>,
 }
 
 const FIRST_WINDOW: WindowSpec = WindowSpec {
@@ -82,7 +88,7 @@ const FIRST_WINDOW: WindowSpec = WindowSpec {
     snapshot_name: "snapshot-114929697-BevfHbX1MRE8ySXdbzp8WZB5i4W1spPhbsZ8UEUhU7di.tar.zst",
     snapshot_bytes: SNAPSHOT_BYTES,
     predecessor: &OVERLAP,
-    requires_custody: false,
+    custody: None,
 };
 
 const REPLAYED_WINDOW: RetainedSegment = RetainedSegment {
@@ -109,14 +115,50 @@ const SUCCESSOR_WINDOW: WindowSpec = WindowSpec {
     snapshot_name: "snapshot-114936474-GqAWTNQiWMCFTZLC1N3SXe2NmykFDcMQdn4Saj4ALSCA.tar.zst",
     snapshot_bytes: 15_568_220_095,
     predecessor: &REPLAYED_WINDOW,
-    requires_custody: true,
+    custody: Some(SnapshotCustody {
+        path: "/var/lib/jetstreamer/horizon266-window-114936475-114943135-static-inputs-v1/bootstrap-custody.json",
+        schema: "foundation-epoch266-successor-bootstrap-private-custody-v1",
+        generation: "1641767207323715",
+    }),
+};
+
+const NEXT_BOOTSTRAP: u64 = 114_943_135;
+const RETAINED_SUCCESSOR: RetainedSegment = RetainedSegment {
+    first: END + 1,
+    last: NEXT_BOOTSTRAP,
+    accounts_hash: SUCCESSOR_WINDOW.terminal_accounts,
+    bytes: 3_037_743_876,
+    archive_digest: "53b8e98d9ed0a2713e561cf7b91bb256418ce9d133cee95857a4eab7298d0be9",
+    manifest_digest: "e73a496e27f97c7256223a1a63eea0822098b572ce472cbeda22ba86a997eb22",
+    terminal_digest: "7865f46557c5011ef282d9262fdc776d7b002293eafc13a1850005ed5bedf658",
+};
+
+const FOLLOWING_WINDOW: WindowSpec = WindowSpec {
+    bounds: QualificationPlan {
+        epoch: EPOCH,
+        bootstrap_slot: NEXT_BOOTSTRAP,
+        replay_start: NEXT_BOOTSTRAP + 1,
+        output_slot_start: NEXT_BOOTSTRAP + 1,
+        end_inclusive: 114_949_777,
+    },
+    source_digest: "d7c016c6cd9c6de2e214c57f3cb1c2649a46a8eb47b1e39ec96eb2fb2cbb5e02",
+    bootstrap_accounts: RETAINED_SUCCESSOR.accounts_hash,
+    terminal_accounts: "2P1wpm3BgAxTEZ13B5dFR6iWvqiN63LLNV6Yf61Qw9Zd",
+    snapshot_name: "snapshot-114943135-6yDbxQ1pi5QgyLa7byJ7SnRRbh3ekSHeYkSVUDCnbyDt.tar.zst",
+    snapshot_bytes: 15_608_791_637,
+    predecessor: &RETAINED_SUCCESSOR,
+    custody: Some(SnapshotCustody {
+        path: "/var/lib/jetstreamer/horizon266-next-114943135-intake-v1/custody.json",
+        schema: "foundation-epoch266-following-bootstrap-private-custody-v1",
+        generation: "1641767202392427",
+    }),
 };
 
 fn window_for(source_digest: &str) -> Result<&'static WindowSpec, String> {
-    [&FIRST_WINDOW, &SUCCESSOR_WINDOW]
+    [&FIRST_WINDOW, &SUCCESSOR_WINDOW, &FOLLOWING_WINDOW]
         .into_iter()
         .find(|spec| spec.source_digest == source_digest)
-        .ok_or_else(|| "epoch 266 source is outside the two pinned windows".to_owned())
+        .ok_or_else(|| "epoch 266 source is outside the pinned windows".to_owned())
 }
 
 const INDEXES: [(&str, &str, u64); 3] = [
@@ -203,7 +245,7 @@ fn validate_plan(plan: &Plan, spec: &WindowSpec, destination: &Path) -> Result<(
             && destination == plan.run_root.join("ledger")
             && sha(&plan.node_sha256)? != [0; 32]
             && plan.minimum_free_bytes >= MIN_GUARD_FLOOR
-            && plan.bootstrap_custody.is_some() == spec.requires_custody,
+            && plan.bootstrap_custody.is_some() == spec.custody.is_some(),
         "epoch 266 plan has a foreign runtime, root or reserve floor",
     )?;
     for (input, expected) in [
@@ -230,7 +272,7 @@ fn validate_plan(plan: &Plan, spec: &WindowSpec, destination: &Path) -> Result<(
             == Some(spec.snapshot_name)
             && plan.snapshot.path.is_absolute()
             && !plan.snapshot.path.starts_with(&plan.run_root)
-            && if spec.requires_custody {
+            && if spec.custody.is_some() {
                 sha(&plan.snapshot.sha256)? != [0; 32]
             } else {
                 plan.snapshot.sha256 == SNAPSHOT
@@ -287,12 +329,13 @@ fn validate_snapshot(plan: &Plan, spec: &WindowSpec) -> Result<[u8; 32], String>
     require_retained_input(&plan.snapshot.path, spec.snapshot_bytes)?;
     let snapshot = open_regular_nofollow(&plan.snapshot.path).map_err(|err| err.to_string())?;
     check_readonly(&snapshot)?;
-    if let Some(custody_ref) = &plan.bootstrap_custody {
+    if let Some(expected) = &spec.custody {
+        let custody_ref = plan
+            .bootstrap_custody
+            .as_ref()
+            .ok_or("epoch 266 successor is missing its custody receipt")?;
         require(
-            custody_ref.path
-                == Path::new(
-                    "/var/lib/jetstreamer/horizon266-window-114936475-114943135-static-inputs-v1/bootstrap-custody.json",
-                ),
+            custody_ref.path == Path::new(expected.path),
             "epoch 266 successor uses a foreign custody receipt",
         )?;
         let custody = read_json(custody_ref)?;
@@ -300,7 +343,7 @@ fn validate_snapshot(plan: &Plan, spec: &WindowSpec) -> Result<[u8; 32], String>
         let metadata = snapshot.metadata().map_err(|err| err.to_string())?;
         let nanos = |sec, frac| i128::from(sec) * 1_000_000_000 + i128::from(frac);
         require(
-            custody["schema"] == "foundation-epoch266-successor-bootstrap-private-custody-v1"
+            custody["schema"] == expected.schema
                 && custody["epoch"] == EPOCH
                 && custody["bootstrap_slot"] == spec.bounds.bootstrap_slot
                 && custody["source_window"]["sha256"] == spec.source_digest
@@ -308,7 +351,7 @@ fn validate_snapshot(plan: &Plan, spec: &WindowSpec) -> Result<[u8; 32], String>
                 && custody["whole_file_sha256_rechecked"] == true
                 && custody["publication_authorized"] == false
                 && input["sha256"] == plan.snapshot.sha256
-                && input["generation"] == "1641767207323715"
+                && input["generation"] == expected.generation
                 && input["bytes"] == metadata.len()
                 && input["device"] == metadata.dev()
                 && input["inode"] == metadata.ino()
@@ -398,7 +441,7 @@ fn read_prefix(
         &plan.predecessor_terminal,
         spec.predecessor,
     )?;
-    if spec.requires_custody {
+    if spec.custody.is_some() {
         let middle = read_segment(
             &Evidence {
                 path: "/home/ubuntu/.jetstreamer-private/qualification-266-hourly-overlap-114929697-v1/work/output/epoch-266-slots-114923431-114929697.jet".into(),
@@ -414,7 +457,27 @@ fn read_prefix(
             },
             &OVERLAP,
         )?;
-        checkpoint_matches(&middle.terminal, &prior.bootstrap)?;
+        if spec.bounds.bootstrap_slot == NEXT_BOOTSTRAP {
+            let replayed = read_segment(
+                &Evidence {
+                    path: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114936474-v1/output/epoch-266-slots-114929698-114936474.jet".into(),
+                    sha256: REPLAYED_WINDOW.archive_digest.into(),
+                },
+                &Evidence {
+                    path: "/var/lib/jetstreamer/horizon266-window-114936475-114943135-static-inputs-v1/prior-segment.json".into(),
+                    sha256: REPLAYED_WINDOW.manifest_digest.into(),
+                },
+                &Evidence {
+                    path: "/var/lib/jetstreamer/horizon266-window-114936475-114943135-static-inputs-v1/prior-terminal.json".into(),
+                    sha256: REPLAYED_WINDOW.terminal_digest.into(),
+                },
+                &REPLAYED_WINDOW,
+            )?;
+            checkpoint_matches(&middle.terminal, &replayed.bootstrap)?;
+            checkpoint_matches(&replayed.terminal, &prior.bootstrap)?;
+        } else {
+            checkpoint_matches(&middle.terminal, &prior.bootstrap)?;
+        }
     }
     Ok(prior.terminal)
 }
@@ -780,6 +843,24 @@ mod tests {
                 .is_err()
         );
         assert_eq!(successor.snapshot_sha256(), [3; 32]);
+        let following = VerifiedRestart {
+            terminal: successor.terminal,
+            snapshot: successor.snapshot,
+            snapshot_digest: [4; 32],
+            spec: window_for(FOLLOWING_WINDOW.source_digest).unwrap(),
+            verified: AtomicBool::new(false),
+        };
+        let archive = ReplayBootstrap::SnapshotArchive(following.snapshot.clone());
+        assert!(following
+            .validate_invocation(EPOCH, &archive, Some(FOLLOWING_WINDOW.bounds), false, false, false)
+            .is_ok());
+        assert!(following
+            .validate_invocation(EPOCH, &archive, Some(SUCCESSOR_WINDOW.bounds), false, false, false)
+            .is_err());
+        assert!(matches!(
+            following.restored_verification().unwrap(),
+            historical_replay::RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(114_949_777)
+        ));
         assert!(window_for(&"0".repeat(64)).is_err());
         assert!(!proof.covers_trusted_root(EPOCH, BOOT, BOOT + 1, END));
         assert!(matches!(
