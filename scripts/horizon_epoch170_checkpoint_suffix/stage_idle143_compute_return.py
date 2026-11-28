@@ -7,13 +7,15 @@ import os
 from pathlib import Path
 import runpy
 import subprocess
+import sys
 import tempfile
 import time
 
+SCRIPT = Path(__file__).resolve().parent
+sys.path.insert(0,str(SCRIPT))
 from derive_serial157_v23 import f, once, read_package
 from idle143_compute_return import FULL, READER, RETURN, RETURNED, ROOT, RT, UNIT, observation
 
-SCRIPT = Path(__file__).resolve().parent
 PRICES = RT/'epoch162-first-hourly-completion-20261127-v2'
 OLD = PRICES/'issued-price-v40'
 NEW = PRICES/'issued-price-v41'
