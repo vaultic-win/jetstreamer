@@ -74,7 +74,7 @@ def geometry(whole, previous_guard, drawdown):
                 fits=whole["fits"] and margin >= 0 and whole["ram_margin"] >= 0)
 
 
-def candidate(whole, predecessor, staged, scope, drawdown_ref):
+def candidate(whole, predecessor, staged, scope, drawdown_ref, *, phase="start"):
     _, guard, layout = inherited(whole, predecessor, staged)
     proof = read(scope)
     drawdown = read(drawdown_ref)
@@ -86,14 +86,27 @@ def candidate(whole, predecessor, staged, scope, drawdown_ref):
          and proof["profile"]["new_home_total_bytes"] == HOME
          and proof["profile"]["new_control_bytes"] == CONTROL
          and proof["following_input"]["single_copy"] and proof["no_worker_started"]
-         and not Path(proof["actor_path"]).exists() and not Path(proof["release_path"]).exists()
-         and not Path(proof["barrier"]).exists(),
-         "different staged 170 source or issued replacement")
+         and not Path(proof["release_path"]).exists() and not Path(proof["barrier"]).exists(),
+         "different staged 170 source or released replacement")
+    actor = None
+    current = whole.get("next_hourly170_accounting")
+    if phase == "start":
+        need(not Path(proof["actor_path"]).exists() and not (current and current["intent"]),
+             "next hourly booking already issued")
+    elif phase == "held":
+        need(current and current["intent"] and current["producer_booking_reused"],
+             "next hourly booking is absent")
+        owner = current["actor"]
+        need(owner and owner["phase"] == "held" and owner["interface"] == scope and not owner["release"]
+             and owner["actor"]["path"] == proof["actor_path"], "different unreleased next hourly owner")
+        actor = owner["actor"]
+    else:
+        raise ValueError("invalid next hourly price phase")
     need(drawdown["worst_stop_unix"] >= drawdown["worst_start_unix"]
          and drawdown["worst_observed_90s_free_byte_decrease"] >= 0,
          "invalid shared allocation drawdown receipt")
     amounts = geometry(whole, guard, drawdown["worst_observed_90s_free_byte_decrease"])
-    return dict(amounts, schema="horizon-170-next-hourly-prestart-price-v1", phase="start",
+    return dict(amounts, schema="horizon-170-next-hourly-price-v1", phase=phase, actor=actor,
                 provider=whole["package"], writer=whole["writer"], fleet=whole["fleet"],
                 predecessor=predecessor, staged_layout=staged, scope=scope, drawdown_evidence=drawdown_ref,
                 shared_price_unchanged=True, additional_input_bytes=0, whole_roster=whole)
