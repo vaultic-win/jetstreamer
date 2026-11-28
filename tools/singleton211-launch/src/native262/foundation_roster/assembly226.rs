@@ -13,6 +13,9 @@ pub(super) const EXCLUSIVE: &str = "14,16-23,78,80-87";
 pub const CAP: u64 = 160 << 30;
 pub const RECEIPTS: u64 = 256 << 20;
 pub const MEMORY: u64 = CAP;
+pub const VERIFY_MEMORY: u64 = 128 << 30;
+pub const VERIFY_UNIT: &str = "foundation-226-assembly-read-verification-v1.service";
+pub const VERIFY_SCHEMA: &str = "foundation-epoch226-assembly-verification-roster-v1";
 pub const ROSTER_SCHEMA: &str = "foundation-epoch226-private-assembly-roster-v1";
 pub const REGISTRATION_SCHEMA: &str = "foundation-epoch226-private-assembly-launch-v1";
 pub const NODE: (&str, &str) = (
@@ -169,4 +172,92 @@ pub(super) fn launched_since_sample(
         "epoch 226 assembly was admitted against another accepted fleet"
     );
     Ok(reference)
+}
+
+pub(super) fn closed(n: &mut Native) -> Result<Bound> {
+    let root = Path::new(STATE);
+    let terminal_path = root.join("terminal.json");
+    let terminal = Bound::new(
+        &terminal_path,
+        hash(&terminal_path).context("epoch 226 assembly has no accepted terminal receipt")?,
+    );
+    let result = terminal.sealed()?;
+    let launch = binding(&result["launch"])?;
+    ensure!(
+        launch.path == root.join("cadence-registration.json"),
+        "foreign epoch 226 assembly registration"
+    );
+    let registered = launch.sealed()?;
+    let iid = text(&registered, "invocation_id")?;
+    let exit = &result["scope"]["pid1_exit"];
+    ensure!(
+        result["schema"] == "foundation-epoch226-assembly-terminal-v1"
+            && result["epoch"] == 226
+            && result["guard_drained"] == true
+            && result["publication_authorized"] == false
+            && result["scope"]["launch"] == json!(launch)
+            && registered["schema"] == REGISTRATION_SCHEMA
+            && registered["unit"] == UNIT
+            && result["scope"]["archive"]["path"]
+                == json!(Path::new(ROOT).join("output/epoch-226-worker-transition-v3.jet"))
+            && hex(text(&result["scope"], "archive_sha256")?, 64)
+            && exit["_PID"] == "1"
+            && exit["_UID"] == "0"
+            && exit["UNIT"] == UNIT
+            && exit["INVOCATION_ID"] == iid
+            && exit["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+            && result["timer_after"]["ActiveState"] == "inactive"
+            && matches!(
+                result["guard_after"]["ActiveState"].as_str(),
+                Some("inactive" | "failed")
+            ),
+        "epoch 226 closure does not prove the exact drained assembly"
+    );
+    for unit in [UNIT, GUARD_SERVICE] {
+        let owner = n.show_fields(
+            unit,
+            "Id,InvocationID,ActiveState,SubState,MainPID,ControlPID,ControlGroup,Job,Result,ExecMainStatus,NRestarts",
+        )?;
+        let closed = if unit == UNIT {
+            owner["ActiveState"] == "inactive"
+                && owner["SubState"] == "dead"
+                && owner["Result"] == "success"
+                && owner["ExecMainStatus"] == "0"
+                && (owner["InvocationID"] == "" || owner["InvocationID"] == iid)
+        } else {
+            matches!(owner["ActiveState"].as_str(), Some("inactive" | "failed"))
+        };
+        ensure!(
+            owner["Id"] == unit
+                && closed
+                && owner["MainPID"] == "0"
+                && owner["ControlPID"] == "0"
+                && owner["ControlGroup"] == ""
+                && owner["Job"] == ""
+                && owner["NRestarts"] == "0"
+                && !Path::new("/sys/fs/cgroup/system.slice").join(unit).exists(),
+            "epoch 226 assembly owner or guard has not drained"
+        );
+    }
+    let timer = n.show_fields(TIMER, "Id,ActiveState,Job")?;
+    ensure!(
+        timer["Id"] == TIMER && timer["ActiveState"] == "inactive" && timer["Job"] == "",
+        "epoch 226 assembly guard can still activate"
+    );
+    Ok(terminal)
+}
+
+pub(super) fn match_observed_exit(terminal: &Bound, observed: &Value) -> Result<()> {
+    let record = terminal.sealed()?;
+    ensure!(
+        observed["epoch"] == 226
+            && observed["phase"] == "diagnostic-qualification"
+            && observed["producer"]["Id"] == UNIT
+            && observed["producer"]["InvocationID"]
+                == record["scope"]["pid1_exit"]["INVOCATION_ID"]
+            && observed["launch_receipt"] == record["launch"]["path"]
+            && observed["launch_receipt_sha256"] == record["launch"]["sha256"],
+        "accepted assembly observation differs from the exact terminal invocation"
+    );
+    Ok(())
 }

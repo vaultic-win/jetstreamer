@@ -1,0 +1,15 @@
+--- cycle.py
++++ cycle.py
+@@ -263 +263 @@
+-    root = V / "horizon288-custody-resource-v1"
++    root = V / "horizon288-custody-resource-v2"
+@@ -268,2 +268,3 @@
+-    assert release["observer"]["path"] == str(root / "jetstreamer-horizon-observe")
+-    assert release["fleet"]["path"] == str(root / "jetstreamer-r2")
++    images = V / "horizon288-custody-resource-v1"
++    assert release["observer"]["path"] == str(images / "jetstreamer-horizon-observe")
++    assert release["fleet"]["path"] == str(images / "jetstreamer-r2")
+@@ -1410 +1411,2 @@
+-                and not diagnostic296_meter.owns(r) and not native262_cadence.owns(r)]
++                and not diagnostic296_meter.owns(r) and not native262_cadence.owns(r)
++                and not holding288_resource.owns(r)]

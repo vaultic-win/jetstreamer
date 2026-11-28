@@ -130,6 +130,15 @@ fn validate_audit(value: &Value, epoch: u64) -> Result<()> {
 }
 
 fn run_child(tool: &Bound, args: &[String], output: &Path) -> Result<Value> {
+    run_child_with_stack(tool, args, output, None)
+}
+
+fn run_child_with_stack(
+    tool: &Bound,
+    args: &[String],
+    output: &Path,
+    stack: Option<u64>,
+) -> Result<Value> {
     verify_executable(tool)?;
     let log = OpenOptions::new()
         .create_new(true)
@@ -138,11 +147,15 @@ fn run_child(tool: &Bound, args: &[String], output: &Path) -> Result<Value> {
         .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
         .open(output)?;
     let started = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-    let status = ProcessCommand::new(&tool.path)
-        .args(args)
+    let mut child = ProcessCommand::new(&tool.path);
+    child.args(args)
         .env_clear()
         .env("PATH", "/usr/bin:/bin")
-        .env("LC_ALL", "C")
+        .env("LC_ALL", "C");
+    if let Some(bytes) = stack {
+        child.env("RUST_MIN_STACK", bytes.to_string());
+    }
+    let status = child
         .stdin(Stdio::null())
         .stdout(log.try_clone()?)
         .stderr(log.try_clone()?)
@@ -182,6 +195,24 @@ pub(super) fn run_bound_child(
         },
         args,
         output,
+    )
+}
+
+pub(super) fn run_bound_child_with_stack(
+    path: &Path,
+    sha256: &str,
+    args: &[String],
+    output: &Path,
+    stack: u64,
+) -> Result<Value> {
+    run_child_with_stack(
+        &Bound {
+            path: path.to_owned(),
+            sha256: sha256.to_owned(),
+        },
+        args,
+        output,
+        Some(stack),
     )
 }
 pub(super) fn validate_bound_child(

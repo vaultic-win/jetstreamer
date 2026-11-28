@@ -4,6 +4,7 @@ use horizon_singleton211_launch::native262::foundation_roster::{self, assembly22
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
 pub(crate) mod terminal;
+pub(crate) mod verify;
 
 const RELEASE: &str = "/var/lib/jetstreamer/horizon226-assembly-fleet-v1/acceptance.json";
 const LAUNCHER_RELEASE: &str = "/var/lib/jetstreamer/horizon226-assembly-launcher-v2/acceptance.json";

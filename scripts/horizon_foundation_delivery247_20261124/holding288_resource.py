@@ -68,3 +68,15 @@ def register(plan):
         gate["evidence"].append(reference)
     gate["next_action"] = "Verify encrypted holding custody and confirm the exact local retirement requirements."
     return True
+
+
+def owns(row):
+    if row.get("unit", {}).get("Id") != UNIT:
+        return False
+    reference, launch, _ = registration()
+    active = row["unit"]
+    assert row["epoch"] == 288 and row["phase"] == "private-holding" and row["live"]
+    assert row["expected_invocation_id"] == active["InvocationID"] == launch["actual"]["InvocationID"]
+    assert row["evidence"] == [reference, launch["admission"]]
+    assert row["ordinary_replay_claim"] is False and row["current_sidecar_eta_valid"] is False
+    return True

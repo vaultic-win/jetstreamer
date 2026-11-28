@@ -35,6 +35,31 @@ pub(super) fn preparation() -> Result<Bound> {
     Ok(source)
 }
 
+// This owner is priced by the native auxiliary census. Remove just its
+// observation from the replay join after binding it to the same process.
+pub(super) fn account_observation(rows: &mut Vec<Value>, owner: Option<&Value>) -> Result<()> {
+    let mut matches = rows
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| row["phase"] == "private-holding" || row["unit"]["Id"] == UNIT);
+    let Some((index, row)) = matches.next() else {
+        return Ok(());
+    };
+    ensure!(
+        matches.next().is_none()
+            && row["epoch"] == 288
+            && row["phase"] == "private-holding"
+            && row["unit"]["Id"] == UNIT,
+        "unexpected or duplicate Foundation private holding row"
+    );
+    live::same_owner(
+        &row["unit"],
+        owner.context("epoch 288 sampled custody has no current owner")?,
+    )?;
+    rows.remove(index);
+    Ok(())
+}
+
 pub(super) fn active(n: &mut Native) -> Result<AuxiliaryOwner> {
     let owner = n.show_fields(UNIT, OWNER_FIELDS)?;
     let iid = text(&owner, "InvocationID")?;
@@ -107,4 +132,27 @@ pub(super) fn active(n: &mut Native) -> Result<AuxiliaryOwner> {
         memory,
         ticks,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn holding_observation_is_joined_before_the_old_replay_is_released() -> Result<()> {
+        let owner = json!({
+            "Id":UNIT,"LoadState":"loaded","InvocationID":"a".repeat(32),"MainPID":"100",
+            "NRestarts":"0","ActiveState":"active","SubState":"running","Result":"success",
+            "ControlGroup":format!("/system.slice/{UNIT}"),
+            "ExecStart":"{ path=/bin/park ; argv[]=/bin/park ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=100 ; code=(null) ; status=0/0 }"
+        });
+        let parked = json!({"epoch":288,"phase":"private-holding","unit":owner});
+        let replay = json!({"epoch":288,"phase":"replay"});
+        let mut rows = vec![parked.clone(), replay.clone()];
+        assert!(account_observation(&mut rows, None).is_err());
+        assert!(account_observation(&mut vec![parked.clone(), parked], Some(&owner)).is_err());
+        account_observation(&mut rows, Some(&owner))?;
+        assert_eq!(rows, vec![replay]);
+        Ok(())
+    }
 }

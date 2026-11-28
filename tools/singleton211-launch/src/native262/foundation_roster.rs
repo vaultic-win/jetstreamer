@@ -174,6 +174,7 @@ enum Quote {
     Suffix226(Bound),
     Suffix226Preview,
     Assembly226(Bound),
+    Verify226(Bound),
     Holding288(Bound),
     Delivery252,
     Delivery261(Bound),
@@ -1789,7 +1790,7 @@ fn measure(
     let epoch = match &quote {
         Some(Quote::Interval141(_)) => 141,
         Some(Quote::FullReplay(full)) => full.epoch,
-        Some(Quote::Suffix226(_) | Quote::Suffix226Preview | Quote::Assembly226(_)) => 226,
+        Some(Quote::Suffix226(_) | Quote::Suffix226Preview | Quote::Assembly226(_) | Quote::Verify226(_)) => 226,
         Some(Quote::Holding288(_)) => 288,
         Some(Quote::Delivery252) => 252,
         Some(Quote::Delivery261(_)) => 261,
@@ -1860,6 +1861,15 @@ fn measure(
     let mut closed_predecessor_266 = None;
     let mut closed_window_266 = None;
     let rows = admission_fleet["active"].as_array_mut().context("Foundation active roster")?;
+    holding288::account_observation(rows, active_holding_288.as_ref().map(|park| &park.owner))?;
+    if quote.is_some()
+        && !live_replays.contains_key(&226)
+        && let Some(index) = rows.iter().position(|row| row["producer"]["Id"] == assembly226::UNIT)
+    {
+        let closure = assembly226::closed(n)?;
+        assembly226::match_observed_exit(&closure, &rows[index])?;
+        rows.remove(index);
+    }
     if let Some(reference) = &closed_288 {
         let stopped = reference.sealed()?;
         if let Some(index) = rows.iter().position(|row| row["epoch"] == 288) {
@@ -2092,7 +2102,7 @@ fn measure(
     let adjacent_copy_group = units::parse_cpu_list("48,112")?;
     let next_266_group = units::parse_cpu_list(NEXT_266_EXCLUSIVE)?;
     let exclusive = match &quote {
-        Some(Quote::Assembly226(_)) => {
+        Some(Quote::Assembly226(_) | Quote::Verify226(_)) => {
             replay296::verify_cpu_group("14,16-23", &assembly_exclusive)?;
             &assembly_exclusive
         }
@@ -2496,6 +2506,7 @@ fn measure(
             capacity::add(assembly226::CAP, assembly226::RECEIPTS)?,
             capacity::add(assembly226::MEMORY, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
         ),
+        Some(Quote::Verify226(_)) => (assembly226::RECEIPTS, assembly226::VERIFY_MEMORY),
         Some(Quote::Holding288(_)) => (holding288::RECEIPT_BYTES, holding288::MEMORY_BYTES),
         Some(Quote::Delivery252) => (
             UPLOAD_261_DISK,
@@ -2623,6 +2634,7 @@ fn measure(
     let schema = match epoch {
         141 => private_schema.as_deref().context("private 141 schema")?,
         226 if matches!(&quote, Some(Quote::Assembly226(_))) => assembly226::ROSTER_SCHEMA,
+        226 if matches!(&quote, Some(Quote::Verify226(_))) => assembly226::VERIFY_SCHEMA,
         226 => "foundation-epoch226-suffix-roster-binding-v1",
         288 => holding288::ROSTER_SCHEMA,
         230 if adjacent_230 => "foundation-epoch230-adjacent-intake-roster-binding-v1",
@@ -2714,6 +2726,13 @@ fn measure(
             "producer_unit":assembly226::UNIT,"assembly_only_no_replay":true,
             "candidate_cap_bytes":assembly226::CAP,"candidate_memory_max_bytes":assembly226::MEMORY,
             "candidate_cpus":selected,"exclusive_online_cpus":assembly_exclusive,
+        });
+    }
+    if let Some(Quote::Verify226(terminal)) = &quote {
+        evidence["assembly_226_verification_quote"] = json!({
+            "terminal":terminal,"producer_unit":assembly226::VERIFY_UNIT,
+            "candidate_cpus":selected,"exclusive_online_cpus":assembly_exclusive,
+            "archive_copy_bytes":0,"candidate_memory_max_bytes":assembly226::VERIFY_MEMORY,
         });
     }
     if let Some(Quote::Holding288(source)) = &quote {
@@ -2976,6 +2995,7 @@ pub fn run() -> Result<()> {
                         | "--feature296-quote"
                         | "--suffix226-preview"
                         | "--assembly226-quote"
+                        | "--verify226-quote"
                         | "--partial288-custody-quote"
                         | "--interval141-third-quote"
                         | "--interval141-fourth-quote"
@@ -3116,6 +3136,8 @@ pub fn run() -> Result<()> {
         }
         Some(flag) if flag == "--assembly226-quote" => assembly226::preparation(&mut native)
             .and_then(|proof| measure(&mut native, None, Some(Quote::Assembly226(proof)))),
+        Some(flag) if flag == "--verify226-quote" => assembly226::closed(&mut native)
+            .and_then(|proof| measure(&mut native, None, Some(Quote::Verify226(proof)))),
         Some(flag) if flag == "--partial288-custody-quote" => holding288::preparation()
             .and_then(|proof| measure(&mut native, None, Some(Quote::Holding288(proof)))),
         Some(flag) if flag == "--interval141-third-quote" => measure(&mut native, None, Some(Quote::Interval141(3))),
