@@ -56,43 +56,75 @@ fn terms(text: &str) -> Vec<&'static str> {
     }
     v
 }
-fn properties(s: &str) -> BTreeMap<String, String> {
-    s.lines()
-        .filter_map(|l| {
-            l.split_once('=')
-                .map(|(a, b)| (a.to_string(), b.to_string()))
-        })
-        .collect()
+// PID1's text view omits empty command arrays and can put literal newlines and
+// multiple ExecStart entries in a single unit. Keep the structured argument vectors.
+const UNIT_PROJECTION: &str = r#"
+def projection(kind, common, detail):
+    parts = [common["FragmentPath"], *common["DropInPaths"], *common["Triggers"], *common["TriggeredBy"]]
+    if kind == "Service" and "ExecStart" not in detail:
+        raise ValueError("incomplete service properties")
+    if kind in ("Path", "Timer"):
+        parts.append(detail["Unit"])
+    if kind == "Path":
+        parts.extend(path for _, path in detail["Paths"])
+    elif kind == "Socket":
+        parts.extend(address for _, address in detail["Listen"])
+    for field in ("ExecCondition", "ExecStartPre", "ExecStart", "ExecStartPost", "ExecReload", "ExecStopPre", "ExecStop", "ExecStopPost"):
+        for entry in detail.get(field, ()):
+            parts.append(entry[0])
+            parts.extend(entry[1])
+    if "WorkingDirectory" in detail:
+        parts.append(detail["WorkingDirectory"])
+    return "\n".join(str(s) for s in parts)
+"#;
+const NATIVE_UNITS: &str = r#"
+import dbus, json, sys
+bus = dbus.SystemBus()
+service = "org.freedesktop.systemd1"
+manager = dbus.Interface(bus.get_object(service, "/org/freedesktop/systemd1", introspect=False), service + ".Manager")
+rows = []
+for unit in sys.argv[1:]:
+    kind = unit.rsplit(".", 1)[1].capitalize()
+    if kind not in ("Service", "Timer", "Path", "Socket"):
+        raise ValueError("unrecognized systemd unit " + unit)
+    try:
+        path = manager.GetUnit(unit)
+        props = dbus.Interface(bus.get_object(service, path, introspect=False), "org.freedesktop.DBus.Properties")
+        common = props.GetAll(service + ".Unit")
+        if common["Id"] != unit:
+            raise ValueError("different native unit " + unit)
+        row = {"unit":unit, "state":str(common["ActiveState"]), "sub":str(common["SubState"]), "projection":""}
+        if row["state"] not in ("inactive", "failed"):
+            detail = props.GetAll(service + "." + kind)
+            row["projection"] = projection(kind, common, detail)
+        rows.append(row)
+    except dbus.DBusException as error:
+        if error.get_dbus_name() not in ("org.freedesktop.systemd1.NoSuchUnit", "org.freedesktop.DBus.Error.UnknownObject"):
+            raise
+        rows.append({"unit":unit, "state":"gone", "sub":"", "projection":""})
+print(json.dumps(rows))
+"#;
+#[derive(serde::Deserialize)]
+struct NativePlan {
+    unit: String,
+    state: String,
+    sub: String,
+    projection: String,
 }
-fn entry_points(p: &BTreeMap<String, String>) -> Result<String> {
-    let id = p.get("Id").context("missing unit ID")?;
-    let mut fields = vec!["FragmentPath", "DropInPaths", "Triggers", "TriggeredBy"];
-    if id.ends_with(".service") {
-        fields.extend([
-            "ExecStart",
-            "ExecStartPre",
-            "ExecStartPost",
-            "ExecCondition",
-            "WorkingDirectory",
-        ]);
-    } else if id.ends_with(".timer") {
-        fields.push("Unit");
-    } else if id.ends_with(".path") {
-        fields.extend(["Unit", "Paths"]);
-    } else if id.ends_with(".socket") {
-        fields.push("Listen");
-    } else {
-        anyhow::bail!("unrecognized unit type {id}");
-    }
-    fields
-        .into_iter()
-        .map(|field| {
-            p.get(field)
-                .map(String::as_str)
-                .with_context(|| format!("{id} lacks {field}"))
-        })
-        .collect::<Result<Vec<_>>>()
-        .map(|values| values.join(" "))
+fn native_plans(units: &[&str]) -> Result<Vec<NativePlan>> {
+    let program = format!("{UNIT_PROJECTION}\n{NATIVE_UNITS}");
+    let mut args = vec!["-IB", "-c", &program];
+    args.extend_from_slice(units);
+    let rows: Vec<NativePlan> = serde_json::from_str(&command("/usr/bin/python3", &args)?)?;
+    ensure!(
+        rows.len() == units.len()
+            && rows
+                .iter()
+                .zip(units)
+                .all(|(row, expected)| row.unit == *expected),
+        "incomplete native entry-point inventory"
+    );
+    Ok(rows)
 }
 fn tokens(s: &str) -> impl Iterator<Item = &str> {
     s.split(|c: char| c.is_ascii_whitespace() || "\\\"'(){}[]=,;|:".contains(c))
@@ -393,17 +425,13 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
     let mut cache = BTreeMap::new();
     let mut matches = Vec::new();
     let mut hits = Vec::new();
-    let fields = "Id,ActiveState,SubState,Job,ControlPID,MainPID,ExecStart,ExecStartPre,ExecStartPost,ExecCondition,WorkingDirectory,FragmentPath,DropInPaths,Triggers,TriggeredBy,Unit,Paths,Listen";
     for slice in potential.chunks(120) {
-        let mut args = vec!["show", "--all", "-p", fields, "--"];
-        args.extend_from_slice(slice);
-        for record in command("/usr/bin/systemctl", &args)?.trim().split("\n\n") {
-            let p = properties(record);
-            let unit = &p["Id"];
-            if matches!(p["ActiveState"].as_str(), "inactive" | "failed") {
+        for plan in native_plans(slice)? {
+            if matches!(plan.state.as_str(), "inactive" | "failed" | "gone") {
                 continue;
             }
-            let projection = entry_points(&p)?;
+            let unit = &plan.unit;
+            let projection = plan.projection;
             let direct = terms(&projection);
             let nested = artifacts(&projection, &mut cache)?;
             if direct.is_empty() && nested.is_empty() {
@@ -427,21 +455,25 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
                             || t.contains("expected")
                     })
                 });
-            let row = json!({"unit":unit,"direct":direct,"plans":nested,"terminal_validator":unit==VUNIT,"ledger_only":historical});
+            let row = json!({"unit":unit,"state":plan.state,"sub":plan.sub,"direct":direct,"plans":nested,"terminal_validator":unit==VUNIT,"ledger_only":historical});
             if !owned && !historical {
                 hits.push(row.clone())
             }
             matches.push(row);
         }
     }
-    ensure!(
-        hits.is_empty(),
-        "unresolved live consumer {}",
-        serde_json::to_string(&hits)?
-            .chars()
-            .take(1600)
-            .collect::<String>()
-    );
+    if !hits.is_empty() {
+        let (_, iid) = role()?;
+        let evidence = receipt(
+            &root(&format!("CENSUS_BLOCKS_{iid}.json")),
+            &json!({"unresolved":hits,"definitions":definitions,"checked":potential.len()}),
+        )?;
+        anyhow::bail!(
+            "{} unresolved staged consumers, evidence {}",
+            hits.len(),
+            evidence
+        );
+    }
     let live = kernel(own)?;
     Ok(
         json!({"operator_seal":o,"original_static_and_producer":known,"parked_original_reserve":reserve,"stopped_original_timer":timer,"original_validator":v,"preserved":validation,"systemd_units_seen":listing.lines().count(),"runnable_units":potential.len(),"resolved_material":cache.len(),"checked_definitions":definitions,"runnable_matches":matches,"kernel":live}),
@@ -468,20 +500,18 @@ mod tests {
     }
     #[test]
     fn pid1_activation_units_have_distinct_entry_properties() {
-        let common =
-            "FragmentPath=/etc/systemd/system/a\nDropInPaths=\nTriggers=a.service\nTriggeredBy=\n";
-        for (kind, fields) in [
-            ("timer", "Unit=a.service"),
-            ("path", "Unit=a.service\nPaths=/some/trigger (PathChanged)"),
-            ("socket", "Listen=/run/a.socket (Stream)"),
-            (
-                "service",
-                "ExecStart=/bin/true\nExecStartPre=\nExecStartPost=\nExecCondition=\nWorkingDirectory=/tmp",
-            ),
-        ] {
-            let p = properties(&format!("{common}Id=a.{kind}\n{fields}"));
-            assert!(entry_points(&p).unwrap().contains("a.service"));
-            assert!(entry_points(&properties(&format!("{common}Id=a.{kind}"))).is_err());
-        }
+        let cases = r#"
+common = dict(FragmentPath="native.service", DropInPaths=[], Triggers=["worker.service"], TriggeredBy=[])
+assert "hourly.service" in projection("Timer", common, dict(Unit="hourly.service"))
+assert "/run/end" in projection("Path", common, dict(Unit="after.service", Paths=[("PathChanged", "/run/end")]))
+assert "/run/bus" in projection("Socket", common, dict(Listen=[("Stream", "/run/bus")]))
+assert "worker.service" in projection("Service", common, dict(ExecStart=[]))
+assert "/second=path\ndetail" in projection("Service", common, dict(ExecStart=[("/first", [], None), ("/second", ["/second=path\ndetail"], None)]))
+"#;
+        command(
+            "/usr/bin/python3",
+            &["-IB", "-c", &format!("{UNIT_PROJECTION}\n{cases}")],
+        )
+        .unwrap();
     }
 }
