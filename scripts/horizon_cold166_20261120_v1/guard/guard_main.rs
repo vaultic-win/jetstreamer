@@ -811,6 +811,13 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
             384_u64 << 30,
         ),
         #[cfg(feature = "epoch170-checkpoint-continuation")]
+        "horizon-qualify-170-from-73760367-20261128-v1.service" => (
+            "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73760367-20261128-v1/guard-receipts",
+            8_958_105_897_878,
+            384_u64 << 30,
+        ),
+        #[cfg(feature = "epoch170-checkpoint-continuation")]
         "horizon-qualify-170-from-73766969-20261127-v1.service" => (
             "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
             "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73766969-20261127-v1/guard-receipts",
@@ -934,6 +941,11 @@ fn epoch170_checkpoint_guards_preserve_original_cap_and_floor() {
     check_170_scope(
         "horizon-qualify-170-from-73746882-20261127-v1.service",
         "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73746882-20261127-v1/guard-receipts",
+    );
+    #[cfg(feature = "epoch170-checkpoint-continuation")]
+    check_170_scope(
+        "horizon-qualify-170-from-73760367-20261128-v1.service",
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73760367-20261128-v1/guard-receipts",
     );
     #[cfg(feature = "epoch170-checkpoint-continuation")]
     check_170_scope(
