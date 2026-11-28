@@ -12,10 +12,11 @@ import time
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch162-third-replay-20261128-v1")
 PIN = "0489c223b03c5bbc889a1cd28b4907fa237c11dd05e10c52bee3ba78615afdb3"
 NAME = "THIRD162_FIRST_PROTECTED_BLOCK.json"
+TRANSACTIONS = "THIRD162_FIRST_PROTECTED_TRANSACTIONS.json"
 BLOCK = re.compile(r"\bblock slot ([0-9]+) total_txs=([0-9]+)")
 
 
-def read_progress(layout, status, held, ref, grant, iid, row, match):
+def read_progress(layout, status, held, ref, grant, iid, row, match, previous=None):
     pid = held["producer_pid"]
     slot,tx = map(int,match.groups())
     layout.need(69_998_120 <= slot <= 70_004_937 and tx >= 0, "journal outside third interval")
@@ -39,16 +40,25 @@ def read_progress(layout, status, held, ref, grant, iid, row, match):
         return None
     keys = ("_BOOT_ID","_PID","_SYSTEMD_INVOCATION_ID","_SYSTEMD_UNIT","__CURSOR",
             "__MONOTONIC_TIMESTAMP","__REALTIME_TIMESTAMP","MESSAGE")
-    receipt = layout.save(ROOT/NAME,dict(schema="horizon-private-162-third-first-protected-block-v1",
+    name = TRANSACTIONS if previous else NAME
+    data = dict(schema="horizon-private-162-third-first-protected-block-v1",
         scope=layout.pinned(ROOT/"SCOPE.json")[1],held=ref,grant=grant,guard=guard,
         actor=dict(unit=layout.UNIT,invocation=iid,pid=pid,start_ticks=held["start_ticks"],worker_pid=worker,
                    worker_start_ticks=ticks,worker_executable=str(name)),journal={k:row[k] for k in keys},
         slot=slot,cumulative_transactions=tx,guard_root_budget=plan["maximum_root_physical_bytes"],
-        canonical_or_r2_writes=False),0o400)
+        canonical_or_r2_writes=False)
+    if previous:
+        before,first_ref = previous
+        layout.need(slot > before["slot"] and tx > before["cumulative_transactions"]
+                    and int(row["__MONOTONIC_TIMESTAMP"]) > int(before["journal"]["__MONOTONIC_TIMESTAMP"]),
+                    "no native third-162 slot or transaction advance")
+        data.update(schema="horizon-private-162-third-first-protected-transaction-advance-v1",previous=first_ref,
+                    slot_delta=slot-before["slot"],transaction_delta=tx-before["cumulative_transactions"])
+    receipt = layout.save(ROOT/name,data,0o400)
     return dict(receipt=receipt,slot=slot,cumulative_transactions=tx,invocation_id=iid)
 
 
-def first(iid):
+def first(iid, transactions=False):
     from hashlib import sha256
     interface = ROOT/"INTERFACE.json"
     data = interface.read_bytes()
@@ -64,8 +74,15 @@ def first(iid):
     g,grant = layout.pinned(layout.DATA/"GRANT.json")
     layout.need(layout.UNIT == info["unit"] and g["held"] == ref and g["iid"] == held["producer_invocation_id"] == iid
                 and layout.ALLOW.read_bytes() == iid.encode() and layout.scope()["previous"] == info["previous"], "foreign private grant")
-    if (ROOT/NAME).exists():
-        rec,existing = layout.pinned(ROOT/NAME)
+    previous = None
+    if transactions:
+        previous = layout.pinned(ROOT/NAME)
+        before = previous[0]
+        layout.need(before["held"] == ref and before["grant"] == grant and before["actor"]["invocation"] == iid,
+                    "first block refers to a different producer")
+    name = TRANSACTIONS if transactions else NAME
+    if (ROOT/name).exists():
+        rec,existing = layout.pinned(ROOT/name)
         layout.need(rec["held"] == ref and rec["grant"] == grant and rec["actor"]["invocation"] == iid,
                     "progress belongs to another producer")
         return dict(receipt=existing,slot=rec["slot"],cumulative_transactions=rec["cumulative_transactions"],invocation_id=iid)
@@ -90,7 +107,9 @@ def first(iid):
                     raise ValueError("third producer reached PID 1 terminal before observed progress: "+row["MESSAGE"])
                 m = BLOCK.search(row["MESSAGE"])
                 if m and all(row.get(k) == v for k,v in sources.items()):
-                    result = read_progress(layout,status,held,ref,grant,iid,row,m)
+                    if previous and (int(m[1]) <= before["slot"] or int(m[2]) <= before["cumulative_transactions"]):
+                        continue
+                    result = read_progress(layout,status,held,ref,grant,iid,row,m,previous)
                     if result is not None:
                         return result
             raise TimeoutError("third producer timed out before a guarded block")
@@ -103,4 +122,6 @@ def first(iid):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("invocation")
-    print(json.dumps(first(parser.parse_args().invocation),sort_keys=True),flush=True)
+    parser.add_argument("--transactions",action="store_true",help="capture the first later block with a positive transaction delta")
+    args = parser.parse_args()
+    print(json.dumps(first(args.invocation,args.transactions),sort_keys=True),flush=True)
