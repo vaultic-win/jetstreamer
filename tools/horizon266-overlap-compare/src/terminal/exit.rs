@@ -242,6 +242,79 @@ pub(super) fn capture_adjacent230(launch_sha: &str, destination: &Path) -> Resul
     capture_window230(&window230::ADJACENT, launch_sha, destination)
 }
 
+pub(super) fn capture_window266(launch_sha: &str, destination: &Path) -> Result<Value> {
+    const STATE: &str = "/var/lib/jetstreamer/horizon266-window-114929698-114936474-runtime-v1";
+    const UNIT: &str = "horizon-qualify-checkpoint-continuation-266-window-114936474-v1.service";
+    const NODE: &str = "/var/lib/jetstreamer/horizon266-window-node-10fe8f2f-v1/jetstreamer-node";
+    const PROFILE_SHA: &str = "f7562054a31277bc38747652f9a79e6967b393d8713499e6998841390cb4c5d6";
+    require_root()?;
+    let parent = destination_parent(destination)?;
+    let state = Path::new(STATE);
+    let reference = Reference::new(state.join("cadence-registration.json"), launch_sha);
+    let launch = reference.read()?;
+    let invocation = string(&launch, "invocation_id")?;
+    let pid: u32 = serde_json::from_value(launch["main_pid"].clone())?;
+    let guard_plan: Reference = serde_json::from_value(launch["guard_plan"].clone())?;
+    let active_guard: Reference = serde_json::from_value(launch["active_guard"].clone())?;
+    let release: Reference = serde_json::from_value(launch["guard_release_fit"].clone())?;
+    let sample = active_guard.read_guard_sample(&state.join("guard-receipts"))?;
+    let fit = release.read()?;
+    ensure!(
+        launch["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
+            && launch["kind"] == "epoch266-private-hourly-window"
+            && launch["epoch"] == 266
+            && launch["unit"] == UNIT
+            && launch["node_path"] == NODE
+            && launch["profile"] == json!(Reference::new(state.join("profile.json"), PROFILE_SHA))
+            && launch["launched"] == true
+            && launch["diagnostic_only"] == true
+            && launch["canonical_epoch_publication_authorized"] == false
+            && hex(invocation, 32)
+            && pid > 1
+            && guard_plan.path == state.join("guard-plan.json")
+            && guard_plan.read()?["invocation_id"] == invocation
+            && release.path == state.join("guard-release-fit.json")
+            && fit["schema"] == "foundation-epoch266-private-window-guard-release-fit-v1"
+            && fit["invocation_id"] == invocation
+            && fit["guard_plan"] == launch["guard_plan"]
+            && fit["node_plan"] == launch["node_plan"]
+            && sample["producer_invocation_id"] == invocation
+            && sample["producer"]["active"] == "active"
+            && sample["producer"]["pid"] == pid
+            && sample["plan_sha256"] == guard_plan.sha256
+            && sample["producer_stop_enabled"] == true
+            && sample["trip_reason"].is_null(),
+        "foreign epoch 266 window launch or live guard"
+    );
+    let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    ensure!(hex(&boot_id, 32), "invalid running boot ID");
+    let producer = Producer {
+        unit: UNIT,
+        invocation,
+        pid,
+        node: Path::new(NODE),
+    };
+    let (_held, properties) = capture_properties(&producer, 7_300_000)?;
+    ensure!(
+        reference.read()? == launch,
+        "epoch 266 window launch changed during capture"
+    );
+    persist_capture(
+        parent,
+        destination,
+        &Capture {
+            schema: "foundation-epoch266-private-window-pid1-exit-v1".to_owned(),
+            launch: reference,
+            boot_id,
+            producer_invocation: invocation.to_owned(),
+            producer_pid: pid,
+            properties,
+        },
+    )
+}
+
 fn capture_window230(
     window: &window230::Window,
     launch_sha: &str,

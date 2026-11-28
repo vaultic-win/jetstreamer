@@ -850,6 +850,10 @@ pub(super) fn collect_adjacent230_terminal(exit: &Path, digest: &str, destinatio
     window230::collect(&window230::ADJACENT, exit, digest, destination)
 }
 
+pub(super) fn capture_window266_exit(launch_sha: &str, destination: &Path) -> Result<Value> {
+    exit::capture_window266(launch_sha, destination)
+}
+
 pub(super) fn collect_v1627_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {
     window230::collect(&window230::V1627, exit, digest, destination)
 }
