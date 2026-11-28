@@ -1,9 +1,0 @@
---- a/cycle.py
-+++ b/cycle.py
-@@ -650,0 +651,3 @@
-+    ordinary_296 = 296 in guarded_replays.by_epoch(cfg['replays'])
-+    if ordinary_296:
-+        cohort += '-replay296'
-@@ -884 +887 @@
--    diagnostic296_meter.register(plan)
-+    diagnostic296_meter.register(plan, ordinary_replay=ordinary_296)

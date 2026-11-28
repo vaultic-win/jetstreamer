@@ -1,9 +1,0 @@
-# SOURCE ONLY. Actual armed native deadline and first successful timer fire are mandatory.
-[Unit]
-Description=Exact epoch 250 v1 replay protective timer
-[Timer]
-OnActiveSec=1s
-OnUnitInactiveSec=60s
-AccuracySec=1s
-RandomizedDelaySec=0
-Unit=horizon-250-reboot-20261117-protective-v1.service

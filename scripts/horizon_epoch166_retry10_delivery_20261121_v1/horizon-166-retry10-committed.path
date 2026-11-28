@@ -1,9 +1,0 @@
-[Unit]
-Description=Watch the original retry10 batch receipt for epoch 166
-
-[Path]
-PathExistsGlob=/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1/replacement-local3retry10-20261121-v1/private/destination-7a798c2c541f09bf18d3c3b33df9faa66e8609f5d416fb227745547144979d81/evidence/archive-batches/destination-000000000000fc00-0000000005970003/batch-*.json
-Unit=horizon-166-retry10-committed.service
-
-[Install]
-WantedBy=multi-user.target

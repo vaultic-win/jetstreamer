@@ -1,9 +1,0 @@
-[Unit]
-Description=Watch the original half-core batch receipt for epoch 172
-
-[Path]
-PathExistsGlob=/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/full-metered-20261120-v1/private/destination-783cdab8017650fef2db0387f2788994bc5c6ddc884b6d810b45d4ac42222e61/evidence/archive-batches/destination-000000000000fc00-0000000006d0058d/batch-*.json
-Unit=horizon-172-full-committed.service
-
-[Install]
-WantedBy=multi-user.target

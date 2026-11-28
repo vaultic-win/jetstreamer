@@ -1,3 +1,0 @@
-Validates the existing status-only receipt format: both observer bindings are recorded under `owner_evidence`, and each status has its own publication time. Every publication must fall between the authenticated observer and audit times, with the audit no more than ten minutes after the observer. All archive, resource, and launch gates remain unchanged.
-
-For every observed replay, the plan must bind its genuine replacement admission and guard-protection receipts. The review checks the epoch, unit, invocation, producer PID, resource-promise retention, and admission-to-protection binding, then carries those receipts into the fleet replay row for the resident-memory admission reader.

@@ -1,9 +1,0 @@
-# Epoch 166 retry9 launcher
-
-Build the locked `launch` binary with `HORIZON_RETRY9_GUARD_SHA256` set to the qualified retry9 guard image digest. Include the sibling `../audit_budget.rs` in the build proof. The launcher consumes the retry9 preparer's existing guard template, receipt path and 309,237,645,312-byte whole-lane cap. Its guard floor is 6,829,053,656,882 bytes.
-
-The package prefix is `/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry9-recovery-20261120-v1`. The normal deployment is `launch-v1/launch`. Create the empty, private, root-owned `launch-state/epoch166` directory under the package prefix for receipts. Prepare the private, root-owned guard-plan parent at `/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry9-live-state-20261120-v1/guard-plans` on HOME before capturing the new witness. The launcher seals each actual IID-bound plan beneath that parent. Its guard receipt directory is the preparer's emitted `preparation/epoch166/local3retry9/guard-state/receipts`; the launcher creates it once.
-
-Supply a normally sealed launch plan with schema `horizon-retry9-single166-launch-plan-v1`, `owner`, `primary_thread`, `launch_authorized`, `output_root`, the `prepared` receipt binding, the two-part `data_fulfillment` contract from that receipt and the exact `prior_stop_completion` binding for epoch 166 retry8. The parent can use the existing calling convention: `launch PLAN --plan-sha256 PLAN_SHA --self-sha256 LAUNCH_SHA --check-only`, followed by `--launch` under the normal admission procedure.
-
-Both modes check the newly admitted fleet, native closed units and jobs, precreated roots, staged genesis, current HOME audit identity, CPU, memory and exact remaining DATA demand. Every launch repeats the concurrent fit immediately before creating guard state. Successful admission receipts require the actual new producer and a successful PID1 timer-driven guard sample within 25 seconds.

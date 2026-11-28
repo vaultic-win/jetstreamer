@@ -1,9 +1,0 @@
-[Unit]
-Description=Watch the original retry10 batch receipt for epoch 170
-
-[Path]
-PathExistsGlob=/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/private/destination-08b5a2ce51e5316cd6a0077cba0f7d6cda7ccfc6c7a8cc92df1e5eb7a49082da/evidence/archive-batches/destination-000000000000fc00-0000000006c7140e/batch-*.json
-Unit=horizon-170-retry10-committed.service
-
-[Install]
-WantedBy=multi-user.target

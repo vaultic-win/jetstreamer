@@ -1,9 +1,0 @@
-LoadState=not-found
-ActiveState=inactive
-SubState=dead
-MainPID=0
-ControlPID=0
-InvocationID=
-NRestarts=0
-Restart=
-Job=

@@ -63,7 +63,7 @@ mod route {
     pub(super) const ALIAS: &str = "/run/horizon143-first-hourly";
     pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch143-first-hourly-20261127-v1";
     pub(super) const SNAPSHOT: &str =
-        "bootstrap/snapshot-61775538-65YRW5KRaq6JezqoEc9rUqnmgp7TjVw3koFbnMtbuun.tar.zst";
+        "bootstrap/snapshot-61775538-65YRW5KRaq6JezqoEc9rUqnmgfp7TjVw3koFbnMtbuun.tar.zst";
     pub(super) const TERMINAL_SLOT: u64 = 61_787_631;
     pub(super) const NODE: &str = "/usr/local/lib/jetstreamer/deploy-epochs144-147-upgradeable-loader-20261016-v1/jetstreamer-node";
 }
@@ -265,6 +265,32 @@ fn is_released(path: &Path, invocation: &str) -> io::Result<bool> {
     Ok(true)
 }
 
+#[cfg(epoch143_first_hourly)]
+fn check_bootstrap_binding(args: &[String]) -> io::Result<()> {
+    let path = args
+        .iter()
+        .find_map(|argument| argument.strip_prefix("--snapshot-archive="))
+        .ok_or_else(|| io::Error::other("missing epoch 143 snapshot argument"))?;
+    let mut snapshot = fs::File::open(path)
+        .map_err(|error| io::Error::new(error.kind(), format!("{path}: {error}")))?;
+    let metadata = snapshot.metadata()?;
+    let mut header = [0; 4];
+    io::Read::read_exact(&mut snapshot, &mut header)?;
+    if !metadata.is_file() || metadata.len() != 3_714_834_246 || header != [0x28, 0xb5, 0x2f, 0xfd]
+    {
+        return Err(io::Error::other(format!(
+            "different epoch 143 snapshot at {path}"
+        )));
+    }
+    eprintln!(
+        "epoch 143 bootstrap binding {path} device={} inode={} bytes={}",
+        metadata.dev(),
+        metadata.ino(),
+        metadata.len()
+    );
+    Ok(())
+}
+
 fn main() -> io::Result<()> {
     #[cfg(epoch140_suffix)]
     let (executable, args) = recording_command()?;
@@ -272,6 +298,12 @@ fn main() -> io::Result<()> {
     let (executable, args) = (format!("{ALIAS}/jetstreamer-node"), replay_args());
     #[cfg(epoch143_first_hourly)]
     let (executable, args) = (NODE, replay_args());
+    #[cfg(epoch143_first_hourly)]
+    if env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--check-bootstrap-binding"))
+        && env::args_os().len() == 2
+    {
+        return check_bootstrap_binding(&args);
+    }
     #[cfg(not(epoch140_suffix))]
     if env::args_os().len() != 1 {
         return Err(io::Error::other(format!(
@@ -288,6 +320,8 @@ fn main() -> io::Result<()> {
             "unexpected epoch {EPOCH} gate identity"
         )));
     }
+    #[cfg(epoch143_first_hourly)]
+    check_bootstrap_binding(&args)?;
     let release = Path::new(ALIAS).join("barrier/allow");
     let started = Instant::now();
     let mut next_heartbeat = started + HEARTBEAT_INTERVAL;
@@ -352,6 +386,10 @@ mod tests {
         );
         #[cfg(epoch143_first_hourly)]
         {
+            assert_eq!(
+                args[3],
+                "--snapshot-archive=/run/horizon143-first-hourly/bootstrap/snapshot-61775538-65YRW5KRaq6JezqoEc9rUqnmgfp7TjVw3koFbnMtbuun.tar.zst"
+            );
             assert_eq!(
                 args[4],
                 format!("--epoch-hashes={ALIAS}/canonical-hashes.txt")

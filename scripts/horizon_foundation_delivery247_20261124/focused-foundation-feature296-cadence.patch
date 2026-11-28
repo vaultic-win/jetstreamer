@@ -1,9 +1,0 @@
---- a/cycle.py
-+++ b/cycle.py
-@@ -979,3 +979,5 @@
--    focused_release = V / "horizon-foundation-focused-fleet-v1/acceptance.json"
-+    focused_release = V / "horizon-foundation-focused-fleet-v2/acceptance.json"
-+    if not focused_release.is_file():
-+        focused_release = V / "horizon-foundation-focused-fleet-v1/acceptance.json"
-     if focused_release.is_file():
-         release = bound(sealed_226_file(focused_release))

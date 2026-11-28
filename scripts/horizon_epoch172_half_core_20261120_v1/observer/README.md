@@ -1,5 +1,0 @@
-# Full epoch 172 in the scheduled fleet
-
-Apply `cadence.patch` in a fresh copy of this host's sealed `replay167-wall-rate-20261120-v1/observer-package` (seal `a3aeb5f43043fb0c41e4e6544e5daa2c9b55f47a1df9f22a39118f6930a50c54`). Include `full172.py` beside the resulting modules. Run `qualify.py CANDIDATE_PACKAGE` as the private receipt reader. The deployment sealer generates the new checksum list.
-
-The existing consumer retains its process lock and scheduled sample chain across the change of executable. Switch the consumer at a sleeping boundary and keep its existing observer timer. At the first scheduled cycle after a guarded launch, record the actual half-core producer under `actual_active_bootstraps`. Its public phase is `verification`. The coordinated sample must measure slot and transaction advancement before publishing `replay`. Prepare the designated producer stdout as an empty root-owned `0600` file before launching so the existing native append observer can bind its inode. Run the controller's `confirm-adoption` against the resulting fleet.

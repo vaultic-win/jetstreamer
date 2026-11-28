@@ -1,9 +1,0 @@
-[Unit]
-Description=Wait for the original epoch 166 committed terminal receipt
-
-[Path]
-PathExists=/var/lib/jetstreamer/horizon_runtime_data/epoch166-terminal-20261121-v1/TERMINAL_SUCCESS.json
-Unit=horizon-166-committed-event.service
-
-[Install]
-WantedBy=multi-user.target

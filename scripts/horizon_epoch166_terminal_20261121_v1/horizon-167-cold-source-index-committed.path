@@ -1,9 +1,0 @@
-[Unit]
-Description=Watch the cold source-index batch receipt for epoch 167
-
-[Path]
-PathExistsGlob=/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-source-index-v1-20261121/cold-source-index-v3-20261122/private/destination-e677f81687d92afb1ef9d81f2d57842d0c8bd0d94c6353aa87a7ddc53eb10d0f/evidence/archive-batches/destination-000000000000fc00-0000000006d30015/batch-*.json
-Unit=horizon-167-cold-source-index-committed.service
-
-[Install]
-WantedBy=multi-user.target

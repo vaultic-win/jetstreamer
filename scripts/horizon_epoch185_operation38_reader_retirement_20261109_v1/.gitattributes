@@ -1,2 +1,0 @@
-# Preserve exact recorded patch context whitespace.
-source-handoff/SOURCE_ONLY_CANDIDATE.diff -whitespace

@@ -1,9 +1,0 @@
-{
-  "epoch": 223,
-  "body_sha256": "aaca9c619411de09fa0f13eee2b1103657b581b3dee7fc05b55dd6812bc8a0cb",
-  "distinct_inodes": 8,
-  "bytes_per_body": 9709637370,
-  "allocated_file_bytes": 77677187072,
-  "reclamation_credit": 0,
-  "local_retirement_authorized": false
-}

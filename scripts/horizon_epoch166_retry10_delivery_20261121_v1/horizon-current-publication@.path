@@ -1,8 +1,0 @@
-[Unit]
-Description=Wait for the original epoch %i local archive commit
-
-[Path]
-PathExists=/var/lib/jetstreamer/horizon_runtime_data/epoch%i-current-delivery-20261121-v1/TERMINAL_SUCCESS.json
-
-[Install]
-WantedBy=multi-user.target

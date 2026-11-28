@@ -1,1 +1,0 @@
-Validates the existing status-only receipt format: both observer bindings are recorded under `owner_evidence`, and each status has its own publication time. Every publication must fall between the authenticated observer and audit times, with the audit no more than ten minutes after the observer. All archive, resource, and launch gates remain unchanged.
