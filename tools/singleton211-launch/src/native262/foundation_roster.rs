@@ -13,6 +13,7 @@ mod replay296;
 use focused::{
     ADJACENT_230, FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, OVERLAP_266,
     OVERLAP_266_EXCLUSIVE, PREDECESSOR_266, RESTORE_258, RESTORE_260, SCOPES, SECOND_HOURLY_230,
+    WINDOW_266,
     TRACE_296, V1627_230,
 };
 mod suffix226;
@@ -1850,7 +1851,7 @@ fn measure(
     let bridge_windows = [FIRST_7871_230.unit, V1627_230.unit, ADJACENT_230.unit];
     for replay in live_replays.values() {
         require_disjoint_cpus(epoch, exclusive, replay.unit, &replay.owner)?;
-        if [OVERLAP_266.unit, PREDECESSOR_266.unit].contains(&replay.unit) {
+        if [OVERLAP_266.unit, PREDECESSOR_266.unit, WINDOW_266.unit].contains(&replay.unit) {
             replay296::verify_cpu_group("30,32-39", &overlap_exclusive)?;
             ensure!(
                 exclusive.is_disjoint(&overlap_exclusive),
@@ -2234,6 +2235,8 @@ fn measure(
         260 => "foundation-epoch260-native-restore-roster-binding-v1",
         261 => "foundation-epoch261-delivery-roster-binding-v1",
         266 if next_266 => "foundation-epoch266-next-bootstrap-intake-roster-binding-v1",
+        266 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == WINDOW_266.unit) =>
+            "foundation-epoch266-private-window-roster-binding-v1",
         266 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == PREDECESSOR_266.unit) =>
             "foundation-epoch266-original-predecessor-roster-binding-v1",
         266 => "foundation-epoch266-hourly-overlap-roster-binding-v1",
@@ -2262,6 +2265,7 @@ fn measure(
         "active_restore_266_launch":active_restore_266.as_ref().map(|restore| &restore.launch),
         "active_overlap_266_registration":live_replays.get(&266).filter(|replay| replay.unit == OVERLAP_266.unit).map(|replay| &replay.reference),
         "active_predecessor_266_registration":live_replays.get(&266).filter(|replay| replay.unit == PREDECESSOR_266.unit).map(|replay| &replay.reference),
+        "active_window_266_registration":live_replays.get(&266).filter(|replay| replay.unit == WINDOW_266.unit).map(|replay| &replay.reference),
         "active_interval_141_launch":active_interval_141.iter().find(|interval| interval.ordinal() <= 3).map(|interval| &interval.launch),
         "active_interval_141_fourth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 4).map(|interval| &interval.launch),
         "active_interval_141_fifth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 5).map(|interval| &interval.launch),
@@ -2348,6 +2352,8 @@ fn measure(
         binding["exclusive_online_cpus"] = json!(overlap_exclusive);
         if spec.unit == PREDECESSOR_266.unit {
             binding["bootstrap_custody"] = json!(spec.predecessor_custody()?);
+        } else if spec.unit == WINDOW_266.unit {
+            binding["bootstrap_custody"] = json!(spec.window_266_custody()?);
         }
     }
     if first_7871_candidate {
@@ -2452,6 +2458,7 @@ pub fn run() -> Result<()> {
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--overlap266-quote"
+                        | "--window266-quote"
                         | "--predecessor266-quote"
                         | "--adjacent230-intake-quote"
                         | "--next266-intake-quote"
@@ -2549,6 +2556,7 @@ pub fn run() -> Result<()> {
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--overlap266-quote"
+                        | "--window266-quote"
                         | "--predecessor266-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
@@ -2566,6 +2574,7 @@ pub fn run() -> Result<()> {
                 Some("--focused258-quote") => &RESTORE_258,
                 Some("--focused260-quote") => &RESTORE_260,
                 Some("--overlap266-quote") => &OVERLAP_266,
+                Some("--window266-quote") => &WINDOW_266,
                 Some("--predecessor266-quote") => &PREDECESSOR_266,
                 Some("--trace296-quote") => &TRACE_296,
                 Some("--feature296-quote") => &FEATURE_296,

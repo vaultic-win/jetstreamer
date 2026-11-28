@@ -227,6 +227,28 @@ pub(super) const PREDECESSOR_266: Focused = Focused {
 };
 const PREDECESSOR_PROFILE: &str =
     "/var/lib/jetstreamer/horizon266-original-predecessor-static-v1/profile.json";
+pub(super) const WINDOW_266: Focused = Focused {
+    epoch: 266,
+    unit: "horizon-qualify-checkpoint-continuation-266-window-114936474-v1.service",
+    guard: "horizon-266-window-114936474-protective-v1",
+    cpus: OVERLAP_266.cpus,
+    scratch_cap: OVERLAP_266.scratch_cap,
+    receipt_disk: OVERLAP_266.receipt_disk,
+    producer_memory: OVERLAP_266.producer_memory,
+    root: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114936474-v1",
+    first: 114_929_698,
+    last: 114_936_474,
+    kind: "epoch266-private-hourly-window",
+    preflight_schema: "foundation-epoch266-private-window-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon266-window-114929698-114936474-runtime-v1",
+    preflight_sha: "9043e168fd2322c6c5e098bee42a40f69507fa9db7afd791ad59577354f3bed1",
+    profile_sha: "f7562054a31277bc38747652f9a79e6967b393d8713499e6998841390cb4c5d6",
+};
+const WINDOW_266_CUSTODY: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon266-next-114929697-intake-v2/custody.json",
+    "98c28740a2bdb0f707624a07046fa8a316dd37ea225f31770cf410d5fd0b7001",
+);
+const WINDOW_266_ADMISSION: &str = "foundation-epoch266-private-window-admission-v1";
 const PREDECESSOR_CUSTODY: (&str, &str) = (
     "/var/lib/jetstreamer/horizon266-predecessor-intake-stage-v1/custody.json",
     "afd03e2258229848a2878f1c2ff75b424ebf810b79fec65788c75ac5111a5959",
@@ -268,7 +290,7 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 13] = [
+pub(super) const SCOPES: [&Focused; 14] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
@@ -279,6 +301,7 @@ pub(super) const SCOPES: [&Focused; 13] = [
     &RESTORE_260,
     &OVERLAP_266,
     &PREDECESSOR_266,
+    &WINDOW_266,
     &LOADER_296,
     &TRACE_296,
     &FEATURE_296,
@@ -825,13 +848,74 @@ impl Focused {
         Ok(reference)
     }
 
+    pub(super) fn window_266_custody(&self) -> Result<Bound> {
+        ensure!(self.unit == WINDOW_266.unit, "foreign epoch 266 checkpoint window");
+        let reference = Bound::new(WINDOW_266_CUSTODY.0, WINDOW_266_CUSTODY.1);
+        let custody = reference.sealed()?;
+        let profile = self.profile().sealed()?;
+        let input = &custody["input"];
+        let snapshot = &profile["node_plan_inputs"]["snapshot"];
+        let path = Path::new(text(input, "path")?);
+        let meta = fs::symlink_metadata(path)?;
+        let projections = profile["readonly_bindings"].as_array().context("window input bindings")?;
+        ensure!(
+            custody["schema"] == "foundation-epoch266-next-bootstrap-private-custody-v1"
+                && custody["epoch"] == 266
+                && custody["bootstrap_slot"] == self.first - 1
+                && custody["copy_drained"] == true
+                && custody["whole_file_sha256_rechecked"] == true
+                && custody["publication_authorized"] == false
+                && profile["bootstrap_custody"] == json!(reference)
+                && snapshot["sha256"] == input["sha256"]
+                && projections.iter().filter(|view| view["role"] == "snapshot").count() == 1
+                && projections.iter().any(|view| {
+                    view["role"] == "snapshot" && view["path"] == input["path"]
+                        && view["sha256"] == input["sha256"] && view["target"] == snapshot["path"]
+                })
+                && meta.is_file() && meta.uid() == 0 && meta.mode() & 0o222 == 0
+                && meta.nlink() == 1 && path.canonicalize()? == path
+                && meta.len() == num(input, "bytes")?
+                && meta.dev() == num(input, "device")?
+                && meta.ino() == num(input, "inode")?,
+            "private epoch 266 checkpoint window lacks its exact retained bootstrap"
+        );
+        Ok(reference)
+    }
+
     pub(super) fn preflight(&self) -> Result<Bound> {
         let state = Path::new(self.state);
         let reference = Bound::new(state.join("preflight.json"), self.preflight_sha);
         let receipt = reference.sealed()?;
         let profile_ref = self.profile();
         let profile = profile_ref.sealed()?;
-        let proven_inputs = if self.unit == PREDECESSOR_266.unit {
+        let proven_inputs = if self.unit == WINDOW_266.unit {
+            self.window_266_custody()?;
+            let guard = binding(&receipt["static_guard_validation"])?.sealed()?;
+            let mount = binding(&receipt["mount_preflight"])?.sealed()?;
+            let build = binding(&receipt["node_build"])?.sealed()?;
+            let seal = binding(&receipt["node_seal"])?.sealed()?;
+            Bound::new(text(&profile["node"], "path")?, text(&profile["node"], "sha256")?)
+                .artifact()?;
+            receipt["first_slot"] == self.first
+                && receipt["profile"] == json!(profile_ref)
+                && receipt["worker_execution"] == false
+                && guard["validated"] == true
+                && guard["unit"] == self.unit
+                && guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
+                && mount["run_root"] == self.root
+                && mount["all_input_mounts_readonly"] == true
+                && mount["scratch_bytes"] == profile["scratch_tmpfs_bytes"]
+                && mount["scratch_noswap"] == true
+                && mount["worker_execution"] == false
+                && build["feature"] == "epoch266-checkpoint-continuation-diagnostic"
+                && build["exact_entrypoint_reached_plan_loader"] == true
+                && build["artifacts"].as_array().and_then(|items| items.last())
+                    .is_some_and(|artifact| artifact["sha256"] == profile["node"]["sha256"])
+                && seal["members"].as_array().is_some_and(|members| members.iter().any(|item| {
+                    item["name"] == "jetstreamer-node"
+                        && item["sha256"] == profile["node"]["sha256"]
+                }))
+        } else if self.unit == PREDECESSOR_266.unit {
             self.predecessor_custody()?;
             let guard = binding(&receipt["static_guard_validation"])?.sealed()?;
             receipt["replay_first_slot"] == self.first
@@ -922,8 +1006,11 @@ impl Focused {
                 && launch["worker"] == profile["worker"]
                 && launch["main_pid"] == pid
                 && profile_ref == self.profile()
-                && admission["schema"]
-                    == format!("foundation-epoch{}-focused-admission-v1", self.epoch)
+                && admission["schema"] == if self.unit == WINDOW_266.unit {
+                    WINDOW_266_ADMISSION.to_owned()
+                } else {
+                    format!("foundation-epoch{}-focused-admission-v1", self.epoch)
+                }
                 && admission["profile"] == launch["profile"]
                 && admission["admitted"] == true
                 && admission["publication_authorized"] == false
@@ -949,10 +1036,32 @@ impl Focused {
         );
         if self.epoch == 266 {
             let released = binding(&launch["guard_release_fit"])?.sealed()?;
-            let mount = format!("{}/work/scratch", self.root);
+            let mount = if self.unit == WINDOW_266.unit {
+                format!("{}/scratch", self.root)
+            } else {
+                format!("{}/work/scratch", self.root)
+            };
             let mountinfo = fs::read_to_string(format!("/proc/{pid}/mountinfo"))?;
 
-            let scope_bound = if self.unit == PREDECESSOR_266.unit {
+            let scope_bound = if self.unit == WINDOW_266.unit {
+                let custody = json!(self.window_266_custody()?);
+                let node_plan = binding(&launch["node_plan"])?;
+                let plan = node_plan.sealed()?;
+                let mut expected = profile["node_plan_inputs"].clone();
+                expected["admission"] = launch["admission"].clone();
+                expected["minimum_free_bytes"] = admission["minimum_free_bytes"].clone();
+                let cmdline = fs::read(format!("/proc/{pid}/cmdline"))?;
+                let expected_argv = format!(
+                    "{}\0{}\0{}/ledger\0--verify\0--checkpoint-continuation-plan={}\0--checkpoint-continuation-plan-sha256={}\0",
+                    node.path.display(), self.epoch, self.root, node_plan.path.display(), node_plan.sha256
+                );
+                launch["bootstrap_custody"] == custody
+                    && quote[self.quote_key()]["bootstrap_custody"] == custody
+                    && plan == expected
+                    && cmdline == expected_argv.as_bytes()
+                    && released["schema"] == "foundation-epoch266-private-window-guard-release-fit-v1"
+                    && released["node_plan"] == launch["node_plan"]
+            } else if self.unit == PREDECESSOR_266.unit {
                 let custody = json!(self.predecessor_custody()?);
                 launch["bootstrap_custody"] == custody
                     && quote[self.quote_key()]["bootstrap_custody"] == custody
