@@ -58,16 +58,35 @@ def issue_price(revision, layout):
 def enrollment(layout, revision):
     issued = layout.pinned(op.BASE/"SHARED_PRICE_V40.json")[0]
     directory = earlier.latest()
-    need(directory == price.NEW and issued["predecessor"] == op.reference(price.OLD/"deployment-seal-receipt.json") and issued["donor"] == op.LEASE
+    need(issued["predecessor"] == op.reference(price.OLD/"deployment-seal-receipt.json") and issued["donor"] == op.LEASE
          and issued["interface"] == price.INTERFACE and issued["private_predecessor"] == op.HISTORY
          and not op.bind(price.REFUSAL)["fits"],"superseded or foreign 169 price")
+    version = int(directory.name.removeprefix("issued-price-v"))
+    current = op.reference(directory/"deployment-seal-receipt.json")
+    link = current
+    lineage = []
+    need(version >= 40 and directory.parent == price.ROOT,"earlier or foreign admission provider")
+    for index in range(version,40,-1):
+        package_dir = price.ROOT/f"issued-price-v{index}"
+        previous = layout.bound(link)
+        source, raw = layout.pinned(package_dir/"SOURCE.json")
+        need(link["path"] == str(package_dir/"deployment-seal-receipt.json") and previous["destination"] == str(package_dir)
+             and any(m["name"]=="SOURCE.json" and m["sha256"]==raw["sha256"] for m in previous["members"])
+             and source["next169_interface"] == price.INTERFACE and source["next169_predecessor"] == op.HISTORY
+             and source["next169_donor"] == op.LEASE and source["fourth162_original_unissued_price"] == price.REFUSAL
+             and all(any(m["name"]==n and m["sha256"]==layout.digest(price.NEW/n) for m in previous["members"])
+                     for n in ("next169_peer.py","next169_price.py")),"successor changed the registered 169 reader or source")
+        lineage.append(link)
+        link = source["prior_shared_price"]
+    need(link == issued["package"] and link == op.reference(price.NEW/"deployment-seal-receipt.json"),
+         "new provider did not inherit the issued V40")
     info = layout.bound(price.INTERFACE)
     scope = layout.scope()
     active = max(CADENCE.glob("FAILED166_CADENCE_V*_ACTIVE.json"), key=lambda p:int(p.name.split("_V")[1].split("_")[0]))
     writer, ref = layout.pinned(active)
     ready = layout.bound(writer["ready"])
     cap = directory/"next169_price.py"
-    pkg = layout.bound(issued["package"])
+    pkg = layout.bound(current)
     need(info["scope"] == ready["next169_scope"] and info["provider"] == ready["next169_provider"]
          and ready["next169_reader"]["sha256"] == info["reader"]["sha256"]
          and ready["next169_interface"] == price.INTERFACE and ready["next169_predecessor"] == op.HISTORY
@@ -77,7 +96,8 @@ def enrollment(layout, revision):
          and pkg["destination"] == str(directory) and any(m["name"] == cap.name and m["sha256"] == layout.digest(cap)
                                                           for m in pkg["members"]),"different writer, shared price or predecessor")
     return dict(schema="horizon-private-169-next-enrollment-v1",writer_active=ref,operator=info["provider"],
-                donor=op.LEASE,capacity=op.reference(cap),whole_roster=issued["package"],source_commit=revision,
+                donor=op.LEASE,capacity=op.reference(cap),whole_roster=current,source_commit=revision,
+                price_lineage=lineage+[link],
                 interface=price.INTERFACE,previous=op.HISTORY,guard_validation=info["guard_validation"],
                 bootstrap=op.CUSTODY,reduced_memory_qualification=info["reduced_memory_qualification"])
 
