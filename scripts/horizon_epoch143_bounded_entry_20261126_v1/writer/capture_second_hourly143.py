@@ -64,7 +64,7 @@ def capture():
          "restored historical worker differs from contract")
     selectors = dict(_SYSTEMD_UNIT=UNIT, _SYSTEMD_INVOCATION_ID=iid, _PID=str(pid),
                      _BOOT_ID=actor["boot_id"].replace("-", ""))
-    records = run("journalctl", "-q", "--no-pager", "-o", "json", "--grep=verified the same worker's full restored checkpoint|progress slot ",
+    records = run("journalctl", "-q", "--no-pager", "-o", "json",
                   *(f"{key}={value}" for key, value in selectors.items()))
     entries = [json.loads(line) for line in records.splitlines()]
     for item in entries:
