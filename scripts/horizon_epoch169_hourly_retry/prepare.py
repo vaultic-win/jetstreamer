@@ -7,7 +7,6 @@ from pathlib import Path
 import stat
 import subprocess
 import sys
-import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -111,7 +110,8 @@ def static_files(staging):
     old_watcher=once(old_watcher,str(c.OLD_CONTROL/"sealed/watch.py"),str(DEPLOY/"watch.py"))
     contents={"gate.py":gate(),"watch.py":watcher(),"actor.py":actor(),c.UNIT:service(),TERMINAL:old_watcher,
               "scratch_mount.py":file_text(OLD/"scratch_mount.py","84d0e9595c355e8a75e73d63f2d9153db9164ef2e74b8508ef4d3c161a0a2fdd")}
-    for name in ("contract.py","namespace.py","custody.py","quote.py","observe.py","prepare.py"):
+    for name in ("contract.py","namespace.py","custody.py","quote.py","observe.py","cadence.py",
+                 "issuer.py","roster.py","prepare.py"):
         contents[name]=(HERE/name).read_text()
     members=[]
     for name,data in contents.items():
@@ -167,22 +167,39 @@ def fixture(deployment):
     ref=layout()
     properties=service().partition("[Service]\n")[2].splitlines()
     skip={"Type","StandardOutput","StandardError","ExecStart"}
-    args=["/usr/bin/systemd-run","--quiet","--wait","--collect","--service-type=exec",
-          f"--unit=horizon-169-retry-namespace-fixture-{time.time_ns()}"]
+    unit=f"horizon-169-retry-namespace-fixture-{time.time_ns()}.service"
+    args=["/usr/bin/systemd-run","--quiet","--wait","--collect","--service-type=exec","--unit="+unit]
     for row in properties:
         if row and row.split("=",1)[0] not in skip:
             args.append("--property="+row.replace(str(DEPLOY)+"/",str(deployment)+"/"))
     log=c.CONTROL/f"NAMESPACE-{time.time_ns()}.log"
     args.extend([f"--property=StandardOutput=append:{log}",f"--property=StandardError=append:{log}",
-                 "/usr/bin/python3","-IB",str(c.BARRIER/"namespace.py")])
-    process=subprocess.run(args, capture_output=True, text=True, timeout=35)
-    c.need(process.returncode==0, f"fixture failed with {process.returncode}: {log} {process.stderr}")
+                 "/usr/bin/python3","-IB",str(c.BARRIER/"namespace.py"),"--hold-for-census"])
+    host={}
+    process=subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+    try:
+        deadline=time.monotonic()+15
+        while time.monotonic()<deadline and process.poll() is None:
+            if log.exists() and log.read_bytes().endswith(b"\n"):
+                native=subprocess.check_output(["systemctl","show","-p","Id,InvocationID,MainPID,ControlGroup,ActiveState",
+                                                unit],text=True,timeout=3)
+                row=dict(line.split("=",1) for line in native.splitlines())
+                c.need(row["Id"]==unit and row["ControlGroup"]=="/system.slice/"+unit and row["ActiveState"]=="active",
+                       "different fixture service")
+                import runpy
+                mounted=runpy.run_path(str(deployment/"namespace.py"))["inspect"](int(row["MainPID"]))
+                host=dict(manager=row,mounts=mounted)
+                break
+            time.sleep(.05)
+    finally:
+        _,stderr=process.communicate(timeout=20)
+    c.need(process.returncode==0 and host, f"fixture failed with {process.returncode}: {log} {stderr}")
     _,data=c.stable(log,keep_bytes=True)
     proof=json.loads(data)
     c.need(proof["schema"]=="horizon-169-retry-native-namespace-v1" and proof["uid"]==1001
-           and not proof["useful_worker_launched"], "foreign namespace result")
+           and not proof["useful_worker_launched"] and host["mounts"]==proof["mounts"], "foreign namespace result")
     return c.recorded(c.CONTROL/f"NAMESPACE_{time.time_ns()}.json",
-                      dict(properties=args, readback=proof, current_inputs=ref, admission=False))
+                      dict(properties=args, readback=proof,host=host,current_inputs=ref,admission=False))
 
 
 if __name__ == "__main__":

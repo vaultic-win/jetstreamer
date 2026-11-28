@@ -5,6 +5,7 @@ from pathlib import Path
 import runpy
 import stat
 import sys
+import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import contract as c
@@ -85,4 +86,6 @@ def fixture():
 
 
 if __name__ == "__main__":
-    print(json.dumps(fixture(), sort_keys=True))
+    print(json.dumps(fixture(), sort_keys=True), flush=True)
+    if sys.argv[1:] == ["--hold-for-census"]:
+        time.sleep(6)
