@@ -28,6 +28,10 @@ pub(super) const DEMOTION_DEBUG_DEPS: &str =
 const DEMOTION_DEBUG: &str =
     "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/debug";
 const DEMOTION_SOURCE: &str = "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1";
+const DEMOTION_NODE_RELEASE_BUILD: &str =
+    "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/release/build";
+const HOLDING_RELEASE_BUILD: &str = "/home/ubuntu/.jetstreamer-private/epoch229-encrypted-custody-build.rLb9yS/target/release/build";
+
 struct PrivateCache {
     schema: &'static str,
     target: &'static str,
@@ -50,7 +54,7 @@ const PRIVATE_CACHES: &[PrivateCache] = &[
     },
     PrivateCache {
         schema: "jetstreamer-horizon-epoch230-demotion-node-release-build-cache-plan-v1",
-        target: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/release/build",
+        target: DEMOTION_NODE_RELEASE_BUILD,
         reference_scope: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-node-v1-target/release",
         source: "/home/ubuntu/.jetstreamer-private/epoch230-demotion-source-v1",
     },
@@ -74,7 +78,7 @@ const PRIVATE_CACHES: &[PrivateCache] = &[
     },
     PrivateCache {
         schema: "jetstreamer-horizon-epoch229-holding-release-build-cache-plan-v1",
-        target: "/home/ubuntu/.jetstreamer-private/epoch229-encrypted-custody-build.rLb9yS/target/release/build",
+        target: HOLDING_RELEASE_BUILD,
         reference_scope: "/home/ubuntu/.jetstreamer-private/epoch229-encrypted-custody-build.rLb9yS/target/release",
         source: "/home/ubuntu/.jetstreamer-private/epoch229-encrypted-custody-source",
     },
