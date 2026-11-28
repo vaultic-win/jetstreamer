@@ -31,9 +31,14 @@ ENROLLING_OPERATORS = {ENROLLING_FOLLOWING, RECONCILED_FOLLOWING, SPLIT_FOLLOWIN
 FOLLOWING_READERS = {FOLLOWING_READER, FOLLOWING_READER.with_name("closed-reader-v2"), FOLLOWING_READER.with_name("closed-reader-v3"), FOLLOWING_READER.with_name("closed-reader-v4")}
 CONTINUATIONS = ENROLLING_OPERATORS | {FOLLOWING_DEPLOYMENT, NEXT_DEPLOYMENT, NEXT_DEPLOYMENT.with_name("operator-with143-v1"), NEXT_DEPLOYMENT.with_name("operator-with143-v2")}
 GAP_DEPLOYMENT = NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-20261128-v1/operator-v1"
-GAP = Path(__file__).resolve().parent == GAP_DEPLOYMENT
+RAM_GAP_DEPLOYMENT = NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-ram-20261128-v1/operator-v1"
+RAM_GAP = Path(__file__).resolve().parent == RAM_GAP_DEPLOYMENT
+GAP = RAM_GAP or Path(__file__).resolve().parent == GAP_DEPLOYMENT
 ENTRY_FIELD = "independent_checkpoint" if GAP else "closed_comparison"
-if GAP:
+if RAM_GAP:
+    q = load("ram170_price")
+    workspace = load("ram170_workspace")
+elif GAP:
     q = load("gap170_price")
 elif Path(__file__).resolve().parent in CONTINUATIONS | RETRY_OPERATORS | FOLLOWING_READERS:
     q = load("continuation_price")
@@ -111,13 +116,14 @@ def actor(held=True):
     i,ir=q.scope()
     s=q.state(UNIT)
     iid=s["InvocationID"];pid=int(s["MainPID"]);proc=Path("/proc")/str(pid)
+    memory = q.PRODUCER_MEMORY if RAM_GAP else 48*G
     need(re.fullmatch("[0-9a-f]{32}",iid) and iid!="0"*32 and s["ActiveState"]=="active"
-         and not s["Job"] and s["ControlPID"]=="0" and s["MemoryMax"]==str(48*G) and s["MemorySwapMax"]=="0"
+         and not s["Job"] and s["ControlPID"]=="0" and s["MemoryMax"]==str(memory) and s["MemorySwapMax"]=="0"
          and s["CPUQuotaPerSecUSec"]=="6s" and s["ControlGroup"]=="/system.slice/"+UNIT,"foreign producer")
     cg=Path("/sys/fs/cgroup"+s["ControlGroup"])
     members={int(p) for p in (cg/"cgroup.procs").read_text().split()}
     need((members=={pid} if held else pid in members) and (cg/"cpu.max").read_text().split()==["600000","100000"]
-         and int((cg/"memory.max").read_text())==48*G and (cg/"memory.swap.max").read_text().strip()=="0",
+         and int((cg/"memory.max").read_text())==memory and (cg/"memory.swap.max").read_text().strip()=="0",
          "actual scheduling limits or members changed")
     target=Path(i["profile"]["sealed_package"]["path"]).with_name("gate") if held else Path(i["profile"]["node"]["path"])
     need((proc/"exe").samefile(target) and (proc/"cgroup").read_text().strip()=="0::"+s["ControlGroup"],
@@ -131,6 +137,8 @@ def actor(held=True):
         need([m.st_dev,m.st_ino,m.st_size,m.st_mtime_ns,m.st_ctime_ns][:len(identity)]==identity
              and os.statvfs(f).f_flag & os.ST_RDONLY, "foreign or writable projection "+dst)
     run=Path(i["run"])
+    if RAM_GAP:
+        workspace.mount(pid, run / "scratch")
     dev=run.stat().st_dev
     major_minor=f"{os.major(dev)}:{os.minor(dev)}"
     mtab=[l.split(" - ",1)[0].split() for l in (proc/"mountinfo").read_text().splitlines()]
@@ -215,6 +223,9 @@ def start():
             need(guard_state["MainPID"]=="0" and not guard_state["Job"], "old guard has an active owner")
             subprocess.run(["/usr/bin/systemctl","reset-failed",GUARD],check=True)
     fit=checked_price("start")
+    if RAM_GAP:
+        q.transfer_guard(save)
+        fit=checked_price("start")
     fref=save("SUCCESSOR_START_FIT.json",fit)
     save("SUCCESSOR_START_INTENT.json",dict({ENTRY_FIELD: closed},interface=ir,price=fref,
         producer_unit=UNIT,guard_unit=GUARD,guard_floor=fit["guard_floor"],guard_cap=fit["guard_cap"],
@@ -273,7 +284,12 @@ def arm():
     intent,_=current("SUCCESSOR_START_INTENT.json")
     fit=checked_price("held")
     # A new held tree with a higher aggregate floor may require a stronger guard before release.
-    floor=max(intent["guard_floor"],fit["guard_floor"])+min(G,max(0,fit["home_margin"])//2)
+    floor=max(intent["guard_floor"],fit["guard_floor"])
+    if RAM_GAP:
+        remaining = max(0, fit["home_margin"] - (floor-fit["guard_floor"]))
+        floor += min(4*G, remaining//2)
+    else:
+        floor += min(G, max(0,fit["home_margin"])//2)
     cap=intent["guard_cap"]
     need(funded_guard(fit, floor, cap),
          "held floor/cap cannot cover remaining growth")

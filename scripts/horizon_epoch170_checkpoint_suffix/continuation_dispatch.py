@@ -242,12 +242,12 @@ def enrollment_writer(interface, ref):
 def gap_dispatch(stage):
     scope, interface = operator.static()
     checkpoint = operator.compare()
-    _, program = q.writer()
     if stage == "check":
         with admission_lock():
-            quote = q.price("start")
+            quote = q.price("start", preliminary=True) if getattr(q,"ENROLL_OPTION",None) else q.price("start")
         return dict(interface=interface, independent_checkpoint=checkpoint, fits=quote["fits"],
                     home_margin=quote["home_margin"], ram_margin=quote["ram_margin"], whole_roster=quote)
+    _, program = q.writer()
     q.need(stage in ("advance", "release"), "unknown gap stage")
     if (q.DEP/"SUCCESSOR_RELEASE.json").exists():
         release, ref = q.read(q.DEP/"SUCCESSOR_RELEASE.json")
@@ -272,7 +272,7 @@ def gap_dispatch(stage):
             _, head = q.prior.current_fleet()
             _, current = q.writer()
             q.need(current == program, "gap writer changed")
-            subprocess.run(["/usr/bin/python3","-IB",str(program),"--enroll-gap-170",
+            subprocess.run(["/usr/bin/python3","-IB",str(program),getattr(q,"ENROLL_OPTION","--enroll-gap-170"),
                             head["path"],head["sha256"]],check=True,timeout=70)
         return operator.release()
 

@@ -13,9 +13,13 @@ ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73746882-20
 RETRY_ROOT = ROOT/"attempt-2"
 FOLLOWING_ROOT = ROOT.parent/"epoch170-from-73766969-20261127-v1"
 GAP_ROOT = ROOT.parent/"epoch170-from-73760367-20261128-v1"
+RAM_ROOT = ROOT.parent/"epoch170-from-73760367-ram-20261128-v1"
+RAM_OPERATOR = RAM_ROOT/"operator-v1"
 RETRY = Path(__file__).resolve().parent in (RETRY_ROOT/"progress-v1", RETRY_ROOT/"progress-v2", RETRY_ROOT/"progress-v3")
 if RETRY:
     ROOT = RETRY_ROOT
+elif Path(__file__).resolve().parent == RAM_OPERATOR:
+    ROOT = RAM_ROOT
 elif Path(__file__).resolve().parent == GAP_ROOT/"progress-v1":
     ROOT = GAP_ROOT
 elif Path(__file__).resolve().parent in (FOLLOWING_ROOT/"progress-v1", FOLLOWING_ROOT/"progress-v2", FOLLOWING_ROOT/"progress-v3", FOLLOWING_ROOT/"progress-v4", FOLLOWING_ROOT/"progress-v5"):
@@ -83,11 +87,16 @@ def worker_sample(dispatch, scope, actor, release):
     def ticks():
         return int((proc/"stat").read_text().rsplit(") ", 1)[1].split()[19])
     start = ticks()
-    exe = (proc/"exe").resolve(strict=True)
     timer = dispatch.q.state(scope["expected_guard_timer"], "ActiveState,Id,InvocationID,Job,Triggers")
     require(timer["ActiveState"] == "active" and not timer["Job"] and timer["Triggers"] == scope["expected_guard_unit"]
-            and timer["InvocationID"] == release["guard_timer_invocation_id"]
-            and exe.is_relative_to(Path(scope["run"])/"scratch") and exe.name == "historical-worker"
+            and timer["InvocationID"] == release["guard_timer_invocation_id"], "different protective timer")
+    if ROOT == RAM_ROOT:
+        matched = dispatch.operator.workspace.worker(pid, actor["producer_pid"], Path(scope["run"])/"scratch",
+                                                    scope["profile"]["worker"],"/system.slice/"+actor["unit"])
+        require(dispatch.operator.actor(False)==actor and ticks()==start, "private worker or actor changed")
+        return ref, dict(matched, exe=matched["path"])
+    exe = (proc/"exe").resolve(strict=True)
+    require(exe.is_relative_to(Path(scope["run"])/"scratch") and exe.name == "historical-worker"
             and dispatch.operator.digest(proc/"exe") == scope["profile"]["worker"]
             and (proc/"cgroup").read_text().strip() == "0::/system.slice/"+actor["unit"]
             and set((Path("/sys/fs/cgroup/system.slice")/actor["unit"]/"cgroup.procs").read_text().split())
@@ -106,7 +115,7 @@ def follow(dispatch):
     require(release["actor"] == actor_ref and release["interface"] == scope_ref
             and release["producer_invocation_id"] == iid and Path(scope["barrier"]).read_text() == iid
             and not release["archive_publication_authorized"], "unconfirmed successor release")
-    if ROOT == GAP_ROOT:
+    if ROOT in (GAP_ROOT,RAM_ROOT):
         require(release["independent_checkpoint"] == q.compare_predecessor(), "different independent gap checkpoint")
     dest = ROOT/"FIRST_PROTECTED_PROGRESS.json"
     if dest.exists():
@@ -154,11 +163,19 @@ def follow(dispatch):
 
 
 def main():
-    observe = ROOT == GAP_ROOT and sys.argv[1:] == ["observe"]
+    observe = ROOT in (GAP_ROOT,RAM_ROOT) and sys.argv[1:] == ["observe"]
     require(observe or sys.argv[1:] in (["check"], ["advance"]), "unknown progress command")
-    original = OPERATOR/"continuation_dispatch.py"
-    require(hashlib.sha256(original.read_bytes()).hexdigest() == EXPECTED_DISPATCH, "dispatcher changed")
-    sys.path.insert(0, str(OPERATOR))
+    directory = RAM_OPERATOR if ROOT == RAM_ROOT else OPERATOR
+    original = directory/"continuation_dispatch.py"
+    expected = EXPECTED_DISPATCH
+    if ROOT == RAM_ROOT:
+        require(observe, "use the registered RAM retry dispatcher to advance")
+        seal = json.loads((directory/"deployment-seal-receipt.json").read_bytes())
+        require(seal["destination"]==str(directory), "different RAM retry operator")
+        member, = [m for m in seal["members"] if m["name"]==original.name]
+        expected = member["sha256"]
+    require(hashlib.sha256(original.read_bytes()).hexdigest() == expected, "dispatcher changed")
+    sys.path.insert(0, str(directory))
     import continuation_dispatch as dispatch
     if sys.argv[1] == "check":
         print(json.dumps(dispatch.dispatch("check")), flush=True)
