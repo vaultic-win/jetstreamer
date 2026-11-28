@@ -640,6 +640,9 @@ fn supported_unit(plan: &Plan) -> bool {
     if plan.unit == "horizon-qualify-143-first-hourly-20261127-v1.service" {
         return cfg!(feature = "epoch143-first-hourly");
     }
+    if plan.unit == "horizon-qualify-162-second-replay-20261128-v3.service" {
+        return cfg!(feature = "epoch162-second-reserved");
+    }
     if plan.unit == "horizon-qualify-162-second-replay-20261128-v2.service" {
         return cfg!(feature = "epoch162-second-retry");
     }
@@ -709,7 +712,8 @@ fn validate_plan(plan: &Plan) -> Result<()> {
     feature = "epoch141-third-hourly",
     feature = "epoch143-first-hourly",
     feature = "epoch162-second-hourly",
-    feature = "epoch162-second-retry"
+    feature = "epoch162-second-retry",
+    feature = "epoch162-second-reserved"
 ))]
 fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
     let (worker_root, receipts, minimum_floor, maximum_tree_bytes) = match plan.unit.as_str() {
@@ -739,6 +743,20 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
                 "/var/lib/jetstreamer/horizon_runtime_data/epoch141-third-hourly-20261127-v1/guard-receipts",
                 9_470_567_509_909,
                 TREE_CAP,
+            )
+        }
+        #[cfg(feature = "epoch162-second-reserved")]
+        "horizon-qualify-162-second-replay-20261128-v3.service" => {
+            const CAP: u64 = (3 << 30) + (64 << 20);
+            ensure!(
+                plan.maximum_root_physical_bytes == Some(CAP),
+                "unexpected second 162 image cap"
+            );
+            (
+                "/home/sol/.jetstreamer-private/epoch162-second-replay-20261128-v3",
+                "/var/lib/jetstreamer/horizon_runtime_data/epoch162-second-replay-20261128-v3/guard-receipts",
+                9_470_567_509_909,
+                CAP,
             )
         }
         #[cfg(feature = "epoch162-second-retry")]
@@ -1256,7 +1274,8 @@ fn run() -> Result<()> {
         feature = "epoch141-third-hourly",
         feature = "epoch143-first-hourly",
         feature = "epoch162-second-hourly",
-        feature = "epoch162-second-retry"
+        feature = "epoch162-second-retry",
+        feature = "epoch162-second-reserved"
     ))]
     validate_checkpoint_scope(&plan)?;
     #[cfg(not(any(
@@ -1270,7 +1289,8 @@ fn run() -> Result<()> {
         feature = "epoch141-third-hourly",
         feature = "epoch143-first-hourly",
         feature = "epoch162-second-hourly",
-        feature = "epoch162-second-retry"
+        feature = "epoch162-second-retry",
+        feature = "epoch162-second-reserved"
     )))]
     ensure!(
         plan.unit == data_fulfillment::COLD_UNIT
