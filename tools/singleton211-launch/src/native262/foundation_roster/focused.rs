@@ -1127,7 +1127,14 @@ impl Focused {
                 && guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
         } else if self.unit == NEXT_V1627_230.unit {
             let custody = binding(&receipt["bootstrap_custody"])?;
-            let held = custody.sealed()?;
+            // This copy receipt is sealed in the private HOME staging namespace.
+            ensure!(
+                custody.path == Path::new("/home/ubuntu/.jetstreamer-private/epoch230-next-v1627.tgZPOmPP/source-evidence/bootstrap-custody.json")
+                    && custody.sha256 == "1c205232c283ef1748202da048b50406aeaffdc7f3f1b4e22887ac73941de8af"
+                    && custody.path.canonicalize()? == custody.path,
+                "epoch 230 bootstrap receipt differs from the admitted transfer"
+            );
+            let held: Value = serde_json::from_slice(&custody.bytes(true)?)?;
             let bootstrap = &held["bootstrap"];
             let snapshot = Path::new(text(bootstrap, "path")?);
             let metadata = fs::symlink_metadata(snapshot)?;
@@ -1148,8 +1155,9 @@ impl Focused {
                 && guard["unit"] == self.unit
                 && guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
                 && profile["bootstrap_custody"] == receipt["bootstrap_custody"]
-                && custody.sha256
-                    == "1c205232c283ef1748202da048b50406aeaffdc7f3f1b4e22887ac73941de8af"
+                && held["schema"] == "foundation-epoch230-next-v1627-bootstrap-custody-v1"
+                && held["replay_admitted"] == false
+                && held["publication_authorized"] == false
                 && bootstrap["generation"] == "1633487072511006"
                 && bootstrap["sha256"]
                     == "a1dcd477a8bd99c7ff52876e8b268d4392b31207bc99f2799f46c732644fb45d"
