@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"actual_completed_fleet_custody_control\":{\"path\":\"/home/sol/.jetstreamer-private/epoch185-positive-upstream-fleet-custody-control-v31-driver11-r3/actual-enrolled-fleet-custody-control.json\",\"sha256\":\"ef3e4cdcea46ad2b9a43c273b61566738a3c678f1a05781cda9e01f50d4fae8a\"}}\n",
+  "stderr": "Running as unit: horizon-positive185-fleet-custody-native-20261108-v31-driver11-r3.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 79ms\nCPU time consumed: 34ms\nMemory peak: 4.5M\nMemory swap peak: 0B\n"
+}

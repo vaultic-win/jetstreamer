@@ -1,0 +1,30 @@
+{
+  "schema": "horizon-helper34-tracked-source-map-v1",
+  "production_source_root": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185",
+  "members": [
+    {
+      "path": "enrollment.rs",
+      "sha256": "0861ee876920d6e4b6ebe8738ffb2833f0213af76febe96e5ba591becccd9d16"
+    },
+    {
+      "path": "inherited_live145.rs",
+      "sha256": "b77d0db2fbbe33d5f7d1434ebb86574faed0d4d6b6d59f4e3ef322ea82fe695a"
+    },
+    {
+      "path": "inherited_live145_fixtures/original-task.json",
+      "sha256": "7a8d56f596f71d9ad4b70153bf97f016308c68624bf6b10675550f2b35cba4bc"
+    },
+    {
+      "path": "inherited_live145_fixtures/prior-fleet.json",
+      "sha256": "4587d110a43837d2f935f62ace9d76eadff459a0230365a533e626b84a5a5dda"
+    },
+    {
+      "path": "inherited_live145_fixtures/prior-plan.json",
+      "sha256": "b5beb5994251d878388d49ac3918cd8f94fe4422317cb5d37fba77d4d5665653"
+    },
+    {
+      "path": "inherited_live145_tests.rs",
+      "sha256": "a284188446468c2bf7f584d565d8f2df86d8f9dd5e0ea70087dd7fa05722a515"
+    }
+  ]
+}

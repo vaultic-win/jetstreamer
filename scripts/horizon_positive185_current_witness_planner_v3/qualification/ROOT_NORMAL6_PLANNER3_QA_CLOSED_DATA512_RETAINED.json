@@ -1,0 +1,12 @@
+{
+  "schema": "horizon-planner3-normal6-QA-closed-DATA512-retained-v1",
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/ROOT_NORMAL6_SERIAL2_PLANNER3_DATA512_BOOKING.json",
+    "sha256": "f17247480cf88708249b807cf6427db37f58bc6cab34f6b86c1b3f446804f7ef"
+  },
+  "all_five_original_actors_terminal_and_drained": true,
+  "normal_pool_bytes": 6442450944,
+  "new_QA_memory_released_bytes": 0,
+  "new_DATA512_retained": true,
+  "complete_DATA_lower_bound_bytes": 5143103746708
+}

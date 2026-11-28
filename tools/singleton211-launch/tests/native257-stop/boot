@@ -1,0 +1,173 @@
+#!/bin/bash
+set -euo pipefail
+umask 022
+stage=${0%/boot}
+[[ "$stage" =~ ^/run/horizon257-exact-stop-sandbox-v[0-9]+-v[0-9]+$ ]]
+test "$0" = "$stage/boot"
+test "$(realpath -- "$0")" = "$0"
+guest=/tmp/epoch257-guest
+outer=${stage##*/}.service
+trace_stage() {
+    exec 8>>"$stage/result/bootstrap.trace"
+    BASH_XTRACEFD=8
+    PS4='+ $BASHPID ${1:-outer} line $LINENO: '
+    set -x
+}
+case ${1:-outer} in
+outer)
+    test "$(id -u)" = 0
+    test "$(cat /proc/self/cgroup)" = "0::/system.slice/$outer"
+    cgroup=/sys/fs/cgroup/system.slice/$outer
+    test "$(cat "$cgroup/memory.max")" = 1073741824
+    test "$(cat "$cgroup/memory.swap.max")" = 0
+    test "$(cat "$cgroup/cpu.max")" = '100000 100000'
+    test "$(cat "$cgroup/pids.max")" = 192
+    test "$(stat -fc %T "$stage/result")" = tmpfs
+    test -z "$(ls -A "$stage/result")"
+    test "$(findmnt -nr -T "$stage/result" -o TARGET)" = "$stage/result"
+    test "$(stat -c '%u:%g:%a' "$stage/result")" = '0:0:700'
+    python3 - "$stage/result" <<'PYMOUNT'
+import os,sys
+m=os.statvfs(sys.argv[1])
+assert m.f_frsize*m.f_blocks == 33554432
+flags=os.ST_NOSUID | os.ST_NODEV | os.ST_NOEXEC
+assert m.f_flag & flags == flags
+PYMOUNT
+    exec >>"$stage/result/outer.log" 2>&1
+    trace_stage outer
+    (cd "$stage/src"; sha256sum --quiet --check "$stage/source.sha256")
+    # The service mount namespace can otherwise be freed at unshare(2) and its
+    # inode number reused by the new PID1. Hold the originals in the outer
+    # supervisor until the guest terminates. Close every handle in its child.
+    exec 3</proc/self/ns/pid 4</proc/self/ns/mnt 5</proc/self/ns/cgroup 6</proc/self/ns/net
+    python3 -c 'import json,os;print(json.dumps({n:os.readlink("/proc/1/ns/"+n) for n in ["pid","mnt","cgroup","net"]}))' > "$stage/result/host-pid1-namespaces.json"
+    python3 -c 'import json,os;print(json.dumps({n:os.readlink("/proc/self/ns/"+n) for n in ["pid","mnt","cgroup","net"]}))' > "$stage/result/host-namespaces.json"
+    exec unshare --mount --propagation private --cgroup --net --uts --ipc "$0" supervisor
+    ;;
+supervisor)
+    trace_stage supervisor
+    mkdir "$guest"
+    mount -t tmpfs -o size=160M,mode=0755,exec tmpfs "$guest"
+    mkdir -p "$guest"/{bin,dev,etc/systemd/system,fixture,home/ubuntu/.jetstreamer-private,proc,run,sys,tmp,usr,var/lib/jetstreamer,var/log,root,evidence}
+    rmdir "$guest/bin"
+    for sym in bin sbin lib lib64; do ln -s "usr/$sym" "$guest/$sym"; done
+    mount --bind /usr "$guest/usr"
+    mount -o remount,bind,ro,nosuid,nodev "$guest/usr"
+    mount -t sysfs -o ro,nosuid,nodev,noexec sysfs "$guest/sys"
+    mount -t cgroup2 -o nosuid,nodev,noexec none "$guest/sys/fs/cgroup"
+    # The outer service owns this delegated tree. Process migration and every
+    # writable cgroup must remain inside that newly-created cgroup namespace.
+    test "$(cat /proc/self/cgroup)" = '0::/'
+    guest_cg="$guest/sys/fs/cgroup"
+    test "$(cat "$guest_cg/memory.max")" = 1073741824
+    test "$(cat "$guest_cg/memory.swap.max")" = 0
+    mkdir "$guest_cg/sandbox-supervisor"
+    echo 0 > "$guest_cg/sandbox-supervisor/cgroup.procs"
+    mount -t tmpfs -o size=1M,mode=0755 tmpfs "$guest/dev"
+    for d in null zero full random urandom tty; do
+        touch "$guest/dev/$d"
+        mount --bind "/dev/$d" "$guest/dev/$d"
+    done
+    touch "$guest/dev/console"
+    mkdir -p "$guest/dev"/{pts,shm}
+    mount -t devpts -o newinstance,ptmxmode=0666,mode=0620 devpts "$guest/dev/pts"
+    ln -s pts/ptmx "$guest/dev/ptmx"
+    for d in fd stdin stdout stderr; do
+        case $d in fd) target=/proc/self/fd;; stdin) target=/proc/self/fd/0;; stdout) target=/proc/self/fd/1;; stderr) target=/proc/self/fd/2;; esac
+        ln -s "$target" "$guest/dev/$d"
+    done
+    chmod 1777 "$guest/tmp" "$guest/dev/shm"
+    mount --bind "$stage/result" "$guest/evidence"
+    install -m 0444 "$stage/result/host-namespaces.json" "$guest/fixture/"
+    install -m 0555 "$stage/src/sandbox-tests" "$guest/fixture/"
+    install -m 0444 "$stage/src/driver.service" "$guest/etc/systemd/system/horizon257-sandbox-driver.service"
+    install -m 0444 "$stage/src/preflight" "$stage/src/postflight" "$guest/fixture/"
+    mkdir -p "$stage/result/journal" "$guest/var/log/journal"
+    mount --bind "$stage/result/journal" "$guest/var/log/journal"
+    install -m 0444 "$stage/src/driver.conf" "$guest/etc/systemd/journald.conf"
+    install -m 0444 "$stage/src/passwd" "$stage/src/group" "$guest/etc/"
+    install -m 0444 /usr/lib/os-release "$guest/etc/os-release"
+    cat /proc/sys/kernel/random/uuid | tr -d '-' > "$guest/etc/machine-id"
+    for u in basic.target sysinit.target sockets.target paths.target timers.target; do
+        echo -e "[Unit]\nDescription=Isolated $u\nDefaultDependencies=no" > "$guest/etc/systemd/system/$u"
+    done
+    for u in systemd-journald.service systemd-journald.socket systemd-journald-dev-log.socket shutdown.target; do
+        install -m 0444 "/usr/lib/systemd/system/$u" "$guest/etc/systemd/system/"
+    done
+    for u in "$stage"/src/units/*; do install -m 0444 "$u" "$guest/etc/systemd/system/"; done
+    for spec in \
+      horizon257-native-input-limited-20261120-v1/horizon257-native-input \
+      horizon257-native-guard-reap-v219/horizon257-native-guard; do
+        install -D -m 0555 "$stage/src/${spec##*/}" "$guest/var/lib/jetstreamer/$spec"
+    done
+    install -d -m 0755 "$guest/var/lib/jetstreamer/horizon-native257-startup-tokens"
+    install -d -m 0700 -o 1000 -g 1000 "$guest/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1"
+    chmod 0755 "$guest/home/ubuntu/.jetstreamer-private"
+    for pkg in sandbox-fixture-admission horizon-native257-startup-plan-takeover-guard-v1; do
+        install -d -m 0755 "$guest/var/lib/jetstreamer/$pkg"
+    done
+    # Root, /run, /var/lib, /proc and writable cgroups are private to this
+    # manager. Host /run, machine bus, systemd control socket and data volumes
+    # are never bound inside it.
+    for fd in 3 4 5 6; do readlink "/proc/$$/fd/$fd"; done
+    SHELL=/bin/sh script -qefc "exec $stage/boot console" "$stage/result/pid1-tty.log" 3<&- 4<&- 5<&- 6<&- </dev/null >/dev/null
+    test -s "$stage/result/sandbox-comparison.json"
+    test -s "$stage/result/stop-intent.json"
+    test -s "$stage/result/triggering-sample.json"
+    test -s "$stage/result/stop-request.json"
+    test -s "$stage/result/protective-stop-capture.json"
+    cat "$stage/result/sandbox-comparison.json"
+
+    ;;
+console)
+    trace_stage console
+    test "$(cat /proc/self/cgroup)" = '0::/sandbox-supervisor'
+    slave=$(tty)
+    [[ "$slave" =~ ^/dev/pts/[0-9]+$ && -c "$slave" ]]
+    mount --bind "$slave" "$guest/dev/console"
+    exec unshare --mount --propagation private --pid --fork --kill-child "$0" init
+    ;;
+init)
+    trace_stage init
+    test "$(cat /proc/self/cgroup)" = '0::/sandbox-supervisor'
+    echo 0 > "$guest/sys/fs/cgroup/cgroup.procs"
+    mount -t proc -o nosuid,nodev,noexec proc "$guest/proc"
+    test "$(cat "$guest/proc/self/stat" | cut -d' ' -f1)" != ''
+    mount --bind "$guest/proc/sys" "$guest/proc/sys"
+    mount -o remount,bind,ro "$guest/proc/sys"
+    python3 - "$guest/proc" "$stage/result/host-pid1-namespaces.json" "$stage/result/host-namespaces.json" <<'PYNS'
+import json, os, sys
+from pathlib import Path
+for src in sys.argv[2:]:
+    original=json.loads(Path(src).read_bytes())
+    for name, before in original.items():
+        after=os.readlink(Path(sys.argv[1])/'self/ns'/name)
+        print(f'{src}: {name} {before} -> {after}', flush=True)
+        if before==after: raise SystemExit('guest namespace equals original '+name)
+PYNS
+    host_ns=$(cat "$guest/fixture/host-namespaces.json")
+    current_pidns=$(readlink "$guest/proc/self/ns/pid")
+    [[ "$host_ns" != *"$current_pidns"* ]]
+    test ! -e "$guest/run/systemd/private"
+    test ! -e "$guest/run/dbus/system_bus_socket"
+    test ! -e "$guest/var/lib/jetstreamer/horizon257-native-bootstrap-inputs-20261120-v1/inputs.json"
+    # Make the fixture the actual mount-namespace root. With chroot alone
+    # /proc/<pid>/exe can include the old prefix across two unit mount namespaces.
+    # The retained log descriptors continue to address the bounded result mount.
+    exec >>"$stage/result/guest-pid1-stdout.log" 2>>"$stage/result/guest-pid1-stderr.log"
+    cd "$guest"
+    mkdir .old-root
+    pivot_root . .old-root
+    cd /
+    /bin/umount --lazy /.old-root
+    rmdir /.old-root
+    test "$(findmnt -nro TARGET -T /)" = /
+    test "$(stat -fc %T /)" = tmpfs
+    test ! -e /tmp/epoch257-guest
+    test ! -e /run/systemd/private
+    set +x
+    exec 8>&-
+    exec /usr/bin/env -i PATH=/usr/bin:/usr/sbin:/bin:/sbin container=horizon257-stop-fixture SYSTEMD_UNIT_PATH=/etc/systemd/system SYSTEMD_LOG_TARGET=console SYSTEMD_LOG_LEVEL=debug SYSTEMD_LOG_LOCATION=1 SYSTEMD_LOG_TIME=1 SYSTEMD_SKIP_SYSV_GENERATOR=1 SYSTEMD_OFFLINE=0 /usr/lib/systemd/systemd --system --show-status=no --unit=horizon257-sandbox-driver.service
+    ;;
+*) exit 2;;
+esac

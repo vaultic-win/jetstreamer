@@ -1,0 +1,19 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -988 +988,3 @@
+-    focused_release = V / "horizon-foundation-focused-fleet-v2/acceptance.json"
++    focused_release = V / "horizon-foundation-focused-fleet-v3/acceptance.json"
++    if not focused_release.is_file():
++        focused_release = V / "horizon-foundation-focused-fleet-v2/acceptance.json"
+@@ -998,0 +1001,2 @@
++            if focused_release.parent.name == "horizon-foundation-focused-fleet-v3":
++                add(plan["gates"]["260"], sealed_226_file(focused_release))
+--- a/delivery261.py
++++ b/delivery261.py
+@@ -80 +80,5 @@
+-    directory = RELEASE if epoch == 261 else V / "horizon252-delivery-fleet-v1"
++    directory = RELEASE
++    if epoch == 252:
++        directory = V / "horizon252-delivery-fleet-v2"
++        if not (directory / "acceptance.json").is_file():
++            directory = V / "horizon252-delivery-fleet-v1"

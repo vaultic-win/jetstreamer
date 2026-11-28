@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1h",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/logrotate.timer",
+      "Id": "logrotate.timer",
+      "InvocationID": "b76daf3c5659403b836ceba761a0efe8",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "logrotate.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/logrotate.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/logrotate.timer",
+          "sha256": "42f723dc5d90247a5fda11a3358d1a67eccceed856192b2264aa222d6aa240f4"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1h",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/logrotate.timer",
+      "Id": "logrotate.timer",
+      "InvocationID": "b76daf3c5659403b836ceba761a0efe8",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "logrotate.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/logrotate.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/logrotate.timer",
+          "sha256": "42f723dc5d90247a5fda11a3358d1a67eccceed856192b2264aa222d6aa240f4"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2529064058625,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794268800000000
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "logrotate.timer",
+  "unset_pending_requires_metadata_requery": false
+}

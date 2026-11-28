@@ -1,0 +1,277 @@
+{
+  "schema": "horizon-imported235237-index-source-bindings-v1",
+  "source_only": true,
+  "check_only_passed": false,
+  "capacity_credit_bytes": 0,
+  "profiles": [
+    {
+      "epoch": 235,
+      "owner_root": "/home/ubuntu/.jetstreamer-private/qualification-235-general-shrink-debt-budget506-e3f15eb2-v1",
+      "imported_canonical": {
+        "epoch": 235,
+        "archive": {
+          "path": "/home/ubuntu/horizon/epoch-235.jet",
+          "identity": {
+            "device": 66305,
+            "inode": 15066138,
+            "size": 165072264512,
+            "blocks": 322407184,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33056,
+            "nlink": 1,
+            "mtime": 1793859729,
+            "mtime_nsec": 561021735
+          },
+          "ctime": 1793872878,
+          "ctime_nsec": 850976144
+        },
+        "checksum": {
+          "path": "/home/ubuntu/horizon/epoch-235.jet.sha256",
+          "sha256": "23fd09a8d33f06bd7502fe0ce5cb096f29c72c40aba6b7c213a1a70b3b830c23",
+          "uid": 1000
+        },
+        "ready_acceptance": {
+          "path": "/var/lib/jetstreamer/horizon235-ready-completion870-Main-v1/authenticated-ready-pair-and-native-completion.json",
+          "sha256": "8e1306269113dbf1501f7687b4c53572f8ff8b64e0a3686436e5c2aa034e79a9",
+          "uid": 0
+        },
+        "original_metadata": [
+          {
+            "path": "/home/ubuntu/.jetstreamer-private/qualification-235-general-shrink-debt-budget506-e3f15eb2-v1/state/destination-e748bbe05a30e82d20c8d3719401380224b340a7e8fdb7016c69f42c7c9701ce/work/root-cohort-235-235/run-2634498-1793673351962548044/cohort-state.json",
+            "sha256": "7492cfdebd0e9ef718881defdb25da93e04470bf68a9071cac3cf8277ecd88de",
+            "uid": 1000
+          },
+          {
+            "path": "/home/ubuntu/.jetstreamer-private/qualification-235-general-shrink-debt-budget506-e3f15eb2-v1/state/destination-e748bbe05a30e82d20c8d3719401380224b340a7e8fdb7016c69f42c7c9701ce/evidence/archive-batches/destination-0000000000010301-0000000000e5d46e/batch-a9756e58dea8404bd48896e41a3362641bac8afbac744423fdadd1900c2f7768.json",
+            "sha256": "aac851db7bf71019c4ae1e2630689c3f36424dcd5836bd36a0c8e4c9d39d9458",
+            "uid": 1000
+          }
+        ]
+      },
+      "preserved": [
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-235-general-shrink-debt-budget506-e3f15eb2-v1/state/destination-e748bbe05a30e82d20c8d3719401380224b340a7e8fdb7016c69f42c7c9701ce/work/root-cohort-235-235/run-2634498-1793673351962548044/cohort-state.json",
+          "identity": {
+            "device": 66305,
+            "inode": 15063693,
+            "size": 222,
+            "blocks": 8,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1793673351,
+            "mtime_nsec": 961644636
+          },
+          "ctime": 1793673351,
+          "ctime_nsec": 961644636
+        },
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-235-general-shrink-debt-budget506-e3f15eb2-v1/state/destination-e748bbe05a30e82d20c8d3719401380224b340a7e8fdb7016c69f42c7c9701ce/evidence/archive-batches/destination-0000000000010301-0000000000e5d46e/batch-a9756e58dea8404bd48896e41a3362641bac8afbac744423fdadd1900c2f7768.json",
+          "identity": {
+            "device": 66305,
+            "inode": 15061925,
+            "size": 9093,
+            "blocks": 24,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1793862986,
+            "mtime_nsec": 986255992
+          },
+          "ctime": 1793862986,
+          "ctime_nsec": 986255992
+        }
+      ],
+      "selected_indexes": [
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-235-general-shrink-debt-budget506-e3f15eb2-v1/output/compact-indexes/235/epoch-235-bafyreihtgvyezymmz43dq53ea6g6wq5vnjalssaxzhvnq6sqvt7c63zhke-mainnet-cid-to-offset-and-size.index",
+          "identity": {
+            "device": 66305,
+            "inode": 15303686,
+            "size": 9088993978,
+            "blocks": 17751968,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1793674533,
+            "mtime_nsec": 751862861
+          },
+          "ctime": 1793674535,
+          "ctime_nsec": 454855961,
+          "allocated_bytes": 9089007616,
+          "header_hex": "636f6d7069737a64760000000900000000000000d427010001040565706f636808eb0000000000000007726f6f744369642401711220f335704ce18ccf36387764078deb43b56a40b94817c9ead87a50acfe2f6f2751076e6574776f726b076d61696e6e6574046b696e64166369642d746f2d6f66667365742d616e642d73697a65",
+          "reproduction_url": "https://files.old-faithful.net/235/epoch-235-bafyreihtgvyezymmz43dq53ea6g6wq5vnjalssaxzhvnq6sqvt7c63zhke-mainnet-cid-to-offset-and-size.index"
+        },
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-235-general-shrink-debt-budget506-e3f15eb2-v1/output/compact-indexes/235/epoch-235-bafyreihtgvyezymmz43dq53ea6g6wq5vnjalssaxzhvnq6sqvt7c63zhke-mainnet-slot-to-cid.index",
+          "identity": {
+            "device": 66305,
+            "inode": 15303685,
+            "size": 16517931,
+            "blocks": 32264,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1793674530,
+            "mtime_nsec": 347876651
+          },
+          "ctime": 1793674530,
+          "ctime_nsec": 350876639,
+          "allocated_bytes": 16519168,
+          "header_hex": "636f6d7069737a646b00000024000000000000002b00000001040565706f636808eb0000000000000007726f6f744369642401711220f335704ce18ccf36387764078deb43b56a40b94817c9ead87a50acfe2f6f2751076e6574776f726b076d61696e6e6574046b696e640b736c6f742d746f2d636964",
+          "reproduction_url": "https://files.old-faithful.net/235/epoch-235-bafyreihtgvyezymmz43dq53ea6g6wq5vnjalssaxzhvnq6sqvt7c63zhke-mainnet-slot-to-cid.index"
+        }
+      ],
+      "retained_adjacent_indexes": [
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-235-general-shrink-debt-budget506-e3f15eb2-v1/output/compact-indexes/234/epoch-234-bafyreigg523mka7ymxmrzpkw6njo5rugjrxd5z44h7m3qpkauhkxezt3ca-mainnet-slot-to-cid.index",
+          "identity": {
+            "device": 66305,
+            "inode": 15303683,
+            "size": 16498665,
+            "blocks": 32224,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1793674528,
+            "mtime_nsec": 120885674
+          },
+          "ctime": 1793674528,
+          "ctime_nsec": 123885661,
+          "allocated_bytes": 16498688
+        }
+      ]
+    },
+    {
+      "epoch": 237,
+      "owner_root": "/home/ubuntu/.jetstreamer-private/qualification-237-general-shrink-debt-budget506-e3f15eb2-v4",
+      "imported_canonical": {
+        "epoch": 237,
+        "archive": {
+          "path": "/home/ubuntu/horizon/epoch-237.jet",
+          "identity": {
+            "device": 66305,
+            "inode": 15061926,
+            "size": 175264138394,
+            "blocks": 342313256,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33056,
+            "nlink": 1,
+            "mtime": 1793932317,
+            "mtime_nsec": 951229171
+          },
+          "ctime": 1793940127,
+          "ctime_nsec": 959095626
+        },
+        "checksum": {
+          "path": "/home/ubuntu/horizon/epoch-237.jet.sha256",
+          "sha256": "10f05cadd9a39784569c68a60dc1d6668c052631a7048758c88d6dee63000bd3",
+          "uid": 1000
+        },
+        "ready_acceptance": {
+          "path": "/var/lib/jetstreamer/horizon237-ready909-event-v1/ready-pair-acceptance.json",
+          "sha256": "79f7f186be192412ac8ec37b101419d43aeac47302a4c9dd4fcd215a4327b335",
+          "uid": 0
+        },
+        "original_metadata": [
+          {
+            "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-shrink-debt-budget506-e3f15eb2-v4/state/destination-84b1112cdb16efc508dc92c7bacafd8acddd7b341578d82ae5734bbb2540d584/evidence/archive-batches/destination-0000000000010301-0000000000e5d387/batch-b730b4ee11cf5aa96863493a891198f97aad89a37ca4b2d78193de09aa46e68e.json",
+            "sha256": "4c5dd71aaebd0b978036762f002b12723a76a7ac19315de07610d5703025150c",
+            "uid": 1000
+          }
+        ]
+      },
+      "preserved": [
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-shrink-debt-budget506-e3f15eb2-v4/state/destination-84b1112cdb16efc508dc92c7bacafd8acddd7b341578d82ae5734bbb2540d584/evidence/archive-batches/destination-0000000000010301-0000000000e5d387/batch-b730b4ee11cf5aa96863493a891198f97aad89a37ca4b2d78193de09aa46e68e.json",
+          "identity": {
+            "device": 66305,
+            "inode": 15061914,
+            "size": 9066,
+            "blocks": 24,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1793935690,
+            "mtime_nsec": 532073467
+          },
+          "ctime": 1793935690,
+          "ctime_nsec": 532073467
+        }
+      ],
+      "selected_indexes": [
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-shrink-debt-budget506-e3f15eb2-v4/output/compact-indexes/237/epoch-237-bafyreiarci2dn5tdfpg7holaaezvgeosp7vgsjqi42o2ov5wxqpjie5w7y-mainnet-cid-to-offset-and-size.index",
+          "identity": {
+            "device": 66305,
+            "inode": 16596348,
+            "size": 9121463306,
+            "blocks": 17815384,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1793746745,
+            "mtime_nsec": 685131168
+          },
+          "ctime": 1793746747,
+          "ctime_nsec": 298124501,
+          "allocated_bytes": 9121476608,
+          "header_hex": "636f6d7069737a64760000000900000000000000e328010001040565706f636808ed0000000000000007726f6f74436964240171122011123436f6632bcdf3b96001335311d27fea692608e69da757b6bc1e9413b6fe076e6574776f726b076d61696e6e6574046b696e64166369642d746f2d6f66667365742d616e642d73697a65",
+          "reproduction_url": "https://files.old-faithful.net/237/epoch-237-bafyreiarci2dn5tdfpg7holaaezvgeosp7vgsjqi42o2ov5wxqpjie5w7y-mainnet-cid-to-offset-and-size.index"
+        },
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-shrink-debt-budget506-e3f15eb2-v4/output/compact-indexes/237/epoch-237-bafyreiarci2dn5tdfpg7holaaezvgeosp7vgsjqi42o2ov5wxqpjie5w7y-mainnet-slot-to-cid.index",
+          "identity": {
+            "device": 66305,
+            "inode": 16596342,
+            "size": 16293353,
+            "blocks": 31824,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1793746742,
+            "mtime_nsec": 590143960
+          },
+          "ctime": 1793746742,
+          "ctime_nsec": 593143947,
+          "allocated_bytes": 16293888,
+          "header_hex": "636f6d7069737a646b00000024000000000000002a00000001040565706f636808ed0000000000000007726f6f74436964240171122011123436f6632bcdf3b96001335311d27fea692608e69da757b6bc1e9413b6fe076e6574776f726b076d61696e6e6574046b696e640b736c6f742d746f2d636964",
+          "reproduction_url": "https://files.old-faithful.net/237/epoch-237-bafyreiarci2dn5tdfpg7holaaezvgeosp7vgsjqi42o2ov5wxqpjie5w7y-mainnet-slot-to-cid.index"
+        }
+      ],
+      "retained_adjacent_indexes": [
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-shrink-debt-budget506-e3f15eb2-v4/output/compact-indexes/236/epoch-236-bafyreiekwwsuvbgwse7inxa6xqz5sc3w6svkd2i22aihftrwcw5mawe2aa-mainnet-slot-to-cid.index",
+          "identity": {
+            "device": 66305,
+            "inode": 16596325,
+            "size": 16513641,
+            "blocks": 32256,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1793746740,
+            "mtime_nsec": 7154635
+          },
+          "ctime": 1793746740,
+          "ctime_nsec": 12154615,
+          "allocated_bytes": 16515072
+        }
+      ]
+    }
+  ],
+  "selected_allocated_bytes": 18243297280,
+  "archive_payload_bytes_read": 0,
+  "index_reads": "bounded complete headers only"
+}

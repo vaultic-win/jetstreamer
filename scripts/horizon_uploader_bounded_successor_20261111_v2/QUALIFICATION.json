@@ -1,0 +1,51 @@
+{
+  "schema": "horizon-uploader-bounded-successor-source-qualification-v1",
+  "source_and_exact_fifteen_extern_graph": {
+    "path": "/var/lib/jetstreamer/uploader-bounded-successor-qualification-20261111-v2/bounded-uploader-v2/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "2708649a76911dc9d334c524d7b4e27f61aabb96234f69ea6427cc8b641dc44b"
+  },
+  "four_strict_and_39_tests": {
+    "path": "/var/lib/jetstreamer/uploader-bounded-successor-qualification-20261111-v2/bounded-uploader-v2/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "1d442793343c5f7809c35ccd940510746355fad1b4d4a8767acc4596c3b0f0f4"
+  },
+  "normal_source_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-bounded-successor-source-20261111-v2/deployment-seal-receipt.json",
+    "sha256": "9be166fe9742bd24611476d9af6386206f6282deb0505459a2623737e25f17a3"
+  },
+  "candidate": {
+    "path": "/var/lib/jetstreamer/uploader-bounded-successor-qualification-20261111-v2/bounded-uploader-v2/work/production",
+    "sha256": "1d5d324e91012cec7dd4982f554885ec2efce68938d47e67994330f1b0fcb877"
+  },
+  "old_exact_source_image_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-exact-source-image-proof-20261110-v1/source-artifact-proof.json",
+    "sha256": "80ece7d136609ed54f259896365ea3f12ddf34fae85cd07dd928f18b9aecf70a"
+  },
+  "prior_streaming_hash_qualification": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/ROOT_FOUR_STRICT_COMPILERS_THREE_EXTRACTED_REGRESSIONS_PASSED.json",
+    "sha256": "3dca8915e3b4213013e2dcab75156412b288a1f139d39766ceca0e50244141cf"
+  },
+  "prior_body_library_9_tests": {
+    "path": "/var/lib/jetstreamer/uploader-bounded-body-library-qualification-20261111-v1/bounded-body-library-v1/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "710247497ab6bc203456d5ba8157b32bc2f6c5d162d4e01442ff40ed0e7e7cc9"
+  },
+  "all_compilers_and_isolated_tests_drained": true,
+  "actual_test_count": 39,
+  "live_uploader_changed": false,
+  "live_candidate_executed": false,
+  "whole_service_future_bound_qualified": false,
+  "pool_ending_authorized": false,
+  "replay_admission_authorized": false,
+  "archive_or_sidecar_mutations": false,
+  "published_source_sha256": {
+    "bounded_body.rs": "706ac0a4633bace52abdaf2d47787d576d76bb3917579e99300dc52a74a58fe2",
+    "main.rs": "d751bfd26b4cad4fc9b0641c8b5de0832dbc058a769352bf7a09cdf02f7cd481"
+  },
+  "normal_candidate": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-bounded-successor-candidate-20261111-v2/candidate-do-not-execute",
+    "sha256": "1d5d324e91012cec7dd4982f554885ec2efce68938d47e67994330f1b0fcb877"
+  },
+  "normal_candidate_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-bounded-successor-candidate-20261111-v2/deployment-seal-receipt.json",
+    "sha256": "afa8343168cd301ce1b8cfb4b806a7a4c2f8373ffdd066a1d28f61cc6d7c6b86"
+  }
+}

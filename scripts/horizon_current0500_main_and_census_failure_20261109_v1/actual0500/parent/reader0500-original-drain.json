@@ -1,0 +1,38 @@
+{
+  "actual_terminal_native": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+    "InvocationID": "",
+    "Job": "",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "cgroup_empty": true,
+  "descriptors_drained": true,
+  "invocation_id": "4c082612ad8f4124ad8db0d825b5423e",
+  "original_outer": {
+    "actual_owned_reader_child": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0500-reader-phase-20261109-v15/original-phase-gated-reader-outer.json",
+      "sha256": "09b9f590a208b9860ff33f52318533e6ea671d9997dfc42cd25fb6a586f42c35"
+    },
+    "actual_phase": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0500-reader-phase-20261109-v15/actual-reader-start-phase.json",
+      "sha256": "d65f069c0ee55d7c2702c721d451dc03cd561bca0720b267c527671f80be3880"
+    },
+    "actual_phase_gated_outer": {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/ROOT_PHASE_GATED_READER_ORIGINAL_OUTER.json",
+      "sha256": "a5894ee6b8cb126eed7f1376a2beabb3349932ae0bbc3f3f1c2d6c0a76b2b514"
+    },
+    "code": 0,
+    "original_stdout_and_stderr_preserved": true,
+    "stderr": "Running as unit: horizon-failed4-current-accounting-reader-20261104-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1min 46.969s\nCPU time consumed: 1min 21.009s\nMemory peak: 731.3M\nMemory swap peak: 0B\n",
+    "stdout": "{\"path\":\"/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/proof.json\",\"sha256\":\"d986be1eafbe34c7e628989361ec8afd9fa8472c6db7a832c9afdee46e30b373\"}\n"
+  },
+  "original_process_absent": true,
+  "outer_reaped": true,
+  "unit": "horizon-failed4-current-accounting-reader-20261104-v1.service"
+}

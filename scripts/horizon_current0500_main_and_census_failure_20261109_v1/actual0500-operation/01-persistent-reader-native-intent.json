@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "show",
+    "horizon-positive185-reader-control-control-positive-reader-v38-driver12-helper35-r1.service",
+    "--no-pager",
+    "--property=Id,LoadState,FragmentPath,DropInPaths,Transient,InvocationID,MainPID,ControlPID,ExecMainPID,ExecMainCode,ExecMainStatus,ControlGroup,Job,NRestarts,Restart,Result,ActiveState,SubState,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic,ExecStart,Type,User,Group,RemainAfterExit,KillMode,MemoryAccounting,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,PrivateMounts,PrivateTmp,ProtectSystem,ProtectHome,PrivateNetwork,EnvironmentFiles,AppArmorProfile"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/systemctl",
+  "timeout_millis": 5000,
+  "wall_started_at": 1794201097
+}

@@ -1,0 +1,37 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -81,6 +81,8 @@
+         assert preserved296_cutoff['previous_fleet']==prevfleet
+ else:prevfleet=audit['previous_fleet']
+ import native262_cadence
++import native260262_status
++native260262_status.adopt(statuses)
+ prevfleet = native262_cadence.predecessor(prevfleet)
+ native262_origin = native262_cadence.registered(prevfleet)
+ verification257 = V / 'horizon257-current-reader-delivery-v1/verification-status-v1/completion.json'
+@@ -1176,6 +1178,14 @@
+     replays = guarded_replays.by_epoch(cfg['replays'])
+     for e,previous in list(statuses.items()):
+         if e in closed: continue
++        if e in native260262_status.LANES:
++            if e in replays:
++                native260262_status.refresh(e, previous, sample, ref(obs), out / str(e), image('jetstreamer-r2'))
++            else:
++                wd = out / str(e)
++                wd.mkdir(mode=0o700, exist_ok=True)
++                record(wd / 'completion.json', bound(previous))
++            continue
+         if e in current_reader_deliveries and current_reader_deliveries[e] is not None and cfg.get(claim_key(e)):
+             try:
+                 delivery261.refresh(previous, sample, globals(), current_reader_deliveries[e], e)
+@@ -1207,6 +1217,10 @@
+             else:refresh(e,previous,sample,globals())
+         except (AssertionError,sp.CalledProcessError):
+             if e not in all_claims or not await_finished(e): raise
++    for epoch in native260262_status.LANES:
++        if epoch in replays and epoch not in statuses:
++            statuses[epoch] = native260262_status.refresh(
++                epoch, None, sample, ref(obs), out / str(epoch), image('jetstreamer-r2'))
+     for epoch in (229, 230, 252, 271, 275, 288, 292):
+         if epoch in replays and epoch not in statuses:
+             guarded_replays.refresh(epoch, None, sample, globals())

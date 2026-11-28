@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/mdmonitor-oneshot.timer",
+      "Id": "mdmonitor-oneshot.timer",
+      "InvocationID": "c21c85c052bc4d98be5fedad08386583",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1d",
+      "RemainAfterElapse": "yes",
+      "Unit": "mdmonitor-oneshot.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/mdmonitor-oneshot.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/mdmonitor-oneshot.timer",
+          "sha256": "f5826525ccab035198e0c266a588ded548a70b05ca10a983bc51279228faa9e2"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/mdmonitor-oneshot.timer",
+      "Id": "mdmonitor-oneshot.timer",
+      "InvocationID": "c21c85c052bc4d98be5fedad08386583",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1d",
+      "RemainAfterElapse": "yes",
+      "Unit": "mdmonitor-oneshot.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/mdmonitor-oneshot.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/mdmonitor-oneshot.timer",
+          "sha256": "f5826525ccab035198e0c266a588ded548a70b05ca10a983bc51279228faa9e2"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2544846604407,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794353472141172
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "mdmonitor-oneshot.timer",
+  "unset_pending_requires_metadata_requery": false
+}

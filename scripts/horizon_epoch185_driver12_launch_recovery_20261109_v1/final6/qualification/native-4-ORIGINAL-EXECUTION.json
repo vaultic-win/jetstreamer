@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest post_main::native_controls::actual_closed_failed_main_guard_rejects_without_lifecycle_capture ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s\n\n",
+  "stderr": "Running as unit: horizon-positive185-final6-native-4-20261109-v1.service; invocation ID: 6cb4e6fffe2644d0a0c6b0e71ac976a2\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 16ms\nCPU time consumed: 12ms\nMemory peak: 804.0K\nMemory swap peak: 0B\n"
+}

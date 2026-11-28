@@ -1,0 +1,38 @@
+{
+  "assembly": {
+    "account_updates_rebased": 645491989,
+    "provenance_version": 4,
+    "slots_merged": 432000,
+    "source_archives": 2
+  },
+  "canonical_root_slot": 88127580,
+  "canonical_sidecar_authorized": false,
+  "current_plugin_verification_passed": false,
+  "fresh_native_checkpoint_matches": true,
+  "fresh_prefix_full_validation_passed": true,
+  "independent_final_archive_verification_passed": false,
+  "initial_boundary_requires_separate_adjacent_evidence": true,
+  "node_sha256": "1a299ad19472906b0721555ae3bd01840cbd249724ece9c0f61e086b8ace8716",
+  "plan": {
+    "path": "/var/lib/jetstreamer/horizon-continuation203-launch-ed66145-v1/plan.json",
+    "sha256": "c1215dac8f5a35bf34ad315d3b99666be5c3a690b4050aff63df352fa3e251bf"
+  },
+  "prefix_archive_sha256": "ba191cf1918cac8b67cb7512bd07cc1eeccb16e525e4c15c27fd7c325f6993ce",
+  "prior_native_result_sha256": "5260d7af71ab802ca711fce706020312212d0c8cdfc01c473398b0a9a0108420",
+  "private_output": "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-203-ed66145-v1/output/epoch-203-checkpoint-restart-v4.jet",
+  "producer_invocation_id": "ddf3ed2de8b040758ee7a0d696159afd",
+  "producer_unit": "horizon-qualify-203-checkpoint-continuation-ed66145-v1.service",
+  "publication_authorized": false,
+  "r2_mutations": false,
+  "remaining_slots": 419,
+  "restart_snapshot_sha256": "d3114597ce25c3efaa4a96899ab3e9437c51cb9086d4166639f0ad2ae0613ee6",
+  "retirement_authorized": false,
+  "schema": "jetstreamer-private-epoch203-checkpoint-continuation-v1",
+  "suffix_archive_sha256": "c3b34173473268950e08e7f1022dd4bc194ab7502fcd6251059c2fbf07fa9615",
+  "timings": {
+    "assembly_millis": 15800695,
+    "prefix_validation_millis": 102289,
+    "suffix_after_native_barrier_millis": 238676,
+    "suffix_runner_to_native_barrier_millis": 733631
+  }
+}

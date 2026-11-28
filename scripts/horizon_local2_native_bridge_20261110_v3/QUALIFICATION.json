@@ -1,0 +1,16 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/local2-native-bridge-qualification-20261110-v3/local2-native-bridge-v3/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "33061e08f99fe9cced23ab75644ab3b17eef93e5ff13ed5c5bd3db00142bac1d"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/local2-native-bridge-qualification-20261110-v3/local2-native-bridge-v3/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "0f11170693859d9057d7659564f0ba62ba8b6ece1e87e2829e9bf2da5115d7d4"
+  },
+  "actual_ordinary_test_count": 3,
+  "published_source_sha256": {
+    "main.rs": "d746b9d79550b1b43db8ae40be7c0f6ec5ec2ed4c01f9b44067842f9d869a88b"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false
+}

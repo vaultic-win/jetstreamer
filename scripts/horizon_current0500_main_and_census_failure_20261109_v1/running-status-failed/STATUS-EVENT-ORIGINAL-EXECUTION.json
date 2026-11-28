@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-status185-current0500-running-event-20261109-v1.service\nTraceback (most recent call last):\n  File \"/usr/local/lib/jetstreamer/horizon-status185-current0500-running-tools-20261109-v1/status.py\", line 57, in <module>\n    assert live_native['InvocationID']=='722adc397ae24bb4b96d452783599f57' and live_native['MainPID']==live_native['ExecMainPID']=='3961564' and live_native['ControlPID']==live_native['NRestarts']=='0' and live_native['ActiveState']=='active' and live_native['SubState']=='running'\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=1\nService runtime: 625ms\nCPU time consumed: 297ms\nMemory peak: 756.0K\nMemory swap peak: 0B\n"
+}

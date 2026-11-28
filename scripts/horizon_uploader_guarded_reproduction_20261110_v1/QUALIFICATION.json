@@ -1,0 +1,377 @@
+{
+  "schema": "horizon-uploader-guarded-reproduction-qualification-v1",
+  "scope": "Accepted guardV3/prestartV2 build and native controls; exact uploader source/image proof is separately bound in REPRODUCTION.json.",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "sources": {
+    "build-guard-v1.rs": {
+      "repository_path": "scripts/horizon_uploader_guarded_reproduction_20261110_v1/source/build-guard-v1.rs",
+      "sha256": "30f0b7d43919b49a99a32e41ef7ca1a9bcc2da2e2e939cfd497b0561f02856bb"
+    },
+    "build-guard-v2.rs": {
+      "repository_path": "scripts/horizon_uploader_guarded_reproduction_20261110_v1/source/build-guard-v2.rs",
+      "sha256": "6a5826952a7129f710e3d492cfc5cb3f98b29330e7704360a4389b05b77a4e33"
+    },
+    "build-guard-v3.rs": {
+      "repository_path": "scripts/horizon_uploader_guarded_reproduction_20261110_v1/source/build-guard-v3.rs",
+      "sha256": "00dd9ef7c6c91b909cbc022bcba539c65ec5ce077b5736c9bbc93d60695291a5"
+    },
+    "build-prestart-v1.rs": {
+      "repository_path": "scripts/horizon_uploader_guarded_reproduction_20261110_v1/source/build-prestart-v1.rs",
+      "sha256": "2d2feb59dabc3c645e347aacf30dab2d0c259fef8c91ecbd2ce997e4900c555f"
+    },
+    "build-prestart-v2.rs": {
+      "repository_path": "scripts/horizon_uploader_guarded_reproduction_20261110_v1/source/build-prestart-v2.rs",
+      "sha256": "0492ea24ea42fe6e5ec514b29cd01d9372ac799309fc3e605df4d471d41195eb"
+    }
+  },
+  "qualified_generations": {
+    "build_guard": {
+      "generation": "uploader-build-guard-qa-v3",
+      "source": {
+        "path": "/usr/local/lib/jetstreamer/horizon-uploader-build-guard-source-20261110-v3/main.rs",
+        "sha256": "00dd9ef7c6c91b909cbc022bcba539c65ec5ce077b5736c9bbc93d60695291a5"
+      },
+      "runtime": {
+        "path": "/usr/local/lib/jetstreamer/horizon-uploader-build-guard-tools-20261110-v3/guard",
+        "sha256": "c5854ffc6ea91e89d0790543d6ee899e51e50bb85864ebf15dab322db02ea8e4"
+      },
+      "artifact_proof": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/ARTIFACT.json",
+        "sha256": "d5f42f198cf52556e67bd703ac73ced651030167721f4d957907e64e0b0dc2ee"
+      },
+      "source_compiler_graph": {
+        "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/SOURCE-COMPILER-LIBRARY-FREEZE.json",
+        "sha256": "fc8f8efd00ac275ffa198c89b73d3d02a9adc7d8c63a3464a761dd0f5ccbe625"
+      },
+      "actual_direct_externs": {
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib": {
+          "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+          "sha256": "c91eaa346c1b75db0e0fcd74193c3640244898a5fa014123362b4f1196716c07"
+        },
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib": {
+          "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+          "sha256": "c3bb7a303d8af544b65907d3b4a50891e079633d1f90b35f95fc7f2ce9d6abe4"
+        },
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib": {
+          "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+          "sha256": "d9f94400c4d56df175e28bdcec983b13944489d5b1e7e83580e62810a2296e14"
+        }
+      },
+      "four_strict_configurations": [
+        "production rustc",
+        "test rustc",
+        "production Clippy",
+        "test Clippy"
+      ],
+      "ordinary_tests_passed": 15,
+      "ordinary_tests_failed": 0,
+      "checks": {
+        "production": {
+          "actual_argv": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/production-ORIGINAL-ARGV.json",
+            "sha256": "ee0d75590279a94f83629289749556074e15a880d9de4538e415b38512c83d6d"
+          },
+          "execution": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/production-ORIGINAL-EXECUTION.json",
+            "sha256": "d19b1ed0acb4dcec8c689c467e580aaa287d3cbaf5a297fb4ddf81a1a54c7ea0"
+          },
+          "exit_code": 0
+        },
+        "build-tests": {
+          "actual_argv": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/build-tests-ORIGINAL-ARGV.json",
+            "sha256": "04abf74a7e1785ce22811d4df8ac07c474d4999a34bd9a0e662191cc4013f17d"
+          },
+          "execution": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/build-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "f013cc0f977a503bb1fe0dc8d0c78ad0e877921c037b30e7ef872b4d92fc6361"
+          },
+          "exit_code": 0
+        },
+        "clippy-production": {
+          "actual_argv": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/clippy-production-ORIGINAL-ARGV.json",
+            "sha256": "1643f88264ab058af6aa22134d5ef73985dc0d1dc5d1a218c645503c153a345f"
+          },
+          "execution": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/clippy-production-ORIGINAL-EXECUTION.json",
+            "sha256": "9082e1eff373381c1c3f03a491e3b1b97bc96d5fefb8f06af0a31a5ce141bf1f"
+          },
+          "exit_code": 0
+        },
+        "clippy-tests": {
+          "actual_argv": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/clippy-tests-ORIGINAL-ARGV.json",
+            "sha256": "07d3e12fe48537903ed27d38f69eef050da35b93d2bc517992b74bd76b0be0bb"
+          },
+          "execution": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/clippy-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "5f40a821f4667079677784fae9589e75e8ba4d02bed840e61e8431493190c65f"
+          },
+          "exit_code": 0
+        },
+        "ordinary-tests": {
+          "actual_argv": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/ordinary-tests-ORIGINAL-ARGV.json",
+            "sha256": "ff840f0ec4b813f26bc72aca3a574072fe9696074f228f776001702ea09305b8"
+          },
+          "execution": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v3/ordinary-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "b0d1da7f682926201f4f5220597906ad57b06b26fda0ff3b341dfe7cc33a2c7b"
+          },
+          "exit_code": 0
+        }
+      },
+      "normal_runtime_seal": {
+        "path": "/usr/local/lib/jetstreamer/horizon-uploader-build-guard-tools-20261110-v3/deployment-seal-receipt.json",
+        "sha256": "4b56b13491d117b7f9927fe320efa8eb7c5fc485c195f77f0fe750a85e66b08d"
+      }
+    },
+    "prestart_gate": {
+      "generation": "uploader-build-prestart-qa-v2",
+      "source": {
+        "path": "/usr/local/lib/jetstreamer/horizon-uploader-build-prestart-source-20261110-v2/main.rs",
+        "sha256": "0492ea24ea42fe6e5ec514b29cd01d9372ac799309fc3e605df4d471d41195eb"
+      },
+      "runtime": {
+        "path": "/usr/local/lib/jetstreamer/horizon-uploader-build-prestart-tools-20261110-v2/gate",
+        "sha256": "8c40227a6ba277905d694b8f1ad4897dffb70f3f4f5d5404da062d19868c156c"
+      },
+      "artifact_proof": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/ARTIFACT.json",
+        "sha256": "b5339895562bbc94cc5b6d6f7a0d464cf2fc8d03dad396b6fb20a8cb29c7262c"
+      },
+      "source_compiler_graph": {
+        "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/SOURCE-COMPILER-LIBRARY-FREEZE.json",
+        "sha256": "fc8f8efd00ac275ffa198c89b73d3d02a9adc7d8c63a3464a761dd0f5ccbe625"
+      },
+      "actual_direct_externs": {
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib": {
+          "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+          "sha256": "c91eaa346c1b75db0e0fcd74193c3640244898a5fa014123362b4f1196716c07"
+        },
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib": {
+          "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+          "sha256": "c3bb7a303d8af544b65907d3b4a50891e079633d1f90b35f95fc7f2ce9d6abe4"
+        },
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib": {
+          "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+          "sha256": "d9f94400c4d56df175e28bdcec983b13944489d5b1e7e83580e62810a2296e14"
+        }
+      },
+      "four_strict_configurations": [
+        "production rustc",
+        "test rustc",
+        "production Clippy",
+        "test Clippy"
+      ],
+      "ordinary_tests_passed": 12,
+      "ordinary_tests_failed": 0,
+      "checks": {
+        "production": {
+          "actual_argv": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/production-ORIGINAL-ARGV.json",
+            "sha256": "998fc29669bd327a29d24f2b96eb80463d9ec44f5dd11f3fbfc5e0c60ff91fee"
+          },
+          "execution": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/production-ORIGINAL-EXECUTION.json",
+            "sha256": "1e00ed89b8b36d13f538b9f422a5db4846f1adefaae85573653d888da72f2cb3"
+          },
+          "exit_code": 0
+        },
+        "build-tests": {
+          "actual_argv": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/build-tests-ORIGINAL-ARGV.json",
+            "sha256": "220c0faf56a301ca5b2982bb8a8b84d865c52928390bd119d331c82a748c5d18"
+          },
+          "execution": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/build-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "b60365d18ca1d4b014a832e6f84828d07a8b93edbd955725231e0991c0d9a353"
+          },
+          "exit_code": 0
+        },
+        "clippy-production": {
+          "actual_argv": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/clippy-production-ORIGINAL-ARGV.json",
+            "sha256": "1f09fb7b1d0c60640cd5fd0bf8f686edbda8c33d4a3d5d63b7531c587149be4b"
+          },
+          "execution": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/clippy-production-ORIGINAL-EXECUTION.json",
+            "sha256": "e4ec8b2283e7f34cad168021a64b7713baee86389aaecba8df8e07e820bdc28a"
+          },
+          "exit_code": 0
+        },
+        "clippy-tests": {
+          "actual_argv": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/clippy-tests-ORIGINAL-ARGV.json",
+            "sha256": "8ea71591c1d44334d51b6d9cf5ed0fb4a0ed9dd8f6f333706a6fa2bba060593f"
+          },
+          "execution": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/clippy-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "b78f5a650ae5e2da9c7b08a076bb8ae9209a0f4f227adb61ef7ef44ac15f1daf"
+          },
+          "exit_code": 0
+        },
+        "ordinary-tests": {
+          "actual_argv": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/ordinary-tests-ORIGINAL-ARGV.json",
+            "sha256": "9fc24b033c7704325aee7ddef3f5ba279e19657822a0d618251b69edbd8d4918"
+          },
+          "execution": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v2/ordinary-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "b2aba5ea05415354b6ad4947dcd57d73cbe743686957fe07fe15078a067315d7"
+          },
+          "exit_code": 0
+        }
+      },
+      "normal_runtime_seal": {
+        "path": "/usr/local/lib/jetstreamer/horizon-uploader-build-prestart-tools-20261110-v2/deployment-seal-receipt.json",
+        "sha256": "8ff5243f2905c17d5a32f794f7f43597f99e03d54bf5001e63fef012755e6988"
+      }
+    }
+  },
+  "failed_generations_preserved": [
+    {
+      "source_repository_path": "scripts/horizon_uploader_guarded_reproduction_20261110_v1/source/build-guard-v1.rs",
+      "source_sha256": "30f0b7d43919b49a99a32e41ef7ca1a9bcc2da2e2e939cfd497b0561f02856bb",
+      "failed_stage": "production",
+      "reason": "unused observe function rejected by -Dwarnings",
+      "actual_argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v1/production-ORIGINAL-ARGV.json",
+        "sha256": "298414b3bb95afe43b122452b57e631fe29f66afcd3cb95804126f08b12f1eec"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v1/production-ORIGINAL-EXECUTION.json",
+        "sha256": "fab015b253e06295ab968bf193d744062f416bfbb34389f6156d5309323d253e"
+      },
+      "original_evidence_retained": true
+    },
+    {
+      "source_repository_path": "scripts/horizon_uploader_guarded_reproduction_20261110_v1/source/build-guard-v2.rs",
+      "source_sha256": "6a5826952a7129f710e3d492cfc5cb3f98b29330e7704360a4389b05b77a4e33",
+      "failed_stage": "clippy-production",
+      "reason": "chunks_exact_to_as_chunks lint rejected by -Dwarnings",
+      "actual_argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v2/clippy-production-ORIGINAL-ARGV.json",
+        "sha256": "a0a187b5e7f7319f340d30af579fa07fa86b6805c571ba5bb3161656df4adbc6"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-guard-qa-v2/clippy-production-ORIGINAL-EXECUTION.json",
+        "sha256": "9e520d8f38e7e64b355d231ef70d141d18ddc23df474b4ab3756b12fda9c2628"
+      },
+      "original_evidence_retained": true
+    },
+    {
+      "source_repository_path": "scripts/horizon_uploader_guarded_reproduction_20261110_v1/source/build-prestart-v1.rs",
+      "source_sha256": "2d2feb59dabc3c645e347aacf30dab2d0c259fef8c91ecbd2ce997e4900c555f",
+      "failed_stage": "clippy-production",
+      "reason": "two cmp_owned lint failures rejected by -Dwarnings",
+      "actual_argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v1/clippy-production-ORIGINAL-ARGV.json",
+        "sha256": "39675dcc2a26ac454ffca0d39359c64869061df13591a380d342dd43660a89b4"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-build-prestart-qa-v1/clippy-production-ORIGINAL-EXECUTION.json",
+        "sha256": "357a501d5aeac8810519bf1677f952cc919d23838f4cd55f1353f68524d802bc"
+      },
+      "original_evidence_retained": true
+    }
+  ],
+  "native_controls": {
+    "evidence": {
+      "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/ROOT_FIVE_NATIVE_PRESTART_CONTROLS_COMPLETE.json",
+      "sha256": "70600bf1cb8c85f025fc65e3c7bfc6164ca547734c80dab1bd064884e39f004e"
+    },
+    "cases": {
+      "missing": {
+        "passed": true,
+        "body_marker_created": false,
+        "body_marker_unchanged": false,
+        "original_actor_argv": {
+          "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/missing/ACTUAL-ACTOR-LAUNCH-ORIGINAL-ARGV.json",
+          "sha256": "106eaff8a7cf2bf58be32b7505ec7603491e3b3313db774e2bdebc48137e0eeb"
+        },
+        "native_outcome": {
+          "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/missing/ACTUAL-NATIVE-OUTCOME.json",
+          "sha256": "4e6ecd1bd08b3c7313f5da9b65e5bfce50f6535a4ed8d549a785a81adea3a618"
+        }
+      },
+      "match": {
+        "passed": true,
+        "body_marker_created": true,
+        "body_marker_unchanged": false,
+        "original_actor_argv": {
+          "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/match/ACTUAL-ACTOR-LAUNCH-ORIGINAL-ARGV.json",
+          "sha256": "c8bd013995e877d287b383cf310ccaee1256acbb11436615ce296ed978d0e388"
+        },
+        "native_outcome": {
+          "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/match/ACTUAL-NATIVE-OUTCOME.json",
+          "sha256": "5ab17abd10b36ceeeefd9f482d3b47d89dbbd7b0349c2b4c303836786381ccfb"
+        }
+      },
+      "old-token": {
+        "passed": true,
+        "body_marker_created": false,
+        "body_marker_unchanged": true,
+        "original_actor_argv": {
+          "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/match/OLD-TOKEN-SECOND-INVOCATION-ACTOR-LAUNCH-ORIGINAL-ARGV.json",
+          "sha256": "c8bd013995e877d287b383cf310ccaee1256acbb11436615ce296ed978d0e388"
+        },
+        "native_outcome": {
+          "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/match/OLD-TOKEN-SECOND-INVOCATION-NATIVE-OUTCOME.json",
+          "sha256": "4464a3c7e048ef1ac1d61a444ecf49d80d1c60d92fbe08e127299da8599fea98"
+        }
+      },
+      "symlink": {
+        "passed": true,
+        "body_marker_created": false,
+        "body_marker_unchanged": false,
+        "original_actor_argv": {
+          "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/symlink/ACTUAL-ACTOR-LAUNCH-ORIGINAL-ARGV.json",
+          "sha256": "dc04d293181eeb6a416fd900d5f8404b9fa201aeefa403de69ce36a43a5f70eb"
+        },
+        "native_outcome": {
+          "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/symlink/ACTUAL-NATIVE-OUTCOME.json",
+          "sha256": "ed3a13208d8ad8bcebe85709508271216397626158633a3cb28f9f99acac1340"
+        }
+      },
+      "environment": {
+        "passed": true,
+        "body_marker_created": false,
+        "body_marker_unchanged": false,
+        "original_actor_argv": {
+          "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/environment/ACTUAL-ACTOR-LAUNCH-ORIGINAL-ARGV.json",
+          "sha256": "35711e5da6ff2af00f7709e6309588a3eb26b6c695fb3568393380b54f1fc26a"
+        },
+        "native_outcome": {
+          "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/environment/ACTUAL-NATIVE-OUTCOME.json",
+          "sha256": "a9dcfc98db155bba069e772a442f28408c45079472948f5b4e43d91d553a6373"
+        }
+      }
+    },
+    "all_metadata_actors_drained": true,
+    "compiler_or_replay_launched": false,
+    "binding_limit": "The successful metadata control was collected. Its default not-found unit properties are not proof of the original cap or success; retain its original start/guard/token/body-marker evidence.",
+    "native_control_memory_or_DATA_credit_bytes": 0,
+    "successful_original_start_pre": {
+      "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/match/ACTUAL-ORIGINAL-START-PRE.json",
+      "sha256": "96efb33b11a1bdbc884da3033ee2b8f3b239beb8f3df398520d9b74b9cf83d69"
+    },
+    "successful_first_guard": {
+      "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/match/FIRST_GENUINE_GUARD_SUCCESS.json",
+      "sha256": "a1c8745af5b75de7ef3bc71fe6dae48170e748db16ddaf24918aa783092968a4"
+    },
+    "successful_token": {
+      "path": "/var/lib/jetstreamer/uploader-build-prestart-native-controls-20261110-v1/match/MATCHED_TOKEN_BINDING.json",
+      "sha256": "9ed82702d5f981437a3a7397ba139bc4588c6fafbc7cc0e4d031d3fe36352648"
+    }
+  },
+  "limits": {
+    "qualified_future_uploader_memory_bound": false,
+    "shared_or_other_pool_ending_authorized": false,
+    "replay_admission_authorized": false,
+    "archive_or_sidecar_mutation_authorized": false,
+    "operational_reexecution_authorized": false
+  }
+}

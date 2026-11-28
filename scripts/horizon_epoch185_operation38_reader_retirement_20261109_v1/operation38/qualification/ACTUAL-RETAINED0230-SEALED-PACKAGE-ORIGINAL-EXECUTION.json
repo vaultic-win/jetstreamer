@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "systemd-run",
+    "--wait",
+    "--pipe",
+    "--service-type=exec",
+    "--unit=horizon-operation38-new-metadata-native-1-20261109-v1",
+    "-p",
+    "User=root",
+    "-p",
+    "MemoryMax=512M",
+    "-p",
+    "MemorySwapMax=0",
+    "-p",
+    "TasksMax=128",
+    "-p",
+    "RuntimeMaxSec=30",
+    "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tests-20261109-v38-driver12-helper35-r1/tests",
+    "--ignored",
+    "--exact",
+    "persistent_reader::successful_retirement::exact0230::tests::actual_retained0230_terminal_and_reader_package_remain_exact_without_cleanup",
+    "--test-threads=1"
+  ],
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest persistent_reader::successful_retirement::exact0230::tests::actual_retained0230_terminal_and_reader_package_remain_exact_without_cleanup ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 75 filtered out; finished in 0.00s\n\n",
+  "stderr": "Running as unit: horizon-operation38-new-metadata-native-1-20261109-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 2ms\nCPU time consumed: 2ms\nMemory peak: 620.0K\nMemory swap peak: 0B\n"
+}

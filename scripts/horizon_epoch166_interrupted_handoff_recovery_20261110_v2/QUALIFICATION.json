@@ -1,0 +1,36 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/data166-interrupted-handoff-recovery-qualification-20261110-v2/data166-interrupted-recovery-v2/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "0dc8da92b8b51893b0c5fb82c5743dd22d38edb158850d8927f3776dbe2e1bb7"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/data166-interrupted-handoff-recovery-qualification-20261110-v2/data166-interrupted-recovery-v2/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "2a4c9a0c9dcca05cb6a191787a4b6c071e768ceb1ee9e6ad331f4ad7200ed1ee"
+  },
+  "source_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch166-interrupted-handoff-recovery-source-20261110-v2/deployment-seal-receipt.json",
+    "sha256": "2f7a788c51e3c46cfd3e38757638f100d609ae0e7554099251dcde0f84718e4a"
+  },
+  "actual_ordinary_test_count": 14,
+  "published_source_sha256": {
+    "main.rs": "646e9cc037db690e063042134015b7f4efd0c23da4ba78da9ad8a5a91fdacc9d",
+    "data_guard_reader.rs": "9462ae6dba8588a8424e0f74f0f0c70e45d5e7ef12fc81e2ed2c4090171c4886",
+    "interrupted_recovery.rs": "537f3d120a76373d1eeec3e4f36984c6131b4ace02058c82ae28d8c96206b3c7",
+    "data-guard-registrations.json": "c48928594cfa2526403fc616fac6112b42b35e6511bd686fa4a4b5ae95fc3f99",
+    "registration-binding.json": "2e9dc2ed3b6e3e99c2317342922ff4abbf00dcbe6f0b6261b056843cd8bf32d8",
+    "targets.json": "1423fe84c7f3e2900dbe300daa76a8d4123cc212f6553901ffe249bdb693d85e"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "runtime_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch166-interrupted-handoff-recovery-20261110-v2/deployment-seal-receipt.json",
+    "sha256": "352ec4f83f02ff7414b98e3c96a19c21c559743870c8dec254ec97f833c68023"
+  },
+  "actual_native_handoffs": {
+    "166": {
+      "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch166/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+      "sha256": "1657f26e74c65e67b5c97427c23de8a8b55a044c8e2d898cc0632b00ad8189f4"
+    }
+  }
+}

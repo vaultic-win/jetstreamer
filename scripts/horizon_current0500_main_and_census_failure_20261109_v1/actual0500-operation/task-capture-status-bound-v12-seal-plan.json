@@ -1,0 +1,12 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-task-capture-status-bound-v12-722adc397ae24bb4b96d452783599f57",
+  "members": [
+    {
+      "mode": 292,
+      "name": "spec.json",
+      "sha256": "b987b60df005d86c05d838b7ac2ab98155743ea0a5c0fbed90a92ea5cbbab117",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-original-r3-20261109-next/task-capture-status-bound-v12-source.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

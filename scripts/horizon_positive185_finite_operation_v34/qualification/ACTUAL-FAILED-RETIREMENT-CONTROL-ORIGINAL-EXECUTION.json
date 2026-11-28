@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"members\":{\"completion.json\":{\"path\":\"/usr/local/lib/jetstreamer/horizon-positive185-failed-reader-retirement-control-positive-retire-v34-helper33-r1/completion.json\",\"sha256\":\"a5a7bfb909022f83dee77531b59283aac39fd07550c03846a6d85ff29b5270dd\"}},\"normal_seal\":{\"path\":\"/usr/local/lib/jetstreamer/horizon-positive185-failed-reader-retirement-control-positive-retire-v34-helper33-r1/deployment-seal-receipt.json\",\"sha256\":\"76fdb3eac8e308738be00f2c529f171d5af54c7e5a4c4bf2b96041c937ae6d91\"}}\n",
+  "stderr": "Running as unit: horizon-positive185-failed-reader-retirement-control-20261108-v34-helper33-r1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 23.412s\nCPU time consumed: 1.856s\nMemory peak: 42.9M\nMemory swap peak: 0B\n"
+}

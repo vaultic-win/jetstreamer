@@ -1,0 +1,35 @@
+--- a/post-stop-fit
++++ b/post-stop-fit
+@@ -57,7 +57,10 @@
+     D / "tools-homefloor-170-metered-hourly-v3",
+ )
+ FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
+-FULL146 = HERE == D / "tools-homefloor-170-full-metered-independent-v18-full146"
++FULL146 = HERE in (
++    D / "tools-homefloor-170-full-metered-independent-v18-full146",
++    D / "tools-homefloor-170-full-metered-independent-v19-full146",
++)
+ FULL146_REQUEST = None
+ BOUNDED146 = FULL146 or HERE in (D / "tools-homefloor-170-full-metered-independent-v16", D / "tools-homefloor-170-full-metered-independent-v17")
+ BOUNDED143 = BOUNDED146 or HERE == D / "tools-homefloor-170-full-metered-independent-v15"
+--- a/full146_capacity.py
++++ b/full146_capacity.py
+@@ -142,7 +142,17 @@
+ 
+ 
+ def check_same(s, first, last):
+-    s.need(first == last, 'full 146 native actor, cgroup, profile, or guard changed during quote')
++    def identity(state):
++        timer = state['timers']
++        if timer is None:
++            return state
++        # The bound timer can run or wait between two valid native samples.
++        s.need(timer['SubState'] in ('waiting', 'running'), 'full 146 protective timer is inactive')
++        return dict(state, timers={key: value for key, value in timer.items() if key != 'SubState'})
++
++    before, after = identity(first), identity(last)
++    changed = sorted(key for key in before.keys() | after.keys() if before.get(key) != after.get(key))
++    s.need(before == after, 'full 146 native accounting changed during quote: ' + ', '.join(changed))
+ 
+ 
+ def project(s, native, state, request):

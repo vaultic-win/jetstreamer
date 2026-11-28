@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-planner5-current-metadata-view-20261109-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-helper34-current-witness-planner-qa-20261108-v5/PLANNER5_CURRENT_SOURCE_ROLE_METADATA_VIEW.json",
+      "name": "current-source-role-view.json",
+      "sha256": "20836358c3d8e30a75cce7e6e473101e15c12d0c39dcfbeaa3131c6647bf6509",
+      "mode": 292
+    }
+  ]
+}

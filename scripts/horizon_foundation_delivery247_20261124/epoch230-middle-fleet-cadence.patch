@@ -1,0 +1,15 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -777,6 +777,12 @@
+         assert release['schema'] == 'foundation-epoch230-final-tail-fleet-release-v1'
+         assert release['fleet']['path'] == str(root / 'jetstreamer-r2')
+         fleet_image = Path(publication_handoff.checked_image(release['fleet']))
++    if any(row['unit'] == diagnostic230_checkpoint_continuation.MIDDLE_UNIT for row in plan['diagnostics']):
++        root = V / 'horizon230-middle-fleet-v1'
++        release = bound(sealed_226_file(root / 'acceptance.json'))
++        assert release['schema'] == 'foundation-epoch230-middle-fleet-release-v1'
++        assert release['fleet']['path'] == str(root / 'jetstreamer-r2')
++        fleet_image = Path(publication_handoff.checked_image(release['fleet']))
+     delivery = V / 'horizon257-current-reader-delivery-v1/pipeline-claim.json'
+     if delivery.is_file():
+         claim_ref = sealed_226_file(delivery)

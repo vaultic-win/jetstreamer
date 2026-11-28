@@ -1,0 +1,17 @@
+{
+  "schema": "horizon-operation37-final4-layout-normal6-DATA512-booking-v1",
+  "owner": "/root",
+  "previous": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/ROOT_NORMAL6_FINAL4_DATA512_BOOKING.json",
+    "sha256": "63b184909418721ffbfcbcd242a9616354291924bbf4e848ed7759cd6899c890"
+  },
+  "previous_retained_DATA_lower_bound_bytes": 5163504841364,
+  "new_retained_DATA_bytes": 536870912,
+  "complete_DATA_bytes": 5164041712276,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_bytes": 0,
+  "one_serial_compiler_or_native_control_bytes": 536870912,
+  "all_prior_DATA_and_failed_actor_promises_retained": true,
+  "no_replay_or_resource_credit": true,
+  "recorded_at_utc": "2026-11-09T01:42:13.758660+00:00"
+}

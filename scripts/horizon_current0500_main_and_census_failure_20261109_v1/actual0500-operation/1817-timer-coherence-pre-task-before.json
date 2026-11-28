@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/certbot.timer",
+      "Id": "certbot.timer",
+      "InvocationID": "484b1e77ead844ae83df681037f682e2",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "12h",
+      "RemainAfterElapse": "yes",
+      "Unit": "certbot.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/certbot.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/certbot.timer",
+          "sha256": "c93a2347a3d8a526daf8fda2dd59297fac3f96030872c2fee246a80a0445a40d"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/certbot.timer",
+      "Id": "certbot.timer",
+      "InvocationID": "484b1e77ead844ae83df681037f682e2",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "12h",
+      "RemainAfterElapse": "yes",
+      "Unit": "certbot.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/certbot.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/certbot.timer",
+          "sha256": "c93a2347a3d8a526daf8fda2dd59297fac3f96030872c2fee246a80a0445a40d"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2529837059405,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794247938677741
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "certbot.timer",
+  "unset_pending_requires_metadata_requery": false
+}

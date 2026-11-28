@@ -1,0 +1,21 @@
+{
+  "schema":"horizon-nine-completed-cache-cleanup-plan-v1",
+  "allowlist_sha256":"ROOT_FILL_AFTER_COORDINATED_SOURCE_FREEZE",
+  "verifier_policy_sha256":"ROOT_FILL_AFTER_COORDINATED_SOURCE_FREEZE",
+  "evidence_observed_unix_seconds":0,
+  "inventory":{"path":"ROOT_FILL_FRESH_AUTHENTICATED_INVENTORY","sha256":"ROOT_FILL"},
+  "dependency_review":{"path":"ROOT_FILL_ROOT_OWNED_DEPENDENCY_REVIEW","sha256":"ROOT_FILL"},
+  "targets":[
+    "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-c/output/compact-indexes/151",
+    "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-c/output/compact-indexes/152",
+    "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-c/output/compact-indexes/153",
+    "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-d/output/compact-indexes/153",
+    "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-d/output/compact-indexes/154",
+    "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-d/output/compact-indexes/155",
+    "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-e/output/compact-indexes/154",
+    "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-e/output/compact-indexes/155",
+    "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-f/output/compact-indexes/155"
+  ],
+  "authority":{"local_index_retirement_authorized":true,"archive_deletion_authorized":false,"snapshot_deletion_authorized":false,"remote_mutations":false,"replay_launch_authorized":false},
+  "prior_check_sha256":null
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "horizon-operation34-helper33-serial-normal6-booking-v1",
+  "previous_retained_DATA_lower_bound_bytes": 5151156810388,
+  "new_additive_retained_DATA_bytes": 536870912,
+  "complete_DATA_lower_bound_bytes": 5151693681300,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA4_currently_open_bytes": 4294967296,
+  "build_waits_for_helper33_QA_drain_and_extra4_closure": true,
+  "metadata_source_preparation_only": true,
+  "qualified_Helper33_pin_unresolved": true,
+  "Final3_unchanged_generic_role_requires_fresh_native_profile_control": true,
+  "all_raw_promises_retained": true,
+  "no_credit_or_replay_or_publication": true
+}

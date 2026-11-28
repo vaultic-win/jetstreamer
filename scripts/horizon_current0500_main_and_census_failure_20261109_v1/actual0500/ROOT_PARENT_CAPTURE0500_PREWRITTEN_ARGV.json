@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/complete_parent_capture0500_witness_v1.py"
+  ],
+  "bindings": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/ROOT_CURRENT_NATIVE_CONTINUATION_BINDINGS.json",
+    "sha256": "52dd58803f20923e01c1c1f3f92ba8e6319ed2aa68a49d4887bba04f6f592b5e"
+  },
+  "metadata_source": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/complete_parent_capture0500_witness_v1.py",
+    "sha256": "34bae3909cb6066c172f18a1e68b6b066bd67514fdda4b40df524edf96c270f2"
+  },
+  "normal_pool_bytes": 6442450944,
+  "native_actor_bytes": 2147483648,
+  "no_replay_authority": true
+}

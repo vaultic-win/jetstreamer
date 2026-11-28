@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "systemctl",
+    "start",
+    "horizon-operation32-coherence-disposable-20261108-v38-r1.timer"
+  ],
+  "code": 0,
+  "stdout": "",
+  "stderr": ""
+}

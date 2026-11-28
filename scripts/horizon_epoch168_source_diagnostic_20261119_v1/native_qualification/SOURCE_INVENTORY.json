@@ -1,0 +1,170 @@
+{
+  "schema": "horizon168-native-harness-source-inventory-v1",
+  "source_only": true,
+  "compiler_or_native_accepted": false,
+  "builds_run": true,
+  "tests_run": false,
+  "native_controls_run": false,
+  "resource_observations_run": false,
+  "remote_operations_run": false,
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 9,
+      "sha256": "306fd52e74fca6746e12acc750f232de15e71da917756a1270d74c91f5eb7368"
+    },
+    {
+      "path": "CARGO_RESOLUTION.json",
+      "bytes": 2152,
+      "sha256": "4bd9091cfedffa13f914a0f472100111e505d2c5789599bf31dfc622109eec53"
+    },
+    {
+      "path": "Cargo.lock",
+      "bytes": 7965,
+      "sha256": "626ca5f97e7885f3c3ff5f81cfef9e6f68bf19c84ed7ca1fafbf30213f502607"
+    },
+    {
+      "path": "Cargo.toml",
+      "bytes": 419,
+      "sha256": "8e90fd4b5a5eaec43da46dbfd3ae1a528f60d34196fda28d785fa098b8250782"
+    },
+    {
+      "path": "HANDOFF.txt",
+      "bytes": 2380,
+      "sha256": "3a8fee4991596817ac0dcfdfb3d9486649ab54f9c5d922670765539023bb8be6"
+    },
+    {
+      "path": "README.md",
+      "bytes": 10199,
+      "sha256": "0222052e30ad7ba027fb4104eac17c1a2130b76d2e81aecf6111acbe9ee5290e"
+    },
+    {
+      "path": "fault-shim/Cargo.toml",
+      "bytes": 170,
+      "sha256": "3b7202e65cd5e82769a229dc4a0155e23830ca113af334615011c205695e8d30"
+    },
+    {
+      "path": "fault-shim/src/lib.rs",
+      "bytes": 5962,
+      "sha256": "7a9ebe1a8655322fb8a6d53b91095e718ef12f258a71d74ef82592d867281d53"
+    },
+    {
+      "path": "src/fixture.rs",
+      "bytes": 21545,
+      "sha256": "bcaba16b6adc257c1a188029639acb3f4f84c37c9ca1081cc97947e2f66ed0da"
+    },
+    {
+      "path": "src/isolation.rs",
+      "bytes": 3315,
+      "sha256": "2b7cc64e380dedd892308534f1a84d90a3c96004fda844e3514ff83350f77de8"
+    },
+    {
+      "path": "src/main.rs",
+      "bytes": 29273,
+      "sha256": "b910a760fb736bd357867d027f3c341fbe8dc8b4d5eebecad75e53b71fd2ea4c"
+    }
+  ],
+  "inspected_references": [
+    {
+      "path": "/tmp/root-terminal168-next-executable-diagnostic-source-20261111-v1/RUNTIME_QUALIFICATION.json",
+      "bytes": 3384,
+      "sha256": "14348fbe08ad10328ebd7f14298a40e25dc738c3553c05fa9f57f0db3bea7774"
+    },
+    {
+      "path": "/tmp/root-terminal168-next-executable-diagnostic-source-20261111-v1/BUILD_AND_NATIVE_QUALIFICATION.md",
+      "bytes": 14940,
+      "sha256": "022f907c658fb98f6a42e4db3748cece5890fbcc44d151110ddb41a8ba9fa744"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/capture/src/main.rs",
+      "bytes": 19333,
+      "sha256": "c4d9fad2bfad9e8320fa2c7becd02cc04960a974515c1b685214517e195a39fb"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/capture/Cargo.toml",
+      "bytes": 861,
+      "sha256": "bc9d46da66f8142be9b307aa18da3c4b098f50c05c92794562c611f71e8a6a91"
+    }
+  ],
+  "authored_unrun_controls": [
+    "baseline",
+    "wrong-self-digest",
+    "wrong-plan-digest",
+    "wrong-funding-digest",
+    "foreign-url-field",
+    "funding-not-accepted",
+    "funding-expired",
+    "funding-future",
+    "funding-overlong",
+    "symlink-plan",
+    "occupied-output",
+    "tls-untrusted",
+    "tls-wrong-name",
+    "head-weak-etag",
+    "head-missing-etag",
+    "head-duplicate-etag",
+    "head-missing-length",
+    "head-zero-length",
+    "head-redirect",
+    "range-http200",
+    "range-http412",
+    "range-redirect",
+    "range-changed-etag",
+    "range-duplicate-etag",
+    "range-wrong-offset",
+    "range-wrong-total",
+    "range-wrong-length",
+    "range-gzip",
+    "range-chunked-overflow",
+    "range-truncated",
+    "range-version-disappears",
+    "range-version-changes",
+    "range-version-appears",
+    "range-version-duplicates",
+    "index-zero",
+    "index-outside",
+    "index-overflow",
+    "index-header-overlap",
+    "index-oversized",
+    "header-nonminimal",
+    "header-oversized",
+    "header-varint-overflow",
+    "header-zero",
+    "header-truncated",
+    "header-changes",
+    "posthead-changed",
+    "posthead-version-disappears",
+    "proxy-ignored",
+    "socket-timeout",
+    "slot-write-enospc",
+    "slot-fsync-eio",
+    "marker-fsync-eio",
+    "marker-kill",
+    "marker-deadline",
+    "marker-clock-regression"
+  ],
+  "authored_unrun_control_count": 55,
+  "static_checks": {
+    "toml_parse": true,
+    "unique_case_names": true,
+    "lock_hash_matches_existing_metadata_resolution": true,
+    "no_local_target_directory": true,
+    "no_source_symlinks": true,
+    "no_trailing_whitespace": true,
+    "scope": "source files and retained references only; no compiler, native listener, runtime probe or resource observation"
+  },
+  "readme_contains_coverage_limits": true,
+  "admission_authorized": false,
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "parent_formatting_note": "Root ran rustfmt on the authored Rust modules and removed trailing blank TOML lines before publication. No build or native control has run.",
+  "parent_first_compiler_result": {
+    "unit": "horizon-168-capture-fixture-build-20261119-v1.service",
+    "invocation_id": "3850c7a956294402b0a751fca9633ff9",
+    "exit": 101,
+    "reason": "strict Clippy rejected collapsible_if and chunks_exact_to_as_chunks",
+    "successor_change": "collapse condition and use fixed-size as_chunks; no suppression or control-policy change",
+    "native_controls_run": false
+  }
+}

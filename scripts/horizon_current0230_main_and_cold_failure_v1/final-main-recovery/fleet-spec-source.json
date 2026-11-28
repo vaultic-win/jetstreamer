@@ -1,0 +1,17 @@
+{
+  "actual_fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-positive185-original-da9b57fed9f04c9fa1b0c5dba1932488.json",
+    "sha256": "90a640528f231efc9a4a9af226e975f0a50b2d4075eec65c99a27abf90f9a9ce"
+  },
+  "actual_fleet_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-fleet-da9b57fed9f04c9fa1b0c5dba1932488/spec.json",
+    "sha256": "2618335430809eb2c80cf06efd6002463d02d38e8ace8ba2ece0f5cf92562362"
+  },
+  "numeric_delivery_eta_millis": 506972206,
+  "output": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/da9b57fed9f04c9fa1b0c5dba1932488/fleet-acceptance.json",
+  "registration": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/da9b57fed9f04c9fa1b0c5dba1932488/registration.json",
+    "sha256": "08169e0010780d2fd6c20cdb330ea98cb48b97af2cbc24a1171f61be697ec813"
+  },
+  "schema": "horizon-epoch185-genuine-fleet-acceptance-spec-v1"
+}

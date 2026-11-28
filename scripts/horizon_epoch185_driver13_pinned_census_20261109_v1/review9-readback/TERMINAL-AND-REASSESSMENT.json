@@ -1,0 +1,241 @@
+{
+  "after_sha256": "2526cbb0627674bfe30b443ba6ba166180ea0e399e7bf4fc48a7adc6630ecbcf",
+  "after_status": {
+    "elapsed_execution_millis": 1632000,
+    "epoch": 185,
+    "estimated_remaining_millis": 495471206,
+    "jet_size_bytes": 0,
+    "phase": "verification",
+    "sampled_at_utc": "2026-11-09T05:42:35Z"
+  },
+  "archive_publication_authorized": false,
+  "assumption": "Actual0500 bounded185 Main started05:15:23 and exited1 at05:23:23 UTC in cold initialization. Final log: allocation census retry limit; no usage accepted: descendant disappeared during allocation census, under live unpacked/accounts. Exact IID722adc397ae24bb4b96d452783599f57/PID3961564 retained, zero restarts, MainPID and ControlPID now0. No canonical transaction progress observed; useful lanes0,target5. Root actively diagnoses Driver12 allocation census and prepares independent163 replacement. Helper35 lifecycle captured before failure; no restart, signal, deadline renewal or replay credit. Final6 wrapper had independently timed out05:15:45 after successful firstguard/token/Main and left worker running. Current0500 Frame/resources/Planner6/O38/H35 accepted; full185 parent route and publication still unqualified. MemoryPeak48GiB alone is not OOM evidence. All original Review8 model anchors, full unexecuted413404206ms/bootstrap1h/verification6h/delivery4h retained. DATA5181758452372 normal6GiB extraQA0. Other host epochs200-300 and protected199 unchanged. Actual0500 current Frame/fullreader/memory/DATA/Planner6/O38/H35/Driver12firstguard/token/Main succeeded; Main05:15:23..05:23:23 then failed its own allocation census during account-file churn, no transactionprogress and cgroupOOM0. Root captured qualifiedHelper35lifecycle without restart before terminal. Exact failure/ownedstop/PID1/openrepair retained. Driver13pinned-inode census now ACTUALLYqualified strictfourcompilers,43ordinary,fiveRootnative,14Solcensus plusoldSolnative, all8originalsPID1success/drained, normallysealed7de0d10f. Original30s/8retries/4M/depth64 preserved; missingbeforepin stillfailsclosed. Helper36/Planner7/Final7/Operation39 actualpair integration stillneeded, no newadmission. Remaining uncertaincontrol estimate120min: minimalHelper36 actualD13registration compilation/qualification25min; Planner7/Final7/Operation39 exactrole/static/nativecontrols35min; nextgenuine scheduledcurrentFrame/resource/admission/Main20min; coldinitialization validation20min; contingency20min. Same19:25:15controlanchor inside unchanged17:30:22+24hqualification; no nativelease/deadline/reset/retry and no replaycost credit. Fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h remain. Bounded80351283/48GiB/14400s isnotcomplete185 route; fullparentqualification and independent163nineconsumer/native48path remainopen. DATA5181758452372normal6extraQA0; useful0target5. Otherhost200-300 and original199FDs protected.",
+  "before_body": "{\"elapsed_execution_millis\":934000,\"epoch\":185,\"estimated_remaining_millis\":496169206,\"jet_size_bytes\":0,\"phase\":\"verification\",\"sampled_at_utc\":\"2026-11-09T05:30:57Z\"}\n",
+  "before_etag": "\"7b70d5a0060cada73d3a8661146b79db\"",
+  "before_sha256": "4017a8001d3fdfc43e181c07972912c2785d8906d5a7affb143146b8d61c4ffe",
+  "before_status": {
+    "elapsed_execution_millis": 934000,
+    "epoch": 185,
+    "estimated_remaining_millis": 496169206,
+    "jet_size_bytes": 0,
+    "phase": "verification",
+    "sampled_at_utc": "2026-11-09T05:30:57Z"
+  },
+  "conditional_header": "If-Match",
+  "epoch": 185,
+  "estimate_parts_millis": {
+    "archive_close_full_plugin_boundary_verification_millis": 21600000,
+    "bootstrap_load_and_warmup_millis": 3600000,
+    "full_boundary_runtime_native_Frame_successor_and_fresh_admission_qualification_millis": 35283000,
+    "full_epoch_replay_using_same_century_peer_rate_with25percent_contingency_millis": 413404206,
+    "native_guard_directory_preparation_closed_write_event_and_reader_retirement_controls_millis": 7184000,
+    "upload_whole_object_readback_and_sidecar_commit_millis": 14400000
+  },
+  "estimated_remaining_millis": 495471206,
+  "key": "epoch-185.epoch-status.json",
+  "owner_evidence": {
+    "accepted_fleet": {
+      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T050022Z-witness-terminal145-v1.json",
+      "sha256": "1a330c37645d7a1c0bdce6cef2861ba6a445cfd0bec08e411df5906dc60fd583"
+    },
+    "actual0030_reader_failure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0030-reader-phase-20261109-v15/94-actual-phase-gated-original-reader-original-outcome.json",
+      "sha256": "84d880ee10cf1b8a3258cf5e5fdd7526f3bd58b9b30e40d29b2466c74233a13d"
+    },
+    "actual0100_final3_failure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/3688-actual-c71-one-original-final-original-outcome.json",
+      "sha256": "3d26a8bfa7abcd2d398acc6f78489689d83f633424aa563b6f1bd6f66fd57933"
+    },
+    "actual0100_first_guard_failure": {
+      "path": "/var/lib/jetstreamer/epoch185-cold-guard-v4/guard-50a0f038091f4c578791c3720a85a72e.json",
+      "sha256": "430cddfe3fc6968557eba5d9469448e860d25027d9b15dc3e2d87ba5558f37ac"
+    },
+    "actual0200_capture_phase_failure": {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0200-20261109-v1/FRAME5-R4-capture-PHASE-EXECUTION.json",
+      "sha256": "c781a3cd80b3799d1f47ae38b6821138bb0d5a7bbdb0c600cd7d7b893039ef47"
+    },
+    "actual0200_original_pending_guard_sample": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0200-frame-capture-r4-20261109-v24/19-reader-start-phase-native-original-outcome.json",
+      "sha256": "4358d7e430728f52efc28901c63e59ab055a3e2855997f2a1b7a9afaceda7827"
+    },
+    "actual0230_closed_cold_initialization_failure_log": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0230-20261109-next/private-stdout-stderr.log",
+      "sha256": "1f8907233e6c3446619868554dea75399d14b0c1e7bfd1893fa565cbf5820928"
+    },
+    "actual0230_failed_after_Main_native": {
+      "ActiveState": "failed",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "ExecMainExitTimestamp": "Mon 2026-11-09 02:47:53 UTC",
+      "ExecMainPID": "3889589",
+      "ExecMainStartTimestamp": "Mon 2026-11-09 02:39:53 UTC",
+      "ExecMainStatus": "1",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service",
+      "InvocationID": "da9b57fed9f04c9fa1b0c5dba1932488",
+      "MainPID": "0",
+      "MemoryPeak": "51539607552",
+      "NRestarts": "0",
+      "Result": "exit-code",
+      "SubState": "failed"
+    },
+    "actual0500_failure_log": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0500-20261109-next/private-stdout-stderr.log",
+      "sha256": "3a19ff12c0c083d156cd326a1d97ef788ae938f6d5841e4a5b9f66cb5c47b875"
+    },
+    "actual0500_terminal_native": {
+      "ActiveState": "failed",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "ExecMainPID": "3961564",
+      "ExecMainStartTimestamp": "Mon 2026-11-09 05:15:23 UTC",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+      "InvocationID": "722adc397ae24bb4b96d452783599f57",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "SubState": "failed"
+    },
+    "actual_Helper34_QA5_closure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+      "sha256": "1cbf8c099c1f3fe5e5e4f53534194fe883435509be25966908fa529c748b9acf"
+    },
+    "actual_Helper34_fresh_extraQA5_booking": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+      "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+    },
+    "actual_current_Frame": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T043022-witness-terminal145-chain128-v5.json",
+      "sha256": "55fda127febcffca00788cb6023a494f7c31e88a65eb0cdaba58d2dbc5e9ea83"
+    },
+    "actual_current_Frame_acceptance": {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0430-20261109-v1/ROOT_GENUINE_CURRENT_CLI_V5_CAPTURE_ACCEPTED.json",
+      "sha256": "6520c80f08f1a82c49eaa98885e1fafd3977316fb83bb1f1a6b5c21ef1e3ab2b"
+    },
+    "actual_current_guarded_actor_terminal": {
+      "ActiveState": "failed",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "ExecMainPID": "0",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service",
+      "InvocationID": "9568cb52af154f7d8fbd48e7571770fa",
+      "Job": "",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "Result": "signal",
+      "SubState": "failed"
+    },
+    "actual_current_producer_invocation_id": "722adc397ae24bb4b96d452783599f57",
+    "actual_current_producer_native": {
+      "ActiveState": "failed",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "ExecMainPID": "3961564",
+      "ExecMainStartTimestamp": "Mon 2026-11-09 05:15:23 UTC",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+      "InvocationID": "722adc397ae24bb4b96d452783599f57",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "SubState": "failed"
+    },
+    "actual_current_producer_unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+    "actual_fleet_failure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual2300-original-r3-20261108-next/1867-actual-enrolled-fleet-original-outcome.json",
+      "sha256": "b07b76afe6c58aeaaf6cdc72322d9e2b153182e1f63b6d0c3f2bd189e08692d2"
+    },
+    "actual_lifecycle": {
+      "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/722adc397ae24bb4b96d452783599f57/lifecycle.json",
+      "sha256": "4858cea6ef8d48c05181c50b55365beba7278985d261df85be830fc988829b9a"
+    },
+    "actual_original_actor_terminal": {
+      "ActiveState": "failed",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "InvocationID": "dff3a3ef94d943b0bae94634fa9dfc50",
+      "Job": "",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "Result": "exit-code",
+      "SubState": "failed"
+    },
+    "actual_qualified_driver13": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/ROOT_ACTUAL_NORMALLY_SEALED_DRIVER13_BINDINGS.json",
+      "sha256": "0dfc3dfc08766d37a69ba47eb064b1424b008025fe87d61b8b3ce0e4090f865f"
+    },
+    "actual_review6_model": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review9-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW9.json",
+      "sha256": "a98e755b7f7acc2a113a704c2633147fd4b1edc28e60d7de28fcd5b665bc40eb"
+    },
+    "actual_review9_model": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review9-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW9.json",
+      "sha256": "a98e755b7f7acc2a113a704c2633147fd4b1edc28e60d7de28fcd5b665bc40eb"
+    },
+    "actual_same_original_main_recovery": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/ROOT_MAIN_LIFECYCLE_CAPTURED_WITHOUT_ACTOR_RESTART.json",
+      "sha256": "12af3df2bb38cd3cf0e146e97366404b5401baf8d7dd5c14f8734482940536d7"
+    },
+    "bounded_native_initialization_active": false,
+    "complete_current_DATA_bytes": 5181758452372,
+    "coordinated_observer": {
+      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T053022Z-postcompletion154-v1.json",
+      "sha256": "9e5afe5b6b4f371b7a49e302425f9886d7795dbb389442ee18085bd8a6a5f0b9"
+    },
+    "current_accepted_resource_frame": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json",
+      "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8"
+    },
+    "current_complete_DATA_authority": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER13_DATA4_BOOKING.json",
+      "sha256": "f707a14d33f3c26438767720bd6a9dd6f3c380f2e160a582d2ac8bc62564556a"
+    },
+    "current_complete_resources_pending": true,
+    "current_operator": "/root",
+    "current_phase": "verification",
+    "current_primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+    "current_shared_dependency": "Nov9 05:00 planned continuation. Replay0target5. ActualD12/H35/Final6/P6/O38 qualifiedsealed; exact0230successfulreader aliases retired04:25aftergenuinepostMainterminalclosure withzeroRAM/DATAcredit. Genuine0430Frame55fda127 captured/finalized and completeHelper27outer passed; exact0300/0330/0400observerbridges finalized preservinginode/bytes/mtime. Actual0430metadata authority and normal6closure revalidated1539historical+87additionalterminalunits; originalhistoricalextraQA6release notcreditedagain. Lastcompleteoperationalresource tuple remains0230; no0430reader/parentmemory/DATA/admission/worker was started beforeoriginal04:45:22cutoff. Next05sourcechainmustpreserveFrame0430/resources0230split. Guard0500ACTUALLYqualified65tests/fourcompilerssealed, but actual05sample/Frame/reader/admissionpendingatpreparation. NewcanonicalDATA5177463485076 includesguard0500DATA512once over5176926614164; normal6extraQA0. Review8actuallypublished04:42:55 afterexplicit04:42:33review; planningcontrol deadline05:42:33, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. 60minuncertainplanningallocation forcurrentauthority/closure/staticchain20min, freshscheduledtuple/resource/admission20min, nativeMain10min, contingency10min; noexistingnativeclockreset. Fleet8 exactinheritedpolicy retained after rejectingadditions; actualnewterminal/qmetadata retainedseparately, no gateweakened. Currentfull185route unqualified; bounded80351283/48GiB/14400s isnotfull185. Otherhost200-300/protected199FDs untouched.",
+    "current_task": "Actual0500 bounded185 Main started05:15:23 and exited1 at05:23:23 UTC in cold initialization. Final log: allocation census retry limit; no usage accepted: descendant disappeared during allocation census, under live unpacked/accounts. Exact IID722adc397ae24bb4b96d452783599f57/PID3961564 retained, zero restarts, MainPID and ControlPID now0. No canonical transaction progress observed; useful lanes0,target5. Root actively diagnoses Driver12 allocation census and prepares independent163 replacement. Helper35 lifecycle captured before failure; no restart, signal, deadline renewal or replay credit. Final6 wrapper had independently timed out05:15:45 after successful firstguard/token/Main and left worker running. Current0500 Frame/resources/Planner6/O38/H35 accepted; full185 parent route and publication still unqualified. MemoryPeak48GiB alone is not OOM evidence. All original Review8 model anchors, full unexecuted413404206ms/bootstrap1h/verification6h/delivery4h retained. DATA5181758452372 normal6GiB extraQA0. Other host epochs200-300 and protected199 unchanged. Actual0500 current Frame/fullreader/memory/DATA/Planner6/O38/H35/Driver12firstguard/token/Main succeeded; Main05:15:23..05:23:23 then failed its own allocation census during account-file churn, no transactionprogress and cgroupOOM0. Root captured qualifiedHelper35lifecycle without restart before terminal. Exact failure/ownedstop/PID1/openrepair retained. Driver13pinned-inode census now ACTUALLYqualified strictfourcompilers,43ordinary,fiveRootnative,14Solcensus plusoldSolnative, all8originalsPID1success/drained, normallysealed7de0d10f. Original30s/8retries/4M/depth64 preserved; missingbeforepin stillfailsclosed. Helper36/Planner7/Final7/Operation39 actualpair integration stillneeded, no newadmission. Remaining uncertaincontrol estimate120min: minimalHelper36 actualD13registration compilation/qualification25min; Planner7/Final7/Operation39 exactrole/static/nativecontrols35min; nextgenuine scheduledcurrentFrame/resource/admission/Main20min; coldinitialization validation20min; contingency20min. Same19:25:15controlanchor inside unchanged17:30:22+24hqualification; no nativelease/deadline/reset/retry and no replaycost credit. Fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h remain. Bounded80351283/48GiB/14400s isnotcomplete185 route; fullparentqualification and independent163nineconsumer/native48path remainopen. DATA5181758452372normal6extraQA0; useful0target5. Otherhost200-300 and original199FDs protected.",
+    "elapsed_time_basis": "Original current producer Main ExecMainStartTimestamp05:15:23, replacing prior Root-repair elapsed basis through authenticated handoff",
+    "estimate_review": {
+      "path": "/home/sol/.jetstreamer-private/actual053022-visible-root-acceptance-20261109-v1/status-estimate-review053022.json",
+      "sha256": "6953aeebf77998fafa594e5e380ffc148f9f5788575b56ae798e37fb3003e910"
+    },
+    "fixed_work_eta_model": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review9-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW9.json",
+      "sha256": "a98e755b7f7acc2a113a704c2633147fd4b1edc28e60d7de28fcd5b665bc40eb"
+    },
+    "immediate_Frame_predecessor": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json",
+      "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8"
+    },
+    "last_complete_resource_selector": {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/accepted-frame-selector.json",
+      "sha256": "02e0b10a1865a6e327a19293b42f9d41957cfaf2729fe6a189e6f84d006547b1"
+    },
+    "no_full_epoch_replay_started": true,
+    "phase": "verification",
+    "previous_authenticated_owner_evidence": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261107155014.json",
+      "sha256": "676075762409b0e7705c250c0c90f11c562e5012c13221f8e0a7b2ffbfe3555a"
+    },
+    "previous_owner_evidence": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109053057.json",
+      "sha256": "7d2b6f054eba1f412dfade49ace833a445cea380e753c2265ffcb3a8375a0905"
+    },
+    "qualified_state_copy": {
+      "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_STATE_CAPTURE_EXACT_BYTES_AND_UNCHANGED_GUARD_ACCEPTED.json",
+      "sha256": "68e08cced670a337cd5173e03605f465d73c8095fa7fa183244b20ab91c5b950"
+    },
+    "qualified_witness": {
+      "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_ACTUAL_FULL_INPUT_WITNESS_ACCEPTED_CONSUMER_INTEGRATION_PENDING.json",
+      "sha256": "c728698afbbb6dac654b3e3c14428622e51c1e58a53392a4f241e2a451312eb2"
+    },
+    "resource_credit_bytes": 0
+  },
+  "previous_receipt": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109053057.json",
+    "sha256": "7d2b6f054eba1f412dfade49ace833a445cea380e753c2265ffcb3a8375a0905"
+  },
+  "replay_launch_authorized": false,
+  "resource_sample_claimed": false,
+  "sampled_at_utc": "2026-11-09T05:42:35Z",
+  "schema": "horizon-status-only-correction-v1"
+}

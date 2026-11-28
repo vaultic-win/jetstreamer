@@ -1,0 +1,9 @@
+[Unit]
+Description=Horizon native 228 protective guard timer
+
+[Timer]
+OnActiveSec=1s
+OnUnitInactiveSec=120s
+AccuracySec=1s
+RandomizedDelaySec=0
+Unit=horizon-native228-protective-v1.service

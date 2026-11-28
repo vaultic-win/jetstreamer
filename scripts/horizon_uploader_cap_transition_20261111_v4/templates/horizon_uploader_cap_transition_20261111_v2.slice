@@ -1,0 +1,7 @@
+[Unit]
+Description=One GiB retained-native16 isolated cap transition aggregate
+[Slice]
+MemoryAccounting=yes
+MemoryMax=1073741824
+MemorySwapMax=0
+TasksMax=512

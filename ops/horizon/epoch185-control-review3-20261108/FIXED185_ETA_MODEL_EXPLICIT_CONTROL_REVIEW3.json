@@ -1,0 +1,54 @@
+{
+  "schema": "horizon-epoch185-fixed-unexecuted-replay-planning-model-v1",
+  "epoch": 185,
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "authenticated_full_work_basis": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261105194538.json",
+    "sha256": "6dae466b92485611a652acb8f527b352191c0b64755468cdae06cce046fea3eb"
+  },
+  "full_replay_fixed_millis": 413404206,
+  "qualification_original_review": {
+    "path": "/home/sol/.jetstreamer-private/actual173022-visible-root-acceptance-20261108-v1/status-estimate-review173022.json",
+    "sha256": "22b318775efec63ec9b542d852ffbfe327cdaa3c299da8b280846ca5c635e146"
+  },
+  "qualification_anchor_utc": "2026-11-08T17:30:22Z",
+  "qualification_original_total_millis": 86400000,
+  "control_model_issued_at_utc": "2026-11-08T19:25:15Z",
+  "control_integration_allocation_millis": 17388000,
+  "control_allocation_is_inside_original24h_budget": true,
+  "bootstrap_millis": 3600000,
+  "verification_millis": 21600000,
+  "delivery_millis": 14400000,
+  "no_full_epoch_replay_has_started": true,
+  "qualification_or_control_clock_is_not_a_replay_lease": true,
+  "assumption": "Uncertain full-sidecar planning. Actual22:30 Frame/fullreader/parent/cached145/memory/DATA allpassed, but Planner3 rejected Helper33 because its native-capture pin still namedHelper32. No185actor was started. Planner4now qualified4compiler/24ordinary andactualbyteidenticalfailed2230requestaccepted in metadata-only control; normal-sealedR2 onlycorrects inherited Helper32metadata label. Operation35pinningPlanner4underqualification. OriginalfullReader300s eligibility expired; nextfresh23:00sample is after current22:49:32control deadline. Explicit review now allocates90minutesremaining from SAME19:25:15anchor INSIDE unchangedoriginal17:30:22+24h total. No native lease/clock or full unexecuted413404206ms replay cost reset. No replay/publication/resource credit. Bootstrap1h,verification6h,delivery4h remain future. Full-route qualification remains outstanding.",
+  "control_review_history": [
+    {
+      "previous_model": {
+        "path": "/home/sol/.jetstreamer-private/actual1925-fixed-work-eta-event185-20261108-v1/FIXED185_ETA_MODEL.json",
+        "sha256": "c0fd7a8ac593998c635731e64e94ad0b32c95ce1d3e74316bb75e0ab34b3ec52"
+      },
+      "previous_total_control_allocation_millis": 7200000,
+      "reviewed_at_utc": "2026-11-08T21:19:32Z",
+      "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+      "explicit_new_remaining_control_allowance_millis": 5400000,
+      "reason": "Original twohour control integration estimate insufficient: actual enrollment helper mismatch fixed, parent periodicguard race fixed andgenuinelypassed, actual21fleet suffix ordering failure now repaired against exactHelper32consumer; qualify remaining controls and freshadmission. No full-route progress or replay credit.",
+      "inside_original24h_qualification_budget": true,
+      "no_original_native_clock_reset": true
+    },
+    {
+      "previous_model": {
+        "path": "/home/sol/.jetstreamer-private/actual2100-fleet-order-and-explicit-control-review-event185-20261108-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW2.json",
+        "sha256": "8563275737b1a5f06120144987d1b48c3dd991ed13884b912194e1ea3af1a080"
+      },
+      "previous_total_control_allocation_millis": 12257000,
+      "reviewed_at_utc": "2026-11-08T22:45:03Z",
+      "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+      "explicit_new_remaining_control_allowance_millis": 5400000,
+      "reason": "Actual22:30 Frame/fullreader/parent/cached145/memory/DATA allpassed, but Planner3 rejected Helper33 because its native-capture pin still namedHelper32. No185actor was started. Planner4now qualified4compiler/24ordinary andactualbyteidenticalfailed2230requestaccepted in metadata-only control; normal-sealedR2 onlycorrects inherited Helper32metadata label. Operation35pinningPlanner4underqualification. OriginalfullReader300s eligibility expired; nextfresh23:00sample is after current22:49:32control deadline. Explicit review now allocates90minutesremaining from SAME19:25:15anchor INSIDE unchangedoriginal17:30:22+24h total. No native lease/clock or full unexecuted413404206ms replay cost reset. No replay/publication/resource credit.",
+      "inside_original24h_qualification_budget": true,
+      "no_original_native_clock_reset": true
+    }
+  ]
+}

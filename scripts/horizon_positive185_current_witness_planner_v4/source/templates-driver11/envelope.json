@@ -1,0 +1,51 @@
+{
+  "schema": "horizon-epoch185-guarded-cold-envelope-v4",
+  "plan": {
+    "schema": "horizon-private-epoch185-capped-root-prefix-plan-v4",
+    "unit": "horizon-qualify-185-capped-cold-missing-token-20261106-v14.service",
+    "run_root": "/home/sol/.jetstreamer-private/capped-root-prefix-185-missing-token-20261106-v14",
+    "node": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/jetstreamer-node",
+      "sha256": "e987401354f0cddbd838b71439768d6ed84baddfe8c0c2b484addec553db1887"
+    },
+    "worker": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/jetstreamer-historical-worker-v1-6-15",
+    "ledger_directory": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3",
+    "snapshot": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/snapshot-79919283-Hozk66F2tKQuhouHceuwU9xZzWaXksnBeU1JBysRBmmf.tar.zst",
+    "epoch_hashes": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/epoch-hashes-185.txt",
+      "sha256": "9ef0d882bf9b530abcd77f8aae199a0c2057c06b32a1d738c7443e3e431606fa"
+    },
+    "target_slot": 80351283,
+    "terminal_slot": 80351283,
+    "minimum_free_bytes": 3503746342342,
+    "maximum_runtime_seconds": 600
+  },
+  "admission": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-current-evidence-20261106-v14/admission.json",
+    "sha256": {
+      "$actual_root_binding": "materialized.admission.sha256"
+    }
+  },
+  "actor_service_path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-native-units-20261106-v14/horizon-qualify-185-capped-cold-missing-token-20261106-v14.service",
+  "guard_service_path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-native-units-20261106-v14/horizon-guard-185-capped-cold-missing-token-20261106-v14.service",
+  "timer_service": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-native-units-20261106-v14/horizon-guard-185-capped-cold-missing-token-20261106-v14.timer",
+    "sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57"
+  },
+  "guard_unit": "horizon-guard-185-capped-cold-missing-token-20261106-v14.service",
+  "timer_unit": "horizon-guard-185-capped-cold-missing-token-20261106-v14.timer",
+  "control_root": "/home/sol/.jetstreamer-private/epoch185-cold-control-missing-token-20261106-v14",
+  "token_root": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4",
+  "guard_receipt_root": "/var/lib/jetstreamer/epoch185-cold-guard-v4",
+  "self_program": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold",
+  "self_sha256": "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2",
+  "limits": {
+    "memory": 2147483648,
+    "scratch": 412316860416,
+    "output": 137438953472,
+    "metadata": 67108864,
+    "log": 67108864,
+    "vmas": 4194304
+  },
+  "setup_deadline_seconds": 60
+}

@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-retire0030-native-control-20261109-v1.service\nError: owner shape\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=1\nService runtime: 28ms\nCPU time consumed: 24ms\nMemory peak: 5.0M\nMemory swap peak: 0B\n"
+}

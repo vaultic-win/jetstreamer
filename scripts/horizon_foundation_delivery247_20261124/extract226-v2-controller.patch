@@ -1,0 +1,90 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -261,6 +261,20 @@
+ EXTRACTION226_BUILD = V / 'horizon226-fleet-registration-release-v1'
+ EXTRACTION226_UNIT = 'horizon-qualify-226-checkpoint-continuation-extract-v1.service'
+ EXTRACTION226_PHASE = 'private-held-extraction'
++EXTRACTION226_RETRY = V / 'horizon226-extract-v2'
++EXTRACTION226_RETRY_UNIT = 'horizon-qualify-226-checkpoint-continuation-extract-v2.service'
++EXTRACTION226_OWNERS = {
++    EXTRACTION226_UNIT: 'foundation-226-original225-broker-v1.service',
++    EXTRACTION226_RETRY_UNIT: 'foundation-226-original225-broker-v2.service',
++}
++
++
++def retry_226_image():
++    root = V / 'horizon226-extract-v2-tools'
++    release = bound(sealed_226_file(root / 'acceptance.json'))
++    assert release['schema'] == 'foundation-epoch226-extraction-cadence-release-v2'
++    assert release['fleet']['path'] == str(root / 'jetstreamer-r2')
++    return Path(publication_handoff.checked_image(release['fleet']))
+
+ def sealed_226_file(p):
+     state = p.lstat()
+@@ -318,6 +332,25 @@
+         add(gate, drain)
+         gate['next_action'] = ('The extraction failed after the Original225 range connection timed out. '
+                                'Qualify the pinned range retry and admit a new extraction before replaying the suffix.')
++    retry_path = EXTRACTION226_RETRY / 'fleet-launch.json'
++    if retry_path.is_file():
++        assert terminal.is_file()
++        retry_ref = sealed_226_file(retry_path)
++        retry = bound(retry_ref)
++        assert retry['schema'] == launch['schema'] and retry['epoch'] == 226
++        assert retry['unit'] == EXTRACTION226_RETRY_UNIT
++        assert retry['broker_unit'] == EXTRACTION226_OWNERS[EXTRACTION226_RETRY_UNIT]
++        assert retry['invocation_id'] != launch['invocation_id']
++        claim = dict(epoch=226, unit=retry['unit'], invocation_id=retry['invocation_id'],
++                     scratch_path=retry['run_root'], launch_receipt=retry_ref)
++        registered = [r for r in records if r['unit'] == retry['unit']]
++        if registered:
++            assert registered == [claim]
++        else:
++            records.append(claim)
++        gate = plan['gates']['226']
++        add(gate, retry_ref, sealed_226_file(V / 'horizon226-range-retry-release-v2/qualification.json'))
++        gate['next_action'] = 'Complete the restarted prefix extraction, then admit playback of the 535-slot suffix.'
+     deployed = bound(sealed_226_file(EXTRACTION226_BUILD / 'fleet-build.json'))
+     assert deployed['schema'] == 'foundation-epoch226-fleet-registration-deployment-v1'
+     binary = Path(deployed['image']['path'])
+@@ -473,6 +506,8 @@
+         fleet_image = Path(successor_250['fleet']['path'])
+     if retry_211:
+         fleet_image = Path(successor_211['fleet']['path'])
++    if any(row['unit'] == EXTRACTION226_RETRY_UNIT for row in plan['diagnostics']):
++        fleet_image = retry_226_image()
+     binding=record(out/f'seven-owner-plan-{cohort}.json',plan)
+     target=Path(plan['output'])
+     if not target.exists():
+@@ -481,14 +516,15 @@
+     f=bound(ref(target))
+     assert f['previous_fleet']==prevfleet and f['observer_sha256']==ref(obs)['sha256'] and len(f['epochs'])==100
+     extraction = [r for r in f['active'] if r['phase'] == EXTRACTION226_PHASE]
+-    diagnostics = [r for r in f['diagnostics'] if r['epoch'] == 226 and r['unit']['Id'] == EXTRACTION226_UNIT]
+-    assert len(diagnostics) <= 1 and len(extraction) == sum(bool(r['live']) for r in diagnostics)
++    diagnostics = [r for r in f['diagnostics'] if r['epoch'] == 226 and r['unit']['Id'] in EXTRACTION226_OWNERS]
++    assert len(diagnostics) == len({r['unit']['Id'] for r in diagnostics})
++    assert len(extraction) <= 1 and len(extraction) == sum(bool(r['live']) for r in diagnostics)
+     for row in extraction:
+-        assert row['epoch'] == 226 and row['producer']['Id'] == EXTRACTION226_UNIT
++        assert row['epoch'] == 226 and row['producer']['Id'] in EXTRACTION226_OWNERS
+         assert row['ordinary_replay_claim'] is False and row['current_sidecar_eta_valid'] is False
+         resources = row['capacity_owners']
+         assert resources['producer']['invocation_id'] == row['producer']['InvocationID']
+-        assert resources['broker']['unit'] == 'foundation-226-original225-broker-v1.service'
++        assert resources['broker']['unit'] == EXTRACTION226_OWNERS[row['producer']['Id']]
+     ordinary = [r for r in f['active'] if r['phase'] != EXTRACTION226_PHASE]
+     assert sorted(r['epoch'] for r in ordinary) == sorted([*roster,*guarded_replays.by_epoch(cfg['replays'])])
+     guarded_replays.validate_fleet([r for r in ordinary if r['epoch'] not in roster], bound(ref(obs))['replays'])
+--- a/native_binding_replays.py
++++ b/native_binding_replays.py
+@@ -19,7 +19,8 @@
+ import guarded_replays
+ extract226 = [r for r in f['active'] if r['phase'] == 'private-held-extraction']
+ assert len(extract226) <= 1 and all(r['epoch'] == 226 and r['ordinary_replay_claim'] is False
+-       and r['producer']['Id'] == 'horizon-qualify-226-checkpoint-continuation-extract-v1.service'
++       and r['producer']['Id'] in ('horizon-qualify-226-checkpoint-continuation-extract-v1.service',
++                                  'horizon-qualify-226-checkpoint-continuation-extract-v2.service')
+        for r in extract226)
+ guarded_replays.validate_fleet([r for r in f['active'] if r not in sample_publishers and r not in extract226], bound(obs)['replays'])
+ live = {int(k): v for k, v in states['active_claims'].items()}

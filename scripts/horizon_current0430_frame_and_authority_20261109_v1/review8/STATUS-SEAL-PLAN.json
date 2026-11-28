@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-status185-review8-tools-20261109-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review8-model-20261109-next-v1/status185-review8.py",
+      "name": "status.py",
+      "sha256": "2efe2c866bafecae52656938daf5cbcb9eaa20beb69eeacc97bf309990923ee7",
+      "mode": 292
+    }
+  ]
+}

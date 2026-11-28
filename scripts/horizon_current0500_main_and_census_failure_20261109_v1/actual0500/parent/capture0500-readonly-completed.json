@@ -1,0 +1,353 @@
+{
+  "all_readonly": true,
+  "files": [
+    {
+      "after": {
+        "ctime_ns": 1794201090534555113,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037843,
+        "mode": 292,
+        "mtime_ns": 1794201090423554716,
+        "nlink": 1,
+        "size": 2190,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201090423554716,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037843,
+        "mode": 256,
+        "mtime_ns": 1794201090423554716,
+        "nlink": 1,
+        "size": 2190,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/capture-execution.json",
+        "sha256": "43a66a83012976de501e0ab3530715521fbd223778580e95429c7e4cff7d78f1"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090534555113,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037842,
+        "mode": 292,
+        "mtime_ns": 1794201090410554669,
+        "nlink": 1,
+        "size": 38047,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201090410554669,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037842,
+        "mode": 256,
+        "mtime_ns": 1794201090410554669,
+        "nlink": 1,
+        "size": 38047,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/census.json",
+        "sha256": "2030dc0aee50655b694ead0c484e46bc5e38d3ec2e50561838008f7cad6e4c3c"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090534555113,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037836,
+        "mode": 292,
+        "mtime_ns": 1794201090285554222,
+        "nlink": 1,
+        "size": 3518,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201090285554222,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037836,
+        "mode": 256,
+        "mtime_ns": 1794201090285554222,
+        "nlink": 1,
+        "size": 3518,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/launcher-4be309611b51f3a6fba0e4aa82b0ca076a7cbd971ab3dad10017abb5ade6a6f4-after.json",
+        "sha256": "8af48cead1b0a14ef664d16d429fb7694c89c613291407766c6c8858a4e90e46"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090534555113,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037832,
+        "mode": 292,
+        "mtime_ns": 1794201089837552619,
+        "nlink": 1,
+        "size": 3518,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201089837552619,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037832,
+        "mode": 256,
+        "mtime_ns": 1794201089837552619,
+        "nlink": 1,
+        "size": 3518,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/launcher-4be309611b51f3a6fba0e4aa82b0ca076a7cbd971ab3dad10017abb5ade6a6f4-before.json",
+        "sha256": "8af48cead1b0a14ef664d16d429fb7694c89c613291407766c6c8858a4e90e46"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090534555113,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037839,
+        "mode": 292,
+        "mtime_ns": 1794201090286554226,
+        "nlink": 1,
+        "size": 2560,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201090286554226,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037839,
+        "mode": 256,
+        "mtime_ns": 1794201090286554226,
+        "nlink": 1,
+        "size": 2560,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/launcher-d29fe8e8bbb4955840539d6d519e48d06804ad428e3fa21021a1f296e1352a5f-after.json",
+        "sha256": "658a190227797991da5979e3f970ac2fdae11b7ecf31708502d4ec5594bb53f1"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090535555117,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037835,
+        "mode": 292,
+        "mtime_ns": 1794201089838552623,
+        "nlink": 1,
+        "size": 2560,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201089838552623,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037835,
+        "mode": 256,
+        "mtime_ns": 1794201089838552623,
+        "nlink": 1,
+        "size": 2560,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/launcher-d29fe8e8bbb4955840539d6d519e48d06804ad428e3fa21021a1f296e1352a5f-before.json",
+        "sha256": "658a190227797991da5979e3f970ac2fdae11b7ecf31708502d4ec5594bb53f1"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090535555117,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037837,
+        "mode": 292,
+        "mtime_ns": 1794201090285554222,
+        "nlink": 1,
+        "size": 1575,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201090285554222,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037837,
+        "mode": 256,
+        "mtime_ns": 1794201090285554222,
+        "nlink": 1,
+        "size": 1575,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/launcher-d881fe75f736a55093ac152b9286b11dc24c2daac2e68aaca33d21948a1b7402-after.json",
+        "sha256": "63bfa03ca03200ab7f56326992dbb3645baf9c85c73522abd3d9e67ce47971f7"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090535555117,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037833,
+        "mode": 292,
+        "mtime_ns": 1794201089838552623,
+        "nlink": 1,
+        "size": 1575,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201089838552623,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037833,
+        "mode": 256,
+        "mtime_ns": 1794201089838552623,
+        "nlink": 1,
+        "size": 1575,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/launcher-d881fe75f736a55093ac152b9286b11dc24c2daac2e68aaca33d21948a1b7402-before.json",
+        "sha256": "63bfa03ca03200ab7f56326992dbb3645baf9c85c73522abd3d9e67ce47971f7"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090535555117,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037838,
+        "mode": 292,
+        "mtime_ns": 1794201090286554226,
+        "nlink": 1,
+        "size": 4292,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201090286554226,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037838,
+        "mode": 256,
+        "mtime_ns": 1794201090286554226,
+        "nlink": 1,
+        "size": 4292,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/launcher-e476c2ba9eba83c6b643b81aa33c6f7afa17b5af5fae4e34deaf78824de5f82a-after.json",
+        "sha256": "ca1ceee708ed39d915e977b2ebe39cf0c48efca0e2067b174ed41ed5361d9aee"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090535555117,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037834,
+        "mode": 292,
+        "mtime_ns": 1794201089838552623,
+        "nlink": 1,
+        "size": 4292,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201089838552623,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037834,
+        "mode": 256,
+        "mtime_ns": 1794201089838552623,
+        "nlink": 1,
+        "size": 4292,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/launcher-e476c2ba9eba83c6b643b81aa33c6f7afa17b5af5fae4e34deaf78824de5f82a-before.json",
+        "sha256": "ca1ceee708ed39d915e977b2ebe39cf0c48efca0e2067b174ed41ed5361d9aee"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090535555117,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037841,
+        "mode": 292,
+        "mtime_ns": 1794201090409554666,
+        "nlink": 1,
+        "size": 8394,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201090409554666,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037841,
+        "mode": 256,
+        "mtime_ns": 1794201090409554666,
+        "nlink": 1,
+        "size": 8394,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/source-list-after.json",
+        "sha256": "c53f42865b9e419a7b8d1bbe6f4509f3211d41be735cb469f942ceeab10130de"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201090535555117,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037840,
+        "mode": 292,
+        "mtime_ns": 1794201090409554666,
+        "nlink": 1,
+        "size": 8394,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201090409554666,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037840,
+        "mode": 256,
+        "mtime_ns": 1794201090409554666,
+        "nlink": 1,
+        "size": 8394,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/source-list-before.json",
+        "sha256": "c53f42865b9e419a7b8d1bbe6f4509f3211d41be735cb469f942ceeab10130de"
+      }
+    }
+  ],
+  "memory_or_DATA_credit_bytes": 0,
+  "same_inode_bytes_digest_and_mtime": true,
+  "writer": {
+    "actual_capture": {
+      "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/capture-execution.json",
+      "sha256": "43a66a83012976de501e0ab3530715521fbd223778580e95429c7e4cff7d78f1"
+    },
+    "original_execution": {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/capture0500-original-execution.json",
+      "sha256": "20d97d0af86b6c742a4ea782d5d84324d89ac0a5deb27fdc1244d1550e5c6463"
+    }
+  }
+}

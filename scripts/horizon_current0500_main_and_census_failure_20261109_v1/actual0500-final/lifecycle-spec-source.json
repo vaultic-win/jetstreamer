@@ -1,0 +1,25 @@
+{
+  "lifecycle": null,
+  "output": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/722adc397ae24bb4b96d452783599f57/lifecycle.json",
+  "prestart_fleet_acceptance": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/fleet-acceptance.json",
+    "sha256": "fe016fccdbc55b78c570d640a527532eb0a4c692b4e928f0cefaa7699ecbdc97"
+  },
+  "prestart_reader_acceptance": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/reader-acceptance.json",
+    "sha256": "e5adc999c585af3034ee0c708f4c193cc827511e6e5cf0051f632241146fcac8"
+  },
+  "previous_fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-positive185-original-722adc397ae24bb4b96d452783599f57.json",
+    "sha256": "7ee6864597173c36a9c110eda06f38403644908a5fddef1e2a65a9f7b69d0540"
+  },
+  "previous_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-fleet-722adc397ae24bb4b96d452783599f57/spec.json",
+    "sha256": "3d65e5093eb5f3d59fba7061613e2eef95b60ca5490faf4a146eb338e5b1da87"
+  },
+  "registration": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/registration.json",
+    "sha256": "f7cf512decd1f2d8f4d43d4e282209ed5b1f01260b50e06029112bef253a6a6b"
+  },
+  "schema": "horizon-epoch185-native-retained-capture-spec-v2"
+}

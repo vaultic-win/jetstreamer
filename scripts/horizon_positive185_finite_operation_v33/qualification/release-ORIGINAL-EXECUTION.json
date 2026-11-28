@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-positive185-current-operation-release-20261108-v33-fleet-order-r1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 3.879s\nCPU time consumed: 6.492s\nMemory peak: 4.3M\nMemory swap peak: 0B\n"
+}

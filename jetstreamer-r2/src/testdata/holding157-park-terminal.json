@@ -1,0 +1,43 @@
+{
+  "schema": "horizon-closed157-laned-park-terminal-v1",
+  "owner": "/root",
+  "recorded_unix_seconds": 1795109901,
+  "unit": "horizon-closed157-laned-park-20261119-v1.service",
+  "invocation_id": "a50dc471156f4aa5a58ae9c947d044c5",
+  "native": {
+    "Restart": "no",
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "success",
+    "NRestarts": "0",
+    "ExecMainStartTimestamp": "Thu 2026-11-19 12:43:17 UTC",
+    "ExecMainExitTimestamp": "Thu 2026-11-19 14:14:38 UTC",
+    "ExecMainStatus": "0",
+    "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-holding-candidate-20261023-v1/jetstreamer-r2 ; argv[]=/usr/local/lib/jetstreamer/horizon-holding-candidate-20261023-v1/jetstreamer-r2 holding-park /usr/local/lib/jetstreamer/horizon-closed157-laned-holding-plan-20261119-v1/plan.json --spec-sha256 2d8908571bbd9f950495300a5ac98c080347659619ac6777757fa55f5aa99db6 --self-sha256 909248d8e4c1db4c3cd89e1a4f15205b4a59d442494f35b7635038152025bb7e ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+    "ControlGroup": "",
+    "Id": "horizon-closed157-laned-park-20261119-v1.service",
+    "TriggeredBy": "",
+    "LoadState": "loaded",
+    "ActiveState": "active",
+    "SubState": "exited",
+    "Job": "",
+    "InvocationID": "a50dc471156f4aa5a58ae9c947d044c5"
+  },
+  "helper": {
+    "path": "/usr/local/lib/jetstreamer/horizon-holding-candidate-20261023-v1/jetstreamer-r2",
+    "sha256": "909248d8e4c1db4c3cd89e1a4f15205b4a59d442494f35b7635038152025bb7e"
+  },
+  "park_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-closed157-laned-holding-plan-20261119-v1/plan.json",
+    "sha256": "2d8908571bbd9f950495300a5ac98c080347659619ac6777757fa55f5aa99db6"
+  },
+  "custody": {
+    "path": "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/receipts/custody-c145a1e9a50039258b9fb98868e8ef175c033051583cb89bd4b4778318463b3c.json",
+    "sha256": "9a10fe91fa1064aa5982c26becc18ad4a7a2ef7e2948a72235d9086fecbe3f2d"
+  },
+  "whole_remote_readback_and_local_revalidation": true,
+  "current_remote_reobservation_claimed": false,
+  "local_retirement_complete": false,
+  "resource_credit_bytes": 0,
+  "replay_launch_authorized": false
+}

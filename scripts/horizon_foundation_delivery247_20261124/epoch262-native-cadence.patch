@@ -1,0 +1,72 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -80,6 +80,9 @@
+         assert preserved296_cutoff['accepted_predecessor']==ref(previous_completion)
+         assert preserved296_cutoff['previous_fleet']==prevfleet
+ else:prevfleet=audit['previous_fleet']
++import native262_cadence
++prevfleet = native262_cadence.predecessor(prevfleet)
++native262_origin = native262_cadence.registered(prevfleet)
+ verification257 = V / 'horizon257-current-reader-delivery-v1/verification-status-v1/completion.json'
+ if 257 in statuses and verification257.is_file():
+     update257 = ref(verification257)
+@@ -233,6 +236,8 @@
+     return Path(publication_handoff.checked_image(release[kind]))
+ 
+ def observe_image():
++    if native262_origin is not None:
++        return native262_cadence.images(native262_origin, publication_handoff.checked_image)["observer"]
+     if cfg.get('delivery257_claim'):
+         return delivery257_rss_image('observer', 'jetstreamer-horizon-observe')
+     if staged_retries:
+@@ -375,6 +380,8 @@
+     saved = bound(ref(config_path))
+     cfg['replays'] = saved['replays']
+     cfg['diagnostic_replays'] = saved['diagnostic_replays']
++    if 'native_input_diagnostics' in saved:
++        cfg['native_input_diagnostics'] = saved['native_input_diagnostics']
+     if 'delivery257_claim' in saved:
+         cfg['delivery257_claim'] = saved['delivery257_claim']
+     for e in closed:
+@@ -404,6 +411,8 @@
+         config257 = delivery257_retry.configuration(retry_257)
+         if config257 is not None:
+             cfg["delivery257_claim"] = config257
++    if native262_origin is not None:
++        native262_cadence.configure(cfg, native262_origin)
+ config=record(config_path,cfg)
+ def check_roster():
+     for e in failed:
+@@ -921,6 +930,8 @@
+         fleet_image = Path(publication_handoff.checked_image(release['fleet']))
+     if cfg.get('delivery257_claim'):
+         fleet_image = delivery257_rss_image('fleet', 'jetstreamer-r2')
++    if native262_origin is not None:
++        fleet_image = native262_cadence.images(native262_origin, publication_handoff.checked_image)["fleet"]
+     rotation223 = V / "horizon223-bootstrap-rotation-settled-v342/completion.json"
+     if rotation223.is_file():
+         rotation = sealed_226_file(rotation223)
+@@ -977,7 +988,7 @@
+         assert resources['broker']['unit'] == EXTRACTION226_OWNERS[row['producer']['Id']]
+     ordinary = [r for r in f['active'] if r['phase'] != EXTRACTION226_PHASE and not diagnostic229.owns(r) and not diagnostic229_bounded.owns(r) and not diagnostic229_bounded_retry.owns(r) and not diagnostic271_trace.owns(r) and not diagnostic271_europe.owns(r) and not diagnostic271_boundary.owns(r) and not diagnostic271_reward_tuples.owns(r) and not diagnostic271_stake_inputs.owns(r) and not diagnostic230_slot_hashes.owns(r) and not diagnostic230_bank_trace.owns(r) and not diagnostic229_slot_hash_ram.owns(r) and not diagnostic288_shrink_debt.owns(r) and not diagnostic230_program_demotion_ram.owns(r) and not diagnostic229_bank_delta.owns(r)
+                 and not diagnostic226_suffix.owns(r) and not diagnostic230_checkpoint_continuation.owns(r)
+-                and not diagnostic296_meter.owns(r)]
++                and not diagnostic296_meter.owns(r) and not native262_cadence.owns(r)]
+     ordinary = [row for row in ordinary
+                 if not (row['epoch'] == 257 and row['phase'] == 'upload-readback'
+                         and row["unit"]["Id"] in (delivery257_retry.PREVIOUS_UNIT, delivery257_retry.UNIT))]
+--- a/native_binding_replays.py
++++ b/native_binding_replays.py
+@@ -44,10 +44,12 @@
+ import diagnostic229_bank_delta
+ import diagnostic226_suffix
+ import diagnostic296_meter
++import native262_cadence
+ diagnostic_handlers = (diagnostic229, diagnostic229_bounded, diagnostic229_bounded_retry, diagnostic271_trace, diagnostic271_europe, diagnostic271_boundary, diagnostic271_reward_tuples, diagnostic271_stake_inputs, diagnostic230_slot_hashes, diagnostic230_bank_trace, diagnostic288_shrink_debt, diagnostic229_slot_hash_ram, diagnostic230_program_demotion_ram, diagnostic230_checkpoint_continuation, diagnostic229_bank_delta, diagnostic226_suffix, diagnostic296_meter)
+ ordinary = [r for r in f['active'] if r not in sample_publishers and r not in extract226
+             and not (r['epoch'] == 257 and r['phase'] == 'upload-readback'
+                      and r["unit"]["Id"] in (delivery257_retry.PREVIOUS_UNIT, delivery257_retry.UNIT))
++            and not native262_cadence.owns(r)
+             and not any(handler.owns(r) for handler in diagnostic_handlers)]
+ guarded_replays.validate_fleet(ordinary, bound(obs)['replays'])
+ live = {int(k): v for k, v in states['active_claims'].items()}

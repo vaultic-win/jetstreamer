@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/sysstat-summary.timer",
+      "Id": "sysstat-summary.timer",
+      "InvocationID": "460bb034ec56402085249a288da72d0d",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "sysstat-summary.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/sysstat-summary.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/sysstat-summary.timer",
+          "sha256": "7ff4be8583010655cbde8820e190b8d4329bfce85a0edecddf5e89995b970745"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/sysstat-summary.timer",
+      "Id": "sysstat-summary.timer",
+      "InvocationID": "460bb034ec56402085249a288da72d0d",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "sysstat-summary.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/sysstat-summary.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/sysstat-summary.timer",
+          "sha256": "7ff4be8583010655cbde8820e190b8d4329bfce85a0edecddf5e89995b970745"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2529484316425,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794269220000000
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "sysstat-summary.timer",
+  "unset_pending_requires_metadata_requery": false
+}

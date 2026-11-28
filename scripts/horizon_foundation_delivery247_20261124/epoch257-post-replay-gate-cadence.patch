@@ -1,0 +1,19 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -771,7 +771,15 @@
+         assert claim['unit'] not in plan['tracked_units']
+         plan['tracked_units'].append(claim['unit'])
+         plan['pipeline_claims'].append(claim)
+-        add(plan['gates']['257'], claim_ref, *claim['evidence'])
++        producer_ref = sealed_226_file(delivery.with_name('producer-terminal.json'))
++        producer = bound(producer_ref)
++        booking = bound(claim['evidence'][0])
++        assert booking['closed_producer'] == producer_ref
++        assert producer['schema'] == 'foundation-epoch257-clean-producer-terminal-v1'
++        assert producer['epoch'] == 257 and producer['producer']['Result'] == 'success'
++        assert producer['producer']['ExecMainStatus'] == '0' and producer['producer']['ControlGroup'] == ''
++        add(plan['gates']['257'], producer_ref, claim_ref, *claim['evidence'])
++        plan['gates']['257']['state'] = 'post-replay-pipeline'
+         plan['gates']['257']['next_action'] = (
+             'Track the verified local archive through authenticated upload, public playback, and sidecar readback.')
+     binding=record(out/f'seven-owner-plan-{cohort}.json',plan)

@@ -1,0 +1,477 @@
+"""Account for the private 168 assembler in a replay quote under the shared host lock."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import time
+
+GIB = 1 << 30
+MIB = 1 << 20
+HOME = Path("/home/sol")
+PRIVATE = HOME / ".jetstreamer-private"
+BOOKINGS = PRIVATE / "epoch168-assembly-operator-20261127-v1"
+OUTPUT = PRIVATE / "epoch168-private-assembly-20261127-v1/output"
+ASSEMBLER = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch168-joint-checkpoint-reduced-run-20261126-v1/private-assembly-tools-20261127-v2/horizon-168-source-views")
+ASSEMBLER_SHA = "a42303fdb80321d670534dc02ea5d117ce591b892d2f730d7b84d80e5a164829"
+UNIT = "horizon-assemble-168-private-20261127-v1.service"
+ARCHIVE, EVIDENCE, RAM = 128 * GIB, 64 * MIB, 8 * GIB
+PEAK = ARCHIVE + EVIDENCE
+
+
+def need(condition, reason):
+    if not condition:
+        raise ValueError(reason)
+
+
+def native(unit=UNIT):
+    fields = "Id,LoadState,ActiveState,SubState,Job,MainPID,ControlPID,InvocationID,ControlGroup,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec"
+    p = subprocess.run(["/usr/bin/systemctl", "show", "--all", "--property=" + fields, "--", unit],
+                       capture_output=True, text=True, timeout=15)
+    row = dict(line.split("=", 1) for line in p.stdout.splitlines())
+    need(p.returncode in (0, 4) and row.get("Id") == unit and set(fields.split(",")) <= row.keys(), "cannot identify epoch 168")
+    return row
+
+
+def evidence(path, expected=None, *, owner_writable=False):
+    st = path.lstat()
+    need(path.resolve(strict=True) == path and stat.S_ISREG(st.st_mode) and st.st_uid == 0
+         and st.st_mode & (0o022 if owner_writable and expected else 0o222) == 0 and st.st_nlink == 1 and st.st_size <= 32*MIB,
+         "unsealed epoch 168 evidence: " + str(path))
+    data = path.read_bytes()
+    ref = {"path": str(path), "sha256": hashlib.sha256(data).hexdigest()}
+    need(expected is None or expected == ref, "epoch 168 evidence binding changed: " + str(path))
+    return json.loads(data), ref
+
+
+def directory_on_home(path):
+    meta = path.lstat()
+    need(path.resolve(strict=True) == path and stat.S_ISDIR(meta.st_mode) and meta.st_uid == 0
+         and not meta.st_mode & 0o022 and meta.st_dev == HOME.stat().st_dev,
+         "unexpected 168 directory custody: " + str(path))
+
+
+def native_command(row, intent, pin):
+    tail = ["/bin/bash", "-o", "pipefail", "-c", '"$1" --assemble-private "$2" "$3" 2>&1 | /usr/bin/head -c 33554432',
+            "epoch168", str(ASSEMBLER), pin["path"], pin["sha256"]]
+    argv = intent["argv"]
+    need(intent["plan"] == pin and not intent["publication_authorized"] and argv[0] == "/usr/bin/systemd-run"
+         and argv[argv.index("--") + 1:] == tail and "--unit=" + UNIT in argv,
+         "different native 168 launch command")
+    # Compare full argv elements. The native wrapper may be represented as /usr/bin/bash in /proc/exe.
+    proc = Path("/proc") / row["MainPID"]
+    args = (proc / "cmdline").read_bytes().split(b"\0")
+    need(args == [os.fsencode(arg) for arg in tail] + [b""] and (proc / "exe").samefile(tail[0])
+         and (proc / "cgroup").read_text().strip() == "0::" + row["ControlGroup"], "unbound native 168 wrapper")
+    group = Path("/sys/fs/cgroup" + row["ControlGroup"])
+    need((group / "memory.max").read_text().strip() == str(RAM) and (group / "memory.swap.max").read_text().strip() == "0"
+         and (group / "cpu.max").read_text().split() == ["100000", "100000"]
+         and row["MainPID"] in (group / "cgroup.procs").read_text().split(), "changed 168 kernel limits")
+    with ASSEMBLER.open("rb") as exe:
+        need(hashlib.file_digest(exe, "sha256").hexdigest() == ASSEMBLER_SHA, "changed epoch 168 assembler")
+
+
+def incremental_ram(fit):
+    carried = fit["same_epoch_reused_memory_bytes"]
+    incremental = fit["additional_assembly_memory_bytes"]
+    need(carried in (4*GIB, 6*GIB) and carried + incremental == RAM, "unknown epoch 168 RAM funding")
+    if carried == 4*GIB:
+        return incremental
+    ref = fit["drained_comparator"]
+    need(ref["sha256"] == "74c0b5a1a5a6e76a5b9bca3149daa7b8f97c5cb00a3ef20b867982f5b0b5e993"
+         and fit["carried_comparator_memory_bytes"] == 2*GIB,
+         "168 does not own the extra 2 GiB comparator allowance")
+    comparison, _ = evidence(Path(ref["path"]), ref)
+    selector = fit["carried_selector_fit"]
+    need(selector["sha256"] == "fd548b83f5b1ddd09f835eb3b2b65c7355ea46fa09dd61f48c128b578f3bc4c8",
+         "different source of 168 selector funding")
+    original, _ = evidence(Path(selector["path"]), selector)
+    basis = original["bounded_native"]
+    bounded, _ = evidence(Path(basis["path"]), basis, owner_writable=True)
+    settled = bounded["terminal168_compute_settlement"]
+    comparator = settled["comparator"]
+    unit = comparison["unit"]
+    iid = comparison["invocation_id"]
+    event = comparator["terminal_event"]
+    need(original["reused_same_epoch_selector_bytes"] == 4*GIB
+         and original["old_selector"] == settled["active_selector"] and original["old_selector"]["memory_bytes"] == 4*GIB
+         and settled["preserved_comparator_memory_bytes"] == comparator["memory_bytes"] == 2*GIB
+         and not settled["other_operation_can_reuse"] and comparator["phase"] == "complete"
+         and unit == comparator["unit"] == event["UNIT"] and iid == comparator["invocation_id"] == event["INVOCATION_ID"]
+         and iid == "328366ba244949efb9c9725df7279051" and event == comparison["pid1_event"]
+         and event["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448" and event["_PID"] == "1" and event["_UID"] == "0"
+         and original["price"]["live_quote"]["joint"]["charged_167"] == fit["replay_price"]["joint"]["charged_167"],
+         "168 comparator slot belongs to a different allocation")
+    now = native(unit)
+    need(now["Id"] == unit and now["ActiveState"] == "inactive" and now["MainPID"] == now["ControlPID"] == "0"
+         and not now["ControlGroup"] and not now["Job"], "168 comparator slot is in use again")
+    return incremental
+
+
+def replay_envelope(fit):
+    replay = fit["replay_price"]
+    q = replay["source"]
+    phase = replay["phase170"]
+    hourly = replay["phase143"]
+    need(phase in {"between", "successor"} and hourly in {"reserved", "held", "released"}
+         and q["fleet"] == fit["fleet"] and q["resource_credit_bytes"] == 0
+         and fit["minimum_home_free_bytes"] >= replay["required_home"] > 0,
+         "168 fit lacks an admitted shared replay envelope")
+    if hourly == "released":
+        peer143 = q["replacement143"]["iid"]
+        need(q["replacement143"]["cap"] == 64*GIB, "different hourly cap")
+    else:
+        peer143 = q["held_invocation"]
+        need(q["phase170"] == phase and q["candidate_home_bytes"] == 64*GIB + EVIDENCE
+             and q["candidate_ram_bytes"] == 41*GIB and q["candidate_cpu_quota_micros"] == 3000000
+             and not q["projection_only"] and not q["archive_publication_authorized"],
+             "168 fit excludes the full 143 booking")
+        peer = q["protected170"]
+        need((peer["iid"] if peer else None) == replay["producer_170_invocation"],
+             "different 170 guard in the 168 fit")
+    peer170 = replay["producer_170_invocation"]
+    need((peer143 is None if hourly == "reserved" else bool(re.fullmatch("[0-9a-f]{32}", peer143 or "")))
+         and (peer170 is None and replay["producer_170_unit"] is None if phase == "between" else
+              replay["producer_170_unit"] == "horizon-qualify-170-from-73746882-20261127-v1.service"
+              and bool(re.fullmatch("[0-9a-f]{32}", peer170 or "")))
+         and 0 <= replay["protected_143_growth_bytes"] <= 64*GIB
+         and 0 <= replay["protected_170_growth_bytes"] <= 384*GIB
+         and (phase != "between" or replay["protected_170_growth_bytes"] == 36*GIB),
+         "foreign 143/170 bindings in the 168 fit")
+    return dict(phase143=hourly, phase170=phase, invocation143=peer143, invocation170=peer170)
+
+
+def physical_output(group):
+    # Only the native writer's output fd can reduce the remaining archive ceiling.
+    # Its temporary file can be larger than evidence, but the evidence file cannot.
+    accepted = set()
+    pids = (group / "cgroup.procs").read_text().split()
+    for pid in pids:
+        proc = Path("/proc") / pid
+        try:
+            if not (proc / "exe").samefile(ASSEMBLER):
+                continue
+            for fd in (proc / "fd").iterdir():
+                name = Path(os.readlink(fd))
+                if name.parent != OUTPUT or not (name.name.startswith(".tmp") or name.name == "epoch-168.jet"):
+                    continue
+                st = fd.stat()
+                if not stat.S_ISREG(st.st_mode) or st.st_uid != 0 or st.st_nlink != 1 or st.st_size <= EVIDENCE:
+                    continue
+                if not fd.samefile(name) or st.st_dev != HOME.stat().st_dev:
+                    continue
+                flags = next(line.split()[1] for line in (proc / "fdinfo" / fd.name).read_text().splitlines()
+                             if line.startswith("flags:"))
+                if int(flags, 8) & os.O_ACCMODE in (os.O_WRONLY, os.O_RDWR):
+                    accepted.add((st.st_dev, st.st_ino, min(st.st_size, st.st_blocks * 512, ARCHIVE)))
+        except (FileNotFoundError, ProcessLookupError):
+            # Unproven allocation simply retains the full reservation.
+            continue
+    need(len(accepted) <= 1, "more than one large 168 output inode")
+    return min((entry[2] for entry in accepted), default=0)
+
+
+def terminal(iid):
+    args = ["/usr/bin/journalctl", "-q", "--no-pager", "-o", "json", "_PID=1", "_UID=0",
+            "UNIT=" + UNIT, "INVOCATION_ID=" + iid]
+    rows = (json.loads(line) for line in subprocess.check_output(args, text=True, timeout=20).splitlines())
+    return any(r.get("MESSAGE_ID") in {"7ad2d189f7e94e70a38c781354912448", "98e322203f7a4ed290d09fe03c09fe15"}
+               for r in rows)
+
+
+def reservation():
+    row = native()
+    directory_on_home(BOOKINGS)
+    dirs = sorted(p for p in BOOKINGS.iterdir() if p.name.startswith("launch-"))
+    live = row["ActiveState"] in {"active", "activating", "deactivating", "reloading"} or bool(row["Job"])
+    if not live:
+        need(row["ActiveState"] in {"inactive", "failed"} and row["MainPID"] == row["ControlPID"] == "0"
+             and not row["ControlGroup"], "indeterminate epoch 168 owner")
+    pending = []
+    for directory in dirs:
+        directory_on_home(directory)
+        audit = directory / "LAUNCH_NATIVE.json"
+        if audit.exists():
+            owner, _ = evidence(audit)
+            iid = owner["InvocationID"]
+            need(owner["Id"] == UNIT and re.fullmatch("[a-f0-9]{32}", iid), "foreign 168 native receipt")
+            if not live or row["InvocationID"] != iid:
+                need(terminal(iid), "unsettled prior 168 invocation " + iid)
+                continue
+        pending.append(directory)
+    if not pending and not live:
+        need(native() == row, "epoch 168 changed during idle check")
+        return {"state": "queued-or-drained", "unit": UNIT, "incremental_home": 0, "incremental_ram": 0,
+                "floor": 0, "native": row}
+    need(len(pending) == 1, "live or pending 168 lacks one bound local booking")
+    directory = pending[0]
+    plan, pin = evidence(directory / "PLAN.json")
+    admission, ar = evidence(directory / "ADMISSION.json", plan["admission"])
+    fit, fr = evidence(directory / "FIT.json", admission["capacity_basis"])
+    floor = plan["minimum_home_free_bytes"]
+    need(plan["schema"] == "horizon-epoch168-private-assembly-plan-v1" and plan["unit"] == admission["unit"] == UNIT
+         and plan["output_directory"] == admission["output_directory"] == str(OUTPUT)
+         and plan["maximum_archive_bytes"] == admission["maximum_archive_bytes"] == ARCHIVE
+         and plan["evidence_allowance_bytes"] == admission["evidence_allowance_bytes"] == EVIDENCE
+         and plan["memory_max_bytes"] == admission["memory_max_bytes"] == RAM
+         and plan["cpu_quota_micros"] == admission["cpu_quota_micros"] == 1000000
+         and 0 < floor == admission["minimum_home_free_bytes"] == fit["minimum_home_free_bytes"]
+         and fit["schema"] == "horizon-epoch168-private-assembly-complete-fit-v1"
+         and admission["schema"] == "horizon-epoch168-private-v4-assembly-admission-v1" and admission["epoch"] == 168
+         and fit["inputs"]["assembler"] == {"path": str(ASSEMBLER), "sha256": ASSEMBLER_SHA}
+         and plan["admission_expires_unix_seconds"] == admission["admission_expires_unix_seconds"]
+         and 0 < plan["admission_expires_unix_seconds"] - fit["observed_unix_seconds"] <= 600
+         and plan["qualification"] == admission["qualification"] and admission["all_existing_commitments_retained"]
+         and fit["resource_credit_bytes"] == admission["resource_credit_bytes"] == admission["swap_bytes"] == 0
+         and all(not d["publication_authorized"] for d in (plan, admission, fit))
+         and fit["fits"] and admission["fits"]
+         and fit["required_available_home_bytes"] == admission["required_available_home_bytes"] == floor + PEAK
+         and fit["available_home_bytes"] == admission["available_home_bytes"] >= floor + PEAK
+         and fit["available_memory_bytes"] == admission["available_memory_bytes"] >= fit["required_available_memory_bytes"]
+         and fit["required_available_memory_bytes"] == admission["required_available_memory_bytes"] >= RAM
+         and fit["complete_cpu_quota_micros"] == admission["complete_cpu_quota_micros"] <= 64000000
+         and fit["same_epoch_reused_cpu_quota_micros"] == 1000000
+         and admission["booked_assembly_home_bytes"] == fit["booked_assembly_home_bytes"] == PEAK
+         and fit["additional_cpu_quota_micros"] == 0,
+         "epoch 168 plan or capacity basis differs from its reserved envelope")
+    ram = incremental_ram(fit)
+    replay = replay_envelope(fit)
+    outstat = OUTPUT.lstat()
+    need(OUTPUT.resolve(strict=True) == OUTPUT and stat.S_ISDIR(outstat.st_mode) and outstat.st_uid == 0
+         and stat.S_IMODE(outstat.st_mode) == 0o700 and outstat.st_dev == HOME.stat().st_dev, "changed 168 output custody")
+    filled = 0
+    if live:
+        need(re.fullmatch("[a-f0-9]{32}", row["InvocationID"]) and row["ControlGroup"] == "/system.slice/" + UNIT
+             and int(row["MemoryMax"]) == RAM and row["MemorySwapMax"] == "0" and row["CPUQuotaPerSecUSec"] == "1s"
+             and row["ActiveState"] == "active" and not row["Job"], "active 168 does not match its sealed plan")
+        intent, _ = evidence(directory / "LAUNCH_INTENT.json")
+        check, _ = evidence(directory / "PLAN_CHECK.json")
+        need(check["plan_sha256"] == pin["sha256"] and check["archive_bytes_written"] == 0
+             and not check["publication_authorized"], "168 preflight differs from the live plan")
+        native_command(row, intent, pin)
+        filled = physical_output(Path("/sys/fs/cgroup" + row["ControlGroup"]))
+    else:
+        need(time.time() <= plan["admission_expires_unix_seconds"], "expired 168 booking without terminal receipt")
+    need(native() == row, "epoch 168 owner changed during pricing")
+    return {"state": "live" if live else "launching", "unit": UNIT, "plan": pin, "admission": ar, "fit": fr,
+            "native": row, "floor": floor, "replay": replay, "verified_occupied_archive_bytes": filled,
+            "incremental_home": PEAK - filled, "incremental_ram": ram, "incremental_cpu_micros": 0}
+
+
+RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
+HOURLY = RT/"epoch143-first-hourly-20261127-v1"
+PHASE = HOURLY/"PHASE_170_FIRST_168_LIVE.json"
+PHASE_END = HOURLY/"PHASE_170_FIRST_168_RELEASED.json"
+LOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
+PHASE_WRITER = RT/"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V46_ACTIVE.json"
+PHASE_INTERFACE = RT/"epoch170-from-73746882-20261127-v1/attempt-2/BOUNDED_SUCCESSOR_WRITER_INTERFACE.json"
+INTERLOCK_SHA = "df01198fdb69a12f67c991963ea72572ec4d45de16171b73c420e49145f29b44"
+HOURLY_UNIT = "horizon-qualify-143-first-hourly-20261127-v1.service"
+
+
+def pinned(ref, path, sha, *, mutable=False):
+    need(ref == {"path": str(path), "sha256": sha}, "foreign phase binding: " + str(path))
+    return evidence(path, ref, owner_writable=mutable)[0]
+
+
+def owns_operation_lock(identity):
+    meta = LOCK.lstat()
+    need(identity == {"dev": meta.st_dev, "ino": meta.st_ino} and stat.S_ISREG(meta.st_mode)
+         and meta.st_uid == 0 and meta.st_nlink == 1 and not meta.st_mode & 0o022, "foreign phase operation lock")
+    owner = f"{os.major(meta.st_dev):02x}:{os.minor(meta.st_dev):02x}:{meta.st_ino}"
+    rows = [line.split() for line in Path("/proc/locks").read_text().splitlines()]
+    need(any(row[1:8] == ["FLOCK", "ADVISORY", "WRITE", str(os.getpid()), owner, "0", "EOF"]
+             for row in rows), "phase pricing must execute under its own exclusive campaign lock")
+
+
+def prove_hourly_exclusion(proof, additional_booker=None):
+    native143 = native(HOURLY_UNIT)
+    guard = HOURLY_UNIT.replace("-qualify-", "-guard-")
+    guard_service = native(guard)
+    timer = subprocess.check_output(["/usr/bin/systemctl", "show", "-p", "ActiveState,Job",
+                                     "--", guard.replace(".service",".timer")], text=True)
+    for state in (native143, guard_service):
+        need(state["ActiveState"] == "inactive" and state["MainPID"] == state["ControlPID"] == "0"
+             and not state["Job"] and not state["ControlGroup"]
+             and not (Path("/sys/fs/cgroup/system.slice")/state["Id"]).exists(), "143 producer or guard is present")
+    need(dict(line.split("=",1) for line in timer.splitlines()) == {"ActiveState":"inactive", "Job":""},
+         "143 guard timer still owns the phase")
+    need(not any(os.path.lexists(HOURLY/f) for f in proof["absent_markers"]), "143 has a pending or live claim")
+    bookings = sorted(HOURLY.glob("WRITER_BOOKING_FIRST_HOURLY*.json"))
+    need(bool(bookings), "143 booking history missing")
+    for path in bookings:
+        booking, _ = evidence(path)
+        need(booking["unit"] == HOURLY_UNIT and booking["latest_start_unix_seconds"] < time.time(),
+             "143 has a second or unexpired booking")
+    routes = {"booking-price-v1", "booking-price-v2", "booking-price-v3", "booking-price-v4"}
+    if additional_booker is not None:
+        routes.add(additional_booker.name)
+        if additional_booker == HOURLY/"booking-price-v48":
+            old = HOURLY/"booking-price-v47"
+            checksum = "f127e596ee005a8d2a1adc72561fb288bb98df03ff10a5439dc4e06bac66aa79"
+            check_phase_package(dict(path=str(old/"deployment-seal-receipt.json"),sha256=checksum),old,checksum)
+            routes.add(old.name)
+    need({p.name for p in HOURLY.glob("booking-price-v*")} == routes, "unqualified 143 booking route appeared")
+    for ref in [*proof["earlier_bookers"], *proof["sealed_operator_paths"], proof["available_booker"], proof["available_launcher"]]:
+        path = Path(ref["path"])
+        with path.open("rb") as fd:
+            m = os.fstat(fd.fileno())
+            need(path.resolve(strict=True) == path and stat.S_ISREG(m.st_mode) and m.st_uid == 0
+                 and not m.st_mode & 0o222 and hashlib.file_digest(fd,"sha256").hexdigest() == ref["sha256"],
+                 "143 booker or launcher changed")
+    return native143
+
+
+def check_phase_package(reference, path, expected):
+    package = pinned(reference, path / "deployment-seal-receipt.json", expected)
+    need(package["destination"] == str(path), "phase package destination changed")
+    for member in package["members"]:
+        file = path / member["name"]
+        with file.open("rb") as stream:
+            st = os.fstat(stream.fileno())
+            need(file.resolve(strict=True) == file and stat.S_ISREG(st.st_mode) and st.st_uid == 0
+                 and not st.st_mode & 0o222 and st.st_size == member["bytes"]
+                 and hashlib.file_digest(stream, "sha256").hexdigest() == member["sha256"],
+                 "phase package member changed: " + str(file))
+
+
+def phase_writer48(phase_ref, original_ref, original):
+    root = PHASE_WRITER.parent
+    old_path = root / "FAILED166_CADENCE_V47_ACTIVE.json"
+    old_ref = {"path": str(old_path), "sha256": "def64d8842984dee1835c05aefa8b5f344c52f9b97e8691db123b1cce2daca86"}
+    old = pinned(old_ref, old_path, old_ref["sha256"], mutable=True)
+    active_path = root/"FAILED166_CADENCE_V48_ACTIVE.json"
+    active_ref = {"path": str(active_path), "sha256": hashlib.sha256(active_path.read_bytes()).hexdigest()}
+    active, _ = evidence(active_path, active_ref, owner_writable=True)
+    ready, _ = evidence(Path(active["ready"]["path"]), active["ready"])
+    rebound, _ = evidence(HOURLY/"REENTRY_V48_REBOUND.json")
+    prior = ready["retained_143_v47_rebound"]
+    old_rebound = pinned(prior, HOURLY/"REENTRY_V47_REBOUND.json", "61883f8f6fd84c70a145042944ef602369d6b798decd34ade652d26e8cbf565e")
+    directory = root/"tools-cold168-retry5-failed166-v48-entry146"
+    booker = HOURLY/"booking-price-v48"
+    need(old["old"] == original and not old["producer_mutations"] and not active["producer_mutations"]
+         and active["old"] == old["new"] and active["new"]["lock"] == original["lock"]
+         and ready["old_owner"] == rebound["writer"] == old_ref
+         and ready["retained_143_listener"] == rebound["original"] == old_rebound["original"]
+         and ready["retained_143_phase"] == rebound["phase"] == old_rebound["phase"] == phase_ref
+         and old_rebound["writer"] == original_ref and ready["package"] == rebound["writer_package"]
+         and not rebound["producer_mutations"], "V48 did not inherit the original 143 booking and consumer lock")
+    check_phase_package(ready["package"], directory, ready["package"]["sha256"])
+    check_phase_package(rebound["booker_package"], booker, rebound["booker_package"]["sha256"])
+    program = directory/"watch143_versions.py"
+    listener = rebound["new"]
+    manager = native(listener["Id"])
+    fields = ("Id","MainPID","InvocationID","ActiveState","Job","ControlGroup","MemoryMax","MemorySwapMax","CPUQuotaPerSecUSec")
+    need(all(manager[k] == listener[k] for k in fields) and manager["ActiveState"] == "active" and not manager["Job"]
+         and (Path("/proc")/manager["MainPID"]/"cmdline").read_bytes().split(b"\0") == [b"/usr/bin/python3",b"-IB",os.fsencode(program),b""],
+         "different V48 143 listener")
+    route = json.loads(subprocess.check_output(["/usr/bin/python3","-IB",str(program),"--check-entry"],timeout=15))
+    need(route == dict(phase=phase_ref,version=48,writer=active_ref,package=ready["package"])
+         and active["new"]["program"] == str(directory/"status_cycle.py"), "143 listener did not resolve V48")
+    return active["new"], booker
+
+
+def phase_writer(phase_ref, original_ref, original):
+    v48 = PHASE_WRITER.with_name("FAILED166_CADENCE_V48_ACTIVE.json")
+    if os.path.lexists(v48):
+        return phase_writer48(phase_ref, original_ref, original)
+    active_path = PHASE_WRITER.with_name("FAILED166_CADENCE_V47_ACTIVE.json")
+    if not os.path.lexists(active_path):
+        return original, None
+    active_ref = {"path": str(active_path), "sha256": "def64d8842984dee1835c05aefa8b5f344c52f9b97e8691db123b1cce2daca86"}
+    active = pinned(active_ref, active_path, active_ref["sha256"], mutable=True)
+    rebound_path = HOURLY / "REENTRY_V47_REBOUND.json"
+    rebound_ref = {"path": str(rebound_path), "sha256": "61883f8f6fd84c70a145042944ef602369d6b798decd34ade652d26e8cbf565e"}
+    rebound = pinned(rebound_ref, rebound_path, rebound_ref["sha256"])
+    ready, _ = evidence(Path(active["ready"]["path"]), active["ready"])
+    directory = PHASE_WRITER.parent / "tools-cold168-retry5-failed166-v47-entry146"
+    booker = HOURLY / "booking-price-v47"
+    need(active["old"] == original and not active["producer_mutations"] and not rebound["producer_mutations"]
+         and ready["old_owner"] == rebound["writer"] == original_ref
+         and ready["retained_143_listener"] == rebound["original"]
+         and ready["retained_143_phase"] == rebound["phase"] == phase_ref
+         and ready["package"] == rebound["writer_package"],
+         "V47 did not inherit the active 143 scheduling exclusion")
+    check_phase_package(ready["package"], directory, "cdeef56bc6fddb7189be65ace5a72468514ed97d08b470be5248d79da8177f55")
+    check_phase_package(rebound["booker_package"], booker, "f127e596ee005a8d2a1adc72561fb288bb98df03ff10a5439dc4e06bac66aa79")
+    listener = rebound["new"]
+    status = native(listener["Id"])
+    checked_fields = ("Id", "InvocationID", "MainPID", "ActiveState", "Job", "ControlGroup", "MemoryMax", "MemorySwapMax", "CPUQuotaPerSecUSec")
+    program = directory / "watch143_versions.py"
+    need(all(status[key] == listener[key] for key in checked_fields) and status["ActiveState"] == "active"
+         and not status["Job"] and (Path("/proc") / status["MainPID"] / "cmdline").read_bytes().split(b"\0")
+         == [b"/usr/bin/python3", b"-IB", os.fsencode(program), b""], "different 143 listener")
+    route = json.loads(subprocess.check_output(["/usr/bin/python3", "-IB", str(program), "--check-entry"], timeout=15))
+    writer = active["new"]
+    need(route == {"phase": phase_ref, "version": 47, "writer": active_ref, "package": ready["package"]}
+         and writer["program"] == str(directory / "status_cycle.py") and writer["lock"] == original["lock"],
+         "143 listener resolved a different writer, phase or lock")
+    return writer, booker
+
+
+def first_phase(base, assembly):
+    if assembly["state"] != "live" or not os.path.lexists(PHASE) or os.path.lexists(PHASE_END):
+        return None
+    doc, ref = evidence(PHASE)
+    need(stat.S_IMODE(PHASE.stat().st_mode) == 0o400 and doc["schema"] == "horizon-170-first-168-live-v1"
+         and doc["boot_id"] == Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+         and 0 < doc["recorded_unix_seconds"] <= time.time(), "invalid 170-first phase intent")
+    owns_operation_lock(doc["operation_lock"])
+    pins = doc["assembly168"]
+    need(pins == {"invocation_id":assembly["native"]["InvocationID"], "plan":assembly["plan"], "floor":assembly["floor"]}
+         and assembly["replay"]["phase143"] == "reserved" and assembly["replay"]["invocation143"] is None
+         and not base["replacement143"] and base["guarded_hourly_remaining"] == 64*GIB
+         and base["guard_floor"] >= 64*GIB+EVIDENCE and base["required_ram"] >= 41*GIB,
+         "phase does not match the live 168 or queued full 143 envelope")
+    i = pinned(doc["interface170"], PHASE_INTERFACE, "f5da8a618bfb147d98d2db1ec91526d9b711df014189c4e6485503f003e63dcd")
+    need(i["profile"]["positions"] == 20087, "different 170 route")
+    h = doc["hourly143"]
+    contract = pinned(h["contract"],HOURLY/"contract-v1/LAUNCH_PROFILE.json","84e2846e7c33a1a6b7793861f918344be2af10d8132dc380450345f59903a19f")
+    term = pinned(h["terminal"],HOURLY/"failed-fa915d8326a34b589238d55833b3e846/RECONCILED.json","f84fa716f64ec84454630a581d13f6fcb92a9abb23b581c471a702b89e4ceab6")
+    proof = pinned(h["exclusion"],Path(h["exclusion"]["path"]),INTERLOCK_SHA)
+    writer = pinned(doc["writer"], PHASE_WRITER,"657c9965f71dbff5478308c1c6a703bb4732855c6ac3d4b6daaa4dfa67907f4f",mutable=True)["new"]
+    need(proof["writer"] == doc["writer"] and term["expired_booking"] == proof["expired_booking"] and term["release_absent"]
+         and not term["archive_created"] and proof["preserved_HOME_bytes"] == contract["guarded_HOME_bytes"] + contract["separate_evidence_HOME_bytes"] == 64*GIB+EVIDENCE
+         and proof["preserved_RAM_bytes"] == contract["producer_RAM_bytes"] + contract["guard_RAM_bytes"] == 41*GIB,
+         "different retained 143 obligation")
+    writer, additional_booker = phase_writer(ref, doc["writer"], writer)
+    manager = native(writer["unit"])
+    proc = Path("/proc")/str(writer["pid"])
+    wlock = (proc/"fd"/str(writer["lock"]["fd"])).stat()
+    need(manager["InvocationID"] == writer["invocation_id"] and manager["MainPID"] == str(writer["pid"])
+         and manager["ActiveState"] == "active" and not manager["Job"] and int((proc/"stat").read_text().rsplit(") ",1)[1].split()[19]) == writer["start_ticks"]
+         and [wlock.st_dev,wlock.st_ino] == [writer["lock"]["device"],writer["lock"]["inode"]]
+         and os.fsencode(writer["program"]) in (proc/"cmdline").read_bytes().split(b"\0"), "143 sole writer changed")
+    prove_hourly_exclusion(proof, additional_booker)
+    return ref
+
+
+def apply_170(base, assembly, *, use_phase=False):
+    growth = base["required_home"] - base["guard_floor"]
+    if assembly["state"] != "queued-or-drained":
+        admitted = assembly["replay"]
+        peer = base["replacement143"]
+        need(not admitted["invocation143"] or (peer and peer["iid"] == admitted["invocation143"]),
+             "168 holds an unreconciled 143 invocation")
+        need(not admitted["invocation170"] or admitted["invocation170"] == base["priced_170_invocation"],
+             "168 holds an unreconciled 170 invocation")
+    # 168 enforces its absolute free-space floor on every write. Keep that
+    # floor available even if 143 and 170 use all their remaining growth.
+    # The 170 base floor already carries 143: add its remaining growth only
+    # on the separate 168 guard constraint, never again on the 170 side.
+    phase = first_phase(base, assembly) if use_phase else None
+    concurrent_hourly = 0 if phase else base["guarded_hourly_remaining"]
+    live_floor = assembly["floor"] + concurrent_hourly if assembly["floor"] else 0
+    runtime_floor = max(base["guard_floor"], live_floor)
+    floor = runtime_floor if use_phase else runtime_floor + assembly["incremental_home"]
+    historical = base["historical_home_margin"] - assembly["incremental_home"]
+    required = runtime_floor + assembly["incremental_home"] + growth
+    margin = min(base["available_home"] - required, historical)
+    ram = base["required_ram"] + assembly["incremental_ram"]
+    return dict(base, assembly168=assembly, guard_floor=floor, required_home=required,
+                phase170_first=phase, concurrent_143_growth_bytes=concurrent_hourly, ordinary_170_guard_floor=base["guard_floor"],
+                assembly168_remaining_bytes=assembly["incremental_home"], candidate_170_growth_bytes=growth,
+                historical_home_margin=historical, home_margin=margin, required_ram=ram,
+                ram_margin=base["available_ram"]-ram, fits=base["fits"] and margin >= 0 and base["available_ram"] >= ram)

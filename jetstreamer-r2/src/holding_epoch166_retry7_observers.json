@@ -1,0 +1,32 @@
+{
+  "horizon-observer-root0119-live166167-20261119-v1.service": {
+    "argv": "/usr/local/lib/jetstreamer/horizon-observer-exit-census-20261107-v1/jetstreamer-horizon-observe /usr/local/lib/jetstreamer/horizon-live166167-observer-config-0049-20261119-v2/next-observer.json",
+    "code": "1",
+    "exit_us": "3397831629442",
+    "fragment": "/run/systemd/transient/horizon-observer-root0119-live166167-20261119-v1.service",
+    "invocation": "355de723595a4e65be43a102942c1dc0",
+    "pid": "1733573",
+    "requisite": [],
+    "requisite_of": [],
+    "result": "exit-code",
+    "sha256": "dc2ba09624b66fe213a4ea275caff42586fea844ed88f110fcd43d6426451edf",
+    "state": "failed",
+    "status": "1",
+    "substate": "failed"
+  },
+  "horizon-observer-root0121-stopped166167-20261119-v1.service": {
+    "argv": "/usr/local/lib/jetstreamer/horizon-observer-exit-census-20261107-v1/jetstreamer-horizon-observe /usr/local/lib/jetstreamer/horizon-stopped166167-observer-0121-20261119-v1/observer.json",
+    "code": "1",
+    "exit_us": "3397993767557",
+    "fragment": "/run/systemd/transient/horizon-observer-root0121-stopped166167-20261119-v1.service",
+    "invocation": "a184efd425a2445e852f657efdb31009",
+    "pid": "1733998",
+    "requisite": [],
+    "requisite_of": [],
+    "result": "success",
+    "sha256": "81b478feaf41934c69bdea4fc80a51be278e5878981b74fc4b92670207f70435",
+    "state": "active",
+    "status": "0",
+    "substate": "exited"
+  }
+}

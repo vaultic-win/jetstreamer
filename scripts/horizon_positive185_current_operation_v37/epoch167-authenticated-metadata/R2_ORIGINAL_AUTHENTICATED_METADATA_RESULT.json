@@ -1,0 +1,7 @@
+{
+  "code": 0,
+  "stdout": "{\n  \"bucket\": \"mainnet-beta-ledger-us-ny5\",\n  \"content_language\": \"en\",\n  \"content_type\": \"application/octet-stream\",\n  \"crc32c_hash\": \"MNqp9Q==\",\n  \"creation_time\": \"2021-10-21T03:36:43+0000\",\n  \"custom_fields\": {\n    \"goog-reserved-file-mtime\": \"1617526989\"\n  },\n  \"etag\": \"CObt5NPJ2vMCEAE=\",\n  \"generation\": \"1634787403577062\",\n  \"md5_hash\": \"HIZvbq/NfEkC5EqgzA7oYQ==\",\n  \"metageneration\": 1,\n  \"name\": \"72143703/snapshot-72143703-CJEQdfn6zGqx4da6wL7CqgDhNAEij9tCPz7CrY9ZWH1a.tar.zst\",\n  \"size\": 2022614652,\n  \"storage_class\": \"STANDARD\",\n  \"storage_class_update_time\": \"2021-10-21T03:36:43+0000\",\n  \"storage_url\": \"gs://mainnet-beta-ledger-us-ny5/72143703/snapshot-72143703-CJEQdfn6zGqx4da6wL7CqgDhNAEij9tCPz7CrY9ZWH1a.tar.zst#1634787403577062\",\n  \"update_time\": \"2021-10-21T03:36:43+0000\"\n}\n",
+  "stderr": "Running as unit: horizon-epoch167-authenticated-source-metadata-20261109-v2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 16.540s\nCPU time consumed: 534ms\nMemory peak: 1.1M\nMemory swap peak: 0B\n",
+  "body_transfer": false,
+  "replay_or_input_acquisition_authorized": false
+}

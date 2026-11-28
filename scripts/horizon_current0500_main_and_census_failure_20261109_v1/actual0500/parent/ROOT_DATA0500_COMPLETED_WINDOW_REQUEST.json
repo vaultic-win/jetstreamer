@@ -1,0 +1,16 @@
+{
+  "DATA_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-ended183-DATA-selection0500-plan-20261109-v1/plan.json",
+    "sha256": "38ff5123b611f6a3fe2152bb9b79cd70a34571ea351de0b012899a2c1126f5e2"
+  },
+  "memory_selection": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/select-1/selection.json",
+    "sha256": "c3592d090473020369d5058c39a91f811b559358ee8494e6fab5117a7a3281f6"
+  },
+  "no_replay_authority": true,
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+    "sha256": "ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079"
+  },
+  "schema": "horizon-current1800-DATA-completed-window-request-v1"
+}

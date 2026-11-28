@@ -1,0 +1,22 @@
+[workspace]
+
+[package]
+name = "horizon-167-retained-overlap"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "horizon-167-retained-overlap"
+path = "retained_overlap.rs"
+
+[dependencies]
+jetstreamer-horizon = { path = "../../jetstreamer-horizon" }
+lencode = "2.0.0"
+libc = "0.2"
+serde_json = "1"
+sha2 = "0.10"
+
+[[bin]]
+name = "horizon-167-signed-trace"
+path = "signed_trace.rs"

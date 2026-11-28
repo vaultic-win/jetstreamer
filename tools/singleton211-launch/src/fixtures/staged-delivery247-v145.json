@@ -1,0 +1,70 @@
+{
+  "argv": [
+    "/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2",
+    "sync",
+    "/home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output",
+    "--epochs",
+    "247-247",
+    "--receipt-directory",
+    "/home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/receipts",
+    "--concurrency",
+    "2",
+    "--current-reader-plan",
+    "/var/lib/jetstreamer/horizon247-public-reader-680e1173-v1/epoch-247-plan.json",
+    "--current-reader-plan-sha256",
+    "e9e7234224b04ab9ae03bfa7459344bec37a6bb241c84e98a7e8dbcaa29bdd1e",
+    "--recover-staged-247"
+  ],
+  "claim": {
+    "epoch": 247,
+    "evidence": [
+      {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/booking.json",
+        "sha256": "f2716aa9619500bed9e722e9a5de23c80f57203d137f6b937d27ba1a9972919e"
+      },
+      {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/launch.json",
+        "sha256": "0ae7be456361ec2a5870b8ae0907a463cf750ecd07de0b2f45b7252c807e1380"
+      }
+    ],
+    "expected_exec_start": "{ path=/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2 ; argv[]=/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2 sync /home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output --epochs 247-247 --receipt-directory /home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/receipts --concurrency 2 --current-reader-plan /var/lib/jetstreamer/horizon247-public-reader-680e1173-v1/epoch-247-plan.json --current-reader-plan-sha256 e9e7234224b04ab9ae03bfa7459344bec37a6bb241c84e98a7e8dbcaa29bdd1e --recover-staged-247 ; ignore_errors=no ; start_time=[Fri 2026-11-20 18:58:29 UTC] ; stop_time=[n/a] ; pid=2149076 ; code=(null) ; status=0/0 }",
+    "invocation_id": "3e08307874db424886cd8c46b3ecfba6",
+    "phase": "upload-readback",
+    "unit": "horizon-upload-247-staged-680e1173-v1.service"
+  },
+  "manager": {
+    "AllowedCPUs": "48-55",
+    "CPUQuotaPerSecUSec": "4s",
+    "ControlPID": "0",
+    "Delegate": "no",
+    "DropInPaths": "",
+    "ExecMainStartTimestampMonotonic": "346182546607",
+    "FragmentPath": "/run/systemd/transient/horizon-upload-247-staged-680e1173-v1.service",
+    "Job": "",
+    "KillMode": "control-group",
+    "MemoryMax": "10737418240",
+    "MemorySwapMax": "0",
+    "NoNewPrivileges": "yes",
+    "ProtectHome": "read-only",
+    "ProtectSystem": "strict",
+    "Restart": "no",
+    "TasksMax": "512",
+    "Transient": "yes",
+    "TriggeredBy": ""
+  },
+  "start_ticks": "34618254",
+  "unit": {
+    "ActiveState": "active",
+    "ControlGroup": "/system.slice/horizon-upload-247-staged-680e1173-v1.service",
+    "ExecMainStatus": "0",
+    "ExecStart": "{ path=/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2 ; argv[]=/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2 sync /home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output --epochs 247-247 --receipt-directory /home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/receipts --concurrency 2 --current-reader-plan /var/lib/jetstreamer/horizon247-public-reader-680e1173-v1/epoch-247-plan.json --current-reader-plan-sha256 e9e7234224b04ab9ae03bfa7459344bec37a6bb241c84e98a7e8dbcaa29bdd1e --recover-staged-247 ; ignore_errors=no ; start_time=[Fri 2026-11-20 18:58:29 UTC] ; stop_time=[n/a] ; pid=2149076 ; code=(null) ; status=0/0 }",
+    "Id": "horizon-upload-247-staged-680e1173-v1.service",
+    "InvocationID": "3e08307874db424886cd8c46b3ecfba6",
+    "LoadState": "loaded",
+    "MainPID": "2149076",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "running",
+    "Type": "exec"
+  }
+}

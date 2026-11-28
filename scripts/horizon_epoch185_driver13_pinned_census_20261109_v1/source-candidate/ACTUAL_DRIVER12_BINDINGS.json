@@ -1,0 +1,28 @@
+{
+  "schema": "horizon-actual-qualified-driver12-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/epoch185-guarded-cold",
+    "sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/artifact-proof.json",
+    "sha256": "5b08baacff6943fbc544dd05085b391bccda34e6963e0194ae4d05f41e6c937a"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/deployment-seal-receipt.json",
+    "sha256": "f33a5e965b6574a1abc9fd1d8294844c16dca26fd50e9f84e81ccfc5f4cc026f"
+  },
+  "QA": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_ALL37_AND_ROOT_SOL_NATIVE_CENSUS_CASES_ACCEPTED.json",
+    "sha256": "d20ea6bd7da6647a9a660e8cb40913c62ea2a6c365d5fc19ff7a63b68817ea15"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER12_DATA4_BOOKING.json",
+    "sha256": "ce37f28b24893c55364ed907fd8246d0617c95f4eb9f499e2d874ad17860de09"
+  },
+  "closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER12_PHASE_CLOSED_DATA4_RETAINED.json",
+    "sha256": "f429be7ef0c8e08907c5d64cf042c24f9390f131dcac2d19eb06d6ae44316473"
+  },
+  "fresh_native_first_guard_and_downstream_registration_required": true
+}

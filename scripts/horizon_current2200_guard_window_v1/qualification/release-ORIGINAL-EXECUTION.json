@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-current2200-guard-compiler-3-release-20261108-r2.service; invocation ID: af3c546d00b945b6bbcaacb777110614\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 2.217s\nCPU time consumed: 2.462s\nMemory peak: 3.6M\nMemory swap peak: 0B\n"
+}

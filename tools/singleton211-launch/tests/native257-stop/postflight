@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+echo "Driver result $SERVICE_RESULT $EXIT_CODE $EXIT_STATUS"
+dest=/evidence/guest-files
+mkdir -m 0700 "$dest"
+for path in /var/lib/jetstreamer/horizon-native257-guard-receipts-* /var/lib/jetstreamer/horizon-native257-guard-binding-* /var/lib/jetstreamer/horizon-native257-startup-plan-* /var/lib/jetstreamer/sandbox-fixture-admission; do
+    if test -d "$path"; then cp -a -- "$path" "$dest/"; fi
+done
+/usr/bin/journalctl --sync

@@ -1,0 +1,34 @@
+{
+  "schema": "horizon-actual-qualified-operation32-enrollment32-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v32-enrollment32-r3/operation",
+    "sha256": "53b0a005d83d25384e2084f994ca013de347cce7011a293342486438469b1a59"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v32-enrollment32-r3/artifact-proof.json",
+    "sha256": "6b73f65ae9490184e7005e747aed55a40d3a884c42cca61b3bf1c99c06cc575a"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v32-enrollment32-r3/deployment-seal-receipt.json",
+    "sha256": "986aab86d8035d254a4f09802407ba229479acafd59b7d0d428382456022c7d9"
+  },
+  "qualified_route": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v32-enrollment32-r3-r3/route.json",
+    "sha256": "324dd0ed2daa96d094da828bf58cdd85a62fc3135a92d6dcd44e7cabe3d160e1"
+  },
+  "capability": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v32-enrollment32-r3-r3/capability.json",
+    "sha256": "bbe3ea35bf12fd9b50c8f002540ed2e8253640e667ad85f65ec290298fcc8326"
+  },
+  "reader_lifecycle_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v32-enrollment32-r3/completion.json",
+    "sha256": "5e7ee4970c310c1d89834366ed2a9c8be405e9daad9c2d95ae96e630adc79c02"
+  },
+  "successful_reader_retirement_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-successful-reader-retirement-control-positive-success-retire-v32-enrollment32-r3/completion.json",
+    "sha256": "fbc7e70d215fd1c1c4f4fe063ae4565642ef4712e375131a543dda9d24edd29e"
+  },
+  "normal6_retained": true,
+  "complete_DATA_lower_bound_bytes": 5144714359444,
+  "fresh_original_guard_and_admission_still_required": true
+}

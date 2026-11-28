@@ -1,0 +1,67 @@
+{
+  "admission": {
+    "path": "/var/lib/jetstreamer/horizon-continuation203-launch-ed66145-v1/admission.json",
+    "sha256": "5e6a6bc88c456046024d3b0d7b416508c7cb38c3daa88b9e287e06381e081196"
+  },
+  "bootstrap_slot": 88127580,
+  "canonical_sidecar_authorized": false,
+  "capability": {
+    "path": "/home/ubuntu/.jetstreamer-private/continuation203-input-capability-ed66145-v1/capability.json",
+    "sha256": "999e3f43f42e7ba9a8b8a5ad0697cfbaa0643f86967e0c675e1974cf17996f1b"
+  },
+  "capture_self_sha256": "791875c277d458c06b673fc4c64bd9ea1d9c33f6583db676bd351c526a4a5808",
+  "capture_spec": {
+    "path": "/var/lib/jetstreamer/horizon-continuation203-launch-ed66145-v1/capture-spec.json",
+    "sha256": "1c9f3388c5cce820fe4d160ec434392f5ea982482db505dcb78f1eb9b1f96dd1"
+  },
+  "continuation_plan": {
+    "path": "/var/lib/jetstreamer/horizon-continuation203-launch-ed66145-v1/plan.json",
+    "sha256": "c1215dac8f5a35bf34ad315d3b99666be5c3a690b4050aff63df352fa3e251bf"
+  },
+  "current_sidecar_eta_valid": false,
+  "epoch": 203,
+  "expected_exec_start": "{ path=/var/lib/jetstreamer/horizon-continuation203-parent-ed66145-v1/jetstreamer-node ; argv[]=/var/lib/jetstreamer/horizon-continuation203-parent-ed66145-v1/jetstreamer-node 203 /home/ubuntu/.jetstreamer-private/checkpoint-continuation-203-ed66145-v1/ledger --verify --checkpoint-continuation-plan=/var/lib/jetstreamer/horizon-continuation203-launch-ed66145-v1/plan.json --checkpoint-continuation-plan-sha256=c1215dac8f5a35bf34ad315d3b99666be5c3a690b4050aff63df352fa3e251bf ; ignore_errors=no ; start_time=[Fri 2026-10-23 04:32:51 UTC] ; stop_time=[n/a] ; pid=3634151 ; code=(null) ; status=0/0 }",
+  "experimental_envelope_bytes": 274877906944,
+  "full_epoch_verified": false,
+  "invocation_id": "ddf3ed2de8b040758ee7a0d696159afd",
+  "launched": true,
+  "layout": {
+    "path": "/var/lib/jetstreamer/horizon-continuation203-launch-state-ed66145-v1/layout.json",
+    "sha256": "900bbbdfbe0585ee01153daa075deef4e56a5dcecc872cd9f5a26d6f65f2e961"
+  },
+  "local_retirement_authorized": false,
+  "maximum_cpu_percent": 800,
+  "maximum_memory_bytes": 137438953472,
+  "maximum_runtime_seconds": 10800,
+  "native_result_sha256": "5260d7af71ab802ca711fce706020312212d0c8cdfc01c473398b0a9a0108420",
+  "node_sha256": "1a299ad19472906b0721555ae3bd01840cbd249724ece9c0f61e086b8ace8716",
+  "observer": {
+    "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/horizon-live-resource-sample-20261023T041554Z-diagnostics-v297.json",
+    "sha256": "e7c784ca6c0ecf2e3852fd36fb07f5e14f6b26058a6a873c437aeacca0f59dc3"
+  },
+  "ordinary_replay_claim": false,
+  "prefix_sha256": "ba191cf1918cac8b67cb7512bd07cc1eeccb16e525e4c15c27fd7c325f6993ce",
+  "previous_fleet": {
+    "path": "/var/lib/jetstreamer/horizon-campaign-fleet/20261023T041554Z-203-ops-staging/fleet-ledger.json",
+    "sha256": "2168f366de2b5e47a4140e72c4de7d0430a4aa86a3f8373e74ef7856de29d6e2"
+  },
+  "private_assembly_authorized": true,
+  "private_run_root": "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-203-ed66145-v1",
+  "private_suffix_authorized": true,
+  "protected_existing_floor_bytes": 2687830606739,
+  "publication_authorized": false,
+  "r2_mutations": false,
+  "recorded_unix_seconds": 1792729986,
+  "remaining_slots": 419,
+  "remote_mutations": false,
+  "required_guard_minimum_free_bytes": 3284969447424,
+  "required_initial_free_bytes": 2962708513683,
+  "runtime_promotion_authorized": false,
+  "schema": "jetstreamer-private-epoch203-checkpoint-continuation-launch-v1",
+  "snapshot_sha256": "d3114597ce25c3efaa4a96899ab3e9437c51cb9086d4166639f0ad2ae0613ee6",
+  "solana_rayon_threads": 16,
+  "suffix_start_slot": 88127581,
+  "terminal_slot": 88127999,
+  "unit": "horizon-qualify-203-checkpoint-continuation-ed66145-v1.service",
+  "worker_sha256": "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc"
+}

@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"actual_successful_reader_retirement\":{\"path\":\"/home/sol/.jetstreamer-private/epoch185-positive-upstream-retire0100-reader-20261109-v37-r1/successful-reader-retirement-completion.json\",\"sha256\":\"6f9bd125cb2ec9d7461e017b1389fe0352d20bca4d538ccac45e1e382f477772\"},\"context\":{\"path\":\"/home/sol/.jetstreamer-private/epoch185-positive-upstream-retire0100-reader-20261109-v37-r1/exact0100-successful-reader-retirement-context.json\",\"sha256\":\"68f9bfdf2df2e993ed59708ee0efb4ecb64dae938cd9ae59fb27098ab6a51af5\"},\"exact0100_original\":true,\"no_replay_or_archive_authority\":true}\n",
+  "stderr": "Running as unit: horizon-positive185-retire-exact0100-reader-20261109-v37-r1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 10.342s\nCPU time consumed: 939ms\nMemory peak: 24.9M\nMemory swap peak: 0B\n"
+}

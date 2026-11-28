@@ -1,0 +1,377 @@
+{
+  "schema": "horizon-operation38-source-only-static-checks-v1",
+  "actual37_source_graph": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "d490b5e6695fd81c44b4a0b848b41cda50ddbd2e7eb9633c72977b96450b90b2"
+  },
+  "all35_actual37_source_hashes_match": true,
+  "actual37_source_rows": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/activation.rs",
+      "sha256": "f0c95bd96fb0216d98db341530a99a64be7f55b051c99c977fd1332553f98090"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/disposable-oneshot.rs",
+      "sha256": "26a8140733ed00a568f5faf0a86c17d20135a7d8683ef5152a64c18ea3df057a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/driver_policy.rs",
+      "sha256": "abe40ce1dfbd1ae9f65f53a518681768c39e386200fd79e44f6c48a04961a118"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/failed_reader_retirement.rs",
+      "sha256": "fada54cb9136e73817c2006883c37118eadf1c6b81b5c9d25731742cbe82d6fe"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/fixtures/original0100-reader-completion.json",
+      "sha256": "518e3459830e841f089e9e768f759e2e67af5647343b6f0621728643ffff189d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/fixtures/original0100-timer-stop-completion.json",
+      "sha256": "f402f674baa2a5474065cc6ff370f5bc971c78062e7a7942691e112892f8b138"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/fixtures/original0100-timer-stop-intent.json",
+      "sha256": "7beb96e85a3926f91640c53e6574903777db194039fa31dc0815d80b24f0d6ef"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/fleet_custody.rs",
+      "sha256": "399595ecb1c4422bfe8bd4302e4d603eb8d43410648fbe578154a5fde42c7075"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/fleet_order.rs",
+      "sha256": "78344b4936a907e0c7d03908017c9201beca8c7820a7d4c4c08f682c288ba3f8"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/follow_on.rs",
+      "sha256": "a485c2cdfcf93475c6c5df6ce43ab25c5f2deade5043c0c6e8f4c026239e5b78"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation30-coherence-disposable-20261108-v1.service",
+      "sha256": "97ce751a00d707fcb844ff0614833c97ac20ddf858697cc6ebdc797608177eee"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation30-coherence-disposable-20261108-v1.timer",
+      "sha256": "f42c5555bfa6736ed4885f5be30019a4621f01b3576b4dcd946ec8bd28def96c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation31-coherence-disposable-20261108-v1.service",
+      "sha256": "925454c200bb1b57608e6bedbcf0acaad67a290d086f40c7999ece7aa7849575"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation31-coherence-disposable-20261108-v1.timer",
+      "sha256": "85ee8fb753f1d09fa42c4fe1e81558f264669dae811347f0548aaa0bc0b192e7"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v1.service",
+      "sha256": "b2f547cc1ced55d6b61411465f1c5fd276b6f08ee67d5d260ac7ceaa9fc644bc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v1.timer",
+      "sha256": "a6d5cd174e37db260f79ca36411d61625764bc17e706fbdb9407dc36eb77c561"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v2.service",
+      "sha256": "2509ef72b600b12c68d764e088ed82011aced6edffad3218851003f522dea3c6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v2.timer",
+      "sha256": "005166e2223e80cde6bcaacdb17d3243fa2d788116b583011576a6019c213b4d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v3.service",
+      "sha256": "316aa5a0debf59f37e63d8b65e4b8b5900a652ce96dfce6caa2b9d8133746ddc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v3.timer",
+      "sha256": "cc48d8a47a77333ad1e51f710862245ad09c6f08184ad4ac6dc367e871908074"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v4.service",
+      "sha256": "8bb21e8d7a6bdddfe8a898842e1fdfeee2d396e4c9169b732dfb4726cb50cec5"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v4.timer",
+      "sha256": "7af598dc482a18590eb4b601a989ae233332cc3b6c756e3847cb5634f4d103d8"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v5.service",
+      "sha256": "fb0b7163bf872c1946201c081dd3caa409717baeb0dc5fba0ff8eeb7df37bb54"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v5.timer",
+      "sha256": "f1abafdb9d8ce1f39412e404d035f52561dbd562d0bcc6fc9c3488fa3a235e00"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/main.rs",
+      "sha256": "8c9e1f7bb90cc84039666ba7306e3dd3a5809ef38747e809cd155577020baa6b"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/persistent_reader.rs",
+      "sha256": "1eb6ebaf5d72485189981beaf9a22955ba1ef45656078685bf11874f502f9dec"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/postreader.rs",
+      "sha256": "87fc229858e13581c759997ac6bddce844804454536d2eb3f3a46c9f0fb9f4e2"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/process.rs",
+      "sha256": "fa26bed67fdf9154df69ee74e34d1657278619b69ef6d194cab5cddf4629306c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/reader-argv-template.json",
+      "sha256": "457a60b6310a93db3851b8b462a8927f860e6bd6f4a4293636e0f4525f2453bc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/reader_phase.rs",
+      "sha256": "2c449a7ad19e6ec3eb11f86587c80982eb6fff186ec8ab16786aa7c5e64b149f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/run_layout.rs",
+      "sha256": "3a4348e3f3f3b5cd8ce4bae0bdb0eb0d136ca2580cb87165460d518d70e81fde"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/storage.rs",
+      "sha256": "a4e4f0e02efc57ee3975215ce860b7bd5830f3ad88fc9c44f30a7e8346505fa6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/successful_reader_retirement.rs",
+      "sha256": "2fc3e45f35c67d69ce74ca100a77b9d3022fc663fc7fa3ba0223fbcb1444adc3"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/successor_roles.rs",
+      "sha256": "dedc396d2c8b95b9da53ccdeeac5cfc7f93cb471faf5fe8d30bd5184787bd64a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/timers.rs",
+      "sha256": "8785ec899c44aadd29b468972cdbe997095e0055564cb6644164fa34f0ece13a"
+    }
+  ],
+  "changed": [
+    "activation.rs",
+    "driver_policy.rs",
+    "main.rs",
+    "postreader.rs",
+    "successful_reader_retirement.rs",
+    "successor_roles.rs"
+  ],
+  "added": [
+    "current_roles_native.rs",
+    "fixtures/original0230-lifecycle.json",
+    "fixtures/original0230-reader-completion.json",
+    "fixtures/original0230-terminal.json",
+    "successful_reader_retirement_0230.rs"
+  ],
+  "byte_preserved": [
+    "disposable-oneshot.rs",
+    "failed_reader_retirement.rs",
+    "fixtures/original0100-reader-completion.json",
+    "fixtures/original0100-timer-stop-completion.json",
+    "fixtures/original0100-timer-stop-intent.json",
+    "fleet_custody.rs",
+    "fleet_order.rs",
+    "follow_on.rs",
+    "horizon-operation30-coherence-disposable-20261108-v1.service",
+    "horizon-operation30-coherence-disposable-20261108-v1.timer",
+    "horizon-operation31-coherence-disposable-20261108-v1.service",
+    "horizon-operation31-coherence-disposable-20261108-v1.timer",
+    "horizon-operation32-coherence-disposable-20261108-v1.service",
+    "horizon-operation32-coherence-disposable-20261108-v1.timer",
+    "horizon-operation32-coherence-disposable-20261108-v2.service",
+    "horizon-operation32-coherence-disposable-20261108-v2.timer",
+    "horizon-operation32-coherence-disposable-20261108-v3.service",
+    "horizon-operation32-coherence-disposable-20261108-v3.timer",
+    "horizon-operation32-coherence-disposable-20261108-v4.service",
+    "horizon-operation32-coherence-disposable-20261108-v4.timer",
+    "horizon-operation32-coherence-disposable-20261108-v5.service",
+    "horizon-operation32-coherence-disposable-20261108-v5.timer",
+    "persistent_reader.rs",
+    "process.rs",
+    "reader-argv-template.json",
+    "reader_phase.rs",
+    "run_layout.rs",
+    "storage.rs",
+    "timers.rs"
+  ],
+  "unchanged_retirement_functions": {
+    "cleanup": {
+      "byte_identical": true,
+      "sha256": "df8fa5ad2d1daa45b6ff91dc466704dd5e3246cbc34b0950092de9874ff63082"
+    },
+    "execute1630": {
+      "byte_identical": true,
+      "sha256": "7e5277eda4c5341fb3257754acc4dc88f8ab8b9995ac97dc0bee6a706c72c04b"
+    },
+    "execute1800": {
+      "byte_identical": true,
+      "sha256": "cce9e424eb73731ba57d4b3a2abc4779d4891e1a63dabf1c5da44aff00e30a18"
+    },
+    "execute0100": {
+      "byte_identical": true,
+      "sha256": "b67e5090571c464f93cc2e77fcca2fc14864f5e6c5f7ce0a93e2e396f8d39eda"
+    },
+    "terminal0100_shape": {
+      "byte_identical": true,
+      "sha256": "0910838bfa9c0d729cb3509cf230e380816e37b8b3974a0fba032f4c8ed2724e"
+    },
+    "installed0100": {
+      "byte_identical": true,
+      "sha256": "67beb6ca231bf03841c68a220196058e8222ed6cdca9be1d9753308d54766343"
+    },
+    "exact0100_installed": {
+      "byte_identical": true,
+      "sha256": "f3b6b0ca1a17d3f26e142f3b069aeb9977d6f20d88b89b8f6a137ca66ebfe2a8"
+    },
+    "control_proof": {
+      "byte_identical": true,
+      "sha256": "c469121630bd6a86e1d5f7c90db1168b2d843903d60180efab8c19f832a44cb7"
+    },
+    "qualify": {
+      "byte_identical": true,
+      "sha256": "97770a303f41448bd23c420121d748b3634bdb6bbf9c926c736c28bc5f71a49f"
+    },
+    "expiry1800_shape": {
+      "byte_identical": true,
+      "sha256": "ed0270c99a2bd8251a28f704f45e93ea73a45be0e1f3eb112a5f51667dc41f61"
+    }
+  },
+  "metadata_bindings_checked": {
+    "ACTUAL_DRIVER12_BINDINGS.PRESERVED.json:qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/artifact-proof.json",
+      "sha256": "5b08baacff6943fbc544dd05085b391bccda34e6963e0194ae4d05f41e6c937a"
+    },
+    "ACTUAL_DRIVER12_BINDINGS.PRESERVED.json:normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/deployment-seal-receipt.json",
+      "sha256": "f33a5e965b6574a1abc9fd1d8294844c16dca26fd50e9f84e81ccfc5f4cc026f"
+    },
+    "ACTUAL_HELPER35_BINDINGS.PRESERVED.json:qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/artifact-proof.json",
+      "sha256": "37f368069ea7594369385d600c5618dc1b236e5c011d7ac2689eaede2a10fec3"
+    },
+    "ACTUAL_HELPER35_BINDINGS.PRESERVED.json:normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/deployment-seal-receipt.json",
+      "sha256": "eb84418cb0a6bf2e79dfe42fe0b53deaa18d9cc8620863036959cb92453dbf12"
+    },
+    "ACTUAL_FINAL6_BINDINGS.PRESERVED.json:qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261109-v6/artifact-proof.json",
+      "sha256": "ed9b900f517332cbacc39ad043f83c186124f6a2c555a1d719e5e32ffd5f9626"
+    },
+    "ACTUAL_FINAL6_BINDINGS.PRESERVED.json:normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261109-v6/deployment-seal-receipt.json",
+      "sha256": "02144312057de7f1cb1a3f0ff01e722129b6730ed5d1357bd53985364584d371"
+    },
+    "actual0230:terminal": {
+      "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/da9b57fed9f04c9fa1b0c5dba1932488/terminal.json",
+      "sha256": "f073eb6ce0ef97f261f205e8910ef1ed22840fc7b7e74622f46a87619a0bcf1b"
+    },
+    "actual0230:completion": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/original-enrolled-reader-completion.json",
+      "sha256": "b832f47364d4ebce9276bb771d9948e340a6f30a37eec5b1eb7ac69cc74fde74"
+    },
+    "actual0230:native_execution": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/genuine-original-persistent-reader.json",
+      "sha256": "5eb4d1eba858c4616a2a806e68a80f2b711db485a09d5ed342eb788102d38414"
+    },
+    "actual0230:outer_execution": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/original-reader-keeper-start-outer.json",
+      "sha256": "71948e9eae6abfe519e6854377612c3c1a66b7dca988855c1530166a2ae30e35"
+    },
+    "actual0230:original_final_failure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/3782-actual-c71-one-original-final-original-outcome.json",
+      "sha256": "c24c739b8b678ebf793e2c75665a043bbc17304a305269db2c9c48835ecc8219"
+    },
+    "actual0230:reader_proof": {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/cda54fabbcad05ee9d1aba2d944926c5d0557b4662d1052fdf1f0a8e776b6c9e-cold185-da9b57fed9f04c9fa1b0c5dba1932488/proof.json",
+      "sha256": "6256ede849a9c9bedf6cf2c4ef98ab01c3ea88640698bd37b94a11e113fb8fd3"
+    },
+    "actual0230:reader_package_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-persistent-reader-positive-da9b57fed9f04c9fa1b0c5dba1932488/deployment-seal-receipt.json",
+      "sha256": "443fe76ddac0c800907c0590ee63d319d3ac3e2b3125e5b5cceda5cda063025e"
+    },
+    "actual0230:reader_PID1": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/original-enrolled-reader-PID1.json",
+      "sha256": "bfbd19759998853944a657ad42bc1e7441684a3b8cf1e80caba28442c41039f2"
+    },
+    "actual0230:lifecycle": {
+      "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/da9b57fed9f04c9fa1b0c5dba1932488/lifecycle.json",
+      "sha256": "4c00568288c78290418cfe40485e2c180066aecece5ef3920e899d370514b1f8"
+    },
+    "ACTUAL_PLANNER6_BINDINGS.PRESERVED.json:qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261109-v6/artifact-proof.json",
+      "sha256": "5a7d6ab4a4bade82ef6e7fd5edf0118899541e8af3b3385987127e1e150fed67"
+    },
+    "ACTUAL_PLANNER6_BINDINGS.PRESERVED.json:normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261109-v6/deployment-seal-receipt.json",
+      "sha256": "ab02057d81f62760b21646074224e80084d9c14707c5cda602d54b768b32f137"
+    },
+    "ACTUAL_PLANNER6_BINDINGS.PRESERVED.json:source_and_recipes": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261109-v6/source-and-recipes.json",
+      "sha256": "5b6e640ae9a7d25eeadfade67e77690c9f50265293e701f7ffeb05ba0ef8d745"
+    }
+  },
+  "actual_final6_driver_policy_byte_identical": true,
+  "readonly_parser_final_passed_modules": [
+    "main.rs",
+    "driver_policy.rs",
+    "postreader.rs",
+    "successor_roles.rs",
+    "activation.rs",
+    "successful_reader_retirement.rs",
+    "successful_reader_retirement_0230.rs",
+    "current_roles_native.rs"
+  ],
+  "no_compilers_tests_native_jobs_or_resource_polls_executed": true,
+  "planner6_qualification_pending": false,
+  "no_cloud_status_timer_booking_Git_mutations": true,
+  "all_raw_promises_and_zero_credit_preserved": true,
+  "actual_planner6": {
+    "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_PLANNER6_BINDINGS.PRESERVED.json",
+    "sha256": "0f8b9390fee8dbb5ea2cc3abf280f524e76cfc80a33690f4d45022d3bd2ff5e0"
+  },
+  "readonly_parser_results": [
+    {
+      "module": "main.rs",
+      "exit_code": 0,
+      "parser_only": true
+    },
+    {
+      "module": "driver_policy.rs",
+      "exit_code": 0,
+      "parser_only": true
+    },
+    {
+      "module": "postreader.rs",
+      "exit_code": 0,
+      "parser_only": true
+    },
+    {
+      "module": "successor_roles.rs",
+      "exit_code": 0,
+      "parser_only": true
+    },
+    {
+      "module": "activation.rs",
+      "exit_code": 0,
+      "parser_only": true
+    },
+    {
+      "module": "successful_reader_retirement.rs",
+      "exit_code": 0,
+      "parser_only": true
+    },
+    {
+      "module": "successful_reader_retirement_0230.rs",
+      "exit_code": 0,
+      "parser_only": true
+    },
+    {
+      "module": "current_roles_native.rs",
+      "exit_code": 0,
+      "parser_only": true
+    }
+  ],
+  "unchanged_shared_external_source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/start_request.rs",
+    "sha256": "7b28a430d3f4179759440bd679005a6231c638b6f808ce673e9933cf7281d4c6"
+  }
+}

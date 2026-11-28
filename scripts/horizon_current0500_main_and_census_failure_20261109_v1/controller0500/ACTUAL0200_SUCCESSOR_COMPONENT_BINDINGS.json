@@ -1,0 +1,38 @@
+{
+  "operation37": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_OPERATION37_BINDINGS.json",
+    "sha256": "5d7b6da01f99ad4dcedb12f1c266d87a9ba9f6a32b8fdada783cb24e2b0a1f09"
+  },
+  "Final4": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_FINAL4_BINDINGS.json",
+    "sha256": "33dbd57ef9d85a9e0ce3336898b1ea2a02873a78049a12ed2f98c3873d379b5c"
+  },
+  "successful0100_retirement": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-retire0100-reader-20261109-v37-r1/successful-reader-retirement-completion.json",
+    "sha256": "6f9bd125cb2ec9d7461e017b1389fe0352d20bca4d538ccac45e1e382f477772"
+  },
+  "successful0100_retirement_original_execution": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/RETIRE-EXACT0100-SUCCESSFUL-READER-ORIGINAL-EXECUTION.json",
+    "sha256": "7596605e60fd98cc58685aca3566e254adbe21ebc87e9d9a4ec716327fb643e1"
+  },
+  "successful0100_retirement_context": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-retire0100-reader-20261109-v37-r1/exact0100-successful-reader-retirement-context.json",
+    "sha256": "68f9bfdf2df2e993ed59708ee0efb4ecb64dae938cd9ae59fb27098ab6a51af5"
+  },
+  "Final4_booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/ROOT_NORMAL6_FINAL4_DATA512_BOOKING.json",
+    "sha256": "63b184909418721ffbfcbcd242a9616354291924bbf4e848ed7759cd6899c890"
+  },
+  "Operation37_booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/ROOT_NORMAL6_OPERATION37_DATA512_BOOKING.json",
+    "sha256": "4a3035f075a3828ebb174ac0627b0ec7946d0f77c9903940191d8296084f1d55"
+  },
+  "guard0200_booking": {
+    "path": "/home/sol/.jetstreamer-private/current0200-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0200_GUARD_DATA512_BOOKING.json",
+    "sha256": "99b935ab6545017bb4f38fc8652b973d00fdc2b9f775f6a67b54347a0f7de9ce"
+  },
+  "guard0200_actual_accepted_QA": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0200-window-20261109-v1-root-r2/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+    "sha256": "0301cb436941726ef74052b6639d7c7e4ead743a5b12c1b50301e61daa26a790"
+  }
+}

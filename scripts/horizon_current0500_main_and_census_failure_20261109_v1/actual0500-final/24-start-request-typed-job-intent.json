@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "--system",
+    "get-property",
+    "org.freedesktop.systemd1",
+    "/org/freedesktop/systemd1/job/41253509",
+    "org.freedesktop.systemd1.Job",
+    "Id",
+    "Unit",
+    "JobType",
+    "State"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "722adc397ae24bb4b96d452783599f57",
+  "program": "/usr/bin/busctl",
+  "timeout_millis": 5000,
+  "wall_started_at": 1794201322
+}

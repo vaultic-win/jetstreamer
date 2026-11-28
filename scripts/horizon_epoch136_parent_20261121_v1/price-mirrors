@@ -1,0 +1,83 @@
+#!/usr/bin/python3 -IB
+"""Read the complete private 136 prestart price and the exact input mirror footprint."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import runpy
+import stat
+import sys
+
+RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
+STORE = RUNTIME / "epoch136-parent-handoff-20261121-v1/immutable-inputs"
+DOWNLOAD = Path("/var/lib/jetstreamer/epoch136-hourly-snapshot-input-20261027-v1/receipts/download.json")
+DOWNLOAD_SHA = "4ac1d403b032808b10b3564ca643a8326d942116ac164949c86562bd6659419e"
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def inspect_input(source, digest, block):
+    from evidence import raw
+    raw_source = raw(source, limit=16 << 20)
+    require(hashlib.sha256(raw_source).hexdigest() == digest, "mirror input changed")
+    dest = STORE / (digest + ".json")
+    existing = os.path.lexists(dest)
+    if existing:
+        require(stat.S_IMODE(dest.lstat().st_mode) == 0o400 and raw(dest, limit=16 << 20) == raw_source,
+                "retained mirror differs")
+    return dict(source=dict(path=str(source), sha256=digest), destination=str(dest), source_bytes=len(raw_source),
+                already_present=existing, required_bytes=0 if existing else ((len(raw_source)+block-1)//block)*block)
+
+
+def capture(path, digest):
+    require(os.geteuid() == 0 and sys.flags.isolated and __debug__, "isolated root reader required")
+    require(path.parent.parent == RUNTIME and path.name == "ROOT_COMPLETE_OPERATIONAL_FLEET.json",
+            "unexpected fleet path")
+    bridge = runpy.run_path(str(Path(__file__).resolve().with_name("incident_prestart.py")))
+    image = bridge["NATIVE"]
+    provider = dict(image=dict(path=str(image / "post-stop-fit"), sha256=bridge["PRICE"]),
+                    seal=dict(path=str(image / "deployment-seal-receipt.json"), sha256=bridge["NATIVE_SEAL"]))
+    parent = Path(__file__).resolve().parent
+    retry = parent == bridge["RETRY_WRITER"] / "preflight-tools"
+    v5n = parent == bridge["V5N_WRITER"] / "preflight-tools"
+    v5o = parent == bridge["V5O_WRITER"] / "preflight-tools"
+    v5q = parent == bridge["V5Q_WRITER"] / "preflight-tools"
+    v5r = parent == bridge["V5R_WRITER"] / "preflight-tools"
+    fixture = v5r or v5q or v5o or v5n or retry or parent == bridge["V7"] / "preflight-tools"
+    if fixture:
+        plan = parent.parent / "production-plan.json"
+        provider = json.loads(bridge["immutable_bytes"](plan))["joint_fit_145"]
+    observed = bridge["inspect"](path, digest, None, "preflight", provider, fixture=fixture, retry=retry,
+                                 v5n=v5n, v5o=v5o, v5q=v5q, v5r=v5r)
+    require(observed["waiting_candidate"] is None and observed["activation_compatible"] is False and
+            observed["new_resource_credit_bytes"] == 0, "unexpected occupied or activating price")
+    meta = STORE.lstat()
+    require(STORE.resolve(strict=True) == STORE and stat.S_ISDIR(meta.st_mode) and meta.st_uid == 0 and
+            stat.S_IMODE(meta.st_mode) == 0o700 and meta.st_dev == Path("/home/sol").stat().st_dev,
+            "unexpected parent mirror directory")
+    disk = os.statvfs(STORE)
+    block = disk.f_frsize
+    inputs = [inspect_input(DOWNLOAD, DOWNLOAD_SHA, block), inspect_input(path, digest, block)]
+    missing = sum(item["required_bytes"] for item in inputs)
+    free = min(observed["available_HOME_bytes"], disk.f_bavail*block)
+    floor = observed["complete_required_HOME_bytes"]
+    if v5n or v5o or v5q or v5r:
+        paid = observed["authoritative_joint_fit"]["recovery_obligations"]
+        require(paid["mirror_inputs"] == inputs and paid["missing_mirror_bytes"] == missing,
+                "priced 136 mirror changed after native capture")
+        # The selected provider charges these exact missing bytes in its full floor.
+        floor -= missing
+    return dict(schema="horizon-136-parent-mirror-price-v1", fleet=observed["fleet"], native=observed,
+                mirror_inputs=inputs, available_HOME_bytes=free, complete_required_HOME_bytes=floor,
+                missing_mirror_bytes=missing, required_with_mirrors_bytes=floor+missing,
+                memory_fits=observed["memory_fits"], mirrors_fit=observed["memory_fits"] and free >= floor+missing,
+                remaining_after_mirrors_bytes=free-floor-missing, resource_credit_bytes=0,
+                admission_granted=False, r2_mutations=False)
+
+
+if __name__ == "__main__":
+    require(len(sys.argv) == 3, "price-mirrors FLEET_PATH FLEET_SHA256")
+    print(json.dumps(capture(Path(sys.argv[1]), sys.argv[2]), sort_keys=True))

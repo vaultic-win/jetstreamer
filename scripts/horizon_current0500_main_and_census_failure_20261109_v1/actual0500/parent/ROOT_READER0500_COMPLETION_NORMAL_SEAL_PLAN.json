@@ -1,0 +1,24 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-parent-memory-reader0500-completion-20261109-v1",
+  "members": [
+    {
+      "mode": 292,
+      "name": "journal.json",
+      "sha256": "48bfb8a245a2ed3dd6052f599d067112ea607017629f6724501f10f0962b8592",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/reader0500-original-PID1.json"
+    },
+    {
+      "mode": 292,
+      "name": "drain.json",
+      "sha256": "8766894357f0bca7b84ef01e9ad5dab0618172e7be9bddb9addaf6681b1288fc",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/reader0500-original-drain.json"
+    },
+    {
+      "mode": 292,
+      "name": "completion.json",
+      "sha256": "5cc844562486e8bc9d897d3738f810ce9ebd33d791e0ff973bb106cde21cbe83",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/reader0500-completion.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

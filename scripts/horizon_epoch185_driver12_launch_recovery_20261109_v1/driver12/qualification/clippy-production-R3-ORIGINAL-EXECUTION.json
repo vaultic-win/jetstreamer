@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-epoch185-empty-hook-adapter-clippy-production-native-trigger-driver12-20261109-v1-r3.service; invocation ID: 64965742b31b4538a21e65cffca1279c\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 536ms\nCPU time consumed: 535ms\nMemory peak: 628.0K\nMemory swap peak: 0B\n"
+}

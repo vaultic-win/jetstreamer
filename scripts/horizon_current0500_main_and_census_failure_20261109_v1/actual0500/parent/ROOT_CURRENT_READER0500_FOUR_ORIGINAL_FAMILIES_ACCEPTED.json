@@ -1,0 +1,60 @@
+{
+  "actual_current_tuple": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/accepted-frame-selector.json",
+    "sha256": "02e0b10a1865a6e327a19293b42f9d41957cfaf2729fe6a189e6f84d006547b1"
+  },
+  "actual_original_completion": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/reader0500-original-PID1.json",
+    "sha256": "48bfb8a245a2ed3dd6052f599d067112ea607017629f6724501f10f0962b8592"
+  },
+  "actual_original_drain": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/reader0500-original-drain.json",
+    "sha256": "8766894357f0bca7b84ef01e9ad5dab0618172e7be9bddb9addaf6681b1288fc"
+  },
+  "actual_original_reader_image": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2",
+    "sha256": "d00ee6ad4076c32b90a416efc9236208cd7ee8b64e572d5ad830c9a709eac470"
+  },
+  "actual_original_reader_proof": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/proof.json",
+    "sha256": "d986be1eafbe34c7e628989361ec8afd9fa8472c6db7a832c9afdee46e30b373"
+  },
+  "actual_original_reader_spec": {
+    "path": "/usr/local/lib/jetstreamer/horizon-failed4-current-accounting-reader-plan-actual0500-20261109-v13/spec.json",
+    "sha256": "c31d19a72cda52ffebedae0276be091347b8513d0f664897083c1e26fb29dbea"
+  },
+  "actual_output_bindings": {
+    "accounting": {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/raw-accounting.json",
+      "sha256": "4dc0fd63a0cf1b0d628dab2401e31dada36ca9f6889a167caa32f2b5fe1fdfe6"
+    },
+    "accounting_before": {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/raw-accounting-before.json",
+      "sha256": "b5296e6e4d20eeea26a0417dd70465214736f01464c1cc48567775e87f64145a"
+    },
+    "original_raw_builder_after": {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/raw-builder-after.json",
+      "sha256": "a15fb2ec21bc5aff0da3eaad6c46babe5e604b280cea87bec2275ebdb6c3d51a"
+    },
+    "original_raw_builder_before": {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/raw-builder-before.json",
+      "sha256": "71288530fb11ccf06366e64b7a5b10f7d031ae1d60d2dcde56d420f471341424"
+    }
+  },
+  "all_four_current_reservations_preserved": true,
+  "all_four_output_censuses_and_before_after_semantic_stability_verified": true,
+  "contract": {
+    "path": "/home/sol/.jetstreamer-private/retained161-all-failure-families-source-20261105-v2/FULL_CURRENT_READER_QUALIFICATION_CONTRACT.SOURCE_ONLY.json",
+    "sha256": "82f947c258abce7f2edb1f00d67b4e1c3c04cd8e05c5bfa4d928471a65adf076"
+  },
+  "exact_original_families": [
+    4,
+    5,
+    6,
+    7
+  ],
+  "memory_or_DATA_credit_bytes": 0,
+  "original_invocation_id": "4c082612ad8f4124ad8db0d825b5423e",
+  "replay_admission_authorized": false,
+  "schema": "horizon-current-production-reader-four-original-family-acceptance-v1"
+}

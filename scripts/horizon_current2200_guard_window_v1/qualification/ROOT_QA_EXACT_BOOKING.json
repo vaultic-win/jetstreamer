@@ -1,0 +1,22 @@
+{
+  "reused_original_DATA_phase": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current2200-window-20261108-v1/ROOT_QA_EXACT_BOOKING.json",
+    "sha256": "d93a1f4963645e7e94935c9f9974c5efe13310ad5c6e3367778cd875590b3988"
+  },
+  "new_retained_DATA_bytes": 0,
+  "previous_retained_DATA_lower_bound_bytes": 5152230552212,
+  "no_new_extra_QA_booking": true,
+  "normal_pool_bytes": 6442450944,
+  "existing_fresh_extra_QA4_bytes": 0,
+  "total_pool_bytes": 6442450944,
+  "window_compiler_or_test_bytes": 1073741824,
+  "overlapping_current_adapter_maximum_bytes": 2147483648,
+  "observer_bytes": 2147483648,
+  "status_bytes": 536870912,
+  "Root_bytes": 536870912,
+  "actual_QA_sum_bytes": 3221225472,
+  "ordinary8GiB_test_actor_may_overlap": false,
+  "total_overlap_memory_with_observer_status_Root_bytes": 6442450944,
+  "complete_DATA_bytes": 5152230552212,
+  "no_memory_or_DATA_credit": true
+}

@@ -1,0 +1,50 @@
+--- cycle.py
++++ cycle.py
+@@ -26,8 +26,19 @@
+     return funds.put(p,v)
+ def samplepath(n):return D/f'horizon-resume-observer-20261120-v{n}.json'
+ def root(n):return D/f'horizon-foundation-seven-lane-v{n}'
++from epoch292_cadence_cutoff import interrupted_cutoff
+ n=222
+-while (root(n)/'status-audit.json').exists():n+=1
++preserved_cutoff=None
++while True:
++    if (root(n)/'status-audit.json').exists():
++        n+=1
++        continue
++    if n==291:
++        preserved_cutoff=interrupted_cutoff()
++        if preserved_cutoff is not None:
++            n+=1
++            continue
++    break
+ if len(sys.argv)==3 and sys.argv[1]=='recover-fleet':
+     n=int(sys.argv[2]);assert (root(n)/'status-audit.json').exists() and not (root(n)/'completion.json').exists()
+ out=root(n);out.mkdir(exist_ok=True,mode=0o700)
+@@ -36,10 +47,12 @@
+ old=samplepath(n-1);obs=samplepath(n)
+ prior=bound(ref(old));next_time=max(dtval(prior['recorded_at_utc'])+1800,dtval(audit['sampled_at_utc'])+1800)
+ if n>222:
+-    last=bound(ref(root(n-1)/'status-audit.json'))
+-    statuses={int(k):v for k,v in last['statuses'].items()}
++    prior_index=290 if n==292 and preserved_cutoff is not None else n-1
++    last=bound(ref(root(prior_index)/'status-audit.json'))
++    status_sources=preserved_cutoff['statuses'] if n==292 and preserved_cutoff is not None else last['statuses']
++    statuses={int(k):v for k,v in status_sources.items()}
+     prevfleet=last['previous_native_fleet']
+-    previous_completion = root(n - 1) / 'completion.json'
++    previous_completion = root(prior_index) / 'completion.json'
+     if not previous_completion.exists() and 'fleet' in last:
+         recovered = bound(last['fleet'])
+         assert recovered['observer_sha256'] == last['observer']['sha256']
+@@ -47,6 +60,10 @@
+                                          statuses=last['statuses'], archive_publications=last['archive_publications']))
+     if previous_completion.exists():
+         prevfleet = bound(ref(previous_completion))['fleet']
++    if n==292 and preserved_cutoff is not None:
++        assert preserved_cutoff['observer']==ref(old)
++        assert preserved_cutoff['accepted_predecessor']==ref(previous_completion)
++        assert preserved_cutoff['previous_fleet']==prevfleet
+ else:prevfleet=audit['previous_fleet']
+ correction=D/'horizon257-full-capacity-status-v222-a1/completion.json'
+ if n==223 and correction.is_file():

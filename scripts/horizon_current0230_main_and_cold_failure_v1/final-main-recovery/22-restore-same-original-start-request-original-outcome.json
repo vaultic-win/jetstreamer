@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "--no-block",
+    "start",
+    "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service"
+  ],
+  "cleanup_terminal_code": null,
+  "cleanup_terminal_signal": null,
+  "cleanup_wait_error": null,
+  "exit_code": 0,
+  "exit_signal": null,
+  "no_retry_or_clock_reset": true,
+  "original_iid": "da9b57fed9f04c9fa1b0c5dba1932488",
+  "program": "/usr/bin/systemctl",
+  "stderr_bytes": [],
+  "stderr_overflow": false,
+  "stderr_read_error": null,
+  "stdout_bytes": [],
+  "stdout_overflow": false,
+  "stdout_read_error": null,
+  "wait_error": null,
+  "wall_finished_at": 1794191992
+}

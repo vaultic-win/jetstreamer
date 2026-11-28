@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "systemctl",
+    "stop",
+    "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.timer"
+  ],
+  "code": 0,
+  "stdout": "",
+  "stderr": ""
+}

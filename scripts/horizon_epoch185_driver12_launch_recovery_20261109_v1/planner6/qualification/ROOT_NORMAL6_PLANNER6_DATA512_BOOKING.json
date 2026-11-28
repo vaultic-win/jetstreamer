@@ -1,0 +1,18 @@
+{
+  "schema": "horizon-normal6-planner6-helper35-booking-v1",
+  "owner": "/root",
+  "previous": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/ROOT_NORMAL6_FINAL6_DATA512_BOOKING.json",
+    "sha256": "58e1cad05f343cf5105ebba8edef168a668699a5189d90a6219f40d01f09e54c"
+  },
+  "previous_retained_DATA_lower_bound_bytes": 5175316001428,
+  "new_retained_DATA_bytes": 536870912,
+  "complete_DATA_bytes": 5175852872340,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_bytes": 0,
+  "one_serial_compiler_bytes": 2147483648,
+  "ordinary_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 2147483648,
+  "all_previous_source_and_DATA_promises_retained": true,
+  "no_replay_or_resource_credit": true
+}

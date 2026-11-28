@@ -1,0 +1,35 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -793,6 +793,9 @@
+         assert resources['broker']['unit'] == EXTRACTION226_OWNERS[row['producer']['Id']]
+     ordinary = [r for r in f['active'] if r['phase'] != EXTRACTION226_PHASE and not diagnostic229.owns(r) and not diagnostic229_bounded.owns(r) and not diagnostic229_bounded_retry.owns(r) and not diagnostic271_trace.owns(r) and not diagnostic271_europe.owns(r) and not diagnostic271_boundary.owns(r) and not diagnostic271_reward_tuples.owns(r) and not diagnostic271_stake_inputs.owns(r) and not diagnostic230_slot_hashes.owns(r) and not diagnostic230_bank_trace.owns(r) and not diagnostic229_slot_hash_ram.owns(r) and not diagnostic288_shrink_debt.owns(r) and not diagnostic230_program_demotion_ram.owns(r) and not diagnostic229_bank_delta.owns(r)
+                 and not diagnostic226_suffix.owns(r) and not diagnostic230_checkpoint_continuation.owns(r)]
++    ordinary = [row for row in ordinary
++                if not (row['epoch'] == 257 and row['phase'] == 'upload-readback'
++                        and row['unit']['Id'] == 'horizon-upload-257-current-reader-v1.service')]
+     assert sorted(r['epoch'] for r in ordinary) == sorted([*roster,*guarded_replays.by_epoch(cfg['replays'])])
+     guarded_replays.validate_fleet([r for r in ordinary if r['epoch'] not in roster], bound(ref(obs))['replays'])
+     reported={r['epoch']:r['status'] for r in f['epochs'] if r['status']}
+@@ -865,6 +868,11 @@
+     replays = guarded_replays.by_epoch(cfg['replays'])
+     for e,previous in list(statuses.items()):
+         if e in closed: continue
++        if e == 257 and (V / 'horizon257-current-reader-delivery-v1/pipeline-claim.json').is_file():
++            wd = out / str(e)
++            wd.mkdir(mode=0o700, exist_ok=True)
++            record(wd / 'completion.json', bound(previous))
++            continue
+         if e in (229, 230, 271, 275, 288, 292) and e not in replays:
+             if e == 271:
+                 private_failure = ref(V/'horizon271-full-guard-v277/repair-backlog.json')
+--- a/native_binding_replays.py
++++ b/native_binding_replays.py
+@@ -44,6 +44,8 @@
+ import diagnostic226_suffix
+ diagnostic_handlers = (diagnostic229, diagnostic229_bounded, diagnostic229_bounded_retry, diagnostic271_trace, diagnostic271_europe, diagnostic271_boundary, diagnostic271_reward_tuples, diagnostic271_stake_inputs, diagnostic230_slot_hashes, diagnostic230_bank_trace, diagnostic288_shrink_debt, diagnostic229_slot_hash_ram, diagnostic230_program_demotion_ram, diagnostic230_checkpoint_continuation, diagnostic229_bank_delta, diagnostic226_suffix)
+ ordinary = [r for r in f['active'] if r not in sample_publishers and r not in extract226
++            and not (r['epoch'] == 257 and r['phase'] == 'upload-readback'
++                     and r['unit']['Id'] == 'horizon-upload-257-current-reader-v1.service')
+             and not any(handler.owns(r) for handler in diagnostic_handlers)]
+ guarded_replays.validate_fleet(ordinary, bound(obs)['replays'])
+ live = {int(k): v for k, v in states['active_claims'].items()}

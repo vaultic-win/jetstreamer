@@ -1,0 +1,20 @@
+{
+  "exact_old_native": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStartTimestampMonotonic": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "new_keeper": "horizon-positive185-reader-positive-722adc397ae24bb4b96d452783599f57-retain.target",
+  "new_service": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+  "no_reset_stop_or_restart": true,
+  "old_original_untouched": true
+}

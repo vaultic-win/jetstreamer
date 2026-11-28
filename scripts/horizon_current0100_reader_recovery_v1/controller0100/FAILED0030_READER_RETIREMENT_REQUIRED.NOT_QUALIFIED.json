@@ -1,0 +1,16 @@
+{
+  "original_outcome": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0030-reader-phase-20261109-v15/94-actual-phase-gated-original-reader-original-outcome.json",
+    "sha256": "84d880ee10cf1b8a3258cf5e5fdd7526f3bd58b9b30e40d29b2466c74233a13d"
+  },
+  "unit": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+  "actual_original_IID": "0e271726da824c2bbbad552fc21598ae",
+  "observed_error": "retained199 guard native changed across readers",
+  "qualified_retirement_program": null,
+  "qualified_retirement_control": null,
+  "actual_original_PID1_and_cgroup_descriptor_drain": null,
+  "actual_alias_retirement_completion": null,
+  "no_reset_or_unqualified_alias_reuse": true,
+  "Root_investigation_pending": true,
+  "not_satisfied_by_a_new_sample_or_guard": true
+}

@@ -1,0 +1,48 @@
+{
+  "schema": "horizon-seven-terminal-fleet-qualification-v1",
+  "source": {
+    "main.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/main.rs",
+      "sha256": "44dd0ad1d3ff661d0d72b24e2138a4df98c87f9a46d8f279093127ed69b9c0ff"
+    },
+    "terminal.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/terminal.rs",
+      "sha256": "58327a9524975ebcd811a66d4929abdd998358b99d7cbc1d8f7ac5d2f618dc2d"
+    },
+    "memory_target.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/memory_target.rs",
+      "sha256": "ae6ba062ddea8082ef9c6e090cdc58ff250deda853d3675d5e683804cb3f2fda"
+    },
+    "bootstrap.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/bootstrap.rs",
+      "sha256": "239800d59817eb40a4484e6d092fc5a604bacde3393ea5d8131977bdca7b804a"
+    }
+  },
+  "four_strict_compiler_configurations_passed": true,
+  "ordinary_tests_passed": 50,
+  "qualification": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/terminal-v9/ROOT_FOUR_STRICT_COMPILERS_FIFTY_TESTS_PASSED.json",
+    "sha256": "a83ed5bb8046fbdca8efae2fc7a4b02e5bd9e0f08c1fefaf4243587607807afb"
+  },
+  "running_image": {
+    "path": "/usr/local/lib/jetstreamer/horizon-root-fleet-operational-review-tools-20261110-v9/review",
+    "sha256": "a5342dedce539f38eabb78ff1cfa8d7f17bc3735a2e27bce1798f078c892c253"
+  },
+  "native_1600": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/terminal-v9/ROOT_NATIVE_FULL100_NINETEEN_STATUS_SEVEN_TERMINAL_ACCEPTED.json",
+    "sha256": "84f87006d571af6bc8fa0e2e0f53dd190db8ba9dfddfadc978cf6e5eef4316b9"
+  },
+  "native_1630": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/terminal-v9/cycle1630/ROOT_ACCEPTED_FLEET.json",
+    "sha256": "5f3a4156f4099872a12376e1ab6f4aa5661f53ab3d050c7eea8d9dace74e1080"
+  },
+  "ready_pairs": 70,
+  "remaining_epochs": 30,
+  "live_replay_count": 0,
+  "terminal_original_count": 7,
+  "last_proven_replay_count": 7,
+  "retained_historical_memory_target": 13,
+  "authenticated_status_count": 19,
+  "resource_credit_bytes": 0,
+  "replay_launch_authorized": false
+}

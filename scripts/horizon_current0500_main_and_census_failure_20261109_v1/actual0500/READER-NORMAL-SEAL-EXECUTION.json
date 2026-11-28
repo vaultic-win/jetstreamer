@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-failed4-current-accounting-reader-plan-actual0500-20261109-v13\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"33a9164e734591b609f3b54304f61387d386ffd672771098efb919e36c6c5715\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

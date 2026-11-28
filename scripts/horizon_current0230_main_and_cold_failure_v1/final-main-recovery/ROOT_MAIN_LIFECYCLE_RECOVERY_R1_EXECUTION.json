@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-positive185-lifecycle-main-recovery-da9b57fe-r1.service\nError: cold185 lifecycle output namespace changed\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=1\nService runtime: 253ms\nCPU time consumed: 222ms\nMemory peak: 4.0M\nMemory swap peak: 0B\n"
+}

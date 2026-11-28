@@ -1,0 +1,9 @@
+{
+  "original_census_execution": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0730-window-v1/census-all-ORIGINAL-EXECUTION.json",
+    "sha256": "43f5a26dcd149e84a627fb1662ad07447867388f41148110e2245661cdd201cf"
+  },
+  "all_actual_executions_authenticated_by_bound_original_time_window": true,
+  "no_original_invocation_invented": true,
+  "all_original_payloads_successful": true
+}

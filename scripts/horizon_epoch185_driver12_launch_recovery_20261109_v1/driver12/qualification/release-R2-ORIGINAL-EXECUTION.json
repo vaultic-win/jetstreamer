@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-epoch185-empty-hook-adapter-release-native-trigger-driver12-20261109-v1-r2.service; invocation ID: 07b425503e474f3c9e46a520f95b09cf\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 6.942s\nCPU time consumed: 6.951s\nMemory peak: 572.0K\nMemory swap peak: 0B\n"
+}

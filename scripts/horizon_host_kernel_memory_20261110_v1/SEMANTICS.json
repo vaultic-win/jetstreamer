@@ -1,0 +1,102 @@
+{
+  "schema": "horizon-linux68-anon-disjoint-kernel-counter-semantics-v1",
+  "owner": "/root",
+  "supported_releases": [
+    "6.8.0-146-generic",
+    "6.8.0-149-generic"
+  ],
+  "global_kernel_fields": [
+    "SUnreclaim",
+    "KernelStack",
+    "PageTables"
+  ],
+  "excluded_fields": [
+    "Slab",
+    "SReclaimable",
+    "KReclaimable",
+    "VmallocUsed",
+    "AnonPages",
+    "RSS",
+    "cgroup-kernel-subcomponents",
+    "Percpu-unqualified-initial-reserved-chunk"
+  ],
+  "per_actor_credited_counter": "memory.stat anon",
+  "global_kernel_ledger_entries": 1,
+  "historical_true_host_component_bytes": 43603734528,
+  "missing_pool_tag_input_promises_bytes_excluded": 2684354560,
+  "minimum_of_two_endpoints": true,
+  "global_additional_margin_bytes": 1073741824,
+  "shared64_bytes_retained": 68719476736,
+  "native16_bytes_retained": 17179869184,
+  "verification96_bytes_retained": 103079215104,
+  "host_future_envelope_proven": false,
+  "uploader_future_envelope_proven": false,
+  "resource_credit_bytes": 0,
+  "replay_admission_authorized": false,
+  "reference_sources": [
+    {
+      "name": "fs__proc__meminfo.c",
+      "sha256": "2c6f41b68527711de9d417d62dd5a7c9b22ff4fb04c7e649a28ee51f0be8fcae",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/fs/proc/meminfo.c"
+    },
+    {
+      "name": "mm__page_alloc.c",
+      "sha256": "5ec6e187b4b7134cf7e4d4eafb6525b29d88d3c2e9b0c9e79436103a077afcd0",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/mm/page_alloc.c"
+    },
+    {
+      "name": "mm__memcontrol.c",
+      "sha256": "950762d45b6c8742b874f6870ed56575e7781db2e09679245baa0ca98d568b3b",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/mm/memcontrol.c"
+    },
+    {
+      "name": "Documentation__filesystems__proc.rst",
+      "sha256": "20b52d9035007c160791f1d79cade05382479822b9b03507ec3fc50dee78f843",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/Documentation/filesystems/proc.rst"
+    },
+    {
+      "name": "Documentation__admin-guide__cgroup-v2.rst",
+      "sha256": "717277564e1c365c38c080339efbbac1efa82585907c4d4e10fb940dc9c856d3",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/Documentation/admin-guide/cgroup-v2.rst"
+    },
+    {
+      "name": "mm__percpu.c",
+      "sha256": "ab581db727de4afe4c5b9c3813311936f58ec166021bfaba8ac7e9ee566790a2",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/mm/percpu.c"
+    },
+    {
+      "name": "mm__show_mem.c",
+      "sha256": "29c0c6f784bf30c666e0f8416e0e4c36ca65bdcbbd4ecccc0218b40bf24aee18",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/mm/show_mem.c"
+    },
+    {
+      "name": "kernel__fork.c",
+      "sha256": "82e2af227e6f67d64f9c4c20a5c121c59aac575c6cb59da54a9bd16c5eb159e8",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/kernel/fork.c"
+    },
+    {
+      "name": "include__asm-generic__pgalloc.h",
+      "sha256": "ce9e2cef493815bd2e0c65a0bd67916720f0fcc37fbc134b5aeac1c8872cbad1",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/include/asm-generic/pgalloc.h"
+    },
+    {
+      "name": "mm__memory.c",
+      "sha256": "85a7bf0d9d61bf21e764a4ea4e458ed72863f1bf2acee9fdcbc2038524ba8266",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/mm/memory.c"
+    },
+    {
+      "name": "arch__x86__include__asm__page_64_types.h",
+      "sha256": "0fabfb5b6c79bbd8909e2f69192b56889265438a80b2f2b79768a860ef8ad7d0",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/arch/x86/include/asm/page_64_types.h"
+    },
+    {
+      "name": "arch__x86__include__asm__page_types.h",
+      "sha256": "aeb01992dcba1bcad2900366e1d14a33087164607b1842d265c27038b8f36e23",
+      "origin_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/arch/x86/include/asm/page_types.h"
+    }
+  ],
+  "diagnostic_only_kernel_fields": [
+    "Percpu"
+  ],
+  "supported_architecture": "x86_64"
+}

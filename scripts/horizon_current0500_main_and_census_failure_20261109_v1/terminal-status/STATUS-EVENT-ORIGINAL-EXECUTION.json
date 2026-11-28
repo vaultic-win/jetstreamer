@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"receipt\": \"/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109052451.json\", \"status\": {\"elapsed_execution_millis\": 568000, \"epoch\": 185, \"estimated_remaining_millis\": 496535206, \"jet_size_bytes\": 0, \"phase\": \"verification\", \"sampled_at_utc\": \"2026-11-09T05:24:51Z\"}, \"control_remaining_millis\": 1062000, \"failed_original_failed_original_terminal_and_drained\": true}\n",
+  "stderr": "Running as unit: horizon-status185-current0500-cold-failure-event-20261109-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1.437s\nCPU time consumed: 290ms\nMemory peak: 760.0K\nMemory swap peak: 0B\n"
+}

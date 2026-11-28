@@ -1,0 +1,23 @@
+[Unit]
+@FAILURE@
+Description=Epoch @EPOCH@ private replay protective guard
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+Restart=no
+MemoryMax=1073741824
+MemorySwapMax=0
+CPUQuota=100%
+TasksMax=256
+TimeoutStartSec=220
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectControlGroups=yes
+PrivateNetwork=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+ReadWritePaths=@STATE@/receipts
+EnvironmentFile=@STATE@/guard.env
+ExecStart=@IMAGE@ @COMMAND@ @ROLE@ @MODE@ @STATE@/supervisor.json ${HORIZON266_SUPERVISOR_SHA}

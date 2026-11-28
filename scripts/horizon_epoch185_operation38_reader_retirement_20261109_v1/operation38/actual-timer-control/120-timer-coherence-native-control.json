@@ -1,0 +1,93 @@
+{
+  "accepted": false,
+  "attempt": 29,
+  "finite_actual_deadline": false,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1us",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/etc/systemd/system/horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+      "Id": "horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+      "InvocationID": "956119710cdc42339fc0a286cf127eda",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "horizon-operation32-coherence-disposable-20261108-v38-r1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "alias_identity": {
+          "ctime": 1794198048,
+          "ctime_nsec": 386487407,
+          "dev": 2304,
+          "ino": 10011651,
+          "mode": 41471,
+          "mtime": 1794198048,
+          "mtime_nsec": 386487407,
+          "uid": 0
+        },
+        "declared_path": "/etc/systemd/system/horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+        "normal_seal": {
+          "path": "/usr/local/lib/jetstreamer/operation38-coherence-control-20261109-v1/deployment-seal-receipt.json",
+          "sha256": "c7d5e187752b00918a74e24c77de9ab3d97a9073d4f550ca6bec544b09cbc0a3"
+        },
+        "source": {
+          "path": "/usr/local/lib/jetstreamer/operation38-coherence-control-20261109-v1/horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+          "sha256": "32e98881054abe6ddcf009f030e483f7ef9c5e6496a6d98d96229d53211a4817"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1us",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/etc/systemd/system/horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+      "Id": "horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+      "InvocationID": "956119710cdc42339fc0a286cf127eda",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "horizon-operation32-coherence-disposable-20261108-v38-r1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "alias_identity": {
+          "ctime": 1794198048,
+          "ctime_nsec": 386487407,
+          "dev": 2304,
+          "ino": 10011651,
+          "mode": 41471,
+          "mtime": 1794198048,
+          "mtime_nsec": 386487407,
+          "uid": 0
+        },
+        "declared_path": "/etc/systemd/system/horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+        "normal_seal": {
+          "path": "/usr/local/lib/jetstreamer/operation38-coherence-control-20261109-v1/deployment-seal-receipt.json",
+          "sha256": "c7d5e187752b00918a74e24c77de9ab3d97a9073d4f550ca6bec544b09cbc0a3"
+        },
+        "source": {
+          "path": "/usr/local/lib/jetstreamer/operation38-coherence-control-20261109-v1/horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+          "sha256": "32e98881054abe6ddcf009f030e483f7ef9c5e6496a6d98d96229d53211a4817"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2544719618519,
+    "next_monotonic_usec": 18446744073709551615,
+    "next_realtime_usec": 18446744073709551615
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+  "unset_pending_requires_metadata_requery": true
+}

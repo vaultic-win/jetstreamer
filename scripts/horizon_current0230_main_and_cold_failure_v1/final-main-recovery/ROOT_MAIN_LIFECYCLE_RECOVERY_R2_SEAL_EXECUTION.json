@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-positive185-lifecycle-main-recovery-da9b57fe-r2\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"1f6ef331e505fa99ab5a7fe95a63ec516c0ea795856620ce535fab39d635ebac\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

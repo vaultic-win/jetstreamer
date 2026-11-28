@@ -1,0 +1,28 @@
+{
+  "schema": "horizon-actual-qualified-driver11-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold",
+    "sha256": "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/artifact-proof.json",
+    "sha256": "4366c991c590c50223a73ca46323aee55b0a8987dbd855e5c066c7927a774b60"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/deployment-seal-receipt.json",
+    "sha256": "307118d4e0f71972aaae70a2e646d11c9c7e3c667513090172c6e9e1618a840c"
+  },
+  "QA": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/ROOT_ALL31_AND_ROOT_SOL_NATIVE_TRANSPORT_CASES_ACCEPTED.json",
+    "sha256": "9346e5819d3146f1507859439f95563c996c0c518f1244e379afd6bf9fd27138"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/ROOT_NORMAL6_SERIAL2_ADDITIVE_DATA4_BOOKING.json",
+    "sha256": "b3e47822d086fdac652c718f067c72474528fe8ece320acc6318c2c5638a7f35"
+  },
+  "closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/ROOT_NORMAL6_SERIAL2_DRIVER11_PHASE_CLOSED_DATA4_RETAINED.json",
+    "sha256": "c226c700dc6f220850f3e10f715519531a6741a2ca320c430980c74aa130bca4"
+  },
+  "fresh_native_first_guard_and_downstream_registration_required": true
+}

@@ -1,0 +1,33 @@
+{
+  "current_authority": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+    "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+  },
+  "current_fleet": {
+    "path": "/var/lib/jetstreamer/root-fleet-replacement-native-qualification-0300-seven-DATA-20261111-v27/ROOT_ACCEPTED_FLEET.json",
+    "sha256": "2e9dfac9363ac5a99338267fecf4cb464c49a74dc0c611bbf81db71b19a9a4d0"
+  },
+  "old_native_commitments_bytes": 13757317120,
+  "one_serial_compiler_bytes": 2147483648,
+  "separate_Root_outer_bytes": 1073741824,
+  "total_native_bytes": 16978542592,
+  "native16_limit_bytes": 17179869184,
+  "separate_OS_artifact_budget_reused_bytes": 536870912,
+  "actual_OS_available_before_bytes": 72915046400,
+  "protected_OS_free_bytes": 68719476736,
+  "actual_Root_outer": {
+    "Restart": "no",
+    "MainPID": "1424569",
+    "NRestarts": "0",
+    "MemoryMax": "1073741824",
+    "MemorySwapMax": "0",
+    "User": "root",
+    "Group": "root",
+    "Id": "horizon-whole-role-source-qa-root-20261111-v5.service",
+    "InvocationID": "2e9da6021ff345bca60651a0cedf8ef4"
+  },
+  "all_promises_retained": true,
+  "scope": "source-QA-only-unbound-template-no-native-execution",
+  "native_execution_authorized": false,
+  "replay_admission_authorized": false
+}

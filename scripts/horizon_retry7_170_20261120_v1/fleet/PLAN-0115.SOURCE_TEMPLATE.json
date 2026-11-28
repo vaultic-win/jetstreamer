@@ -1,0 +1,30 @@
+{
+  "schema": "horizon-Root-terminal-fleet-reconcile-plan-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "previous_fleet": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/root2325-live166retry8-167retry7-170retry6-homeaudit-observation-20261119-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json",
+    "sha256": "a845ae7e977b6e3b6cd0fc0e5d675d15212f115f1d87bf2f8ec13f5811be404e"
+  },
+  "recovery_overlay": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/root0040-recovery-20261120-v1/ROOT_OPERATIONAL_RECOVERY_EVENT.json",
+    "sha256": "e8fedd5fc957649318a9b3d5aca84761cb0f394c0bb215d557577c8b887e8eba"
+  },
+  "previous_observer": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/sample-root0040-live166retry8-167retry7-20261120-v1.json",
+    "sha256": "eb48dbfb231e53c6ef781067e57c6c05c0f227ef4641aa9ee803f13bfce37c5f"
+  },
+  "observer": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/sample-root0115-live166retry8-167retry7-20261120-v1.json",
+    "sha256": "800f07765570c0925971d3623b884256082680e1ca48b21b5162e8b744d4136f"
+  },
+  "authenticated_status_audit": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/cycle0115-live166retry8-167retry7-19-20261120-v1/COMPLETED.json",
+    "sha256": "036c0d65691cd3db76f611a1865aa933e54f626ac50493919f43a2f352f4c625"
+  },
+  "sole_next_observer": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/root0115-recovery-20261120-v1/sealed-next-observer/next-observer.json",
+    "sha256": "d74c2bebc8a1fff6ae18e5bc8e8267a8709e6eef944935d9c1a24635a41693d8"
+  },
+  "output_directory": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/fleet0115-v1"
+}

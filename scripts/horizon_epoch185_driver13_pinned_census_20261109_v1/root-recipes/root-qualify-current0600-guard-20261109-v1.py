@@ -1,0 +1,28 @@
+from pathlib import Path
+import json,os,hashlib,subprocess,re
+packet=Path('/tmp/root-current0600-window-source-20261109-v1');v=json.loads((packet/'SOURCE_ONLY_MANIFEST.json').read_text());p=Path(v['root_QA_directory']);sha=lambda b:hashlib.sha256(b).hexdigest()
+def b(f):return dict(path=str(f),sha256=sha(f.read_bytes()))
+def save(n,x):
+ fd=os.open(p/n,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+ with os.fdopen(fd,'w') as f:json.dump(x,f,indent=2);f.flush();os.fsync(f.fileno())
+assert b(p/'source/main.rs')['sha256']==v['source_sha256']
+originals=[]
+def run(label,a):
+ save(label+'-ORIGINAL-ARGV.json',a);z=subprocess.run(a,capture_output=True,text=True,timeout=330);save(label+'-ORIGINAL-EXECUTION.json',dict(code=z.returncode,stdout=z.stdout,stderr=z.stderr));print(label,z.returncode,z.stderr[-1500:] if z.returncode else '',flush=True);assert z.returncode==0,z.stderr
+ unit=next(x.split('=',1)[1] for x in a if x.startswith('--unit='))+'.service';n=dict(x.split('=',1) for x in subprocess.check_output(['systemctl','show',unit,'-pMainPID,ControlPID,ControlGroup,NRestarts,Result,ExecMainStatus'],text=True).splitlines());assert n['MainPID']==n['ControlPID']==n['NRestarts']==n['ExecMainStatus']=='0' and n['Result']=='success' and n['ControlGroup']==''
+ rows=[json.loads(x) for x in subprocess.check_output(['journalctl','--all','--no-pager','-ojson','-u',unit],text=True).splitlines()];done=[x for x in rows if x.get('_PID')=='1' and x.get('_UID')=='0' and x.get('UNIT')==unit and x.get('MESSAGE_ID')=='7ad2d189f7e94e70a38c781354912448'];assert len(done)==1
+ originals.append(dict(execution=b(p/(label+'-ORIGINAL-EXECUTION.json')),original_native=n,original_PID1_success=done[0],original_outer_reaped=True,original_cgroup_empty=True));return z
+for stage,name in v['recipes'].items():run(stage,json.loads((packet/'recipes'/name).read_text())['argv'])
+s='/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment';h=re.search("h='([a-f0-9]{64})'",Path('/tmp/arm-first-lane-observer1900.py').read_text()).group(1);assert sha(Path(s).read_bytes())==h;os.umask(0o022)
+def seal(label,plan):
+ for row in plan['members']:row['sha256']=sha(Path(row['source']).read_bytes())
+ save(label+'-NORMAL-SEAL-PLAN.json',plan);f=p/(label+'-NORMAL-SEAL-PLAN.json');z=subprocess.run([s,str(f),'--plan-sha256',sha(f.read_bytes()),'--self-sha256',h],capture_output=True,text=True);save(label+'-NORMAL-SEAL-EXECUTION.json',dict(code=z.returncode,stdout=z.stdout,stderr=z.stderr));assert z.returncode==0,z.stderr
+seal('TEST',json.loads((packet/'TEST_NORMAL_SEAL_PLAN.UNSTARTED.json').read_text()))
+counts={}
+for name in ['census-all','census-ignored','all61']:
+ a=json.loads((packet/'recipes'/(name+'-ARGV.UNSTARTED.json')).read_text())['argv'];z=run(name,a)
+ if name!='all61':counts[name]=[x[:-6] for x in z.stdout.splitlines() if x.endswith(': test')]
+ else:assert len(counts['census-all'])==65 and not counts['census-ignored'] and 'test result: ok. 65 passed; 0 failed; 0 ignored;' in z.stdout
+proof=p/'work/ARTIFACT_PROOF_BEFORE_SEAL.json';save('work/ARTIFACT_PROOF_BEFORE_SEAL.json',dict(schema='horizon-current0600-qualified-guard-v1',source=b(p/'source/main.rs'),production=b(p/'work/horizon-current0600-guard-window'),actual_test_census=counts,ordinary_tests_passed=65,all_original_61_names_preserved=True,all_original_actors_drained=True,prod_clippy_passed=True,test_clippy_passed=True,all_required_tests_passed=True,originals=originals,sample_utc=v['sample_utc'],sample_unix=v['sample_unix'],native_guard_window_still_required=True,replay_launch_authorized=False,memory_credit_bytes=0,DATA_credit_bytes=0))
+seal('PRODUCTION',json.loads((packet/'PRODUCTION_NORMAL_SEAL_PLAN.UNSTARTED.json').read_text()))
+print('Normally sealed current0600 guard-window',flush=True)

@@ -1,0 +1,111 @@
+{
+  "schema": "horizon235237-imported-index-consumer-review923-v1",
+  "reviewed_at_utc": "2026-11-06T15:31:25.043670+00:00",
+  "selected_index_allocated_bytes": 18243297280,
+  "selected_file_count": 4,
+  "selection_scope": "Only sameepoch235/237 complete compactindexes; preserve previous234/236indexes, all owner/output directory identities, original batch/cohort files and all canonicalarchives/sidecars.",
+  "tool": {
+    "path": "/var/lib/jetstreamer/horizon-imported235237-index-candidate923-v1/jetstreamer-horizon-retire-terminal-compact-index",
+    "sha256": "fc6ba728a04b4fc1cf48209f0474eeb84983c4909ecb11a04e24be8dd5b44bb1"
+  },
+  "nineteen_native_tests": {
+    "path": "/var/lib/jetstreamer/horizon235237-index-tests923-state-v2/nineteen-tests-natural-completion.json",
+    "sha256": "045dfa49c496a5d632e3944e10773bb04b588bf6d0145813a7d07abd371ec4bf"
+  },
+  "qualified_release": {
+    "path": "/var/lib/jetstreamer/horizon235237-index-tests923-state-v3/release-natural-completion.json",
+    "sha256": "20d3f4fe19c1b4da9c454af56f5d6737483ccdaacf78b0cecd3d76f9a4bbd2d4"
+  },
+  "current_fleet": {
+    "path": "/var/lib/jetstreamer/horizon-complete-range-fleet923-Main-v1/fleet.json",
+    "sha256": "31a10aa52f9745dc7c6646b20c6c5340112179c0685e55f9eef65170e0eda2c2"
+  },
+  "current_native_census": {
+    "path": "/var/lib/jetstreamer/horizon-cycle923-current-native-capture-Main-v1/census.json.gz",
+    "sha256": "5ef39669dd35b161a886555cc826655c8cf1ea3cb1b86b749a990f6004019c64"
+  },
+  "authenticated_R2_audit": {
+    "path": "/var/lib/jetstreamer/horizon-repair-status-refresh-cycle923-v1/completed/audit-completion.json",
+    "sha256": "3f84b561d4a56a0455e7cbf4a2b6e6e5e62a9af2d86700a1e7d2bf55a3024841"
+  },
+  "observer": {
+    "path": "/var/lib/jetstreamer/horizon-exact-prefix-output-observer-78dc39c3-v2/jetstreamer-horizon-observe",
+    "sha256": "78dc39c3b8cf3e4198e6d2b35348ba764fe1c2ceecbd12cc536090ae8315facd"
+  },
+  "next_observer_config": {
+    "path": "/var/lib/jetstreamer/horizon-observer924-with236-Main-v1/config.json",
+    "sha256": "64f89c7be760abce768ec6a99b2743cd305670fd6f1139683f4ecaa5998e1c83"
+  },
+  "qualified_shared_helper": {
+    "path": "/var/lib/jetstreamer/horizon-shared-helper-four-feature-b764db2d-candidate920-v1/jetstreamer-r2",
+    "sha256": "b764db2d0a55da63e8b05f66dd3e11b2c02332c08665a3e055b67d014a99b52c"
+  },
+  "reader_source_bindings": {
+    "path": "/home/ubuntu/workspace/horizon-imported235237-index922-source-v1/READER-SOURCE-BINDINGS.json",
+    "sha256": "748274b6033df2bdc19c252b152918821bf1fe297eb4cc7482d852f8b42920ee"
+  },
+  "required_original_metadata": [
+    {
+      "path": "/home/ubuntu/.jetstreamer-private/qualification-235-general-shrink-debt-budget506-e3f15eb2-v1/state/destination-e748bbe05a30e82d20c8d3719401380224b340a7e8fdb7016c69f42c7c9701ce/work/root-cohort-235-235/run-2634498-1793673351962548044/cohort-state.json",
+      "sha256": "7492cfdebd0e9ef718881defdb25da93e04470bf68a9071cac3cf8277ecd88de",
+      "uid": 1000
+    },
+    {
+      "path": "/home/ubuntu/.jetstreamer-private/qualification-235-general-shrink-debt-budget506-e3f15eb2-v1/state/destination-e748bbe05a30e82d20c8d3719401380224b340a7e8fdb7016c69f42c7c9701ce/evidence/archive-batches/destination-0000000000010301-0000000000e5d46e/batch-a9756e58dea8404bd48896e41a3362641bac8afbac744423fdadd1900c2f7768.json",
+      "sha256": "aac851db7bf71019c4ae1e2630689c3f36424dcd5836bd36a0c8e4c9d39d9458",
+      "uid": 1000
+    },
+    {
+      "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-shrink-debt-budget506-e3f15eb2-v4/state/destination-84b1112cdb16efc508dc92c7bacafd8acddd7b341578d82ae5734bbb2540d584/evidence/archive-batches/destination-0000000000010301-0000000000e5d387/batch-b730b4ee11cf5aa96863493a891198f97aad89a37ca4b2d78193de09aa46e68e.json",
+      "sha256": "4c5dd71aaebd0b978036762f002b12723a76a7ac19315de07610d5703025150c",
+      "uid": 1000
+    }
+  ],
+  "consumer_findings": "Retain all original batches/cohort files at original paths; current/shared v7v8 capacity/Frame readers reopen those small files and check owner/output directory identities, not these derived sameepoch indexes. No source/cache tree is retired. Native observer retains terminal235/237 diagnostic rows and validates inactive owner before any worker/tree walk. Current3live236241245roots/claims are disjoint. The unchanged final /proc command/maps/cwd/root/exe/fd scanner and staged-recipe closure remain mandatory and fail closed on any actual consumer or foreign recipe; this review grants no exemption.",
+  "receipt_projection": [
+    {
+      "epoch": 235,
+      "host_original": {
+        "path": "/home/ubuntu/.jetstreamer-private/r2-receipts/epoch-235.r2.json",
+        "sha256": "0d0d6c5ef1e5759e9ce13b1c6579154058db44dd0628672965f7eb2991eea277"
+      },
+      "host_original_identity": {
+        "device": 66305,
+        "inode": 509608,
+        "uid": 1000,
+        "gid": 1000,
+        "mode": 33152,
+        "nlink": 1,
+        "size": 513,
+        "mtime_ns": 1793881716374226700,
+        "ctime_ns": 1793881716376226690
+      },
+      "immutable_root_copy": "/var/lib/jetstreamer/horizon235237-index-operation923-evidence-v1/epoch-235.r2.json",
+      "projected_at_exact_original_path_in_private_readonly_bind_only": true
+    },
+    {
+      "epoch": 237,
+      "host_original": {
+        "path": "/home/ubuntu/.jetstreamer-private/r2-receipts/epoch-237.r2.json",
+        "sha256": "191d4a0e07348da4496dc2c63843a52900063ec97397d2dc90aff6008226a8cb"
+      },
+      "host_original_identity": {
+        "device": 66305,
+        "inode": 509711,
+        "uid": 1000,
+        "gid": 1000,
+        "mode": 33152,
+        "nlink": 1,
+        "size": 513,
+        "mtime_ns": 1793953908850883945,
+        "ctime_ns": 1793953908855883925
+      },
+      "immutable_root_copy": "/var/lib/jetstreamer/horizon235237-index-operation923-evidence-v1/epoch-237.r2.json",
+      "projected_at_exact_original_path_in_private_readonly_bind_only": true
+    }
+  ],
+  "receipt_projection_gate": "Root-only typed helper requires canonical receiptUID0 while accepted originalpath receiptUID1000mode0600. Seal byteidentical non-sensitive Rootcopies; bind each readonly at exactly its originalpath in private operation sandbox. Prove projected inode/UID/ROmount/hash and unchangedhostoriginal before checkonly. Never chmod/change original or relabelreceiptcontents.",
+  "no_canonical_archive_or_sidecar_retirement_authority": true,
+  "no_R2_mutation_authority": true,
+  "final_live_consumer_check_still_required": true
+}

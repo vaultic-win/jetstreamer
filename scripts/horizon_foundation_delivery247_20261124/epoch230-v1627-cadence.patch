@@ -1,0 +1,18 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -1040,6 +1040,15 @@
+         assert publication_handoff.checked_image(release["predecessor"]) == str(fleet_image)
+         fleet_image = Path(publication_handoff.checked_image(release["fleet"]))
+         add(plan["gates"]["230"], sealed_226_file(first_7871_release), release["preflight"])
++    v1627_release = V / "horizon230-v1627-fleet-v1/acceptance.json"
++    if v1627_release.is_file():
++        release = bound(sealed_226_file(v1627_release))
++        assert release["schema"] == "foundation-epoch230-v1627-fleet-release-v1"
++        assert release["fleet_reconcile_only"] and release["admission_authorized"] is False
++        assert release["preflight"]["sha256"] == "8301ba667e1f440365cc40dcdbe4b5f69fa6d224e2e754734738908345b35cca"
++        bound(release["preflight"])
++        assert publication_handoff.checked_image(release["predecessor"]) == str(fleet_image)
++        fleet_image = Path(publication_handoff.checked_image(release["fleet"]))
+     rotation223 = V / "horizon223-bootstrap-rotation-settled-v342/completion.json"
+     if rotation223.is_file():
+         rotation = sealed_226_file(rotation223)

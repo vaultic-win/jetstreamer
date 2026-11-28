@@ -1,0 +1,18 @@
+{
+  "originals": [
+    "ordinary",
+    "root-native",
+    "sol-old-native",
+    "sol-census-native"
+  ],
+  "test_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-pinned-census-tests-20261109-v13/tests",
+    "sha256": "fcc92da4b3662f4b4f9c65bd4207971b834f0cc4c725960c8d836ea57c65a902"
+  },
+  "all_required_originals_passed": true,
+  "ordinary_output_summary": " ok. 43 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.01s\n\n",
+  "root_native_output_summary": " ok. 5 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.09s\n\n",
+  "sol_census_output_summary": " ok. 14 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.01s\n\n",
+  "new_production_and_tests_normally_sealed": false,
+  "no_replay_or_publication_authority": true
+}

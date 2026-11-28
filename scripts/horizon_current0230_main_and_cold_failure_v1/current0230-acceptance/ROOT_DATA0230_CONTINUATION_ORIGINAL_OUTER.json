@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"stage\": \"DATA0230\", \"code\": 0, \"stdout\": \"{\\\"no_resource_credit\\\":true,\\\"original_command_completed\\\":true,\\\"original_invocation_identity_pending_actual_DATA_receipt_and_PID1\\\":true,\\\"unit\\\":\\\"horizon-epoch183-ended-DATA-select-20261105-v1.service\\\"}\\n\", \"stderr\": \"\"}\n",
+  "stderr": ""
+}

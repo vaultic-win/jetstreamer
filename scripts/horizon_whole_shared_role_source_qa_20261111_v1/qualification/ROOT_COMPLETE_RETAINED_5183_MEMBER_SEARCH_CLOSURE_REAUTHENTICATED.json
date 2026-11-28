@@ -1,0 +1,14 @@
+{
+  "accepted_v5": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V5_EXACT_SOURCE_AND_REUSED_LIBRARY_FREEZE.json",
+    "sha256": "9c470619d39590fb20c7903f6dbd7d1490e0467ab94646dd27e8c7aeb7c37423"
+  },
+  "original_freeze": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_EXACT_SOURCE_AND_REUSED_LIBRARY_FREEZE.json",
+    "sha256": "9840d2514e47716b71c911094403fbe10004e854b60bebff19612c2c6fece81e"
+  },
+  "original_member_count": 5183,
+  "compiler_search_member_count": 5181,
+  "all_retained_members_rehashed": true,
+  "exact_search_directory_membership": true
+}

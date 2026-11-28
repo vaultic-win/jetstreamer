@@ -1,0 +1,33 @@
+{
+  "schema": "horizon-positive185-operation27-normal6-serial-QA512-booking-v1",
+  "prior_normal_pool_closure": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/ROOT_HELPER27_CURRENT1330_NORMAL_POOL_REVALIDATED_CLOSURE_R2_WITH_SELECTED30.json",
+    "sha256": "9b0d9404ce219bb8232a0cb52335ca4a06d7a52e00c085e404c6bbc0a1e5eb39"
+  },
+  "actual_helper30_extraQA6_closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-ready-custody-helper-qa-20261108-v30/ROOT_HELPER30_EXTRA_QA6_CLOSED_NORMAL6_RETAINED.json",
+    "sha256": "5e45f23fe98393a2d9cdd891478558c299826e4d869dd75a5d715fb36a0b1cdd"
+  },
+  "coordinated_observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261108T140022Z-postcompletion154-v1.json",
+    "sha256": "98f55cb1a0f6bf3855e28784c13b773fd74c73115874eccef2a6ff911e6e3802"
+  },
+  "total_pool_bytes": 6442450944,
+  "serial_compiler_or_native_control_bytes": 536870912,
+  "failed_original_reader_slot_bytes": 0,
+  "Root_bytes": 536870912,
+  "status_bytes": 536870912,
+  "observer_bytes": 2147483648,
+  "guard_compiler_bytes": 0,
+  "maximum_native_child_bytes": 2147483648,
+  "overlap_bound_bytes": 5905580032,
+  "retained_DATA_lower_bound_bytes": 5129145102996,
+  "outputs_within_retained_helper30_DATA4_envelope": true,
+  "additional_memory_bytes": 0,
+  "no_competing_compiler": true,
+  "new_resource_credit_bytes": 0,
+  "original1330_expiry": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1330-original-r3-20261108-v26/ROOT_ACTUAL1330_ORIGINAL_SETUP_EXPIRED_AND_DRAINED.json",
+    "sha256": "4244a6f42f8d20c15918aa470df14a52e3c2b7caed2f99fd5eaff319e921ec20"
+  }
+}

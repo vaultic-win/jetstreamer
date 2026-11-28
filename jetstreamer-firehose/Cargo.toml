@@ -1,0 +1,86 @@
+[package]
+name = "jetstreamer-firehose"
+description = "Support crate for Jetstreamer containing firehose ingestion engine and core abstractions"
+keywords.workspace = true
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+default-run = "jetstreamer-firehose"
+repository.workspace = true
+documentation.workspace = true
+
+[features]
+default = []
+verify-transaction-signatures = []
+s3-backend = [
+    "aws-credential-types",
+    "aws-sdk-s3",
+    "aws-smithy-types",
+    "aws-types",
+]
+
+[[bin]]
+name = "jetstreamer-firehose"
+path = "src/main.rs"
+
+[dependencies]
+crossbeam-channel.workspace = true
+serial_test.workspace = true
+solana-rpc.workspace = true
+solana-runtime.workspace = true
+solana-hash.workspace = true
+solana-account-decoder-client-types.workspace = true
+solana-geyser-plugin-manager.workspace = true
+solana-storage-proto.workspace = true
+solana-address.workspace = true
+solana-transaction.workspace = true
+solana-message.workspace = true
+solana-transaction-status.workspace = true
+solana-ledger.workspace = true
+solana-signature.workspace = true
+solana-sdk-ids.workspace = true
+prost_011.workspace = true
+solana-entry.workspace = true
+httpdate = "1"
+reqwest = { workspace = true, features = ["json", "stream"] }
+tokio = { workspace = true, features = ["rt", "sync", "io-util", "fs"] }
+futures-util.workspace = true
+jetstreamer-horizon.workspace = true
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+cid.workspace = true
+multihash.workspace = true
+base64.workspace = true
+wincode.workspace = true
+solana-logger.workspace = true
+log.workspace = true
+rseek.workspace = true
+ripget.workspace = true
+crc.workspace = true
+serde_cbor.workspace = true
+fnv.workspace = true
+serde_json.workspace = true
+zstd.workspace = true
+solana-reward-info.workspace = true
+solana-instruction-error.workspace = true
+solana-serde.workspace = true
+solana-transaction-error.workspace = true
+bincode.workspace = true
+xxhash-rust.workspace = true
+ahash.workspace = true
+dashmap.workspace = true
+once_cell.workspace = true
+url.workspace = true
+libc.workspace = true
+sha2.workspace = true
+
+aws-credential-types = { workspace = true, optional = true }
+aws-sdk-s3 = { workspace = true, optional = true }
+aws-smithy-types = { workspace = true, optional = true }
+aws-types = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
+serial_test = "4"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

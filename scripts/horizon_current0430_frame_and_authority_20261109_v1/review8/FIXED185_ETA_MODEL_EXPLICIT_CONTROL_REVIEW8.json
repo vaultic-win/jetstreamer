@@ -1,0 +1,119 @@
+{
+  "schema": "horizon-epoch185-fixed-unexecuted-replay-planning-model-v1",
+  "epoch": 185,
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "authenticated_full_work_basis": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261105194538.json",
+    "sha256": "6dae466b92485611a652acb8f527b352191c0b64755468cdae06cce046fea3eb"
+  },
+  "full_replay_fixed_millis": 413404206,
+  "qualification_original_review": {
+    "path": "/home/sol/.jetstreamer-private/actual173022-visible-root-acceptance-20261108-v1/status-estimate-review173022.json",
+    "sha256": "22b318775efec63ec9b542d852ffbfe327cdaa3c299da8b280846ca5c635e146"
+  },
+  "qualification_anchor_utc": "2026-11-08T17:30:22Z",
+  "qualification_original_total_millis": 86400000,
+  "control_model_issued_at_utc": "2026-11-08T19:25:15Z",
+  "control_integration_allocation_millis": 37038000,
+  "control_allocation_is_inside_original24h_budget": true,
+  "bootstrap_millis": 3600000,
+  "verification_millis": 21600000,
+  "delivery_millis": 14400000,
+  "no_full_epoch_replay_has_started": true,
+  "qualification_or_control_clock_is_not_a_replay_lease": true,
+  "assumption": "D12/H35/Final6/P6/O38 now actually qualified and normally sealed, actual0230 successfulreader aliases retired after genuine postMain terminal closure without payload/credit changes. Genuine0430 Frame captured55fda127 and completeHelper27 outer passed after exact0300/0330/0400 bridge finalization; native43resource/admission/worker not started. Fleet8 rejected newpolicy rows and gateevidence, so accepted0430rawfleet retains exactoldpolicy while newterminal/q context is preserved separately; no policygate bypass. Remaining estimated control allocation60min: complete current authority binding and full prior-plus-new qualification/poolclosure20min; next fresh scheduled tuple/Frame/resource/prereader/admission integration20min; native setup/firstguard/token/Main/earlybootstrap10min; contingency10min. This is uncertain planning, not a lease or clockreset. Same19:25:15controlanchor inside original17:30:22+24hqualification, same fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h. Bounded80351283/48GiB/14400s is not full185; fullparentroute still separately unqualified. CurrentDATA5176926614164normal6GiBextraQA0, replay0target5, otherhost200-300/protected199 untouched.",
+  "control_review_history": [
+    {
+      "previous_model": {
+        "path": "/home/sol/.jetstreamer-private/actual1925-fixed-work-eta-event185-20261108-v1/FIXED185_ETA_MODEL.json",
+        "sha256": "c0fd7a8ac593998c635731e64e94ad0b32c95ce1d3e74316bb75e0ab34b3ec52"
+      },
+      "previous_total_control_allocation_millis": 7200000,
+      "reviewed_at_utc": "2026-11-08T21:19:32Z",
+      "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+      "explicit_new_remaining_control_allowance_millis": 5400000,
+      "reason": "Original twohour control integration estimate insufficient: actual enrollment helper mismatch fixed, parent periodicguard race fixed andgenuinelypassed, actual21fleet suffix ordering failure now repaired against exactHelper32consumer; qualify remaining controls and freshadmission. No full-route progress or replay credit.",
+      "inside_original24h_qualification_budget": true,
+      "no_original_native_clock_reset": true
+    },
+    {
+      "previous_model": {
+        "path": "/home/sol/.jetstreamer-private/actual2100-fleet-order-and-explicit-control-review-event185-20261108-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW2.json",
+        "sha256": "8563275737b1a5f06120144987d1b48c3dd991ed13884b912194e1ea3af1a080"
+      },
+      "previous_total_control_allocation_millis": 12257000,
+      "reviewed_at_utc": "2026-11-08T22:45:03Z",
+      "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+      "explicit_new_remaining_control_allowance_millis": 5400000,
+      "reason": "Actual22:30 Frame/fullreader/parent/cached145/memory/DATA allpassed, but Planner3 rejected Helper33 because its native-capture pin still namedHelper32. No185actor was started. Planner4now qualified4compiler/24ordinary andactualbyteidenticalfailed2230requestaccepted in metadata-only control; normal-sealedR2 onlycorrects inherited Helper32metadata label. Operation35pinningPlanner4underqualification. OriginalfullReader300s eligibility expired; nextfresh23:00sample is after current22:49:32control deadline. Explicit review now allocates90minutesremaining from SAME19:25:15anchor INSIDE unchangedoriginal17:30:22+24h total. No native lease/clock or full unexecuted413404206ms replay cost reset. No replay/publication/resource credit.",
+      "inside_original24h_qualification_budget": true,
+      "no_original_native_clock_reset": true
+    },
+    {
+      "previous_model": {
+        "path": "/home/sol/.jetstreamer-private/actual2230-planner4-explicit-control-review3-event185-20261108-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW3.json",
+        "sha256": "7277c044bde1cd513ba1c03e2ffc807ebdc1a3ef633511e0634497683ce66edc"
+      },
+      "previous_total_control_allocation_millis": 17388000,
+      "reviewed_at_utc": "2026-11-08T23:58:36Z",
+      "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+      "explicit_new_remaining_control_allowance_millis": 5400000,
+      "reason": "Helper34 now genuinely qualified four compiler stages,2937ordinary,three historical23:00 composition controls and retained full outer; Planner5 qualified27ordinary/six real saved2300 request controls; Operation36 qualified63ordinary/ten genuine native/lifecycle/profile/eight-file controls and normally sealed. Original23:00 actor expired without Main. These repairs consumed23:30 startup window; next sole00:00 sample needed. Midnight guard current code compiled but one test retained23:00 expected timestamp; distinctR2 test-source correction and genuine requalification required. Actual successor-authority integration, original2300 terminal preservation, fresh reader/admission/first native guard/Main still outstanding. Explicit90minute control allowance from SAME19:25:15 anchor within unchanged original17:30:22+24h qualification budget; no nativelease/clock or fullreplay reset.",
+      "inside_original24h_qualification_budget": true,
+      "no_original_native_clock_reset": true
+    },
+    {
+      "previous_model": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review4-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW4.json",
+        "sha256": "4fe10f74670a446803e9dd151678f070dfe6137164301be555934d01d660cd45"
+      },
+      "previous_total_control_allocation_millis": 21801000,
+      "reviewed_at_utc": "2026-11-09T01:25:00Z",
+      "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+      "explicit_new_remaining_control_allowance_millis": 3600000,
+      "reason": "Actual0100 reached genuine current Frame, fullReader13, parent/memory/DATA, original guarded actor, enrolledHelper34 persistent fullreader, allfour readableviews and actualeightfileSolread. First realDriver11guard thenfailed because activation omitted scratch/ledger/output/receipts; bothguard andworker requirepreexisting empty0700dirs. Final3also exposed IN_MODIFY receipt readbeforeclose race. Actor was positively guardstopped beforeMain; no fullreplay. Remaining estimates: Final4closed-write fix/nativepublicationcontrols10min; Operation37dirsetup/actualunprivilegedscan and exact0100successfulreaderretirement10min; strict successor/profile/nativeintegration10min; fresh scheduledtuple and originalguardedreader/admission/Main20min plus10mincontingency. These are uncertain planning allocations, not nativeleaseextensions. Existing Reader13/H34/P5/D11retained; fullboundary/publicationstillunqualified.",
+      "inside_original24h_qualification_budget": true,
+      "no_original_native_clock_reset": true
+    },
+    {
+      "previous_model": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review5-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW5.json",
+        "sha256": "08720c9def3712b29d4b3e8022e7e74134df4dc42655fa7eb5431d5555321b30"
+      },
+      "previous_total_control_allocation_millis": 25185000,
+      "reviewed_at_utc": "2026-11-09T02:17:25Z",
+      "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+      "explicit_new_remaining_control_allowance_millis": 3600000,
+      "reason": "Actual02 finitechain passed strict qualified37/Final4 metadata authority and realfleet; realFrame capability passed. O26 capture-phase failed while the unchanged145 periodicguard was activating with pendingJob41040174. Its query rejects Job before its intended active-guard wait branch. No02Frame/reader/actor/Main ran; no retry after original02:15:22 cutoff. Root will repair this finite readonly phase wait to classify exact busy guard states as waiting, retain strict settled guard/timer identity and all2-4s/25s gates, qualify native negatives, and integrate phase successor. Remaining planning allocation: timing source and ordinary/native qualification15min, next02:30 guard/current metadata preparation10min, fresh finite Frame/reader/admission/originalMain25min, contingency10min. Final4/Operation37/guard0200 actual qualification and exact0100retirement remain completed and not repeated. Fullboundary/publicationstillunqualified. Original24h qualification and full unexecuted replay costs unchanged; no native lease change.",
+      "inside_original24h_qualification_budget": true,
+      "no_original_native_clock_reset": true
+    },
+    {
+      "previous_model": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW6.json",
+        "sha256": "12f903138485d1bd73326bec9792a2c228fa5d0dddeb072c2f4abc1a55e26c35"
+      },
+      "previous_total_control_allocation_millis": 28330000,
+      "reviewed_at_utc": "2026-11-09T03:13:21Z",
+      "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+      "explicit_new_remaining_control_allowance_millis": 5400000,
+      "reason": "Actual0230 got through genuineFrame/fullreader/resources/planner/actualSolrunlayout/enrolledH34/firstguard/token/Main. Main coldinitialized8min thenOWN5sresourceguardreportedENOENT, no canonicalprogress; zeroOOMcounters. ActualFinal4postMaincapture exposed prestartguard race andwrongoutputnamespace, qualifiedH34R2 captured lifecycle without restart, qualified terminalcapture succeeded after exactfailedtimerstop. Remaining allocation: Driver12 complete-census transient-file/PID repair plus ordinary/native tests15min; exactnewconsumerregistration/helper-Frame-CLI completeouter25min; Final5/O38/postMainreaderretirement qualification15min; freshscheduledtuple/fullreader/admission/nativeMain/earlybootstrap25min; contingency10min. Existingconsumerpins andnativeclocks remain until actuallyqualified replacements. Fullparentroute stillseparate. Explicit90minremaining is uncertainplanning from SAME19:25:15controlanchor INSIDE original17:30:22+24hqualification, notnativeleaseextension orfailedworkerrestart. Fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h unchanged, noresourceorfullreplaycredit.",
+      "inside_original24h_qualification_budget": true,
+      "no_original_native_clock_reset": true
+    },
+    {
+      "previous_model": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review7-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW7.json",
+        "sha256": "6fa0bc5c379a47d66e72add1ee72a994c76389f8bce73f945f493f0eab1d358c"
+      },
+      "previous_total_control_allocation_millis": 33486000,
+      "reviewed_at_utc": "2026-11-09T04:42:33Z",
+      "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+      "explicit_new_remaining_control_allowance_millis": 3600000,
+      "reason": "D12/H35/Final6/P6/O38 now actually qualified and normally sealed, actual0230 successfulreader aliases retired after genuine postMain terminal closure without payload/credit changes. Genuine0430 Frame captured55fda127 and completeHelper27 outer passed after exact0300/0330/0400 bridge finalization; native43resource/admission/worker not started. Fleet8 rejected newpolicy rows and gateevidence, so accepted0430rawfleet retains exactoldpolicy while newterminal/q context is preserved separately; no policygate bypass. Remaining estimated control allocation60min: complete current authority binding and full prior-plus-new qualification/poolclosure20min; next fresh scheduled tuple/Frame/resource/prereader/admission integration20min; native setup/firstguard/token/Main/earlybootstrap10min; contingency10min. This is uncertain planning, not a lease or clockreset. Same19:25:15controlanchor inside original17:30:22+24hqualification, same fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h. Bounded80351283/48GiB/14400s is not full185; fullparentroute still separately unqualified. CurrentDATA5176926614164normal6GiBextraQA0, replay0target5, otherhost200-300/protected199 untouched.",
+      "inside_original24h_qualification_budget": true,
+      "no_original_native_clock_reset": true
+    }
+  ]
+}

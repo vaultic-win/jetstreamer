@@ -1,0 +1,13 @@
+{
+  "all65_passed": true,
+  "original4_R2_compilers_not_repeated": true,
+  "production_source": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0000-window-20261109-v1-r2/source/main.rs",
+    "sha256": "a87d1d30eb5d17ca364fc6bb22881992d48b6432cf49e3fc8d3f8023a44121b6"
+  },
+  "production_normal_seal": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0000-window-20261109-v1-r2/PRODUCTION-NORMAL-SEAL-EXECUTION.json",
+    "sha256": "9acaf0ca2ae47a308656e6f8b261679c116a01e81ef3e781aaa77411ef1996a9"
+  },
+  "retained_DATA_booked_once": true
+}

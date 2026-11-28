@@ -1,0 +1,9 @@
+{
+  "all_four_passed": true,
+  "source_and_graph": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES_R2.json",
+    "sha256": "66ae08526329adc4dbe34677176f0816dbc197046ef8a1943277f9588b7ace8f"
+  },
+  "native_controls_still_required": true,
+  "no_replay_or_publication_authority": true
+}

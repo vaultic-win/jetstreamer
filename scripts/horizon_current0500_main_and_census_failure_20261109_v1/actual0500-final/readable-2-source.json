@@ -1,0 +1,20 @@
+{
+  "normal_copy_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-readable-originals-final-722adc397ae24bb4b96d452783599f57/deployment-seal-receipt.json",
+    "sha256": "343d8622c862a2aaa3ec00d30d1f1f98a194648a37336d0dd1418e6ec1ee8034"
+  },
+  "original_bridge": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/task-acknowledgment.json",
+    "sha256": "c3279e8772a736fa639da4470dbfe188da55942a1ec91d0cfcbd374edc8a4011"
+  },
+  "output": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/readable-task-acknowledgment.json",
+  "readable_underlying": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-readable-originals-final-722adc397ae24bb4b96d452783599f57/task.json",
+    "sha256": "364915751ba88c4451d9c4d79d38a522ded7633bc55a2b8c279ad2d1032ac239"
+  },
+  "schema": "horizon-epoch185-readable-original-proof-spec-v1",
+  "task": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/task.json",
+    "sha256": "364915751ba88c4451d9c4d79d38a522ded7633bc55a2b8c279ad2d1032ac239"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/replacement-local-fleet-qualification-20261110-v25/replacement-fleet-v25/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "4926f14f8c6d9081daeb11116b0c679dca2e78afe18632c767bde2f04356212f"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/replacement-local-fleet-qualification-20261110-v25/replacement-fleet-v25/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "e1b8569461e34ee7c71fb3269a56307af08578e09c8df2983c76fe51dc79e983"
+  },
+  "source_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-root-fleet-replacement-local-source-20261110-v25/deployment-seal-receipt.json",
+    "sha256": "36531540e3aad13e0a904f5e50d0323d72c6241f250d8a21c2d35b5a2a814f47"
+  },
+  "runtime_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-root-fleet-operational-review-tools-20261110-v25/deployment-seal-receipt.json",
+    "sha256": "7f5233bf55f64f54e75c18b47a8378e873346acffdf8001cd72545399c3957f9"
+  },
+  "runtime_members": {
+    "review": {
+      "path": "/usr/local/lib/jetstreamer/horizon-root-fleet-operational-review-tools-20261110-v25/review",
+      "sha256": "711d00f1af466576a67cab92258a23eb11df40087f267b96c16b049e8bae77ca"
+    }
+  },
+  "actual_ordinary_test_count": 92,
+  "published_source_sha256": {
+    "main.rs": "205281e68d7ae6e6e70f0f26b968a89cc237de639c7752488da9c22ed178ce82",
+    "terminal.rs": "58327a9524975ebcd811a66d4929abdd998358b99d7cbc1d8f7ac5d2f618dc2d",
+    "bootstrap.rs": "239800d59817eb40a4484e6d092fc5a604bacde3393ea5d8131977bdca7b804a",
+    "memory_target.rs": "ae6ba062ddea8082ef9c6e090cdc58ff250deda853d3675d5e683804cb3f2fda",
+    "replacement.rs": "d29998e2cd852afda146797c577351544af53caea389a844a6c7ff1e196a5f42",
+    "replacement_validation.rs": "63533dbff692bda1abcb680ea05e51636a3cef4fb3199cfd17907488ea14d260",
+    "replacement_tests.rs": "978c7f73d8d187990342468b9b1d32a4ab72075c0bb48e8e15dd18dc3d79b077",
+    "status_events.rs": "071fc4fe9ef1725301a26dc0729b5344c1b1069bb83e07d875734df3a88b0569",
+    "data_guard_reader.rs": "33726508799f263fd786b9c0cd983a6ab0bb12090b4f18a0ae12bd395fbc8776",
+    "data-guard-registrations.json": "c48928594cfa2526403fc616fac6112b42b35e6511bd686fa4a4b5ae95fc3f99"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "remote_mutations": false,
+  "actual_native_acceptance": {
+    "path": "/var/lib/jetstreamer/root-fleet-replacement-native-qualification-2300-seven-20261110-v25/ROOT_ACCEPTED_FLEET.json",
+    "sha256": "d9b43164c0a1a1756a545eaaf506aa3d41b13b7b922acd088ba28016c572bb99"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-original199-parent-memory-selection0500-plan-20261109-v1",
+  "members": [
+    {
+      "mode": 292,
+      "name": "request.json",
+      "sha256": "8e83ecb55ec3e9575a41629f80d60e2417f9f9b193397758f07c82bbf4ecdde6",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/selection0500-request.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

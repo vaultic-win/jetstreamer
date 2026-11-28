@@ -1,0 +1,1321 @@
+{
+  "archive_mutations": false,
+  "cached145": {
+    "mode": "retained",
+    "phase": "captured-private-work-with-full-promises",
+    "schema": "jetstreamer-recovered-cached145-history-v1",
+    "sources": {
+      "admission": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-epoch145-cached-admission-b2a09f57de39c384/admission.json",
+          "sha256": "48f4f35ce19d27183305f39c9d7dc183b5e8f09ecbb02f25a29830093f4009f4"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/admission.json",
+          "sha256": "48f4f35ce19d27183305f39c9d7dc183b5e8f09ecbb02f25a29830093f4009f4"
+        }
+      },
+      "capture": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/epoch145-cached-b2a09f57de39c384/receipts/capture.json",
+          "sha256": "401a71da189371aa4546a8bb0da817990d386eb0c45ea637e8b4658f5bbdb46b"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/capture.json",
+          "sha256": "401a71da189371aa4546a8bb0da817990d386eb0c45ea637e8b4658f5bbdb46b"
+        }
+      },
+      "continuity_proof": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-cached145-three-phase-guard-continuity-proof-20261101-v1/qualification.json",
+          "sha256": "d58d38515b0116aad73750d380a5fae9ae571b2f2d500ea13b4f09c88adae01a"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/continuity_proof.json",
+          "sha256": "d58d38515b0116aad73750d380a5fae9ae571b2f2d500ea13b4f09c88adae01a"
+        }
+      },
+      "entry_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T111809Z-cached145-b2a09f57de39c384-entry-v1.json",
+          "sha256": "dab11316d95db5f9d651e4558e621b58cac976b4aced1c2a432958b77576ffac"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/entry_fleet.json",
+          "sha256": "dab11316d95db5f9d651e4558e621b58cac976b4aced1c2a432958b77576ffac"
+        }
+      },
+      "entry_observer": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261101T111809Z-postcompletion154-v1.json",
+          "sha256": "866c6f714979f7cc22726122a4456249eec10124e512b7d63201cebcbfa0a4d2"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/entry_observer.json",
+          "sha256": "866c6f714979f7cc22726122a4456249eec10124e512b7d63201cebcbfa0a4d2"
+        }
+      },
+      "entry_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-fleet-plan-20261101-v1/plan.json",
+          "sha256": "416ed47456a164ad38bd099fe21969a52ee8c758c8f7672c14d0e3063686385a"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/entry_plan.json",
+          "sha256": "416ed47456a164ad38bd099fe21969a52ee8c758c8f7672c14d0e3063686385a"
+        }
+      },
+      "entry_previous_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T111809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "d44d2d940067e3e40d3bcb369490a59c0374f9f784e2a43f0e687830703655ae"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/entry_previous_fleet.json",
+          "sha256": "d44d2d940067e3e40d3bcb369490a59c0374f9f784e2a43f0e687830703655ae"
+        }
+      },
+      "entry_previous_frame": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261101T111809-private154-delivery-terminal-retained-g6-g7-debt-v26.json",
+          "sha256": "963d63c2414aebff6bd06558dc2f2b44f954a88553346d7337aac2d0c0e2720a"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/entry_previous_frame.json",
+          "sha256": "963d63c2414aebff6bd06558dc2f2b44f954a88553346d7337aac2d0c0e2720a"
+        }
+      },
+      "entry_previous_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal1118-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "624f95fd90d67feaf553fb4b44fc9c5850037cece078dd8d31ca5b6ed1b8b0e5"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/entry_previous_plan.json",
+          "sha256": "624f95fd90d67feaf553fb4b44fc9c5850037cece078dd8d31ca5b6ed1b8b0e5"
+        }
+      },
+      "first_guard": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/epoch145-cached-b2a09f57de39c384/receipts/sample-3d3a06e2c0ec4fa3a1f41a50c1f79222.json",
+          "sha256": "93fdfc33d57456b34b691ef3e3e9b1d9825eab31c2f7657cc614e0d2bca6c478"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/first_guard.json",
+          "sha256": "93fdfc33d57456b34b691ef3e3e9b1d9825eab31c2f7657cc614e0d2bca6c478"
+        }
+      },
+      "first_guard_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-guard-plan-20261101-v1/plan.json",
+          "sha256": "952428636744031320a10354f6b5e526abeb54af7b4cc3694eaf511cfbce2ccf"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/first_guard_plan.json",
+          "sha256": "952428636744031320a10354f6b5e526abeb54af7b4cc3694eaf511cfbce2ccf"
+        }
+      },
+      "runner_artifact": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-runner-tools-20261101-v1/artifact-proof.json",
+          "sha256": "45a35b16c91c30e7bfc97d68b591d7ea2c69e6cd4f56b594b86d013a075b18ce"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/runner_artifact.json",
+          "sha256": "45a35b16c91c30e7bfc97d68b591d7ea2c69e6cd4f56b594b86d013a075b18ce"
+        }
+      },
+      "scope": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-scope-20261101-v1/scope.json",
+          "sha256": "b2a7dd4f4adb81e783a193620819e592554471724954853a19bac09ffe00afc3"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/scope.json",
+          "sha256": "b2a7dd4f4adb81e783a193620819e592554471724954853a19bac09ffe00afc3"
+        }
+      },
+      "work_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-work-plan-20261101-v1/plan.json",
+          "sha256": "9274bef992c06ffb55a1170b3c3332de25225bdf14eacf1ff8c6ab905ff35408"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch145-cached-b2a09f57de39c384-entry-history-20261101-v1/work_plan.json",
+          "sha256": "9274bef992c06ffb55a1170b3c3332de25225bdf14eacf1ff8c6ab905ff35408"
+        }
+      }
+    }
+  },
+  "cached145_inactive_timer_reload_display": {
+    "schema": "horizon-closed145-inactive-timer-single-reload-display-v1",
+    "sources": [
+      {
+        "key": "reload145.event",
+        "path": "/home/sol/.jetstreamer-private/actual0458-postreplay145-native-20261106-v1/ROOT_ORIGINAL185_RELOAD_AND_CLOSED145_TIMER_DISPLAY_DIFFERENCE_EVIDENCE.json",
+        "sha256": "e90ff210c999dfb69bc183116b839c6dc575a9a54a8e816b21d1bcca8bf3c7c0"
+      },
+      {
+        "key": "reload145.execution",
+        "path": "/home/sol/.jetstreamer-private/epoch185-missing-token-native-transaction-source-20261105-v13/reviewed-templates-r3/materialized/ROOT_RELOAD_ORIGINAL_EXECUTION.json",
+        "sha256": "54f5149ff2202dad2a588191bc3cbf82cfb4146525548d8f5252790b5c911b43"
+      },
+      {
+        "key": "reload145.v13_preserved",
+        "path": "/home/sol/.jetstreamer-private/epoch185-missing-token-native-transaction-source-20261105-v13/reviewed-templates-r3/materialized/ROOT_ORIGINAL_V13_PREACTIVATION_FAILURE_AND_NEVER_STARTED_NATIVE_PROOF.json",
+        "sha256": "bf2e3aa1d476f2afddf5d0d211b43ce31e98ddff91f638d091efd2b3ebcc2023"
+      },
+      {
+        "key": "reload145.fixture",
+        "path": "/home/sol/.jetstreamer-private/cached145-terminal-observer-ancestry-source-20261106-v1/frame-cli-source-r4/src/cached145_closed_guard.fixture.json",
+        "sha256": "43bf24fdd1cccb31eee46d71543f4523123d13ab6412874217473cea8482cf2e"
+      },
+      {
+        "key": "reload145.before_fleet",
+        "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261106T042809Z-cached145-loaded-terminal-ancestry-v1.json",
+        "sha256": "783cd6007e40d8b7e766d1f111bb3bcba8f2ce58b6560fec1e3df726f758626c"
+      },
+      {
+        "key": "reload145.after_fleet",
+        "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261106T045809Z-cached145-loaded-terminal-ancestry-v1.json",
+        "sha256": "b90c888394dbf1ef5ce9177d89668deaae9891c6eb77aab2f0ac8e3b4e46de59"
+      }
+    ]
+  },
+  "cached145_terminal_observer_ancestry": {
+    "capture": {
+      "path": "/var/lib/jetstreamer/epoch145-cached-b2a09f57de39c384/receipts/capture.json",
+      "sha256": "401a71da189371aa4546a8bb0da817990d386eb0c45ea637e8b4658f5bbdb46b"
+    },
+    "schema": "horizon-cached145-terminal-observer-ancestry-v1",
+    "terminal": {
+      "path": "/home/sol/.jetstreamer-private/cached145-postreplay-handoff-20261105-v1/ROOT_ACTUAL145_CLEAN_TERMINAL_AND_VERIFIED_SEGMENT.json",
+      "sha256": "8fe99753332d62254da147dcf1324bf4834a78d595d55c853228ce3fb469cd9d"
+    }
+  },
+  "canonical_batch_snapshot": {
+    "path": "/usr/local/lib/jetstreamer/horizon-cohort183-canonical-import-evidence-20261029-v1/import-batch.json",
+    "sha256": "b39580174621cf92fafd138ae47f249470021bd67c2751ea67dcc43d5e1e0d53"
+  },
+  "canonical_import": {
+    "path": "/usr/local/lib/jetstreamer/horizon-cohort183-canonical-import-evidence-20261029-v1/terminal.json",
+    "sha256": "5d0fcb753e3b2b984958657a2cee8e3eea7c6000bd6c375ba68aa8793dc14395"
+  },
+  "completed184": {
+    "schema": "jetstreamer-completed184-verifier-history-v1",
+    "sources": {
+      "full.plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-cohort183-verification-plans-20261030T035317Z-v4/epoch-184-full.json",
+          "sha256": "41f7f619fd0301213a0742078784ec4131dfa65471661440a46566ec2a215664"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-cohort183-verification-plans-20261030T035317Z-v4/epoch-184-full.json",
+          "sha256": "41f7f619fd0301213a0742078784ec4131dfa65471661440a46566ec2a215664"
+        }
+      },
+      "full.receipt": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-cohort183-canonical-verification-20261029-v1/epoch-184/full/receipts/epoch-184.full.ok",
+          "sha256": "92d7bd572bf1b2e38052d159ce9e319f77008da031627060c702d319ea8dbe8a"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-completed184-full-receipt-20261030-v1/full.ok",
+          "sha256": "92d7bd572bf1b2e38052d159ce9e319f77008da031627060c702d319ea8dbe8a"
+        }
+      },
+      "plugin.plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-cohort183-verification-plans-20261030T035317Z-v4/epoch-184-plugin.json",
+          "sha256": "d036c4f3516cdd31b8fda89dc92d06fd93c292cf56e50b4f72b63e5c34ca682c"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-cohort183-verification-plans-20261030T035317Z-v4/epoch-184-plugin.json",
+          "sha256": "d036c4f3516cdd31b8fda89dc92d06fd93c292cf56e50b4f72b63e5c34ca682c"
+        }
+      },
+      "plugin.receipt": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-cohort183-canonical-verification-20261029-v1/epoch-184/plugin/receipts/epoch-184.plugin.ok",
+          "sha256": "ef1509f031e929272c11fece90af9d7f52ecc00c47a91571f472b0edc4af1bd9"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame1418-postgap-plan-20261030-v1/plugin.ok",
+          "sha256": "ef1509f031e929272c11fece90af9d7f52ecc00c47a91571f472b0edc4af1bd9"
+        }
+      }
+    }
+  },
+  "delivery_owner_delta": {
+    "mode": "retained",
+    "schema": "jetstreamer-recovered-delivery183184-history-v1",
+    "sources": {
+      "anchor_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261030T022317Z-postfull183-v1.json",
+          "sha256": "b60689b4aaa906035b155c7efc11a9eb32e77a27a341bc1f7168c3587f795bb2"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/delivery-anchor_fleet.json",
+          "sha256": "b60689b4aaa906035b155c7efc11a9eb32e77a27a341bc1f7168c3587f795bb2"
+        }
+      },
+      "anchor_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postfull183-fleet022317-plan-20261030-v1/fleet-plan.json",
+          "sha256": "f7dc980f7b2c5549986245b8b23f3605c9f7ee9fea60b20b20469801596358dc"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/delivery-anchor_plan.json",
+          "sha256": "f7dc980f7b2c5549986245b8b23f3605c9f7ee9fea60b20b20469801596358dc"
+        }
+      },
+      "anchor_recovery": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame022317-postfull183-v1.json",
+          "sha256": "c6114a348055ecda9f9d0c7b35b5d891747a2de959042cf0da97bc8a5aac2444"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/delivery-anchor_recovery.json",
+          "sha256": "c6114a348055ecda9f9d0c7b35b5d891747a2de959042cf0da97bc8a5aac2444"
+        }
+      },
+      "assembly154_started": {
+        "origin": {
+          "path": "/home/sol/.jetstreamer-private/epoch154-assembly-only-output-20261030-v1/assembly-started.json",
+          "sha256": "547818a7fe8d93464096dfafe6807f5f2932aeb82e45725743e170a156dd6947"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery183184-assembly154-preserved-sources-20261030-v1/epoch-154-assembly-started.json",
+          "sha256": "547818a7fe8d93464096dfafe6807f5f2932aeb82e45725743e170a156dd6947"
+        }
+      },
+      "entry_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261030T022317Z-delivery184-uploader183-metadata-v1.json",
+          "sha256": "c063d906e4dcd60aaad8d6faec4a5afc3b666d1a73fc9b6465b1128d9bf9a011"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/delivery-entry_fleet.json",
+          "sha256": "c063d906e4dcd60aaad8d6faec4a5afc3b666d1a73fc9b6465b1128d9bf9a011"
+        }
+      },
+      "entry_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery183-184-owner-transition-20261030-v1/fleet-plan.json",
+          "sha256": "60709bf63c7141487b6bc8740d4b9beeaf3299a658c77325d035324acb721cca"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/delivery-entry_plan.json",
+          "sha256": "60709bf63c7141487b6bc8740d4b9beeaf3299a658c77325d035324acb721cca"
+        }
+      },
+      "event": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery183-184-owner-transition-20261030-v1/event.json",
+          "sha256": "ccd19408467433cee58f4d57604da0af1fb310ae56575d6ac809c6e903b56d48"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/delivery-event.json",
+          "sha256": "ccd19408467433cee58f4d57604da0af1fb310ae56575d6ac809c6e903b56d48"
+        }
+      },
+      "final_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261030T045559Z-native154-retained-entry-v1.json",
+          "sha256": "eb65b85033f09bce36aead806b6b1638a76803996fe5bc26ca910dfa357e22cd"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/delivery-final_fleet.json",
+          "sha256": "eb65b85033f09bce36aead806b6b1638a76803996fe5bc26ca910dfa357e22cd"
+        }
+      },
+      "final_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-native154-owner0455-plan-20261030-v1/fleet-plan.json",
+          "sha256": "7eccdbfbd639b180004fc6de8364003aef52bacc37c8954ccfeb100110fdaf75"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/delivery-final_plan.json",
+          "sha256": "7eccdbfbd639b180004fc6de8364003aef52bacc37c8954ccfeb100110fdaf75"
+        }
+      },
+      "full_launch": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-cohort183-canonical-verification-20261029-v1/epoch-184/full/launch.json",
+          "sha256": "f9fe50f3fc3c2994a013726f65abe5438b587e00c8e54caae79357f19c18d98a"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery183184-assembly154-preserved-sources-20261030-v1/epoch-184-full-launch.json",
+          "sha256": "f9fe50f3fc3c2994a013726f65abe5438b587e00c8e54caae79357f19c18d98a"
+        }
+      },
+      "plugin_launch": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-cohort183-canonical-verification-20261029-v1/epoch-184/plugin/launch.json",
+          "sha256": "e9dac5395508acba69b7b3f1edcb1bf9cb5a326b920ff3187804f58af27b2b97"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery183184-assembly154-preserved-sources-20261030-v1/epoch-184-plugin-launch.json",
+          "sha256": "e9dac5395508acba69b7b3f1edcb1bf9cb5a326b920ff3187804f58af27b2b97"
+        }
+      },
+      "previous_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261030T022317Z-input161-g5-entry-v1.json",
+          "sha256": "53fc9c7aa07702841884440223225e15fc644b21b62fa33f87ad4dfd91627fce"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/delivery-previous_fleet.json",
+          "sha256": "53fc9c7aa07702841884440223225e15fc644b21b62fa33f87ad4dfd91627fce"
+        }
+      },
+      "previous_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch161-g5-initial-fleet0223-20261030-v1/fleet-plan.json",
+          "sha256": "d71d417e3fc4548097229ecadad17dafbafd33dfde9a9cb7c65b29a76d91c1a7"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/delivery-previous_plan.json",
+          "sha256": "d71d417e3fc4548097229ecadad17dafbafd33dfde9a9cb7c65b29a76d91c1a7"
+        }
+      },
+      "uploader_handoff": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-cohort183-uploader-transition-20261029-v2/handoff.json",
+          "sha256": "41e427a1be15669aad1505f102cb6ec10fbf503aa619fb9670d38afb41b6251e"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery183184-assembly154-preserved-sources-20261030-v1/epoch-183-uploader-handoff.json",
+          "sha256": "41e427a1be15669aad1505f102cb6ec10fbf503aa619fb9670d38afb41b6251e"
+        }
+      }
+    }
+  },
+  "durable_prefix141": {
+    "mode": "retained",
+    "phase": "captured-unreleased-terminal",
+    "schema": "jetstreamer-recovered-durable-prefix141-history-v1",
+    "sources": {
+      "enrollment_base_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T164809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "0f8058594b74a566e0f493cedc0a3169bf496a15f60842890ee8011650aad1ad"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T164809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "0f8058594b74a566e0f493cedc0a3169bf496a15f60842890ee8011650aad1ad"
+        }
+      },
+      "enrollment_base_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal1648-fleet-plan-20261031-v1/fleet-plan.json",
+          "sha256": "5b8af27f3deb2771cd339100ad2c73e9b1d88e7968b58f3464d52e96c7a75348"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal1648-fleet-plan-20261031-v1/fleet-plan.json",
+          "sha256": "5b8af27f3deb2771cd339100ad2c73e9b1d88e7968b58f3464d52e96c7a75348"
+        }
+      },
+      "enrollment_frame": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame164809-private154-delivery-terminal-retained-v9.json",
+          "sha256": "71b53e4e635b0acbd8ec4742bb6bc90717756846b6b177d9fdaeee7afff0fd84"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame164809-private154-delivery-terminal-retained-v9.json",
+          "sha256": "71b53e4e635b0acbd8ec4742bb6bc90717756846b6b177d9fdaeee7afff0fd84"
+        }
+      },
+      "metadata_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T164809Z-original141-captured-unreleased-debt-entry-v1.json",
+          "sha256": "7655bcf40f0bbd2c8959eb79845bbb7483cb2d7390b65a60b34f6171db5b2d3e"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T164809Z-original141-captured-unreleased-debt-entry-v1.json",
+          "sha256": "7655bcf40f0bbd2c8959eb79845bbb7483cb2d7390b65a60b34f6171db5b2d3e"
+        }
+      },
+      "metadata_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-first141-early-terminal-debt1648-plan-20261031-v1/fleet-plan.json",
+          "sha256": "f33f294044c67a89ac3161dac5d1ae17a83a94c8426927386fd62695720e0d82"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-first141-early-terminal-debt1648-plan-20261031-v1/fleet-plan.json",
+          "sha256": "f33f294044c67a89ac3161dac5d1ae17a83a94c8426927386fd62695720e0d82"
+        }
+      },
+      "original_base_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T131809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "c86a14f2fe902d567763aca11390fbe0b1de01f9488d8a3dae5b7191e79ebbf8"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T131809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "c86a14f2fe902d567763aca11390fbe0b1de01f9488d8a3dae5b7191e79ebbf8"
+        }
+      },
+      "original_base_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal1318-fleet-plan-20261031-v1/fleet-plan.json",
+          "sha256": "f4215e471fa62f16ce56a5950ed96808a9988bc72f771208de0e1d7ef069775d"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal1318-fleet-plan-20261031-v1/fleet-plan.json",
+          "sha256": "f4215e471fa62f16ce56a5950ed96808a9988bc72f771208de0e1d7ef069775d"
+        }
+      },
+      "original_frame": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame131809-private154-delivery-terminal-retained-v9.json",
+          "sha256": "dea009c063f1b844d46e1bf88271774700a9e7474138cc6feba812a85b52a6b5"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame131809-private154-delivery-terminal-retained-v9.json",
+          "sha256": "dea009c063f1b844d46e1bf88271774700a9e7474138cc6feba812a85b52a6b5"
+        }
+      },
+      "terminal": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-epoch141-captured-unreleased-terminal-20261031-v1/terminal.json",
+          "sha256": "5d9ac17b83595e2dbf5b713a81c48fe98925f38c5e276c17e30da0419548a7bd"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer/horizon-epoch141-captured-unreleased-terminal-20261031-v1/terminal.json",
+          "sha256": "5d9ac17b83595e2dbf5b713a81c48fe98925f38c5e276c17e30da0419548a7bd"
+        }
+      }
+    }
+  },
+  "fleet_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0430-fleet-plan-20261109-v1-r4/fleet-plan.json",
+    "sha256": "516908cd210cb412cc693f6d0cb3cca627f8d57dee70aec9ff74dbc33bccb36f"
+  },
+  "g5_entry": {
+    "schema": "jetstreamer-recovered-input161-g5-entry-history-v1",
+    "sources": {
+      "admission": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/epoch161-snapshot-input-20261030-g5/receipts/admission.json",
+          "sha256": "03cb40c0fd07518f1f995a491d309793d9955bc54c9350223420215405d6a157"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/g5_entry-admission.json",
+          "sha256": "03cb40c0fd07518f1f995a491d309793d9955bc54c9350223420215405d6a157"
+        }
+      },
+      "first_guard": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/epoch161-snapshot-input-20261030-g5/receipts/initial-guard.json",
+          "sha256": "0656e59f04cbd3376db176e708ca8b230f61c43164246398b2541153fc61f3e0"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/g5_entry-first_guard.json",
+          "sha256": "0656e59f04cbd3376db176e708ca8b230f61c43164246398b2541153fc61f3e0"
+        }
+      },
+      "plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch161-snapshot-download-plan-20261030-g5/plan.json",
+          "sha256": "5fbc024c8223b03dff1f28836ce600fe68b32799161cee11a4f538e19eac174f"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/g5_entry-plan.json",
+          "sha256": "5fbc024c8223b03dff1f28836ce600fe68b32799161cee11a4f538e19eac174f"
+        }
+      }
+    }
+  },
+  "input161_retry6_pre_ready": {
+    "mode": "retained",
+    "schema": "jetstreamer-recovered-input161-retry6-pre-ready-debt-history-v1",
+    "sources": {
+      "base_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T231809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "ef1f9955bb54f32e071bdd6c77a94615614934ea50dc001d622a32112da9c2eb"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame2348-original141-and-G6-pre-ready-debt-plan-20261031-v16/g6-pre-ready-base_fleet.json",
+          "sha256": "ef1f9955bb54f32e071bdd6c77a94615614934ea50dc001d622a32112da9c2eb"
+        }
+      },
+      "base_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal2318-fleet-plan-20261031-v1/fleet-plan.json",
+          "sha256": "b624fc921999d884de4f25b175e00a00cc0dc03d574351a8641b93d524c53420"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame2348-original141-and-G6-pre-ready-debt-plan-20261031-v16/g6-pre-ready-base_plan.json",
+          "sha256": "b624fc921999d884de4f25b175e00a00cc0dc03d574351a8641b93d524c53420"
+        }
+      },
+      "debt": {
+        "origin": {
+          "path": "/home/sol/.jetstreamer-private/epoch161-post-admission-recovery-20261031-v1/actual2218-failed-profile-accounting/result-v2.json",
+          "sha256": "61272ebc48df19344024b6551205cca9ccc6f3831749ee7b094166b78dfc696a"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame2348-original141-and-G6-pre-ready-debt-plan-20261031-v16/g6-pre-ready-debt.json",
+          "sha256": "61272ebc48df19344024b6551205cca9ccc6f3831749ee7b094166b78dfc696a"
+        }
+      },
+      "proof": {
+        "origin": {
+          "path": "/home/sol/.jetstreamer-private/epoch161-post-admission-recovery-20261031-v1/actual2218-failed-profile-accounting/ACTUAL_CONSERVATIVE_DEBT.json",
+          "sha256": "60d58a20363caa1c2ea29874c4b933d5a64c586765675f2eb466c439411e0996"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame2348-original141-and-G6-pre-ready-debt-plan-20261031-v16/g6-pre-ready-proof.json",
+          "sha256": "60d58a20363caa1c2ea29874c4b933d5a64c586765675f2eb466c439411e0996"
+        }
+      }
+    }
+  },
+  "input161_retry7": {
+    "mode": "retained",
+    "phase": "terminal-unregistered",
+    "pre_entry_normal_pairs": 4,
+    "schema": "jetstreamer-recovered-input161-retry7-history-v1",
+    "sources": {
+      "admission": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/epoch161-snapshot-input-20261031-g7/receipts/admission.json",
+          "sha256": "3a4f80d2b60bc6773689c6fbb408ea466580266b67a0e5a355edd230b2ce4f18"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer/epoch161-snapshot-input-20261031-g7/receipts/admission.json",
+          "sha256": "3a4f80d2b60bc6773689c6fbb408ea466580266b67a0e5a355edd230b2ce4f18"
+        }
+      },
+      "base_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T001809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "50559a02908388c0c0e12d9a62e041eb8037e5bbc3ea91ea96957833e219a86c"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T001809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "50559a02908388c0c0e12d9a62e041eb8037e5bbc3ea91ea96957833e219a86c"
+        }
+      },
+      "base_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0018-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "8bbdad5251bfdcfdcafe6d6e4e0ffa364e8ba72b2acfc2b9a7e4707629fce97b"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0018-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "8bbdad5251bfdcfdcafe6d6e4e0ffa364e8ba72b2acfc2b9a7e4707629fce97b"
+        }
+      },
+      "download_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch161-snapshot-download-plan-20261031-g7/plan.json",
+          "sha256": "55941b070178e949e6e39464766a77448c9f4fff15c6639409913d79747566c7"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch161-snapshot-download-plan-20261031-g7/plan.json",
+          "sha256": "55941b070178e949e6e39464766a77448c9f4fff15c6639409913d79747566c7"
+        }
+      },
+      "normal_fleet_00": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T014809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "adc8f24b926c5d3d04026342469df60469c274d199c138161e6a75f0e176980d"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T014809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "adc8f24b926c5d3d04026342469df60469c274d199c138161e6a75f0e176980d"
+        }
+      },
+      "normal_fleet_01": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T011809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "aa923fd9e1768f2af370b85cd4c4529a404008c77afaf06003f96c05cda1eaa0"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T011809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "aa923fd9e1768f2af370b85cd4c4529a404008c77afaf06003f96c05cda1eaa0"
+        }
+      },
+      "normal_fleet_02": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T004809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "fd713e6f80e748ec170f84a42d41aef6e7aacb4623f6d3b8ad3175cd94f343bc"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T004809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "fd713e6f80e748ec170f84a42d41aef6e7aacb4623f6d3b8ad3175cd94f343bc"
+        }
+      },
+      "normal_fleet_03": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T001809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "50559a02908388c0c0e12d9a62e041eb8037e5bbc3ea91ea96957833e219a86c"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T001809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "50559a02908388c0c0e12d9a62e041eb8037e5bbc3ea91ea96957833e219a86c"
+        }
+      },
+      "normal_plan_00": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0148-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "cdfc1cdf529812210d9dba2e2d78e6af5b8bfdcf140c685a0ad83ebec4a55551"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0148-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "cdfc1cdf529812210d9dba2e2d78e6af5b8bfdcf140c685a0ad83ebec4a55551"
+        }
+      },
+      "normal_plan_01": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0118-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "ab8e9341c5415e68241eaf6edc24a45148f0dc11496089b491396fede2aedce0"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0118-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "ab8e9341c5415e68241eaf6edc24a45148f0dc11496089b491396fede2aedce0"
+        }
+      },
+      "normal_plan_02": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0048-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "760d260b8d67d61f257a08181a0dad8f7ac8f46d19e8dcc1a90b4ca5f17ddc5a"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0048-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "760d260b8d67d61f257a08181a0dad8f7ac8f46d19e8dcc1a90b4ca5f17ddc5a"
+        }
+      },
+      "normal_plan_03": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0018-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "8bbdad5251bfdcfdcafe6d6e4e0ffa364e8ba72b2acfc2b9a7e4707629fce97b"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0018-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "8bbdad5251bfdcfdcafe6d6e4e0ffa364e8ba72b2acfc2b9a7e4707629fce97b"
+        }
+      },
+      "ready": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/epoch161-snapshot-input-20261031-g7/receipts/initial-guard.json",
+          "sha256": "7f0b1254b7ef233f3587cd57d27f7a7f04c5ba3417731bfd46420b69257b933a"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-G7-first-guard-preservation-20261101-v1/initial-guard.json",
+          "sha256": "7f0b1254b7ef233f3587cd57d27f7a7f04c5ba3417731bfd46420b69257b933a"
+        }
+      },
+      "terminal": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/epoch161-snapshot-input-20261031-g7/receipts/terminal.json",
+          "sha256": "3bec3c88c3f33d229c8c79bfee59913a420b4b08d71d2b82cba055ef331b5d01"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer/epoch161-snapshot-input-20261031-g7/receipts/terminal.json",
+          "sha256": "3bec3c88c3f33d229c8c79bfee59913a420b4b08d71d2b82cba055ef331b5d01"
+        }
+      },
+      "terminal_base_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T004809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "fd713e6f80e748ec170f84a42d41aef6e7aacb4623f6d3b8ad3175cd94f343bc"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T004809Z-postcompletion154-original-policy-C4-v1.json",
+          "sha256": "fd713e6f80e748ec170f84a42d41aef6e7aacb4623f6d3b8ad3175cd94f343bc"
+        }
+      },
+      "terminal_base_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0048-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "760d260b8d67d61f257a08181a0dad8f7ac8f46d19e8dcc1a90b4ca5f17ddc5a"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-postcompletion154-normal0048-fleet-plan-20261101-v1/fleet-plan.json",
+          "sha256": "760d260b8d67d61f257a08181a0dad8f7ac8f46d19e8dcc1a90b4ca5f17ddc5a"
+        }
+      },
+      "terminal_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T014809Z-G7-unregistered-terminal-enrollment-v1.json",
+          "sha256": "c1715f6f9487dc600cd17cf6748d6fd83ef8aeabc06a02e170e9a1b9f89436cd"
+        },
+        "preserved": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261101T014809Z-G7-unregistered-terminal-enrollment-v1.json",
+          "sha256": "c1715f6f9487dc600cd17cf6748d6fd83ef8aeabc06a02e170e9a1b9f89436cd"
+        }
+      },
+      "terminal_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch161-G7-unregistered-terminal-enrollment-20261101T0148-v1/fleet-plan.json",
+          "sha256": "06add1f4319f319c29872794e4b15845447171dbd43640b0b4cec4222ab9cf97"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch161-G7-unregistered-terminal-enrollment-20261101T0148-v1/fleet-plan.json",
+          "sha256": "06add1f4319f319c29872794e4b15845447171dbd43640b0b4cec4222ab9cf97"
+        }
+      }
+    }
+  },
+  "new191_closure_incremental_DATA_credit_bytes": 0,
+  "previous_cohort183_transition": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0230-chain128-frame-plan-20261109-v5/transition.json",
+    "sha256": "e51715173ceb9a1e77df54c810ac7445ecea48d73759ffa3f00e28689b195490"
+  },
+  "previous_recovery": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T023022-witness-terminal145-chain128-v5.json",
+    "sha256": "30fb6b0ae48f865b052734c5d1db7ec6163f9e3fa6c72994aed81e3758675524"
+  },
+  "prior_fleet_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0230-fleet-plan-20261109-v1/fleet-plan.json",
+    "sha256": "78cf73bac9d1fd7543fb0865136d2b811ec359910d506e847aefe462eb67b9b2"
+  },
+  "private154_downstream_roles": {
+    "mode": "retained",
+    "roles": [
+      "collect",
+      "import",
+      "deliver"
+    ],
+    "schema": "jetstreamer-recovered-private154-downstream-role-history-v1",
+    "sources": {
+      "collect.entry_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261030T211803Z-private154-collect-entry-v1.json",
+          "sha256": "09f0a37e0fdedaea9721f636cc0a4913321abd4aaeefdbab8dbdc4ed05ffa27d"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-collect-history-sources-20261030-v1/entry_fleet.json",
+          "sha256": "09f0a37e0fdedaea9721f636cc0a4913321abd4aaeefdbab8dbdc4ed05ffa27d"
+        }
+      },
+      "collect.entry_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-collect-entry-fleet-plan-20261030-v1/fleet-plan.json",
+          "sha256": "ae229ab58bce1b43899257f4db31ee829ed0a6d1e9ce17f94964855783c789b8"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-collect-history-sources-20261030-v1/entry_plan.json",
+          "sha256": "ae229ab58bce1b43899257f4db31ee829ed0a6d1e9ce17f94964855783c789b8"
+        }
+      },
+      "collect.event": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-private154-downstream-events-20261030-v1/collect.json",
+          "sha256": "d9db18c489f1f48a2e16f428bcb34b8b9801cb204d745cc44d9c6d1fbfd3bfcd"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-collect-history-sources-20261030-v1/event.json",
+          "sha256": "d9db18c489f1f48a2e16f428bcb34b8b9801cb204d745cc44d9c6d1fbfd3bfcd"
+        }
+      },
+      "collect.live_origin": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-epoch154-publication-evidence-20261030-v1/evidence.json",
+          "sha256": "129ebd968b93e77d57a6a3bab51d48e2bdaa98c5397a3b408f096cac2916c9f9"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-collect-history-sources-20261030-v1/live_origin.json",
+          "sha256": "129ebd968b93e77d57a6a3bab51d48e2bdaa98c5397a3b408f096cac2916c9f9"
+        }
+      },
+      "collect.previous_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261030T211803Z-private154-both-success-normal-v1.json",
+          "sha256": "9a1d335592cf1cd90656b56d341c1000c2a5116a2b161bc104da842b1fecd2d6"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-collect-history-sources-20261030-v1/previous_fleet.json",
+          "sha256": "9a1d335592cf1cd90656b56d341c1000c2a5116a2b161bc104da842b1fecd2d6"
+        }
+      },
+      "collect.previous_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-both-success-normal2118-fleet-plan-20261030-v1/fleet-plan.json",
+          "sha256": "fda9f1760e273134fced7f9831cc2cf1951d9ba4052eb7c8f05b89ea7fecff6f"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-collect-history-sources-20261030-v1/previous_plan.json",
+          "sha256": "fda9f1760e273134fced7f9831cc2cf1951d9ba4052eb7c8f05b89ea7fecff6f"
+        }
+      },
+      "collect.role_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch154-artifact-collector-plan-20261030-v1/collector.json",
+          "sha256": "6259a6fe06b8d780fdb4a450a315b26c878cff75ad6ba53f093ae6a3edff121e"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-collect-history-sources-20261030-v1/role_plan.json",
+          "sha256": "6259a6fe06b8d780fdb4a450a315b26c878cff75ad6ba53f093ae6a3edff121e"
+        }
+      },
+      "deliver.entry_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T083227Z-private154-delivery-entry-C4-v3.json",
+          "sha256": "dad212e240e05dc14c336e978d920d7e0546904bc6311f20364c5116246c35d4"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-delivery-history-sources-20261031-v1/deliver-entry_fleet.json",
+          "sha256": "dad212e240e05dc14c336e978d920d7e0546904bc6311f20364c5116246c35d4"
+        }
+      },
+      "deliver.entry_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-delivery-entry0832-fleet-plan-20261031-v3/fleet-plan.json",
+          "sha256": "8e031eb4496b878be086182c31999cbade724c52d65c37f5a88d1f16c7fbf373"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-delivery-history-sources-20261031-v1/deliver-entry_plan.json",
+          "sha256": "8e031eb4496b878be086182c31999cbade724c52d65c37f5a88d1f16c7fbf373"
+        }
+      },
+      "deliver.event": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-private154-downstream-events-20261030-v1/deliver.json",
+          "sha256": "4818016574c2f51bf63c85657a1c17e785568e89a5c7c193eb043129361d97d2"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-delivery-history-sources-20261031-v1/deliver-event.json",
+          "sha256": "4818016574c2f51bf63c85657a1c17e785568e89a5c7c193eb043129361d97d2"
+        }
+      },
+      "deliver.previous_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T081809Z-private154-import-normal-C3-v1.json",
+          "sha256": "7c03ed8aac30d35a1042e5c7cebb8d3d6ea8e11d9e0f3cc8d91aa55d5e763e52"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-delivery-history-sources-20261031-v1/deliver-previous_fleet.json",
+          "sha256": "7c03ed8aac30d35a1042e5c7cebb8d3d6ea8e11d9e0f3cc8d91aa55d5e763e52"
+        }
+      },
+      "deliver.previous_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-import-normal0818-fleet-plan-20261031-v1/fleet-plan.json",
+          "sha256": "0b6b9a771fc49cf60ef4113b352555ab83ea7deb1682ce54e38a8158951a72b1"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-delivery-history-sources-20261031-v1/deliver-previous_plan.json",
+          "sha256": "0b6b9a771fc49cf60ef4113b352555ab83ea7deb1682ce54e38a8158951a72b1"
+        }
+      },
+      "deliver.role_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-dedicated-delivery-runtime-20261031-v1/delivery-plan.json",
+          "sha256": "0e5812d0470354510a0489139caaf0f6852ffdeb7a1409f4c5c0b78c02f02951"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-delivery-history-sources-20261031-v1/deliver-role_plan.json",
+          "sha256": "0e5812d0470354510a0489139caaf0f6852ffdeb7a1409f4c5c0b78c02f02951"
+        }
+      },
+      "import.entry_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T064809Z-private154-import-C3-v1.json",
+          "sha256": "0d024a4e031ca012eccbf8300a338becec1dbb85df99a9ba54b1d541ce556020"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame0648-private154-import-plan-20261031-v7/import-entry_fleet.json",
+          "sha256": "0d024a4e031ca012eccbf8300a338becec1dbb85df99a9ba54b1d541ce556020"
+        }
+      },
+      "import.entry_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-import0648-fleet-plan-20261031-v1/fleet-plan.json",
+          "sha256": "2fafb25809d878145003cf436b7b28ee447c1edd8ca07c14da492ad7715aca42"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame0648-private154-import-plan-20261031-v7/import-entry_plan.json",
+          "sha256": "2fafb25809d878145003cf436b7b28ee447c1edd8ca07c14da492ad7715aca42"
+        }
+      },
+      "import.event": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-private154-downstream-events-20261030-v1/import.json",
+          "sha256": "76b4ad62f88b10e1a228300718057a2c9091a210e63adcb9218760fc6c4580fb"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame0648-private154-import-plan-20261031-v7/import-event.json",
+          "sha256": "76b4ad62f88b10e1a228300718057a2c9091a210e63adcb9218760fc6c4580fb"
+        }
+      },
+      "import.previous_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261031T064809Z-private154-collect-normal-v1.json",
+          "sha256": "ce05e6dd8431c160ee2d17e375ff1c6c579c50f590b7124318c22b3215ca78bd"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame0648-private154-import-plan-20261031-v7/import-previous_fleet.json",
+          "sha256": "ce05e6dd8431c160ee2d17e375ff1c6c579c50f590b7124318c22b3215ca78bd"
+        }
+      },
+      "import.previous_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-collect-normal0648-fleet-plan-20261031-v1/fleet-plan.json",
+          "sha256": "04dab2fbb89f5be7d563a732aa0e1b8a0831e67738346251cbfca41969b3b7f0"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame0648-private154-import-plan-20261031-v7/import-previous_plan.json",
+          "sha256": "04dab2fbb89f5be7d563a732aa0e1b8a0831e67738346251cbfca41969b3b7f0"
+        }
+      },
+      "import.role_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-publication-import-runtime0648-20261031-v1/publication.json",
+          "sha256": "43ef0118ec54f3db152aca34e69013152daa98712d9731e03b96e1041eb555ab"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-frame0648-private154-import-plan-20261031-v7/import-role_plan.json",
+          "sha256": "43ef0118ec54f3db152aca34e69013152daa98712d9731e03b96e1041eb555ab"
+        }
+      }
+    }
+  },
+  "private154_plugin_terminal": {
+    "mode": "retained",
+    "schema": "jetstreamer-recovered-private154-plugin-terminal-history-v1",
+    "sources": {
+      "entry_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261030T194803Z-private154-plugin-terminal-entry-v1.json",
+          "sha256": "0cdb3a20d5e67def8bbd2aa87a5e848ee9d2edb37fcd9e3569fbe06c5de5be00"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-plugin-terminal-history-sources-20261030-v1/entry_fleet.json",
+          "sha256": "0cdb3a20d5e67def8bbd2aa87a5e848ee9d2edb37fcd9e3569fbe06c5de5be00"
+        }
+      },
+      "entry_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-plugin-terminal-entry-fleet-plan-20261030-v1/fleet-plan.json",
+          "sha256": "6705e5ff928b19eb8643230c062137b0a1dcc034c65a082644d5ac1c8f6bb814"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-plugin-terminal-history-sources-20261030-v1/entry_plan.json",
+          "sha256": "6705e5ff928b19eb8643230c062137b0a1dcc034c65a082644d5ac1c8f6bb814"
+        }
+      },
+      "event": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-private154-plugin-terminal-events-20261030-v1/terminal.json",
+          "sha256": "d6fbf7dc1c132d271a8f69fe77aa689f08428354bac1297a2de4962023f67b01"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-plugin-terminal-history-sources-20261030-v1/event.json",
+          "sha256": "d6fbf7dc1c132d271a8f69fe77aa689f08428354bac1297a2de4962023f67b01"
+        }
+      },
+      "previous_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261030T194803Z-private154-combined-normal-v1.json",
+          "sha256": "d74495fdfc64749290bbf891bf51681e2a5806ac250351b4b1dce9e9eec3781a"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-plugin-terminal-history-sources-20261030-v1/previous_fleet.json",
+          "sha256": "d74495fdfc64749290bbf891bf51681e2a5806ac250351b4b1dce9e9eec3781a"
+        }
+      },
+      "previous_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-normal1948-fleet-plan-20261030-v1/fleet-plan.json",
+          "sha256": "bd696b45c83f6f23ae39e384f155f4d2ede9a61aeab99c8ad763fddc104a1835"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-plugin-terminal-history-sources-20261030-v1/previous_plan.json",
+          "sha256": "bd696b45c83f6f23ae39e384f155f4d2ede9a61aeab99c8ad763fddc104a1835"
+        }
+      },
+      "receipt": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-epoch154-private-verification-20261030-v1/plugin/verification.json",
+          "sha256": "c99075da988fb532b381655e949fec6ea06a72690276f17953b1c408b8cc8a30"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-plugin-terminal-history-sources-20261030-v1/receipt.json",
+          "sha256": "c99075da988fb532b381655e949fec6ea06a72690276f17953b1c408b8cc8a30"
+        }
+      }
+    }
+  },
+  "private154_scan_combined": {
+    "mode": "retained",
+    "schema": "jetstreamer-recovered-private154-combined-first-adoption-history-v1",
+    "sources": {
+      "entry_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261030T164803Z-private154-combined-entry-v1.json",
+          "sha256": "0b525415bbb81efdb886788413597c98de770882672040bc10cb8db632f82a93"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/entry-fleet.json",
+          "sha256": "0b525415bbb81efdb886788413597c98de770882672040bc10cb8db632f82a93"
+        }
+      },
+      "entry_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-entry-fleet-plan-20261030-v1/fleet-plan.json",
+          "sha256": "8e618aa7a353166c5f828eda015a6ac260dad6892705a570df1857e65eefb5e7"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/entry-plan.json",
+          "sha256": "8e618aa7a353166c5f828eda015a6ac260dad6892705a570df1857e65eefb5e7"
+        }
+      },
+      "full.admission": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch154-private-scan-admissions-20261030-v1/full.json",
+          "sha256": "380d9eebd541eb40dfb2ce7442d9f20dcb38386637cee6e0cfb5f7b099ba39b0"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/full-admission.json",
+          "sha256": "380d9eebd541eb40dfb2ce7442d9f20dcb38386637cee6e0cfb5f7b099ba39b0"
+        }
+      },
+      "full.plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch154-private-scan-plans-20261030-v2/full.json",
+          "sha256": "e9142448fff85863ee7798ae8530b66454d9f74e0afa256db11e7890becc49ba"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/full-plan.json",
+          "sha256": "e9142448fff85863ee7798ae8530b66454d9f74e0afa256db11e7890becc49ba"
+        }
+      },
+      "full_receipt": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-epoch154-private-verification-20261030-v1/full/verification.json",
+          "sha256": "791cba075b0993b19fc98fe089e6e08442bb6ae94ebb2813d57e02f21146830b"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/full-verification.json",
+          "sha256": "791cba075b0993b19fc98fe089e6e08442bb6ae94ebb2813d57e02f21146830b"
+        }
+      },
+      "full_terminal_event": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-private154-full-terminal-events-20261030-v1/terminal.json",
+          "sha256": "5fca943c81beb15618c15f262212ff7031717abecfd611b2ce9a4e3a525ccacc"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/full-terminal-event.json",
+          "sha256": "5fca943c81beb15618c15f262212ff7031717abecfd611b2ce9a4e3a525ccacc"
+        }
+      },
+      "launch_event": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-private154-scan-owner-events-20261030-v1/launch.json",
+          "sha256": "0c9a3116f9443ba12de8a9c3cf5b30617e4c12174bffe4c3f119f6b03b2a680d"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/launch-event.json",
+          "sha256": "0c9a3116f9443ba12de8a9c3cf5b30617e4c12174bffe4c3f119f6b03b2a680d"
+        }
+      },
+      "plugin.admission": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch154-private-scan-admissions-20261030-v1/plugin.json",
+          "sha256": "881efaffcb2375012f4d5c95a560bd65c57f22548fd0c1de9737e385824abaaa"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/plugin-admission.json",
+          "sha256": "881efaffcb2375012f4d5c95a560bd65c57f22548fd0c1de9737e385824abaaa"
+        }
+      },
+      "plugin.plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch154-private-scan-plans-20261030-v2/plugin.json",
+          "sha256": "bd0bb4d84152d600d5a7e117f4c5628a1f82e82d476fe5f837bf853943c0b513"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/plugin-plan.json",
+          "sha256": "bd0bb4d84152d600d5a7e117f4c5628a1f82e82d476fe5f837bf853943c0b513"
+        }
+      },
+      "previous_fleet": {
+        "origin": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261030T164803Z-retained-canonical-v2.json",
+          "sha256": "2cfd078b2eb091e93912d35d2227edf887def0587d658a9aa44262853f743388"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/previous-fleet.json",
+          "sha256": "2cfd078b2eb091e93912d35d2227edf887def0587d658a9aa44262853f743388"
+        }
+      },
+      "previous_plan": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-fleet1648-retained-canonical-plan-20261030-v2/fleet-plan.json",
+          "sha256": "562f4b5db1fc1447deb36bd5f3e8a871d1641ccd13ffc2046353b82ee7858dc7"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-private154-combined-first-adoption-sources-20261030-v1/previous-plan.json",
+          "sha256": "562f4b5db1fc1447deb36bd5f3e8a871d1641ccd13ffc2046353b82ee7858dc7"
+        }
+      }
+    }
+  },
+  "publication_authorized": false,
+  "remaining_growth_released": false,
+  "remote_mutations": false,
+  "repair_incident_remains_open": true,
+  "replay_launch_authorized": false,
+  "schema": "jetstreamer-horizon-cohort183-recovered-frame-refresh-v1",
+  "sidecar_mutations": false,
+  "source_batch_snapshot": {
+    "path": "/usr/local/lib/jetstreamer/horizon-cohort183-canonical-import-evidence-20261029-v1/source-batch.json",
+    "sha256": "433f668b7efee917040c65f214bf6a476ac0bcd96a1160addce765c5ab4a47e6"
+  },
+  "terminal154": {
+    "new_resource_samples": 0,
+    "physical_retirement_credit_bytes": 0,
+    "publication_authorized": false,
+    "r2_mutations": false,
+    "recorded_unix_seconds": 1793337300,
+    "remaining_growth_credit_bytes": 0,
+    "remote_mutations": false,
+    "replay_launch_authorized": false,
+    "schema": "jetstreamer-terminal154-g5-retained-frame-transition-v1",
+    "sources": {
+      "allocation": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-native154-suffix-20261029-v1/terminal.json",
+          "sha256": "ec1f4455f70444f63602c7b26700c0eaee8d7528f2f00befb6fd327c9b19b16b"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/terminal154-terminal.json",
+          "sha256": "ec1f4455f70444f63602c7b26700c0eaee8d7528f2f00befb6fd327c9b19b16b"
+        }
+      },
+      "first_guard": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-native154-suffix-release-20261029-v1/first-guard.json",
+          "sha256": "2c5ff272b4746246993f11c736a61ebf6a4e21630c25ea18e35f781415086b73"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/terminal154-first_guard.json",
+          "sha256": "2c5ff272b4746246993f11c736a61ebf6a4e21630c25ea18e35f781415086b73"
+        }
+      },
+      "g5.admission": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/epoch161-snapshot-input-20261030-g5/receipts/admission.json",
+          "sha256": "03cb40c0fd07518f1f995a491d309793d9955bc54c9350223420215405d6a157"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/terminal154-g5-admission.json",
+          "sha256": "03cb40c0fd07518f1f995a491d309793d9955bc54c9350223420215405d6a157"
+        }
+      },
+      "g5.allocation": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/epoch161-snapshot-input-20261030-g5/receipts/terminal.json",
+          "sha256": "72bd3d8606df5fb6acd9c3af21a4ec52089b12f67977b779e05412387d21475d"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/terminal154-g5-terminal.json",
+          "sha256": "72bd3d8606df5fb6acd9c3af21a4ec52089b12f67977b779e05412387d21475d"
+        }
+      },
+      "g5.terminal": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/epoch161-snapshot-input-20261030-g5/receipts/terminal.json",
+          "sha256": "72bd3d8606df5fb6acd9c3af21a4ec52089b12f67977b779e05412387d21475d"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/terminal154-g5-terminal.json",
+          "sha256": "72bd3d8606df5fb6acd9c3af21a4ec52089b12f67977b779e05412387d21475d"
+        }
+      },
+      "metadata_event_value": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-native154-owner0455-plan-20261030-v1/event.json",
+          "sha256": "2b9faeffa558cc5592091d951b6eb011cc063d75f3fe45f5bc970f2599f53cff"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/terminal154-metadata_event_value.json",
+          "sha256": "2b9faeffa558cc5592091d951b6eb011cc063d75f3fe45f5bc970f2599f53cff"
+        }
+      },
+      "owner": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-native154-suffix-20261029-v1/owner.json",
+          "sha256": "68e16da57d67b791b70bce1a84b381df1c264f60c33cf179adb93ea1a8437e63"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/terminal154-owner.json",
+          "sha256": "68e16da57d67b791b70bce1a84b381df1c264f60c33cf179adb93ea1a8437e63"
+        }
+      },
+      "prepared": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-native154-suffix-20261029-v1/prepared.json",
+          "sha256": "31ae09051bf59fbfbf3b905b26e9275d26ba47743bd83963f331077f92708cff"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/terminal154-prepared.json",
+          "sha256": "31ae09051bf59fbfbf3b905b26e9275d26ba47743bd83963f331077f92708cff"
+        }
+      },
+      "release": {
+        "origin": {
+          "path": "/usr/local/lib/jetstreamer/horizon-native154-suffix-release-20261029-v1/release.json",
+          "sha256": "3469292ede4a1c1519aedd443e9b127e373524493e50f95eefcc604dd34fc7d9"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/terminal154-release.json",
+          "sha256": "3469292ede4a1c1519aedd443e9b127e373524493e50f95eefcc604dd34fc7d9"
+        }
+      },
+      "terminal": {
+        "origin": {
+          "path": "/var/lib/jetstreamer/horizon-native154-suffix-20261029-v1/terminal.json",
+          "sha256": "ec1f4455f70444f63602c7b26700c0eaee8d7528f2f00befb6fd327c9b19b16b"
+        },
+        "preserved": {
+          "path": "/usr/local/lib/jetstreamer/horizon-delivery184-frame-history-sources-20261030-v1/terminal154-terminal.json",
+          "sha256": "ec1f4455f70444f63602c7b26700c0eaee8d7528f2f00befb6fd327c9b19b16b"
+        }
+      }
+    }
+  },
+  "verifier183": {
+    "event": {
+      "path": "/usr/local/lib/jetstreamer/horizon-cohort183-verifier-owner-transition-20261030-v1/plan.json",
+      "sha256": "9e4ae0744121fb8d035a621c30d7e4f3b09daf8d4e5ce5c1ec73180dad802922"
+    },
+    "full_launch": {
+      "path": "/usr/local/lib/jetstreamer/horizon-cohort183-native-verification-event-20261030-v1/full-launch.json",
+      "sha256": "df5231becab356419ee4e2735f71aa4b20da8d79c3fc1571b9b617c49f9b52fd"
+    },
+    "mode": "retained",
+    "plugin_launch": {
+      "path": "/usr/local/lib/jetstreamer/horizon-cohort183-native-verification-event-20261030-v1/plugin-launch.json",
+      "sha256": "4d839b1e4a60d0762dd50bcc040f7bb06813cc44a7e3fcecfe869da7f3c12539"
+    },
+    "schema": "jetstreamer-recovered-verifier183-history-v1"
+  },
+  "observation_bridge": [
+    {
+      "observer": {
+        "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T030022Z-postcompletion154-v1.json",
+        "sha256": "03a38c4dce0fd1f8d8fa8838b9b7d41d9ce225e71a5276fa354de6c357ed39ad"
+      }
+    },
+    {
+      "observer": {
+        "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T033022Z-postcompletion154-v1.json",
+        "sha256": "5c8457f3d3f32eeecab7e5e89c793362a363350ab74c2ca86295925cd42d2c94"
+      }
+    },
+    {
+      "observer": {
+        "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T040022Z-postcompletion154-v1.json",
+        "sha256": "3c06e946f1d031dd459feda5dd90d9f4a25f91dd0c29d81006b53ab66342836f"
+      }
+    }
+  ]
+}

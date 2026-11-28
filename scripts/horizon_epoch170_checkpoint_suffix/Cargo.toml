@@ -1,0 +1,29 @@
+[package]
+name = "horizon-epoch170-checkpoint-operator"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "operator"
+path = "operator.rs"
+
+[dependencies]
+anyhow = "1"
+libc = "0.2"
+serde_json = "1"
+sha2 = "0.10"
+
+[[bin]]
+name = "bridge-checkpoints"
+path = "bridge_checkpoints.rs"
+
+[[bin]]
+name = "bounded-checkpoints"
+path = "bounded_checkpoints.rs"
+
+[[bin]]
+name = "following-checkpoints"
+path = "following_checkpoints.rs"

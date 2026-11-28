@@ -1,0 +1,34 @@
+[Unit]
+Description=Isolated genuine uncapped to capped idle census transition
+[Service]
+Type=exec
+User=sol
+Group=horizon
+Slice=horizon_uploader_cap_transition_20261111_v2-fixture.slice
+ExecStart=/usr/local/lib/jetstreamer/horizon-uploader-freeze-fixture-tools-20261103-v1/waiter idle
+Restart=on-failure
+RestartSec=30s
+MemoryAccounting=yes
+MemoryMax=infinity
+MemorySwapMax=0
+TasksMax=256
+OOMPolicy=stop
+CPUQuota=100%
+KillMode=control-group
+KillSignal=SIGTERM
+FinalKillSignal=SIGKILL
+SendSIGKILL=yes
+TimeoutStopSec=5s
+RuntimeMaxSec=180s
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectControlGroups=yes
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=yes
+TemporaryFileSystem=/var/lib/jetstreamer:size=8M,mode=0755
+BindPaths=/var/lib/jetstreamer/horizon-uploader-cap-transition-20261111-v2/waiter:/var/lib/jetstreamer/horizon-uploader-freeze-fixture-positive-20261103-v1-waiter-v5
+ReadWritePaths=/var/lib/jetstreamer/horizon-uploader-freeze-fixture-positive-20261103-v1-waiter-v5
+StandardInput=null
+StandardOutput=journal
+StandardError=inherit

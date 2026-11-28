@@ -1,0 +1,35 @@
+{
+  "cases": [
+    {
+      "case": "actual-qualified-successor36-positive",
+      "passed": true
+    },
+    {
+      "case": "reject-old-helper33",
+      "passed": true
+    },
+    {
+      "case": "reject-old-planner4",
+      "passed": true
+    },
+    {
+      "case": "reject-old-operation35",
+      "passed": true
+    },
+    {
+      "case": "reject-crossed-old-lifecycle",
+      "passed": true
+    },
+    {
+      "case": "reject-duplicate-DATA-booking",
+      "passed": true
+    },
+    {
+      "case": "reject-missing-DATA-reservation",
+      "passed": true
+    }
+  ],
+  "all_passed": true,
+  "original_manifest_sha256": "805b3c51512bd3c7fe63c85a98b97db0cac4d661b1acc08cda7306335c652e89",
+  "no_native_or_R2_or_launch_authority": true
+}

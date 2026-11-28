@@ -1,0 +1,9 @@
+{
+  "schema": "positive185-retire-exact0230-successful-reader-v1",
+  "operation_root": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-retire0230-reader-20261109-v38-r1",
+  "generation": "positive-retire0230-reader-v38-r1",
+  "native_retirement_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-successful-reader-retirement-control-positive-success-retire-v38-driver12-helper35-r1/completion.json",
+    "sha256": "5b91d03471d40b0ef01cbebe61cbd0dc8e9f693c1e24e5e4960ebb84898443ff"
+  }
+}

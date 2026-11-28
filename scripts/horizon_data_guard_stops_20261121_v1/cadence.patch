@@ -1,0 +1,142 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -1,6 +1,7 @@
+ """Receipt-backed rolling input and sample interpretation, independent of the clock tag."""
+ import cadence168
+ import full172
++import guard_stops
+ import closed166
+ import closed168
+ import private136
+@@ -126,7 +127,7 @@
+         need(f["focused169_cadence_anchor"]==seed and (prevref==seed or prev["focused169_cadence_anchor"]==seed) and f["stable_cadence_anchor"]==ANCHOR and f["terminal172_cadence_anchor"]==prev["terminal172_cadence_anchor"] and f["observer"]!=prev["observer"],"invalid five-owner successor")
+         before=checked(f["observer"])
+         need(utc(f["sampled_at_utc"])>=utc(prev["sampled_at_utc"])+dt.timedelta(seconds=1800) and before["cadence"]["previous_sample_sha256"]==prev["observer"]["sha256"] and before["cadence"]["previous_sample"]==prev["observer"]["path"],"previous sample chain broken")
+-    extra=int(full172.owned(f) is not None) + int(cadence168.previous(f) is not None) - int(closed166.FIELD in f)
++    extra=-len(guard_stops.closed_epochs(f))+int(full172.owned(f) is not None) + int(cadence168.previous(f) is not None) - int(closed166.FIELD in f)
+     bounded136=private136.previous(f)
+     retired168=int(closed168.prior(f))
+     need(f["owner"]=="/root" and f["active_producer_count"]==5+extra+bounded136-retired168 and f["canonical_producer_count"]==3+extra and f["active_private_diagnostic_count"]==2+bounded136-retired168,"changed producer counts")
+@@ -145,8 +146,8 @@
+         self.fleet,self.cfg,self.prior=load_fleet(self.fleet_ref)
+         self.paths=names(self.cfg["not_before_utc"]);self.sample_ref=pair(self.paths["sample"],sample_sha)
+         self.sample=checked(self.sample_ref)
+-        self.terminal166=closed166.native_config(self)
+-        self.owner_fleet=closed168.owner_view(self,closed166.owner_view(self.fleet,self.terminal166))
++        self.terminal166 = None
++        self.owner_fleet = closed168.owner_view(self, guard_stops.select_cycle(self))
+         self.retired168=closed168.FIELD in self.owner_fleet
+         if self.historical166:
+             self.original_status_dir=self.paths["statuses"]
+@@ -174,7 +175,7 @@
+             samples = [row for row in samples if row["range"] != "166"]
+         config={int(r["range"]):r for r in registered if r["range"] not in ("168","172")}
+         self.lanes={int(r["range"]):r for r in samples if r["range"] not in ("168","172")}
+-        need(len(registered) == len(samples) == len(config)+sum(r["range"] in ("168","172") for r in registered) and set(config)==set(self.lanes)==set(self.rows)==set(IDS)-({166} if self.terminal166 else set()),"changed canonical replay list")
++        need(len(registered) == len(samples) == len(config)+sum(r["range"] in ("168","172") for r in registered) and set(config)==set(self.lanes)==set(self.rows)==set(IDS)-guard_stops.closed_epochs(self.owner_fleet),"changed canonical replay list")
+         self.advancing={}
+         for epoch,l in self.lanes.items():
+             iid,pid,ticks=IDS[epoch];r=config[epoch];owner=self.rows[epoch]
+--- a/owners.py
++++ b/owners.py
+@@ -1,4 +1,5 @@
+ """Identity bindings for the three accepted archive workers and private diagnostic."""
++import guard_stops
+ import closed168
+ import cadence168
+ import full172
+@@ -120,7 +121,7 @@
+ 
+ def verified_owners(fleet):
+     rows=[r for r in fleet["actual_executing_replays"] if r["epoch"] not in (168,172)]
+-    expected = set(IDS) - ({166} if fleet.get("terminal166_local_commit") else set())
++    expected = set(IDS) - guard_stops.closed_epochs(fleet)
+     need(len(rows)==len(expected) and {r["epoch"] for r in rows}==expected and all(r["epoch"] in (168,172) for r in fleet["actual_active_bootstraps"]),"canonical owner set changed; reconcile its guarded admission or terminal event")
+     priv=[r for r in fleet["actual_active_private_diagnostics"] if r["epoch"]!=136]
+     expected_private={169:fleet["focused169_admission"]}
+@@ -137,6 +138,8 @@
+     rows=[r for r in fleet["actual_executing_replays"] if r["epoch"] not in (168,172)]
+     from terminal import drained
+     drained()
++    if guard_stops.closed_epochs(fleet):
++        guard_stops.assert_drained(checked(guard_stops.EVENT)["reports"])
+     import focused169
+     focused=focused169.native(fleet["focused169_admission"])
+     expected=next(r for r in fleet["actual_active_private_diagnostics"] if r["epoch"]==169)
+--- a/reconcile.py
++++ b/reconcile.py
+@@ -1,6 +1,7 @@
+ """Derive the next observer and publish the validated local fleet after its sole timer is armed."""
+ import cadence168
+ import full172
++import guard_stops
+ import closed166
+ import closed168
+ import private136
+@@ -110,7 +111,7 @@
+         need(capacity.get(cadence168.FIELD)==c.metered168['reference'],'normal 168 capacity belongs to another sample')
+     cadence168.install(c,f)
+     private136.install(c,f)
+-    closed166.attach(f,c)
++    guard_stops.install(f,c)
+     return f
+ def run(c,operation):
+     out=c.paths["out"];ensure_dir(out);fd=lock(out/"fleet-cycle.lock")
+--- a/status.py
++++ b/status.py
+@@ -2,6 +2,7 @@
+ import cadence168
+ import full172
+ import delivery_eta
++import guard_stops
+ import closed166
+ import private136
+ import datetime as dt
+@@ -146,8 +147,8 @@
+ def follow_event(e,ref,etag,raw,terminal166=None):
+     prior=checked(ref)
+     if prior["after_etag"]==etag and prior["after_sha256"]==digest(raw) and prior["after_status"]==json.loads(raw):return ref,prior
+-    if e == replay167_rate.EPOCH:
+-        return replay167_event.follow(ref,etag,raw)
++    if e in guard_stops.EPOCHS:
++        return guard_stops.initial_readback(e,ref,etag,raw)
+     need(e not in IDS or (e==166 and terminal166),"canonical remote status changed; reconcile current owner's event")
+     # Follow a finite, hash-and-ETag-linked chain of root-owned corrections.
+     events=[]
+@@ -184,7 +185,10 @@
+     if c.metered168:
+         result[cadence168.FIELD]=c.metered168["reference"]
+     result.update(private136.status_fields(c,e))
+-    if e == replay167_rate.EPOCH:
++    if e in guard_stops.EPOCHS:
++        result.update(original_data_guard_stop=checked(guard_stops.EVENT)["reports"][str(e)],
++                      estimate_model="Carry the absolute repair, full replay and archive delivery forecast from the authenticated guard stop.")
++    elif e == replay167_rate.EPOCH:
+         result.update(estimate_model=c.rolling167["model"], rolling_rate_evidence=c.rolling167)
+     quote=getattr(c,"delivery_forecasts",{}).get(e)
+     if quote:
+--- a/run-cycle.sh
++++ b/run-cycle.sh
+@@ -44,7 +44,7 @@
+         [[ $(date -u -d "$due" +%s) -gt $(date -u +%s) ]] || { echo 'observer due passed; reconcile actual cadence' >&2; exit 1; }
+         systemd-run --unit="${timer%.timer}" --on-calendar="$(date -u -d "$due" '+%F %T UTC')" \
+           --timer-property=AccuracySec=1s --timer-property=RemainAfterElapse=no \
+-          /usr/bin/python3 -B "$pkg/race166.py" "$config"
++          /usr/bin/python3 -B "$pkg/guard_stops.py" "$config"
+     else
+         [[ $waiting == "$timer" ]] || { echo 'another observer timer already owns this cadence' >&2; exit 1; }
+     fi
+--- a/consume
++++ b/consume
+@@ -47,10 +47,7 @@
+         sleep 3
+     done
+     read -r binding _ < <(sha256sum -- "$sample")
+-    if ! "$pkg/run-cycle.sh" "$fleet" "$sha" "$binding"; then
+-        /usr/bin/python3 -B "$pkg/race166.py" retry-status "$fleet" "$sha" "$binding"
+-        "$pkg/run-cycle.sh" "$fleet" "$sha" "$binding"
+-    fi
++    "$pkg/run-cycle.sh" "$fleet" "$sha" "$binding"
+     fleet="$(jq -er .out <<<"$meta")/ROOT_COMPLETE_OPERATIONAL_FLEET.json"
+     [[ -s "$fleet" && $(stat -c %u "$fleet") == 0 ]]
+     read -r sha _ < <(sha256sum -- "$fleet")

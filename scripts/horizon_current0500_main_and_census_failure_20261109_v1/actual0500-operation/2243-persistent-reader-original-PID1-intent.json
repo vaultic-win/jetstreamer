@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "--all",
+    "--no-pager",
+    "-ojson",
+    "-n",
+    "2",
+    "_PID=1",
+    "_UID=0",
+    "UNIT=horizon-failed4-current-accounting-reader-20261104-v1.service",
+    "INVOCATION_ID=091e4ddd0e9a49e0830a835192473b40",
+    "MESSAGE_ID=7ad2d189f7e94e70a38c781354912448"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/journalctl",
+  "timeout_millis": 5000,
+  "wall_started_at": 1794201304
+}

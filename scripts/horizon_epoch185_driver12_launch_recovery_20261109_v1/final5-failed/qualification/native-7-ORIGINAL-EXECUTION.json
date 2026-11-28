@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest post_main::native_controls::actual_postmain_guard_keeps_close_write_publication_semantics ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.16s\n\n",
+  "stderr": "Running as unit: horizon-positive185-final5-native-7-20261109-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 172ms\nCPU time consumed: 18ms\nMemory peak: 1.6M\nMemory swap peak: 0B\n"
+}

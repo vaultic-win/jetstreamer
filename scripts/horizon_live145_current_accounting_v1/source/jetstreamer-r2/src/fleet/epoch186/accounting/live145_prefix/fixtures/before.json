@@ -1,0 +1,35 @@
+{
+  "admission": {
+    "path": "/var/lib/jetstreamer/horizon-epoch145-prefix-extract-shared72h-20261107-v8g1/admission.json",
+    "sha256": "eecfdac8d2b968979c3bf541d75b5362d6b223b8d58da17600b7c4af25664c02"
+  },
+  "at_unix_seconds": 1794037481,
+  "plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-plan-shared72h-20261107-v8g1/plan.json",
+    "sha256": "c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3"
+  },
+  "schema": "horizon-epoch145-actual-pre-read-guard-v1",
+  "token": {
+    "actor_iid": "f37b155136614e0183ba2e9adb8714ef",
+    "actor_pid": 2463122,
+    "actor_start_ticks": 238412403,
+    "actual_available_memory_bytes": 793486536704,
+    "actual_free_bytes": 7070060707840,
+    "admission": {
+      "path": "/var/lib/jetstreamer/horizon-epoch145-prefix-extract-shared72h-20261107-v8g1/admission.json",
+      "sha256": "eecfdac8d2b968979c3bf541d75b5362d6b223b8d58da17600b7c4af25664c02"
+    },
+    "at_boottime_millis": 2384142079,
+    "at_unix_seconds": 1794037480,
+    "guard_iid": "dd3192c4e1f8420eb283d09e6a74e7f9",
+    "guard_pid": 2463244,
+    "guard_start_ticks": 238413276,
+    "plan": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-plan-shared72h-20261107-v8g1/plan.json",
+      "sha256": "c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3"
+    },
+    "protected_available_memory_bytes": 642177138688,
+    "protected_free_bytes": 5074152197938,
+    "schema": "horizon-epoch145-private-extractor-native-guard-token-v1"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/local1-scratch-retirement-qualification-20261110-v5/local1-scratch-retirement-v4/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "b1a838329569960bafea5046d357cc5c35f299b66e47832d51209df45ee78d77"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/local1-scratch-retirement-qualification-20261110-v5/local1-scratch-retirement-v4/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "0940bfd8ab41cdc571f94a157f9a85a209b4ae9965d4653259e929b8c1692090"
+  },
+  "source_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local1-scratch-retire-source-20261110-v4/deployment-seal-receipt.json",
+    "sha256": "78592a87465e732048bccad4a7534c1de55c2c1a4bb99d02e689defa705120d0"
+  },
+  "actual_ordinary_test_count": 33,
+  "published_source_sha256": {
+    "main.rs": "53250c3d64e8fef4c13f43ae95920fe364e91a5b98ea6a38cfd51a3381a94854",
+    "tests.rs": "6eed88ed52fb6afd5b659fc87bda1dc4b240e4d89fb930317e860c7833153183",
+    "stopped_tree.rs": "543e3a9a0dd216b564de569001fb7fbc318bdd65f2d04f247094984cb4dc3096",
+    "process_references.rs": "f60ffd9fd04a1604226567b9af0ea0652d0b622dc95ee8608b045b4e48391756",
+    "profiles.rs": "4285a181305a013663c35427b88e0dae2927e42ad2adb8de7d53f7efc26caa31",
+    "profiles.json": "80fd0c8ae3dddc6ca23c08b2c8b198280135bcd42edf6c893f9b0509de420d5e",
+    "source-review.md": "c5f2353626f954c9556312c1e5f927a0ce99d80610d4de3b86f51b30c3bf9845"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0
+}

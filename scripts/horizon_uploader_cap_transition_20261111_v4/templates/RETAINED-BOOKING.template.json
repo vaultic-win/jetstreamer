@@ -1,0 +1,40 @@
+{
+  "schema": "horizon-isolated-cap-transition-retained-booking-v2",
+  "owner": "/root",
+  "retained_native16_bytes": 17179869184,
+  "aggregate_controller_fixture_reader_bytes": 1073741824,
+  "controller_bytes": 536870912,
+  "fixture_ancestor_bytes": 268435456,
+  "one_serial_reader_bytes": 134217728,
+  "experimental_subject_cap_bytes": 134217728,
+  "compiler_active_during_capture": false,
+  "existing_OS_source_artifact_bytes": 536870912,
+  "OS_floor_bytes": 68719476736,
+  "all_memory_promises_retained_bytes": 759789531136,
+  "all_DATA_promises_retained_bytes": 6229838610226,
+  "new_resource_promise_bytes": 0,
+  "resource_credit_bytes": 0,
+  "actual_existing_parent_booking": {
+    "path": "ROOT_MUST_BIND_ACTUAL_RETAINED_BOOKING",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "actual_exclusion_census": {
+    "path": "ROOT_MUST_BIND_ACTUAL_COMPILER_DRAIN_AND_EXCLUSIVE_POOL_CONTROL",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "source_artifact_allowance_reused": true,
+  "fixture_aggregate_slice_bytes": 1073741824,
+  "root_outer_bytes": 1073741824,
+  "total_transition_and_root_outer_bytes": 2147483648,
+  "root_outer_identity": {
+    "unit": "ROOT_MUST_BIND_ACTUAL_SEPARATE_ROOT_OUTER_SERVICE",
+    "invocation_id": "ROOT_MUST_BIND_ACTUAL_IID",
+    "main_pid": 0,
+    "start_ticks": 0,
+    "control_group": "ROOT_MUST_BIND_ACTUAL_DISJOINT_ROOT_OUTER_CGROUP"
+  },
+  "root_outer_allocation_is_disjoint": true,
+  "all_other_retained_native16_commitments_preserved": true,
+  "other_retained_native16_committed_bytes": "ROOT_MUST_BIND_ACTUAL_OTHER_RETAINED_NATIVE16_COMMITMENTS",
+  "native16_total_with_transition_bytes": "ROOT_MUST_BIND_ACTUAL_OTHER_PLUS_TWO_GIB_NO_NEW_PROMISES"
+}

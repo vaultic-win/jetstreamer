@@ -1,0 +1,23 @@
+[Unit]
+Description=Record the original private epoch 169 terminal and drain its timer
+After=systemd-journald.service
+StartLimitIntervalSec=3600
+StartLimitBurst=12
+
+[Service]
+Type=oneshot
+Slice=system.slice
+ExecStart=/usr/bin/python3 -IB /var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-terminal-20261121-v1/closure-tools/closure169.py settle
+TimeoutStartSec=200
+Restart=on-failure
+RestartSec=15
+CPUQuota=25%
+MemoryHigh=48M
+MemoryMax=64M
+MemorySwapMax=0
+TasksMax=12
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-terminal-20261121-v1

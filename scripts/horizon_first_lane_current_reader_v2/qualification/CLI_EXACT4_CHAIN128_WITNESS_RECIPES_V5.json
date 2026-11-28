@@ -1,0 +1,900 @@
+{
+  "recipes": {
+    "clippy-prod": [
+      "systemd-run",
+      "--wait",
+      "--pipe",
+      "--service-type=exec",
+      "--unit=horizon-first-lane-chain128-witness-frame-cli-clippy-prod-20261107-v5",
+      "-p",
+      "User=root",
+      "-p",
+      "Group=root",
+      "-p",
+      "UMask=0022",
+      "-p",
+      "MemoryAccounting=yes",
+      "-p",
+      "MemoryHigh=1G",
+      "-p",
+      "MemoryMax=2G",
+      "-p",
+      "MemorySwapMax=0",
+      "-p",
+      "CPUQuota=200%",
+      "-p",
+      "TasksMax=256",
+      "-p",
+      "RuntimeMaxSec=300",
+      "-p",
+      "Restart=no",
+      "-p",
+      "PrivateNetwork=yes",
+      "-p",
+      "ProtectSystem=strict",
+      "-p",
+      "ProtectHome=read-only",
+      "-p",
+      "NoNewPrivileges=yes",
+      "-p",
+      "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+      "-p",
+      "AmbientCapabilities=CAP_DAC_OVERRIDE",
+      "-p",
+      "ReadWritePaths=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5",
+      "--setenv=TMPDIR=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5/tmp",
+      "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-original199-witness-consumer-current-graph-library-20261107-v1",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-first-lane-witness-frame-v5-r6-library-20261107-v1",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/frame-v5-r6/work",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-live145-census-frame-library-tools-20261107-v2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-original199-retained-frame-library-tools-20261104-v5",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-parent-directory-anchor-library-tools-20261105-v1",
+      "--extern",
+      "horizon_original199_parent_memory=/usr/local/lib/jetstreamer/horizon-parent-directory-anchor-library-tools-20261105-v1/libhorizon_original199_parent_memory.rlib",
+      "--check-cfg",
+      "cfg(docsrs,test)",
+      "--check-cfg",
+      "cfg(feature, values(\"native210-small\",\"native227-small\"))",
+      "--cfg",
+      "feature=\"native210-small\"",
+      "--cfg",
+      "feature=\"native227-small\"",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-failed4-foreman-command-library-20261104-v2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/failed4-canonical-v5-final-writer-source-20261104-v3/propagation/frame-v8/build",
+      "-C",
+      "metadata=typed_fleet_bridge_Frame_20261105_v1",
+      "--check-cfg=cfg(test)",
+      "--check-cfg=cfg(horizon_input137_first_entry_fixture)",
+      "--crate-name",
+      "horizon_cached145_terminal_ancestry_capture",
+      "--edition=2024",
+      "-Dwarnings",
+      "-C",
+      "debuginfo=0",
+      "-C",
+      "codegen-units=2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps",
+      "--extern",
+      "jetstreamer_typed_memory=/usr/local/lib/jetstreamer/horizon-failed4-foreman-command-library-20261104-v2/libjetstreamer_typed_memory.rlib",
+      "--extern",
+      "serde=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib",
+      "--extern",
+      "serde_json=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "--extern",
+      "sha2=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "--extern",
+      "libc=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "--extern",
+      "anyhow=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "--crate-type=bin",
+      "--emit=metadata",
+      "-C",
+      "opt-level=0",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-accepted0428-family-predecessor-library-tools-20261106-v1",
+      "--extern",
+      "horizon_recovered_resource_frame_recovery199=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/work/libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
+      "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/main.rs",
+      "-o",
+      "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5/clippy-prod.rmeta"
+    ],
+    "clippy-tests": [
+      "systemd-run",
+      "--wait",
+      "--pipe",
+      "--service-type=exec",
+      "--unit=horizon-first-lane-chain128-witness-frame-cli-clippy-tests-20261107-v5",
+      "-p",
+      "User=root",
+      "-p",
+      "Group=root",
+      "-p",
+      "UMask=0022",
+      "-p",
+      "MemoryAccounting=yes",
+      "-p",
+      "MemoryHigh=1G",
+      "-p",
+      "MemoryMax=2G",
+      "-p",
+      "MemorySwapMax=0",
+      "-p",
+      "CPUQuota=200%",
+      "-p",
+      "TasksMax=256",
+      "-p",
+      "RuntimeMaxSec=300",
+      "-p",
+      "Restart=no",
+      "-p",
+      "PrivateNetwork=yes",
+      "-p",
+      "ProtectSystem=strict",
+      "-p",
+      "ProtectHome=read-only",
+      "-p",
+      "NoNewPrivileges=yes",
+      "-p",
+      "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+      "-p",
+      "AmbientCapabilities=CAP_DAC_OVERRIDE",
+      "-p",
+      "ReadWritePaths=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5",
+      "--setenv=TMPDIR=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5/tmp",
+      "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-original199-witness-consumer-current-graph-library-20261107-v1",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-first-lane-witness-frame-v5-r6-library-20261107-v1",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/frame-v5-r6/work",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-live145-census-frame-library-tools-20261107-v2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-original199-retained-frame-library-tools-20261104-v5",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-parent-directory-anchor-library-tools-20261105-v1",
+      "--extern",
+      "horizon_original199_parent_memory=/usr/local/lib/jetstreamer/horizon-parent-directory-anchor-library-tools-20261105-v1/libhorizon_original199_parent_memory.rlib",
+      "--check-cfg",
+      "cfg(docsrs,test)",
+      "--check-cfg",
+      "cfg(feature, values(\"native210-small\",\"native227-small\"))",
+      "--cfg",
+      "feature=\"native210-small\"",
+      "--cfg",
+      "feature=\"native227-small\"",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-failed4-foreman-command-library-20261104-v2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/failed4-canonical-v5-final-writer-source-20261104-v3/propagation/frame-v8/build",
+      "-C",
+      "metadata=typed_fleet_bridge_Frame_20261105_v1",
+      "--check-cfg=cfg(test)",
+      "--check-cfg=cfg(horizon_input137_first_entry_fixture)",
+      "--crate-name",
+      "horizon_cached145_terminal_ancestry_capture",
+      "--edition=2024",
+      "-Dwarnings",
+      "-C",
+      "debuginfo=0",
+      "-C",
+      "codegen-units=2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps",
+      "--extern",
+      "jetstreamer_typed_memory=/usr/local/lib/jetstreamer/horizon-failed4-foreman-command-library-20261104-v2/libjetstreamer_typed_memory.rlib",
+      "--extern",
+      "serde=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib",
+      "--extern",
+      "serde_json=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "--extern",
+      "sha2=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "--extern",
+      "libc=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "--extern",
+      "anyhow=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "--test",
+      "--emit=metadata",
+      "-C",
+      "opt-level=0",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-accepted0428-family-predecessor-library-tools-20261106-v1",
+      "--extern",
+      "horizon_recovered_resource_frame_recovery199=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/work/libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
+      "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/main.rs",
+      "-o",
+      "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5/clippy-tests.rmeta",
+      "--extern",
+      "tempfile=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libtempfile-47898064045d0aed.rlib"
+    ],
+    "release": [
+      "systemd-run",
+      "--wait",
+      "--pipe",
+      "--service-type=exec",
+      "--unit=horizon-first-lane-chain128-witness-frame-cli-release-20261107-v5",
+      "-p",
+      "User=root",
+      "-p",
+      "Group=root",
+      "-p",
+      "UMask=0022",
+      "-p",
+      "MemoryAccounting=yes",
+      "-p",
+      "MemoryHigh=1G",
+      "-p",
+      "MemoryMax=2G",
+      "-p",
+      "MemorySwapMax=0",
+      "-p",
+      "CPUQuota=200%",
+      "-p",
+      "TasksMax=256",
+      "-p",
+      "RuntimeMaxSec=300",
+      "-p",
+      "Restart=no",
+      "-p",
+      "PrivateNetwork=yes",
+      "-p",
+      "ProtectSystem=strict",
+      "-p",
+      "ProtectHome=read-only",
+      "-p",
+      "NoNewPrivileges=yes",
+      "-p",
+      "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+      "-p",
+      "AmbientCapabilities=CAP_DAC_OVERRIDE",
+      "-p",
+      "ReadWritePaths=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5",
+      "--setenv=TMPDIR=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5/tmp",
+      "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-original199-witness-consumer-current-graph-library-20261107-v1",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-first-lane-witness-frame-v5-r6-library-20261107-v1",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/frame-v5-r6/work",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-live145-census-frame-library-tools-20261107-v2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-original199-retained-frame-library-tools-20261104-v5",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-parent-directory-anchor-library-tools-20261105-v1",
+      "--extern",
+      "horizon_original199_parent_memory=/usr/local/lib/jetstreamer/horizon-parent-directory-anchor-library-tools-20261105-v1/libhorizon_original199_parent_memory.rlib",
+      "--check-cfg",
+      "cfg(docsrs,test)",
+      "--check-cfg",
+      "cfg(feature, values(\"native210-small\",\"native227-small\"))",
+      "--cfg",
+      "feature=\"native210-small\"",
+      "--cfg",
+      "feature=\"native227-small\"",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-failed4-foreman-command-library-20261104-v2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/failed4-canonical-v5-final-writer-source-20261104-v3/propagation/frame-v8/build",
+      "-C",
+      "metadata=typed_fleet_bridge_Frame_20261105_v1",
+      "--check-cfg=cfg(test)",
+      "--check-cfg=cfg(horizon_input137_first_entry_fixture)",
+      "--crate-name",
+      "horizon_cached145_terminal_ancestry_capture",
+      "--edition=2024",
+      "-Dwarnings",
+      "-C",
+      "debuginfo=0",
+      "-C",
+      "codegen-units=2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps",
+      "--extern",
+      "jetstreamer_typed_memory=/usr/local/lib/jetstreamer/horizon-failed4-foreman-command-library-20261104-v2/libjetstreamer_typed_memory.rlib",
+      "--extern",
+      "serde=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib",
+      "--extern",
+      "serde_json=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "--extern",
+      "sha2=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "--extern",
+      "libc=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "--extern",
+      "anyhow=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "--crate-type=bin",
+      "-C",
+      "opt-level=1",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-accepted0428-family-predecessor-library-tools-20261106-v1",
+      "--extern",
+      "horizon_recovered_resource_frame_recovery199=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/work/libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
+      "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/main.rs",
+      "-o",
+      "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5/jetstreamer-horizon-frame"
+    ],
+    "test-build": [
+      "systemd-run",
+      "--wait",
+      "--pipe",
+      "--service-type=exec",
+      "--unit=horizon-first-lane-chain128-witness-frame-cli-test-build-20261107-v5",
+      "-p",
+      "User=root",
+      "-p",
+      "Group=root",
+      "-p",
+      "UMask=0022",
+      "-p",
+      "MemoryAccounting=yes",
+      "-p",
+      "MemoryHigh=1G",
+      "-p",
+      "MemoryMax=2G",
+      "-p",
+      "MemorySwapMax=0",
+      "-p",
+      "CPUQuota=200%",
+      "-p",
+      "TasksMax=256",
+      "-p",
+      "RuntimeMaxSec=300",
+      "-p",
+      "Restart=no",
+      "-p",
+      "PrivateNetwork=yes",
+      "-p",
+      "ProtectSystem=strict",
+      "-p",
+      "ProtectHome=read-only",
+      "-p",
+      "NoNewPrivileges=yes",
+      "-p",
+      "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+      "-p",
+      "AmbientCapabilities=CAP_DAC_OVERRIDE",
+      "-p",
+      "ReadWritePaths=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5",
+      "--setenv=TMPDIR=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5/tmp",
+      "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-original199-witness-consumer-current-graph-library-20261107-v1",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-first-lane-witness-frame-v5-r6-library-20261107-v1",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/frame-v5-r6/work",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-live145-census-frame-library-tools-20261107-v2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-original199-retained-frame-library-tools-20261104-v5",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-parent-directory-anchor-library-tools-20261105-v1",
+      "--extern",
+      "horizon_original199_parent_memory=/usr/local/lib/jetstreamer/horizon-parent-directory-anchor-library-tools-20261105-v1/libhorizon_original199_parent_memory.rlib",
+      "--check-cfg",
+      "cfg(docsrs,test)",
+      "--check-cfg",
+      "cfg(feature, values(\"native210-small\",\"native227-small\"))",
+      "--cfg",
+      "feature=\"native210-small\"",
+      "--cfg",
+      "feature=\"native227-small\"",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-failed4-foreman-command-library-20261104-v2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/failed4-canonical-v5-final-writer-source-20261104-v3/propagation/frame-v8/build",
+      "-C",
+      "metadata=typed_fleet_bridge_Frame_20261105_v1",
+      "--check-cfg=cfg(test)",
+      "--check-cfg=cfg(horizon_input137_first_entry_fixture)",
+      "--crate-name",
+      "horizon_cached145_terminal_ancestry_capture",
+      "--edition=2024",
+      "-Dwarnings",
+      "-C",
+      "debuginfo=0",
+      "-C",
+      "codegen-units=2",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps",
+      "--extern",
+      "jetstreamer_typed_memory=/usr/local/lib/jetstreamer/horizon-failed4-foreman-command-library-20261104-v2/libjetstreamer_typed_memory.rlib",
+      "--extern",
+      "serde=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib",
+      "--extern",
+      "serde_json=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "--extern",
+      "sha2=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "--extern",
+      "libc=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "--extern",
+      "anyhow=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "--test",
+      "-C",
+      "opt-level=1",
+      "-L",
+      "dependency=/usr/local/lib/jetstreamer/horizon-accepted0428-family-predecessor-library-tools-20261106-v1",
+      "--extern",
+      "horizon_recovered_resource_frame_recovery199=/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/typed-frame-v4/work/libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
+      "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/main.rs",
+      "-o",
+      "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-work-v5/frame-cli-tests",
+      "--extern",
+      "tempfile=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libtempfile-47898064045d0aed.rlib"
+    ]
+  },
+  "source_freeze": [
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_closed_guard.fixture.json",
+      "sha256": "43bf24fdd1cccb31eee46d71543f4523123d13ab6412874217473cea8482cf2e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_closed_guard.rs",
+      "sha256": "862eca40008e658ec58fe357f3ef32f534d8fa75f1025c29e558ded2cd4b2684"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_closed_guard_capture.fixture.json",
+      "sha256": "401a71da189371aa4546a8bb0da817990d386eb0c45ea637e8b4658f5bbdb46b"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_closed_guard_terminal.fixture.json",
+      "sha256": "8fe99753332d62254da147dcf1324bf4834a78d595d55c853228ce3fb469cd9d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_frame.rs",
+      "sha256": "c40900d6307c2e22a9102bcdac5768993f17488f1950c81339627ed423d02c31"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_frame_guard.rs",
+      "sha256": "4554870a539a2adbbaeefe5e3dccaa98eb6419e456c076f410300c9edafac11a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_frame_tests.rs",
+      "sha256": "1a1a0b5f126341086b441cc76e5041e390549783f934528f5d772c18705ba00d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_guard_sample_ready.rs",
+      "sha256": "6c9225126dde1792b93a3d94bfb0665b72a58c48a28222422464ad181423ff44"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_history.rs",
+      "sha256": "0d8c673437690d1ee0387c94e04131025a3b72c8bfc7eb8ca3031b4c6c2b9f42"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_history_tests.rs",
+      "sha256": "6ec93de9e0a5ec8ea46f6a43f39b226e8233d023aaeced6a9617359674e0c4e6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_input137_entry.rs",
+      "sha256": "7de51ab13e03332d7f08c53680045effdd689938359edbaa78d88cc4c97086c0"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_observer_recovery.rs",
+      "sha256": "145148f94632a5c067c33709de0013887a3c99a32eed2903616818593190c6fb"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_rollover_pure.rs",
+      "sha256": "f88d040d5c909734819616fa7c9a05ea2c1ce20fc3bc49bdc40546b742b35519"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_scope.rs",
+      "sha256": "3d7c68cb639a993ea1c97610efdeac93f3252f3562cacb8b60b4269ca22b6be1"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cached145_timer.rs",
+      "sha256": "709e94372c0715ba3f57e66ca7b10e1dfafa356919884ea7d5074d1dbcd59576"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/charge136_retry0003_history.rs",
+      "sha256": "ba6b983054c3446e273683d29818d814d145ee15c8ea9274804e802329816187"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/charge136_retry0003_history_pure.rs",
+      "sha256": "7731d53aa762a9bfa616377c9166d8f6573fef79a3cb3e884fa333cc564ced9f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/charge136_retry0004_frame.rs",
+      "sha256": "ea3d82f0f03a264bdb257691e6f75cb658309955614fee5ad06cda0c27c3db5d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/charge136_retry0004_frame_view.rs",
+      "sha256": "e21ff884ccc2673694a4a8404cf597129f528fc83e6a1ede853471d51b0b787d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/charge136_retry0004_history.rs",
+      "sha256": "dd08293058688be3b9d008aac7d4995138e83e0c59b161337e5f73fd31ebbcfc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/charge136_retry0004_history_pure.rs",
+      "sha256": "ad570b4eb844925a8e1e142761f1de0b37c951515fa49b56339e7bdd5e1b4c0a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/charge136_retry0005_frame.rs",
+      "sha256": "d4b9eb83928742dbc0aeea20188612f562b200f9b48badb08a68da6785c445aa"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/charge136_retry0005_frame_view.rs",
+      "sha256": "b2281aa87ec1cd9e9fd61e0f3b70e6f85b8696b403d85c1e87e433aedcd463ee"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/charge136_retry0005_history.rs",
+      "sha256": "3470cdd634af9708715b5ed59662ebdd7f2feb20a697bbe065f22990e5058551"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/charge136_retry0005_history_pure.rs",
+      "sha256": "770a3045be723a383b1f136164895d3779b93eaca70368a6f52ccdb935d4944d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/closed145_reload_sources.fixture.json",
+      "sha256": "472faf953a0737b3f3b7fbebe95f4866e717f84157f30440189b3d2e481221df"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/cohort183_canonical_import.rs",
+      "sha256": "15ee0d24d5bdaaffa6a394bf53ca893f9f00d391e97ed1f2cf3e83829a2afc7a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/delivery_history.rs",
+      "sha256": "621e8412e332f7f1818a2f22cbe642d0b23289922743db499ba20a4447ac5b3a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/delivery_history_tests.rs",
+      "sha256": "67c5dc0a0df6624f626daaa83b524ece9ef33c230e5e6582e5aa7c75efe3fc68"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/delivery_owner_delta.rs",
+      "sha256": "1e22148a47391f42fc3dd14b4a64a07ae6d2736b4a2e0273b9148457f4ce713e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/durable_prefix141_contract.rs",
+      "sha256": "67ce4705e935b487e6815722ad48249e3bfaadf3f8c8d2e7459bf29ac8fe342c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/durable_prefix141_history.rs",
+      "sha256": "4a24e06acf05ea065127790b1871140a79d6a096aa8b6baf220bfdcf7f452790"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/durable_prefix141_history_pure.rs",
+      "sha256": "e9ef731e45b81b94bc323a4124a5f629677e9f94f2b492e6b09adb0a699d60cc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/durable_prefix141_history_tests.rs",
+      "sha256": "86dcb608f3daac77e575491f1255e75722d092ba828f52002674f3e6602255f6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/early_terminal141_census.rs",
+      "sha256": "5701fdad6c22f19703680eda13d71a6ca9821869de5866774c0f9fe923a917fe"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/early_terminal141_history.rs",
+      "sha256": "334edeb2407c8f3137d64a829854e0d4b8082f37fc9b73f571d18c4860a5d050"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/early_terminal141_policy.rs",
+      "sha256": "2890f6741ac1a393008152416a44c6ceafc64bbd0db0525c51149d1c763c3b98"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/early_terminal141_pure.rs",
+      "sha256": "8e1f84d1bfc85e513c6ed519216031592243f97d391fc2f701734a05d3c7f78a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/epoch136_retry0005_failed4.rs",
+      "sha256": "98732c7f86f5280a4739c3ada8f102568ae3dcb76677610b5a7c25f7f974b46f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/epoch136_retry0005_memory_reader_tests.rs",
+      "sha256": "141d5e1c7b0dbf567ad29e0d90af8748f5e118e3e99dc63cf0a664d857b79f6f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/epoch136_retry0005_scope.rs",
+      "sha256": "cdc5aa07e48803a9748f0f04a2e0fb064f20d752a89a01315ae0bb38183f4be0"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/epoch137_exact_contract.rs",
+      "sha256": "365ec6a86efdd6bd2c2b41238b8846fc4d05c1f57a08ca47bf52def20802d0b3"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/epoch137_exact_contract_tests.rs",
+      "sha256": "97af6b3d5b5c0f412cafd3b5e7359b9df128bcbd6491db81511747594e8b6046"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/epoch137_history.rs",
+      "sha256": "e1a3d53e9c45a9d2cac03b74e691ba328ab266a59edacd01bd975a7d8d3186fc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/epoch137_history_tests.rs",
+      "sha256": "133533c2eb307c470db1615d55a508443ffa1174506d814ce39abf20b5d90720"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/epoch137_registration.rs",
+      "sha256": "f0dd9832392a96d5725d898e0801bdca6b04be80945a852f5d2cd788b2a3edc4"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/epoch137_release_contract.rs",
+      "sha256": "003a3d9c5b35ea7552a5e2a570c57e2ebf4796ac9675e282a4518dfc82c1290b"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/fixtures/input137-actual-profile2-guard-rollover-regression.json",
+      "sha256": "40f12ac32bb2cff4e2b4b56274f8addd2a45e92feda80fab02115322ac696f1a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/fixtures/input137-authentic-accepted1918.json",
+      "sha256": "9f9c1089a47daf8bb1d020a7ba235a0e667ca1bf5db8bfc2b1eb117412bd2fd9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/g6_complete_graph_tests.rs",
+      "sha256": "00e09c325f45455f8a15e0af10f7ae08d0b691f81cfdc26706f2f208806e90d8"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/g6_history_pure.rs",
+      "sha256": "e329ae0bbd59188e8ded0140cbd07226e8663e20f940aba3f3327ca4792b1422"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/g6_history_tests.rs",
+      "sha256": "cf5b20c85c64da3facb18a1e266d417e9e1d551a68c94dbc43a33d6828de4199"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/g6_outer_frame_tests.rs",
+      "sha256": "6a28866df112bb5dcb8d746432d31e37dc354e41e4b7f396409fc6c661264489"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/g7_complete_graph_tests.rs",
+      "sha256": "fa678902962787742d65a2bd062c4d9819b01aa5adfd24a838e589fac69ab4d7"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/g7_history_pure.rs",
+      "sha256": "70f8fc506aa6b80fd25951529909d2aa783ab5a7340712c1e767f861cf769356"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/g7_history_tests.rs",
+      "sha256": "dcc89e12ddb69ddbf7a2a632a612ba4ff9fe43a9d4c7524dc91201e3d09a3aeb"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/g7_normal_chain.rs",
+      "sha256": "acf5a581cc7db6c6fe4a65bdba80e38d1d2f4a51b3ea684860d455501bed2982"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/g7_outer_frame_tests.rs",
+      "sha256": "9a98c16d8920566bd441663455d999c3b2b89d4d4946a1d2e79cc3aebb3fa6ce"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/genuine0728_complete_validator_tests.rs",
+      "sha256": "951d9c3548ddea92d448deefc25825bd3ce9a0a3d541ad39cacf22b98e5fd128"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/input137_entry_guard_rollover_tests.rs",
+      "sha256": "7c6df0687a86e9deb0a1369050e04f84e62d498873949be9158119311c452544"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/input137_frame.rs",
+      "sha256": "c6251aadfb1a03476d2f007015f442ae10efe9e501dce63a31e1735063877bc8"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/input137_frame_tests.rs",
+      "sha256": "ca08ea4098f54026178ab0c90e706452557fdab350e3f32bc6656ac297b70fae"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/input137_producer_io_tests.rs",
+      "sha256": "fe30b8b9f41e5535283fc8eb8320d48db5befc3a525430cb763d8a5a56b66909"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/input137_source_loader.rs",
+      "sha256": "6e282e5833378b84fad220f46141eb1085b1f63091adf1726801f1b8c7e46814"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/input161_retry6_history.rs",
+      "sha256": "fa7b91563d995112c1316615636c3986519cbd6747559f033732c63f70bbaa1c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/input161_retry6_pre_ready_history.rs",
+      "sha256": "6e37e261a7bd9de0a67b480bf3520786b85cb31396a616846797f50f96e99825"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/input161_retry7_history.rs",
+      "sha256": "82c923c58fc2ca8ee4f5967d3633cbab414f5befc72a2b21f804eedfae3832ac"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/lib.rs",
+      "sha256": "09684cdaafbdf472136bd191d08cecc25c3cef700321402dc7cb4efc50332822"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/main.rs",
+      "sha256": "4377bb15498a8e57a89daefade4b62f36353c581dd7cffbabcfacde946f1a1a8"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/native_census.rs",
+      "sha256": "6aa05717f0ed0361bbe201a7d7257c05187eb8ad12dd87b6b140fdb7e8a298bb"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/observer_collected_terminal.rs",
+      "sha256": "aece478405621006bfc34b97f6d0e6804008db2f0f547a47d22a37cc183fdddf"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/observer_recovery_outer_tests.rs",
+      "sha256": "ca0d7ff2ba0355ce745c1750cbbc2a5b840a3e547b909ccf34cefc5d62ad3866"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/ordinary199.rs",
+      "sha256": "8e927805c856b1dff6593426d7d46a3e1f77496fe227971355647aa0e150a27b"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/ordinary199_frame.rs",
+      "sha256": "aada181c582c376ecb1911305c30353544c9fda15bceec6b889b1815802138d7"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/ordinary199_tests.rs",
+      "sha256": "2ded81d0241f2440ca1bdf930d70babe8dae8dbbb95db921ecbedec9b16d8f2f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_combined_history.rs",
+      "sha256": "e2e66b21f97ced76e8dc5b47493d1831b45f033b4c2a2013360bcd136faa1dc4"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_downstream_bridge_tests.rs",
+      "sha256": "1bc0cd8fee6fab40ed6c1f75933df85269520d48fb0d20347e59410949a18351"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_downstream_history.rs",
+      "sha256": "b17b2e8aa406896f1c3c11828f092277b457839623ce04c87c66b2076dc5d778"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_downstream_roles_pure.rs",
+      "sha256": "171b033760c27640fc0b86e854d63f170d41a492c7a8137ce30e42019120cb6c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_full_terminal_pure.rs",
+      "sha256": "ac330cf14f9e83bebc45ca33517779d5d625fddad8142c7d8be9775b32685c0c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_full_terminal_tests.rs",
+      "sha256": "84a8cb898c0b2c46eaae544c9a698223bc0485225c07543484e18bfb3f95c961"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_plugin_history.rs",
+      "sha256": "2abc2004855f19675c26546c721464123a2cf1761a744829dca0c952179b17cf"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_plugin_terminal_pure.rs",
+      "sha256": "692990704d0e6b640486d0f202c1df557b70b84d4d84c358fc9827f92e007167"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_plugin_tests.rs",
+      "sha256": "b0467474e7615ba929cba0c9fb3e8172e3c1291ba7b420b0fed20971ed16433f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_scan_event_pure.rs",
+      "sha256": "7b2b9c2057f2bb9dca0795a2ac96e6aeeb6fb842bceb9c15b30c86dd2a3dd562"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_scan_history.rs",
+      "sha256": "7b52a811da617e61a6e0ea58dd13dfb351d2aa7c883b13d4a38e1bc08f6911a9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/private154_scan_tests.rs",
+      "sha256": "53ba888dbe3198871fb458b2b5d98769e81a19e49fa3b61aec420bffb9e553e5"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/qualified_previous_ordinary199_v5_tests.rs",
+      "sha256": "c69d2ad71025ace0030fb68b3be7b4547f6b5013dc5810d4b674bec4e72de485"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/qualified_previous_v6_tests.rs",
+      "sha256": "a2be684e25e118c41570bbc78834a93a151701c341c27b0dcedf45dc4de99c7c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/queue183_successor.rs",
+      "sha256": "d13688fbdb14cefaa38f6b3c198398be86521743de087121be3dc9ace31ce2f9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retained_g6_debt.rs",
+      "sha256": "159913cdf988dd3f5353ad1b167494de24cd56ce0dcba6a210b87e69d118e1b6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retained_observer_chain.rs",
+      "sha256": "b33f9aa394e9a87a96b7c43bed8e25a80f595f5d16064f81170cccc0e6dc6d62"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retry0004_memory_shape.rs",
+      "sha256": "03df725134b2c44f6eca6ca7b21b0f19028defd324b2c5cf6599a4a938427665"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retry0005_custody_retained/accounting.rs",
+      "sha256": "58966453bd7e86964579a970a2c2fc19443b305117ebc303439a7ffa4f344394"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retry0005_custody_retained/contract.rs",
+      "sha256": "aff03f90aba1948b0988c50408408b8f7518eb18585ccd0689f34b08d574e54a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retry0005_custody_retained/io.rs",
+      "sha256": "0da34aeb75c579c09569befd8f920fdd4f9736286e9d5d2386e993f105ba35dd"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retry0005_custody_retained/lib.rs",
+      "sha256": "05f5acb4fbd610616626f009d4033441bce3e3af414a93babd521e00efebba23"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retry0005_custody_retained/native.rs",
+      "sha256": "63962f5342ce9565731f9fbf97476bee4e0d0fde0abcf37017edefff971646c9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retry0005_failed4_custody.rs",
+      "sha256": "12a36d4cbd0df4e4798de0c4058b1e441b6700cf05b765729ce23444049f4547"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retry0005_memory_shape.rs",
+      "sha256": "a3fba381acdb58ae7e41c3f2036918c7008849a5221c3b39e7cda262c7025f96"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retry0005_outer_tests.rs",
+      "sha256": "2c617d6044ec3e0987f4eba0dc0a0933f0f04e690e2d08e3544c0fa9440aee46"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/retry0005_source_loader.rs",
+      "sha256": "2ce3ab4013e0f257bdfab9e89b794220589ad41059b552da76f40cda6bcb40bf"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/rollover_sources.rs",
+      "sha256": "46856842a833bc8283de63486d21c5d521f10e164a6603350e89e7bec9614355"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/suffix154.rs",
+      "sha256": "e961936eb2dfd3c573a7c1bf380e2e61b8eeee792760613f1fbb8965e7fe1083"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/terminal154_history.rs",
+      "sha256": "940a3e9f3926ab46297f4d1bfca606e67ebf381bcd98611fd3a7b79594667fbc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/terminal199_context.rs",
+      "sha256": "401b0e32e49a1370b986dbe57d9ef281ceab489c07d17da259518796103fd814"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/verifier183.rs",
+      "sha256": "4487ae6ca9819be6bd03061b5b3ad4c0558cc30c20c6dbe5c20b03bccaf2fac5"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/verifier183_tests.rs",
+      "sha256": "2b13c9fcc99408e9291d364b26d822becad391b90acafb3082e944c85827ef6d"
+    }
+  ],
+  "source_bytes_unchanged_from_V2": true,
+  "original_namespace_failure_preserved": true,
+  "correction": "Rebind source and QA work paths as separate exact old prefixes without substituting cli inside the new cli-work path.",
+  "chain128_compiled_main_change": true,
+  "new_actual_typed_Frame_v4_extern_required": true,
+  "production_change": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/cli-v4/src/main.rs",
+    "before_sha256": "6140273315fd4ccc7f8a793a805d9df108897e5c3e56cfde9201649f4cb1276e",
+    "after_sha256": "4377bb15498a8e57a89daefade4b62f36353c581dd7cffbabcfacde946f1a1a8",
+    "semantics": "Three actual native CLI constructor/comparison/envelope callers explicitly select current plan witness; legacy load behavior stays in library; no original evidence body access."
+  },
+  "original_native_capability_denial_preserved": true
+}

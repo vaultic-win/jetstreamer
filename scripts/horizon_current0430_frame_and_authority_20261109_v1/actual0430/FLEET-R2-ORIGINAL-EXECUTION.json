@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stdout": "",
+  "stderr": "Job for horizon-first-lane-current0430-fleet-20261109-v1-r2.service failed because the control process exited with error code.\nSee \"systemctl status horizon-first-lane-current0430-fleet-20261109-v1-r2.service\" and \"journalctl -xeu horizon-first-lane-current0430-fleet-20261109-v1-r2.service\" for details.\n"
+}

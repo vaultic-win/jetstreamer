@@ -1,0 +1,19 @@
+[package]
+name = "horizon-retry9-single166-launch"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+anyhow = "1"
+libc = "0.2"
+serde_json = "1"
+sha2 = "0.10"
+
+[[bin]]
+name = "launch"
+path = "main.rs"
+
+[dev-dependencies]
+tempfile = "3"

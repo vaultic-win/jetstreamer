@@ -1,0 +1,76 @@
+{
+  "diagnostic_replays": [
+    {
+      "controller_unit": "horizon-qualify-144-assembly-only-recovery-20261022-v1.service",
+      "expected_controller_invocation_id": "00ca9bfb862549f6b99117b1ce590365",
+      "expected_producer_invocation_id": "00ca9bfb862549f6b99117b1ce590365",
+      "producer_unit": "horizon-qualify-144-assembly-only-recovery-20261022-v1.service",
+      "range": "144",
+      "scratch_path": "/home/sol/.jetstreamer-private/epoch144-assembly-only-20261022-v2",
+      "worker_executable_basename": "historical-worker"
+    },
+    {
+      "controller_unit": "horizon-qualify-141-original-entry-capped-root-20261023-v1.service",
+      "expected_controller_invocation_id": "e639f007d482464f8a251455659d2ede",
+      "expected_producer_invocation_id": "e639f007d482464f8a251455659d2ede",
+      "producer_unit": "horizon-qualify-141-original-entry-capped-root-20261023-v1.service",
+      "range": "141",
+      "scratch_path": "/home/sol/.jetstreamer-private/epoch141-original-entry-capped-root-20261023-v1/scratch",
+      "worker_executable_basename": "historical-worker"
+    },
+    {
+      "controller_unit": "horizon-native154-suffix-control-20261029-v1.service",
+      "expected_controller_invocation_id": "de29975b10b0418293f78836e8677322",
+      "expected_producer_invocation_id": "edc1d1915dcb4c2785d2cf24cdaa10c2",
+      "producer_unit": "horizon-qualify-154-checkpoint-continuation-20261029-v1.service",
+      "range": "154",
+      "scratch_path": "/home/sol/.jetstreamer-private/checkpoint-continuation-154-20261029-v1/scratch",
+      "worker_executable_basename": "jetstreamer-historical-worker-v1-5-8"
+    },
+    {
+      "controller_unit": "horizon-qualify-136-hourly-charge-trace-retry-0002-20261030-v1.service",
+      "expected_controller_invocation_id": "5e32c880437d464498475df8406ff4c8",
+      "expected_producer_invocation_id": "5e32c880437d464498475df8406ff4c8",
+      "producer_unit": "horizon-qualify-136-hourly-charge-trace-retry-0002-20261030-v1.service",
+      "range": "136",
+      "scratch_path": "/home/sol/.jetstreamer-private/epoch136-hourly-charge-trace-run-parent-20261029-v1/attempts/retry-0002/reproduction",
+      "worker_executable_basename": "historical-worker"
+    },
+    {
+      "controller_unit": "horizon-qualify-145-cached-b2a09f57de39c384.service",
+      "expected_controller_invocation_id": "15ddd220e2144aaa8d7418f73f60768f",
+      "expected_producer_invocation_id": "15ddd220e2144aaa8d7418f73f60768f",
+      "producer_unit": "horizon-qualify-145-cached-b2a09f57de39c384.service",
+      "range": "145",
+      "scratch_path": "/home/sol/.jetstreamer-private/epoch145-cached-b2a09f57de39c384/work",
+      "worker_executable_basename": "historical-worker"
+    },
+    {
+      "controller_unit": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+      "expected_controller_invocation_id": "dbf49bb1b72c42c584f2d3ac94259cb8",
+      "expected_producer_invocation_id": "2a1c51f557a64cd1ad691281cbb77c94",
+      "producer_unit": "jetstreamer-root-sweep-e199-backfill-20261102-v1-e199-200-lane-a-1.service",
+      "range": "199-200",
+      "scratch_path": "/home/sol/.jetstreamer-private/epoch199-private-tail-20261017-v1/lane-a/private",
+      "worker_executable_basename": "historical-worker"
+    },
+    {
+      "controller_unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+      "producer_unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+      "expected_controller_invocation_id": "722adc397ae24bb4b96d452783599f57",
+      "expected_producer_invocation_id": "722adc397ae24bb4b96d452783599f57",
+      "range": "185",
+      "scratch_path": "/home/sol/.jetstreamer-private/capped-root-prefix-185-positive-positive-0500-20261109-next/scratch",
+      "worker_executable_basename": "historical-worker"
+    }
+  ],
+  "filesystem_path": "/home/sol",
+  "host_global_pressure": true,
+  "minimum_interval_seconds": 1800,
+  "not_before_utc": "2026-11-09T05:30:22Z",
+  "observation_reason": "routine",
+  "output": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T053022Z-postcompletion154-v1.json",
+  "previous_sample": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+  "replays": [],
+  "schema": "jetstreamer-horizon-live-resource-sample-config-v2"
+}

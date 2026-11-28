@@ -1,0 +1,72 @@
+--- a/staged211.py
++++ b/staged211.py
+@@ -10,6 +10,7 @@
+ OLD = "horizon-upload-211-ordinary-v221.service"
+ ROOT = D / UNIT.removesuffix(".service")
+ REGISTRATION = ROOT / "cadence-registration.json"
++TERMINAL_REPAIR = ROOT / "terminal-repair-status/completion.json"
+ PUBLISHER = V / "horizon211-staged-recovery-v1"
+ OBSERVER = V / "horizon211-staged-recovery-observer-v1"
+ PUBLISHED_PACKAGE = V / "horizon211-staged-published-v256"
+@@ -123,6 +124,26 @@
+     return Path(binary["path"])
+
+
++def terminal_repair(successor):
++    if not TERMINAL_REPAIR.exists():
++        assert not TERMINAL_REPAIR.is_symlink()
++        return None
++    assert successor is not None
++    reference = sealed(TERMINAL_REPAIR)
++    completion = bound(reference)
++    intent = bound(completion["intent"])
++    incident = bound(intent["incident"])
++    terminal = intent["terminal_state"]
++    assert intent["terminal_claim"] == incident["claim"] == successor["claim"]
++    assert terminal == incident["terminal_state"] == props(UNIT, list(terminal))
++    assert terminal["InvocationID"] == successor["configuration"]["invocation_id"]
++    assert terminal["ActiveState"] == "failed" and terminal["ExecMainStatus"] == "1"
++    assert terminal["MainPID"] == terminal["ControlPID"] == terminal["NRestarts"] == "0"
++    assert not terminal["Job"] and not terminal["ControlGroup"]
++    assert incident["archive_identity_unchanged"] and not incident["ready_sidecar_present"]
++    return reference
++
++
+ def adopt_status(current, successor):
+     """Retain restart-safe status chronology after the first handoff."""
+     if current is None:
+--- a/cycle.py
++++ b/cycle.py
+@@ -60,12 +60,14 @@
+ import staged250
+ from seven_status import publisher_fields, verify_publisher
+ definitions, successor_211, successor_247, successor_250 = publication_handoff.select_roster()
++terminal_211 = staged211.terminal_repair(successor_211)
+ if successor_211 is not None:
+     assert roster[211] == successor_211['predecessor']
+     roster[211] = successor_211['claim']
+-    current = staged211.adopt_status(statuses.get(211), successor_211)
+-    if current is not None:
+-        statuses[211] = current
++    if terminal_211 is None:
++        current = staged211.adopt_status(statuses.get(211), successor_211)
++        if current is not None:
++            statuses[211] = current
+ if successor_247:
+     assert roster[247] == successor_247['predecessor']
+     roster[247] = successor_247['claim']
+@@ -115,9 +117,12 @@
+
+ def register_failed():
+     for e, sha in repair_status_digests.items():
+-        if {211: successor_211, 247: successor_247, 250: successor_250}.get(e):
++        if e == 211 and terminal_211:
++            status = terminal_211
++        elif {211: successor_211, 247: successor_247, 250: successor_250}.get(e):
+             continue
+-        status = {'path':str(repair_root/str(e)/'completion.json'),'sha256':sha}
++        else:
++            status = {'path':str(repair_root/str(e)/'completion.json'),'sha256':sha}
+         receipt = bound(status)
+         intent = bound(receipt['intent'])
+         assert intent['schema']=='horizon-status-only-fallback-repair-intent-v1'

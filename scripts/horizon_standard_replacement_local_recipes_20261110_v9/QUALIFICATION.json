@@ -1,0 +1,18 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/cached-local-recipes-qualification-20261110-v7/local-recipes-v9/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "4a135a9a80443c7854e19e027cb03a0c90fe3695754ab2447163f8279b610d7d"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/cached-local-recipes-qualification-20261110-v7/local-recipes-v9/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "7c4a546ebad37e4771ad5541d4d9815f733effe71e32d68f998aad9fb071a21a"
+  },
+  "actual_ordinary_test_count": 43,
+  "published_source_sha256": {
+    "main.rs": "220fd422f3238bd98a2a622229a3b9a183585a7fd30d7d2a9e5bd744482a110d",
+    "profile.rs": "5daaf70a67b4e1d16642952844644aa178e718867e921632b28b99481175f584",
+    "tests.rs": "be4239d5e4b272cfbea79711900720d11e09adc97f79196abb5989d0594a35d2",
+    "local.rs": "8319089e637ceb79bd1b3d7100633b75feeab066fee4f81d0d2abdfdadbd49e2"
+  },
+  "replay_launch_authorized": false
+}

@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-ended183-DATA-policy-0500-20261109-v1\",\"member_count\":2,\"outcome\":\"created\",\"plan_sha256\":\"917a726646b14abc30c12fc31965b4bcf676232eb406c8e0d29829b51437cfd8\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n"
+}

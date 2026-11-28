@@ -1,0 +1,22 @@
+{
+  "native": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "success",
+    "NRestarts": "0",
+    "ExecMainPID": "0",
+    "ExecMainStatus": "0",
+    "ControlGroup": "",
+    "Id": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+    "ActiveState": "inactive",
+    "SubState": "dead",
+    "Job": "",
+    "InvocationID": ""
+  },
+  "actual_successful0230_reader_retirement": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-operation38-driver12-helper35-qa-20261109-v1/ROOT_ACTUAL_EXACT0230_SUCCESSFUL_READER_RETIRED.json",
+    "sha256": "96b5f24a466f9432b50a66d23136b90cd9c5c17aabf8ded2dc9381b03e969f64"
+  },
+  "all_originals_preserved": true,
+  "no_new_reset_or_signal": true
+}

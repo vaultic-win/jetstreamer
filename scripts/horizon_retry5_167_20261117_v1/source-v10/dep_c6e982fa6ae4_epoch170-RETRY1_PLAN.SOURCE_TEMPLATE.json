@@ -1,0 +1,75 @@
+{
+  "attempt": "local3",
+  "cleanup_completion": {
+    "path": "/var/lib/jetstreamer/local2-scratch-native-retirement-20261112-v1/epoch170/execute1645/ROOT_ACTUAL_CONTENTS_RETIREMENT_COMPLETE.json",
+    "sha256": "656603ef3aed8ef141322d130c7c721f07b0709c24187979f612fc4df7a538ad"
+  },
+  "closed_units": [
+    "horizon-qualify-170-standard-20261109-v1.service",
+    "horizon-guard-170-standard-duplicate722-correction-20261110-v1.service",
+    "horizon-guard-170-standard-duplicate722-correction-20261110-v1.timer",
+    "horizon-guard-170-standard-20261109-v1.service",
+    "horizon-guard-170-standard-20261109-v1.timer",
+    "horizon-qualify-170-replacement-local2-20261110-v1.service",
+    "horizon-guard-replacement-170-local2-20261110-v1.service",
+    "horizon-guard-replacement-170-local2-20261110-v1.timer",
+    "jetstreamer-epochs159-173-target1-controller-v1-r2.service",
+    "horizon-guard-170-standard-old722-data-20261110-v1.service",
+    "horizon-guard-170-standard-old722-data-20261110-v1.timer",
+    "horizon-replacement-170-local1-20261110-v1.service",
+    "horizon-guard-replacement-170-local1-20261110-v1.service",
+    "horizon-guard-replacement-170-local1-20261110-v1.timer",
+    "horizon-qualify-170-replacement-local3-20261110-v1.service",
+    "horizon-guard-replacement-170-local3-20261110-v1.service",
+    "horizon-guard-replacement-170-local3-20261110-v1.timer",
+    "horizon-guard-replacement-170-local2-DATA-20261110-v1.service",
+    "horizon-guard-replacement-170-local2-DATA-20261110-v1.timer"
+  ],
+  "epoch": 170,
+  "existing_preparation": null,
+  "fleet": {
+    "path": "UNRESOLVED_FRESH_FLEET",
+    "sha256": "UNRESOLVED"
+  },
+  "fresh_subtree": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3-retry1-20261112-v1",
+  "guard_base": "horizon-guard-replacement-170-local3-20261110-v1",
+  "input_proof": {
+    "path": "UNRESOLVED_FRESH_INPUT_PROOF",
+    "sha256": "UNRESOLVED"
+  },
+  "inventory": {
+    "path": "UNRESOLVED_FRESH_INVENTORY",
+    "sha256": "UNRESOLVED"
+  },
+  "local_inputs": {
+    "bootstrap": {
+      "path": "/usr/local/lib/jetstreamer/horizon-standard-local-input170-20261110-v1/snapshot-73439777-AAfuW4HhAkKNYunC4zf6ipDSCUYsnVfoLMFrmBeb5Sbs.tar.zst",
+      "sha256": "1fff1c4d4c76f56f7b5ba6ba17f379d7811cddb3e314043829ceb864205cab0a"
+    },
+    "capability": {
+      "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/epoch170/ROOT_EXACT_CACHED_NODE_NEGATIVE_CAPABILITY_CONTROLS_ACCEPTED.json",
+      "sha256": "4ef4bea7334938a588a193f738c870ce66da7997af8fe51a5dce3ef1167343a8"
+    },
+    "deployment_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-standard-local-input170-20261110-v1/deployment-seal-receipt.json",
+      "sha256": "730ee7981393c2f8ae98e18c2b266d0436ae3593ced223602f5412be58599e26"
+    },
+    "genesis": {
+      "path": "/usr/local/lib/jetstreamer/horizon-standard-local-input170-20261110-v1/genesis.tar.bz2",
+      "sha256": "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"
+    }
+  },
+  "owner": "/root",
+  "prepare_authorized": true,
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "producer_unit": "horizon-qualify-170-replacement-local3-20261110-v1.service",
+  "remote_mutations": false,
+  "replay_launch_authorized": false,
+  "resident_memory": null,
+  "resource_promise_ending_authorized": false,
+  "review": {
+    "path": "UNRESOLVED_FRESH_REVIEW",
+    "sha256": "UNRESOLVED"
+  },
+  "schema": "horizon-standard-replacement-recipe-plan-v1"
+}

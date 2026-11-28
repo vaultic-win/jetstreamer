@@ -1,0 +1,30 @@
+{
+  "schema": "horizon-actual-qualified-helper32-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver11-postreader-tools-20261108-v32/jetstreamer-r2",
+    "sha256": "7d93abb0ff24e187f648d3ba06a1be544d39528b28f46776f818dc409df21925"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver11-postreader-tools-20261108-v32/artifact-proof.json",
+    "sha256": "f906341d0a68fac71f5c9607cb92359e3c11ef31804b5434fc1e3a0d3f0c4b6a"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver11-postreader-tools-20261108-v32/deployment-seal-receipt.json",
+    "sha256": "610fbccb3ceb41089ba7e4547fd8a8d567d68ccfd98d449b9b4201bce516f527"
+  },
+  "source_and_recipes": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver11-postreader-tools-20261108-v32/source-and-recipes.json",
+    "sha256": "6c74446f40ae0de30a50e28a0025ac6f2beee4bba41ce887c8b2db9cf7fb3935"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver11-helper-qa-20261108-v32/ROOT_EXTRA_QA6_ADDITIVE_DATA4_BOOKING.json",
+    "sha256": "4bef891750ab7364a212e9f9bd377f94698e1229c93c2bd20484ed5f0fba5124"
+  },
+  "closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver11-helper-qa-20261108-v32/ROOT_EXTRA_QA6_CLOSED_NORMAL6_DATA4_RETAINED.json",
+    "sha256": "222be54763b1068a1bda2a4c68f5b50b9662d6e69731e9b078fe71daf21f90dd"
+  },
+  "actual_native_task_capture_and_postreader_same_image": true,
+  "complete_DATA_lower_bound_bytes": 5142030004884,
+  "fresh_original_guard_and_operational_reader_still_required": true
+}

@@ -1,0 +1,7 @@
+[Unit]
+Description=Watch the original epoch 145 frozen verifier's terminal receipts
+
+[Path]
+PathExists=/var/lib/jetstreamer/horizon_runtime_data/epoch145-guarded-export-20261121-v1/state/5dfb817906f74b73a27f61a386751d75/complete.json
+PathExists=/var/lib/jetstreamer/horizon_runtime_data/epoch145-guarded-export-20261121-v1/state/5dfb817906f74b73a27f61a386751d75/failed.json
+Unit=horizon-145-original-outcome.service

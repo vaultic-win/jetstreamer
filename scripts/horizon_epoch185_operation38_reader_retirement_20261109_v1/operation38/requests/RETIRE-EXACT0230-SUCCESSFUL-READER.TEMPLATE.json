@@ -1,0 +1,9 @@
+{
+  "schema": "positive185-retire-exact0230-successful-reader-v1",
+  "operation_root": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-retire0230-reader-20261109-v38-r1",
+  "generation": "positive-retire0230-reader-v38-r1",
+  "native_retirement_control": {
+    "path": "__ROOT_NEW38_NORMALLY_SEALED_SUCCESSFUL_RETIREMENT_COMPLETION_PATH__",
+    "sha256": "__ROOT_NEW38_SAME_IMAGE_SUCCESSFUL_RETIREMENT_COMPLETION_SHA256__"
+  }
+}

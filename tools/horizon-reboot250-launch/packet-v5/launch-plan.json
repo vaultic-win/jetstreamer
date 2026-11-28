@@ -1,0 +1,28 @@
+{
+  "archive_retirement_authorized": false,
+  "candidate_epoch": 250,
+  "fourth_lane_fit_proven": false,
+  "guard_unit": "horizon-250-reboot-20261117-protective-v1.service",
+  "input_auth": {
+    "path": "/var/lib/jetstreamer/horizon250-reboot-20261117-input-auth-v1/acceptance.json",
+    "sha256": "8c7bcf8828827081f6005e0be006aa8bb3b25fb64a03b55dc5ebf1919943bf04"
+  },
+  "maximum_root_physical_bytes": 506191984640,
+  "maximum_worker_vmas": 3500000,
+  "memory_high_bytes": 167361060864,
+  "memory_max_bytes": 251041591296,
+  "operator_deadline_seconds": 50,
+  "producer_unit": "horizon-qualify-250-reboot-20261117-v1.service",
+  "remote_mutations": false,
+  "reuse_original_invocation_authorized": false,
+  "schema": "horizon250-reboot-launch-plan-v1",
+  "setup_seconds": 60,
+  "state_directory": "/var/lib/jetstreamer/horizon250-reboot-20261117-state-v1",
+  "static_seal": {
+    "path": "/var/lib/jetstreamer/horizon250-reboot-20261117-static-v2/deployment-seal-receipt.json",
+    "sha256": "9bbc1af99e689c1ddf614a8a79c91d561e18a66716782658f6b2c8688de6be1f"
+  },
+  "terminal249_required": true,
+  "timer_unit": "horizon-250-reboot-20261117-protective-v1.timer",
+  "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-250-reboot-20261117-v1"
+}

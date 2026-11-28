@@ -1,0 +1,124 @@
+{
+  "schema": "horizon-original722-duplicate-ending-conservative-correction-qualification-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "sources": {
+    "duplicate722-authority-audit-v1.rs": {
+      "path": "scripts/horizon_epoch173_memory_20261110_v1/source/duplicate722-authority-audit-v1.rs",
+      "sha256": "a9c6d5ac9f31b49f01befed071ab8976e41c62c82218e61bac8f7dab5f9b0484"
+    },
+    "duplicate722-authority-audit-v2.rs": {
+      "path": "scripts/horizon_epoch173_memory_20261110_v1/source/duplicate722-authority-audit-v2.rs",
+      "sha256": "d0323702e2ba881389f8e1075caa7b9be2c48b4093cacf8bdf55077e14c914ca"
+    }
+  },
+  "v1_strict_clippy_failed_preserved": true,
+  "v1_closed_duplicate_compiler_work_retired_bytes": 12136448,
+  "v2_four_strict_compilers_passed": true,
+  "v2_ordinary_tests_passed": 10,
+  "qualified_runtime": {
+    "path": "/usr/local/lib/jetstreamer/horizon-duplicate722-authority-audit-tools-20261110-v2/check",
+    "sha256": "c611b83a549e56838d2c15b127332d86ed45fab2902ec2d2c7e118405e5067e8"
+  },
+  "genuine_native_ancestry_nodes": 45,
+  "duplicate_actor_and_future_DATA_selection_found": true,
+  "first_ending_already_consumed_by_actual170": true,
+  "all11_actual_memory_transitions_exactly_checked": true,
+  "DATA_rebooking_scope": "effective selected ancestry numeric transitions; no claim of global artifact absence",
+  "conservative_actor_add_back_bytes": 51539607552,
+  "conservative_DATA_add_back_bytes": 480969228288,
+  "corrected_complete_projected_memory_bytes": 759789531136,
+  "corrected_complete_DATA_bytes": 6582025928498,
+  "existing_all_seven_producer_caps_and_shared64_native16_verifier96_pools_unchanged": true,
+  "old_authority_superseded_for_current_accounting": true,
+  "original_endings_and_selection_history_preserved": true,
+  "effective_consumer_and_guard_correction_pending": true,
+  "new_credit_bytes": 0,
+  "new_replay_admission_authorized": false,
+  "evidence": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/ACTUAL_PLAN.json",
+      "sha256": "2eb05adc18c50f6dc7fb6ddf8fddce6f68f351d754b8260fc663b6a54d1f751b"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/ARTIFACT.json",
+      "sha256": "fa371e90807a27b9590bed0324add962ddcae409e13057874a0b03032fdde08e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/ROOT_QUALIFIED_NATIVE_PENDING.json",
+      "sha256": "18b361b89fb7e678f808f82fc6145cc79f4cdabd6718cad5eda827aa374414e9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/ACTUAL_DUPLICATE722_AUTHORITY_AUDIT.json",
+      "sha256": "b462365e124649771596844998dafb87c4f403466cf3fb5beb410d2f75fbf751"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/ROOT_NATIVE_AUDIT_DRAINED_CONSERVATIVE_CORRECTION_NOT_YET_SELECTED.json",
+      "sha256": "b2a4c4c70e749d6c620a45a14eabeed2867f97052b67779e6917fccef411236d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/NATIVE-ORIGINAL-ARGV.json",
+      "sha256": "9b2722ed25cf40b3d9b8f3698235100d981ae73095028e56d2a585758029a13b"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/NATIVE-ORIGINAL-EXECUTION.json",
+      "sha256": "4f1c6b94c284ba947bac3fece4738787ad8449a37d981d2a48962db1aad2e94b"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/production-ORIGINAL-ARGV.json",
+      "sha256": "64346949606e64c2a6e70746b79fa863b3f9a0df18a0e4ee0b37d5d5f1bb990e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/production-ORIGINAL-EXECUTION.json",
+      "sha256": "961e31cb3912b60824322987f3a829381f626391cf3552a3f24eb8c2698f2bf7"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/build-tests-ORIGINAL-ARGV.json",
+      "sha256": "ffea2c351dc8570989f7b1fc85797662f811c7936c059929b64ceb7c55e5a8a4"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/build-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "8094a72f595a6536099f572ffd54571c7ed53878569d20a74491fadaf3cc79f1"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/clippy-production-ORIGINAL-ARGV.json",
+      "sha256": "51af0a0612b3f7b58875a929c6215c9d1517c4dfb0195c3c18b361104ba91180"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "974374b60d6a1fc0c70896892d26ce6e9065a66ab731bd01f6d962abba82cdb6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/clippy-tests-ORIGINAL-ARGV.json",
+      "sha256": "6f611b2afb9aaec12709045ba15884056541c6596c84bebde31ff16a79b9cf36"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "6f0a3487ed0ef2693a812b6e6febdea169172bbdd6e70cab68f953b17d4f2363"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/ordinary-tests-ORIGINAL-ARGV.json",
+      "sha256": "e282424e4e88ace87807266e5cad08a2ca159db4b9c01cfe0cd7f7592078379a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/ordinary-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "c2ab05f18ed9953c324e716494281ec41d3bc39c62687b05dfc093144ea70c9e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_DUPLICATE_OLD722_ENDING_INCIDENT.json",
+      "sha256": "6f8eb6047469cf883f30b9ea8c420866f46ff2a0b78832a7ee11029ccdbaa652"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_CONSERVATIVE_DUPLICATE722_ADD_BACK_CURRENT_AUTHORITY.json",
+      "sha256": "ee31a884f0cbbb0f58f045eaaf9d9dd823fe8ec8852f560d0f5c21f79aa004d8"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_ACTUAL173_DUPLICATE_ENDING_INCIDENT_AND_CURRENT_STATUS_V3.json",
+      "sha256": "05472129768c2175ca44afa7d55258ca7920a329d0b5c21df389e4f091632645"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_DUPLICATE722_EVENT185_AUTHENTICATED_READBACK.json",
+      "sha256": "e3c22ef28496e5f8b79a04d5cb3360afc407f5ddca423a7c0566c82fc4470133"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schema": "horizon-driver11-normal6-serial-QA-closed-DATA-retained-v1",
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/ROOT_NORMAL6_SERIAL2_ADDITIVE_DATA4_BOOKING.json",
+    "sha256": "b3e47822d086fdac652c718f067c72474528fe8ece320acc6318c2c5638a7f35"
+  },
+  "normal_pool_bytes": 6442450944,
+  "new_extra_QA_memory_released_bytes": 0,
+  "complete_DATA_lower_bound_bytes": 5137735037588,
+  "new_DATA4_reservation_retained": true,
+  "all_compiler_and_test_outer_processes_completed": true,
+  "no_replay_or_publication_authority": true
+}

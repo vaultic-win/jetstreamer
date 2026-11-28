@@ -1,0 +1,27 @@
+[package]
+name = "horizon-old220-peers1012"
+version = "0.1.0"
+edition = "2021"
+publish = false
+[dependencies]
+anyhow = "=1.0.102"
+libc = "=0.2.189"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+
+[features]
+default = []
+test-fixtures = []
+
+[workspace]
+members = ["."]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[[bin]]
+name = "jetstreamer-old220-peer-capture"
+path = "src/capture_main.rs"

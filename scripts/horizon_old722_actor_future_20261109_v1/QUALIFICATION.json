@@ -1,0 +1,82 @@
+{
+  "schema": "horizon-old722-future-obligation-qualification-v1",
+  "actual_originals": {
+    "ROOT_SOURCE_OS_ONLY_AND_EXACT_PREDECESSOR_GRAPH.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/ROOT_SOURCE_OS_ONLY_AND_EXACT_PREDECESSOR_GRAPH.json",
+      "sha256": "671c29f5f2849e58708eab6e34782d87c19da002cfab841d2714efc3e5644a89"
+    },
+    "SOURCE-V3-SEAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/SOURCE-V3-SEAL-EXECUTION.json",
+      "sha256": "eca4501bb585ed9221e1fbbf9fd5d81672583b2c3af1852598b5ea77ddd2641c"
+    },
+    "RUNTIME-V3-SEAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/RUNTIME-V3-SEAL-EXECUTION.json",
+      "sha256": "0e88f55f6ce7c2fed3027e7f8bcda66d605d4e12f3f7ba356571a436baaadf4c"
+    },
+    "NATIVE-CHECK-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/NATIVE-CHECK-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "7c0d41190046b55f8ecaeff2e29b403775b8542a7f9c2752a2bb965fff3aff25"
+    },
+    "NATIVE-END-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/NATIVE-END-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "b22998fe64c078804e4f66d0c436e95354d87fbc6e3b813de8d41b9282ee99c5"
+    },
+    "ROOT_V3_NATIVE_CHECK_ACCEPTED_END_PENDING.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/ROOT_V3_NATIVE_CHECK_ACCEPTED_END_PENDING.json",
+      "sha256": "bcc736ccb876d9833ddfe8c3e38f8a6e553db369ed7954b8c01e28ad4e8999d8"
+    },
+    "ROOT_NATIVE512_DRAINED_ONCE_ONLY_OLD722_ENDING_SELECTED.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/ROOT_NATIVE512_DRAINED_ONCE_ONLY_OLD722_ENDING_SELECTED.json",
+      "sha256": "3a946aa9ab7e72d692b12285bccb3dea8637fe10ef08174bae8f2c83b9081fb3"
+    },
+    "ROOT_ACTUAL169_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/ROOT_ACTUAL169_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+      "sha256": "57f1658527dea0790b0086d4baf4ad2852ba8b5da1cf9befa5c8057e2a9c005a"
+    },
+    "production-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/production-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "230d1e501582c2dde0e57aed813cb9847d173c36fd1c7912821d68c78cc492f0"
+    },
+    "build-tests-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/build-tests-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "0f41136fab08b066e4253ff5d2985950b3bee3de80987a29386877172efe5670"
+    },
+    "clippy-production-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/clippy-production-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "08d414a8ca7bafb5652c57e2d32b92a3a47f9a60eb22a55defde80c49cf98031"
+    },
+    "clippy-tests-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/clippy-tests-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "12f364e60e690ff3490c0d9749a71b97a401d10d1382d2246803f5e9f49414f0"
+    },
+    "tests-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/tests-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "0e858b78ad4196bb7411a0f08fd7f23a5c6d0f264d66c37d942558dd14088170"
+    },
+    "NATIVE-SCANNER-CONTROLS-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/NATIVE-SCANNER-CONTROLS-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "3f84d85e86f1ec57f92a19807a3e1395b5fc157ea42bd44cb80c842ce2c2f4e8"
+    }
+  },
+  "source_members": {
+    "main.rs": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/source-v3/main.rs",
+      "sha256": "2ff0996c8ebd3657d879fbc09d6f67f45ac8fbb29d00116e20fd8460a4b6ef12"
+    },
+    "common.rs": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/source-v3/common.rs",
+      "sha256": "4c4f0dc85361b87be4206c99d7fe43b741c4c64196bb2faffc2e946c4e40199e"
+    },
+    "bindings.json": {
+      "path": "/var/lib/jetstreamer/old722-actor-future-qualification-20261109-v1/source-v3/bindings.json",
+      "sha256": "0d9c2041f40050c3abf0988849d817819ebccd3d4366b7364d7b8edd442595e6"
+    }
+  },
+  "actual_once_only_ending": {
+    "path": "/var/lib/jetstreamer/horizon-old722-actor-future-20261109-v1/722adc397ae24bb4b96d452783599f57/ended.json",
+    "sha256": "eec2a374a3bd7a52f49ceaeaa2de16fd17ef52d740a310a0d6a6c8469cf2fee9"
+  },
+  "all_four_compilers_eleven_ordinary_two_native_scanner_controls_and_actual_check_end_passed": true,
+  "physical_bytes_retired": 0,
+  "replay_admission_authorized": false
+}

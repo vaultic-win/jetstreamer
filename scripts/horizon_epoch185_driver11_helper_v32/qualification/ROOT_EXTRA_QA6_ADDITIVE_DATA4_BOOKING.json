@@ -1,0 +1,61 @@
+{
+  "schema": "horizon-helper32-extra-QA6-additive-DATA4-booking-v1",
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261108T183022Z-postcompletion154-v1.json",
+    "sha256": "7a22d062bb8003aab7b26aad45314a9638c99b44c35ad138d2457b23c0da99ec"
+  },
+  "current_frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261108T183022-witness-terminal145-chain128-v5.json",
+    "sha256": "d683be8c9f0d717d10173f4236334fa7531d1b0c995793171acd153ccf59eff6"
+  },
+  "actual_retained_phase": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current1800-reviewed-metadata-20261108-v1/RESOURCE_PHASES_POSITIVE185_CURRENT1800.json",
+    "sha256": "acd3c1e27ed3d9b89ec6daa4529ee652931ab50270c606b54992d537e0d9c504"
+  },
+  "actual_driver11": {
+    "schema": "horizon-actual-qualified-driver11-bindings-v1",
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold",
+      "sha256": "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/artifact-proof.json",
+      "sha256": "4366c991c590c50223a73ca46323aee55b0a8987dbd855e5c066c7927a774b60"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/deployment-seal-receipt.json",
+      "sha256": "307118d4e0f71972aaae70a2e646d11c9c7e3c667513090172c6e9e1618a840c"
+    },
+    "QA": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/ROOT_ALL31_AND_ROOT_SOL_NATIVE_TRANSPORT_CASES_ACCEPTED.json",
+      "sha256": "9346e5819d3146f1507859439f95563c996c0c518f1244e379afd6bf9fd27138"
+    },
+    "booking": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/ROOT_NORMAL6_SERIAL2_ADDITIVE_DATA4_BOOKING.json",
+      "sha256": "b3e47822d086fdac652c718f067c72474528fe8ece320acc6318c2c5638a7f35"
+    },
+    "closure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/ROOT_NORMAL6_SERIAL2_DRIVER11_PHASE_CLOSED_DATA4_RETAINED.json",
+      "sha256": "c226c700dc6f220850f3e10f715519531a6741a2ca320c430980c74aa130bca4"
+    },
+    "fresh_native_first_guard_and_downstream_registration_required": true
+  },
+  "normal_pool_bytes": 6442450944,
+  "new_extra_QA6_bytes": 6442450944,
+  "total_external_pool_bytes": 12884901888,
+  "one_serial_actor_bytes": 8589934592,
+  "ordinary_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "total_overlap_bytes": 11811160064,
+  "minimum_live145_and_retained185_with_external12_bytes": 792769429504,
+  "actual_conservative_MemAvailable_bytes": 793171714048,
+  "guard_runway_headroom_bytes": 402284544,
+  "new_additive_retained_DATA_bytes": 4294967296,
+  "complete_DATA_lower_bound_bytes": 5142030004884,
+  "complete_conservative_raw_DATA_booking_bytes": 5263622877844,
+  "all_old_memory_DATA_and_original185_candidate_promises_retained": true,
+  "no_credit_from_old_QA_releases": true,
+  "no_replay_launch_or_publication": true,
+  "kernel_limits_set_before_first_instruction": true,
+  "no_new_guard_bound_or_armed_after_activation": true
+}

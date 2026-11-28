@@ -1,0 +1,18 @@
+{
+  "destination": "/var/lib/jetstreamer/horizon249-reboot-20261117-launcher-v3",
+  "members": [
+    {
+      "mode": 365,
+      "name": "horizon-reboot249-launch",
+      "sha256": "074b679d3c83f0c45ef71b5fb77c90731c1c5fd4b98a850b8179dc40309351ad",
+      "source": "/home/ubuntu/workspace/jetstreamer/tools/horizon-reboot249-launch/target/release/horizon-reboot249-launch"
+    },
+    {
+      "mode": 292,
+      "name": "launch-plan.json",
+      "sha256": "085ac1f52ff1b915f3509d145dacfff8d569210f9521d68de37f0d99c8af734d",
+      "source": "/home/ubuntu/workspace/jetstreamer/tools/horizon-reboot249-launch/packet/launch-plan.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

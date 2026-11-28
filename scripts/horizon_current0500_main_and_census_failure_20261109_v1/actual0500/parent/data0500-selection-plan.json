@@ -1,0 +1,20 @@
+{
+  "data_policy": {
+    "path": "/usr/local/lib/jetstreamer/horizon-ended183-DATA-policy-0500-20261109-v1/policy.json",
+    "sha256": "c0085c72b6704d33aff687691d55a6814602c715251430baaa32a4dbbff1538a"
+  },
+  "data_policy_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-ended183-DATA-policy-0500-20261109-v1/deployment-seal-receipt.json",
+    "sha256": "59c7aec546e0abe007e3eeb1a7c6369a770230e2bb86f2e5f43a296af4ba780c"
+  },
+  "memory_original_completion": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch163-selector0500-completion-20261109-v1/completion.json",
+    "sha256": "9a3c324ad98dc80739e37b4c4bcff1f7729f04e21f0333886b09e1ee34f4083a"
+  },
+  "memory_selection": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/select-1/selection.json",
+    "sha256": "c3592d090473020369d5058c39a91f811b559358ee8494e6fab5117a7a3281f6"
+  },
+  "output_directory": "/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079",
+  "schema": "epoch183-native-current-ended-DATA-selection-plan-v1"
+}

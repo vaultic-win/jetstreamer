@@ -1,0 +1,276 @@
+{
+  "frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json",
+    "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8"
+  },
+  "plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0500-chain128-frame-plan-20261109-v5/plan.json",
+    "sha256": "aefd830ff88295380dab0cf709a9284303c8653cefd137d3f2ee817245d5c50e"
+  },
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T050022Z-witness-terminal145-v1.json",
+    "sha256": "1a330c37645d7a1c0bdce6cef2861ba6a445cfd0bec08e411df5906dc60fd583"
+  },
+  "fleet_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0500-fleet-plan-20261109-v1/fleet-plan.json",
+    "sha256": "8e7141bc68802af127583727dffd3fa5760236211081c903ab66aaca9c77106a"
+  },
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+    "sha256": "ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079"
+  },
+  "actual_completed_writer": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "success",
+    "NRestarts": "0",
+    "ExecMainPID": "3936671",
+    "ExecMainStatus": "0",
+    "ControlGroup": "",
+    "Id": "horizon-first-lane-current0500-chain128-witness-frame-capture-r4-20261109-v5.service",
+    "ActiveState": "active",
+    "SubState": "exited",
+    "InvocationID": "890a9bf1d85342698cc704ac1f83edfd"
+  },
+  "CLI_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-chain128-witness-frame-cli-tools-20261107-v5/jetstreamer-horizon-frame",
+    "sha256": "70b82a16f8c5d71257305a0873440deccf8746f78b09fc33ee23f5c691e29fe4"
+  },
+  "original_final_drains_pending": false,
+  "complete_reader_pending": true,
+  "replay_launch_authorized": false,
+  "memory_credit_bytes": 0,
+  "DATA_credit_bytes": 0,
+  "original_payload_and_outer_success": true,
+  "metadata_finalization": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/EXACT_GENERATED_METADATA_READONLY_FINALIZATION_RECEIPT.json",
+    "sha256": "a64695bf9e17c68daf84a96982d669ec34792913faee86a7371791f2ff1ef2b6"
+  },
+  "original_writers_and_cgroups": [
+    {
+      "unit": "horizon-visible-primary-observer050022-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-visible-primary-observer050022-20261109-v1.service",
+        "ActiveState": "active",
+        "SubState": "exited",
+        "InvocationID": "081b80830020496a8f167984f8c4c037"
+      },
+      "original_PID1_completion": [
+        {
+          "MESSAGE": "Finished horizon-visible-primary-observer050022-20261109-v1.service - /usr/local/lib/jetstreamer/horizon-observer-exit-census-20261107-v1/jetstreamer-horizon-observe /usr/local/lib/jetstreamer/horizon-visible-primary-observer-050022-plan-20261109-v1/observer.json.",
+          "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+          "_RUNTIME_SCOPE": "system",
+          "_COMM": "systemd",
+          "_HOSTNAME": "dev-samjohnson",
+          "_CAP_EFFECTIVE": "1ffffffffff",
+          "_EXE": "/usr/lib/systemd/systemd",
+          "CODE_FILE": "src/core/job.c",
+          "JOB_TYPE": "start",
+          "__MONOTONIC_TIMESTAMP": "2547099026722",
+          "CODE_FUNC": "job_emit_done_message",
+          "_SYSTEMD_CGROUP": "/init.scope",
+          "_SYSTEMD_SLICE": "-.slice",
+          "_GID": "0",
+          "_PID": "1",
+          "_SELINUX_CONTEXT": "unconfined\n",
+          "MESSAGE_ID": "39f53479d3a045ac8e11786248231fbf",
+          "_SYSTEMD_UNIT": "init.scope",
+          "UNIT": "horizon-visible-primary-observer050022-20261109-v1.service",
+          "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+          "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+          "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+          "JOB_RESULT": "done",
+          "_SOURCE_REALTIME_TIMESTAMP": "1794200437924418",
+          "TID": "1",
+          "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=36a4edf;b=763ea84ca81f4dddad364b1ea2ba36dd;m=2510aeec522;t=65fd0d7c2225a;x=51085990268fc3bd",
+          "_TRANSPORT": "journal",
+          "CODE_LINE": "796",
+          "JOB_ID": "41234188",
+          "__SEQNUM": "57298655",
+          "INVOCATION_ID": "081b80830020496a8f167984f8c4c037",
+          "PRIORITY": "6",
+          "SYSLOG_IDENTIFIER": "systemd",
+          "_UID": "0",
+          "__REALTIME_TIMESTAMP": "1794200437924442",
+          "SYSLOG_FACILITY": "3"
+        }
+      ]
+    },
+    {
+      "unit": "horizon-first-lane-current0500-fleet-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-current0500-fleet-20261109-v1.service",
+        "ActiveState": "active",
+        "SubState": "exited",
+        "InvocationID": "997f7cd2d2b9405b8dd0b74f882af5d8"
+      },
+      "original_PID1_completion": [
+        {
+          "_SYSTEMD_UNIT": "init.scope",
+          "_GID": "0",
+          "__SEQNUM": "57298842",
+          "JOB_RESULT": "done",
+          "_SYSTEMD_CGROUP": "/init.scope",
+          "CODE_FILE": "src/core/job.c",
+          "_CAP_EFFECTIVE": "1ffffffffff",
+          "_UID": "0",
+          "_EXE": "/usr/lib/systemd/systemd",
+          "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+          "_RUNTIME_SCOPE": "system",
+          "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=36a4f9a;b=763ea84ca81f4dddad364b1ea2ba36dd;m=25117a37b16;t=65fd0e476d84e;x=a8c7c48ec682ceab",
+          "INVOCATION_ID": "997f7cd2d2b9405b8dd0b74f882af5d8",
+          "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+          "_TRANSPORT": "journal",
+          "_SOURCE_REALTIME_TIMESTAMP": "1794200651094076",
+          "_HOSTNAME": "dev-samjohnson",
+          "__MONOTONIC_TIMESTAMP": "2547312196374",
+          "JOB_ID": "41237638",
+          "CODE_FUNC": "job_emit_done_message",
+          "UNIT": "horizon-first-lane-current0500-fleet-20261109-v1.service",
+          "PRIORITY": "6",
+          "_SELINUX_CONTEXT": "unconfined\n",
+          "CODE_LINE": "796",
+          "_SYSTEMD_SLICE": "-.slice",
+          "_COMM": "systemd",
+          "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+          "_PID": "1",
+          "MESSAGE_ID": "39f53479d3a045ac8e11786248231fbf",
+          "JOB_TYPE": "start",
+          "TID": "1",
+          "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+          "SYSLOG_FACILITY": "3",
+          "__REALTIME_TIMESTAMP": "1794200651094094",
+          "MESSAGE": "Finished horizon-first-lane-current0500-fleet-20261109-v1.service - /usr/local/lib/jetstreamer/horizon-first-lane-chain128-candidate-fleet-helper-tools-20261107-v8/jetstreamer-r2 fleet-reconcile /usr/local/lib/jetstreamer/horizon-first-lane-current0500-fleet-plan-20261109-v1/fleet-plan.json --plan-sha256 8e7141bc68802af127583727dffd3fa5760236211081c903ab66aaca9c77106a.",
+          "SYSLOG_IDENTIFIER": "systemd"
+        }
+      ]
+    },
+    {
+      "unit": "horizon-first-lane-current0500-chain128-witness-frame-capture-r4-20261109-v5.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-current0500-chain128-witness-frame-capture-r4-20261109-v5.service",
+        "ActiveState": "active",
+        "SubState": "exited",
+        "InvocationID": "890a9bf1d85342698cc704ac1f83edfd"
+      },
+      "original_PID1_completion": [
+        {
+          "UNIT": "horizon-first-lane-current0500-chain128-witness-frame-capture-r4-20261109-v5.service",
+          "CODE_FILE": "src/core/job.c",
+          "MESSAGE_ID": "39f53479d3a045ac8e11786248231fbf",
+          "JOB_ID": "41239593",
+          "_TRANSPORT": "journal",
+          "__REALTIME_TIMESTAMP": "1794200712825194",
+          "CODE_LINE": "796",
+          "PRIORITY": "6",
+          "__SEQNUM": "57298924",
+          "JOB_RESULT": "done",
+          "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+          "_SYSTEMD_UNIT": "init.scope",
+          "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+          "SYSLOG_FACILITY": "3",
+          "_HOSTNAME": "dev-samjohnson",
+          "_SOURCE_REALTIME_TIMESTAMP": "1794200712825179",
+          "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+          "_EXE": "/usr/lib/systemd/systemd",
+          "_GID": "0",
+          "_CAP_EFFECTIVE": "1ffffffffff",
+          "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=36a4fec;b=763ea84ca81f4dddad364b1ea2ba36dd;m=2511b516c33;t=65fd0e824c96a;x=42fa02d6e9aabec8",
+          "SYSLOG_IDENTIFIER": "systemd",
+          "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+          "_PID": "1",
+          "_UID": "0",
+          "_SELINUX_CONTEXT": "unconfined\n",
+          "_COMM": "systemd",
+          "INVOCATION_ID": "890a9bf1d85342698cc704ac1f83edfd",
+          "__MONOTONIC_TIMESTAMP": "2547373927475",
+          "CODE_FUNC": "job_emit_done_message",
+          "_SYSTEMD_SLICE": "-.slice",
+          "JOB_TYPE": "start",
+          "_RUNTIME_SCOPE": "system",
+          "_SYSTEMD_CGROUP": "/init.scope",
+          "TID": "1",
+          "MESSAGE": "Finished horizon-first-lane-current0500-chain128-witness-frame-capture-r4-20261109-v5.service - /usr/local/lib/jetstreamer/horizon-first-lane-chain128-witness-frame-cli-tools-20261107-v5/jetstreamer-horizon-frame /usr/local/lib/jetstreamer/horizon-first-lane-current0500-chain128-frame-plan-20261109-v5/plan.json --plan-sha256 aefd830ff88295380dab0cf709a9284303c8653cefd137d3f2ee817245d5c50e --self-sha256 70b82a16f8c5d71257305a0873440deccf8746f78b09fc33ee23f5c691e29fe4."
+        }
+      ]
+    },
+    {
+      "unit": "horizon-first-lane-current0500-chain128-witness-frame-capability-r4-20261109-v5.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-first-lane-current0500-chain128-witness-frame-capability-r4-20261109-v5.service",
+        "ActiveState": "active",
+        "SubState": "exited",
+        "InvocationID": "3984d7397c444ca5a190988c778d51d7"
+      },
+      "original_PID1_completion": [
+        {
+          "PRIORITY": "6",
+          "JOB_ID": "41238903",
+          "JOB_TYPE": "start",
+          "_GID": "0",
+          "INVOCATION_ID": "3984d7397c444ca5a190988c778d51d7",
+          "_CAP_EFFECTIVE": "1ffffffffff",
+          "_UID": "0",
+          "CODE_FILE": "src/core/job.c",
+          "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+          "_PID": "1",
+          "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+          "_EXE": "/usr/lib/systemd/systemd",
+          "_SYSTEMD_CGROUP": "/init.scope",
+          "MESSAGE_ID": "39f53479d3a045ac8e11786248231fbf",
+          "__MONOTONIC_TIMESTAMP": "2547343849568",
+          "__SEQNUM": "57298884",
+          "_TRANSPORT": "journal",
+          "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+          "JOB_RESULT": "done",
+          "_SYSTEMD_UNIT": "init.scope",
+          "CODE_LINE": "796",
+          "_SELINUX_CONTEXT": "unconfined\n",
+          "TID": "1",
+          "SYSLOG_IDENTIFIER": "systemd",
+          "UNIT": "horizon-first-lane-current0500-chain128-witness-frame-capability-r4-20261109-v5.service",
+          "_SOURCE_REALTIME_TIMESTAMP": "1794200682747255",
+          "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=36a4fc4;b=763ea84ca81f4dddad364b1ea2ba36dd;m=25119867860;t=65fd0e659d597;x=21f386734180d9a5",
+          "CODE_FUNC": "job_emit_done_message",
+          "_HOSTNAME": "dev-samjohnson",
+          "_RUNTIME_SCOPE": "system",
+          "SYSLOG_FACILITY": "3",
+          "_COMM": "systemd",
+          "MESSAGE": "Finished horizon-first-lane-current0500-chain128-witness-frame-capability-r4-20261109-v5.service - /usr/local/lib/jetstreamer/horizon-first-lane-chain128-witness-frame-cli-tools-20261107-v5/jetstreamer-horizon-frame --capability-probe /usr/local/lib/jetstreamer/horizon-first-lane-current0500-chain128-frame-plan-20261109-v5/plan.json --plan-sha256 aefd830ff88295380dab0cf709a9284303c8653cefd137d3f2ee817245d5c50e --self-sha256 70b82a16f8c5d71257305a0873440deccf8746f78b09fc33ee23f5c691e29fe4.",
+          "__REALTIME_TIMESTAMP": "1794200682747287",
+          "_SYSTEMD_SLICE": "-.slice",
+          "_MACHINE_ID": "59498204047045e4a428419acee7df19"
+        }
+      ]
+    }
+  ],
+  "accepted_selector": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/accepted-frame-selector.json",
+    "sha256": "02e0b10a1865a6e327a19293b42f9d41957cfaf2729fe6a189e6f84d006547b1"
+  },
+  "full_current_reader_memory_DATA_pending": true
+}

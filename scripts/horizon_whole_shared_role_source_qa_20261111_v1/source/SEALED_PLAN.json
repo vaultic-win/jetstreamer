@@ -1,0 +1,940 @@
+{
+  "schema": "horizon-whole-shared-role-census-plan-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "own_unit": "horizon-whole-shared-role-census-qualification-20261111-v1.service",
+  "own_cgroup": "/system.slice/horizon-whole-shared-role-census-qualification-20261111-v1.service",
+  "image_path": "/usr/local/lib/jetstreamer/horizon-whole-shared-role-census-tools-20261111-v1/check",
+  "template_requires_root_binding": true,
+  "current_complete_authority": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+    "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa",
+    "bytes": 3987
+  },
+  "current_fleet": {
+    "path": "/var/lib/jetstreamer/root-fleet-replacement-native-qualification-0130-seven-DATA-20261111-v27/ROOT_ACCEPTED_FLEET.json",
+    "sha256": "17856b86957f7fbe70b1b5d4ab314900770aa7a51cd5c8d246be3384310e54ba",
+    "bytes": 383
+  },
+  "owner_basis": "exact-current-seven-local2-20261110-v1",
+  "current_guard_proofs": [
+    {
+      "epoch": 166,
+      "proof": {
+        "path": "/ROOT-MUST-BIND-FRESH-guard-166.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "epoch": 167,
+      "proof": {
+        "path": "/ROOT-MUST-BIND-FRESH-guard-167.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "epoch": 168,
+      "proof": {
+        "path": "/ROOT-MUST-BIND-FRESH-guard-168.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "epoch": 169,
+      "proof": {
+        "path": "/ROOT-MUST-BIND-FRESH-guard-169.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "epoch": 170,
+      "proof": {
+        "path": "/ROOT-MUST-BIND-FRESH-guard-170.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "epoch": 171,
+      "proof": {
+        "path": "/ROOT-MUST-BIND-FRESH-guard-171.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "epoch": 172,
+      "proof": {
+        "path": "/ROOT-MUST-BIND-FRESH-guard-172.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ],
+  "resource_promise_ending_authorized": false,
+  "replay_launch_authorized": false,
+  "native_Frame_or_full_Reader_authority": false,
+  "future_host_or_shared_role_bound_claimed": false,
+  "retained_shared_bytes": 68719476736,
+  "historical_host_bytes": 43603734528,
+  "separate_input_bytes": 2684354560,
+  "historical_kernel_fulfillment_reused": false,
+  "global_future_kernel_reserve_disjoint_from_historical_host": true,
+  "maximum_capture_seconds": 30,
+  "native_booking": null,
+  "own_expected_ancestor_controls": {},
+  "own_expected_native_controls": {},
+  "protected_background_owners": [
+    {
+      "invocation_id": "7ac4617f73ab4f979a8527cce461c6a4",
+      "main_pid": "3204661",
+      "unit": "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service"
+    },
+    {
+      "invocation_id": "dbf49bb1b72c42c584f2d3ac94259cb8",
+      "main_pid": "2467123",
+      "unit": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service"
+    },
+    {
+      "invocation_id": "2612e3bb8fe4415b804532ee87d46ea3",
+      "main_pid": "199885",
+      "unit": "jetstreamer-horizon-audit-epochs101-181-v4.service"
+    },
+    {
+      "invocation_id": "699d09b3e4254b7cab02a7b26456428b",
+      "main_pid": "200082",
+      "unit": "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service"
+    },
+    {
+      "invocation_id": "671943ead310459fbd812c8874c3d1b9",
+      "main_pid": "200234",
+      "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service"
+    },
+    {
+      "invocation_id": "89b072dea9cd4167881d060c571be6cf",
+      "main_pid": "200268",
+      "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service"
+    },
+    {
+      "invocation_id": "99c1aded731d4de8aa6bff571134aac6",
+      "main_pid": "200281",
+      "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service"
+    }
+  ],
+  "retained_verification_roles": [
+    {
+      "immutable_script": {
+        "path": "/usr/local/lib/jetstreamer/horizon-parallel-audit-20260926-v6/verify_horizon_range.sh",
+        "sha256": "a64fed21248715b2214292ea961a82afc5367a34b337d35afdbbc48d62c04bed"
+      },
+      "retained_cap_bytes": 34359738368,
+      "unit": "jetstreamer-horizon-audit-epochs101-181-v4.service"
+    },
+    {
+      "immutable_script": {
+        "path": "/usr/local/lib/jetstreamer/horizon-verifier-fsync-20261009-v1/verify_horizon_boundaries_progressive.sh",
+        "sha256": "24de5d678f6723d28b1161f4904119ff5952d7ba92a1b794ead32efd03058e80"
+      },
+      "retained_cap_bytes": 8589934592,
+      "unit": "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service"
+    },
+    {
+      "immutable_script": {
+        "path": "/usr/local/lib/jetstreamer/horizon-plugin-receipt-watcher-20261001-v1/watch_horizon_plugin_progressive.sh",
+        "sha256": "2b0202515b166ccdf131e86dc66a26b3e461805d56352fe02c5e9bd28be18890"
+      },
+      "retained_cap_bytes": 8589934592,
+      "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-a-v4-fsync.service"
+    },
+    {
+      "immutable_script": {
+        "path": "/usr/local/lib/jetstreamer/horizon-plugin-receipt-watcher-20261001-v1/watch_horizon_plugin_progressive.sh",
+        "sha256": "2b0202515b166ccdf131e86dc66a26b3e461805d56352fe02c5e9bd28be18890"
+      },
+      "retained_cap_bytes": 8589934592,
+      "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service"
+    },
+    {
+      "immutable_script": {
+        "path": "/usr/local/lib/jetstreamer/horizon-plugin-receipt-watcher-20261001-v1/watch_horizon_plugin_progressive.sh",
+        "sha256": "2b0202515b166ccdf131e86dc66a26b3e461805d56352fe02c5e9bd28be18890"
+      },
+      "retained_cap_bytes": 34359738368,
+      "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service"
+    },
+    {
+      "immutable_script": {
+        "path": "/usr/local/lib/jetstreamer/horizon-plugin-receipt-watcher-20261001-v1/watch_horizon_plugin_progressive.sh",
+        "sha256": "2b0202515b166ccdf131e86dc66a26b3e461805d56352fe02c5e9bd28be18890"
+      },
+      "retained_cap_bytes": 8589934592,
+      "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service"
+    }
+  ],
+  "roles": [
+    {
+      "claim_key": "replay-local2-166",
+      "pool": "actor",
+      "kind": "userspace",
+      "units": [
+        "horizon-qualify-166-replacement-local2-20261110-v1.service"
+      ],
+      "cgroup": "/system.slice/horizon-qualify-166-replacement-local2-20261110-v1.service",
+      "per_instance_bytes": 73014444032,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 73014444032,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "horizon-qualify-166-replacement-local2-20261110-v1.service": {
+          "unit": "horizon-qualify-166-replacement-local2-20261110-v1.service",
+          "invocation_id": "3d0d0bb640684627ab370e314e6c116a",
+          "main_pid": "1056542",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "replay-local2-167",
+      "pool": "actor",
+      "kind": "userspace",
+      "units": [
+        "horizon-qualify-167-replacement-local2-20261110-v1.service"
+      ],
+      "cgroup": "/system.slice/horizon-qualify-167-replacement-local2-20261110-v1.service",
+      "per_instance_bytes": 73014444032,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 73014444032,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "horizon-qualify-167-replacement-local2-20261110-v1.service": {
+          "unit": "horizon-qualify-167-replacement-local2-20261110-v1.service",
+          "invocation_id": "5a5ea1ae3f9e41bab0a2231e38e59028",
+          "main_pid": "1056574",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "replay-local2-168",
+      "pool": "actor",
+      "kind": "userspace",
+      "units": [
+        "horizon-qualify-168-replacement-local2-20261110-v1.service"
+      ],
+      "cgroup": "/system.slice/horizon-qualify-168-replacement-local2-20261110-v1.service",
+      "per_instance_bytes": 73014444032,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 73014444032,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "horizon-qualify-168-replacement-local2-20261110-v1.service": {
+          "unit": "horizon-qualify-168-replacement-local2-20261110-v1.service",
+          "invocation_id": "28c71c8287714cd2bec606a0ee463c9d",
+          "main_pid": "1056602",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "replay-local2-169",
+      "pool": "actor",
+      "kind": "userspace",
+      "units": [
+        "horizon-qualify-169-replacement-local2-20261110-v1.service"
+      ],
+      "cgroup": "/system.slice/horizon-qualify-169-replacement-local2-20261110-v1.service",
+      "per_instance_bytes": 73014444032,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 73014444032,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "horizon-qualify-169-replacement-local2-20261110-v1.service": {
+          "unit": "horizon-qualify-169-replacement-local2-20261110-v1.service",
+          "invocation_id": "81a6eee953d249a0a11ab123c81d63cc",
+          "main_pid": "1123930",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "replay-local2-170",
+      "pool": "actor",
+      "kind": "userspace",
+      "units": [
+        "horizon-qualify-170-replacement-local2-20261110-v1.service"
+      ],
+      "cgroup": "/system.slice/horizon-qualify-170-replacement-local2-20261110-v1.service",
+      "per_instance_bytes": 73014444032,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 73014444032,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "horizon-qualify-170-replacement-local2-20261110-v1.service": {
+          "unit": "horizon-qualify-170-replacement-local2-20261110-v1.service",
+          "invocation_id": "350248d54a4f437bbb04b65319e6275f",
+          "main_pid": "1145812",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "replay-local2-171",
+      "pool": "actor",
+      "kind": "userspace",
+      "units": [
+        "horizon-qualify-171-replacement-local2-20261110-v1.service"
+      ],
+      "cgroup": "/system.slice/horizon-qualify-171-replacement-local2-20261110-v1.service",
+      "per_instance_bytes": 73014444032,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 73014444032,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "horizon-qualify-171-replacement-local2-20261110-v1.service": {
+          "unit": "horizon-qualify-171-replacement-local2-20261110-v1.service",
+          "invocation_id": "9b33770ea58a4622b55a5e6e5165eaa5",
+          "main_pid": "1177103",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "replay-local2-172",
+      "pool": "actor",
+      "kind": "userspace",
+      "units": [
+        "horizon-qualify-172-replacement-local2-20261110-v1.service"
+      ],
+      "cgroup": "/system.slice/horizon-qualify-172-replacement-local2-20261110-v1.service",
+      "per_instance_bytes": 73014444032,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 73014444032,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "horizon-qualify-172-replacement-local2-20261110-v1.service": {
+          "unit": "horizon-qualify-172-replacement-local2-20261110-v1.service",
+          "invocation_id": "5359f45fc6df479ca62b17912f08e43d",
+          "main_pid": "1213582",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "verifier:jetstreamer-horizon-audit-epochs101-181-v4.service",
+      "pool": "verifier96",
+      "kind": "userspace",
+      "units": [
+        "jetstreamer-horizon-audit-epochs101-181-v4.service"
+      ],
+      "cgroup": "/system.slice/jetstreamer-horizon-audit-epochs101-181-v4.service",
+      "per_instance_bytes": 34359738368,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 34359738368,
+      "funding": null,
+      "source_files": [
+        {
+          "path": "/usr/local/lib/jetstreamer/horizon-parallel-audit-20260926-v6/verify_horizon_range.sh",
+          "sha256": "a64fed21248715b2214292ea961a82afc5367a34b337d35afdbbc48d62c04bed"
+        }
+      ],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "jetstreamer-horizon-audit-epochs101-181-v4.service": {
+          "invocation_id": "2612e3bb8fe4415b804532ee87d46ea3",
+          "main_pid": "199885",
+          "unit": "jetstreamer-horizon-audit-epochs101-181-v4.service",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "verifier:jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service",
+      "pool": "verifier96",
+      "kind": "userspace",
+      "units": [
+        "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service"
+      ],
+      "cgroup": "/system.slice/jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service",
+      "per_instance_bytes": 8589934592,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 8589934592,
+      "funding": null,
+      "source_files": [
+        {
+          "path": "/usr/local/lib/jetstreamer/horizon-verifier-fsync-20261009-v1/verify_horizon_boundaries_progressive.sh",
+          "sha256": "24de5d678f6723d28b1161f4904119ff5952d7ba92a1b794ead32efd03058e80"
+        }
+      ],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service": {
+          "invocation_id": "699d09b3e4254b7cab02a7b26456428b",
+          "main_pid": "200082",
+          "unit": "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "verifier:jetstreamer-horizon-plugin-receipt-watcher-shard-a-v4-fsync.service",
+      "pool": "verifier96",
+      "kind": "userspace",
+      "units": [
+        "jetstreamer-horizon-plugin-receipt-watcher-shard-a-v4-fsync.service"
+      ],
+      "cgroup": "/system.slice/jetstreamer-horizon-plugin-receipt-watcher-shard-a-v4-fsync.service",
+      "per_instance_bytes": 8589934592,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 8589934592,
+      "funding": null,
+      "source_files": [
+        {
+          "path": "/usr/local/lib/jetstreamer/horizon-plugin-receipt-watcher-20261001-v1/watch_horizon_plugin_progressive.sh",
+          "sha256": "2b0202515b166ccdf131e86dc66a26b3e461805d56352fe02c5e9bd28be18890"
+        }
+      ],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "verifier:jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service",
+      "pool": "verifier96",
+      "kind": "userspace",
+      "units": [
+        "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service"
+      ],
+      "cgroup": "/system.slice/jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service",
+      "per_instance_bytes": 8589934592,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 8589934592,
+      "funding": null,
+      "source_files": [
+        {
+          "path": "/usr/local/lib/jetstreamer/horizon-plugin-receipt-watcher-20261001-v1/watch_horizon_plugin_progressive.sh",
+          "sha256": "2b0202515b166ccdf131e86dc66a26b3e461805d56352fe02c5e9bd28be18890"
+        }
+      ],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service": {
+          "invocation_id": "671943ead310459fbd812c8874c3d1b9",
+          "main_pid": "200234",
+          "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "verifier:jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service",
+      "pool": "verifier96",
+      "kind": "userspace",
+      "units": [
+        "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service"
+      ],
+      "cgroup": "/system.slice/jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service",
+      "per_instance_bytes": 34359738368,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 34359738368,
+      "funding": null,
+      "source_files": [
+        {
+          "path": "/usr/local/lib/jetstreamer/horizon-plugin-receipt-watcher-20261001-v1/watch_horizon_plugin_progressive.sh",
+          "sha256": "2b0202515b166ccdf131e86dc66a26b3e461805d56352fe02c5e9bd28be18890"
+        }
+      ],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service": {
+          "invocation_id": "89b072dea9cd4167881d060c571be6cf",
+          "main_pid": "200268",
+          "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "verifier:jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service",
+      "pool": "verifier96",
+      "kind": "userspace",
+      "units": [
+        "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service"
+      ],
+      "cgroup": "/system.slice/jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service",
+      "per_instance_bytes": 8589934592,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 8589934592,
+      "funding": null,
+      "source_files": [
+        {
+          "path": "/usr/local/lib/jetstreamer/horizon-plugin-receipt-watcher-20261001-v1/watch_horizon_plugin_progressive.sh",
+          "sha256": "2b0202515b166ccdf131e86dc66a26b3e461805d56352fe02c5e9bd28be18890"
+        }
+      ],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service": {
+          "invocation_id": "99c1aded731d4de8aa6bff571134aac6",
+          "main_pid": "200281",
+          "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "current-DATA-guard-166",
+      "pool": "normal10",
+      "kind": "userspace",
+      "units": [
+        "ROOT-BIND-current-DATA-guard-166.service"
+      ],
+      "cgroup": "/system.slice/ROOT-BIND-current-DATA-guard-166.service",
+      "per_instance_bytes": 1073741824,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 1073741824,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "current-DATA-guard-167",
+      "pool": "normal10",
+      "kind": "userspace",
+      "units": [
+        "ROOT-BIND-current-DATA-guard-167.service"
+      ],
+      "cgroup": "/system.slice/ROOT-BIND-current-DATA-guard-167.service",
+      "per_instance_bytes": 1073741824,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 1073741824,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "current-DATA-guard-168",
+      "pool": "normal10",
+      "kind": "userspace",
+      "units": [
+        "ROOT-BIND-current-DATA-guard-168.service"
+      ],
+      "cgroup": "/system.slice/ROOT-BIND-current-DATA-guard-168.service",
+      "per_instance_bytes": 1073741824,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 1073741824,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "current-DATA-guard-169",
+      "pool": "normal10",
+      "kind": "userspace",
+      "units": [
+        "ROOT-BIND-current-DATA-guard-169.service"
+      ],
+      "cgroup": "/system.slice/ROOT-BIND-current-DATA-guard-169.service",
+      "per_instance_bytes": 1073741824,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 1073741824,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "current-DATA-guard-170",
+      "pool": "normal10",
+      "kind": "userspace",
+      "units": [
+        "ROOT-BIND-current-DATA-guard-170.service"
+      ],
+      "cgroup": "/system.slice/ROOT-BIND-current-DATA-guard-170.service",
+      "per_instance_bytes": 1073741824,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 1073741824,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "current-DATA-guard-171",
+      "pool": "normal10",
+      "kind": "userspace",
+      "units": [
+        "ROOT-BIND-current-DATA-guard-171.service"
+      ],
+      "cgroup": "/system.slice/ROOT-BIND-current-DATA-guard-171.service",
+      "per_instance_bytes": 1073741824,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 1073741824,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "current-DATA-guard-172",
+      "pool": "normal10",
+      "kind": "userspace",
+      "units": [
+        "ROOT-BIND-current-DATA-guard-172.service"
+      ],
+      "cgroup": "/system.slice/ROOT-BIND-current-DATA-guard-172.service",
+      "per_instance_bytes": 1073741824,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 1073741824,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "normal10-existing-remainder-unresolved",
+      "pool": "normal10",
+      "kind": "userspace",
+      "units": [],
+      "cgroup": "/ROOT-BIND-normal10-remainder",
+      "per_instance_bytes": 3221225472,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 3221225472,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "native16-existing-commitments-unresolved",
+      "pool": "native16",
+      "kind": "userspace",
+      "units": [],
+      "cgroup": "/ROOT-BIND-distinct-native-commitments",
+      "per_instance_bytes": 13757317120,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 13757317120,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "whole-role-native-callback",
+      "pool": "native16",
+      "kind": "userspace",
+      "units": [
+        "horizon-whole-shared-role-census-qualification-20261111-v1.service"
+      ],
+      "cgroup": "/system.slice/horizon-whole-shared-role-census-qualification-20261111-v1.service",
+      "per_instance_bytes": 536870912,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 536870912,
+      "funding": null,
+      "source_files": [],
+      "images": [
+        {
+          "path": "/usr/local/lib/jetstreamer/horizon-whole-shared-role-census-tools-20261111-v1/check",
+          "from_genuine_self_artifact": true
+        }
+      ],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "root-native-outer",
+      "pool": "native16",
+      "kind": "userspace",
+      "units": [],
+      "cgroup": "/ROOT-BIND-native-outer.service",
+      "per_instance_bytes": 1073741824,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 1073741824,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "protected:horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+      "pool": "shared64",
+      "kind": "userspace",
+      "units": [
+        "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service"
+      ],
+      "cgroup": "/system.slice/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+      "per_instance_bytes": null,
+      "max_parallel": null,
+      "recovery_overlap_bytes": null,
+      "aggregate_budget_bytes": null,
+      "funding": null,
+      "source_files": [
+        {
+          "path": "/usr/local/lib/jetstreamer/horizon-cohort183-uploader-transition-20261029-v2/upload-progressive.zsh",
+          "sha256": "d9b3bc9c64664b17f9da7275834abb01f7e00fec4d2257c8aa92156d185e07f3",
+          "bytes": 2270
+        }
+      ],
+      "images": [
+        {
+          "path": "/usr/local/lib/jetstreamer/horizon-r2-rust-20261017-v3-auth-only/jetstreamer-r2-progressive",
+          "sha256": "1eede7d15cec7e5b1907ee44328caf2b20457ca8513472ca17e83fe3e08f9087",
+          "bytes": 611672
+        },
+        {
+          "path": "/usr/local/lib/jetstreamer/horizon-r2-rust-20261017-v3-auth-only/jetstreamer-r2",
+          "sha256": "7b21414c1c105cefb18f5bf3ca8bb96759c14c529ea42232a70835bdc864b990",
+          "bytes": 12635528
+        }
+      ],
+      "future_policy": null,
+      "current_owner": {
+        "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service": {
+          "invocation_id": "7ac4617f73ab4f979a8527cce461c6a4",
+          "main_pid": "3204661",
+          "unit": "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "protected:jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+      "pool": "original199",
+      "kind": "userspace",
+      "units": [
+        "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service"
+      ],
+      "cgroup": "/system.slice/jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+      "per_instance_bytes": 536870912,
+      "max_parallel": 1,
+      "recovery_overlap_bytes": 0,
+      "aggregate_budget_bytes": 536870912,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {
+        "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service": {
+          "invocation_id": "dbf49bb1b72c42c584f2d3ac94259cb8",
+          "main_pid": "2467123",
+          "unit": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+          "start_ticks": null
+        }
+      },
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "sessions-login-SSH-Root-Codex",
+      "pool": "shared64",
+      "kind": "userspace",
+      "units": [],
+      "cgroup": "/user.slice",
+      "per_instance_bytes": null,
+      "max_parallel": null,
+      "recovery_overlap_bytes": null,
+      "aggregate_budget_bytes": null,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "ordinary-os-daemons",
+      "pool": "shared64",
+      "kind": "userspace",
+      "units": [],
+      "cgroup": "/ROOT-BIND-distinct-ordinary-daemons",
+      "per_instance_bytes": null,
+      "max_parallel": null,
+      "recovery_overlap_bytes": null,
+      "aggregate_budget_bytes": null,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "future-control-foreman-status-holding-restore-retirement-GCloud",
+      "pool": "shared64",
+      "kind": "userspace",
+      "units": [],
+      "cgroup": "/ROOT-BIND-distinct-launchers",
+      "per_instance_bytes": null,
+      "max_parallel": null,
+      "recovery_overlap_bytes": null,
+      "aggregate_budget_bytes": null,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    },
+    {
+      "claim_key": "global-future-kernel-reserve",
+      "pool": "shared64",
+      "kind": "global-kernel",
+      "units": [],
+      "cgroup": "",
+      "per_instance_bytes": null,
+      "max_parallel": null,
+      "recovery_overlap_bytes": null,
+      "aggregate_budget_bytes": null,
+      "funding": null,
+      "source_files": [],
+      "images": [],
+      "future_policy": null,
+      "current_owner": {},
+      "launch_grammar": null,
+      "unit_source_sets": {},
+      "unit_profiles": {}
+    }
+  ],
+  "output": "/ROOT-MUST-BIND-PRIVATE-ROOT-OUTPUT/WHOLE_SHARED_ROLE_REPORT.json"
+}

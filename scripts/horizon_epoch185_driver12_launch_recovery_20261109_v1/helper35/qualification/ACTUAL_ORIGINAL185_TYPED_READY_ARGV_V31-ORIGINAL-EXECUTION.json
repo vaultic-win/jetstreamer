@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest fleet::cold185::native::typed_ready_original_control::actual_original185_ready_source_uses_worker_custody_and_rejects_crossed_binding ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3063 filtered out; finished in 0.00s\n\n",
+  "stderr": "Running as unit: horizon-helper34-actual-original185-typed-ready-argv-v31-20261108-v1-helper35-20261109.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 19ms\nCPU time consumed: 18ms\nMemory peak: 4.0M\nMemory swap peak: 0B\n"
+}

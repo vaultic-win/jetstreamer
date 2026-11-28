@@ -1,0 +1,131 @@
+{
+  "archive_mutations": false,
+  "authenticated_inventory_complete": true,
+  "current_frame_acceptance_pending": true,
+  "current_resource_control_incident": "Nov9 05:00 planned continuation. Replay0target5. ActualD12/H35/Final6/P6/O38 qualifiedsealed; exact0230successfulreader aliases retired04:25aftergenuinepostMainterminalclosure withzeroRAM/DATAcredit. Genuine0430Frame55fda127 captured/finalized and completeHelper27outer passed; exact0300/0330/0400observerbridges finalized preservinginode/bytes/mtime. Actual0430metadata authority and normal6closure revalidated1539historical+87additionalterminalunits; originalhistoricalextraQA6release notcreditedagain. Lastcompleteoperationalresource tuple remains0230; no0430reader/parentmemory/DATA/admission/worker was started beforeoriginal04:45:22cutoff. Next05sourcechainmustpreserveFrame0430/resources0230split. Guard0500ACTUALLYqualified65tests/fourcompilerssealed, but actual05sample/Frame/reader/admissionpendingatpreparation. NewcanonicalDATA5177463485076 includesguard0500DATA512once over5176926614164; normal6extraQA0. Review8actuallypublished04:42:55 afterexplicit04:42:33review; planningcontrol deadline05:42:33, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. 60minuncertainplanningallocation forcurrentauthority/closure/staticchain20min, freshscheduledtuple/resource/admission20min, nativeMain10min, contingency10min; noexistingnativeclockreset. Fleet8 exactinheritedpolicy retained after rejectingadditions; actualnewterminal/qmetadata retainedseparately, no gateweakened. Currentfull185route unqualified; bounded80351283/48GiB/14400s isnotfull185. Otherhost200-300/protected199FDs untouched.",
+  "first_epoch": 101,
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T023022Z-witness-terminal145-v1.json",
+    "sha256": "172c77e6f8a0a0d1772f2b0233505ac1027aebfea9ca4c90c5131eb1a3508fa6"
+  },
+  "frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T023022-witness-terminal145-chain128-v5.json",
+    "sha256": "30fb6b0ae48f865b052734c5d1db7ec6163f9e3fa6c72994aed81e3758675524"
+  },
+  "fresh_fleet_reconciliation_pending": true,
+  "fresh_resource_audit_pending": true,
+  "interruption_recovery": true,
+  "last_accepted_fleet_resource_clock": "2026-11-09T02:30:22Z",
+  "last_epoch": 200,
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+    "sha256": "ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079"
+  },
+  "outcomes": [
+    {
+      "epoch": 136,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-136.status-correction-20261109050316.json",
+        "sha256": "ebad2a0da809ee86c6bc28835b074d5c49501074424f8a6f272f24d882acd8de"
+      }
+    },
+    {
+      "epoch": 137,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-137.status-correction-20261109050316.json",
+        "sha256": "d84652f5fbe7da51334e75b90d6b8186e0b4de5a2c210a6a50d0b6a985d9cb4c"
+      }
+    },
+    {
+      "epoch": 141,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-141.status-correction-20261109050316.json",
+        "sha256": "762e0ac5f1fc5be69ba300ea332c5851fe7fb5389dd09a212b4b7089bc59108a"
+      }
+    },
+    {
+      "epoch": 145,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-145.status-correction-20261109050316.json",
+        "sha256": "a92457c9b9aecb443f33d5b1f59edde67c970ba116875cbfc6f48590672466e7"
+      }
+    },
+    {
+      "epoch": 159,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-159.status-correction-20261109050316.json",
+        "sha256": "fd7d34a78c6fdaa29cc8683083b173cd0f41e92f866dc5135ee454de8a47b831"
+      }
+    },
+    {
+      "epoch": 161,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-161.status-correction-20261109050316.json",
+        "sha256": "4d0678e88038c867108a47bb55a70a557c4a92312b95313f050d62d6e470e747"
+      }
+    },
+    {
+      "epoch": 163,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-163.status-correction-20261109050316.json",
+        "sha256": "223e55f3f9ce5aef61d5c9e16aafd1b209bf7f6e28957c0ba16dfaf7203c0b88"
+      }
+    },
+    {
+      "epoch": 185,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109050316.json",
+        "sha256": "a5193fefc2c9b41ded47ca8079152fdd84cc7a239bc17088e7d1af85e6858362"
+      }
+    },
+    {
+      "epoch": 186,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-186.status-correction-20261109050316.json",
+        "sha256": "2d80442a047da62626fd1a5d44810361d568ca810cebe6afc6141e3f24d7c657"
+      }
+    },
+    {
+      "epoch": 199,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-199.status-correction-20261109050316.json",
+        "sha256": "9c1490eac2fc9c29eddcb0b2a4c9384bec625a986badbcbe7cd2825b2c65e179"
+      }
+    },
+    {
+      "epoch": 200,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-200.status-correction-20261109050316.json",
+        "sha256": "0b78e5043fe511b3c5182d4262564dbe463bf3d2f1d8476264b9f9d2fc5b7500"
+      }
+    }
+  ],
+  "sampled_at_utc": "2026-11-09T05:03:16Z",
+  "schema": "horizon-range-status-event-correction-v1",
+  "sidecar_mutations": false,
+  "status_keys": {
+    "136": "epoch-136.epoch-status.json",
+    "137": "epoch-137.epoch-status.json",
+    "141": "epoch-141.epoch-status.json",
+    "145": "epoch-145.epoch-status.json",
+    "159": "epoch-159.epoch-status.json",
+    "161": "epoch-161.epoch-status.json",
+    "163": "epoch-163.epoch-status.json",
+    "185": "epoch-185.epoch-status.json",
+    "186": "epoch-186.epoch-status.json",
+    "199": "epoch-199.epoch-status.json",
+    "200": "epoch-200.epoch-status.json"
+  },
+  "unresolved_status_incidents": []
+}

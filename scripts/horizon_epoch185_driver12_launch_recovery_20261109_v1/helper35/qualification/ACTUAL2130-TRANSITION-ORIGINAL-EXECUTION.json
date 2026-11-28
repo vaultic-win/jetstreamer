@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest fleet::cold185::enrollment::tests::actual2130_plan_composes_complete_transition_with_same_live145_consumer ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3063 filtered out; finished in 0.01s\n\n",
+  "stderr": "Running as unit: horizon-helper34-actual2130-transition-20261108-v1-helper35-20261109.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 31ms\nCPU time consumed: 30ms\nMemory peak: 4.0M\nMemory swap peak: 0B\n"
+}

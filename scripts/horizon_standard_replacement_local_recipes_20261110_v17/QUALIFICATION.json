@@ -1,0 +1,46 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/next171172-local-recipes-qualification-20261110-v17/local-recipes-v17/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "1ccf5063fd3874b89d909189168e69bdc40c4fd5411d99417724360b30a06b51"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/next171172-local-recipes-qualification-20261110-v17/local-recipes-v17/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "470571ff22a43a7e6a9c63d7afc40112488f64b2ff872ba12c7e159590cfd49e"
+  },
+  "source_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-standard-replacement-local-source-20261110-v17/deployment-seal-receipt.json",
+    "sha256": "c1c39f14471b86749ec4e0e55e8ae0de40e12ea09fb364662bd52517401727f8"
+  },
+  "runtime_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-standard-replacement-recipes-20261110-v17/deployment-seal-receipt.json",
+    "sha256": "d19a5fea96769059d5d549a92c588334622cc75405dc28c844948b12f90f7faf"
+  },
+  "runtime_members": {
+    "prepare": {
+      "path": "/usr/local/lib/jetstreamer/horizon-standard-replacement-recipes-20261110-v17/prepare",
+      "sha256": "f4c0cef177a9887221fe39bd0bc48d266b8298fe81a6ab35823a6b9dbeeb3184"
+    }
+  },
+  "actual_ordinary_test_count": 120,
+  "published_source_sha256": {
+    "main.rs": "7adcd70dad5cc243dcaf3f4f57de028b761c80ccd3d2a617d90474ffa994a297",
+    "profile.rs": "ad904595bb77ccfddefc1c8f7cbcfc6cbae8b08c2fb43fa76a36e790b4b8a04b",
+    "tests.rs": "2944336ca1c895cc241aff9321597b0d18f387cd88592d9b66253fe6d1de8c3b",
+    "local.rs": "8319089e637ceb79bd1b3d7100633b75feeab066fee4f81d0d2abdfdadbd49e2",
+    "resident_capture.rs": "64bfeee3982f366d5241cfe48dd984e7f4add7fc85576585d1df7387475adaab",
+    "resident_memory.rs": "5c57345022170cd0ff83ad4d13f849f568a22ec3f54824688804acfcb46b7dfd",
+    "resident_memory_tests.rs": "e29ab6b342b31f669705b8e527d2aeed5d0df42e67642747898661ef297cb859",
+    "host_fulfillment.rs": "27eebadac3853db91d3a5b166b4fcc479827433130a06f97527ac40593a8ad70",
+    "data_admission.rs": "9f7b0371ddc66874547ca8d43f3ce1a9e6797580020aab19a74e4bc6a089d3b7",
+    "data_witness.rs": "0d14ca336cec51841974b276a037bfafc2d0bca7745fa853ec2d5acd9c551bfa",
+    "data_guard_reader.rs": "33726508799f263fd786b9c0cd983a6ab0bb12090b4f18a0ae12bd395fbc8776",
+    "data-guard-registrations.json": "c48928594cfa2526403fc616fac6112b42b35e6511bd686fa4a4b5ae95fc3f99",
+    "PINNED_INPUTS.json": "19beee2d90445830f4bff65a7b2bbb74d4f6f9ef467ae7963352e5c4faf18772",
+    "witness-set.json": "731806c5b1f4f35b6f9f9f52239cd60654454cd1e14f63640f7396b505bcd36c"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "remote_mutations": false,
+  "optional_DATA_native_admission_passed": false
+}

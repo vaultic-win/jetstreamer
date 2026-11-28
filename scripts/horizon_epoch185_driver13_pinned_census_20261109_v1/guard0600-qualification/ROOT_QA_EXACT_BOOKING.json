@@ -1,0 +1,21 @@
+{
+  "schema": "horizon-normal6-current0600-guard-booking-v1",
+  "owner": "/root",
+  "previous": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver13-consumer-helper-qa-20261109-v36/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+    "sha256": "72a528e150be743374de0ba29d404ad93e379c1d3929250b0910b608d436cade"
+  },
+  "previous_retained_DATA_lower_bound_bytes": 5186053419668,
+  "new_retained_DATA_bytes": 536870912,
+  "complete_DATA_bytes": 5186590290580,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_bytes": 5368709120,
+  "one_serial_compiler_bytes": 536870912,
+  "other_compiler_overlap_permitted": false,
+  "all_failed_original_actor_and_DATA_promises_retained": true,
+  "no_replay_or_resource_credit": true,
+  "actual_original_booking": {
+    "path": "/home/sol/.jetstreamer-private/current0600-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0600_GUARD_DATA512_BOOKING.json",
+    "sha256": "97fc5f9412579beb90ca49b8a0a422870a44c3cce3de212124e3e20c870d5752"
+  }
+}

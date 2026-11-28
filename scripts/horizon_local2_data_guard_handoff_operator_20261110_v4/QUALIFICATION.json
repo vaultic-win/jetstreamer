@@ -1,0 +1,55 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/data-guard-handoff-operator-qualification-20261110-v4/data-guard-handoff-operator-v4/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "9658b5fd302604908b1df65768811a56239b1c4ec76c254ba7369c39da08a93a"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/data-guard-handoff-operator-qualification-20261110-v4/data-guard-handoff-operator-v4/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "59c9286c8c6039fb34d2308cd6d0f2e53cb8e3ad5b6903001f3df3c5ffc85ec3"
+  },
+  "source_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-data-guard-handoff-operator-source-20261110-v4/deployment-seal-receipt.json",
+    "sha256": "6fe88c209b49c1b8090d39e7c9e2801d6c3a7cbf4549cbc566f7e03a8159aa15"
+  },
+  "actual_ordinary_test_count": 14,
+  "published_source_sha256": {
+    "main.rs": "e2be5aa753122985b30e6325726c9d39d190aaf2843443ad3e0726607e77ce59",
+    "data_guard_reader.rs": "33726508799f263fd786b9c0cd983a6ab0bb12090b4f18a0ae12bd395fbc8776",
+    "data-guard-registrations.json": "c48928594cfa2526403fc616fac6112b42b35e6511bd686fa4a4b5ae95fc3f99",
+    "registration-binding.json": "2e9dc2ed3b6e3e99c2317342922ff4abbf00dcbe6f0b6261b056843cd8bf32d8",
+    "targets.json": "1423fe84c7f3e2900dbe300daa76a8d4123cc212f6553901ffe249bdb693d85e"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "runtime_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-data-guard-handoff-operator-20261110-v4/deployment-seal-receipt.json",
+    "sha256": "8aa11a0fedfd763151a2caea8311607eb88a153604f8f7c551e74f2fa0945ef2"
+  },
+  "actual_native_handoffs": {
+    "167": {
+      "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch167/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+      "sha256": "30758097987a213cdb85e57e39f5386dc18031d1b5570decf3754f4ad0559cb4"
+    },
+    "168": {
+      "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch168/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+      "sha256": "6fa4eb29df8f1a67d3bdda8454475f859af29432005a0d5cc678101e6e1beaac"
+    },
+    "169": {
+      "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch169/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+      "sha256": "0074ff13640814ea42e5d0d874019b67ab5142c8c0e269e5129e9486f664224d"
+    },
+    "170": {
+      "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch170/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+      "sha256": "521ee0d2d25d269261685c430cc7c15d4ae185af8db7cb105afc370d83e01583"
+    },
+    "171": {
+      "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch171/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+      "sha256": "88e619c07dd65607676e243445dfd739543e4ec00bb85d4cb5be02e9d9c7ee86"
+    },
+    "172": {
+      "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch172/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+      "sha256": "0b5bbdda4a487ad93abf38f2b8440e12c728f5b7573e02d39ec908df877544e0"
+    }
+  }
+}

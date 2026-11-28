@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/apt-daily-upgrade.timer",
+      "Id": "apt-daily-upgrade.timer",
+      "InvocationID": "ec415a542f91449d9a137b3349a2dced",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1h",
+      "RemainAfterElapse": "yes",
+      "Unit": "apt-daily-upgrade.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/apt-daily-upgrade.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/apt-daily-upgrade.timer",
+          "sha256": "b804d7bab8eb41202384f9270e25d5383346ace8b3d7c4f5029c150638d77bcd"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/apt-daily-upgrade.timer",
+      "Id": "apt-daily-upgrade.timer",
+      "InvocationID": "ec415a542f91449d9a137b3349a2dced",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1h",
+      "RemainAfterElapse": "yes",
+      "Unit": "apt-daily-upgrade.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/apt-daily-upgrade.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/apt-daily-upgrade.timer",
+          "sha256": "b804d7bab8eb41202384f9270e25d5383346ace8b3d7c4f5029c150638d77bcd"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2465846238414,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794205347360013
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "apt-daily-upgrade.timer",
+  "unset_pending_requires_metadata_requery": false
+}

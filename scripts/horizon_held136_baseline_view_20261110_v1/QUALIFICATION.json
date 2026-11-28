@@ -1,0 +1,46 @@
+{
+  "schema": "horizon-held136-baseline-view-source-qualification-v1",
+  "library_compiler_configurations_passed": 4,
+  "library_tests_passed": 68,
+  "library_ignored_tests": 2,
+  "CLI_compiler_configurations_passed": 4,
+  "CLI_tests_passed": 3,
+  "genuine_native_terminal_census_passed": true,
+  "actual_native_and_compiler_slots_drained": true,
+  "receipts": [
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_FOUR_LIBRARY_COMPILERS_R4_PASSED_TESTS_PENDING.json",
+      "sha256": "69aef74b4dcf229dcfef89aaf8fbbaa9f916784b80811ad583546029cb711ac2"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/LIBRARY-R4-ORDINARY-TESTS-ORIGINAL-EXECUTION.json",
+      "sha256": "0917ef38326638276ef42690002b2b7e0a7925907a74f7d3341bfbde6abfed3a"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ALL_LIBRARY_AND_CLI_V4_QA_PASSED_NATIVE_PENDING.json",
+      "sha256": "f61b519fb058eea587a8a8f774c4d5e0b91e95cd937cdf072a3d0adae2f8ae36"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ACTUAL_HELD136_BASELINE_VIEW_NATIVE_V3_QUALIFICATION.json",
+      "sha256": "ec3738515f771dc0aee0b4807d87bb16963085f6b19bed54da772d4d61cb0daa"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_HELD136_NATIVE_V3_PASSED_AND_DRAINED_NO_SELECTION.json",
+      "sha256": "7c2a6f488124b40e7d92a2bc380f7d42546a61fddc6c0ba2437e1df8f10b69bb"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_HELD136_EFFECTIVE_MEMORY_SELECTED_CURRENT_AUTHORITY.json",
+      "sha256": "27ad17c9736d64bfca20e3d02442cc54c72e8198ae412ab33c2eece66e2c69ab"
+    }
+  ],
+  "new_retirement_recorded": false,
+  "DATA_credit_bytes": 0,
+  "physical_credit_bytes": 0,
+  "shared_library_replaced": false,
+  "current_manual_authority_memory_bytes": 645972897792,
+  "admission_authorized": false,
+  "source": {
+    "source/library.patch": "378f78db3b8d7ab0f48285ad7e27761cd05ebe48b3d9e6aab42e8b1b95042b10",
+    "source/main.rs": "952a149c4ab79ae679cfa7ad5c82fa877a8124687c3c12b2dbf58c40bd89d202"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "--system",
+    "--json=short",
+    "get-property",
+    "org.freedesktop.systemd1",
+    "/org/freedesktop/systemd1/unit/certbot_2etimer",
+    "org.freedesktop.systemd1.Timer",
+    "NextElapseUSecMonotonic",
+    "NextElapseUSecRealtime",
+    "LastTriggerUSecMonotonic"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/busctl",
+  "timeout_millis": 5000,
+  "wall_started_at": 1794201178
+}

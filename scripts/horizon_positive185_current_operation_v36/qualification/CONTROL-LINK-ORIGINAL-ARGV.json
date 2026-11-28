@@ -1,0 +1,6 @@
+[
+  "systemctl",
+  "link",
+  "/usr/local/lib/jetstreamer/operation36-coherence-control-20261108-v1/horizon-operation32-coherence-disposable-20261108-v6.service",
+  "/usr/local/lib/jetstreamer/operation36-coherence-control-20261108-v1/horizon-operation32-coherence-disposable-20261108-v6.timer"
+]

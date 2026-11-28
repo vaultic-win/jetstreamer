@@ -1,0 +1,297 @@
+{
+  "admission": {
+    "producer_invocation_id": "913443d7f9f44d7e9d3e0eec420acfab",
+    "producer_unit": "horizon-qualify-168-full-metered-cold-v4-20261123.service",
+    "producer_pid": 916123,
+    "start_ticks": 374640772,
+    "cgroup": "/system.slice/horizon-qualify-168-full-metered-cold-v4-20261123.service",
+    "source": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-retry4-rebook-20261123-v1/PREPARED.json",
+      "sha256": "91f4ba8df878b796e4a2a3735c5302791abde215a92638ca5bbaa4d4a71b65cc"
+    },
+    "intent": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-retry4-rebook-20261123-v1/START_INTENT.json",
+      "sha256": "a599dc69a7403e1265bd949086066cc499781298787608bce9f9591753dbb3f6"
+    },
+    "actual_guard_plan": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-retry4-rebook-20261123-v1/ACTUAL_GUARD_PLAN.json",
+      "sha256": "37aa75305bf5f70a9f277284c7273f197380af1bc012607db12409ed7ba9edbf"
+    },
+    "timer_unit": "horizon-guard-168-full-metered-cold-v4-20261123.timer"
+  },
+  "worker": {
+    "producer_invocation_id": "913443d7f9f44d7e9d3e0eec420acfab",
+    "producer_unit": "horizon-qualify-168-full-metered-cold-v4-20261123.service",
+    "producer_pid": 916123,
+    "start_ticks": 374640772,
+    "cgroup": "/system.slice/horizon-qualify-168-full-metered-cold-v4-20261123.service",
+    "admission": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-retry4-rebook-20261123-v1/ACTUAL_ADMISSION_AND_PROTECTION.json",
+      "sha256": "35ca20f8e092902e8e48c2ebd7b36d1350f6d9019904622d97c90c9e926f0e5f"
+    },
+    "worker_pid": 916805,
+    "worker_start_ticks": 374644726
+  },
+  "intent": {
+    "schema": "jetstreamer-horizon-standalone-stop-intent-v1",
+    "reason": "root-physical-budget",
+    "producer_invocation_id": "913443d7f9f44d7e9d3e0eec420acfab",
+    "plan_sha256": "37aa75305bf5f70a9f277284c7273f197380af1bc012607db12409ed7ba9edbf",
+    "sample": {
+      "producer_invocation_id": "913443d7f9f44d7e9d3e0eec420acfab",
+      "plan_sha256": "37aa75305bf5f70a9f277284c7273f197380af1bc012607db12409ed7ba9edbf",
+      "trip_reason": "root-physical-budget",
+      "producer": {
+        "active": "active",
+        "cgroup": "/system.slice/horizon-qualify-168-full-metered-cold-v4-20261123.service",
+        "delegated": false,
+        "invocation_id": "913443d7f9f44d7e9d3e0eec420acfab",
+        "kill_mode": "control-group",
+        "load_state": "loaded",
+        "pid": 916123,
+        "restart_policy": "no",
+        "restarts": 0,
+        "result": "success",
+        "sub": "running"
+      },
+      "workers": [
+        [
+          916805,
+          396789
+        ]
+      ]
+    }
+  },
+  "stop": {
+    "intent": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-retry4-rebook-20261123-v1/guard-receipts/stop-intent.json",
+    "plan_sha256": "37aa75305bf5f70a9f277284c7273f197380af1bc012607db12409ed7ba9edbf",
+    "producer_invocation_id": "913443d7f9f44d7e9d3e0eec420acfab",
+    "r2_mutations": false,
+    "remote_mutations": false,
+    "schema": "jetstreamer-horizon-standalone-stop-completion-v1",
+    "scratch_deleted": false,
+    "terminal": {
+      "active": "inactive",
+      "cgroup": "/system.slice/horizon-qualify-168-full-metered-cold-v4-20261123.service",
+      "delegated": false,
+      "invocation_id": "913443d7f9f44d7e9d3e0eec420acfab",
+      "kill_mode": "control-group",
+      "load_state": "loaded",
+      "pid": 0,
+      "restart_policy": "no",
+      "restarts": 0,
+      "result": "success",
+      "sub": "dead"
+    }
+  },
+  "plan": {
+    "unit": "horizon-qualify-168-full-metered-cold-v4-20261123.service",
+    "invocation_id": "913443d7f9f44d7e9d3e0eec420acfab",
+    "filesystem": "/home/sol",
+    "maximum_root_physical_bytes": 309237645312
+  },
+  "payload": {
+    "epoch": 168,
+    "whole_root_cap": 309237645312,
+    "producer_unit": "horizon-qualify-168-full-metered-cold-v4-20261123.service",
+    "guard_unit": "horizon-guard-168-full-metered-cold-v4-20261123",
+    "bootstrap": {
+      "accounts_hash": "Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx",
+      "anchor_slot": 72575704,
+      "crc32c": "VhThrg==",
+      "extension": ".tar.zst",
+      "generation": 1634787413893700,
+      "md5_hash": "HweknD02yvMktO0EeZgbpA==",
+      "size": 2029219745,
+      "slot": 72575704,
+      "source": "root",
+      "uri": "gs://mainnet-beta-ledger-us-ny5/72575704/snapshot-72575704-Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx.tar.zst",
+      "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/72575704/snapshot-72575704-Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx.tar.zst#1634787413893700"
+    },
+    "root_checkpoint": {
+      "accounts_hash": "AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R",
+      "anchor_slot": 73007829,
+      "crc32c": "iKJ/WA==",
+      "extension": ".tar.zst",
+      "generation": 1634787450103391,
+      "md5_hash": "jNdqo/vyNfQlFRcwpR2Iww==",
+      "size": 2109034648,
+      "slot": 73007829,
+      "source": "root",
+      "uri": "gs://mainnet-beta-ledger-us-ny5/73007829/snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst",
+      "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/73007829/snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst#1634787450103391"
+    },
+    "bootstrap_file": {
+      "identity": [
+        64512,
+        104141334,
+        2029219745,
+        1794247159477632042,
+        1794247160396636029
+      ],
+      "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/private/destination-38f108e9d00d485f8ed68d9e7caaeb0a1570f35891271acc1ddc6e75b942e5ad/work/root-cohort-168-168/run-14201-1794247152158421923/inputs/snapshot-72575704-Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx.tar.zst",
+      "sha256": "f1a8902dcb00eb59266a2f688d05f7d406af1999eb78956bfd0c46056571ad04"
+    },
+    "retained_terminal_partial": {
+      "identity": [
+        64512,
+        104804528,
+        42215375916,
+        1795249077620618153,
+        1795249077620618153
+      ],
+      "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/replacement-local1-20261110-v1/trace-local3-20261120-v1/epoch-168.diagnostic.jet"
+    },
+    "genesis": {
+      "identity": [
+        64512,
+        103875385,
+        20144,
+        1794247171653684863,
+        1794247171653684863
+      ],
+      "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/output/genesis.tar.bz2",
+      "sha256": "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"
+    },
+    "indexes": [
+      {
+        "independent_trace_copy": {
+          "identity": [
+            64512,
+            114115538,
+            14777203,
+            1795161936722984983,
+            1795161936729985017
+          ],
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/replacement-local1-20261110-v1/trace-local3-20261120-v1/ledger/compact-indexes/167/epoch-167-bafyreienhstqouv46ysqm2r5dqeixnhmil3qem77x76q5hicq4egi3uzhi-mainnet-slot-to-cid.index"
+        },
+        "source": {
+          "identity": [
+            64512,
+            104138613,
+            14777203,
+            1794247351658466226,
+            1794247351667466265
+          ],
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/output/compact-indexes/167/epoch-167-bafyreienhstqouv46ysqm2r5dqeixnhmil3qem77x76q5hicq4egi3uzhi-mainnet-slot-to-cid.index"
+        },
+        "target": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry4-20261123/output/compact-indexes/167/epoch-167-bafyreienhstqouv46ysqm2r5dqeixnhmil3qem77x76q5hicq4egi3uzhi-mainnet-slot-to-cid.index"
+      },
+      {
+        "independent_trace_copy": {
+          "identity": [
+            64512,
+            114115551,
+            15210704,
+            1795161940297002400,
+            1795161940307002449
+          ],
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/replacement-local1-20261110-v1/trace-local3-20261120-v1/ledger/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-slot-to-cid.index"
+        },
+        "source": {
+          "identity": [
+            64512,
+            104141091,
+            15210704,
+            1794247357057489674,
+            1794247357065489709
+          ],
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/output/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-slot-to-cid.index"
+        },
+        "target": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry4-20261123/output/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-slot-to-cid.index"
+      },
+      {
+        "independent_trace_copy": {
+          "identity": [
+            64512,
+            114115552,
+            4362826998,
+            1795161975444173735,
+            1795161975622174603
+          ],
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/replacement-local1-20261110-v1/trace-local3-20261120-v1/ledger/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-cid-to-offset-and-size.index"
+        },
+        "source": {
+          "identity": [
+            64512,
+            104146058,
+            4362826998,
+            1794247389003628431,
+            1794247389315629786
+          ],
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/output/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-cid-to-offset-and-size.index"
+        },
+        "target": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry4-20261123/output/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-cid-to-offset-and-size.index"
+      }
+    ],
+    "regular_node_argv": [
+      "/run/horizon-full168-cold-v4/jetstreamer-node",
+      "168",
+      "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry4-20261123/output",
+      "--verify",
+      "--root-checkpoint-cohort",
+      "--cohort-manifest=/run/horizon-full168-cold-v4/preflight-168-v4.json",
+      "--cohort-manifest-fingerprint=sha256:f5824f170325f9def8fe257fd542c9093f298419b1f558d4c35ddd1a6ae98011",
+      "--snapshot-archive=/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/private/destination-38f108e9d00d485f8ed68d9e7caaeb0a1570f35891271acc1ddc6e75b942e5ad/work/root-cohort-168-168/run-14201-1794247152158421923/inputs/snapshot-72575704-Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx.tar.zst"
+    ],
+    "members": {
+      "jetstreamer-historical-worker-v1-5-6": [
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch172-full-replay-20261120-v1/inputs-v1/jetstreamer-historical-worker-v1-5-6",
+        "b0219574172b54b251b4f2feda6285ca3b6bee5f2830a0d46e69ee8ea2275541"
+      ],
+      "jetstreamer-node": [
+        "/usr/local/lib/jetstreamer/horizon-independent168-singleton-package-20261109-v1/jetstreamer-node",
+        "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65"
+      ],
+      "preflight-168-v4.json": [
+        "/usr/local/lib/jetstreamer/horizon-independent168-singleton-package-20261109-v1/preflight-168-v4.json",
+        "27b7a803c39d7cf42407e46bc9fe5033761f471f668545460a1bcbde007ee196"
+      ]
+    },
+    "environment": {
+      "JETSTREAMER_CLEAR_ACCOUNTS_ON_START": "true",
+      "JETSTREAMER_LOAD_FROM_DIR": "0",
+      "JETSTREAMER_HISTORICAL_WORKER_V1_5_6": "/run/horizon-full168-cold-v4/jetstreamer-historical-worker-v1-5-6"
+    }
+  },
+  "prepared": {
+    "payload": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-retry4-rebook-20261123-v1/COLD_PAYLOAD.json",
+      "sha256": "490c8f5ddc6abfb1c73236de45b061bc57eded20ed698ae213a505575f3cd1e3"
+    },
+    "node_sha256": "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65",
+    "worker_sha256": "b0219574172b54b251b4f2feda6285ca3b6bee5f2830a0d46e69ee8ea2275541",
+    "profile": {
+      "producer_unit": "horizon-qualify-168-full-metered-cold-v4-20261123.service",
+      "producer_argv": [
+        "fixture gate",
+        "/run/horizon-full168-cold-v4/jetstreamer-node",
+        "168",
+        "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry4-20261123/output",
+        "--verify",
+        "--root-checkpoint-cohort",
+        "--cohort-manifest=/run/horizon-full168-cold-v4/preflight-168-v4.json",
+        "--cohort-manifest-fingerprint=sha256:f5824f170325f9def8fe257fd542c9093f298419b1f558d4c35ddd1a6ae98011",
+        "--snapshot-archive=/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/private/destination-38f108e9d00d485f8ed68d9e7caaeb0a1570f35891271acc1ddc6e75b942e5ad/work/root-cohort-168-168/run-14201-1794247152158421923/inputs/snapshot-72575704-Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx.tar.zst"
+      ]
+    }
+  },
+  "namespace": {
+    "prepared": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-retry4-rebook-20261123-v1/PREPARED.json",
+      "sha256": "91f4ba8df878b796e4a2a3735c5302791abde215a92638ca5bbaa4d4a71b65cc"
+    },
+    "dropin": {
+      "path": "/run/systemd/system/horizon-qualify-168-full-metered-cold-v4-20261123.service.d/90-cold-retry4-home-namespace.conf",
+      "sha256": "962785e09604bb61d88ab2eeeedbf2a7f6975e28cd46c4f7c82553125180268e"
+    },
+    "unit": "horizon-qualify-168-full-metered-cold-v4-20261123.service"
+  },
+  "start": {
+    "prepared": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-retry4-rebook-20261123-v1/PREPARED.json",
+      "sha256": "91f4ba8df878b796e4a2a3735c5302791abde215a92638ca5bbaa4d4a71b65cc"
+    },
+    "producer_unit": "horizon-qualify-168-full-metered-cold-v4-20261123.service"
+  }
+}

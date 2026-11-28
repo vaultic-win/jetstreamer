@@ -1,0 +1,97 @@
+{
+  "schema": "horizon-exact-closed-generated-metadata-readonly-finalization-v1",
+  "files": [
+    {
+      "binding": {
+        "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T043022Z-postcompletion154-v1.json",
+        "sha256": "11fa170d36aa749232c5bf88f5954687529efd430442b186ed68c434bf8ff834"
+      },
+      "before": {
+        "dev": 2304,
+        "ino": 2761629,
+        "uid": 0,
+        "gid": 0,
+        "nlink": 1,
+        "size": 306161,
+        "mode": 420,
+        "mtime_ns": 1794198637921173243,
+        "ctime_ns": 1794198637921173243
+      },
+      "after": {
+        "dev": 2304,
+        "ino": 2761629,
+        "uid": 0,
+        "gid": 0,
+        "nlink": 1,
+        "size": 306161,
+        "mode": 292,
+        "mtime_ns": 1794198637921173243,
+        "ctime_ns": 1794199145542647621
+      },
+      "same_path_inode_bytes_digest_and_mtime": true
+    },
+    {
+      "binding": {
+        "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T043022Z-witness-terminal145-v1.json",
+        "sha256": "1f7ef15795bf4ec32c53a70fb4650cc6c3fd2d894cb0b70d22fd13db61aeb73f"
+      },
+      "before": {
+        "dev": 2304,
+        "ino": 2761630,
+        "uid": 0,
+        "gid": 0,
+        "nlink": 1,
+        "size": 1104130,
+        "mode": 384,
+        "mtime_ns": 1794198996946945030,
+        "ctime_ns": 1794198996947945035
+      },
+      "after": {
+        "dev": 2304,
+        "ino": 2761630,
+        "uid": 0,
+        "gid": 0,
+        "nlink": 1,
+        "size": 1104130,
+        "mode": 292,
+        "mtime_ns": 1794198996946945030,
+        "ctime_ns": 1794199145543647626
+      },
+      "same_path_inode_bytes_digest_and_mtime": true
+    },
+    {
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T043022-witness-terminal145-chain128-v5.json",
+        "sha256": "55fda127febcffca00788cb6023a494f7c31e88a65eb0cdaba58d2dbc5e9ea83"
+      },
+      "before": {
+        "dev": 2304,
+        "ino": 3609234,
+        "uid": 0,
+        "gid": 0,
+        "nlink": 1,
+        "size": 2684746,
+        "mode": 384,
+        "mtime_ns": 1794199091527393743,
+        "ctime_ns": 1794199091527393743
+      },
+      "after": {
+        "dev": 2304,
+        "ino": 3609234,
+        "uid": 0,
+        "gid": 0,
+        "nlink": 1,
+        "size": 2684746,
+        "mode": 292,
+        "mtime_ns": 1794199091527393743,
+        "ctime_ns": 1794199145546647640
+      },
+      "same_path_inode_bytes_digest_and_mtime": true
+    }
+  ],
+  "all_scoped_files_readonly": true,
+  "actual_closed_file_count": 3,
+  "no_original_payload_path_inode_or_history_change": true,
+  "memory_credit_bytes": 0,
+  "DATA_credit_bytes": 0
+}

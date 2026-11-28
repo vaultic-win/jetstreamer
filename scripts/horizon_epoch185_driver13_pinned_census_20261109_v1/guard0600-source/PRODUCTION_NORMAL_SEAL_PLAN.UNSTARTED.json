@@ -1,0 +1,18 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-current0600-bound-guard-window-tools-20261109-v1",
+  "members": [
+    {
+      "name": "horizon-current0600-guard-window",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0600-window-20261109-v1/work/horizon-current0600-guard-window",
+      "sha256": null,
+      "mode": 365
+    },
+    {
+      "name": "artifact-proof.json",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0600-window-20261109-v1/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+      "sha256": null,
+      "mode": 292
+    }
+  ]
+}

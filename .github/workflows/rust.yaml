@@ -1,0 +1,265 @@
+name: Rust
+
+concurrency:
+  group: check-rust-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  OPENSSL_NO_VENDOR: "1"
+
+jobs:
+  cargo-check:
+    name: cargo check (${{ matrix.name }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix: &rust-feature-matrix
+        include:
+          - name: default
+            scope: "--workspace"
+            flags: ""
+            examples: true
+          # Node qualification modes are intentionally mutually exclusive.
+          # Exercise every mode independently instead of disabling their guards.
+          - name: node-epoch140-native-restore
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch140-native-restore-diagnostic"
+            examples: false
+          - name: node-epoch141-original-entry-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch141-original-entry-qualification"
+            examples: false
+          - name: all-compatible-features
+            scope: "--workspace --exclude jetstreamer-node --exclude jetstreamer-horizon-observe"
+            flags: "--all-features"
+            examples: true
+          # The exact epoch 223 snapshot package cannot be combined with the
+          # older snapshot profiles. Exercise both feature families explicitly.
+          - name: observer-existing-compatible-features
+            scope: "-p jetstreamer-horizon-observe"
+            flags: "--features ram-snapshot-eight-core-stopped225,epoch225-shrink-snapshot-tests,epoch203-ram-resource-supervisor,epoch203-ram-shrink-candidate"
+            examples: false
+          - name: observer-epoch223-tail-snapshot
+            scope: "-p jetstreamer-horizon-observe"
+            flags: "--features epoch223-tail-snapshot-tests"
+            examples: false
+          - name: observer-epoch223-cold-snapshot
+            scope: "-p jetstreamer-horizon-observe"
+            flags: "--features epoch223-cold-snapshot-tests"
+            examples: false
+          - name: observer-epoch223-warmup-snapshot
+            scope: "-p jetstreamer-horizon-observe"
+            flags: "--features epoch223-warmup-snapshot-tests"
+            examples: false
+          - name: observer-epoch223-v1620-native-input
+            scope: "-p jetstreamer-horizon-observe"
+            flags: "--features epoch223-v1620-native-input"
+            examples: false
+          - name: observer-epoch223-v1620-native-input-release
+            scope: "-p jetstreamer-horizon-observe"
+            flags: "--features epoch223-v1620-native-input-release"
+            examples: false
+          - name: node-epoch213-continuation
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch213-checkpoint-continuation-diagnostic"
+            examples: false
+          - name: node-epoch207-singleton-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch207-singleton-qualification"
+            examples: false
+          - name: node-epochs209-212-singleton-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epochs209-212-singleton-qualification"
+            examples: false
+          - name: node-epoch223-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch223-v1-6-25-qualification"
+            examples: false
+          - name: node-epoch223-v1620-prefix-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch223-v1-6-20-prefix-qualification"
+            examples: false
+          - name: utils-epoch223-v1620-root-prefix
+            scope: "-p jetstreamer-utils"
+            flags: "--features epoch223-v1620-root-prefix-resource"
+            examples: false
+          - name: node-epoch144-continuation
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch144-checkpoint-continuation-diagnostic"
+            examples: false
+          - name: node-epoch144-native-restore
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch144-native-restore-diagnostic"
+            examples: false
+          - name: node-epoch203-native-restore
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch203-native-restore-diagnostic"
+            examples: false
+          - name: node-epoch203-continuation
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch203-checkpoint-continuation-diagnostic"
+            examples: false
+          - name: node-epoch205-native-restore
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch205-native-restore-diagnostic"
+            examples: false
+          - name: node-epoch224-account-delta
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch224-account-delta-diagnostic"
+            examples: false
+          - name: node-epoch224-comparison
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch224-v1-6-25-diagnostic"
+            examples: false
+          - name: node-epoch224-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch224-v1-6-25-qualification"
+            examples: false
+          - name: node-epoch225-comparison
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch225-v1-6-25-diagnostic"
+            examples: false
+          - name: node-epoch225-qualification
+            scope: "-p jetstreamer-node"
+            flags: "--features epoch225-v1-6-25-qualification"
+            examples: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libudev-dev clang llvm-dev libclang-dev pkg-config libssl-dev
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: cargo check (${{ matrix.name }})
+        run: cargo check ${{ matrix.scope }} ${{ matrix.flags }}
+
+  cargo-test:
+    name: cargo test (${{ matrix.name }})
+    runs-on: ubuntu-22.04
+    env:
+      # Keep test artifacts within the standard hosted runner's disk and memory limits.
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      # Several configurations produce libraries larger than sccache's ZIP cache supports.
+      # Compile tests directly while retaining every configuration and test command.
+      RUSTC_WRAPPER: ""
+    strategy:
+      fail-fast: false
+      matrix: *rust-feature-matrix
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libudev-dev clang llvm-dev libclang-dev pkg-config libssl-dev
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: cargo test (${{ matrix.name }})
+        shell: bash
+        run: cargo test ${{ matrix.scope }} ${{ matrix.flags }} 2>&1 | tee "$RUNNER_TEMP/rust-test.log"
+      - name: Archive example regressions (${{ matrix.name }})
+        if: matrix.examples
+        run: |
+          cargo test -p jetstreamer-horizon ${{ matrix.flags }} \
+            --example reencode_archive \
+            --example verify_archive
+      - name: Report test failure in check annotations
+        if: failure()
+        shell: bash
+        run: |
+          # Public check annotations remain readable to SSH-only maintainers,
+          # while the Actions log-download API requires a separate API token.
+          if [[ -f "$RUNNER_TEMP/rust-test.log" ]]; then
+            failure_tail="$(tail -n 100 "$RUNNER_TEMP/rust-test.log" | tail -c 12000)"
+            failure_tail="${failure_tail//'%'/'%25'}"
+            failure_tail="${failure_tail//$'\r'/'%0D'}"
+            failure_tail="${failure_tail//$'\n'/'%0A'}"
+            printf '::error title=Rust test failure details::%s\n' "$failure_tail"
+          fi
+
+  cargo-fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libudev-dev clang llvm-dev libclang-dev pkg-config libssl-dev
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: Install cargo-fmt
+        run: rustup component add rustfmt
+      - name: cargo fmt
+        run: cargo fmt -- --check
+
+  cargo-doc:
+    name: cargo doc
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libudev-dev clang llvm-dev libclang-dev pkg-config libssl-dev
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: cargo doc
+        run: cargo doc --no-deps
+
+  cargo-clippy:
+    name: cargo clippy (${{ matrix.name }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix: *rust-feature-matrix
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libudev-dev clang llvm-dev libclang-dev pkg-config libssl-dev
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: Install cargo-clippy
+        run: rustup component add clippy
+      - name: cargo clippy (${{ matrix.name }})
+        run: cargo clippy ${{ matrix.scope }} ${{ matrix.flags }}
+
+  cargo-fix:
+    name: cargo fix
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libudev-dev clang llvm-dev libclang-dev pkg-config libssl-dev
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: cargo fix --workspace
+        run: |
+          # Run cargo fix on the project
+          cargo fix --workspace
+
+          # Check for local git changes
+          if ! git diff --exit-code; then
+              echo "There are local changes after running 'cargo fix --workspace' ❌"
+              exit 1
+          else
+              echo "No changes detected after running 'cargo fix --workspace' ✅"
+          fi

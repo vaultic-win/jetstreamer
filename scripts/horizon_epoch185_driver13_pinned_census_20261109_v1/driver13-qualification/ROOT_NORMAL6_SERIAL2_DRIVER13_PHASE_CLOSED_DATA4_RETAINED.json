@@ -1,0 +1,16 @@
+{
+  "all_eight_originals_success_terminal_and_drained": true,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_bytes": 0,
+  "new_memory_credit_bytes": 0,
+  "complete_DATA_bytes": 5181758452372,
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER13_DATA4_BOOKING.json",
+    "sha256": "f707a14d33f3c26438767720bd6a9dd6f3c380f2e160a582d2ac8bc62564556a"
+  },
+  "all_previous_source_and_DATA_promises_retained": true,
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v13/artifact-proof.json",
+    "sha256": "28aa84473585e6fe9f4199f8704af6b50e01b49e85ff8e69b81146d86cbe4ef9"
+  }
+}

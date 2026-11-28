@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-positive185-final-test-build-20261109-v6-fixed-deadline.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1.178s\nCPU time consumed: 1.592s\nMemory peak: 3.3M\nMemory swap peak: 0B\n"
+}

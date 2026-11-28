@@ -1,0 +1,240 @@
+{
+  "argv": [
+    "/usr/bin/systemd-run",
+    "--wait",
+    "--pipe",
+    "--unit=horizon-epoch183-ended-DATA-select-20261105-v1.service",
+    "--service-type=exec",
+    "-p",
+    "User=root",
+    "-p",
+    "Group=root",
+    "-p",
+    "Restart=no",
+    "-p",
+    "MemoryAccounting=yes",
+    "-p",
+    "MemoryHigh=2G",
+    "-p",
+    "MemoryMax=2G",
+    "-p",
+    "MemorySwapMax=0",
+    "-p",
+    "CPUQuota=100%",
+    "-p",
+    "TasksMax=512",
+    "-p",
+    "RuntimeMaxSec=600",
+    "-p",
+    "TimeoutStopSec=15",
+    "-p",
+    "PrivateNetwork=yes",
+    "-p",
+    "ProtectSystem=strict",
+    "-p",
+    "ProtectHome=read-only",
+    "-p",
+    "NoNewPrivileges=yes",
+    "-p",
+    "CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE",
+    "-p",
+    "AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE",
+    "-p",
+    "ReadWritePaths=/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079",
+    "-p",
+    "TemporaryFileSystem=/tmp:ro /var/tmp:ro",
+    "/usr/local/lib/jetstreamer/horizon-first-lane-witness-ended183-DATA-selector-tools-20261107-v4/ended183-data",
+    "select",
+    "/usr/local/lib/jetstreamer/horizon-ended183-DATA-selection0500-plan-20261109-v1/plan.json",
+    "--plan-sha256",
+    "38ff5123b611f6a3fe2152bb9b79cd70a34571ea351de0b012899a2c1126f5e2",
+    "--self-sha256",
+    "85f374198bd5418bfa269faf01c9751b50f30a94a0cb0c0cc9a9b8b18133d243",
+    "--output",
+    "/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/selection.json"
+  ],
+  "before": {
+    "TimersMonotonic_entries": [],
+    "fields": {
+      "ActiveState": "inactive",
+      "ControlPID": "0",
+      "ExecMainStatus": "0",
+      "Id": "horizon-epoch183-ended-DATA-select-20261105-v1.service",
+      "InvocationID": "",
+      "Job": "",
+      "LoadState": "not-found",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "Result": "success",
+      "SubState": "dead"
+    }
+  },
+  "exact_synchronous_exec_transport_unchanged": true,
+  "logical_argv": [
+    "/usr/bin/systemd-run",
+    "--wait",
+    "--pipe",
+    "--unit=horizon-epoch183-ended-DATA-select-20261105-v1.service",
+    "--service-type=exec",
+    "-p",
+    "User=root",
+    "-p",
+    "Group=root",
+    "-p",
+    "Restart=no",
+    "-p",
+    "MemoryAccounting=yes",
+    "-p",
+    "MemoryHigh=2G",
+    "-p",
+    "MemoryMax=2G",
+    "-p",
+    "MemorySwapMax=0",
+    "-p",
+    "CPUQuota=100%",
+    "-p",
+    "TasksMax=512",
+    "-p",
+    "RuntimeMaxSec=600",
+    "-p",
+    "TimeoutStopSec=15",
+    "-p",
+    "PrivateNetwork=yes",
+    "-p",
+    "ProtectSystem=strict",
+    "-p",
+    "ProtectHome=read-only",
+    "-p",
+    "NoNewPrivileges=yes",
+    "-p",
+    "CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE",
+    "-p",
+    "AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE",
+    "-p",
+    "ReadWritePaths=/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079",
+    "-p",
+    "TemporaryFileSystem=/tmp:ro /var/tmp:ro",
+    "/usr/local/lib/jetstreamer/horizon-first-lane-witness-ended183-DATA-selector-tools-20261107-v4/ended183-data",
+    "select",
+    "/usr/local/lib/jetstreamer/horizon-ended183-DATA-selection0500-plan-20261109-v1/plan.json",
+    "--plan-sha256",
+    "38ff5123b611f6a3fe2152bb9b79cd70a34571ea351de0b012899a2c1126f5e2",
+    "--self-sha256",
+    "85f374198bd5418bfa269faf01c9751b50f30a94a0cb0c0cc9a9b8b18133d243",
+    "--output",
+    "/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/selection.json"
+  ],
+  "no_retry": true,
+  "plan": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/ROOT_DATA0500_COMPLETED_WINDOW_ARGV_PLAN.json",
+    "sha256": "006bf2413beb29cc2859d847d19dfe13ff000a819aa8ea903b4822e1761e7f37"
+  },
+  "preflight": {
+    "absolute_next_monotonic_usec": 2547778731613,
+    "bounded_wait_metadata": [
+      {
+        "absolute_next_monotonic_usec": 2547778731613,
+        "guard": {
+          "TimersMonotonic_entries": [],
+          "fields": {
+            "ActiveState": "inactive",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+            "InvocationID": "34039a1593364628b3036d7a966f0fc1",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "success",
+            "SubState": "dead"
+          }
+        },
+        "remaining_usec": 23635263,
+        "sampled_monotonic_usec": 2547755096350,
+        "timer": {
+          "TimersMonotonic_entries": [
+            [
+              "OnUnitActiveUSec",
+              30000000,
+              2547778731613
+            ],
+            [
+              "OnActiveUSec",
+              1000000,
+              2008011141884
+            ]
+          ],
+          "fields": {
+            "ActiveState": "active",
+            "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+            "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+            "Job": "",
+            "LoadState": "loaded",
+            "Result": "success",
+            "SubState": "waiting",
+            "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+          }
+        }
+      }
+    ],
+    "controller": {
+      "TimersMonotonic_entries": [],
+      "fields": {
+        "ActiveState": "active",
+        "ControlPID": "0",
+        "ExecMainStatus": "0",
+        "Id": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+        "InvocationID": "dbf49bb1b72c42c584f2d3ac94259cb8",
+        "Job": "",
+        "LoadState": "loaded",
+        "MainPID": "2467123",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "running"
+      }
+    },
+    "guard": {
+      "TimersMonotonic_entries": [],
+      "fields": {
+        "ActiveState": "inactive",
+        "ControlPID": "0",
+        "ExecMainStatus": "0",
+        "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+        "InvocationID": "34039a1593364628b3036d7a966f0fc1",
+        "Job": "",
+        "LoadState": "loaded",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "dead"
+      }
+    },
+    "no_guard_timer_or_controller_mutation": true,
+    "schema": "horizon-original-completed-guard-window-preflight-v3-rust",
+    "timer": {
+      "TimersMonotonic_entries": [
+        [
+          "OnUnitActiveUSec",
+          30000000,
+          2547778731613
+        ],
+        [
+          "OnActiveUSec",
+          1000000,
+          2008011141884
+        ]
+      ],
+      "fields": {
+        "ActiveState": "active",
+        "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+        "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+        "Job": "",
+        "LoadState": "loaded",
+        "Result": "success",
+        "SubState": "waiting",
+        "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+      }
+    }
+  }
+}

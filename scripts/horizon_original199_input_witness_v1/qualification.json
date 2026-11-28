@@ -1,0 +1,26 @@
+{
+  "schema": "horizon-original199-input-witness-source-qualification-v1",
+  "source_sha256": "6ad78cb23cfbef4e9af15488ea56c1555fdc64ad2de333a0d97070b1406a3386",
+  "strict_Clippy_configurations_passed": 2,
+  "tests_passed": 17,
+  "production_program_sha256": "53346c7900eb2a17f8da59897b2dbaf0a22f137f64f0cdfd70376bd1ededc027",
+  "actual_verification": {
+    "unit": "horizon-original199-input-witness-actual-second-20261107-v3.service",
+    "invocation_id": "dc4c92601a7a41419d485c52f147ceb1",
+    "complete_input_count": 5,
+    "complete_input_bytes": 8054507614,
+    "source_verification_usec": 5307698,
+    "remaining_guard_margin_usec": 15169577,
+    "accepted_package": "/usr/local/lib/jetstreamer/horizon-original199-input-witness-actual-second-accepted-20261107-v3"
+  },
+  "acceptance": {
+    "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_ACTUAL_FULL_INPUT_WITNESS_ACCEPTED_CONSUMER_INTEGRATION_PENDING.json",
+    "sha256": "c728698afbbb6dac654b3e3c14428622e51c1e58a53392a4f241e2a451312eb2"
+  },
+  "preserved_original_failure": "2464bce5b8864938a8f777a3001e5fc7",
+  "original_exporter_invocation_unchanged": "f37b155136614e0183ba2e9adb8714ef",
+  "consumer_integration_implemented": false,
+  "replay_admission_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0
+}

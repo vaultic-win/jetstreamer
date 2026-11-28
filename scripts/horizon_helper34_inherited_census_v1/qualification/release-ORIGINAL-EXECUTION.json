@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-first-lane-helper34-release-20261108-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1min 44.717s\nCPU time consumed: 6min 3.417s\nMemory peak: 4.6G\nMemory swap peak: 0B\n"
+}

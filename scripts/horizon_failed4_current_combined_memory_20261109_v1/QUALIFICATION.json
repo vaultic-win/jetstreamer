@@ -1,0 +1,105 @@
+{
+  "schema": "horizon-failed4-combined-reader-four-compiler-tests-v1",
+  "actual_originals": [
+    {
+      "phase": "clippy-prod",
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/clippy-prod-ORIGINAL-ARGV.json",
+        "sha256": "02d72f4639e3f0219b24587f5302738e083150b14f718bf9b586b3beb4e8086b"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/clippy-prod-ORIGINAL-EXECUTION.json",
+        "sha256": "3b146386f1918be68c1e2db7b4238eb49403919ceee29cac46b70e6a351e3a28"
+      },
+      "native_drain": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/clippy-prod-ACTUAL-NATIVE-PID1-DRAIN.json",
+        "sha256": "5a03d8aef8192fa1b205739749e85e4cc49153a8043ea4b1997811aed60367c8"
+      }
+    },
+    {
+      "phase": "clippy-tests",
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/clippy-tests-ORIGINAL-ARGV.json",
+        "sha256": "28d771363afb783126ff526ab2737b67d50f0940c48bcd6306652c5ff50128de"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/clippy-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "93fc6184925513746ce5c09d320d8da3b326f0fbed692e3c79ab51f13a1be31a"
+      },
+      "native_drain": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/clippy-tests-ACTUAL-NATIVE-PID1-DRAIN.json",
+        "sha256": "7e57e32099c6a8e99136557147591ea1f928ef60a7c1457d14c4d9bb4a20bd97"
+      }
+    },
+    {
+      "phase": "release",
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/release-ORIGINAL-ARGV.json",
+        "sha256": "64972b843c541fad5e0706f9dfe72b28153ff1e19e1bc8a882f658ae68e0a8a0"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/release-ORIGINAL-EXECUTION.json",
+        "sha256": "d94d6c5d8c71f00072a823773f523f7232e6900f79b635b86a9ba6d8fcd4b24a"
+      },
+      "native_drain": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/release-ACTUAL-NATIVE-PID1-DRAIN.json",
+        "sha256": "912f032892a8196bb02244291131ada695c9fe3083f60e0ef572361f8424643c"
+      }
+    },
+    {
+      "phase": "tests-build",
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/tests-build-ORIGINAL-ARGV.json",
+        "sha256": "ca5ff92b7d9a673ac22484bf5073d15d0502af0d5768bdaeb8aa2c1b157b20e1"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/tests-build-ORIGINAL-EXECUTION.json",
+        "sha256": "41af260b8f0800fe3ea31d648c015e2f866056e358b2a4023350bb246bc6b36b"
+      },
+      "native_drain": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/tests-build-ACTUAL-NATIVE-PID1-DRAIN.json",
+        "sha256": "a9c0d117dc05049d118011eb16a7965eff66549b47e06e9eb775320258f80955"
+      }
+    },
+    {
+      "phase": "ordinary-tests",
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/ordinary-tests-ORIGINAL-ARGV.json",
+        "sha256": "09fe4ebb22199092eab894e42ae4d59631cce140962d117808ed78fa10e5eae0"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/ordinary-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "d68c059aeee793c89994a46e85d6e64cf9a183e357d355e1b01493c13f438e20"
+      },
+      "native_drain": {
+        "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/ordinary-tests-ACTUAL-NATIVE-PID1-DRAIN.json",
+        "sha256": "250ce7b2cdbb058420a28fc6efa5213245910b59a6a1a7411704afc8d97a4058"
+      }
+    }
+  ],
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/ROOT_REVISION2_SAME_BOOKING_AND_ACTUAL_FREEZE.json",
+    "sha256": "c176854c4ada1882b0406f2c8a346e3094d15d88914571b99bdfe996d0f74256"
+  },
+  "source_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-failed4-combined-current-reader-source-20261109-v2/deployment-seal-receipt.json",
+    "sha256": "4b2043eff215f5073b522c5b3362c1662dfc58a91782aec6fcdde1c96b1d2af8"
+  },
+  "runtime_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-failed4-combined-current-reader-tools-20261109-v1/deployment-seal-receipt.json",
+    "sha256": "af083d48a8a3090da42e8b8509795b1c8c3365182f7eef268b84ace496a8dd03"
+  },
+  "all_four_compilers_and_two_tests_passed": true,
+  "native_operational_positive_not_yet_run": true,
+  "historical_failed4_retirement_not_repeated": true,
+  "memory_or_DATA_credit_applied_bytes": 0,
+  "qualified_parent_optional_branch_native_capability_pending": true,
+  "first_original_clippy_failure_preserved": {
+    "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/clippy-prod-ORIGINAL-EXECUTION.json",
+    "sha256": "42edd6b692baae5fffb9a26e3a832e98019f680e671535e46e7fa270ebe47b19"
+  },
+  "private_original_artifact_proof": {
+    "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/ROOT_FOUR_COMPILERS_TWO_TESTS_AND_NORMAL_SEAL_ACCEPTED_NATIVE_PENDING.json",
+    "sha256": "9cd11e6bafe2da558a6e26723640a6d08bc33e076e14326a569eb8f9b9a355f2"
+  }
+}

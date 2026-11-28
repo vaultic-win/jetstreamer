@@ -1,0 +1,24 @@
+{
+  "schema": "horizon-actual-qualified-final3-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261108-v3/horizon-positive185-final",
+    "sha256": "47fb5d1fd85e6a19ff31cc493bd4eb660441f4f8f08d6b238b62316d87f50f84"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261108-v3/artifact-proof.json",
+    "sha256": "2579486e89905bf96666d8d70d7e4bfa406dc43f987e1db1fa2e606c4ee7c0e6"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261108-v3/deployment-seal-receipt.json",
+    "sha256": "40266ead2155831ac4dff65bcceb5260d06aed3de8b2de207ad920bbb3008536"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-final3-driver11-qa-20261108-v1/ROOT_NORMAL6_SERIAL_FINAL3_QA_BOOKING.json",
+    "sha256": "f04afb7d6ef11e0a20d2587c08c63b2c030b269e8cc451940aac4ceec45c2460"
+  },
+  "closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-final3-driver11-qa-20261108-v1/ROOT_NORMAL6_FINAL3_SERIAL_QA_CLOSED_DATA_RETAINED.json",
+    "sha256": "6b652e5c9331bd30162194463cfecc3a8c19621bf9b316f1e5769802fa3632bc"
+  },
+  "native_profile_and_fresh_original_guard_required": true
+}

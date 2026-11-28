@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "--all",
+    "--no-pager",
+    "-ojson",
+    "-n",
+    "2",
+    "_PID=1",
+    "_UID=0",
+    "UNIT=horizon-positive185-reader-control-control-positive-reader-v38-driver12-helper35-r1.service",
+    "INVOCATION_ID=d245b9e3a8b6434ea0ff0a0b43f6f8f8",
+    "MESSAGE_ID=7ad2d189f7e94e70a38c781354912448"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/journalctl",
+  "timeout_millis": 5000,
+  "wall_started_at": 1794201097
+}

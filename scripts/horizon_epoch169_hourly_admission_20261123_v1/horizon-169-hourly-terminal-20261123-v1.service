@@ -1,0 +1,27 @@
+[Unit]
+Description=Record the closed private epoch 169 hourly diagnostic
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+CPUQuota=100%
+MemoryMax=1G
+MemorySwapMax=0
+TasksMax=64
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+NoNewPrivileges=yes
+PrivateNetwork=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE
+AmbientCapabilities=CAP_DAC_OVERRIDE
+ReadWritePaths=/var/lib/jetstreamer/horizon_runtime_data/epoch169-hourly-admission-20261123-v1/results
+ExecStart=/usr/bin/python3 -IB /var/lib/jetstreamer/horizon_runtime_data/epoch169-hourly-admission-20261123-v1/sealed/watch.py --terminal-event
+TimeoutStartSec=30min
+Restart=no

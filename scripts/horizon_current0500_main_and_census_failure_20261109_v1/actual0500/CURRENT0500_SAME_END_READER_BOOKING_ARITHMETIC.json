@@ -1,0 +1,38 @@
+{
+  "DATA_credit_bytes": 0,
+  "all_historical_and_terminal199_obligations_retained": true,
+  "baseline_already_inside_raw_not_added_again": true,
+  "current_same_end_capacity": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/ROOT_CURRENT0500_READONLY_POOL_CAPACITY.json",
+    "sha256": "eb0a053722c237cc1190bf9ed005ba991743cf69b41887ada9b8311ed4fc4f86"
+  },
+  "headroom_bytes": 11470647296,
+  "host_total_bytes": 810902843392,
+  "memory_credit_bytes": 0,
+  "native_reader_must_revalidate_actual_raw_total": true,
+  "new199_parent_controller_guard_bytes": 207232172032,
+  "no_new_resource_observation": true,
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+    "sha256": "ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079"
+  },
+  "one_external_serial_bytes": 6442450944,
+  "positive_uncovered_delta_bytes": 4912365568,
+  "prior_raw_historical_and_baseline": {
+    "path": "/home/sol/.jetstreamer-private/native1428-reader-memory-DATA-continuation-source-20261107-v1/runtime/CURRENT1428_SAME_END_READER_BOOKING_ARITHMETIC.json",
+    "sha256": "fac8ee87396e3f1067fbd859d4b20a8c5fee2d6653415399cd49fb9b237bd770"
+  },
+  "raw_historical_memory_bytes": 788077379584,
+  "recorded_at_utc": "2026-11-09T05:09:14.238857+00:00",
+  "replay_admission_authorized": false,
+  "same_end_accounting": {
+    "before": {
+      "other_with_kernel_bytes": 42728112128
+    },
+    "after": {
+      "other_with_kernel_bytes": 42730938368
+    }
+  },
+  "total_reserved_bytes": 799432196096,
+  "uncovered_baseline_bytes": 37818572800
+}

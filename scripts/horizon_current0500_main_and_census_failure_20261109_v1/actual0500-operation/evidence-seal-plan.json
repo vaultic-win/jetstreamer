@@ -1,0 +1,54 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next",
+  "members": [
+    {
+      "mode": 292,
+      "name": "current-full-reader.json",
+      "sha256": "d986be1eafbe34c7e628989361ec8afd9fa8472c6db7a832c9afdee46e30b373",
+      "source": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/proof.json"
+    },
+    {
+      "mode": 292,
+      "name": "current-frame.json",
+      "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8",
+      "source": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json"
+    },
+    {
+      "mode": 292,
+      "name": "typed-memory.json",
+      "sha256": "c3592d090473020369d5058c39a91f811b559358ee8494e6fab5117a7a3281f6",
+      "source": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/select-1/selection.json"
+    },
+    {
+      "mode": 292,
+      "name": "typed-data.json",
+      "sha256": "9edb94c846b292aa258821b6de9f88dedefc75dac210f1393eb9be4ed0d32873",
+      "source": "/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/selection.json"
+    },
+    {
+      "mode": 292,
+      "name": "fleet-owner.json",
+      "sha256": "1a330c37645d7a1c0bdce6cef2861ba6a445cfd0bec08e411df5906dc60fd583",
+      "source": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T050022Z-witness-terminal145-v1.json"
+    },
+    {
+      "mode": 292,
+      "name": "status-readback.json",
+      "sha256": "a5193fefc2c9b41ded47ca8079152fdd84cc7a239bc17088e7d1af85e6858362",
+      "source": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109050316.json"
+    },
+    {
+      "mode": 292,
+      "name": "root-acceptance.json",
+      "sha256": "3e088677027b3dde428c2b7b99a17d2d280c2645c21a2ee8380f69638fe5a5e4",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-original-r3-20261109-next/root-acceptance.json"
+    },
+    {
+      "mode": 292,
+      "name": "admission.json",
+      "sha256": "e07d88bc90d5cfe472bdb64f26fb34963f5ff92bc505ee344a23917b0b8921c5",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-original-r3-20261109-next/admission.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

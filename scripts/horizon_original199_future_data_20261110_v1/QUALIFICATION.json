@@ -1,0 +1,58 @@
+{
+  "schema": "horizon-original199-unused-future-DATA-qualified-source-v1",
+  "parent_four_compiler_configurations_passed": true,
+  "parent_ordinary_tests_passed": 60,
+  "parent_ignored_tests": 3,
+  "check_four_compiler_configurations_passed": true,
+  "check_ordinary_tests_passed": 5,
+  "ending_four_compiler_configurations_passed": true,
+  "ending_ordinary_tests_passed": 9,
+  "genuine_native_check_and_ending_passed_and_drained": true,
+  "original_DATA_raw_bytes": 824633720832,
+  "retained_DATA_bytes": 481036337152,
+  "ended_unused_future_DATA_bytes": 343597383680,
+  "physical_retirement_bytes": 0,
+  "complete_DATA_bytes": 6289632608050,
+  "complete_projected_memory_bytes": 645972897792,
+  "current_Frame_or_full_Reader_authority": false,
+  "receipts": [
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ORIGINAL199_PARENT_AUXILIARY_FOUR_COMPILERS_AND_ORDINARY_PASSED.json",
+      "sha256": "4b82b8817e27250ba9177fe3c8c1f26c8500d09bfd1ca4cf13625ea7a9a44a41"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-DATA-CLI-V2-ORDINARY-ORIGINAL-EXECUTION.json",
+      "sha256": "8f33d4ce20699a32e7432964707de51e4e6e9f6bc08938a759a9ba3178d37132"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ACTUAL_ORIGINAL199_FUTURE_DATA_NATIVE_CHECK.json",
+      "sha256": "638f47fc5a4c482472684376e5ccb3daa3aacb65d7375b1453a8ff448a3656ab"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ORIGINAL199_NATIVE_CHECK_PASSED_AND_DRAINED_NO_ENDING.json",
+      "sha256": "7ebf198c03e5181e6cb6e55c5052194f3ad13dccc13b3ac800dcdd294467ffa5"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-DATA-END-CLI-V3-ORDINARY-ORIGINAL-EXECUTION.json",
+      "sha256": "26a321689502e87cc476b4c22216e2e634e7df19f5362bece817607da4283027"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ORIGINAL199_UNUSED_FUTURE_DATA_ENDED_ONCE.json",
+      "sha256": "f82eeda0aef314f3c2e16a94b06bd73c12f721831aa0554c30e176c370697cdd"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ORIGINAL199_FUTURE_DATA_ENDING_V3_PASSED_AND_DRAINED.json",
+      "sha256": "ef9f71bced1e450593c62926beb39145fa701642ac56fbd8b950de78f5f6c9b7"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_ORIGINAL199_FUTURE_DATA_SELECTED_CURRENT_AUTHORITY.json",
+      "sha256": "ebf7f27984954b9ff91db3b3b25ef58bd801c6d58fb49f5b647741c40e3b7188"
+    }
+  ],
+  "source": {
+    "end.rs": "46ebc85e04916613163108350058c7a25612a9aab1246401a4c1a60d053570cf",
+    "library.patch": "1de592693f2bb689003c8024160dee0f328bf9b8775b50b15436ba6d7116f11c",
+    "check.rs": "0db79f9330a0c3a3ce60ebc03f15003ebc535233c36a342c875210ecd50ec510",
+    "held_future_data.rs": "96d46a0dd55a39faf7db945b56c8fe04305f1dfd78669d56c113ab7fdda5c0d6"
+  }
+}

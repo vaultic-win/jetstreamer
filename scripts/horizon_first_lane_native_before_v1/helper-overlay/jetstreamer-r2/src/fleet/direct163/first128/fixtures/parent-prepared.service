@@ -1,0 +1,31 @@
+[Unit]
+Description=Private epoch163 first-output-only128GiB diagnostic
+ConditionPathExists=/UNRESOLVED_FIRST163128_DO_NOT_START
+[Service]
+Type=exec
+User=sol
+Group=horizon
+UMask=0077
+MemoryAccounting=yes
+MemoryHigh=120G
+MemoryMax=128G
+MemorySwapMax=0
+CPUQuota=800%
+TasksMax=1024
+RuntimeMaxSec=3600
+TimeoutStopSec=60
+KillMode=control-group
+Restart=no
+Delegate=no
+PrivateNetwork=no
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+NoNewPrivileges=yes
+Environment=JETSTREAMER_FIRST163128_PLAN=UNRESOLVED_NORMAL_RUNTIME_PLAN_PATH
+Environment=JETSTREAMER_FIRST163128_PLAN_SHA256=UNRESOLVED_ACTUAL_RUNTIME_PLAN_SHA256
+Environment=JETSTREAMER_HISTORICAL_WORKER_V1_5_6=/usr/local/lib/jetstreamer/deploy-epoch163-singleton-20261104-v1/jetstreamer-historical-worker-v1-5-6
+Environment=TMPDIR=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/work/scratch
+ReadWritePaths=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/work
+ExecStart=/usr/local/lib/jetstreamer/horizon-first-lane-witness-first163128-node-tools-20261107-v2/jetstreamer-node 163 /home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/work/ledger --verify --qualification-end-slot=70416000 --snapshot-archive=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/inputs/snapshot-70415741-2aSbRXHXZJgT4bdrY34gWizngFB527wavw6Ar9KadzUY.tar.zst --epoch-hashes=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/inputs/checkpoint-names.txt --horizon-output=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/work/output/first-output.jet --replay-scratch=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/work/scratch
+BindReadOnlyPaths=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/inputs/genesis.tar.bz2:/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/work/ledger/genesis.tar.bz2

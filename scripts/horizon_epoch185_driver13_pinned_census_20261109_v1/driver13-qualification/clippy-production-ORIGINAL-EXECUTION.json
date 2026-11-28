@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stdout": "",
+  "stderr": "Job for horizon-epoch185-empty-hook-adapter-clippy-production-native-trigger-pinned-census-20261109-v1-r3.service failed because the control process exited with error code.\nSee \"systemctl status horizon-epoch185-empty-hook-adapter-clippy-production-native-trigger-pinned-census-20261109-v1-r3.service\" and \"journalctl -xeu horizon-epoch185-empty-hook-adapter-clippy-production-native-trigger-pinned-census-20261109-v1-r3.service\" for details.\n"
+}

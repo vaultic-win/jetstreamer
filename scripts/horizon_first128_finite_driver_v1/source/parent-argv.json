@@ -1,0 +1,11 @@
+[
+  "/usr/local/lib/jetstreamer/horizon-first-lane-witness-first163128-node-tools-20261107-v2/jetstreamer-node",
+  "163",
+  "/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/work/ledger",
+  "--verify",
+  "--qualification-end-slot=70416000",
+  "--snapshot-archive=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/inputs/snapshot-70415741-2aSbRXHXZJgT4bdrY34gWizngFB527wavw6Ar9KadzUY.tar.zst",
+  "--epoch-hashes=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/inputs/checkpoint-names.txt",
+  "--horizon-output=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/work/output/first-output.jet",
+  "--replay-scratch=/home/sol/.jetstreamer-private/epoch163-first-output128-20261106-v1/work/scratch"
+]

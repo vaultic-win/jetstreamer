@@ -1,0 +1,142 @@
+{
+  "actual_c71_sol_eight_file_read": {
+    "actual_horizon_gid": 1003,
+    "actual_sol_uid": 1001,
+    "all_eight_exact_bound_files_read": true
+  },
+  "actual_driver11_native_first_guard_accepted": false,
+  "actual_driver12_native_first_guard_accepted": false,
+  "actual_eight_file_control_package": {
+    "members": {
+      "control-0.json": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-profile-positive-profile-v38-driver12-helper35-r1-r3/control-0.json",
+        "sha256": "c64487b7c5407a1a982cf8312e4be30a755a4f3fe55af28a50ec4c2abaf7c155"
+      },
+      "control-1.json": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-profile-positive-profile-v38-driver12-helper35-r1-r3/control-1.json",
+        "sha256": "54dea5f9da967c146ca7966ca7c77193fd790e0ba19e8afa751ff3127bf3e330"
+      },
+      "control-2.json": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-profile-positive-profile-v38-driver12-helper35-r1-r3/control-2.json",
+        "sha256": "4ea6a05d48adb1de66cac41382921e252e3a86908e4a1748ef99dbb31e74abd9"
+      },
+      "control-3.json": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-profile-positive-profile-v38-driver12-helper35-r1-r3/control-3.json",
+        "sha256": "82fb4d36d9993f883ac5ee7f3fde0d905254121f141a80152c0138e8cb1d026e"
+      },
+      "control-4.json": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-profile-positive-profile-v38-driver12-helper35-r1-r3/control-4.json",
+        "sha256": "276530ec2ab44b942ea152ed5ae66e854372b5a04380d4a6286da54d99415a20"
+      },
+      "control-5.json": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-profile-positive-profile-v38-driver12-helper35-r1-r3/control-5.json",
+        "sha256": "0b44b8d9a521f512414d8f81519fcd40b3336b1142af88ebd1beced31cbe938e"
+      },
+      "control-6.json": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-profile-positive-profile-v38-driver12-helper35-r1-r3/control-6.json",
+        "sha256": "34b15b3eacb754bcaa40ce9a2b163d79fbc34f92b818c7e1cd8029b1a33dbe18"
+      },
+      "control-7.json": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-profile-positive-profile-v38-driver12-helper35-r1-r3/control-7.json",
+        "sha256": "728f0beaacad0a521f032fb6340e69649e36885ec2a54141ff834f7ec23c027e"
+      }
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-profile-positive-profile-v38-driver12-helper35-r1-r3/deployment-seal-receipt.json",
+      "sha256": "f07965338b9b12a65f828d0ccf385af1b75ac6f46e3228ca0bb855677d19dbb7"
+    }
+  },
+  "actual_persistent_reader_lifecycle_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v38-driver12-helper35-r1/completion.json",
+    "sha256": "ee79626f351a7dc4dd20faae260dd38de3e321d8ba8fe190ff34bbb2e946f98e"
+  },
+  "actual_root_profile": {
+    "actual_fd_soft_limit": 1000000,
+    "actual_root_uid": 0,
+    "effective_CHOWN_DAC_OVERRIDE_SYS_PTRACE": true,
+    "original_cgroup": "0::/system.slice/horizon-positive185-upstream-positive-profile-v38-driver12-helper35-r1-r3-root-profile.service\n",
+    "original_invocation_id": "b427574ef5094d3bb454085eede115b2",
+    "original_process_id": 3921970
+  },
+  "actual_sol_profile": {
+    "NoNewPrivileges": true,
+    "actual_horizon_gid": 1003,
+    "actual_private_work_control_writes_and_retirement_passed": true,
+    "actual_sol_uid": 1001,
+    "effective_capabilities": 0,
+    "no_inputs_or_replay": true,
+    "original_cgroup": "0::/system.slice/horizon-positive185-upstream-positive-profile-v38-driver12-helper35-r1-r3-sol-profile.service\n",
+    "original_invocation_id": "1e852fed88754220b968393b8c2cb291"
+  },
+  "actual_start_request_common_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-start-request-common-control-20261108-v1/actual-held-reload-control.json",
+    "sha256": "bf097b8e6632bc46f608874dac439c9a4f101e0c000c7387448c1dd2e2b30921"
+  },
+  "all_raw_obligations_and_live_guards_preserved": true,
+  "bounded_probe_only": true,
+  "driver": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/epoch185-guarded-cold",
+    "sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e"
+  },
+  "executor": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261109-v6/horizon-positive185-final",
+    "sha256": "2ceb9bd082b7596a927f84b139d862c475166dc44f2042199170c583bea4a1b1"
+  },
+  "fresh_admission_ready_task_fleet_reader_and_original_release_still_required": true,
+  "fresh_native_first_guard_required": true,
+  "full_boundary_route_qualified": false,
+  "helper": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/jetstreamer-r2",
+    "sha256": "5059c749d74f59711ce5ed9642dd2383a4a3b4bb21e3338ff5c1dce77a5a47fa"
+  },
+  "metadata_control_not_native_input_or_positive_replay_capability": true,
+  "native_capture_image": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/jetstreamer-r2",
+    "sha256": "5059c749d74f59711ce5ed9642dd2383a4a3b4bb21e3338ff5c1dce77a5a47fa"
+  },
+  "original_setup_seconds": 600,
+  "original_start_request_common_qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-start-request-common-control-20261108-v1/completion.json",
+    "sha256": "f27564f63b1ea6ef588cbda23734658637ad9d8aea6bff1469c9aa06233399a4"
+  },
+  "original_start_request_policy_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/deployment-seal-receipt.json",
+    "sha256": "9e38f26506a532193f8ef21beb5dc11f1b24606e2e4a8283425503267c533dcf"
+  },
+  "original_start_request_policy_source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/start_request.rs",
+    "sha256": "7b28a430d3f4179759440bd679005a6231c638b6f808ce673e9933cf7281d4c6"
+  },
+  "original_v19_negative": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/finite-v19-r1/materialized/ROOT_ACTUAL_MISSING_TOKEN_NATIVE_CASE_ACCEPTED.json",
+    "sha256": "e020c7eeb875191fc09a2ee9e09bbf8ec6bfac79ea3d19db02c5f4a8185e4581"
+  },
+  "original_writer_custody_supported": true,
+  "prelaunch_reader_image": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2",
+    "sha256": "d00ee6ad4076c32b90a416efc9236208cd7ee8b64e572d5ad830c9a709eac470"
+  },
+  "publication_authorized": false,
+  "qualified_driver_role": {
+    "artifact": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/artifact-proof.json",
+      "sha256": "5b08baacff6943fbc544dd05085b391bccda34e6963e0194ae4d05f41e6c937a"
+    },
+    "image": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/epoch185-guarded-cold",
+      "sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/deployment-seal-receipt.json",
+      "sha256": "f33a5e965b6574a1abc9fd1d8294844c16dca26fd50e9f84e81ccfc5f4cc026f"
+    }
+  },
+  "retained_source_base_helper_sha256": "50b2b6636068811d1176f87f5d49b76206db785dcb1e0ac80023c517cefac07a",
+  "schema": "horizon-positive185-final-route-capability-v2",
+  "scope": "one-original-post-reader-release-attempt",
+  "split_prelaunch_postreader_roles": true,
+  "start_request_common_control_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-start-request-common-control-20261108-v1/deployment-seal-receipt.json",
+    "sha256": "4f995c51bb3f4f100f1d5fc62ef07239b01f9913fe0bfaea227dd9a2270fba55"
+  }
+}

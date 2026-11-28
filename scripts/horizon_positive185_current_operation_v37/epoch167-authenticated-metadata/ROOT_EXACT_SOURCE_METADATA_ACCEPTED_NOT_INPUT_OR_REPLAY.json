@@ -1,0 +1,32 @@
+{
+  "schema": "horizon-epoch167-requester-pays-exact-generation-metadata-accepted-v1",
+  "recorded_at_utc": "2026-11-09T01:39:55.646702+00:00",
+  "source_request": {
+    "path": "/tmp/independent162-173-lane-source-20261108-v1/EPOCH167_AUTHENTICATED_METADATA_ARGV.NOT_EXECUTED.json",
+    "sha256": "0cfa40bc8e6e4b2891c81c09b98c08d44a98e134dfc3e215cc4d358ebadcb48a"
+  },
+  "original_execution": {
+    "path": "/home/sol/.jetstreamer-private/epoch167-exact-source-authenticated-metadata-20261109-v1/R2_ORIGINAL_AUTHENTICATED_METADATA_RESULT.json",
+    "sha256": "a31bd50792933d6262c486110e7eb84a312cfe2398ec9218bdf50894158eb9e7"
+  },
+  "metadata": {
+    "path": "/home/sol/.jetstreamer-private/epoch167-exact-source-authenticated-metadata-20261109-v1/R2_AUTHENTICATED_SOURCE_METADATA.json",
+    "sha256": "2b830b40c58f5d1ea1c28932af7bcd89295cb31e0e1894ee26ca48d9f4eeb84e"
+  },
+  "exact_generation_size_crc32c_md5_name_match": true,
+  "prior_anonymous_requester_pays_blocker_resolved": true,
+  "original_credential_config_readonly": true,
+  "disposable_cache_removed": true,
+  "body_bytes_acquired": 0,
+  "body_integrity_verified": false,
+  "ordinary_runtime_route_qualified": false,
+  "replay_admission_authorized": false,
+  "publication_authorized": false,
+  "remaining_gates": [
+    "distinct singleton manifest/package and independent fingerprint",
+    "generation-pinned body acquisition and full validation",
+    "both exact no-worker package probes",
+    "complete ordinary runtime/native-input route",
+    "fresh accounting admission and invocation-bound protective guard/fleet lifecycle"
+  ]
+}

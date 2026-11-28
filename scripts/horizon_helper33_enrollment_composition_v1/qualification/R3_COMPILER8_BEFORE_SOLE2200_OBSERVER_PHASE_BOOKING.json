@@ -1,0 +1,39 @@
+{
+  "schema": "horizon-helper33-eightGiB-original-compiler-before-existing-observer-v1",
+  "fresh_pool_booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/ROOT_FRESH_EXTRA_QA4_COMPILER6_R2_BOOKING.json",
+    "sha256": "3c137977f6567aa0d9cee937525674f4f204023668746fea6b8873d8051fdd6c"
+  },
+  "failed6G_test_build": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/R2_TEST_BUILD_OOM_TERMINAL_AND_DRAIN_NO_CREDIT.json",
+    "sha256": "60ff2963bf22f7d8b8ddfa35f35abaab8c764393fddcf5b8ea2d89449d490258"
+  },
+  "normal_pool_bytes": 6442450944,
+  "already_booked_fresh_extra_QA_bytes": 4294967296,
+  "total_external_pool_bytes": 10737418240,
+  "one_serial_compiler_bytes": 8589934592,
+  "Root_and_status_bytes": 1073741824,
+  "maximum_overlap_bytes": 9663676416,
+  "observer_phase_excluded_until_original_timer": true,
+  "actual_next_observer": {
+    "NextElapseUSecRealtime": "Sun 2026-11-08 22:00:22 UTC",
+    "Id": "horizon-visible-primary-observer220022-20261108-v1.timer",
+    "ActiveState": "active",
+    "SubState": "waiting",
+    "InvocationID": "e7bdde0e492c4245aaebc1a106bede78"
+  },
+  "actual_observer_not_started": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "ActiveState": "inactive"
+  },
+  "latest_all_compiler_terminal_unix_seconds": 1794175207,
+  "each_original_kernel_runtime_seconds": 210,
+  "each_stop_margin_seconds": 15,
+  "source_and_clippy_unchanged": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "dbf782b3285d85da2319b4ec571c0c9513c22b0967d97bb68d47351a96feada8"
+  },
+  "complete_DATA_lower_bound_bytes": 5151156810388,
+  "no_new_extra_QA_booking_or_credit_or_guard_mutation": true
+}

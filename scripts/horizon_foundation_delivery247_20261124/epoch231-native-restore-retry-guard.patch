@@ -1,0 +1,52 @@
+diff --git a/jetstreamer-utils/src/horizon_standalone_guard_bin.rs b/jetstreamer-utils/src/horizon_standalone_guard_bin.rs
+--- a/jetstreamer-utils/src/horizon_standalone_guard_bin.rs
++++ b/jetstreamer-utils/src/horizon_standalone_guard_bin.rs
+@@ -659,8 +659,13 @@
+             "/home/ubuntu/.jetstreamer-private/epoch230-demotion-tmpfs-v328",
+             "/var/lib/jetstreamer/horizon230-program-demotion-ram-v328/guard-receipts",
+             150_000_000_000,
+         )),
++        "horizon-perf-epoch231-native-restore@v2.service" => Some((
++            "/home/ubuntu/.jetstreamer-private/epoch231-native-restore-tmpfs-v2",
++            "/var/lib/jetstreamer/horizon231-native-restore-runtime-v2/guard-receipts",
++            128 << 30,
++        )),
+         _ => None,
+     };
+     if let Some((mount, receipts, scratch_limit)) = ram_scope {
+         let mount = Path::new(mount);
+@@ -1811,8 +1816,34 @@
+         assert!(validate_plan(&serde_json::from_value(invalid).unwrap()).is_err());
+     }
+
+     #[test]
++    fn epoch231_native_restore_guard_requires_its_exact_ram_scope() {
++        let plan = json!({
++            "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
++            "unit": "horizon-perf-epoch231-native-restore@v2.service",
++            "invocation_id": "a".repeat(32),
++            "filesystem": "/home/ubuntu/.jetstreamer-private/epoch231-native-restore-tmpfs-v2",
++            "worker_root": "/home/ubuntu/.jetstreamer-private/epoch231-native-restore-tmpfs-v2/run",
++            "receipt_directory": "/var/lib/jetstreamer/horizon231-native-restore-runtime-v2/guard-receipts",
++            "minimum_free_bytes": 2u64 << 30,
++            "maximum_root_physical_bytes": 128u64 << 30,
++            "maximum_worker_vmas": 3_500_000,
++        });
++        assert!(validate_plan(&serde_json::from_value(plan.clone()).unwrap()).is_ok());
++        for (field, value) in [
++            ("filesystem", json!("/")),
++            ("worker_root", json!("/tmp")),
++            ("maximum_root_physical_bytes", json!((128u64 << 30) + 1)),
++            ("minimum_free_bytes", json!((2u64 << 30) - 1)),
++        ] {
++            let mut changed = plan.clone();
++            changed[field] = value;
++            assert!(validate_plan(&serde_json::from_value(changed).unwrap()).is_err());
++        }
++    }
++
++    #[test]
+     fn epoch288_shrink_debt_compare_uses_exact_root_filesystem_and_original_cap() {
+         let plan = json!({
+             "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+             "unit": "horizon-perf-epoch288-shrink-debt@v327.service",

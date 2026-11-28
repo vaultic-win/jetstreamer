@@ -1,0 +1,62 @@
+[
+  {
+    "actual_qualified_source": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/src/adapter/tests.rs",
+      "sha256": "f5d959a87747eff9441aebc892aec2fce57887221ddc563c4b27ef511a2e06cb"
+    },
+    "archived_source": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch185_driver12_launch_recovery_20261109_v1/driver12/src/adapter/tests.rs",
+      "sha256": "f5d959a87747eff9441aebc892aec2fce57887221ddc563c4b27ef511a2e06cb"
+    }
+  },
+  {
+    "actual_qualified_source": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/src/adapter.rs",
+      "sha256": "94e923d187150298332bb47f118ac918f45d65e6fd28aa789301858a074e7f4d"
+    },
+    "archived_source": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch185_driver12_launch_recovery_20261109_v1/driver12/src/adapter.rs",
+      "sha256": "94e923d187150298332bb47f118ac918f45d65e6fd28aa789301858a074e7f4d"
+    }
+  },
+  {
+    "actual_qualified_source": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/src/bounded_resource_runner.rs",
+      "sha256": "9827dc473cd3e77a2f08db2e8ac8ce9e20a1e72f7577a2ea008c66fb9e2e0c0d"
+    },
+    "archived_source": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch185_driver12_launch_recovery_20261109_v1/driver12/src/bounded_resource_runner.rs",
+      "sha256": "9827dc473cd3e77a2f08db2e8ac8ce9e20a1e72f7577a2ea008c66fb9e2e0c0d"
+    }
+  },
+  {
+    "actual_qualified_source": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/src/main.rs",
+      "sha256": "d73f82c4a6a8e95bd459f55028a0dea1c610f36de9cd83e83bcbe2b2a16c42ea"
+    },
+    "archived_source": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch185_driver12_launch_recovery_20261109_v1/driver12/src/main.rs",
+      "sha256": "d73f82c4a6a8e95bd459f55028a0dea1c610f36de9cd83e83bcbe2b2a16c42ea"
+    }
+  },
+  {
+    "actual_qualified_source": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/src/native_empty_hooks.rs",
+      "sha256": "53c77d1419afafbc0f6ccf1d7e6eede8d7ed84f4d4575349903ab7e8f733c4ac"
+    },
+    "archived_source": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch185_driver12_launch_recovery_20261109_v1/driver12/src/native_empty_hooks.rs",
+      "sha256": "53c77d1419afafbc0f6ccf1d7e6eede8d7ed84f4d4575349903ab7e8f733c4ac"
+    }
+  },
+  {
+    "actual_qualified_source": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/src/resource_census.rs",
+      "sha256": "5002b718fe40be83325a59efe0f2893da261b10193f4232540fe6a4922958db1"
+    },
+    "archived_source": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch185_driver12_launch_recovery_20261109_v1/driver12/src/resource_census.rs",
+      "sha256": "5002b718fe40be83325a59efe0f2893da261b10193f4232540fe6a4922958db1"
+    }
+  }
+]

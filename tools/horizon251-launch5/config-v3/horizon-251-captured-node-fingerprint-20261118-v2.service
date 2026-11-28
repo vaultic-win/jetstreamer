@@ -1,0 +1,49 @@
+# Source only. Seal and admit this distinct no-replay negative probe before installation.
+[Unit]
+Description=Epoch 251 cached input fingerprint rejection capability
+StartLimitIntervalSec=3600
+StartLimitBurst=1
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+UMask=0077
+Restart=no
+KillMode=control-group
+Delegate=no
+RuntimeMaxSec=120
+TimeoutStopSec=15
+MemoryHigh=536870912
+MemoryMax=1073741824
+MemorySwapMax=0
+CPUQuota=200%
+TasksMax=128
+LimitFSIZE=16777216:16777216
+LimitCORE=0
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateNetwork=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectControlGroups=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX
+PassEnvironment=
+UnsetEnvironment=HORIZON_S3_ENDPOINT HORIZON_ACCESS_KEY_ID HORIZON_SECRET_ACCESS_KEY HORIZON_PUBLIC_BASE_URL JETSTREAMER_PARENT_EPOCH_LEASE_PID JETSTREAMER_ROOT_COHORT_RESUME_RUN JETSTREAMER_EXPORT_HANDOFF_SNAPSHOT_DIR JETSTREAMER_LOAD_FROM_DIR JETSTREAMER_ADAPTIVE_EPOCH_CONCURRENCY JETSTREAMER_ADAPTIVE_EPOCH_MAX JETSTREAMER_EPOCH_ISOLATION LD_PRELOAD LD_AUDIT LD_LIBRARY_PATH BASH_ENV ENV PYTHONPATH PYTHONHOME
+Environment="JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1"
+Environment="JETSTREAMER_HISTORICAL_WORKER_V1_7_15=/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15"
+Environment="JETSTREAMER_PRIVATE_RUN_ROOT=/home/ubuntu/.jetstreamer-private/snapshot-caches/251-captured-node-capability-eabd0b6a-v2/fingerprint/state"
+Environment="TMPDIR=/home/ubuntu/.jetstreamer-private/snapshot-caches/251-captured-node-capability-eabd0b6a-v2/fingerprint/tmp"
+Environment="TOKIO_WORKER_THREADS=2" "RAYON_NUM_THREADS=2" "RUST_LOG=info"
+WorkingDirectory=/home/ubuntu/.jetstreamer-private/snapshot-caches/251-captured-node-capability-eabd0b6a-v2/fingerprint
+ReadWritePaths=/home/ubuntu/.jetstreamer-private/snapshot-caches/251-captured-node-capability-eabd0b6a-v2/fingerprint
+ExecStart=/var/lib/jetstreamer/horizon234-production-eabd0b6a-candidate922-v1/jetstreamer-node 251 /home/ubuntu/.jetstreamer-private/snapshot-caches/251-captured-node-capability-eabd0b6a-v2/fingerprint/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon251-single-epoch-manifest-20261118-v1/preflight-251-single-epoch.json --cohort-manifest-fingerprint=sha256:0000000000000000000000000000000000000000000000000000000000000000 --snapshot-archive=/var/lib/jetstreamer/horizon251-native-input-20261118-v1/snapshot-108431365-C5eqGwzDFEDfeBovidro6WnY3Drw7caJ2p2mjnJbGJVE.tar.zst
+StandardOutput=append:/home/ubuntu/.jetstreamer-private/snapshot-caches/251-captured-node-capability-eabd0b6a-v2/fingerprint/stage.log
+StandardError=append:/home/ubuntu/.jetstreamer-private/snapshot-caches/251-captured-node-capability-eabd0b6a-v2/fingerprint/stage.log

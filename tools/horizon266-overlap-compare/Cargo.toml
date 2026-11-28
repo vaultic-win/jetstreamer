@@ -1,0 +1,33 @@
+[package]
+name = "horizon266-overlap-compare"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+anyhow = "1"
+jetstreamer-horizon = { path = "../../jetstreamer-horizon" }
+lencode = { version = "=2.0.0", features = ["solana-primitives", "std"] }
+libc = "0.2"
+log = "0.4"
+rayon = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+solana-hash = "=4.3.0"
+tempfile = "3"
+thiserror = "2"
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
+
+[patch.crates-io]
+solana-program-runtime = { path = "../../vendor/solana-program-runtime" }
+
+[features]
+# Enables the native seekable validator with an explicit decoder limit.
+default = ["epoch226-checkpoint-continuation-diagnostic"]
+epoch226-checkpoint-continuation-diagnostic = []
+
+[build-dependencies]
+sha2 = "0.10"

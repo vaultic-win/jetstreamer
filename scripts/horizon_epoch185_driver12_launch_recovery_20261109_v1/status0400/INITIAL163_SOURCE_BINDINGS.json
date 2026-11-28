@@ -1,0 +1,47 @@
+{
+  "actual_Frame_CLI_QA_and_normal_seal": {
+    "path": "/home/sol/.jetstreamer-private/epoch199-recovery-Frame-independent-qa-20261105-v4/ROOT_CLI_QA_RELEASE_AND_NORMAL_PRODUCTION_SEAL_ACCEPTED.json",
+    "sha256": "fa65c883fcc244e64fe95cb0f7f675ed011d0970a407d43f39d74e47a2c523ec"
+  },
+  "actual_Frame_library_QA_and_normal_seal": {
+    "path": "/home/sol/.jetstreamer-private/epoch199-recovery-Frame-independent-qa-20261105-v4/ROOT_LIBRARY_QA_RELEASE_AND_NORMAL_PRODUCTION_SEAL_ACCEPTED.json",
+    "sha256": "aff28851a2acd86c86963fb1f04b57ab958480a814e4de1492a42305c69a0daf"
+  },
+  "actual_QA_to_normal6GiB_pool_handoff": {
+    "path": "/home/sol/.jetstreamer-private/actual1528-terminal199-runtime-20261105-v2/ROOT_QA_TO_NORMAL_POOL_HANDOFF.json",
+    "sha256": "a27ecf5898ceb08b2a64177f414b54e8511fb1910f88625b6b18841329ba6242"
+  },
+  "actual_complete_helper_QA_release_normal_seal": {
+    "path": "/home/sol/.jetstreamer-private/epoch199-complete-reader-test-name-source-20261105-v8/ROOT_QA_RELEASE_AND_NORMAL_PRODUCTION_SEAL_ACCEPTED.json",
+    "sha256": "0006750841de83d6c2f7f6a89f5d02b81c2bfc7d37fa537ce855d8b6cf65112c"
+  },
+  "actual_fresh_native_pipeline_start": {
+    "path": "/home/sol/.jetstreamer-private/actual1528-terminal199-runtime-20261105-v2/ROOT_ACTUAL1528_FRESH_NATIVE_PIPELINE_RUNNING.json",
+    "sha256": "9aab67cdb95498c642c7060feddebdc919fc715178250b7d4c003f02a7335250"
+  },
+  "current_history_audit": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-complete-history-source-20261105-v1/SOURCE_HANDOFF.json",
+    "sha256": "d7be2b237d060b7d6bb06560c2ebe42092be3747a1bd65ae6691893de728781e"
+  },
+  "current_recovery_Frame_QA_source": {
+    "path": "/home/sol/.jetstreamer-private/epoch199-recovery-Frame-independent-qa-20261105-v4/SOURCE_FREEZE.json",
+    "sha256": "644890347aec9eb65cb2f0fd08d68f88f4202f7a352d0444f11ae0c5e1f5b31d"
+  },
+  "epoch185_guarded_adapter_source": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-guarded-cold-orchestration-adapter-source-20261105-v4/SOURCE_HANDOFF.json",
+    "sha256": "624b8b448fa045a065e9e65e740567a81d9fe1f014ca1cfb54117289cb77449a"
+  },
+  "exact_debug_cache_source_successor": {
+    "path": "/home/sol/.jetstreamer-private/private-integration-debug-cache-profiles-source-20261105-v2/SOURCE_HANDOFF.json",
+    "sha256": "05691a2aa3a9a25b40b38ac52a6cd36806d11c82e6e776d678d4e83c170ad416"
+  },
+  "latest_combined_source": {
+    "path": "/home/sol/.jetstreamer-private/epoch199-complete-reader-test-name-source-20261105-v8/SOURCE_HANDOFF.json",
+    "sha256": "a77e63c6b8331c16ae36f7cbedfa80496991b25e672b2340f81b289fdbfbe87c"
+  },
+  "root_current_owner_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/actual0058-terminal199-control-20261105-v1/INITIAL163_ROOT_CURRENT_OWNER_ACCEPTANCE.json",
+    "sha256": "8dbe45eca68df506cc354a41757b96835dbac606c2781ea4e1957adce95c1c24"
+  },
+  "source_current_frontier": "The actual 15:28 cycle authenticated all eleven status reports: 70 ready, 30 missing, one healthy epoch 145 replay, desired five lanes and proven two. The complete selected historical graph was audited across 41 families and every selected original journal query; the capped 141 gap is repaired. Shared helper v8 actually passed 2,658 ordinary tests, ten distinct selected native checks, all required focused suites, strict production and test Clippy, release and the normal production seal. Its exact 26 externs preserve all original 25 and both features. Recovery Frame library and CLI passed 363 and 42 ordinary tests respectively and are normally sealed. All compiler and QA actors are drained, and the temporary 12 GiB pool was ended through an actual normal 6 GiB handoff. Root launched the genuinely fresh 15:28 fleet/Frame/full reader and independent memory/DATA sequence in a distinct source generation, using the actual four intermediate scheduled observers and new qualified capture registration. That pipeline has original invocation b2690bf3e34e4a4485c9490c693fa9f3; no native success or resource credit is assumed from launch. Keep the last accepted full components at 05:58 until actual new complete receipts prove otherwise. Every failed source, test and reader namespace remains preserved. Epoch 185 guarded Rust adapter source has 21 unrun tests and still needs actual qualification, cohesive package and upstream admission/enrollment. Cached 185 input integrity already passed. The debug cache source has 35 unrun tests and unresolved cleanup gates. Preserve original 199 controller and FD 9, healthy 145, raw 193 GiB memory, 768 GiB DATA and 72 GiB residual. Retain each latest authenticated task and numeric estimate. No new replay lane, deletion or archive readiness is claimed. Shared branch remains account-updates at 0c22f507."
+}

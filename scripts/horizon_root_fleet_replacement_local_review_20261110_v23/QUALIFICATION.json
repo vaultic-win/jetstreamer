@@ -1,0 +1,28 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/replacement-local-fleet-qualification-20261110-v23/replacement-fleet-v23/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "98cff20a1addfaeaebfb8cff31b3eb490384019cc8bfe77c0816e4be8095a424"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/replacement-local-fleet-qualification-20261110-v23/replacement-fleet-v23/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "6db4f41547963db858534b21b27795fda0d4c15bde1b03b137ad77e0c394d208"
+  },
+  "actual_ordinary_test_count": 83,
+  "published_source_sha256": {
+    "main.rs": "12d54fe0c7c4bee0c8343c270857459efb673e76eb8ec9ede1350004611a21c7",
+    "terminal.rs": "58327a9524975ebcd811a66d4929abdd998358b99d7cbc1d8f7ac5d2f618dc2d",
+    "bootstrap.rs": "239800d59817eb40a4484e6d092fc5a604bacde3393ea5d8131977bdca7b804a",
+    "memory_target.rs": "ae6ba062ddea8082ef9c6e090cdc58ff250deda853d3675d5e683804cb3f2fda",
+    "replacement.rs": "d29998e2cd852afda146797c577351544af53caea389a844a6c7ff1e196a5f42",
+    "replacement_validation.rs": "01fd0134a74b2f8e2f6436ed40bef34f77a0d11e12144ce1d6b1b7ead3359eeb",
+    "replacement_tests.rs": "978c7f73d8d187990342468b9b1d32a4ab72075c0bb48e8e15dd18dc3d79b077",
+    "status_events.rs": "680ada21f1329fb4ae7512ad9aa50a6514da10ed66ecd33b3648fc7ab0593170"
+  },
+  "actual_native_acceptance": {
+    "path": "/var/lib/jetstreamer/root-fleet-replacement-native-qualification-2200-six-event-retry1-20261110-v23/ROOT_ACCEPTED_FLEET.json",
+    "sha256": "eff3c451cedc7ad92f60a6fdf3f5fcf1333918b0afe33bcd5e1e69670a27d42c"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0
+}

@@ -1,0 +1,51 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/standalone-data-fulfillment-guard-qualification-20261110-v5/standalone-data-fulfillment-guard-v5/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "99f05f9baa22a39d52ad812fda44cadb6716c3498dd6ddd87ee0e176cab78135"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/standalone-data-fulfillment-guard-qualification-20261110-v5/standalone-data-fulfillment-guard-v5/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "e8f871be31b49a74b3b18638825a0c8edf11620e9bd999740646e266afd809b0"
+  },
+  "source_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-standalone-data-fulfillment-guard-source-20261110-v5/deployment-seal-receipt.json",
+    "sha256": "8039360499fd20d792a64424db20a9f757875231b324b0b7b0379e6dd2044201"
+  },
+  "runtime_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-standalone-data-fulfillment-guard-20261110-v5/deployment-seal-receipt.json",
+    "sha256": "bd04b4ab3eed5623a58003de72986b958721b57ce65f2fafd3048282d314ef3a"
+  },
+  "runtime_members": {
+    "jetstreamer-horizon-standalone-guard": {
+      "path": "/usr/local/lib/jetstreamer/horizon-standalone-data-fulfillment-guard-20261110-v5/jetstreamer-horizon-standalone-guard",
+      "sha256": "7ecab4ad6b4f6adbc84dd4f6a717467d7eabafa309d06aca1f22fdd3cb6ce29b"
+    },
+    "tests": {
+      "path": "/usr/local/lib/jetstreamer/horizon-standalone-data-fulfillment-guard-20261110-v5/tests",
+      "sha256": "c60f6b6bd4b36f15790f00f3c8929a30920ecd572cdcbdb2abff4ab3c368edfc"
+    }
+  },
+  "actual_ordinary_test_count": 52,
+  "published_source_sha256": {
+    "horizon_standalone_guard_bin.rs": "b417949925b62caba587e586c943016894a108dd4738415fafb408dcff737007",
+    "horizon_standalone_guard_data.rs": "727ab6ba7857b1c0ea2e466eb22cc1d227f07c3f44e455e7011f9ea37ef8de7d",
+    "horizon_standalone_guard_handoff.rs": "8398eca5b4edd6dc4c67ae5860ad1bcb0da28afe337865f2a64f9c64ba4a7027",
+    "horizon_standalone_guard_native227.rs": "6dd43961e4d4327d500b9942917552ff76066fe934f26d401d3190700da242cf",
+    "horizon_standalone_guard_root.rs": "ad7de942180bb4f0d62648186a52fc16e9e8a520c737167bc7d8c60850fe2a97",
+    "PINNED_INPUTS.json": "19beee2d90445830f4bff65a7b2bbb74d4f6f9ef467ae7963352e5c4faf18772",
+    "witness-set.json": "731806c5b1f4f35b6f9f9f52239cd60654454cd1e14f63640f7396b505bcd36c"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "remote_mutations": false,
+  "actual_native_witness": {
+    "path": "/var/lib/jetstreamer/standalone-data-fulfillment-guard-qualification-20261110-v5/standalone-data-fulfillment-guard-v5/native-witness/NATIVE_WITNESS.json",
+    "sha256": "ed7efaa0ba8ea5ed553b3b22eaca77a6bc4c667434f787fe34bfd1d4d7a5010c"
+  },
+  "actual_native_capability166": {
+    "path": "/var/lib/jetstreamer/standalone-data-fulfillment-guard-registration-20261110-v5/native-capability166/ROOT_ACTUAL_CAPABILITY_ONLY_ACCEPTED.json",
+    "sha256": "cc0a900e58a214c0ec84f32180061cd54ff9417bc92807c7b59819f42bcdedf3"
+  },
+  "native_fulfilled_existing_DATA_bytes": 241482399744
+}

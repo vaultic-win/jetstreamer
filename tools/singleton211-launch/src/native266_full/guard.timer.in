@@ -1,0 +1,8 @@
+[Unit]
+Description=Epoch @EPOCH@ private replay protective timer
+[Timer]
+OnActiveSec=1s
+OnUnitInactiveSec=20s
+AccuracySec=1s
+RandomizedDelaySec=0
+Unit=@GUARD@

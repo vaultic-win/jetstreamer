@@ -1,0 +1,18 @@
+[
+  {
+    "original_source": {
+      "path": "/tmp/continuations0030-helper34-operation36-20261109-v1/parent/run_data_after0030_witness_memory_v1.py",
+      "sha256": "933f4a81f742bd2a4c60bccb3004742b1f73c51325eb10bc8d85368d87f151c1"
+    },
+    "prepared_source": "/tmp/continuations0100-helper34-operation36-20261109-v1/parent/run_data_after0100_witness_memory_v1.py",
+    "prepared_source_sha256": "1cb589c3e7e04f08e2760ee3dd8c601e4094ed49d18a9bd7c8c7f41c5bcb253c"
+  },
+  {
+    "original_source": {
+      "path": "/tmp/continuations0030-helper34-operation36-20261109-v1/parent/complete_parent_capture0030_witness_v1.py",
+      "sha256": "3ac17828d046c7dc1f5fd656fcd48d93aa786151909b7c6c6514ca228abdc99d"
+    },
+    "prepared_source": "/tmp/continuations0100-helper34-operation36-20261109-v1/parent/complete_parent_capture0100_witness_v1.py",
+    "prepared_source_sha256": "353e12a72e473a70e4942832b3894291e5ccc53df3c91c07d45da010be2d7c81"
+  }
+]

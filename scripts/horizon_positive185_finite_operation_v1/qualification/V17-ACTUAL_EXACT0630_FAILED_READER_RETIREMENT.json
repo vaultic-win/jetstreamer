@@ -1,0 +1,50 @@
+{
+  "actual_same_shared_retirement_primitive_exercised": true,
+  "actual_two_owned_manager_aliases_removed": true,
+  "final_keeper_native": {
+    "ActiveState": "inactive",
+    "Id": "horizon-positive185-reader-positive-a89c476c915f4e8f910c14222f8fe4f6-retain.target",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "SubState": "dead"
+  },
+  "final_reader_native": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStartTimestampMonotonic": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "input_body_reads": 0,
+  "intent": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact0630-failed-reader-retirement-20261108-v17/failed-reader-retirement-intent.json",
+    "sha256": "4091059c24af963f7496b7156b7ee06db56fa2228f23a49c97feca0596533ddd"
+  },
+  "only_failed_reader_reset": true,
+  "only_zero_process_keeper_stopped": true,
+  "original_PID1_journal": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact0630-failed-reader-retirement-20261108-v17/failed-reader-original-PID1.json",
+    "sha256": "a0a4c8477896cc3208962d8c2591cfe50958e9b967233029311df66617509cae"
+  },
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v17/operation",
+    "sha256": "6c4e84d1d3b979b92bdc80c022f27279498193391f07883b0921680dd39b85ba"
+  },
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "resource_credit_bytes": 0,
+  "schema": "horizon-positive185-failed-reader-manager-retirement-v1",
+  "sealed_packages_and_failed_namespaces_preserved": true,
+  "timer_audit": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact0630-failed-reader-retirement-20261108-v17/failed-reader-retirement-timer-audit.json",
+    "sha256": "64ec327c5595cfd421e76e4b2c036fde546eac9623c681a2c4a21d5ea6687f69"
+  }
+}

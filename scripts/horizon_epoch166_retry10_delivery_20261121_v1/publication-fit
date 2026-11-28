@@ -1,0 +1,309 @@
+#!/usr/bin/python3 -IB
+"""Price the recovered epoch's delivery on the original booking and accepted full fleet."""
+import hashlib
+import json
+import os
+import select
+from pathlib import Path
+import stat
+import subprocess
+import sys
+import time
+
+R=Path("/var/lib/jetstreamer/horizon_runtime_data")
+D=R/"epoch166-retry10-delivery-20261121-v1"
+T=R/"epoch166-retry10-terminal-20261121-v1"
+BOOK=16<<20
+MEM=810658050048
+FULL168=R/"epoch168-current-delivery-20261121-v1"
+FLEET_FIELDS={166:"recovered166_local_commit",167:"indexed167_local_commit",168:"metered168_local_commit",170:"recovered170_local_commit",172:"full172_local_commit"}
+CLOSURES={166:"closed_recovered166",167:"closed_indexed167",168:"closed_metered168",170:"closed_recovered170",172:"closed_full172"}
+TERMINALS={166:T,168:FULL168,**{e:R/f"epoch{e}-current-delivery-20261121-v1" for e in (167,170,172)}}
+PACKAGES={166:D/"capacity-tools-v5",168:FULL168/"capacity-tools-v4",172:TERMINALS[172]/"capacity-tools-v2",
+          **{e:TERMINALS[e]/"capacity-tools-v3" for e in (167,170)}}
+PAID145_PACKAGES={epoch:old.with_name("capacity-tools-paid145") for epoch,old in PACKAGES.items()}
+PAID145_PROVIDER=R/"incident-replay-fit-20261121-v1/tools-v15/post-stop-fit"
+PAID145_PROVIDER_SHA="ef38a9640e35d60d2257d59d0cee5641f3a35df4d76365d336a741cf480490ea"
+BOUNDED_PACKAGES={epoch:old.with_name("capacity-tools-bounded") for epoch,old in PACKAGES.items()}
+FIT_FAMILY=R/"incident-replay-fit-20261121-v1"
+TIMER_PROVIDER=FIT_FAMILY/"tools-v16/post-stop-fit"
+TIMER_PROVIDER_SHA="5829fb668122a391d61672598e82967e5299a9d84909d2ee6fc6ffd5563d1ee4"
+TIMER_SEAL_SHA="b11e6366a6fc0cf3ed91d2584314851b628f2589d60b70d41b922cb1170d0cb5"
+POST_PROVIDER=FIT_FAMILY/"tools-v17/post-stop-fit"
+POST_REGISTRATION=FIT_FAMILY/"BOUNDED_POST145_PUBLICATION_PRICE_SUCCESSOR.json"
+COLD168_ROOT=R/"epoch168-cold-delivery-20261123-v4"
+COLD168_PACKAGE=COLD168_ROOT/"capacity-tools-bounded"
+COLD168_FULL=FIT_FAMILY/"tools-homefloor-publish-cold168-retry4-v1"
+COLD170_ROOT=R/"epoch170-cold-delivery-20261122-v13"
+COLD170_PACKAGE=COLD170_ROOT/"capacity-tools-bounded"
+COLD170_FULL=FIT_FAMILY/"tools-homefloor-publish-cold170-v1"
+CAPS={166:288<<30,167:512<<30,168:288<<30,170:384<<30,172:288<<30}
+# Exact unused allowances in the three authenticated, pre-launch START_INTENT receipts.
+PRESTART={166:169028829184,167:177601941504,170:230591926272}
+
+def need(ok,why):
+    if not ok:raise ValueError(why)
+
+def read(path,mode,limit=32<<20):
+    need(path.is_absolute() and path.resolve(strict=True)==path,"noncanonical capacity input")
+    with os.fdopen(os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK),"rb") as f:
+        m=os.fstat(f.fileno())
+        need(stat.S_ISREG(m.st_mode) and stat.S_IMODE(m.st_mode)==mode and m.st_uid==m.st_gid==0 and
+             m.st_nlink==1 and 0<m.st_size<=limit,"untrusted capacity input "+str(path))
+        data=f.read(limit+1)
+        need(len(data)==m.st_size and os.fstat(f.fileno()).st_ctime_ns==m.st_ctime_ns and os.path.samestat(m,path.lstat()),"capacity input changed")
+    return data,dict(path=str(path),sha256=hashlib.sha256(data).hexdigest())
+
+def identity(value):
+    return {k:tuple(tuple(p) for p in v) for k,v in value['population'].items()}
+
+def diagnostic(value,fleet):
+    registered=fleet.get("focused169_terminal");retirement=fleet.get("focused169_guard_retirement")
+    proof=value.get("closed_focused169")
+    need((registered is None)==(retirement is None)==(proof is None),"split focused 169 terminal")
+    if proof is None:
+        need("169" in value["survivors"] and "169" not in value["bookings"],"lost or repeated focused 169 booking")
+        return
+    book=value["bookings"]["169"];eq=value["registered_host_equation"]
+    need(proof["terminal"]==registered and proof["guard_retirement"]==retirement and proof["resource_credit_bytes"]==0 and
+         proof["producer_invocation_id"]=="0dfa0d36fbc246c28443a1c90a82c9cb" and
+         str(TERMINALS[172].parent/"epoch169-focused-terminal-20261121-v1/TERMINAL.json")==registered["path"]
+         and proof["disposition"] in ("completed-private-span","diagnosed-target-mismatch","interrupted-or-unclassified")
+         and book["cap_bytes"]==96<<30 and 0<=book["remaining_bytes"]<=book["cap_bytes"] and
+         book["remaining_bytes"]+book["physical_bytes"]==book["cap_bytes"] and book["plan"]==eq["retained_169_plan"]==proof["actual_guard_plan"]
+         and book["remaining_bytes"]==eq["retained_169_remaining"] and book["measurement"]=="two complete stopped-tree walks"
+         and "169" not in value["survivors"] and "169" not in value["joined_resident_lower_bounds"] and
+         not any(r["epoch"]==169 for g in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for r in fleet[g]),"different focused 169 retained obligation")
+
+def closing(value,fleet,cold170=False,cold168=False):
+    diagnostic(value,fleet)
+    result={}
+    for epoch,field in FLEET_FIELDS.items():
+        registered=fleet.get(field)
+        proof=value.get(CLOSURES[epoch])
+        need((registered is None)==(proof is None),"fleet and native closure differ")
+        if proof is not None:
+            need(isinstance(proof,dict) and proof.get("terminal")==registered and isinstance(registered,dict) and proof.get("resource_credit_bytes")==0,"different epoch terminal")
+            result[epoch]=proof
+    if cold170:
+        proof=value["closed_cold170"]
+        need(170 not in result and proof["terminal"] == fleet["cold170_local_commit"]
+             and proof["terminal"]["path"] == str(COLD170_ROOT/"TERMINAL_SUCCESS.json")
+             and proof["producer_invocation_id"] == "c44b5215f8d949159e7ce9cf911e9be1"
+             and proof["guard_retirement"] == fleet["cold170_guard_retirement"]
+             and proof["guard_retirement"]["path"] == str(COLD170_ROOT/"TERMINAL_GUARD_DRAINED.json")
+             and proof["resource_credit_bytes"] == 0, "different cold170 commit or drain")
+        result[170]=proof
+    if cold168:
+        proof=value["closed_cold168"]
+        reserve=fleet["retained_cold168_retry4_reservation"]
+        need(168 not in result and proof["terminal"] == fleet["cold168_local_commit"] == reserve["terminal"]
+             and proof["terminal"]["path"] == str(COLD168_ROOT/"TERMINAL_SUCCESS.json")
+             and proof["producer_invocation_id"] == "913443d7f9f44d7e9d3e0eec420acfab"
+             and proof["guard_retirement"] == fleet["cold168_guard_retirement"] == reserve["guard_retirement"]
+             and proof["guard_retirement"]["path"] == str(COLD168_ROOT/"TERMINAL_GUARD_DRAINED.json")
+             and proof["admission"] == reserve["admission"] and reserve["retained_cap_bytes"] == CAPS[168]
+             and proof["resource_credit_bytes"] == reserve["resource_credit_bytes"] == reserve["reservation_ending_bytes"] == 0,
+             "different cold168 retry4 commit, drain or retained booking")
+        result[168]=proof
+    return result
+
+def validate(value,fleet,fr,tr,epoch=166,cold170=False,cold168=False):
+    closed=closing(value,fleet,cold170,cold168)
+    expected={row["unit"]["Id"] for group in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for row in fleet[group]}
+    need(value["schema"]=="horizon-incident-replay-fit-v1" and value["epoch"]==145 and value["fleet"]==fr and value["fits"] and
+         epoch in closed and tr==closed[epoch]["terminal"] and set(value["population"])==expected and
+         value["complete_cpu_quota_micros"]==64000000 and value["complete_memory_plus_reserve_bytes"]==MEM and
+         value["resource_credit_bytes"]==value["stopped_generation_resident_credit_bytes"]==0 and
+         value["replay_launch_authorized"] is False and 0<=time.time()-value["recorded_unix_seconds"]<=180,
+         "different joined reservation or population")
+    prepaid = {str(e):PRESTART[e] for e in closed if e in PRESTART}
+    if cold168 or cold170:
+        stops=value["homefloor_stops"]
+    if cold170:
+        need(set(stops) == {"166","167","168","170"}
+             and value["cold170"]["stable_root"] == dict(path=str(R/"epoch170-retry13-rebook-20261122-v1/SUCCESSOR_ROOT.json"),
+                    sha256="654e6612f8ce9ee2f9f5c9f172f79f9ce5da4b0f6f02443c856f3a5228a5ca69")
+             and value["bookings"]["170"]["run"] == str(Path(value["bookings"]["170"]["root"]) /
+                 "replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/cold-retry13-20261122"),
+             "missing protected campaign obligations or wrong stopped retry13 tree")
+    if cold168:
+        booking=value["bookings"]["168"]
+        need(set(stops) == {"166","167","168","170"} and
+             booking["stable_root"] == dict(path=str(R/"epoch168-retry4-rebook-20261123-v1/SUCCESSOR_ROOT.json"),
+                    sha256="713e94750dd3d430c2f54c1ccb2af7ed708dec802af5cbf210ee4963a992d0f4") and
+             booking["run"] == str(Path(booking["root"])/"full-metered-20261121-v1/cold-retry4-20261123") and
+             value["phase145"].get("invocation_id", value["phase145"].get("completed_invocation_id")) ==
+                 "a71285e56d674de3bf793692f93dfbb3",
+             "foreign retry4 stopped tree or epoch 145 verifier")
+    if cold168 or cold170:
+        prepaid.update({str(e):v for e,v in PRESTART.items() if str(e) in stops})
+    need(value["closed_prestart_remaining"]==prepaid,
+         "closed prepaid allowances differ from the original admissions")
+    for e in closed:
+        key=str(e);booking=value["bookings"][key]
+        need(key not in value["joined_resident_lower_bounds"] and key not in value["replacements"] and
+             not any(row["epoch"]==e for group in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for row in fleet[group]) and
+             (e not in PRESTART or key not in (fleet.get("original_disk_guard_recovery_workers", {}) if cold168 or cold170 else fleet["original_disk_guard_recovery_workers"])) and
+             (e!=168 or value["normal168"] is None and value["active168_guard_floor"]==0 and
+              value["registered_host_equation"]["retained_168_remaining"]==booking["remaining_bytes"]) and
+             (e!=172 or key not in value["survivors"] and value["registered_host_equation"]["retained_172_remaining"]==booking["remaining_bytes"]
+              and value["registered_host_equation"]["retained_172_plan"]==booking["plan"]
+              and fleet.get("full172_guard_retirement")==closed[172]["guard_retirement"]) and
+             booking["measurement"]=="two complete stopped-tree walks" and booking["physical_bytes"]>0 and
+             booking["remaining_bytes"]+booking["physical_bytes"]==booking["cap_bytes"]==CAPS[e],"closed booking or owner changed")
+    memory=MEM-sum(p["resident"] for p in value["survivors"].values())-sum(value["joined_resident_lower_bounds"].values())
+    if (cold168 or cold170) and value.get("bounded_qualification"):
+        memory += value["bounded_qualification"]["memory_bytes"]
+    need(value["required_available_memory_bytes"]==memory,"different complete memory equation")
+    # Each closed archive may be verified concurrently on its own retained CPU/RAM
+    # allowance. Reserve the small additional HOME staging once for each such publisher.
+    floor=value["complete_required_HOME_bytes"]+len(closed)*BOOK
+    need(value["available_HOME_bytes"]>=floor and value["available_memory_bytes"]>=value["required_available_memory_bytes"]>0,
+         "insufficient publication capacity")
+    return floor
+
+def wait_for_145_probe():
+    # A concurrent full census is a descendant of the frozen 145 verifier. Wait
+    # for that exact process to exit, then discard every earlier fit measurement.
+    unit="horizon-holding-export145-20261121-v1.service"
+    scope=Path("/sys/fs/cgroup/system.slice")/unit
+    evidence=R/"epoch145-semantic-continuity-20261121-v1/V5C_ACTUAL_ADVANCING_WORKER.json"
+    data,ref=read(evidence,0o400)
+    need(ref["sha256"]=="6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76","foreign 145 advancing witness")
+    witness=json.loads(data);sample=witness["observations"][-1];iid=witness["invocation_id"]
+    manager,worker=sample["parent_pid"],sample["child_pid"]
+    image=evidence.parent/"tools-v5c/export145"
+    for pid,ticks in ((manager,sample["parent_ticks"]),(worker,sample["child_ticks"])):
+        proc=Path("/proc")/str(pid)
+        need(int((proc/"stat").read_text().rsplit(")",1)[1].split()[19])==ticks and (proc/"exe").samefile(image) and (proc/"cgroup").read_text().strip()=="0::/system.slice/"+unit and
+             ("INVOCATION_ID="+iid).encode() in (proc/"environ").read_bytes().split(b"\0"),"foreign 145 verifier")
+    candidates=set(map(int,(scope/"cgroup.procs").read_text().split()))-{manager,worker}
+    if not candidates:return
+    original=R/"incident-replay-fit-20261121-v1/tools-v10/post-stop-fit"
+    need(read(original,0o555)[1]["sha256"]=="d5ed981b98ad6fc2c54843667852e9d3c3567c764398b644afac00231cd2940d","different 145 internal provider")
+    for pid in candidates:
+        try:
+            proc=Path("/proc")/str(pid)
+            fd=os.pidfd_open(pid)
+            try:
+                args=(proc/"cmdline").read_bytes().decode().strip("\0").split("\0")
+                if (not (proc/"exe").samefile("/usr/bin/python3") or len(args)!=6 or
+                    args[:4]!=["/usr/bin/python3","-IB",str(original),"145"] or
+                    int((proc/"stat").read_text().rsplit(")",1)[1].split()[1])!=manager):continue
+                fleet=Path(args[4])
+                need(fleet.parent.parent==R and fleet.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json" and read(fleet,0o600)[1]["sha256"]==args[5],
+                     "foreign 145 internal census fleet")
+                need(select.select([fd],[],[],120)[0],"145 census deadline")
+                return
+            finally:os.close(fd)
+        except (FileNotFoundError,ProcessLookupError):continue
+    need(set(map(int,(scope/"cgroup.procs").read_text().split()))=={manager,worker},"unidentified 145 descendant")
+
+def bounded_provider(initial):
+    expected={"path":str(TIMER_PROVIDER),"sha256":TIMER_PROVIDER_SHA}
+    need(initial==expected,"wrong initial timer-recovery provider")
+    try:
+        raw,_=read(POST_REGISTRATION,0o400)
+    except FileNotFoundError:
+        return initial
+    handoff=json.loads(raw)
+    need(handoff["schema"]=="five-bounded-publication-post145-price-successor-v1" and
+         handoff["predecessor"]==expected and handoff["provider"]["path"]==str(POST_PROVIDER),
+         "wrong post-verifier capacity handoff")
+    package=POST_PROVIDER.parent
+    raw,seal_ref=read(package/"deployment-seal-receipt.json",0o444)
+    seal=json.loads(raw)
+    raw,qa_ref=read(package/"qualification.json",0o444)
+    qa=json.loads(raw)
+    phase_path=R/"epoch145-semantic-continuity-20261121-v1/tools-v11/deployment-seal-receipt.json"
+    _,phase=read(phase_path,0o444)
+    members={m["name"]:m["sha256"] for m in seal["members"]}
+    need(seal_ref==handoff["seal"] and qa_ref==handoff["qualification"] and seal["destination"]==str(package)
+         and seal["sealer_sha256"]=="e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+         and members["post-stop-fit"]==handoff["provider"]["sha256"] and members["qualification.json"]==qa_ref["sha256"]
+         and qa["predecessor"]=={"path":str(TIMER_PROVIDER.parent/"deployment-seal-receipt.json"),"sha256":TIMER_SEAL_SHA}
+         and phase==handoff["post_verifier"] and any(row["seal"]==phase for row in qa["registrations"].values())
+         and qa["resource_credit_bytes"]==0,"unqualified post-verifier price successor")
+    return handoff["provider"]
+
+
+def capture_provider(provider,path,digest):
+    for attempt in range(3):
+        result=subprocess.run([provider,"145",path,digest],capture_output=True,timeout=150)
+        if result.returncode==0:return result.stdout
+        if attempt==2 or b"foreign 145 descendants" not in result.stderr and b"capacity generation changed during collection" not in result.stderr:
+            raise RuntimeError(result.stderr.decode(errors="replace")[-1800:])
+        if b"foreign 145 descendants" in result.stderr:
+            if Path(provider) in (PAID145_PROVIDER,TIMER_PROVIDER,POST_PROVIDER,COLD168_FULL/"post-stop-fit"):
+                # The next full census must succeed independently. A concurrent
+                # self-check may already have exited before this call returns.
+                time.sleep(2)
+            else:
+                wait_for_145_probe()
+
+def capture(path,sha,epoch=166,pkg=None):
+    cold170=(epoch == 170 and pkg == COLD170_PACKAGE)
+    cold168=(epoch == 168 and pkg == COLD168_PACKAGE)
+    terminal=(COLD168_ROOT if cold168 else COLD170_ROOT if cold170 else TERMINALS[epoch])/"TERMINAL_SUCCESS.json"
+    if pkg is None:pkg=PACKAGES[epoch]
+    need(cold168 or cold170 or pkg in (PACKAGES[epoch],PAID145_PACKAGES[epoch],BOUNDED_PACKAGES[epoch]),"foreign epoch capacity package")
+    raw,fr=read(path,0o600);fleet=json.loads(raw)
+    need(path.parent.parent==R and path.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json" and fr["sha256"]==sha,"wrong fleet")
+    _,tr=read(terminal,0o400)
+    field = "cold168_local_commit" if cold168 else "cold170_local_commit" if cold170 else FLEET_FIELDS[epoch]
+    need(fleet.get(field)==tr,"no accepted recovered commit")
+    if cold168:
+        _,dr=read(COLD168_ROOT/"TERMINAL_GUARD_DRAINED.json",0o400)
+        need(fleet.get("cold168_guard_retirement")==dr,"cold168 guard drain is not adopted")
+    snapshot,sr=read(pkg/"deployment-seal-receipt.json",0o444);seal=json.loads(snapshot)
+    refdata,rr=read(pkg/"provider.json",0o444);binding=json.loads(refdata)
+    if cold168 or cold170:
+        full = COLD168_FULL if cold168 else COLD170_FULL
+        provider_seal, sealref=read(full/"deployment-seal-receipt.json",0o444)
+        verified=json.loads(provider_seal)
+        need(binding["seal"]==sealref and verified["destination"]==str(full)
+             and verified["sealer_sha256"]=="e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+             "foreign full capacity deployment")
+        binding=binding["provider"]
+        need(binding["path"]==str(full/"post-stop-fit"), "foreign full capacity provider")
+        for member in verified["members"]:
+            name=member["name"]
+            need(Path(name).name==name and read(full/name,int(member["mode"],8))[1]["sha256"]==member["sha256"],
+                 "changed full capacity deployment")
+    if pkg==BOUNDED_PACKAGES[epoch]:binding=bounded_provider(binding)
+    elf=Path(binding["path"]);_,pr=read(elf,0o555)
+    if pkg==PAID145_PACKAGES[epoch]:
+        need(elf==PAID145_PROVIDER and pr["sha256"]==PAID145_PROVIDER_SHA,"wrong paid 145 provider")
+    elif pkg==PACKAGES[epoch]:
+        need(elf==R/"incident-replay-fit-20261121-v1/tools-v13/post-stop-fit","wrong original provider")
+    need(seal["destination"]==str(pkg) and any(x["name"]=="provider.json" and x["sha256"]==rr["sha256"] for x in seal["members"]) and
+         pr==binding,"unsealed capacity provider")
+    results=[];refs=[]
+    for _ in range(2):
+        data=capture_provider(elf,path,sha)
+        v=json.loads(data);validate(v,fleet,fr,tr,epoch,cold170,cold168);results.append(v)
+        refs.append(dict(sha256=hashlib.sha256(data).hexdigest(),recorded_unix_seconds=v["recorded_unix_seconds"],
+                         available_home=v["available_HOME_bytes"],required_home=v["complete_required_HOME_bytes"],
+                         available_memory=v["available_memory_bytes"],required_memory=v["required_available_memory_bytes"]))
+    a,b=results
+    need(identity(a)==identity(b) and a["phase145"]==b["phase145"] and a["candidate136"]==b["candidate136"] and
+         closing(a,fleet,cold170,cold168)==closing(b,fleet,cold170,cold168) and a["status_registration"]==b["status_registration"] and
+         read(path,0o600)[1]==fr and read(terminal,0o400)[1]==tr and (not cold168 or read(COLD168_ROOT/"TERMINAL_GUARD_DRAINED.json",0o400)[1]==dr),
+         "capacity population changed between captures")
+    return dict(schema=f"horizon-{epoch}-publication-fit-v1",fleet=fr,terminal=tr,boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
+                observed_unix_seconds=int(time.time()),available_bytes=b["available_HOME_bytes"],protected_bytes=validate(b,fleet,fr,tr,epoch,cold170,cold168),
+                available_memory_bytes=b["available_memory_bytes"],required_available_memory_bytes=b["required_available_memory_bytes"],
+                publication_cpu_quota_micros=500000 if epoch==172 else 1000000,publication_memory_bytes=2<<30,complete_cpu_quota_micros=64000000,
+                complete_memory_plus_reserve_bytes=MEM,resource_credit_bytes=0,all_existing_commitments_retained=True,
+                full_capacity_provider=pr,complete_captures=refs,source_booking=b["bookings"][str(epoch)],funded_extra_home_bytes=len(closing(b,fleet,cold170,cold168))*BOOK,
+                charged_to_original_epoch=epoch,**({"closed_cold168":b["closed_cold168"]} if cold168 else {}),**({"closed_cold170":b["closed_cold170"]} if cold170 else {}),**{field:b.get(field) for field in CLOSURES.values()})
+
+if __name__=="__main__":
+    need(os.geteuid()==0 and __debug__ and sys.flags.isolated and len(sys.argv)==3,"expected FLEET SHA256")
+    path=Path(__file__).resolve(strict=True)
+    selected=next((e for packages in (PACKAGES, PAID145_PACKAGES, BOUNDED_PACKAGES) for e,pkg in packages.items() if path==pkg/"publication-fit"),None)
+    if path==COLD168_PACKAGE/"publication-fit":selected=168
+    if path==COLD170_PACKAGE/"publication-fit":selected=170
+    need(selected is not None,"unregistered publication capacity image")
+    print(json.dumps(capture(Path(sys.argv[1]),sys.argv[2],selected,path.parent),sort_keys=True))

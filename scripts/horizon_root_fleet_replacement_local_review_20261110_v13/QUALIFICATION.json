@@ -1,0 +1,21 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/replacement-local-fleet-qualification-20261110-v13/replacement-fleet-v13/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "b5a8eaf53ce86d558f2204ded0f80f581644e18aae7b4daee3da2f72e5214d3a"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/replacement-local-fleet-qualification-20261110-v13/replacement-fleet-v13/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "677dab5dea412e3430c1f118ecac96154a9adfacaf61607a9b2cfbb63bac6376"
+  },
+  "actual_ordinary_test_count": 66,
+  "published_source_sha256": {
+    "main.rs": "7c1c2c451d3de9f2fa714df298134a4f215632100a18928bda881e1f28b5d032",
+    "bootstrap.rs": "239800d59817eb40a4484e6d092fc5a604bacde3393ea5d8131977bdca7b804a",
+    "replacement_validation.rs": "4c7ad94d6e7675793577147fc14e0893f41cefc8911cca9f42279d229219f2de",
+    "replacement_tests.rs": "28bfbb4545d5562375e9e855e9d57a64e5471ab50dd8addc5eef8efba155bd93",
+    "replacement.rs": "5e6de3629bbba51562e0c0d1093c877a9a2ecd6dffa41b1117b3f731a91d8b6c",
+    "terminal.rs": "58327a9524975ebcd811a66d4929abdd998358b99d7cbc1d8f7ac5d2f618dc2d",
+    "memory_target.rs": "ae6ba062ddea8082ef9c6e090cdc58ff250deda853d3675d5e683804cb3f2fda"
+  },
+  "replay_launch_authorized": false
+}

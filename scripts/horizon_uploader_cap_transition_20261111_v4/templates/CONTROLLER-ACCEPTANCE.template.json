@@ -1,0 +1,22 @@
+{
+  "schema": "horizon-isolated-controller-actual-acceptance-v1",
+  "four_strict_configurations_passed": false,
+  "normal_seal_verified": false,
+  "accepted_image": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-cap-transition-controller-20261111-v4/runner",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "source_freeze": {
+    "path": "ROOT_MUST_BIND_ACTUAL_SOURCE_FREEZE",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "actual_four_strict_configurations": {
+    "path": "ROOT_MUST_BIND_ACTUAL_QUALIFICATION",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "actual_normal_deployment_seal": {
+    "path": "ROOT_MUST_BIND_ACTUAL_NORMAL_SEAL",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "no_production_liveness_or_resource_credit": true
+}

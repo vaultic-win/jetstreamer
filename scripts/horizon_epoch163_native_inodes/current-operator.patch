@@ -1,0 +1,95 @@
+--- a/phase.rs
++++ b/phase.rs
+@@ -1,5 +1,7 @@
+ use super::*;
+ use std::time::{Duration, Instant};
++#[path = "consumer_capacity.rs"]
++mod consumer_capacity;
+ const WORK: &str = "/home/sol/.jetstreamer-private/epoch163-native48-input-qa-20261112-v1/work";
+ const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
+ const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
+@@ -811,6 +813,9 @@
+     rootunit: &str,
+     attempt: &mut Attempt,
+ ) -> Result<Value> {
++    let current_review = bound(review)?;
++    let floor = n(&current_review, "raw_guard_floor_bytes")?;
++    consumer_capacity::current_floor(floor)?;
+     let gate: Bound = serde_json::from_value(protocol["gate"].clone())?;
+     let plan = op.save("gate-plan.json", &p["gate_plan"])?;
+     op.seal(
+@@ -824,6 +829,7 @@
+     let started = Instant::now();
+     let setup_deadline =
+         (started + Duration::from_secs(170)).min(op.deadline - Duration::from_secs(180));
++    consumer_capacity::current_floor(floor)?;
+     attempt.actor_started = true;
+     op.execute("ACTOR-LAUNCH", &launch, 20, true)?;
+     let unit = s(p, "actor_unit")?;
+@@ -960,6 +966,7 @@
+     let run_end = (Instant::now() + Duration::from_secs(n(p, "actor_runtime_seconds")? + 10))
+         .min(op.deadline - Duration::from_secs(180));
+     let terminal = loop {
++        consumer_capacity::current_floor(floor)?;
+         let a = native(unit)?;
+         if payload_terminal(&a) {
+             break a;
+@@ -1015,9 +1022,9 @@
+     ensure!(
+         r["all_original_promises_retained"] == true
+             && r["same_additive_authority_reserved_once"] == true
+-            && r["complete_projected_memory_bytes"] == 761131708416u64
+-            && r["complete_DATA_bytes"] == 6240576028466u64
+-            && r["raw_guard_floor_bytes"] == 6274868657970u64
++            && r["complete_projected_memory_bytes"] == 810658050048u64
++            && n(r,"complete_DATA_bytes")? >= 6240576028466u64
++            && n(r,"raw_guard_floor_bytes")? >= n(r,"complete_DATA_bytes")?
+             && r["new_memory_or_DATA_promise_bytes"] == 0
+             && r["resource_credit_bytes"] == 0
+             && r["replay_launch_authorized"] == false
+@@ -1155,25 +1162,19 @@
+         "another native/compiler operation owns serial lock"
+     );
+     let fleet = checked_json(&r["current_complete_fleet"])?;
+-    ensure!(
+-        fleet["owner"] == "/root"
+-            && fleet["current_event_live_replay_epochs"] == json!([166, 167, 169, 170])
+-            && fleet["current_event_live_replay_count"] == 4
+-            && fleet["complete_projected_memory_bytes"] == 761131708416u64
+-            && fleet["complete_DATA_bytes"] == 6240576028466u64,
+-        "current four-lane additive fleet required"
+-    );
++    let (_donor, _compiler, _floor) = consumer_capacity::reserve(&r, &fleet)?;
+     let next = checked_json(&r["sole_next_observer"])?;
+-    let timer = &next["actual_timer"];
+-    let timer_now = native(s(timer, "Id")?)?;
+-    ensure!(
+-        timer_now["InvocationID"] == timer["InvocationID"]
+-            && timer_now["ActiveState"] == "active"
+-            && timer_now["SubState"] == "waiting",
+-        "sole next routine timer changed"
+-    );
++    ensure!(r["sole_next_observer"] == fleet["sole_next_observer"]
++            && next["minimum_interval_seconds"] == 1800
++            && next["observation_reason"] == "routine", "changed sole scheduled observer");
++    let expected_timer = fleet["sole_next_timer"].as_str()
++        .or_else(|| fleet["sole_next_timer"]["unit"].as_str()).context("Root timer")?;
++    let timer = native(expected_timer)?;
++    ensure!(timer["Id"] == expected_timer && timer["InvocationID"] == r["next_timer_invocation_id"]
++            && timer["ActiveState"] == "active" && timer["SubState"] == "waiting",
++            "next observation identity changed");
+     let mut st = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+-    let osroot = CString::new("/var/lib/jetstreamer")?;
++    let osroot = CString::new("/home/sol")?;
+     ensure!(
+         unsafe { libc::statvfs(osroot.as_ptr(), st.as_mut_ptr()) } == 0,
+         "OS filesystem observation"
+@@ -1367,7 +1368,7 @@
+         serde_json::from_str(include_str!("PROTOCOL.json")).unwrap()
+     }
+     fn review(p: &Value) -> Value {
+-        json!({"schema":"horizon-Root-native163-consumer15-phase-review-v1","owner":"/root","primary_thread":THREAD,"phase":p["phase"],"phase_index":p["index"],"protocol_sha256":"a".repeat(64),"recorded_unix_seconds":1000,"absolute_completion_deadline_unix_seconds":1600,"next_observer_unix_seconds":1800,"all_original_promises_retained":true,"same_additive_authority_reserved_once":true,"complete_projected_memory_bytes":761131708416u64,"complete_DATA_bytes":6240576028466u64,"raw_guard_floor_bytes":6274868657970u64,"new_memory_or_DATA_promise_bytes":0,"resource_credit_bytes":0,"replay_launch_authorized":false,"no_other_compiler_or_native_callback_overlap":true,"source_review_passed":true,"previous_complete_OS_caps_bytes":4073717760u64,"additional_operator_OS_scope_bytes":536870912u64,"complete_OS_caps_bytes":4610588672u64,"normal_pool_bytes":10737418240u64,"additional_QA_memory_bytes":1342177280u64,"maximum_serial_compiler_bytes":4294967296u64,"guard_bytes":268435456u64,"Root_bytes":1073741824u64,"observer_bytes":2147483648u64,"four_original_guard_slots_bytes":4294967296u64})
++        json!({"schema":"horizon-Root-native163-consumer15-phase-review-v1","owner":"/root","primary_thread":THREAD,"phase":p["phase"],"phase_index":p["index"],"protocol_sha256":"a".repeat(64),"recorded_unix_seconds":1000,"absolute_completion_deadline_unix_seconds":1600,"next_observer_unix_seconds":1800,"all_original_promises_retained":true,"same_additive_authority_reserved_once":true,"complete_projected_memory_bytes":810658050048u64,"complete_DATA_bytes":6240576028466u64,"raw_guard_floor_bytes":6274868657970u64,"new_memory_or_DATA_promise_bytes":0,"resource_credit_bytes":0,"replay_launch_authorized":false,"no_other_compiler_or_native_callback_overlap":true,"source_review_passed":true,"previous_complete_OS_caps_bytes":4073717760u64,"additional_operator_OS_scope_bytes":536870912u64,"complete_OS_caps_bytes":4610588672u64,"normal_pool_bytes":10737418240u64,"additional_QA_memory_bytes":1342177280u64,"maximum_serial_compiler_bytes":4294967296u64,"guard_bytes":268435456u64,"Root_bytes":1073741824u64,"observer_bytes":2147483648u64,"four_original_guard_slots_bytes":4294967296u64})
+     }
+     #[test]
+     fn all15_payloads_and_resource_caps_remain_frozen() {

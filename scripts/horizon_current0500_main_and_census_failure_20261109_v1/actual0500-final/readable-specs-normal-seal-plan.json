@@ -1,0 +1,36 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-readable-specs-722adc397ae24bb4b96d452783599f57",
+  "members": [
+    {
+      "mode": 292,
+      "name": "fleet.json",
+      "sha256": "af073a37453d9c54877af01b23366f4d708c8ae47ef020399946d9a4f42e2cd9",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/readable-0-source.json"
+    },
+    {
+      "mode": 292,
+      "name": "reader.json",
+      "sha256": "a4220a871ad54d1ff3ee11506e8f0233e0104512bb4f06faa615a7c5e641989c",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/readable-1-source.json"
+    },
+    {
+      "mode": 292,
+      "name": "task.json",
+      "sha256": "a98e4d2e6ea411320a848aa4c33172962e3b93e7fd9044b2b42db26589c61012",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/readable-2-source.json"
+    },
+    {
+      "mode": 292,
+      "name": "status.json",
+      "sha256": "1ad78e90b4348ed4e18967c32d541e12287e878d62b1360ad4f56f4954eb28d7",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/readable-3-source.json"
+    },
+    {
+      "mode": 292,
+      "name": "lifecycle.json",
+      "sha256": "527fc70259fa1692174533594f1be69c27ab13ca0c2096ec61d378fdd889d8f7",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/lifecycle-spec-source.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

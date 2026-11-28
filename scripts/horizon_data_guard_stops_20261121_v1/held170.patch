@@ -1,0 +1,33 @@
+--- a/owners.py
++++ b/owners.py
+@@ -77,6 +77,15 @@
+         if not entry.name.isdecimal(): continue
+         try: exe=(entry/"exe").readlink().name.removesuffix(" (deleted)")
+         except FileNotFoundError: continue
++        held = restored.get("170")
++        if held and int(entry.name) == held["actor"]["producer_pid"] and (entry/"exe").samefile("/usr/bin/python3"):
++            # recovered.native validated the held command, mounted profile, gate and cgroup.
++            # The authorized exec preserves this PID and its invocation.
++            import recovered
++            current = recovered.native(170)
++            need(current and current[1] == held["actor"], "epoch 170 startup actor changed")
++            found[held["unit"]["Id"]] = int(entry.name)
++            continue
+         if exe!="jetstreamer-node" and exe!="historical-worker" and not exe.startswith("jetstreamer-historical-worker-") and exe not in ("gate168","horizon-168-trace-gate","gate169","horizon-169-focused-gate","horizon-169-focused-node"): continue
+         name=(entry/"cgroup").read_text().strip().removeprefix("0::/system.slice/")
+         if name==private136.UNIT:
+--- a/cadence168.py
++++ b/cadence168.py
+@@ -96,6 +96,12 @@
+             need(worker['pid'] == first['worker_pid'] and worker['matching_workers'] == 1
+                  and worker['executable_beneath_bound_scratch'], 'different sampled 168 worker')
+         progress = sample['useful_work']
++        if not old or not old.get('last_progress'):
++            from recovered import startup_progress
++            window = startup_progress(progress)
++            if window is not progress:
++                progress = window
++                measured = observed_lane(dict(sample, useful_work=window), config, actor['producer_invocation_id'], actor['producer_pid'])
+         last = progress.get('last')
+         if measured:
+             need(FIRST <= progress['first']['slot'] <= last['slot'] <= LAST and last['terminal_slot'] == LAST,

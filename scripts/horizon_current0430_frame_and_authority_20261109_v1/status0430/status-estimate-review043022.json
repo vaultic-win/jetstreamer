@@ -1,0 +1,340 @@
+{
+  "coordinated_observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T043022Z-postcompletion154-v1.json",
+    "sha256": "11fa170d36aa749232c5bf88f5954687529efd430442b186ed68c434bf8ff834"
+  },
+  "current_cycle_reassessment": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+  "latest_authenticated_status_by_epoch": {
+    "136": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-136.status-correction-20261109040138.json",
+      "sha256": "7b99eb2da6333cd16709baa9c0a9010e17ade21737708ba665e90167826a30dd"
+    },
+    "137": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-137.status-correction-20261109040138.json",
+      "sha256": "e19625585e826b4cff74c111f828717c0b517141baed4955886c25152a75222f"
+    },
+    "141": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-141.status-correction-20261109040138.json",
+      "sha256": "b83e2662e157811e4ea805c6c75254a6b7bce0c3e36817c2a8de2b848fb192bc"
+    },
+    "145": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-145.status-correction-20261109040138.json",
+      "sha256": "31e5c3990a759067bcc35fe0b26f4dbd8ddd72a85bb37ab3513f06e5f3b5ca8f"
+    },
+    "159": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-159.status-correction-20261109040138.json",
+      "sha256": "ef80e2c63e8fce30152db852266b5d0235cb1df80d7c001cb40768957ea2aa47"
+    },
+    "161": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-161.status-correction-20261109040138.json",
+      "sha256": "db8c94e2da57245578850dc401ba548a6776ec5b7382b9bad2d296fe266d355d"
+    },
+    "163": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-163.status-correction-20261109040138.json",
+      "sha256": "8d5c4bb832880fef80d0a168c39c4b45a5956e4cf26acad7e7ad4def3d983337"
+    },
+    "185": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109040138.json",
+      "sha256": "b1fb752ddde907eb37dcc5b53a1fafa746d8187b3cb6426e9c040c55c040bc51"
+    },
+    "186": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-186.status-correction-20261109040138.json",
+      "sha256": "90b63be20abfe27adf88c6391a1989a8fe00ff64fc24653c1282a8e2edff4e76"
+    },
+    "199": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-199.status-correction-20261109040138.json",
+      "sha256": "6822d7750b95f05b0730803ca882832298669370f4517e88d9162f1af14685dd"
+    },
+    "200": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-200.status-correction-20261109040138.json",
+      "sha256": "5f1de4ed7cd6b6da50c6ecc17c47243fcf73138c6f7bc8fdba1111dedadcd416"
+    }
+  },
+  "owner_review_approved_by_main": true,
+  "owner_updates_by_epoch": {
+    "136": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Finish combined shared-helper and canonical-publisher integration using the qualified timer library and CLI, then advance fresh epoch 136 charge-recovery admission and enrollment. Preserve the original hourly-charge failure and all retained obligations.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-136.status-correction-20261107153407.json",
+        "sha256": "0a7160759bc9e54830fa41543720ffe8e54bab0497b421354a2fc9e2a4f8159f"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      }
+    },
+    "137": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Qualify a distinct exact-input admission envelope for the retained g3 transfer artifacts; the earlier comparable build exceeded its original time and memory limits. Preserve first-entry, release and original failure gates before any consumption or replay.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-137.status-correction-20261107153407.json",
+        "sha256": "1ad4352a77f8d46abe1ac60fbda073636f21b92d40ec335a3a712530341e4ce3"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      }
+    },
+    "141": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Continue canonical epoch 141 input, terminal-root and runtime repair. Preserve retained DATA and CPU obligations; any memory-retirement selection and replay still require complete fresh candidate admission.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-141.status-correction-20261107153407.json",
+        "sha256": "07f53db9330daf9381bc239c93bc4ff1ab5b11132c7ea0a8c83c8741dd73a714"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      }
+    },
+    "145": {
+      "current_internal_stage": "terminal-native-guard-recovery",
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Diagnose original145 v8g1 guard reference closure failure at17:33, preserve all sources/partial and original outcome, qualify recovery exporter and fresh admission before retry. No live replay or export claimed.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-145.status-correction-20261107153407.json",
+        "sha256": "ca4b0fef5685b7511ccf27f0d09c6070e30ebe24f4116123d278558fdda4bc00"
+      },
+      "terminal_event": {
+        "path": "/home/sol/.jetstreamer-private/actual173022-terminal145-status-recovery-20261107-v2/ROOT_ORIGINAL145_TERMINAL_FAILURE_AND_NO_RELEASE.json",
+        "sha256": "00298147c0c204fcd957814ec33f8bdddf1ab1faf34dd21f9b76949a7690afa2"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      }
+    },
+    "159": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Continue trusted source-shred, hidden-PoH and exact-state qualification from the retained successful metadata audit. Preserve its 5,774 requests, 17,322 post-gap targets, 44,102 skipped slots and 61,424 boundaries as metadata evidence; canonical replay and delivery remain unqualified.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-159.status-correction-20261107153407.json",
+        "sha256": "555f75ec76ae1203766f143034a4476d4ba6026be76bba5726e375406d170307"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      }
+    },
+    "161": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Preserve the epoch 161 retained family and completed reader, memory and DATA evidence. After combined shared-helper integration, restore a fresh complete typed tuple before any new candidate admission or producer enrollment.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-161.status-correction-20261107153407.json",
+        "sha256": "4ec083cc2d0c224597bf3e3900cae2011cad0024621c5dadc9d14ecf523ad444"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      }
+    },
+    "163": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Refreshed login validated for exact generation; qualified Rust downloader verified1901405026 compressed bytes with CRC32C/MD5/SHA256 and stable before/after generation metadata. Continue native48/helper qualification, explicit original199 witness-reader integration, fresh complete accounting and guarded replay.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-163.status-correction-20261107153407.json",
+        "sha256": "6354f540471418df3d92d983844529ed051f835069c628522009884dc4ed5dad"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      }
+    },
+    "185": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261107155014.json",
+        "sha256": "676075762409b0e7705c250c0c90f11c562e5012c13221f8e0a7b2ffbfe3555a"
+      },
+      "qualified_state_copy": {
+        "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_STATE_CAPTURE_EXACT_BYTES_AND_UNCHANGED_GUARD_ACCEPTED.json",
+        "sha256": "68e08cced670a337cd5173e03605f465d73c8095fa7fa183244b20ab91c5b950"
+      },
+      "qualified_witness": {
+        "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_ACTUAL_FULL_INPUT_WITNESS_ACCEPTED_CONSUMER_INTEGRATION_PENDING.json",
+        "sha256": "c728698afbbb6dac654b3e3c14428622e51c1e58a53392a4f241e2a451312eb2"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "fixed_work_eta_model": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review7-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW7.json",
+        "sha256": "6fa0bc5c379a47d66e72add1ee72a994c76389f8bce73f945f493f0eab1d358c"
+      },
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      },
+      "actual_Helper34_QA5_closure": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+        "sha256": "1cbf8c099c1f3fe5e5e4f53534194fe883435509be25966908fa529c748b9acf"
+      }
+    },
+    "186": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Qualify retained capped-singleton runtime, continuing-floor accounting and exact registrations. The root 128 guard still needs a production-enforced allocation or write-rate ceiling before its overshoot can be established; preserve existing DATA and all earlier failures.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-186.status-correction-20261107153407.json",
+        "sha256": "eaf50364bf83120499172689fab709d3508c36c3f5aac9b02e33d13b2de89026"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      }
+    },
+    "199": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Preserve the failed cohort output, original live controller and read-only FD 9. Advance distinct HTTP 500 recovery admission, guard enrollment and bounded retry integration after fresh accounting and exact-input gates; the original failed producer is not a live replay.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-199.status-correction-20261107153407.json",
+        "sha256": "513d0b4b9ea374aa751926cf55690cff9ae4c924a2deca9c1dbd6bbae0ffb4f6"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      }
+    },
+    "200": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:30 recovery. Replay0target5. D12/H35/Final6/Planner6/Operation38 ACTUALLYqualified and normallysealed. Operation38 fourR3compilers71ordinary5ignored and all13native controls passed incl genuineFinal6Root/Sol/eightfileprofile and currentD12/H35/P6/F6sealedrole controls. Firstunusednativegeneration layoutcollision and compilerlint/testname failures preserved, corrected runs genuine. Exactsuccessful0230readerretirement ACTUALLYcompleted04:25 with samequalifiedO38 after genuinepostMainterminalclosure: onlytwoownedmanageraliases andemptykeeper removed, allpayloads/packages/history and rawresourcepromises retained, noRAM/DATAcredit. Current0430guard qualified65tests/fourcompilers and normallysealed; standaloneQA not actualfreshguardoradmission. LatestcanonicalDATA5176926614164 includesO38DATA512 andguard0430DATA512once, normal6extraQA0; no0400guardbooking. Fresh0430Frame/fullreader/parentmemory/DATA/currentguards/admission/worker stillrequired; lastcompleteFrame/resources0230 with genuine0300/0330/0400 observerbridges pendingnewFrame. Original0230Main failedcold ownstorageguardENOENT zeroOOMcounters; D12racefix qualified, no blindoldD11restart. Review7deadline04:43:21 remains originalplanningreviewbound, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h; newnativeleasesnotcreated. Otherhost200-300three lanes andoriginal199FDs protected. Full185route stillunqualified; bounded80351283/48GiB/14400sroute isnotcompleteepoch. Noarchive/sidecarmutation orbytecredit.",
+      "current_task": "Retain epoch 200 input custody, failed cohort lineage and original controller state. Advance the distinct HTTP 500 recovery admission and enrollment with bounded retries, while preserving every independent verification and sidecar gate.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-200.status-correction-20261107153407.json",
+        "sha256": "27d15f81d1bcc8b3a3f0a9fecb96f67d360c308a4d660727f4f64bcac6574008"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5176926614164,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+        "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+      }
+    }
+  },
+  "parts_by_epoch": {
+    "136": {
+      "remaining_until_prior_authenticated_planning_arrival": 820158797
+    },
+    "137": {
+      "remaining_until_prior_authenticated_planning_arrival": 313109000
+    },
+    "141": {
+      "remaining_until_prior_authenticated_planning_arrival": 453509000
+    },
+    "145": {
+      "guard_process_reference_failure_diagnosis_and_qualified_recovery": 0,
+      "independent_full_plugin_boundary": 0,
+      "source_validation_and_fresh_guarded_export": 106515000,
+      "uncertainty_contingency": 0,
+      "upload_readback_sidecar": 21600000
+    },
+    "159": {
+      "remaining_until_prior_authenticated_planning_arrival": 431909000
+    },
+    "161": {
+      "remaining_until_prior_authenticated_planning_arrival": 455309000
+    },
+    "163": {
+      "remaining_until_prior_authenticated_planning_arrival": 302309000
+    },
+    "185": {
+      "archive_close_full_plugin_boundary_verification_millis": 21600000,
+      "bootstrap_load_and_warmup_millis": 3600000,
+      "current_fleet_order_repair_and_launch_controls_millis": 0,
+      "fresh_full_reader_memory_DATA_and_replay_admission_millis": 2503000,
+      "full_boundary_runtime_native_Frame_successor_qualification_millis": 46021000,
+      "full_epoch_replay_using_same_century_peer_rate_with25percent_contingency_millis": 413404206,
+      "upload_whole_object_readback_and_sidecar_commit_millis": 14400000
+    },
+    "186": {
+      "remaining_until_prior_authenticated_planning_arrival": 460709000
+    },
+    "199": {
+      "remaining_until_prior_authenticated_planning_arrival": 394109000
+    },
+    "200": {
+      "remaining_until_prior_authenticated_planning_arrival": 394109000
+    }
+  },
+  "schema": "horizon-main-status-planning-review-v1",
+  "predecessor_review": {
+    "path": "/home/sol/.jetstreamer-private/actual040022-visible-root-acceptance-20261109-v1/status-estimate-review040022.json",
+    "sha256": "11f7a68612e454d2987522e926df11a830c81eece2431c0a203504e3433fa977"
+  },
+  "latest_completed_event_readback": {
+    "path": "/home/sol/.jetstreamer-private/current0230-explicit-control-review7-status-event-20261109-v1/AUTHENTICATED-READBACK.json",
+    "sha256": "eba6818602d992f0dc1d4e2e1c06d0ca317f929523feb16af5853c82814847c5"
+  }
+}

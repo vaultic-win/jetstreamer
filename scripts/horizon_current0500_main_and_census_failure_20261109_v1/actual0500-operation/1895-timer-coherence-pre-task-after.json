@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/fwupd-refresh.timer",
+      "Id": "fwupd-refresh.timer",
+      "InvocationID": "b312172d85b440dc87423d4ba3af9bf0",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1h",
+      "RemainAfterElapse": "yes",
+      "Unit": "fwupd-refresh.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/fwupd-refresh.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/fwupd-refresh.timer",
+          "sha256": "8d90cd120f922b7471e47cca994ff3e23860a1975f09af41ca2b22c474f2ad17"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/fwupd-refresh.timer",
+      "Id": "fwupd-refresh.timer",
+      "InvocationID": "b312172d85b440dc87423d4ba3af9bf0",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1h",
+      "RemainAfterElapse": "yes",
+      "Unit": "fwupd-refresh.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/fwupd-refresh.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/fwupd-refresh.timer",
+          "sha256": "8d90cd120f922b7471e47cca994ff3e23860a1975f09af41ca2b22c474f2ad17"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2547775968970,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794206170865388
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "fwupd-refresh.timer",
+  "unset_pending_requires_metadata_requery": false
+}

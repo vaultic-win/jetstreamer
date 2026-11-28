@@ -1,0 +1,31 @@
+[package]
+name = "horizon-epoch136-donor171"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[features]
+fixture-semantic = []
+retry-semantic = ["fixture-semantic"]
+v5n-semantic = ["fixture-semantic"]
+v5o-semantic = ["fixture-semantic"]
+v5q-semantic = ["fixture-semantic"]
+v5r-semantic = ["v5q-semantic"]
+
+[dependencies]
+anyhow = "1"
+libc = "0.2"
+serde_json = "1"
+sha2 = "0.10"
+
+[[bin]]
+name = "admit136"
+path = "main.rs"
+
+[lib]
+name = "guard168"
+path = "../horizon_epoch168_trace_admission_20261120_v1/guard_plan.rs"
+
+[dev-dependencies]
+tempfile = "3"

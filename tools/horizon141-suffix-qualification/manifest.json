@@ -1,0 +1,10 @@
+{
+  "schema": "jetstreamer-local-slot-ranges-overrides-v1",
+  "entries": [
+    {
+      "epoch": 141,
+      "path": "/usr/local/lib/jetstreamer/epoch141-strict-suffix-inputs/epoch-141-slot-ranges.raw",
+      "sha256": "ed2654c5fdd9a115176d6d799df636ee1ce945fca393c812a0ba2f1db8f909c8"
+    }
+  ]
+}

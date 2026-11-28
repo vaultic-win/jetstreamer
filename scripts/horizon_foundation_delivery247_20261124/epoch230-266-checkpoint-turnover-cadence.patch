@@ -1,0 +1,40 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -1098,10 +1098,17 @@
+             assert current["ExecStart"] == launch["exec_start"] and current["AllowedCPUs"] == "32-39"
+             assert current["MemoryMax"] == "192000000000" and current["MemorySwapMax"] == "0"
+             gate["next_action"] = "Collect the private snapshot restore and compare the Bank, accounts root and last blockhash at slot 114923430."
+-        elif (restore_266 / "completion.json").is_file():
+-            terminal = sealed_226_file(restore_266 / "completion.json")
+-            assert bound(terminal)["launch"] == launch_ref
+-            add(gate, terminal)
++        elif (restore_266 / "completion-v2.json").is_file():
++            receipt = sealed_226_file(restore_266 / "completion-v2.json")
++            finished = bound(receipt)
++            assert receipt["sha256"] == "acc63b4e817648d1a04b83bf371088c038d27b7b98d916290110b80976812e30"
++            assert finished["launch"] == launch_ref and finished["cgroup_drained"] and finished["verified_hourly_checkpoint"]
++            native = bound(finished["native_result_journal_bytes"])
++            assert native == finished["native_result"] and native["invocation_id"] == launch["invocation_id"]
++            assert native["capitalization"] == 512823375441850375 and native["slot"] == 114923430
++            assert native["replay_entries_sent"] == 0 and native["worker_shutdown_succeeded"]
++            add(gate, receipt, finished["native_result_journal_bytes"])
++            gate["next_action"] = "Qualify the guarded replay from the verified hourly checkpoint and compare its overlap with the retained prefix."
+     active_private_intervals = set()
+     for ordinal, cohort_label in ((2, "-private141"), (3, "-private141-third"), (4, "-private141-fourth"), (5, "-private141-fifth"), (6, "-private141-sixth"), (7, "-private141-seventh"), (8, "-private141-eighth")):
+         interval141_launch = V / f"horizon141-foundation-interval{ordinal}-runtime-v1/replay-launch.json"
+@@ -1225,9 +1232,12 @@
+         if e in focused_foundation_status.REGISTRATIONS and e not in replays:
+             result = focused_foundation_status.refresh(e, previous, sample, ref(obs), out / str(e))
+             if result is None:
+-                wd = out / str(e)
+-                wd.mkdir(mode=0o700, exist_ok=True)
+-                record(wd / 'completion.json', bound(previous))
++                if e == 230 and focused_foundation_status.CHECKPOINT_STATUS[230].is_file():
++                    refresh(e, previous, sample, globals())
++                else:
++                    wd = out / str(e)
++                    wd.mkdir(mode=0o700, exist_ok=True)
++                    record(wd / 'completion.json', bound(previous))
+             continue
+         if e in native260262_status.LANES:
+             if e in replays:

@@ -1,0 +1,72 @@
+{
+  "archive_length": 0,
+  "authority": {
+    "canonical_prefix_independently_qualified": false,
+    "canonical_sidecar_authorized": false,
+    "full_cold_epoch_peak_qualified": false,
+    "ordinary_replay_authorized": false,
+    "publication_authorized": false,
+    "r2_mutations": false,
+    "remote_mutations": false,
+    "runtime_promotion_authorized": false
+  },
+  "capture": null,
+  "capture_error": null,
+  "capture_is_peak_proof": false,
+  "cgroup_after": {
+    "cpu.stat": "usage_usec 1533616498\nuser_usec 1336926648\nsystem_usec 196689849\ncore_sched.force_idle_usec 0\nnr_periods 5207\nnr_throttled 3368\nthrottled_usec 3716457773\nnr_bursts 0\nburst_usec 0\n",
+    "io.pressure": "some avg10=4.44 avg60=0.92 avg300=0.23 total=1633168\nfull avg10=4.44 avg60=0.92 avg300=0.23 total=1633157\n",
+    "io.stat": "259:7 rbytes=271491072 wbytes=9383792640 rios=4347 wios=146466 dbytes=0 dios=0\n259:0 rbytes=377839616 wbytes=0 rios=18287 wios=0 dbytes=0 dios=0\n259:3 rbytes=450998272 wbytes=0 rios=21099 wios=0 dbytes=0 dios=0\n9:0 rbytes=828837888 wbytes=0 rios=39386 wios=0 dbytes=0 dios=0\n259:6 rbytes=535662592 wbytes=15592857600 rios=26021 wios=286912 dbytes=0 dios=0\n252:0 rbytes=807153664 wbytes=24976650240 rios=29423 wios=391759 dbytes=0 dios=0\n",
+    "memory.current": "44494905344\n",
+    "memory.events": "low 0\nhigh 0\nmax 6991\noom 0\noom_kill 0\noom_group_kill 0\n",
+    "memory.peak": "51539607552\n",
+    "memory.pressure": "some avg10=0.33 avg60=0.46 avg300=0.45 total=3041652\nfull avg10=0.33 avg60=0.46 avg300=0.45 total=3041652\n",
+    "memory.stat": "anon 34282450944\nfile 8980701184\nkernel 1230352384\nkernel_stack 901120\npagetables 152035328\nsec_pagetables 0\npercpu 11352\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 8815951872\nfile_dirty 1071833088\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 19664158720\nactive_anon 13259190272\ninactive_file 9087631360\nactive_file 1252048896\nunevictable 0\nslab_reclaimable 907588888\nslab_unreclaimable 169736216\nslab 1077325104\nworkingset_refault_anon 0\nworkingset_refault_file 194537\nworkingset_activate_anon 0\nworkingset_activate_file 23535\nworkingset_restore_anon 0\nworkingset_restore_file 23165\nworkingset_nodereclaim 0\npgscan 8449562\npgsteal 4583259\npgscan_kswapd 0\npgscan_direct 8449562\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 4583259\npgsteal_khugepaged 0\npgfault 18609388\npgmajfault 19241\npgrefill 41767\npgactivate 1813724\npgdeactivate 0\npglazyfree 4438302\npglazyfreed 300521\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\n"
+  },
+  "cgroup_before": {
+    "cpu.stat": "usage_usec 6682887\nuser_usec 4576423\nsystem_usec 2106463\ncore_sched.force_idle_usec 0\nnr_periods 468\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0\n",
+    "io.pressure": "some avg10=1.08 avg60=0.19 avg300=0.04 total=943158\nfull avg10=1.08 avg60=0.19 avg300=0.04 total=943158\n",
+    "io.stat": "259:7 rbytes=0 wbytes=20480 rios=0 wios=1 dbytes=0 dios=0\n259:0 rbytes=377839616 wbytes=0 rios=18287 wios=0 dbytes=0 dios=0\n259:3 rbytes=450998272 wbytes=0 rios=21099 wios=0 dbytes=0 dios=0\n9:0 rbytes=828837888 wbytes=0 rios=39386 wios=0 dbytes=0 dios=0\n259:6 rbytes=0 wbytes=4096 rios=0 wios=1 dbytes=0 dios=0\n252:0 rbytes=0 wbytes=24576 rios=0 wios=2 dbytes=0 dios=0\n",
+    "memory.current": "842813440\n",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+    "memory.peak": "843661312\n",
+    "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+    "memory.stat": "anon 12509184\nfile 828866560\nkernel 344064\nkernel_stack 0\npagetables 81920\nsec_pagetables 0\npercpu 12408\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 4096\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 12505088\ninactive_file 828866560\nactive_file 0\nunevictable 0\nslab_reclaimable 15872\nslab_unreclaimable 172312\nslab 188184\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 134154\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\n"
+  },
+  "child_return_code": null,
+  "elapsed_millis": 473873,
+  "epoch": 185,
+  "error": "allocation census retry limit; no usage accepted: descendant disappeared during allocation census: /home/sol/.jetstreamer-private/capped-root-prefix-185-positive-positive-0500-20261109-next/scratch/.historical-runtime/jetstreamer-historical-parent-VBsh07/jetstreamer-historical-v1.6.15-WBzde7/unpacked/accounts/79661924.1174279578",
+  "external_signal": 0,
+  "first_progress": null,
+  "free_after": 6921308864512,
+  "free_before": 6946146131968,
+  "invocation_id": "722adc397ae24bb4b96d452783599f57",
+  "last_progress": null,
+  "natural_parent_completion_required": true,
+  "node_sha256": "e987401354f0cddbd838b71439768d6ed84baddfe8c0c2b484addec553db1887",
+  "plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-0500-20261109-next/envelope.json",
+    "sha256": "ff8bd6e279fad04843692652ed2ed014455974bb1f8db3a7b00e6bacdb8605bd"
+  },
+  "producer_canonical_root_prefix_present": false,
+  "producer_segment_manifest": null,
+  "producer_segment_manifest_sha256": "",
+  "runner_sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e",
+  "schema": "horizon-private-epoch185-capped-root-prefix-resource-v4",
+  "snapshot_sha256": "218173053f960ab1917adaae99b1680fdd75968d95f22aae6ffd41aef37f9ef2",
+  "solana_rayon_threads": 8,
+  "storage_evidence": {
+    "free_bytes": 6946146131968,
+    "maximum_process_vmas": 67,
+    "memory_bytes": 842739712,
+    "metadata_allocated_bytes": 16384,
+    "output_allocated_bytes": 4096,
+    "scratch_allocated_bytes": 28672
+  },
+  "success": false,
+  "target_slot": 80351283,
+  "terminal_root_slot": 80351283,
+  "unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+  "worker_sha256": "6eef40863851927d0611fd90dd7c68528c8e1491a0fc18a28de492afa67316bd"
+}

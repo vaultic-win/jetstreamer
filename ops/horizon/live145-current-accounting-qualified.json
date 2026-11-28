@@ -1,0 +1,155 @@
+{
+  "schema": "horizon-live145-current-accounting-publication-v1",
+  "purpose": "Include the exact live145 post-replay exporter, protective guard, retained185 source and original reservations in current reader accounting before positive185 admission.",
+  "predecessor_production": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-integrated-current-reader-tools-20261107-v1/jetstreamer-r2",
+    "sha256": "90b650505dbdf40daddfb005796625eb5eb080c19a0004086344000a19054d8e"
+  },
+  "production": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-prefix-current-accounting-tools-20261107-v1/jetstreamer-r2",
+    "sha256": "50b2b6636068811d1176f87f5d49b76206db785dcb1e0ac80023c517cefac07a"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-prefix-current-accounting-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "832f34a19794778bc00d6c1d551b5d405598859b7ab87efda57e00977fd08e85"
+  },
+  "artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-prefix-current-accounting-tools-20261107-v1/artifact-proof.json",
+    "sha256": "920b761cc75f7dc55c8625e5944ecc238c77e1f172db8760fbc8ed30ca6b05ce"
+  },
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/ROOT_INTEGRATED_LIVE145_SOURCE_FREEZE_V5.json",
+    "sha256": "43d20c581bc0093b76c73fcc4a8d6ad2a7e78fe2fa3aa25e487940d723d229bd"
+  },
+  "source_members": [
+    {
+      "path": "scripts/horizon_live145_current_accounting_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/custody.rs",
+      "sha256": "e638f46a943e4df1afafd4717eb673de114397729be4e0f46df2578c76ef8b88",
+      "bytes": 9387,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/custody.rs",
+        "sha256": "e638f46a943e4df1afafd4717eb673de114397729be4e0f46df2578c76ef8b88"
+      },
+      "predecessor_sha256": null
+    },
+    {
+      "path": "scripts/horizon_live145_current_accounting_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/fixtures/before.json",
+      "sha256": "3410e0ea3c4fbbfe911185e893f9c79eb246a6cf419ecea7f567ac03ae79c53d",
+      "bytes": 1536,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/fixtures/before.json",
+        "sha256": "3410e0ea3c4fbbfe911185e893f9c79eb246a6cf419ecea7f567ac03ae79c53d"
+      },
+      "predecessor_sha256": null
+    },
+    {
+      "path": "scripts/horizon_live145_current_accounting_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/fixtures/plan.json",
+      "sha256": "c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3",
+      "bytes": 3847,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/fixtures/plan.json",
+        "sha256": "c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3"
+      },
+      "predecessor_sha256": null
+    },
+    {
+      "path": "scripts/horizon_live145_current_accounting_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/fixtures/ready.json",
+      "sha256": "d8cd0712b4ee180fa10d3d977b6981a40846d7cd5f78698fd4a0bf9ad938457b",
+      "bytes": 665,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/fixtures/ready.json",
+        "sha256": "d8cd0712b4ee180fa10d3d977b6981a40846d7cd5f78698fd4a0bf9ad938457b"
+      },
+      "predecessor_sha256": null
+    },
+    {
+      "path": "scripts/horizon_live145_current_accounting_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/model.rs",
+      "sha256": "5113e7678c064ff7fcd832a3c85cd26ba6d7706b96216950f1641e00ff209ccd",
+      "bytes": 4610,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/model.rs",
+        "sha256": "5113e7678c064ff7fcd832a3c85cd26ba6d7706b96216950f1641e00ff209ccd"
+      },
+      "predecessor_sha256": null
+    },
+    {
+      "path": "scripts/horizon_live145_current_accounting_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/native.rs",
+      "sha256": "4889594d4950d3bd43e93acdb7036e86e77fe9411c1e90ebe67d62594c89c64c",
+      "bytes": 13962,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/native.rs",
+        "sha256": "4889594d4950d3bd43e93acdb7036e86e77fe9411c1e90ebe67d62594c89c64c"
+      },
+      "predecessor_sha256": null
+    },
+    {
+      "path": "scripts/horizon_live145_current_accounting_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/tests.rs",
+      "sha256": "395ac28fd3b1ca068177c62f65d8a029547c46e52e70edda659e4b70267be10d",
+      "bytes": 14805,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/tests.rs",
+        "sha256": "395ac28fd3b1ca068177c62f65d8a029547c46e52e70edda659e4b70267be10d"
+      },
+      "predecessor_sha256": null
+    },
+    {
+      "path": "scripts/horizon_live145_current_accounting_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix.rs",
+      "sha256": "2ed0ed73d24dadb01aea33e4c10fb93273dfb0909c366f9f30c7452609532c2b",
+      "bytes": 25751,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix.rs",
+        "sha256": "2ed0ed73d24dadb01aea33e4c10fb93273dfb0909c366f9f30c7452609532c2b"
+      },
+      "predecessor_sha256": null
+    },
+    {
+      "path": "scripts/horizon_live145_current_accounting_v1/source/jetstreamer-r2/src/fleet/epoch186/accounting.rs",
+      "sha256": "f5411ff7238499f3ecc7afe325ce10739e675ec5fea1be8522bac3aeebb7057d",
+      "bytes": 182157,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/accounting.rs",
+        "sha256": "f5411ff7238499f3ecc7afe325ce10739e675ec5fea1be8522bac3aeebb7057d"
+      },
+      "predecessor_sha256": "1a508bd8b1d1abbd947635c2be07f1d575147817f29e772897a1b6e7ff9374ce"
+    }
+  ],
+  "patch": {
+    "path": "/home/sol/workspace/jetstreamer/scripts/horizon_live145_current_accounting_v1/integration.patch",
+    "sha256": "52442c7e4a43fa32f840a72cd9a3ab722eaf8ef180e65764ba557c488ff5c58a"
+  },
+  "patch_dry_run_applies_to_exact_predecessor": true,
+  "ordinary_tests_passed": 2853,
+  "ignored_tests": 114,
+  "native_metadata_tests_passed": 2,
+  "native_actual_live145_guard_rollover": {
+    "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/qa-v5/ROOT_ACTUAL_LIVE145_READONLY_ROLLOVER_ACCEPTED.json",
+    "sha256": "78485258849b30ba12f3cdc8c1f8a355982f1da49cc3111f9bf6f4c0539cb78d"
+  },
+  "actual_features": [
+    "native210-small",
+    "native227-small"
+  ],
+  "extern_count": 28,
+  "all23_QA_scopes_drained_extra12GiB_closed": {
+    "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/ROOT_ALL23_SCOPES_DRAINED_ADDITIONAL12GiB_QA_CLOSED.json",
+    "sha256": "0f4640a46ba3062cdc30e42510f10bda6c916bd46fba807ff857626359d73614"
+  },
+  "retained_DATA_phase_bytes": 4294967296,
+  "normal_external_memory_pool_bytes": 6442450944,
+  "extra_QA_memory_bytes": 0,
+  "current_reader_requires_live145_selector": true,
+  "historical_comparisons_do_not_reopen_undeclared_absent_live_sources": true,
+  "omitted_live_captures_rejected": true,
+  "original_live145_guards_and_promises_unchanged": true,
+  "remaining_gates": [
+    "Fresh genuine native fleet and Frame with all guards and original writer drains",
+    "Same exact helper full reader and positive185 current-reader proof",
+    "Typed memory/DATA with retained185 source4GiB reclassified once",
+    "Independently admitted fitting positive185 profile and original600s setup; final proofs/token/read within30s",
+    "Full epoch185 boundary and qualified finite useful runtime beyond checkpoint prefix"
+  ],
+  "replay_admission_authorized": false,
+  "recovered_replay_lanes": 0,
+  "completed_R2_pairs": 70,
+  "missing_epochs": 30
+}

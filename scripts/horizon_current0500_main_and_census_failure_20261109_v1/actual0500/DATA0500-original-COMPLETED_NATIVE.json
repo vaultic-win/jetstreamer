@@ -1,0 +1,20 @@
+{
+  "current_native_IID_may_be_cleared": true,
+  "invocation_identity_and_original_PID1_must_come_from_actual_DATA_receipt": true,
+  "native": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-epoch183-ended-DATA-select-20261105-v1.service",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "no_original_invocation_invented": true,
+  "no_resource_credit": true,
+  "original_stdout_and_stderr": "DATA0500-original-ORIGINAL_EXECUTION.json"
+}

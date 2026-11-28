@@ -1,0 +1,18 @@
+{
+  "destination": "/var/lib/jetstreamer/horizon247-reboot-20261117-launcher-v2",
+  "members": [
+    {
+      "mode": 365,
+      "name": "horizon-reboot247-launch",
+      "sha256": "b47678d51c9359d102e196b4d601fea81e923433704226a983b499b0f6cc23d6",
+      "source": "/tmp/horizon-reboot247-cargo-20261117/release/horizon-reboot247-launch"
+    },
+    {
+      "mode": 292,
+      "name": "launch-plan.json",
+      "sha256": "8bdaa764f4cfbe6caad1d391676a8e725684d2b77de763e0814c6b1a5dfac7f6",
+      "source": "/home/ubuntu/workspace/horizon-reboot247-launch-source-20261117-v1/packet/launch-plan.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

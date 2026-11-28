@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-lifecycle-main-recovery-da9b57fe-r2",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/ROOT_MAIN_LIFECYCLE_RECOVERY_R2_SPEC.json",
+      "name": "spec.json",
+      "sha256": "85b700390033f381d9adeb87c7477bd1b64d7d36cbef3cc1e4e887f8f80b8419",
+      "mode": 292
+    }
+  ]
+}

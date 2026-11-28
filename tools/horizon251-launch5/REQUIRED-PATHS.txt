@@ -1,0 +1,32 @@
+Retain until the epoch 251 fifth-lane attempt and its evidence are disposed:
+/var/lib/jetstreamer/horizon251-fifth-20261118-launcher-v2
+/var/lib/jetstreamer/horizon251-fifth-20261118-static-v3
+/var/lib/jetstreamer/horizon251-published-guard-20261118-v1
+/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1
+/var/lib/jetstreamer/horizon234-production-eabd0b6a-candidate922-v1
+/var/lib/jetstreamer/horizon251-captured-node-auth-20261118-v1
+/var/lib/jetstreamer/horizon251-captured-node-probe-acceptance-20261118-v1
+/var/lib/jetstreamer/horizon251-main-source-provenance-20261118-v1
+/var/lib/jetstreamer/horizon251-main-admission-review-20261118-v1
+/home/ubuntu/.codex/diagnostics/horizon251-captured-node-input-20261118-v1/acceptance.json
+/home/ubuntu/.codex/diagnostics/horizon251-fresh-admission-20261118-v1
+/var/lib/jetstreamer/horizon251-fifth-20261118-state-v1
+/var/lib/jetstreamer/horizon251-replacement-20261118-guard-v1
+/var/lib/jetstreamer/horizon251-replacement-20261118-tokens-v1
+/var/lib/jetstreamer/horizon251-replacement-20261118-receipts-v1
+/var/lib/jetstreamer/horizon251-fifth-20261118-launcher-v1
+/var/lib/jetstreamer/horizon251-fifth-20261118-static-v2
+/var/lib/jetstreamer/horizon251-native-input-20261118-v1
+/var/lib/jetstreamer/horizon251-single-epoch-manifest-20261118-v1
+/var/lib/jetstreamer/horizon251-index-cache-20261118-v1
+/home/ubuntu/.codex/diagnostics/horizon251-input-auth-20261118-v1/acceptance.json
+/home/ubuntu/.codex/diagnostics/horizon251-network-proof-20261118-v1.json
+/home/ubuntu/.jetstreamer-private/qualification-251-replacement-20261118-v1
+/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1
+/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1
+/var/lib/jetstreamer/horizon-live-observe-a1afd55-v147/jetstreamer-seal-deployment
+/var/lib/jetstreamer/horizon247-reboot-20261117-state-v2/launch-v2/guarded-startup-handoff.json
+/var/lib/jetstreamer/horizon248-reboot-20261117-state-v1/launch-v1/guarded-startup-handoff.json
+/var/lib/jetstreamer/horizon249-reboot-20261117-state-v1/launch-v1/guarded-startup-handoff.json
+/var/lib/jetstreamer/horizon250-reboot-20261117-state-v2/launch-v1/guarded-startup-handoff.json
+Retain the original guard plans and fresh admission's bound documents too.

@@ -1,0 +1,29 @@
+{
+  "schema": "horizon-helper33-enrollment-composition-serial-bounded-compiler-booking-v1",
+  "accepted_same_end_capacity": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current2130-20261108-v1/ROOT_CURRENT2130_READONLY_POOL_CAPACITY.json",
+    "sha256": "a43e5e55001c5d954ef3bf573ec8713d145358bb786ec920a7178080fc47af67"
+  },
+  "base_helper32": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver11-helper-qa-20261108-v32/ROOT_ACTUAL_QUALIFIED_HELPER32_BINDINGS.json",
+    "sha256": "7fa38326f86b205a66d5f906f4ce87ba75b241733db2731a6ecfda7fe608753e"
+  },
+  "normal_pool_bytes": 6442450944,
+  "new_extra_QA_bytes": 0,
+  "one_serial_compiler_bytes": 3221225472,
+  "sole_scheduled_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "kernel_limits_before_first_instruction": true,
+  "no_new_guard_armed_after_activation": true,
+  "lowered_new_compiler_limit_is_a_distinct_bounded_attempt": true,
+  "previous_compiler_limit_bytes": 8589934592,
+  "new_additive_retained_DATA_bytes": 4294967296,
+  "previous_complete_DATA_lower_bound_bytes": 5146861843092,
+  "complete_DATA_lower_bound_bytes": 5151156810388,
+  "all_raw_memory_and_DATA_obligations_retained": true,
+  "no_replay_or_credit_or_clock_reset": true,
+  "patch": {
+    "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/enrollment.rs",
+    "sha256": "a9f4df6e904725ab9c07bb9690d3e88b63f2655765050c72e03cc3e5e100b90c"
+  }
+}

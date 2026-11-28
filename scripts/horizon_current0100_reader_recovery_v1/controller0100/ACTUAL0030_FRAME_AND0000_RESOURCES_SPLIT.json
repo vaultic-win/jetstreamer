@@ -1,0 +1,42 @@
+{
+  "schema": "horizon0100-split0030Frame0000resources-source-v1",
+  "Frame0030": {
+    "observer": {
+      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T003022Z-postcompletion154-v1.json",
+      "sha256": "dfff3d02f7a0bdc46e29e351957d6c2a1388629c68fe0089bf5cdac5d3559d35"
+    },
+    "fleet": {
+      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T003022Z-witness-terminal145-v1.json",
+      "sha256": "1133e97bbdad6474c63d455a32b5a2ca4253cbf3b56ebb6688e21ff25e3c77c7"
+    },
+    "fleet_plan": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0030-fleet-plan-20261109-v1/fleet-plan.json",
+      "sha256": "c0d1e0fa1103c6e4d2b296ab94d7fa32b44e8f2369745ba01cae0d8430c3755a"
+    },
+    "frame": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T003022-witness-terminal145-chain128-v5.json",
+      "sha256": "828075d52c451269bcf845fd55ffc1f61d324214dac7edc7d1988fd475cb16a3"
+    }
+  },
+  "actual0030_Frame_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0030-20261109-v1/ROOT_GENUINE_CURRENT_CLI_V5_CAPTURE_ACCEPTED.json",
+    "sha256": "5b21932da2c1b20b153d59aa47fefd846dd18da8c07ced980a1ef551f2fb820a"
+  },
+  "actual0030_selector": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0030-20261109-v1/accepted-frame-selector.json",
+    "sha256": "cd89c4809e5bb9fff288485a1ac44cbfb90bd1f584193e7145a4dfa27f273777"
+  },
+  "actual0030_Frame_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0030-chain128-frame-plan-20261109-v5-r2/plan.json",
+    "sha256": "dfbd6e7fbc3bff9c16e4534d5e2383849d66a35f912f2be60d0d532d0a1ccd11"
+  },
+  "actual0000_resources_manifest": {
+    "path": "/tmp/continuations0030-helper34-operation36-20261109-v1/ACTUAL0000_PREDECESSORS.json",
+    "sha256": "e26345a06a42e0149afdb6c5aaabc2e7a8d715c8c11b8903f90ec0a4f7705e4c"
+  },
+  "no0030_complete_resource_tuple_exists_or_is_claimed": true,
+  "failed0030_reader_outcome": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0030-reader-phase-20261109-v15/94-actual-phase-gated-original-reader-original-outcome.json",
+    "sha256": "84d880ee10cf1b8a3258cf5e5fdd7526f3bd58b9b30e40d29b2466c74233a13d"
+  }
+}

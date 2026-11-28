@@ -1,0 +1,17 @@
+{
+  "README.md": "b10b5142e90b242540504d9663da74f312f4d3c240309cf1dda954bff064d082",
+  "qualification/ORDINARY-ORIGINAL-EXECUTION.json": "180f146ca7d86289128c8b9a020f01577ec81861c8c2cf9f0cc7e1b7acafdd09",
+  "qualification/PRODUCTION-SEAL-EXECUTION.json": "c7369f8d3ba3d5a38d69cd57debbacddc53045ac4b7f436ff0248205673bb88f",
+  "qualification/ROOT_ACTUAL_QUALIFIED_FINAL3_BINDINGS.json": "5c0efec99d84855712bddae66b8ca8393019058c35d727b566ff39caeb78c54c",
+  "qualification/ROOT_NORMAL6_FINAL3_SERIAL_QA_CLOSED_DATA_RETAINED.json": "6b652e5c9331bd30162194463cfecc3a8c19621bf9b316f1e5769802fa3632bc",
+  "qualification/ROOT_NORMAL6_SERIAL_FINAL3_QA_BOOKING.json": "f04afb7d6ef11e0a20d2587c08c63b2c030b269e8cc451940aac4ceec45c2460",
+  "qualification/SOURCE_AND_EXACT4_FROZEN_RECIPES.json": "7456936ede651d58ade05cfc00125794efd414ad85fd56f442b1608c82ad12fd",
+  "qualification/artifact-proof.json": "2579486e89905bf96666d8d70d7e4bfa406dc43f987e1db1fa2e606c4ee7c0e6",
+  "source/driver_policy.rs": "abe40ce1dfbd1ae9f65f53a518681768c39e386200fd79e44f6c48a04961a118",
+  "source/events.rs": "1a9eb8143e15ee79832de4c95de01f2327055bb0ec310ab1bea10f9d45cf3aee",
+  "source/main.rs": "396d53543aec8cd03a3af71d28af8d476d6775ecb9236168443fad6060992801",
+  "source/native_timer.rs": "93507d20210b8ad62604eb73c6d6e3fcae3b6295feaa46b25b888e4ef79fb748",
+  "source/process.rs": "4dacb2baa0013bfdf90a6b3680f8b5c9bf8c18d8c8a630ac17cca7546e890576",
+  "source/storage.rs": "50d6bbef5d3373bc5f95bf082ff29f79588b8b4ce444e6ba03dd70c02fa40071",
+  "source/transaction.rs": "f520c8338f6a1776fccbd97e08bd44e2212e6fa3fc8a4b99d0b50f028a9d42b4"
+}

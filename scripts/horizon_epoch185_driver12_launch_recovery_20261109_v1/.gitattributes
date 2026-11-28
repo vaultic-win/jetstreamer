@@ -1,0 +1,2 @@
+# Preserve the exact source patch, including its context-line whitespace.
+planner6-source-handoff/SOURCE_ONLY_CANDIDATE.diff -whitespace

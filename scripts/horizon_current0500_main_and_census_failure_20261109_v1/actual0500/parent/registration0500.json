@@ -1,0 +1,87 @@
+{
+  "DATA_bytes": 824633720832,
+  "census": {
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-original199-parent-census-tools-20261107-v4/parent-memory-census",
+      "sha256": "5e83d113490cab069fb125f823124d8cf8b80eb89e27159aa7c62ffb46920d13"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-parent-memory-census0500-qualification-20261109-v1/qualification.json",
+      "sha256": "37581a762edbd36f7b179cc0758b3c05fa84f9964ec91f6fd5ce3a0fd3df0649"
+    }
+  },
+  "census_scope_review": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-parent-memory-witness-bootstrap-policy-20261107-v4/scope-review.json",
+    "sha256": "6aca2318a17df42da6e9a7d1243681b92425b3f3a6e7d2c5e3ff4e46ea0acf6c"
+  },
+  "controller_argv": [
+    "/usr/bin/python3",
+    "/usr/local/lib/jetstreamer/horizon-epoch199-backfill-controller-guard-20261102-v1/adaptive-root-cohort-sweep.py",
+    "--deploy-dir=/usr/local/lib/jetstreamer/deploy-epoch199-singleton-20261017-v1",
+    "--manifest=/usr/local/lib/jetstreamer/deploy-epoch199-singleton-20261017-v1/preflight-199-with-private-200-tail-v4.json",
+    "--manifest-fingerprint=sha256:581f9ef3a74fc80a8b6b2754a7f4def480c8092d20529f446784f0d73dae810b",
+    "--cohort-bootstrap=199-200=/usr/local/lib/jetstreamer/deploy-epoch199-singleton-20261017-v1/snapshot-85967282-BQvC7FcQTSguJkWHeLnpkVSFv32ZKRqUbgHKxVF97o3x.tar.zst",
+    "--public-dir=/home/sol/horizon",
+    "--public-private-root=/home/sol/.jetstreamer-private/epoch199-backfill-20261102-v1-import",
+    "--r2-receipt-directory=/home/sol/.jetstreamer-private/r2-receipts",
+    "--r2-bucket=solana-archive-with-accounts-data",
+    "--state-dir=/var/lib/jetstreamer-root-sweep-epoch199-backfill-20261102-v1",
+    "--lane=lane-a=/home/sol/.jetstreamer-private/epoch199-private-tail-20261017-v1/lane-a",
+    "--first-epoch=199",
+    "--last-epoch=200",
+    "--initial-concurrency=1",
+    "--target-concurrency=1",
+    "--max-concurrency=1",
+    "--settle-seconds=300",
+    "--poll-seconds=30",
+    "--memory-high-gib=128",
+    "--memory-max-gib=192",
+    "--memory-admission-gib=181",
+    "--disk-budget-per-worker-gib=768",
+    "--cpus-per-lane=5",
+    "--cpu-quota-percent=800",
+    "--solana-rayon-threads=8",
+    "--gcloud-account=sam.johnson@anza.xyz",
+    "--gcloud-project=principal-lane-200702",
+    "--gcloud-bin=/usr/lib/google-cloud-sdk/bin/gcloud",
+    "--controller-id=e199-backfill-20261102-v1",
+    "--controller-sha256=62592209a3fc2b659ea4bfb924bbcf34435b4228c87e56232eb6b962b907023e",
+    "--memory-reserve-gib=64",
+    "--protected-memory-gib=285",
+    "--disk-reserve-gib=3577",
+    "--external-disk-growth-claim-gib=horizon-qualify-145-cached-b2a09f57de39c384.service=15ddd220e2144aaa8d7418f73f60768f:337",
+    "--execute"
+  ],
+  "controller_executable": {
+    "path": "/usr/bin/python3.12",
+    "sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f"
+  },
+  "controller_source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch199-backfill-controller-guard-20261102-v1/adaptive-root-cohort-sweep.py",
+    "sha256": "62592209a3fc2b659ea4bfb924bbcf34435b4228c87e56232eb6b962b907023e"
+  },
+  "controller_start_ticks": 200799001,
+  "enabled": true,
+  "guard_source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch199-backfill-controller-guard-20261102-v1/guard_adaptive_replay_reserve.py",
+    "sha256": "b62e58f5be764935a679408e1fcc446a9768170109a6639c87fd01571b9f2b62"
+  },
+  "native_units": [
+    "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+    "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+    "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+    "jetstreamer-root-sweep-e199-backfill-20261102-v1-e199-200-lane-a-1.service"
+  ],
+  "quarantined_state": {
+    "path": "/var/lib/jetstreamer-root-sweep-epoch199-backfill-20261102-v1/state.json",
+    "sha256": "051642bf5ff3f1fffb5e7d8b2133ff399a0a0f1947fef50c74976b12858da152"
+  },
+  "raw_memory_bytes": 207232172032,
+  "residual_controller_guard_bytes": 1073741824,
+  "schema": "terminal199-parent-only-memory-retirement-policy-v1",
+  "selected_parent_bytes": 0,
+  "terminal_context": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-terminal-context-20261104-v2/registry.json",
+    "sha256": "733487fcb07438d603999234b0a0598d62261ba0c1cb0ba6003693260ebc1389"
+  }
+}

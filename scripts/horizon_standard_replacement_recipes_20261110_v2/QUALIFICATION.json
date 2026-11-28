@@ -1,0 +1,17 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/recovery-source-qualification-20261110-v4/replacement-recipes-v2/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "86ebb408ea4678f28f5a16a7cd6e9404b64bed4e593dc8e9da61d77a01099404"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/recovery-source-qualification-20261110-v4/replacement-recipes-v2/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "1f620f72bd70f479bf78393352deaf127df8d6bdda300aa0a2ae5b3c93f4d015"
+  },
+  "actual_ordinary_test_count": 32,
+  "replay_launch_authorized": false,
+  "published_source_sha256": {
+    "main.rs": "64912bc37e1e6d4bc646d82c9dc269454354386e704c4bb98bf02193d5f2b340",
+    "profile.rs": "5daaf70a67b4e1d16642952844644aa178e718867e921632b28b99481175f584",
+    "tests.rs": "495654171e20f8ef740a9a1ddce496bc45d04b5a9c792a389cadeab2b9414cc9"
+  }
+}

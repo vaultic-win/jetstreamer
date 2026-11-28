@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-current0000-bound-guard-window-tests-20261109-v1-r2\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"10866e4f07bebe834a98fdfc234e367517724b2ee752516c5aadcf6d67492428\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

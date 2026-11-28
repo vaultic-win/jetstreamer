@@ -1,0 +1,175 @@
+{
+  "schema": "horizon-final4-qualified-publication-repair-archive-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/source/events_publication_native_tests.rs",
+      "archive": "source/events_publication_native_tests.rs",
+      "sha256": "f59f5aaf9ce046c4abf75bfc20901b7b83013bec303bbef9fc6b8f4248de2f13"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/source/native_timer.rs",
+      "archive": "source/native_timer.rs",
+      "sha256": "93507d20210b8ad62604eb73c6d6e3fcae3b6295feaa46b25b888e4ef79fb748"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/source/transaction.rs",
+      "archive": "source/transaction.rs",
+      "sha256": "62f0c7041f93eda9cd1cd71850041925993cabdab3ceaa17038a8acbc7997ae0"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/source/storage.rs",
+      "archive": "source/storage.rs",
+      "sha256": "50d6bbef5d3373bc5f95bf082ff29f79588b8b4ce444e6ba03dd70c02fa40071"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/source/process.rs",
+      "archive": "source/process.rs",
+      "sha256": "4dacb2baa0013bfdf90a6b3680f8b5c9bf8c18d8c8a630ac17cca7546e890576"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/source/events.rs",
+      "archive": "source/events.rs",
+      "sha256": "fd5ffc69104cafae1d656a68c4d5c03ac0721e43502007ad9c5b28e633340fac"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/source/main.rs",
+      "archive": "source/main.rs",
+      "sha256": "396d53543aec8cd03a3af71d28af8d476d6775ecb9236168443fad6060992801"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/source/driver_policy.rs",
+      "archive": "source/driver_policy.rs",
+      "sha256": "abe40ce1dfbd1ae9f65f53a518681768c39e386200fd79e44f6c48a04961a118"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "archive": "qualification/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "sha256": "2102e5aa416ffa4e9ffbf7cc5a8862154afc96faf44ddcf68a153b734d9fbca5"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/ROOT_NORMAL6_FINAL4_DATA512_BOOKING.json",
+      "archive": "qualification/ROOT_NORMAL6_FINAL4_DATA512_BOOKING.json",
+      "sha256": "63b184909418721ffbfcbcd242a9616354291924bbf4e848ed7759cd6899c890"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/ARTIFACT-PROOF.json",
+      "archive": "qualification/ARTIFACT-PROOF.json",
+      "sha256": "bb3dd54b1e1e738aba4b3f07a217587d232fd67f61d2a9f434f9b291866a09c9"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_FINAL4_BINDINGS.json",
+      "archive": "qualification/ROOT_ACTUAL_QUALIFIED_FINAL4_BINDINGS.json",
+      "sha256": "33dbd57ef9d85a9e0ce3336898b1ea2a02873a78049a12ed2f98c3873d379b5c"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/ALL_FOUR_ORIGINAL_COMPILERS_PASSED.json",
+      "archive": "qualification/ALL_FOUR_ORIGINAL_COMPILERS_PASSED.json",
+      "sha256": "e7e7ba0bb60307345a3c81daf546a52e1af4b774be809821380a17f0365408ea"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/ordinary-ORIGINAL-EXECUTION.json",
+      "archive": "qualification/ordinary-ORIGINAL-EXECUTION.json",
+      "sha256": "519ab916ebac251e85ecc6f24fe3ae62bff1bf0ef01f46fe4c6025ba009f0072"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/native-0-ORIGINAL-EXECUTION.json",
+      "archive": "qualification/native-0-ORIGINAL-EXECUTION.json",
+      "sha256": "2f4a3cb3ffdd5675792762888ce39bd69d9d94079513f0e6e17ec78efd1320dd"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/native-1-ORIGINAL-EXECUTION.json",
+      "archive": "qualification/native-1-ORIGINAL-EXECUTION.json",
+      "sha256": "58fee4a94dfb711ee666eb70782b7f8d82618ad575fb8de161e949f279479684"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/native-2-ORIGINAL-EXECUTION.json",
+      "archive": "qualification/native-2-ORIGINAL-EXECUTION.json",
+      "sha256": "005ba4ec3fed959b86dad53051994ab63a361a1406e04c52a1490047853d473d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/native-3-ORIGINAL-EXECUTION.json",
+      "archive": "qualification/native-3-ORIGINAL-EXECUTION.json",
+      "sha256": "4d3331dd74686861f12bd31838900a7f029cb4fe0d627921c58b5cf73ce16e65"
+    },
+    {
+      "source": "/tmp/root-build-final4-publication-r1.py",
+      "archive": "operator-source/root-build-final4-publication-r1.py",
+      "sha256": "23fc51ca09b9dc8c18f62599699a5cd9abe58446582a228282989f15fb310111"
+    },
+    {
+      "source": "/tmp/root-qualify-final4-publication-r1.py",
+      "archive": "operator-source/root-qualify-final4-publication-r1.py",
+      "sha256": "53362277d404b81aab034ef2445bf9570b7f1cc234508501f085e584bc1dc8ad"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/3688-actual-c71-one-original-final-original-outcome.json",
+      "archive": "actual0100/3688-actual-c71-one-original-final-original-outcome.json",
+      "sha256": "3d26a8bfa7abcd2d398acc6f78489689d83f633424aa563b6f1bd6f66fd57933"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/original-enrolled-reader-completion.json",
+      "archive": "actual0100/original-enrolled-reader-completion.json",
+      "sha256": "518e3459830e841f089e9e768f759e2e67af5647343b6f0621728643ffff189d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/actual-postreader-context.json",
+      "archive": "actual0100/actual-postreader-context.json",
+      "sha256": "3ca0b2b962aceefbfe5d52025ee94b50a4f8407cb354c702aac1f8996c218406"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-9568cb52af154f7d8fbd48e7571770fa/ORIGINAL_FINAL_FAILURE.json",
+      "archive": "actual0100/ORIGINAL_FINAL_FAILURE.json",
+      "sha256": "1f57de3572e6f9fde3bf25b3ffa9d723b89e8f06b1548b0c3497f7fa9e651de8"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-9568cb52af154f7d8fbd48e7571770fa/17-actual-sol-eight-file-read-original-outcome.json",
+      "archive": "actual0100/17-actual-sol-eight-file-read-original-outcome.json",
+      "sha256": "74e7dea87ae49d6515cc6808eb5591f4e9d5ccf9e801f66deab76f2c805da39c"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-9568cb52af154f7d8fbd48e7571770fa/18-arm-original-timer-original-outcome.json",
+      "archive": "actual0100/18-arm-original-timer-original-outcome.json",
+      "sha256": "deaeef9f964edc653e7e6e16aaf9cdcb44f81e4d737f4732080a17294037e907"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0100-original-failure-and-owned-timer-stop-20261109-v1/STOP_ONLY_NEW_FAILED0100_TIMER_INTENT.json",
+      "archive": "actual0100/STOP_ONLY_NEW_FAILED0100_TIMER_INTENT.json",
+      "sha256": "7beb96e85a3926f91640c53e6574903777db194039fa31dc0815d80b24f0d6ef"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0100-original-failure-and-owned-timer-stop-20261109-v1/EXACT_OWNED_TIMER_STOP_EXECUTION.json",
+      "archive": "actual0100/EXACT_OWNED_TIMER_STOP_EXECUTION.json",
+      "sha256": "d2496c7946607c710c74704b8fbf8c048401225e03cbf806a91ae187cd10c352"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0100-original-failure-and-owned-timer-stop-20261109-v1/EXACT_OWNED_TIMER_STOP_COMPLETION.json",
+      "archive": "actual0100/EXACT_OWNED_TIMER_STOP_COMPLETION.json",
+      "sha256": "f402f674baa2a5474065cc6ff370f5bc971c78062e7a7942691e112892f8b138"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review5-model-20261109-next-v1/MODEL_BINDING.json",
+      "archive": "estimate-review5/MODEL_BINDING.json",
+      "sha256": "47fc0f4f3179c9a20b9e8284cb5b9e4db18e7c145084bffb1cedc683c61d0fce"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review5-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW5.json",
+      "archive": "estimate-review5/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW5.json",
+      "sha256": "08720c9def3712b29d4b3e8022e7e74134df4dc42655fa7eb5431d5555321b30"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review5-model-20261109-next-v1/EXPLICIT_REVIEW5_BEFORE_REVIEW4_EXPIRY.json",
+      "archive": "estimate-review5/EXPLICIT_REVIEW5_BEFORE_REVIEW4_EXPIRY.json",
+      "sha256": "2d4421c672477ffb8e63db0cfff72d63d97579408b964a8b83e21c87327ac157"
+    },
+    {
+      "source": "/var/lib/jetstreamer/epoch185-cold-guard-v4/guard-50a0f038091f4c578791c3720a85a72e.json",
+      "archive": "actual0100/first-guard-failure.json",
+      "sha256": "430cddfe3fc6968557eba5d9469448e860d25027d9b15dc3e2d87ba5558f37ac"
+    },
+    {
+      "source": "/tmp/final4-guard-publication-source-20261109-v1/HANDOFF.md",
+      "archive": "SOURCE_HANDOFF_NOT_OPERATIONAL_AUTHORITY.md",
+      "sha256": "178cf4d3d9795c6bef8b108753a3cdafdfaa487c5e9bd2a5d921766183e4c9e2"
+    }
+  ]
+}

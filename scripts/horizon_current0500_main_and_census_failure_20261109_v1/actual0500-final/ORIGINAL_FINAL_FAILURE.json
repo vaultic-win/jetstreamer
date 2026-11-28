@@ -1,0 +1,11 @@
+{
+  "at": 1794201345,
+  "error": "original event deadline expired",
+  "no_retry_clock_reset_fake_success_or_actor_restart": true,
+  "original_setup_deadline": 1794201715,
+  "original_task": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/task.json",
+    "sha256": "364915751ba88c4451d9c4d79d38a522ded7633bc55a2b8c279ad2d1032ac239"
+  },
+  "token_may_have_been_committed_preserve_actual_state": true
+}

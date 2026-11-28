@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest fleet::cold185::enrollment::inherited_live145_tests::actual2300_history_or_raw_family_tampering_never_authorizes_projection ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3063 filtered out; finished in 0.16s\n\n",
+  "stderr": "Running as unit: horizon-helper34-actual2300_history_or_raw_family_tampering_never_authorizes_projection-20261108-v1-helper35-20261109.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 175ms\nCPU time consumed: 174ms\nMemory peak: 4.0M\nMemory swap peak: 0B\n"
+}

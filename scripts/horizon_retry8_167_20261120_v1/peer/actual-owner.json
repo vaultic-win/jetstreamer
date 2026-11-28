@@ -1,0 +1,15 @@
+{
+  "epoch": 166,
+  "unit": "horizon-qualify-independent-cold166-20261120-v1.service",
+  "invocation_id": "fa16ee2f14fe44ecbc37c59e197553ac",
+  "main_pid": 2452922,
+  "main_start_ticks": 349365780,
+  "admission": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch166-independent-cold-20261120-v1/launch-state/epoch166/ACTUAL_REPLACEMENT_ADMISSION.json",
+    "sha256": "06cbda4ed64f3317384e6f220304aa491d40aa1a75fbc91c1b5525e8cecdc395"
+  },
+  "guard_protection": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch166-independent-cold-20261120-v1/launch-state/epoch166/ACTUAL_GUARD_PROTECTION.json",
+    "sha256": "4007d76ead9ed05f962867dbd84ff6f18b7f4ddcc9c97a4f448402e72c58b95b"
+  }
+}

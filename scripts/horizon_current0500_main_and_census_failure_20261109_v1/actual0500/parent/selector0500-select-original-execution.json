@@ -1,0 +1,17 @@
+{
+  "code": 0,
+  "native_after": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-original199-parent-memory-select-20261104-v1.service",
+    "InvocationID": "",
+    "Job": "",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "stderr": "Running as unit: horizon-original199-parent-memory-select-20261104-v1.service; invocation ID: 20320069758746988e3a99a265e12693\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 2.614s\nCPU time consumed: 2.579s\nMemory peak: 165.9M\nMemory swap peak: 0B\n",
+  "stdout": ""
+}

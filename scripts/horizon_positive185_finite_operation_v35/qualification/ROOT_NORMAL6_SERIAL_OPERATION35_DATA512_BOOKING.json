@@ -1,0 +1,14 @@
+{
+  "schema": "horizon-operation35-planner4-normal6-serial-DATA512-booking-v1",
+  "normal_pool_bytes": 6442450944,
+  "new_extra_QA_memory_bytes": 0,
+  "new_additive_retained_DATA_bytes": 536870912,
+  "previous_DATA_lower_bound_bytes": 5153304294036,
+  "complete_DATA_lower_bound_bytes": 5153841164948,
+  "actual_planner4": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper33-current-witness-planner-qa-20261108-v4/ROOT_ACTUAL_QUALIFIED_PLANNER4_R2_BINDINGS.json",
+    "sha256": "849f04156f39db00e2e7a2f38b223f4938e906a7b25ec77cc3299246bd88a8cc"
+  },
+  "all_old_promises_retained": true,
+  "no_credit_or_clock_reset": true
+}

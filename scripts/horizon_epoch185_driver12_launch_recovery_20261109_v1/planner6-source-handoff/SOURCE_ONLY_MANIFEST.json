@@ -1,0 +1,125 @@
+{
+  "schema": "horizon-planner6-driver12-helper35-source-only-v1",
+  "status": "SOURCE_ONLY_NOT_BUILT_NOT_QUALIFIED",
+  "P6_future_program": null,
+  "P6_future_proof": null,
+  "P6_booking": null,
+  "canonical_DATA_before_P6_booking_bytes": 5174779130516,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_bytes": 0,
+  "operational_actions": 0,
+  "files": [
+    {
+      "path": "ACTUAL_DRIVER12_BINDINGS.json",
+      "sha256": "f8f5cad6a75a689ae70789c605beb084267212d7482244c0db6e2aba3613f96e"
+    },
+    {
+      "path": "ACTUAL_HELPER35_BINDINGS.json",
+      "sha256": "7c292756432e2d1f798a494249dda901449da096552c55797ac249c04cae7ab6"
+    },
+    {
+      "path": "ACTUAL_PLANNER5_CURRENT_GRAPH_MATCH.json",
+      "sha256": "5d3ea12f7154930d52417e27c383781f0695757e0595096d2edac91a02b1d286"
+    },
+    {
+      "path": "ACTUAL_PREDECESSOR_PLANNER5_BINDINGS.json",
+      "sha256": "18c4c6cb267d8480c00c08e9936f2c0e1028bacdc7b96233866d51fc00e19733"
+    },
+    {
+      "path": "HANDOFF.md",
+      "sha256": "7c95543caa9595d9d596db38a48a016a2b5f599f4d054739c40c2f9d754cd07b"
+    },
+    {
+      "path": "INTEGRATION_NOTE.txt",
+      "sha256": "df8898b06c54515736fe307a6b9ef8e5b60eea8c23509f73dae99c538c28fef1"
+    },
+    {
+      "path": "SOURCE_AND_EXACT4_RECIPES.NOT_EXECUTED.json",
+      "sha256": "3f43ef39ff64b9160cdd3be3d849efb1069b23e64c518a276cfb65a02dab55c6"
+    },
+    {
+      "path": "SOURCE_ONLY_CANDIDATE.diff",
+      "sha256": "ca97be673839c62df70ee08755a267aaf6fe84a598142b33f603f6a086898dd9"
+    },
+    {
+      "path": "SOURCE_PREDECESSOR_BINDINGS.json",
+      "sha256": "fb4b8af8f0054180ec6b1247b9220307902dad8e645d954379cac3b035c5735a"
+    },
+    {
+      "path": "STATIC_CHECKS.json",
+      "sha256": "399ff4235708713f0a8b928cc69d459319e23c33b80d2475c52b5643d43a1bf5"
+    },
+    {
+      "path": "source/final_window.rs",
+      "sha256": "a30c4d0616afc8bd678cc6fd6060a7d3d6dfdb94b40bfcee345fcc843d18cc5c"
+    },
+    {
+      "path": "source/lineage.rs",
+      "sha256": "575fbb3c90288dbb59b9021e5c894b9ff9f8e0a2a520ad3b30451405161787db"
+    },
+    {
+      "path": "source/main.rs",
+      "sha256": "496e025f0d6460461e895e559b90ac841ac01f7e3d58a792ea413c4bb61d9511"
+    },
+    {
+      "path": "source/positive.rs",
+      "sha256": "8c16dde6c8fdc5875dc01249090fa170a06d2fc7005218f7fa065c34f7541e91"
+    },
+    {
+      "path": "source/resources.rs",
+      "sha256": "997c88a5d090fc0504f2d1a897cf3f8219979edf893d252ca008ee0bdbc52dc1"
+    },
+    {
+      "path": "source/storage.rs",
+      "sha256": "50d6bbef5d3373bc5f95bf082ff29f79588b8b4ce444e6ba03dd70c02fa40071"
+    },
+    {
+      "path": "source/templates/actor.service",
+      "sha256": "30278ba3fdc7c5322f4f269e7aaac4400905a12bddf1f1aa13823b566dac9a51"
+    },
+    {
+      "path": "source/templates/admission.json",
+      "sha256": "073a6a13a543193c6da88238ce0d5f80502d5acd39929237d95abe62fbff9861"
+    },
+    {
+      "path": "source/templates/envelope.json",
+      "sha256": "1eaeb843163f8decfe8101328713e95ec7b9e9c382324aec9279dbcce82ffac0"
+    },
+    {
+      "path": "source/templates/guard.service",
+      "sha256": "c8f39e424dd6226266d177455e58434581f2526612e7ff8a74154ecd2fdc9a55"
+    },
+    {
+      "path": "source/templates/guard.timer",
+      "sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57"
+    },
+    {
+      "path": "source/templates/task-spec.json",
+      "sha256": "22567a4994626bb0259b389b46a6eeb830274516a9cfb3ddcf0cba17df62109d"
+    },
+    {
+      "path": "source/templates-driver11/actor.service",
+      "sha256": "2e370ca591546667a0717417a4bf92e9ea8b3cf34456cbc9bb239d744e5b34d2"
+    },
+    {
+      "path": "source/templates-driver11/admission.json",
+      "sha256": "073a6a13a543193c6da88238ce0d5f80502d5acd39929237d95abe62fbff9861"
+    },
+    {
+      "path": "source/templates-driver11/envelope.json",
+      "sha256": "584b2f5ea2998d22a0bd09094aa83f4b6f4d104851c7064fc7a5e7424bed3f23"
+    },
+    {
+      "path": "source/templates-driver11/guard.service",
+      "sha256": "dfe6e68cc35cb5804172ca986a217bbc15f1ef0a46006340440727898ba25077"
+    },
+    {
+      "path": "source/templates-driver11/guard.timer",
+      "sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57"
+    },
+    {
+      "path": "source/templates-driver11/task-spec.json",
+      "sha256": "22567a4994626bb0259b389b46a6eeb830274516a9cfb3ddcf0cba17df62109d"
+    }
+  ]
+}

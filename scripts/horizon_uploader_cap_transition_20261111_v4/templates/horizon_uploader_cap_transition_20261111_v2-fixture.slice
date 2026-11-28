@@ -1,0 +1,7 @@
+[Unit]
+Description=Dedicated bounded baseline fixture ancestor inside retained aggregate
+[Slice]
+MemoryAccounting=yes
+MemoryMax=268435456
+MemorySwapMax=0
+TasksMax=512

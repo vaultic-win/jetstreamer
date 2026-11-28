@@ -1,0 +1,5 @@
+[
+  "systemctl",
+  "stop",
+  "horizon-operation32-coherence-disposable-20261108-v4.timer"
+]

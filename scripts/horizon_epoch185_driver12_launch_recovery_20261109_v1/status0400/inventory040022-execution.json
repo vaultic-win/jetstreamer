@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-range101-200-normal040022-visible-inventory-20261109-v1.service; invocation ID: 73da17938b6b44b8bc973a88526657b8\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 5.119s\nCPU time consumed: 126ms\n"
+}

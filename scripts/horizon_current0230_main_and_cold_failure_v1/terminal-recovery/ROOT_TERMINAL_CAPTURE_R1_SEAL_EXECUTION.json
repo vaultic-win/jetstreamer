@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-positive185-terminal-capture-da9b57fe-r1\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"4d614b115ff0727ba94e78d15e074b778e548e4cc0c59f22ebc48e3bc7ef5daf\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

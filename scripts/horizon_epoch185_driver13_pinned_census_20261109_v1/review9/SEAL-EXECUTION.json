@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-status185-review9-tools-20261109-v1\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"a096413dca88fcdf65c7cecbe6bacb1e151fda29627f801bb8ae5628879391a7\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

@@ -1,0 +1,336 @@
+"""Price epoch 168 retry5 against the retained retry4 and complete host bookings."""
+import json
+import os
+from pathlib import Path
+import subprocess
+
+R = Path('/var/lib/jetstreamer/horizon_runtime_data')
+FAMILY = R / 'epoch145-semantic-continuity-20261121-v1'
+V7 = {
+    'generation': 'v7',
+    'handoff': FAMILY / 'v7-168-stop-name-handoff',
+    'checker': FAMILY / 'tools-v7-168-stop-v2',
+    'checker_sha': '589d1da9f51c305be8699a9dc01e443c9ec2367d1f67e7905ba67fdeb0d35c7b',
+    'submission_sha': '4c83262f7bb705f30f1850dcc1274a549b2f08b80618bc23c3c9955fae4f4163',
+    'start_sha': 'ed8a68eb322ffeb2788f3017b14fd7c5dfe256f0e95362ed932457bab7d8e487',
+    'invocation': 'f7043fd6595a4151b659d4b098bede11',
+    'schema': 'horizon-epoch145-v5z-custody-successor-semantic-completion-v1',
+}
+V8 = {
+    'generation': 'v8',
+    'handoff': FAMILY / 'v8-pid1-timeout-name-handoff',
+    'checker': FAMILY / 'tools-v8-pid1-timeout',
+    'checker_sha': '970f9aa956611e499ce1582d37dc845c5e7bfacd639c6002a6c72ccb1a3d718c',
+    'submission_sha': '6209b4b6a1c8a95803b82dc4d7e385e67ce59519e53b608ce146032eedf915b6',
+    'start_sha': 'e3fedd1fb256f88f0a98175f122a0d140c291b109f6abc88e3a1b906de1c64ab',
+    'invocation': 'e0aa2fa7d85e41578b8489eddd8695b5',
+    'schema': 'horizon-epoch145-v7-timeout-successor-semantic-completion-v1',
+}
+
+V9 = {
+    'generation': 'v9',
+    'handoff': FAMILY / 'v9-census-name-handoff',
+    'checker': FAMILY / 'tools-v9-census-recovery',
+    'checker_sha': '8766c269034824f114eb1906e1913188f615309b51243e8e23ca111936efeebd',
+    'submission_sha': '33cef3c0ae1bc0aebe1bd8ab950c781c518ce646656f8ffbc66229aaf823c973',
+    'start_sha': 'eaf570320604963b6270c1aa2854c48f6cc0c3a5254c829a699d9b6272e6b2c4',
+    'invocation': 'ebdfc34db47c4e7699ea5ccbada5d604',
+    'schema': 'horizon-epoch145-v8-census-successor-semantic-completion-v1',
+}
+
+V10 = {
+    'generation': 'v10',
+    'handoff': FAMILY / 'v10-census-name-handoff',
+    'checker': FAMILY / 'tools-v10-census-recovery',
+    'checker_sha': '29aac4e0527dcea47f4e9bcb14c5e071b67b8d749669873cc04d7cd1cc5d4e75',
+    'submission_sha': '63afb9ef8ffa492e2fe12b05b9eccd6bd2e1c533d024f59ebeb21460e43da8cf',
+    'start_sha': 'ed1dd13fb7803f31e90b7040b09359a484f0fef2608bce74a0c65bd2c37fa605',
+    'invocation': '104f023c5cd24a55b6585ef525b80067',
+    'schema': 'horizon-epoch145-v9-census-successor-semantic-completion-v1',
+}
+
+
+def drained145(s, fit, load, *, owner=V7):
+    generation = owner['generation']
+    invocation = owner['invocation']
+    manager = s.show(fit.A145)
+    group = Path('/sys/fs/cgroup/system.slice') / fit.A145
+    s.need(manager['ActiveState'] == 'inactive' and manager['SubState'] == 'dead' and
+           manager['MainPID'] == manager['ControlPID'] == '0' and
+           manager['InvocationID'] in ('', invocation) and not manager['ControlGroup'] and
+           not manager['Job'] and not fit.members(fit.A145) and not group.exists(),
+           f'epoch 145 {generation} verifier has not drained')
+    checker, checker_sha = owner['checker'], owner['checker_sha']
+    load(checker, checker_sha)
+    saved, completion = s.read(owner['handoff'] / 'SEMANTIC_COMPLETION.json')
+    submission = owner['handoff'] / 'START_RESULT.json'
+    start = R / 'epoch145-guarded-export-20261121-v1/state' / invocation / 'recovery-started.json'
+    start_ref = s.ref(start, owner['start_sha'])
+    proof = json.loads(subprocess.check_output(
+        ['/usr/bin/python3', '-IB', checker / 'v5v_semantic_completion.py', submission, owner['submission_sha']],
+        timeout=20))
+    s.need(proof == saved and proof['schema'] == owner['schema'] and proof['invocation_id'] == invocation and
+           proof['start'] == proof['startup_evidence']['start'] == start_ref and
+           proof['startup_evidence']['submission_result'] == s.ref(submission, owner['submission_sha']) and
+           proof['publication_authorized'] is False and proof['r2_mutations'] is False and
+           s.show(fit.A145) == manager and not fit.members(fit.A145) and not group.exists(),
+           f'changed epoch 145 {generation} terminal or native owner')
+    return dict(Id=fit.A145, MainPID='0', stage=f'{generation}-semantic-complete-drained',
+                completed_invocation_id=invocation, completion=completion,
+                checker_seal=s.ref(checker / 'deployment-seal-receipt.json', checker_sha))
+
+
+def retained(s, fit, fleet, cold168):
+    stop, source = cold168['retry5_stop'](s, fit)
+    capacity_ref = fleet['current_home_cycle_capacity']
+    capacity = s.bound(capacity_ref, Path(capacity_ref['path']))
+    s.need(stop == fleet['cold168_retry4_root_physical_stop'] ==
+           capacity['retained_cold168_retry4_reservation'] and
+           not fleet.get('cold168_local_commit') and not fleet.get('metered168_local_commit'),
+           'retained retry4 is not bound to the accepted fleet')
+    return stop, source
+
+
+def protected_owner(s, cold168, fleet, actor):
+    """Require the exact admitted retry5 worker in the coordinated replay census."""
+    rows = [row for row in fleet['actual_executing_replays'] if row['epoch'] == 168]
+    s.need(actor is not None and len(rows) == 1 and len(actor['processes']) == 2
+           and actor['admission'] is not None, 'full epoch 170 requires a protected retry5 worker')
+    row, = rows
+    unit, invocation = actor['producer_unit'], actor['producer_invocation_id']
+    producer, worker = actor['processes']
+    first, first_ref = s.read(R / cold168['DIRECTORY'] / 'FIRST_PROTECTED_WORKER.json')
+    s.need(unit == cold168['UNIT'] == row['unit']['Id'] == first['producer_unit']
+           and invocation == row['unit']['InvocationID'] == first['producer_invocation_id']
+           and producer[:2] == [int(row['unit']['MainPID']), row['start_ticks']]
+           == [first['producer_pid'], first['start_ticks']]
+           and worker[:2] == [first['worker_pid'], first['worker_start_ticks']]
+           and first['worker_sha256'] == cold168['WORKER_SHA']
+           and actor['admission'] == row['admission'] == first['admission']
+           and first['observer_row'] == row['observer_config']
+           and row['guard_timer']['Id'] == actor['timer']
+           and row['guard_timer']['InvocationID'] == actor['timer_invocation_id']
+           == first['worker_guard']['timer']['InvocationID'],
+           'full epoch 170 retry5 owner differs from its protected fleet row')
+    return {**{key: actor[key] for key in ('producer_unit', 'producer_invocation_id', 'producer_pid',
+                                          'start_ticks', 'admission', 'plan', 'timer',
+                                          'timer_invocation_id', 'floor', 'processes')},
+            'first_worker': first_ref}
+
+
+def stopped_retry5(s, cold168, fleet, actor):
+    """Preserve the released retry5 invocation's physical obligation after its stop."""
+    stop = fleet['cold168_retry5_physical_scan_stop']
+    source = R / cold168['DIRECTORY']
+    terminal = s.bound(stop['terminal'], source/'guard-receipts/stop-completion.json')
+    intent = s.bound(stop['stop_intent'], source/'guard-receipts/stop-intent.json')
+    admission = s.bound(stop['admission'], source/'ACTUAL_ADMISSION_AND_PROTECTION.json')
+    plan = s.bound(admission['actual_guard_plan'], source/'ACTUAL_GUARD_PLAN.json')
+    s.need(actor is None and not any(row['epoch'] == 168 for row in fleet['actual_executing_replays'])
+           and stop['resource_credit_bytes'] == stop['reservation_ending_bytes'] == 0
+           and stop['retained_cap_bytes'] == plan['maximum_root_physical_bytes'] == cold168['CAP']
+           and stop['producer_invocation_id'] == terminal['producer_invocation_id']
+           == admission['producer_invocation_id'] == plan['invocation_id']
+           and terminal['plan_sha256'] == intent['plan_sha256'] == admission['actual_guard_plan']['sha256']
+           and intent['reason'] == 'root-physical-observation-failed'
+           and intent['sample']['root_physical_observation_error'] == 'physical scan time bound exceeded'
+           and (plan['unit'], admission['timer_unit']) == (cold168['UNIT'], stop['retired_guard_timer']),
+           'invalid stopped retry5 resource authority')
+    return dict(stop=stop, floor=plan['minimum_free_bytes'])
+
+
+def donor_cover(s, donor, before, native, fleet, *, registered_writer=None,
+                independent_entry146=False, retry5_provider=None):
+    """Price the paid donor with the V12 roster while retaining all old claims."""
+    donor_args = {'retry5_provider': retry5_provider} if retry5_provider else {}
+    after = donor['snapshot'](**donor_args)
+    fits = (native['fits'] and native['schema'] == 'horizon-incident-replay-fit-v1' and
+            native['resource_credit_bytes'] == 0 and not native['replay_launch_authorized'] and
+            native['complete_cpu_quota_micros'] == 64_000_000 and
+            native['complete_memory_plus_reserve_bytes'] == 810_658_050_048)
+    s.need(before == after and before['invocation_id'] == donor['IID'] and
+           before['grant_sha256'] == donor['GRANT'] and before['driver_exit'] == donor['EXIT'] and fits,
+           'incomplete native retry5 or donor price')
+
+    g, m = donor['GIB'], donor['MIB']
+    loan = native['candidate136']
+    retry4 = native['stopped_cold168']
+    fail166, fail170 = native['failed_cold166'], native['failed_cold170']
+    old = native['bookings']['168']
+    writer = native['status_registration']
+    valid_writer = (writer == registered_writer if registered_writer is not None else
+                    writer['consumer_seal']['sha256'] ==
+                    '6899ee7708ca74e9bf2a04cb932ce2fc75dff18e16866149b1dbeea3887496ac')
+    s.need(not loan['occupied'] and not loan['loan_micros'] and
+           valid_writer and
+           retry4['resource_credit_bytes'] == retry4['reservation_ending_bytes'] == 0 and
+           old['cap_bytes'] == retry4['retained_cap_bytes'] == 288 * g and
+           old['remaining_bytes'] == max(0, old['cap_bytes'] - old['physical_bytes']) and
+           old['measurement'] == 'two complete stopped-tree walks' and
+           old['unreconciled_stop_bytes'] ==
+               max(0, retry4['measured_physical_bytes'] - max(old['cap_bytes'], old['physical_bytes'])) and
+           fail166 == fleet['cold166_retry11_write_version_failure'] and
+           fail170 == fleet['cold170_retry13_execution_failure'] and
+           fail166['reservation_ending_bytes'] == fail170['reservation_ending_bytes'] == 0,
+           'changed stopped replay booking or registered cadence')
+    for epoch, cap in (('166', 288*g), ('170', 384*g)):
+        booking = native['bookings'][epoch]
+        s.need(booking['cap_bytes'] == booking['physical_bytes'] + booking['remaining_bytes'] == cap and
+               booking['measurement'] == 'two complete stopped-tree walks', 'changed retained ' + epoch)
+
+    fit168 = native['epoch'] == 168
+    phases = {'v7-semantic-complete-drained', 'v8-semantic-complete-drained',
+              'v9-semantic-complete-drained', 'v10-semantic-complete-drained'}
+    if native['epoch'] == 145:
+        phases |= {'v5j-semantic-complete', 'post-full', 'publish'}
+        if independent_entry146:
+            entry = native['bounded_qualification']
+            s.need(entry is not None and entry['registration'] == fleet['epoch146_bounded_entry_lease'],
+                   'independent 145 handoff lost the accepted epoch 146 lease')
+            phases = {'independent-semantic-complete-v10-drained'}
+    if retry5_provider:
+        s.need(native['epoch'] == 168 and native['bounded_qualification'] is None,
+               'independent 145 handoff requires the epoch 168 replay booking')
+        phases = {'independent-semantic-complete-v10-drained'}
+    peers = native['replacements']
+    own = native['candidate'] if fit168 else peers.get('168')
+    roster = fleet['actual_executing_replays']
+    scoped = [row for row in roster if row['epoch'] == 168]
+    s.need(native['epoch'] in (145, 168) and native['phase145']['stage'] in phases and
+           native['retry5_retained_source']['sha256'] ==
+           '488dbd9e630511b97a0ad0704241a0a1fdec71a614caf17c6cd1d3a63b3dc0b2' and
+           len(scoped) <= 1 and fleet['canonical_producer_count'] == len(roster) == 2 + len(scoped) and
+           {row['epoch'] for row in roster if row['epoch'] != 168} == {167, 172} and
+           set(peers) - {'168'} == {'167'} and set(native['survivors']) == {'172'} and
+           ('168' not in peers or own == peers['168']) and
+           all(own and row['unit']['Id'] == own['producer_unit'] and
+               row['unit']['InvocationID'] == own['producer_invocation_id'] and
+               row['admission'] == own['admission'] for row in scoped),
+           'changed protected replay population in the donor census')
+
+    orig, _ = donor['bound'](donor['ROOT'] / 'HEAD131757-132005-donor.json', donor['PRICE'])
+    shared = orig['reserved_hourly']
+    booked = {
+        'guard_cpu_micros': 1_000_000, 'guard_memory': g, 'producer_cpu_micros': 3_000_000,
+        'producer_memory': 68*g, 'future_staging': 6_589_353_984, 'private_workspace': 68_117_473_606,
+    }
+    s.need(all(shared[key] == value for key, value in booked.items()) and orig['charged_reference'] == {
+        'cpu_cores': 2, 'memory_bytes': 48*g, 'other_home_bytes': 32*m, 'scratch_bytes': 24*g, 'swap_bytes': 0,
+    }, 'changed original 169 or 159 resources')
+    obligations = native['recovery_obligations']
+    workers = obligations['public_workers']
+    s.need(len({(w['pid'], w['start_ticks']) for w in workers}) == len(workers) and
+           sum(w['required_bytes'] for w in obligations['mirror_inputs']) == obligations['missing_mirror_bytes'],
+           'incomplete public audit')
+    public = max(obligations['public_storage']['remaining_DATA_growth_bytes'],
+                 fleet['active_ready_range_audit_obligation']['current_storage']['remaining_DATA_growth_bytes'])
+    vfs = os.statvfs(donor['HOME'])
+    available = min(vfs.f_bavail*vfs.f_frsize, native['available_HOME_bytes'],
+                    fleet['complete_cycle_conservative_available_DATA_bytes'])
+    required = native['complete_required_HOME_bytes'] + public + shared['future_staging'] + shared['private_workspace'] + 32*m
+    margin = min(available - required, orig['remaining_home_bytes'])
+    s.need(margin >= 0 and native['available_memory_bytes'] >= native['required_available_memory_bytes'],
+           'insufficient HOME or general-slot memory')
+    return dict(schema='horizon-145-drained-159-donor-cover-v1', diagnostic=after, fleet=native['fleet'],
+                native_recorded_unix_seconds=native['recorded_unix_seconds'], original_donor_price_sha256=donor['PRICE'],
+                build_HOME_bytes=0, build_RAM_bytes=0, remaining_home_bytes=margin,
+                native_home_required=required, native_home_available=available,
+                general_slot_cpu_micros=1_000_000, general_slot_memory_bytes=2*g,
+                original_guard_memory_bytes=g, original_guard_cpu_micros=1_000_000,
+                original_producer_cpu_micros=3_000_000, original_producer_memory_bytes=68*g,
+                credited_retirement_bytes=0, replay_launch_authorized=False)
+
+
+def price(s, native, current, ret, donor, cold168):
+    """Add retry5 growth once, after the entire incumbent floor has been priced."""
+    cap = cold168['CAP']
+    lag = cold168['OUTSIDE_CAP_STOP_ALLOWANCE']
+    charge = max(ret['physical_bytes'], native['stopped_cold168']['measured_physical_bytes'])
+    s.need(ret['remaining_bytes'] == 0 and charge <= current['physical_bytes'] <= cap
+           and current['remaining_bytes'] == cap - current['physical_bytes'],
+           'invalid retained retry4 or retry5 physical booking')
+    candidate = native['epoch'] == 168
+    retained_floor = donor['native_home_required'] + lag
+    guard_floor = native['active168_guard_floor']
+    protected = retained_floor if candidate else max(retained_floor, guard_floor)
+    required = protected + current['remaining_bytes']
+    available = donor['native_home_available']
+    details = dict(schema='horizon-168-retry5-complete-booking-v1',
+                   retained_guard_floor_bytes=0 if candidate else guard_floor,
+                   previous_producer_physical_charge_bytes=charge,
+                   prior_stop=native['stopped_cold168']['terminal'],
+                   outside_cap_stop_allowance_bytes=lag,
+                   retained_source=native['retry5_retained_source'],
+                   retained_base_HOME_bytes=donor['native_home_required'],
+                   protected_raw_floor_bytes=protected, complete_required_HOME_bytes=required,
+                   candidate_remaining_bytes=current['remaining_bytes'],
+                   producer_cpu_quota_micros=9_000_000, producer_memory_bytes=68 << 30,
+                   guard_cpu_quota_micros=250_000, guard_memory_bytes=1 << 30,
+                   producer_swap_bytes=0, guard_swap_bytes=0,
+                   funded=available >= required)
+    native.update(protected_raw_floor_bytes=protected if candidate else required,
+                  complete_required_HOME_bytes=required,
+                  available_HOME_bytes=available, retry5_complete_booking=details,
+                  fits=native['fits'] and details['funded'], epoch159_donor_cover=donor)
+    native['bookings']['168'] = current
+    return native
+
+
+def price166(s, native, current, ret, donor, cold168):
+    """Carry the paid retry5 growth through both whole-tree 166 projections."""
+    base = native['complete_required_HOME_bytes']
+    zero = native['full166_zero_remaining_native_HOME_bytes']
+    donor_home = donor['native_home_required']
+    s.need(0 < zero <= base <= donor_home, 'inconsistent epoch 166 base and donor projections')
+    quote = price(s, native, current, ret, donor, cold168)
+    retry5 = quote['retry5_complete_booking']
+    zero_with_donor = zero + donor_home - base
+    zero_with_retry5 = (max(zero_with_donor + retry5['outside_cap_stop_allowance_bytes'],
+                            retry5['retained_guard_floor_bytes']) + retry5['candidate_remaining_bytes'])
+    quote['full166_retry5_projection'] = dict(
+        native_current_HOME_bytes=base,
+        native_zero_remaining_HOME_bytes=zero,
+        funded_current_HOME_bytes=quote['complete_required_HOME_bytes'],
+        funded_zero_remaining_HOME_bytes=zero_with_retry5,
+    )
+    return quote
+
+
+def price170(s, native, cold168):
+    """Apply retry5 to both 170 projections after the donor and holding price."""
+    base = native['complete_required_HOME_bytes']
+    zero = native['full170_zero_remaining_native_HOME_bytes']
+    donor = native['epoch159_donor_cover']
+    donor_home = donor['native_home_required']
+    s.need(0 < zero <= base <= donor_home, 'inconsistent epoch 170 donor projections')
+    owner = native['full170_retry5_owner']
+    stopped = native.get('full170_retry5_stopped')
+    if stopped is None:
+        s.need(owner['floor'] == native['active168_guard_floor'] > 0, 'missing live retry5 floor')
+    else:
+        s.need(owner is None and native['active168_guard_floor'] == 0 and stopped['floor'] > 0,
+               'stopped retry5 price claimed a live guard')
+    current = native.pop('full170_retry5_current')
+    retained = native['bookings']['168']
+    price(s, native, current, retained, donor, cold168)
+    retry5 = native['retry5_complete_booking']
+    required = native['complete_required_HOME_bytes']
+    joint_zero = (max(zero + donor_home - base + retry5['outside_cap_stop_allowance_bytes'],
+                      retry5['retained_guard_floor_bytes']) + current['remaining_bytes'])
+    if stopped is None:
+        remaining = donor['remaining_home_bytes'] - (required - donor_home)
+    else:
+        # This stop preserved an independently admitted booking. Charge its
+        # remaining growth to actual free HOME and keep the donor's original
+        # allowance as a separate ceiling on new funding.
+        remaining = min(donor['remaining_home_bytes'], donor['native_home_available'] - required)
+    native.update(full170_zero_remaining_native_HOME_bytes=joint_zero,
+                  epoch159_donor_cover=dict(donor, native_home_required=required,
+                                           remaining_home_bytes=max(0, remaining)),
+                  fits=native['fits'] and remaining >= 0,
+                  full170_retry5_projection=dict(native_current_HOME_bytes=base,
+                                                 native_zero_remaining_HOME_bytes=zero,
+                                                 donor_HOME_bytes=donor_home,
+                                                 funded_current_HOME_bytes=required,
+                                                 funded_zero_remaining_HOME_bytes=joint_zero))
+    return native

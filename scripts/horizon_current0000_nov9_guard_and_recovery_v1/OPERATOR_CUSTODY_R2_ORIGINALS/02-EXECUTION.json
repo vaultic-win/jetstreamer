@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/tmp/continuations0000-helper34-operation36-20261109-v1/bind-actual0000-qualified-metadata-v1.py"
+  ],
+  "code": 0,
+  "stdout": "Actual0000 qualified bindings filled c36ed15a8e40ac4049b8d72c7c740cb362973321cb95985ee916e00fb44daae1\n",
+  "stderr": ""
+}

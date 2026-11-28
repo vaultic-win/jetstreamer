@@ -1,0 +1,171 @@
+{
+  "available_bytes_after": 1851054665728,
+  "available_bytes_before": 1392635379712,
+  "common": {
+    "archive_deletion_authorized": false,
+    "epoch": 237,
+    "preserved": {
+      "archives": {
+        "device": 66305,
+        "gid": 1000,
+        "inode": 13547616,
+        "mode": 448,
+        "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/state/destination-8c7367f2f955a823f78f02aa3e05000b22d3fdc277987e9f22b4fa5da9a5556d/work/root-cohort-237-237/run-2030542-1793568723686999262/archives",
+        "uid": 1000
+      },
+      "cohort_state": {
+        "bytes": 222,
+        "device": 66305,
+        "gid": 1000,
+        "inode": 13547609,
+        "mode": 384,
+        "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/state/destination-8c7367f2f955a823f78f02aa3e05000b22d3fdc277987e9f22b4fa5da9a5556d/work/root-cohort-237-237/run-2030542-1793568723686999262/cohort-state.json",
+        "sha256": "4316367f69e54c02157df2c97129250027184f79d51a30d9bdae9b9a884d5029",
+        "uid": 1000
+      },
+      "diagnostic_observations": [
+        {
+          "bytes": 130,
+          "device": 66305,
+          "gid": 0,
+          "inode": 4773166,
+          "mode": 420,
+          "path": "/var/lib/jetstreamer/horizon237-stop-incident780-v1/stopped-original-scope.txt",
+          "sha256": "b824972de4825e44deb063c4580b869eca8878bf334f615393c5f71afbcc32bf",
+          "uid": 0
+        },
+        {
+          "bytes": 94,
+          "device": 66305,
+          "gid": 0,
+          "inode": 4773165,
+          "mode": 420,
+          "path": "/var/lib/jetstreamer/horizon237-stop-incident780-v1/after-old-monitor-close.txt",
+          "sha256": "dbb6c1f75b7b09784eb4c78c91a2b31402c142afae98abdcf1ef066b6af58650",
+          "uid": 0
+        }
+      ],
+      "genesis": {
+        "bytes": 20144,
+        "device": 66305,
+        "gid": 1000,
+        "inode": 13547593,
+        "mode": 384,
+        "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/output/genesis.tar.bz2",
+        "sha256": "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945",
+        "uid": 1000
+      },
+      "immutable_inputs": [
+        {
+          "bytes": 48454432,
+          "device": 66305,
+          "gid": 0,
+          "inode": 12298210,
+          "mode": 365,
+          "path": "/var/lib/jetstreamer/horizon-contiguous-237-240-current-46b4b4a-v1/jetstreamer-node",
+          "sha256": "362e928c778c171dff190c2efcf631a7fc9675b96be4f1b699e433993ac365a1",
+          "uid": 0
+        },
+        {
+          "bytes": 6511712,
+          "device": 66305,
+          "gid": 0,
+          "inode": 12298234,
+          "mode": 365,
+          "path": "/var/lib/jetstreamer/horizon-contiguous-237-240-current-46b4b4a-v1/jetstreamer-historical-worker-v1-7-15",
+          "sha256": "88581898fb68efa52bbb2415eeb0c229c68d32cd36ee40d124c87761ba2b7486",
+          "uid": 0
+        },
+        {
+          "bytes": 11340036935,
+          "device": 66305,
+          "gid": 0,
+          "inode": 12298236,
+          "mode": 292,
+          "path": "/var/lib/jetstreamer/horizon-contiguous-237-240-current-46b4b4a-v1/snapshot-102383737-59seMYbTe6MBQPFhEJFcbK3J3wfwBGs6NubdbFQED6UN.tar.zst",
+          "sha256": "e0881930a7872286ac442757a1009fc1cbf4841760221d7ac162967d3bf7ceaf",
+          "uid": 0
+        }
+      ],
+      "incident_sha256": "e49056e4baf3f6cb131e00c37181457f6d140f5222a8602bad0f06b8f7235c25",
+      "inputs": {
+        "device": 66305,
+        "gid": 1000,
+        "inode": 13547654,
+        "mode": 448,
+        "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/state/destination-8c7367f2f955a823f78f02aa3e05000b22d3fdc277987e9f22b4fa5da9a5556d/work/root-cohort-237-237/run-2030542-1793568723686999262/inputs",
+        "uid": 1000
+      },
+      "manifest": {
+        "bytes": 229012,
+        "device": 66305,
+        "gid": 0,
+        "inode": 165330422,
+        "mode": 292,
+        "path": "/var/lib/jetstreamer/horizon-supported-233-target1-46b4b4a-v1/preflight-233-301-target1-offline-publish300.json",
+        "sha256": "207701a70fad8b6cdee7e848b0e7e5f7e88bbe4648f808fc89a5976b51b3bded",
+        "uid": 0
+      },
+      "operator_review": {
+        "path": "/var/lib/jetstreamer/horizon237-bootstrap-restart-review-main787-v1/review.json",
+        "sha256": "0d6734990a42b0b9debbee359b4a1aa875b05a4859637b2ed08ed62be782effb"
+      },
+      "original_stop_intent_sha256": "b441c23133ab8656d39a2ddc069e56ae6873251e838837dc029ce1c0f1acfd3d",
+      "partial_archive": {
+        "full_digest_claimed": false,
+        "identity": {
+          "bytes": 157334577077,
+          "ctime_nanoseconds": 385301224,
+          "ctime_seconds": 1793716861,
+          "device": 66305,
+          "gid": 1000,
+          "inode": 13547667,
+          "links": 1,
+          "mode": 33152,
+          "mtime_nanoseconds": 385301224,
+          "mtime_seconds": 1793716861,
+          "uid": 1000
+        },
+        "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/state/destination-8c7367f2f955a823f78f02aa3e05000b22d3fdc277987e9f22b4fa5da9a5556d/work/root-cohort-237-237/run-2030542-1793568723686999262/archives/epoch-237.jet",
+        "payload_read": false,
+        "read_only_descriptor_held": true
+      },
+      "run": {
+        "device": 66305,
+        "gid": 1000,
+        "inode": 13547606,
+        "mode": 448,
+        "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/state/destination-8c7367f2f955a823f78f02aa3e05000b22d3fdc277987e9f22b4fa5da9a5556d/work/root-cohort-237-237/run-2030542-1793568723686999262",
+        "uid": 1000
+      }
+    },
+    "r2_mutations": false,
+    "remote_mutations": false,
+    "replay_launch_authorized": false,
+    "scope_sha256": "32dd2ea5b114b9a4fd4ff0bb781ee5364c6876a3f6d3ea9c6325dec3e879e850",
+    "target": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/state/destination-8c7367f2f955a823f78f02aa3e05000b22d3fdc277987e9f22b4fa5da9a5556d/work/root-cohort-237-237/run-2030542-1793568723686999262/scratch",
+    "tool_sha256": "43f2cb3c2c58bcf97fb30f4a0c459b20aeadad72b9e05a5aca449883a1acd27c"
+  },
+  "intent": "/var/lib/jetstreamer/horizon237-stopped-scratch-retirement-v1/intent.json",
+  "intent_sha256": "77ab494a74addaaa6f953bd580a38d834b7d050c73988160820a2112e6fe718c",
+  "plan": {
+    "path": "/var/lib/jetstreamer/horizon237-check-inputs795-v1/check-plan.json",
+    "sha256": "9df256c564cf9f9cd017889dd7c6cb18ff0509164cc8a24ee29f8cc751d7a17b"
+  },
+  "recorded_unix_seconds": 1793745024,
+  "schema": "jetstreamer-stopped237-scratch-completion-v1",
+  "scratch": {
+    "directories": 16,
+    "identity": {
+      "device": 66305,
+      "gid": 1000,
+      "inode": 13547631,
+      "mode": 448,
+      "path": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/state/destination-8c7367f2f955a823f78f02aa3e05000b22d3fdc277987e9f22b4fa5da9a5556d/work/root-cohort-237-237/run-2030542-1793568723686999262/scratch",
+      "uid": 1000
+    },
+    "physical_bytes": 456800903168,
+    "regular_files": 565073
+  },
+  "scratch_deleted": true
+}

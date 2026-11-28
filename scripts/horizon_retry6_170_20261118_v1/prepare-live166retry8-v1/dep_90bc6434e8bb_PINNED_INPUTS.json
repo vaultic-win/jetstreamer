@@ -1,0 +1,726 @@
+{
+  "schema": "horizon-DATA-fulfillment-source-research-v1",
+  "owner": "/root/data_fulfillment",
+  "source_only": true,
+  "current_authority": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+    "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+  },
+  "original70node_manifest": {
+    "path": "/tmp/root-old154-lineage-20261110-v1/LINEAGE_MANIFEST.json",
+    "sha256": "4906d22bdcc5656c2f28da7a9a28d45496c65ca57fc13cf898382b09a514b505"
+  },
+  "authenticated_static_node_count": 70,
+  "all70_hashes_schemas_totals_match": true,
+  "raw_accounting": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/e6a0713f158869752e84560f11f52d52a7f9dfb405038e5ee2d4af031e6b2334-cold185-722adc397ae24bb4b96d452783599f57/raw-accounting.json",
+    "sha256": "d783309cf31a26a572b0ad9113c154e4c86604fe1c8a8f882b17f3a6285f7274"
+  },
+  "canonical_booking": {
+    "path": "/home/sol/.jetstreamer-private/failed1530-ended-obligation-qa-20261109-v1/ROOT_CANONICAL_ALL_POSITIVE_INCREMENTS_RETAINED_BOOKING.json",
+    "sha256": "62d6b90bb4e12f2547fe4f74b39018373645523b05bf89c2a2ce5cea07631c3e"
+  },
+  "roles": [
+    {
+      "epoch": 166,
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch166-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD166_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "9fe7e360d83f203cc6762dc2a68fdb8fb789e800015092eba49cc55db2380ff1"
+      },
+      "full_root_cap_bytes": 309237645312,
+      "separate_guard_metadata_bytes": 8589934592,
+      "still_preserved_in_selected154_authority": true,
+      "selection_authority": false
+    },
+    {
+      "epoch": 167,
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch167-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD167_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "28c10a133d9773b33c5b47291e82ecd5da8e0b3b05d954be87e20734e1f8755f"
+      },
+      "full_root_cap_bytes": 309237645312,
+      "separate_guard_metadata_bytes": 8589934592,
+      "still_preserved_in_selected154_authority": true,
+      "selection_authority": false
+    },
+    {
+      "epoch": 168,
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch168-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD168_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "8d733e8fd750052fb050726a0b930fe9d213ebf4edc174ba2eb7711878255913"
+      },
+      "full_root_cap_bytes": 309237645312,
+      "separate_guard_metadata_bytes": 8589934592,
+      "still_preserved_in_selected154_authority": true,
+      "selection_authority": false
+    },
+    {
+      "epoch": 169,
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch169-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD169_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "48fd8018efb668cf164d4bb8a83b2f4ca087b2e8ad3e71e93606338378b59393"
+      },
+      "full_root_cap_bytes": 309237645312,
+      "separate_guard_metadata_bytes": 8589934592,
+      "still_preserved_in_selected154_authority": true,
+      "selection_authority": false
+    },
+    {
+      "epoch": 170,
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch170-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD170_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "3f053325eeb812fecf4f6444f9ed8e0b6d29e64dd7d1ff06ebfb87f99b5ac1ce"
+      },
+      "full_root_cap_bytes": 309237645312,
+      "separate_guard_metadata_bytes": 8589934592,
+      "still_preserved_in_selected154_authority": true,
+      "selection_authority": false
+    },
+    {
+      "epoch": 171,
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch171-independent-singleton-20261110-v1/ROOT_FRESH_STANDARD171_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "c781a0a2237546fc49bfc0fa30cd6472cc7437c1513a1416031333b6260fc594"
+      },
+      "full_root_cap_bytes": 309237645312,
+      "separate_guard_metadata_bytes": 8589934592,
+      "still_preserved_in_selected154_authority": true,
+      "selection_authority": false
+    },
+    {
+      "epoch": 172,
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/ROOT_FRESH_STANDARD172_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "d0fa07c259fdb5dadc4ce564d3afc562b32180354db16788ba083fb670e96027"
+      },
+      "full_root_cap_bytes": 309237645312,
+      "separate_guard_metadata_bytes": 8589934592,
+      "still_preserved_in_selected154_authority": true,
+      "selection_authority": false
+    }
+  ],
+  "full_root_caps_sum_bytes": 2164663517184,
+  "guard_metadata_sum_bytes": 60129542144,
+  "other_unchanged_DATA_bytes": 4005045550898,
+  "stronger_guard_surplus_over_current_DATA_bytes": 34292629504,
+  "retained_file_candidates_from_prior_native_ledgers": [
+    {
+      "epoch": 166,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/output/compact-indexes/166/epoch-166-bafyreibiiohrh4nfurrukccpyjdwu3c5a5ym4y5nqhkntxez734kdtlafe-mainnet-cid-to-offset-and-size.index",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch166/local2/physical.json",
+        "sha256": "8b306602fc19f66bde2a50c46e0abd3e21e2cd0d270b25c341306e023d46ed20"
+      },
+      "old_physical_bytes": 4196278272,
+      "old_identity": [
+        64512,
+        103874566,
+        1001,
+        1003,
+        33152,
+        1,
+        4196268262,
+        1794243380,
+        322660847,
+        1794243380,
+        341660926
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 166,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/private/destination-dd3947fd4ee7fdd82612b5977aea040658746bdd51eab3e2bc25858329734ef8/work/root-cohort-166-166/run-4188448-1794243111198290622/archives/epoch-166.jet",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch166/local2/physical.json",
+        "sha256": "8b306602fc19f66bde2a50c46e0abd3e21e2cd0d270b25c341306e023d46ed20"
+      },
+      "old_physical_bytes": 51630596096,
+      "old_identity": [
+        64512,
+        103161676,
+        1001,
+        1003,
+        33152,
+        1,
+        51630524269,
+        1794325192,
+        888639132,
+        1794325192,
+        888639132
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 166,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/private/destination-dd3947fd4ee7fdd82612b5977aea040658746bdd51eab3e2bc25858329734ef8/work/root-cohort-166-166/run-4188448-1794243111198290622/inputs/snapshot-71711708-73JLv83cyRgHUNxtajhwXimfDSH4GUmu6R8LHKPbxu76.tar.zst",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch166/local2/physical.json",
+        "sha256": "8b306602fc19f66bde2a50c46e0abd3e21e2cd0d270b25c341306e023d46ed20"
+      },
+      "old_physical_bytes": 1968021504,
+      "old_identity": [
+        64512,
+        103161637,
+        1001,
+        1003,
+        33152,
+        1,
+        1968014870,
+        1794243133,
+        359642565,
+        1794243134,
+        107645626
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 167,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/output/compact-indexes/167/epoch-167-bafyreienhstqouv46ysqm2r5dqeixnhmil3qem77x76q5hicq4egi3uzhi-mainnet-cid-to-offset-and-size.index",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch167/local2/physical.json",
+        "sha256": "bbf18c67dd2e6059987874d357cf2f123c03298a3fb4a53ef7bdc2ae27628f19"
+      },
+      "old_physical_bytes": 4170416128,
+      "old_identity": [
+        64512,
+        104136796,
+        1001,
+        1003,
+        33152,
+        1,
+        4170405634,
+        1794244658,
+        157824009,
+        1794244658,
+        614826080
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 167,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/private/destination-3b4f5569567cd789fd6de35befb8fb809d131b8a84c8a96ffb6060701e7e01f4/work/root-cohort-167-167/run-713-1794244398155881047/archives/epoch-167.jet",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch167/local2/physical.json",
+        "sha256": "bbf18c67dd2e6059987874d357cf2f123c03298a3fb4a53ef7bdc2ae27628f19"
+      },
+      "old_physical_bytes": 47289450496,
+      "old_identity": [
+        64512,
+        103874818,
+        1001,
+        1003,
+        33152,
+        1,
+        47289381803,
+        1794325161,
+        579465645,
+        1794325161,
+        579465645
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 167,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/private/destination-3b4f5569567cd789fd6de35befb8fb809d131b8a84c8a96ffb6060701e7e01f4/work/root-cohort-167-167/run-713-1794244398155881047/inputs/snapshot-72143703-CJEQdfn6zGqx4da6wL7CqgDhNAEij9tCPz7CrY9ZWH1a.tar.zst",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch167/local2/physical.json",
+        "sha256": "bbf18c67dd2e6059987874d357cf2f123c03298a3fb4a53ef7bdc2ae27628f19"
+      },
+      "old_physical_bytes": 2022621184,
+      "old_identity": [
+        64512,
+        103874754,
+        1001,
+        1003,
+        33152,
+        1,
+        2022614652,
+        1794244405,
+        612669403,
+        1794244406,
+        432673189
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 168,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/output/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-cid-to-offset-and-size.index",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch168/local2/physical.json",
+        "sha256": "26fb109fc1009a7eb4dae70f4a8fab432b1d1ee39dce6ef73431a4912f67a502"
+      },
+      "old_physical_bytes": 4362846208,
+      "old_identity": [
+        64512,
+        104146058,
+        1001,
+        1003,
+        33152,
+        1,
+        4362826998,
+        1794247389,
+        3628431,
+        1794247389,
+        315629786
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 168,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/private/destination-38f108e9d00d485f8ed68d9e7caaeb0a1570f35891271acc1ddc6e75b942e5ad/work/root-cohort-168-168/run-14201-1794247152158421923/archives/epoch-168.jet",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch168/local2/physical.json",
+        "sha256": "26fb109fc1009a7eb4dae70f4a8fab432b1d1ee39dce6ef73431a4912f67a502"
+      },
+      "old_physical_bytes": 38965637120,
+      "old_identity": [
+        64512,
+        104136907,
+        1001,
+        1003,
+        33152,
+        1,
+        38965576349,
+        1794325165,
+        40484823,
+        1794325165,
+        40484823
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 168,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/private/destination-38f108e9d00d485f8ed68d9e7caaeb0a1570f35891271acc1ddc6e75b942e5ad/work/root-cohort-168-168/run-14201-1794247152158421923/inputs/snapshot-72575704-Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx.tar.zst",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch168/local2/physical.json",
+        "sha256": "26fb109fc1009a7eb4dae70f4a8fab432b1d1ee39dce6ef73431a4912f67a502"
+      },
+      "old_physical_bytes": 2029223936,
+      "old_identity": [
+        64512,
+        104141334,
+        1001,
+        1003,
+        33152,
+        1,
+        2029219745,
+        1794247159,
+        477632042,
+        1794247160,
+        396636029
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 169,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/output/compact-indexes/169/epoch-169-bafyreibnyugrtsptq5qsj6tdweurgpzl55f75t7ku5r7wpxtia6e7gojbm-mainnet-cid-to-offset-and-size.index",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v13/epoch169/local2/physical.json",
+        "sha256": "9f8739b0dd9b00e7ff87f8a1b82ec5cdadbb771484db8e2707fd91016bb5bfc6"
+      },
+      "old_physical_bytes": 4322861056,
+      "old_identity": [
+        64512,
+        105775786,
+        1001,
+        1003,
+        33152,
+        1,
+        4322853290,
+        1794254702,
+        708567274,
+        1794254702,
+        935568306
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 169,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/private/destination-d5071eb14bc459360668014134a7a0f1cec90ee78c9360cf175ef3cdd7fab573/work/root-cohort-169-169/run-50818-1794254430868327931/archives/epoch-169.jet",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v13/epoch169/local2/physical.json",
+        "sha256": "9f8739b0dd9b00e7ff87f8a1b82ec5cdadbb771484db8e2707fd91016bb5bfc6"
+      },
+      "old_physical_bytes": 40540561408,
+      "old_identity": [
+        64512,
+        105580250,
+        1001,
+        1003,
+        33152,
+        1,
+        40540503403,
+        1794325194,
+        623648746,
+        1794325194,
+        623648746
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 169,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/private/destination-d5071eb14bc459360668014134a7a0f1cec90ee78c9360cf175ef3cdd7fab573/work/root-cohort-169-169/run-50818-1794254430868327931/inputs/snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v13/epoch169/local2/physical.json",
+        "sha256": "9f8739b0dd9b00e7ff87f8a1b82ec5cdadbb771484db8e2707fd91016bb5bfc6"
+      },
+      "old_physical_bytes": 2109042688,
+      "old_identity": [
+        64512,
+        105595455,
+        1001,
+        1003,
+        33152,
+        1,
+        2109034648,
+        1794254438,
+        492384885,
+        1794254439,
+        439389044
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 170,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/output/compact-indexes/170/epoch-170-bafyreia7an3ku7nhc6mwpqygmsldmq25yli5urrrtf4j75u7k4zwx2psc4-mainnet-cid-to-offset-and-size.index",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v13/epoch170/local2/physical.json",
+        "sha256": "9d29acaf035c481319127316f19398cd5aab10fb620a814615c7903de570a5af"
+      },
+      "old_physical_bytes": 4334780416,
+      "old_identity": [
+        64512,
+        105906342,
+        1001,
+        1003,
+        33152,
+        1,
+        4334770962,
+        1794259833,
+        785639676,
+        1794259833,
+        820639851
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 170,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/private/destination-24e279767bbd094f36e571aa8357667d7337eb6c90155883d927dbea39e6d2a9/work/root-cohort-170-170/run-86457-1794259534268950195/archives/epoch-170.jet",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v13/epoch170/local2/physical.json",
+        "sha256": "9d29acaf035c481319127316f19398cd5aab10fb620a814615c7903de570a5af"
+      },
+      "old_physical_bytes": 36757716992,
+      "old_identity": [
+        64512,
+        105841225,
+        1001,
+        1003,
+        33152,
+        1,
+        36757661429,
+        1794325159,
+        885456259,
+        1794325159,
+        885456259
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    },
+    {
+      "epoch": 170,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
+      "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/private/destination-24e279767bbd094f36e571aa8357667d7337eb6c90155883d927dbea39e6d2a9/work/root-cohort-170-170/run-86457-1794259534268950195/inputs/snapshot-73439777-AAfuW4HhAkKNYunC4zf6ipDSCUYsnVfoLMFrmBeb5Sbs.tar.zst",
+      "source_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v13/epoch170/local2/physical.json",
+        "sha256": "9d29acaf035c481319127316f19398cd5aab10fb620a814615c7903de570a5af"
+      },
+      "old_physical_bytes": 2151055360,
+      "old_identity": [
+        64512,
+        105847732,
+        1001,
+        1003,
+        33152,
+        1,
+        2151049662,
+        1794259541,
+        850183114,
+        1794259542,
+        847188082
+      ],
+      "identity_array_fields": [
+        "dev",
+        "inode",
+        "uid",
+        "gid",
+        "mode",
+        "nlink",
+        "logical_size",
+        "mtime",
+        "mtime_ns",
+        "ctime",
+        "ctime_ns"
+      ],
+      "fresh_allocation_or_integrity_proof": false,
+      "live_or_staged_consumer_closure_proven_here": false
+    }
+  ],
+  "prior_native_ledgers": [
+    {
+      "epoch": 166,
+      "ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch166/local2/physical.json",
+        "sha256": "8b306602fc19f66bde2a50c46e0abd3e21e2cd0d270b25c341306e023d46ed20"
+      },
+      "whole_root_physical_bytes_at_old_admission": 61787738112
+    },
+    {
+      "epoch": 167,
+      "ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch167/local2/physical.json",
+        "sha256": "bbf18c67dd2e6059987874d357cf2f123c03298a3fb4a53ef7bdc2ae27628f19"
+      },
+      "whole_root_physical_bytes_at_old_admission": 57525030912
+    },
+    {
+      "epoch": 168,
+      "ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch168/local2/physical.json",
+        "sha256": "26fb109fc1009a7eb4dae70f4a8fab432b1d1ee39dce6ef73431a4912f67a502"
+      },
+      "whole_root_physical_bytes_at_old_admission": 49438928896
+    },
+    {
+      "epoch": 169,
+      "ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v13/epoch169/local2/physical.json",
+        "sha256": "9f8739b0dd9b00e7ff87f8a1b82ec5cdadbb771484db8e2707fd91016bb5bfc6"
+      },
+      "whole_root_physical_bytes_at_old_admission": 47021047808
+    },
+    {
+      "epoch": 170,
+      "ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v13/epoch170/local2/physical.json",
+        "sha256": "9d29acaf035c481319127316f19398cd5aab10fb620a814615c7903de570a5af"
+      },
+      "whole_root_physical_bytes_at_old_admission": 43281264640
+    }
+  ],
+  "candidate_old_allocated_bytes": 246851108864,
+  "not_current_credit": true,
+  "resource_credit_bytes": 0,
+  "native_checks_performed": false,
+  "guard_or_producer_mutations": false,
+  "remote_mutations": false
+}

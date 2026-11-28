@@ -1,0 +1,72 @@
+{
+  "archive_length": 0,
+  "authority": {
+    "canonical_prefix_independently_qualified": false,
+    "canonical_sidecar_authorized": false,
+    "full_cold_epoch_peak_qualified": false,
+    "ordinary_replay_authorized": false,
+    "publication_authorized": false,
+    "r2_mutations": false,
+    "remote_mutations": false,
+    "runtime_promotion_authorized": false
+  },
+  "capture": null,
+  "capture_error": null,
+  "capture_is_peak_proof": false,
+  "cgroup_after": {
+    "cpu.stat": "usage_usec 1537532004\nuser_usec 1342469946\nsystem_usec 195062057\ncore_sched.force_idle_usec 0\nnr_periods 5217\nnr_throttled 3386\nthrottled_usec 3756046126\nnr_bursts 0\nburst_usec 0\n",
+    "io.pressure": "some avg10=1.63 avg60=0.29 avg300=0.12 total=1772463\nfull avg10=1.63 avg60=0.29 avg300=0.12 total=1772463\n",
+    "io.stat": "259:7 rbytes=123981824 wbytes=10778861568 rios=1992 wios=169111 dbytes=0 dios=0\n259:0 rbytes=376930304 wbytes=0 rios=37126 wios=0 dbytes=0 dios=0\n259:3 rbytes=451907584 wbytes=0 rios=43934 wios=0 dbytes=0 dios=0\n9:0 rbytes=828837888 wbytes=0 rios=81060 wios=0 dbytes=0 dios=0\n259:6 rbytes=233603072 wbytes=14217568256 rios=20536 wios=269172 dbytes=0 dios=0\n252:0 rbytes=357584896 wbytes=24996429824 rios=22169 wios=396854 dbytes=0 dios=0\n",
+    "memory.current": "46840303616\n",
+    "memory.events": "low 0\nhigh 0\nmax 7172\noom 0\noom_kill 0\noom_group_kill 0\n",
+    "memory.peak": "51539607552\n",
+    "memory.pressure": "some avg10=0.00 avg60=0.34 avg300=0.34 total=2443995\nfull avg10=0.00 avg60=0.34 avg300=0.34 total=2443995\n",
+    "memory.stat": "anon 36631764992\nfile 8977911808\nkernel 1228533760\nkernel_stack 753664\npagetables 151760896\nsec_pagetables 0\npercpu 10296\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 8777199616\nfile_dirty 425791488\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 19532378112\nactive_anon 14117384192\ninactive_file 11381915648\nactive_file 577843200\nunevictable 0\nslab_reclaimable 906185808\nslab_unreclaimable 169739184\nslab 1075924992\nworkingset_refault_anon 0\nworkingset_refault_file 84251\nworkingset_activate_anon 0\nworkingset_activate_file 10799\nworkingset_restore_anon 0\nworkingset_restore_file 6352\nworkingset_nodereclaim 0\npgscan 8703800\npgsteal 4444946\npgscan_kswapd 0\npgscan_direct 8703800\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 4444946\npgsteal_khugepaged 0\npgfault 18172582\npgmajfault 5736\npgrefill 208324\npgactivate 1231878\npgdeactivate 0\npglazyfree 4239086\npglazyfreed 272749\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\n"
+  },
+  "cgroup_before": {
+    "cpu.stat": "usage_usec 6667862\nuser_usec 4597336\nsystem_usec 2070525\ncore_sched.force_idle_usec 0\nnr_periods 472\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0\n",
+    "io.pressure": "some avg10=4.16 avg60=0.75 avg300=0.15 total=760341\nfull avg10=4.16 avg60=0.75 avg300=0.15 total=760341\n",
+    "io.stat": "259:7 rbytes=0 wbytes=20480 rios=0 wios=1 dbytes=0 dios=0\n259:0 rbytes=253661184 wbytes=0 rios=21698 wios=0 dbytes=0 dios=0\n259:3 rbytes=295325696 wbytes=0 rios=25003 wios=0 dbytes=0 dios=0\n9:0 rbytes=548986880 wbytes=0 rios=46701 wios=0 dbytes=0 dios=0\n259:6 rbytes=0 wbytes=4096 rios=0 wios=1 dbytes=0 dios=0\n252:0 rbytes=0 wbytes=24576 rios=0 wios=2 dbytes=0 dios=0\n",
+    "memory.current": "562630656\n",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+    "memory.peak": "563490816\n",
+    "memory.pressure": "some avg10=0.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0\n",
+    "memory.stat": "anon 12505088\nfile 549015552\nkernel 315392\nkernel_stack 0\npagetables 90112\nsec_pagetables 0\npercpu 10296\nsock 0\nvmalloc 12288\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 4096\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 12505088\ninactive_file 549011456\nactive_file 0\nunevictable 0\nslab_reclaimable 16720\nslab_unreclaimable 139976\nslab 156696\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 134836\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\n"
+  },
+  "child_return_code": null,
+  "elapsed_millis": 474528,
+  "epoch": 185,
+  "error": "No such file or directory (os error 2)",
+  "external_signal": 0,
+  "first_progress": null,
+  "free_after": 6947351220224,
+  "free_before": 6972209852416,
+  "invocation_id": "da9b57fed9f04c9fa1b0c5dba1932488",
+  "last_progress": null,
+  "natural_parent_completion_required": true,
+  "node_sha256": "e987401354f0cddbd838b71439768d6ed84baddfe8c0c2b484addec553db1887",
+  "plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-0230-20261109-next/envelope.json",
+    "sha256": "b6e9cc3eb80135643ec6e07d370089b147cb943c72943f30eba04e0d6a469a26"
+  },
+  "producer_canonical_root_prefix_present": false,
+  "producer_segment_manifest": null,
+  "producer_segment_manifest_sha256": "",
+  "runner_sha256": "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2",
+  "schema": "horizon-private-epoch185-capped-root-prefix-resource-v4",
+  "snapshot_sha256": "218173053f960ab1917adaae99b1680fdd75968d95f22aae6ffd41aef37f9ef2",
+  "solana_rayon_threads": 8,
+  "storage_evidence": {
+    "free_bytes": 6972209852416,
+    "maximum_process_vmas": 68,
+    "memory_bytes": 562511872,
+    "metadata_allocated_bytes": 16384,
+    "output_allocated_bytes": 4096,
+    "scratch_allocated_bytes": 28672
+  },
+  "success": false,
+  "target_slot": 80351283,
+  "terminal_root_slot": 80351283,
+  "unit": "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service",
+  "worker_sha256": "6eef40863851927d0611fd90dd7c68528c8e1491a0fc18a28de492afa67316bd"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "horizon-positive185-upstream-static-qualified-native-control-pending-v1",
+  "production_artifact": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation35-planner4-qa-20261108-v1/qa/planner",
+    "sha256": "2a46be553c8e07f91e4e8e5e0f378761b5c9a4cacf5008e5542d59380051b543"
+  },
+  "exact_source_and_compiler_graph": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation35-planner4-qa-20261108-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "5839db27116d79ac85dfa9da46b57aac751957b771802125fe58a69fe07c7cb1"
+  },
+  "ordinary_tests_passed": 62,
+  "ignored_tests": 3,
+  "prod_clippy_passed": true,
+  "test_clippy_passed": true,
+  "all_required_tests_passed": false,
+  "actual_reader_lifecycle_control_pending": true,
+  "replay_launch_authorized": false,
+  "publication_authorized": false
+}

@@ -1,0 +1,18 @@
+{
+  "current_main": {
+    "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+    "sha256": "17b43a0b0df0cb67166b3b236175db8b16ab416fc53d77d9cfa678b97c8966c9"
+  },
+  "functions": {
+    "identity": "1fbd086355936c6012a3de445c2c14f4c9e430727c5ee7cc1e73c4bc887fde0d",
+    "regular_identity": "0ceebb84ce8a07c299600f9662d766f3b69114d1d189b1f8fb2e1950a39cceab",
+    "hash_and_etag": "f7aef61e6a035c1828493295a25683d8665bb7c14cbf5946d30055614bc595ea",
+    "hash_and_etag_observed": "29c41adccbe82092cad1387515fd420c8ef7fa8bae15992bd40d1e544305b866",
+    "multipart_etag": "b85a6f4cc7f79ffd685728a79a2b507f3bc9591f812ee3284efa1a00f84bdad6",
+    "composite_sha256": "3f7944af8957ad76bb613069e8982e3943b06a0b4bd649671df9747db6f22e35",
+    "hash_proof_binds_sha_and_etag": "d0afc8fb320ea977fa450f5dc66ac8398bfe16803580c8688936db2e1e6de50d",
+    "zero_hash_part_size_is_rejected_before_opening_the_archive": "14ec7c42eff5df2c5144d313260141ad21fbbb1b8c096055b51c28794f14d276",
+    "streaming_part_digests_preserve_empty_single_and_many_part_proofs": "88fa041b551696101d44e5872af8a3b6775cdcfde04329e60a6070485d22507e"
+  },
+  "test_harness_changes": "Standalone library imports and public visibility only; six complete function bodies and three real regression bodies copied exactly from current main. No uploader, remote operation, deployment or memory credit."
+}

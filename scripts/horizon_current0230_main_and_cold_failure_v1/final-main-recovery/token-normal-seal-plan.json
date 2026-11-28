@@ -1,0 +1,12 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4/da9b57fed9f04c9fa1b0c5dba1932488",
+  "members": [
+    {
+      "mode": 292,
+      "name": "token.json",
+      "sha256": "88f40a7be1df5ed9046fa5a33803a00c0513e3baf4f7e0ffae5f286104411871",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/original-token-source.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

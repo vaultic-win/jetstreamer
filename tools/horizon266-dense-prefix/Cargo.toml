@@ -1,0 +1,21 @@
+[package]
+name = "horizon266-dense-prefix"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+jetstreamer-horizon = { path = "../../jetstreamer-horizon" }
+lencode = { version = "=2.0.0", features = ["solana-primitives", "std"] }
+libc = "=0.2.189"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+solana-hash = "=4.3.0"
+tempfile = "=3.27.0"
+xxhash-rust = { version = "=0.8.15", features = ["xxh64"] }
+
+[patch.crates-io]
+solana-program-runtime = { path = "../../vendor/solana-program-runtime" }

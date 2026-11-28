@@ -1,0 +1,68 @@
+[Unit]
+Description=Private epoch 166 replay across the account write-version gap
+
+[Service]
+Type=exec
+User=sol
+Group=horizon
+WorkingDirectory=/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1/bounded-write-version-20261124-v1/ledger
+Restart=no
+KillMode=control-group
+TimeoutStopSec=2min
+RuntimeMaxSec=2h
+CPUQuota=900%
+MemoryHigh=68719476736
+MemoryMax=73014444032
+MemorySwapMax=0
+TasksMax=1024
+LimitNOFILE=1048576
+Nice=5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=4
+OOMPolicy=stop
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateIPC=yes
+TemporaryFileSystem=/dev/shm:rw,nosuid,nodev,noexec,mode=1777,size=64M
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=cgroup
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+InaccessiblePaths=-/home/sol/.config -/home/sol/.ssh -/home/sol/.gnupg -/home/sol/.codex -/home/sol/workspace
+NoExecPaths=/home/sol
+ExecPaths=/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1/bounded-write-version-20261124-v1 /run/horizon-166-write-version-v1/gate /run/horizon-166-write-version-v1/jetstreamer-node /run/horizon-166-write-version-v1/historical-worker-v1-5-6
+ReadWritePaths=/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1/bounded-write-version-20261124-v1
+BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/epoch166-write-version-gap-20261124-v1/sealed/gate:/run/horizon-166-write-version-v1/gate
+BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/epoch166-write-version-gap-20261124-v1/sealed/canonical-hashes.txt:/run/horizon-166-write-version-v1/canonical-hashes.txt
+BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/epoch166-write-version-gap-20261124-v1/barrier:/run/horizon-166-write-version-v1/barrier
+BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-independent166-singleton-package-20261109-v1/jetstreamer-node:/run/horizon-166-write-version-v1/jetstreamer-node
+BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-independent166-singleton-package-20261109-v1/jetstreamer-historical-worker-v1-5-6:/run/horizon-166-write-version-v1/historical-worker-v1-5-6
+BindReadOnlyPaths=/home/sol/.jetstreamer-private/epoch166-write-version-gap-20261124-v1/inputs/snapshot-71998051-6GepGUiRjT1G4UpKJKDbCahrzyTeZLPqgZzw7g9td7jm.tar.zst:/run/horizon-166-write-version-v1/snapshot-71998051-6GepGUiRjT1G4UpKJKDbCahrzyTeZLPqgZzw7g9td7jm.tar.zst
+BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-standard-local-input166-20261110-v1/genesis.tar.bz2:/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1/bounded-write-version-20261124-v1/ledger/genesis.tar.bz2
+BindReadOnlyPaths=/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1/replacement-local3retry9-20261110-v1/output/compact-indexes/166:/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1/bounded-write-version-20261124-v1/ledger/compact-indexes/166
+Environment=HOME=/home/sol
+Environment=TMPDIR=/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1/bounded-write-version-20261124-v1/tmp
+Environment=JETSTREAMER_PRIVATE_RUN_ROOT=/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1/bounded-write-version-20261124-v1/private
+Environment=JETSTREAMER_HISTORICAL_WORKER_V1_5_6=/run/horizon-166-write-version-v1/historical-worker-v1-5-6
+Environment=JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1 SOLANA_RAYON_THREADS=32 JETSTREAMER_HISTORICAL_POH_THREADS=10 RAYON_NUM_THREADS=10
+Environment=JETSTREAMER_HISTORICAL_REAP_TIMEOUT_SECS=600 JETSTREAMER_ARCHIVE_BACKEND=http JETSTREAMER_HTTP_BASE_URL=https://files.old-faithful.net/ JETSTREAMER_COMPACT_INDEX_BASE_URL=https://files.old-faithful.net/
+Environment=JETSTREAMER_NETWORK_CAPACITY_MB=1024 JETSTREAMER_THREADS=12 JETSTREAMER_RIPGET_THREADS=12
+Environment=JETSTREAMER_VERIFY_SNAPSHOTS=1 JETSTREAMER_SKIP_SNAPSHOT_VERIFY=0 JETSTREAMER_PRUNE_EPOCH_SNAPSHOTS=0 JETSTREAMER_ENFORCE_ARCHIVE_HASH=1
+Environment=RUST_LOG=info,solana_metrics=off,solana_runtime::bank=warn,solana_runtime::accounts_db=warn RUST_BACKTRACE=1
+StandardOutput=append:/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1/bounded-write-version-20261124-v1/producer.log
+StandardError=inherit
+ExecStart=/run/horizon-166-write-version-v1/gate

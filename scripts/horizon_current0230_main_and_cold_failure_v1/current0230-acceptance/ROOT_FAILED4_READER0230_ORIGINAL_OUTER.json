@@ -1,0 +1,18 @@
+{
+  "code": 0,
+  "stdout": "{\"path\":\"/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/cda54fabbcad05ee9d1aba2d944926c5d0557b4662d1052fdf1f0a8e776b6c9e/proof.json\",\"sha256\":\"3452bb83f9861d47b40340946ff3138611b9b5cf672deb08fd37e25555b9cc6b\"}\n",
+  "stderr": "Running as unit: horizon-failed4-current-accounting-reader-20261104-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1min 46.490s\nCPU time consumed: 1min 21.009s\nMemory peak: 691.8M\nMemory swap peak: 0B\n",
+  "actual_owned_reader_child": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0230-reader-phase-20261109-v15/original-phase-gated-reader-outer.json",
+    "sha256": "2ca6acf83cae0e682409008216690a75e0161b057a65baed9082f013168749ae"
+  },
+  "actual_phase_gated_outer": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0230-20261109-v1/ROOT_PHASE_GATED_READER_ORIGINAL_OUTER.json",
+    "sha256": "3891a1aa259008d49d6c3b7cca51ae45a72ebef0cc1362ff8cc7af852c5bd5fa"
+  },
+  "actual_phase": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0230-reader-phase-20261109-v15/actual-reader-start-phase.json",
+    "sha256": "bf3f6edd9d2f106137b02564bbe71cda0be6bc143176af7840c421cb12fe83c9"
+  },
+  "original_stdout_and_stderr_preserved": true
+}

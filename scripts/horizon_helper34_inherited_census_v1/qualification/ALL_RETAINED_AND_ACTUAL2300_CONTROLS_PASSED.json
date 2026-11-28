@@ -1,0 +1,23 @@
+{
+  "ordinary_passed": 2937,
+  "ignored_count": 126,
+  "actual2300_composed_historical_not_failed_whole_native_census": true,
+  "three_historical_negative_and_population_controls_passed": true,
+  "retained_labels": [
+    "ACTUAL2130-TRANSITION",
+    "HELPER_CENSUS_ALL_ARGV_V31",
+    "HELPER_CENSUS_IGNORED_ARGV_V31",
+    "HELPER_ORDINARY_ARGV_V31",
+    "HELPER_NATIVE-PUBLICATION_ARGV_V31",
+    "ACTUAL_ORIGINAL185_TYPED_READY_ARGV_V31",
+    "ACTUAL_ORIGINAL1630_ALL_PEER_SOURCES_ARGV_V31",
+    "REGRESSION_genuine-current-outer_R3_ARGV_V31",
+    "REGRESSION_actual-current-coordinator_R3_ARGV_V31",
+    "REGRESSION_actual-terminal145_R3_ARGV_V31",
+    "REGRESSION_actual-terminal-discovery_R3_ARGV_V31",
+    "ACTUAL_CURRENT1830_COMPLETE_OUTER_ORIGINAL_ARGV",
+    "ACTUAL2130-COMPLETE-OUTER"
+  ],
+  "genuine_current2300_complete_outer_adapter_passed": true,
+  "no_replay_or_publication_or_resource_credit": true
+}

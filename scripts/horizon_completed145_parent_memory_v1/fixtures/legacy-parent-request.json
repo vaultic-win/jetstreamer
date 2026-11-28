@@ -1,0 +1,58 @@
+{
+  "baseline": {
+    "captured141": {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/c1344e4432bd0e62041762bf9154b67af924c6782f668c0930103d798e46945b/captured141-selection.json",
+      "sha256": "e9f8df8447de49c507e9b8ff4c69c55387cad6359ff6a8b37ae25047180a410c"
+    },
+    "kind": "captured141-only"
+  },
+  "census": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/c1344e4432bd0e62041762bf9154b67af924c6782f668c0930103d798e46945b/capture-1/census.json",
+    "sha256": "30a3678dfc091a56deb3a68ce80efa1a3b00af121b2e9d43066ef044519640b8"
+  },
+  "current": {
+    "fleet": {
+      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261106T132809Z-cached145-loaded-terminal-reload-v1.json",
+      "sha256": "15b9b8922501f223cef54220328b297a15a3298fe589c16e020157490c81c66b"
+    },
+    "fleet_plan": {
+      "path": "/usr/local/lib/jetstreamer/horizon-postreplay145-current1328-fleet-plan-20261106-v1/fleet-plan.json",
+      "sha256": "1d556c09322e89ee668490190f967c686dfa08ccfbce9a1e77fd551bb96e2b77"
+    },
+    "frame": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261106T132809-cached145-original-terminal-reload-native-v1.json",
+      "sha256": "d39b368a8f00a349ba855643468db17f5e2c69b2286c466fe7ed79cfbdf5defb"
+    },
+    "observer": {
+      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261106T132809Z-postcompletion154-v1.json",
+      "sha256": "c1344e4432bd0e62041762bf9154b67af924c6782f668c0930103d798e46945b"
+    }
+  },
+  "current_reader": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/c1344e4432bd0e62041762bf9154b67af924c6782f668c0930103d798e46945b/proof.json",
+    "sha256": "63401d46e754049a6b8d3f8bc6d724187de9f699ae965c423a1eaeb0739c936d"
+  },
+  "current_reader_acceptance": {
+    "path": "/usr/local/lib/jetstreamer/horizon-parent-memory-reader1328-completion-20261106-v1/completion.json",
+    "sha256": "52c113fb82bd422f4c29ca1a6ad15c574162da0fb3db112714aeb51e815252a2"
+  },
+  "reader_program": {
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-accepted0428-refresh-current163-helper-tools-20261106-v1/jetstreamer-r2",
+      "sha256": "37367ddf6c4f9daa615b9b6ce9cb539b6f3ef61bb7099eef13da43f3cf358779"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-parent-memory-reader1328-combined-history-qualification-20261106-v1/reader-qualified-artifact.json",
+      "sha256": "389f3db40e31638a209ee3aab3e61215b4413b7e013bd5477725b189a4ff8a06"
+    }
+  },
+  "registration": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-parent-memory-registration-1328-native-parser-20261106-v1/registration.json",
+    "sha256": "30e2bb4a890566020a8b62aa7d3650032bb453bf94ff334e9e35fd845b3a698f"
+  },
+  "registration_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-parent-memory-registration-1328-native-parser-20261106-v1/deployment-seal-receipt.json",
+    "sha256": "27c2688b640b99dc3305c27787424f4ea4cbfec81727674d4a2fc9c76e502864"
+  },
+  "schema": "terminal199-parent-only-memory-selection-request-v1"
+}

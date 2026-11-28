@@ -1,0 +1,11 @@
+{
+  "schema": "jetstreamer-private-epoch228-native-capture-spec-v1",
+  "mode": "running",
+  "admission": {
+    "path": "/var/lib/jetstreamer/horizon-228-native-admission-from335-v1/admission.json",
+    "sha256": null
+  },
+  "guard": { "path": null, "sha256": null },
+  "guard_plan": { "path": null, "sha256": null },
+  "output": "/var/lib/jetstreamer/horizon-228-native-capture-actual-v1/intent.json"
+}

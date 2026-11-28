@@ -1,0 +1,5 @@
+root:x:0:
+tty:x:5:
+nogroup:x:65534:
+systemd-journal:x:999:
+ubuntu:x:1000:

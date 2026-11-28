@@ -1,0 +1,24 @@
+{
+  "native": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "success",
+    "NRestarts": "0",
+    "ExecMainPID": "3925285",
+    "ExecMainStatus": "0",
+    "ControlGroup": "",
+    "Id": "horizon-first-lane-current0430-fleet-20261109-v1-r4.service",
+    "ActiveState": "active",
+    "SubState": "exited",
+    "InvocationID": "d44fbf61332e43b6aa4058c9af4f9d4f"
+  },
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T043022Z-witness-terminal145-v1.json",
+    "sha256": "1f7ef15795bf4ec32c53a70fb4650cc6c3fd2d894cb0b70d22fd13db61aeb73f"
+  },
+  "plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0430-fleet-plan-20261109-v1-r4/fleet-plan.json",
+    "sha256": "516908cd210cb412cc693f6d0cb3cca627f8d57dee70aec9ff74dbc33bccb36f"
+  },
+  "no_replay_or_credit": true
+}

@@ -1,0 +1,531 @@
+{
+  "schema": "horizon-phase145-busy-v3-source-and-qualification-archive-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ACTUAL-CROSS-FIRE-PHASE-ARGV.json",
+      "archive": "phase145-v3/ACTUAL-CROSS-FIRE-PHASE-ARGV.json",
+      "sha256": "b124deffed4efc8c9203c902a6a646df8a4bb3448c35d1eae9188d11b93c8f23"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ACTUAL-CROSS-FIRE-PHASE-EXECUTION.json",
+      "archive": "phase145-v3/ACTUAL-CROSS-FIRE-PHASE-EXECUTION.json",
+      "sha256": "78e913bb50dcb3d819963aee48cbd19981dd2871166b83ed8de5bdc0ddf1b552"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ACTUAL-CROSS-FIRE-PHASE-REQUEST.json",
+      "archive": "phase145-v3/ACTUAL-CROSS-FIRE-PHASE-REQUEST.json",
+      "sha256": "4e3af6dc4c803f482ca7885e3d014c61a8dc866ae7d6428a2190c587458d3df4"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ACTUAL-NATIVE-PHASE-ARGV.json",
+      "archive": "phase145-v3/ACTUAL-NATIVE-PHASE-ARGV.json",
+      "sha256": "6c685f77c981933c70f15c0dac4869fc32683f3ba2b9804fb2702788a360eb14"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ACTUAL-NATIVE-PHASE-EXECUTION.json",
+      "archive": "phase145-v3/ACTUAL-NATIVE-PHASE-EXECUTION.json",
+      "sha256": "0c05f57c54434f86d428f1439f3a17f3fd1e283cb16e46beefe83945e7dc9004"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ACTUAL-READER-PHASE-REQUEST.json",
+      "archive": "phase145-v3/ACTUAL-READER-PHASE-REQUEST.json",
+      "sha256": "348cabc20b7b3caa06de1c01ed0600858ac4c9801479edfcb3801f87723c3f85"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ALL_FOUR_ORIGINAL_COMPILERS_PASSED.json",
+      "archive": "phase145-v3/ALL_FOUR_ORIGINAL_COMPILERS_PASSED.json",
+      "sha256": "57931f878de05646ef7738198d0a22c1ba98b0685f64067612d4d48057c287bf"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ARTIFACT-PROOF.json",
+      "archive": "phase145-v3/ARTIFACT-PROOF.json",
+      "sha256": "a7f1cb5889729fff6f6fa8b5e1209f90a74c22d3d93621824d37ddbf2a40df50"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/CANDIDATE-SEAL-EXECUTION.json",
+      "archive": "phase145-v3/CANDIDATE-SEAL-EXECUTION.json",
+      "sha256": "1b2480bb47e07fb6b5295a2aa9d95cbab26bf38493caeb4e27d367e2ec778e2a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/CANDIDATE-SEAL-PLAN.json",
+      "archive": "phase145-v3/CANDIDATE-SEAL-PLAN.json",
+      "sha256": "bda1f3d79ab381d25e084a614ce1a2ce3c429922677c3fb66a668c941f969fc9"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ORDINARY-ORIGINAL-ARGV.json",
+      "archive": "phase145-v3/ORDINARY-ORIGINAL-ARGV.json",
+      "sha256": "41a52853b6f3c2401796173eae60f2dba4d6bbe65202309bbe4c2c56f311000f"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ORDINARY-ORIGINAL-EXECUTION.json",
+      "archive": "phase145-v3/ORDINARY-ORIGINAL-EXECUTION.json",
+      "sha256": "1118199da60b9c3efce8c3a54cf25804a2cd3f053693336f52f0db96d6a291f3"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/PRODUCTION-SEAL-EXECUTION.json",
+      "archive": "phase145-v3/PRODUCTION-SEAL-EXECUTION.json",
+      "sha256": "a64d464eb5f8a22f899eb8a7b21f9925120f2780faf502a0ace7661a1d2a22fb"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/PRODUCTION-SEAL-PLAN.json",
+      "archive": "phase145-v3/PRODUCTION-SEAL-PLAN.json",
+      "sha256": "4acc89c813c96697dde603c5f3020bd4f6a1e16c0a63c3ae96af71e830320ff0"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ROOT_ACTUAL_QUALIFIED_ADVISORY_PHASE199_BINDINGS.json",
+      "archive": "phase145-v3/ROOT_ACTUAL_QUALIFIED_ADVISORY_PHASE199_BINDINGS.json",
+      "sha256": "97fa74f882fed1301ecbe5ae8ffe9f44f1d016d87199c7a42995c372604e18d5"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ROOT_ALL_SIX_ORIGINALS_NATIVE_SUCCESS_AND_DRAIN.json",
+      "archive": "phase145-v3/ROOT_ALL_SIX_ORIGINALS_NATIVE_SUCCESS_AND_DRAIN.json",
+      "sha256": "215223c1c35ab6af7780cfd14157ee16ddd18be788e78af726dc7ad20d701a59"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ROOT_NORMAL6_PHASE145_BUSY_DATA512_BOOKING.json",
+      "archive": "phase145-v3/ROOT_NORMAL6_PHASE145_BUSY_DATA512_BOOKING.json",
+      "sha256": "cf2642db91b91d4bf19215c770cd2571a6ecbdf3ed7c0e5ae0cde27c8b3faa0a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "archive": "phase145-v3/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "sha256": "d8cf83b5fbf4b1b8673af968a4a9c0ba44ab0d3bed03907c64d7f15e43ebdd8f"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/STATIC-QUALIFIED-NATIVE-PENDING.json",
+      "archive": "phase145-v3/STATIC-QUALIFIED-NATIVE-PENDING.json",
+      "sha256": "25d594f430cf58cba30d408d8507c6a7aa1b6292a1d62f9fcc0ea02ca430bd20"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/TESTS-SEAL-EXECUTION.json",
+      "archive": "phase145-v3/TESTS-SEAL-EXECUTION.json",
+      "sha256": "ae887f2ee62b0b6f76aa4de9c9780e28baf94f9745ba582a20245605dce5700d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/TESTS-SEAL-PLAN.json",
+      "archive": "phase145-v3/TESTS-SEAL-PLAN.json",
+      "sha256": "2a6df4c18dff96f5544729b84421bb53143ea0314f63897fffc80a1f09369487"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/clippy-production-ORIGINAL-ARGV.json",
+      "archive": "phase145-v3/clippy-production-ORIGINAL-ARGV.json",
+      "sha256": "435c90c8da2a04e5196d01d80e1aca019f9b996a3e23e80db502967a2c210685"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/clippy-production-ORIGINAL-EXECUTION.json",
+      "archive": "phase145-v3/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "f58e70b277ba2089f81b8855016436841dbe5476915bac0a7f1516d1013f3a6b"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/clippy-tests-ORIGINAL-ARGV.json",
+      "archive": "phase145-v3/clippy-tests-ORIGINAL-ARGV.json",
+      "sha256": "46dbbb88f4667dd34e4ad3f37079f8296f34bd964ca97fe7b3539ce8077fe988"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/clippy-tests-ORIGINAL-EXECUTION.json",
+      "archive": "phase145-v3/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "4e73c9783d562d273efe07c149c674f58d84be0ab3d77efa94daeec428d9c215"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/release-ORIGINAL-ARGV.json",
+      "archive": "phase145-v3/release-ORIGINAL-ARGV.json",
+      "sha256": "2b1498021cd500a916ebea77516e811253e4a59147ea46b9f6e0ce1dd481cf9b"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/release-ORIGINAL-EXECUTION.json",
+      "archive": "phase145-v3/release-ORIGINAL-EXECUTION.json",
+      "sha256": "c754e59c5649836c9e796943d4afb6cc96b07138937020f8006cc23a09a2d857"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/activation.rs",
+      "archive": "phase145-v3/source/activation.rs",
+      "sha256": "8d1d969e77d811cab07978518f73e88cb1c64aa51a2649c5315e9a94a2aa9f1a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/disposable-oneshot.rs",
+      "archive": "phase145-v3/source/disposable-oneshot.rs",
+      "sha256": "26a8140733ed00a568f5faf0a86c17d20135a7d8683ef5152a64c18ea3df057a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/driver_policy.rs",
+      "archive": "phase145-v3/source/driver_policy.rs",
+      "sha256": "abe40ce1dfbd1ae9f65f53a518681768c39e386200fd79e44f6c48a04961a118"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/failed_reader_retirement.rs",
+      "archive": "phase145-v3/source/failed_reader_retirement.rs",
+      "sha256": "fada54cb9136e73817c2006883c37118eadf1c6b81b5c9d25731742cbe82d6fe"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/fleet_custody.rs",
+      "archive": "phase145-v3/source/fleet_custody.rs",
+      "sha256": "399595ecb1c4422bfe8bd4302e4d603eb8d43410648fbe578154a5fde42c7075"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/fleet_order.rs",
+      "archive": "phase145-v3/source/fleet_order.rs",
+      "sha256": "78344b4936a907e0c7d03908017c9201beca8c7820a7d4c4c08f682c288ba3f8"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/follow_on.rs",
+      "archive": "phase145-v3/source/follow_on.rs",
+      "sha256": "a485c2cdfcf93475c6c5df6ce43ab25c5f2deade5043c0c6e8f4c026239e5b78"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation30-coherence-disposable-20261108-v1.service",
+      "archive": "phase145-v3/source/horizon-operation30-coherence-disposable-20261108-v1.service",
+      "sha256": "97ce751a00d707fcb844ff0614833c97ac20ddf858697cc6ebdc797608177eee"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation30-coherence-disposable-20261108-v1.timer",
+      "archive": "phase145-v3/source/horizon-operation30-coherence-disposable-20261108-v1.timer",
+      "sha256": "f42c5555bfa6736ed4885f5be30019a4621f01b3576b4dcd946ec8bd28def96c"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation31-coherence-disposable-20261108-v1.service",
+      "archive": "phase145-v3/source/horizon-operation31-coherence-disposable-20261108-v1.service",
+      "sha256": "925454c200bb1b57608e6bedbcf0acaad67a290d086f40c7999ece7aa7849575"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation31-coherence-disposable-20261108-v1.timer",
+      "archive": "phase145-v3/source/horizon-operation31-coherence-disposable-20261108-v1.timer",
+      "sha256": "85ee8fb753f1d09fa42c4fe1e81558f264669dae811347f0548aaa0bc0b192e7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation32-coherence-disposable-20261108-v1.service",
+      "archive": "phase145-v3/source/horizon-operation32-coherence-disposable-20261108-v1.service",
+      "sha256": "b2f547cc1ced55d6b61411465f1c5fd276b6f08ee67d5d260ac7ceaa9fc644bc"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation32-coherence-disposable-20261108-v1.timer",
+      "archive": "phase145-v3/source/horizon-operation32-coherence-disposable-20261108-v1.timer",
+      "sha256": "a6d5cd174e37db260f79ca36411d61625764bc17e706fbdb9407dc36eb77c561"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation32-coherence-disposable-20261108-v2.service",
+      "archive": "phase145-v3/source/horizon-operation32-coherence-disposable-20261108-v2.service",
+      "sha256": "2509ef72b600b12c68d764e088ed82011aced6edffad3218851003f522dea3c6"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation32-coherence-disposable-20261108-v2.timer",
+      "archive": "phase145-v3/source/horizon-operation32-coherence-disposable-20261108-v2.timer",
+      "sha256": "005166e2223e80cde6bcaacdb17d3243fa2d788116b583011576a6019c213b4d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation32-coherence-disposable-20261108-v3.service",
+      "archive": "phase145-v3/source/horizon-operation32-coherence-disposable-20261108-v3.service",
+      "sha256": "316aa5a0debf59f37e63d8b65e4b8b5900a652ce96dfce6caa2b9d8133746ddc"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation32-coherence-disposable-20261108-v3.timer",
+      "archive": "phase145-v3/source/horizon-operation32-coherence-disposable-20261108-v3.timer",
+      "sha256": "cc48d8a47a77333ad1e51f710862245ad09c6f08184ad4ac6dc367e871908074"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation32-coherence-disposable-20261108-v4.service",
+      "archive": "phase145-v3/source/horizon-operation32-coherence-disposable-20261108-v4.service",
+      "sha256": "8bb21e8d7a6bdddfe8a898842e1fdfeee2d396e4c9169b732dfb4726cb50cec5"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation32-coherence-disposable-20261108-v4.timer",
+      "archive": "phase145-v3/source/horizon-operation32-coherence-disposable-20261108-v4.timer",
+      "sha256": "7af598dc482a18590eb4b601a989ae233332cc3b6c756e3847cb5634f4d103d8"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation32-coherence-disposable-20261108-v5.service",
+      "archive": "phase145-v3/source/horizon-operation32-coherence-disposable-20261108-v5.service",
+      "sha256": "fb0b7163bf872c1946201c081dd3caa409717baeb0dc5fba0ff8eeb7df37bb54"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/horizon-operation32-coherence-disposable-20261108-v5.timer",
+      "archive": "phase145-v3/source/horizon-operation32-coherence-disposable-20261108-v5.timer",
+      "sha256": "f1abafdb9d8ce1f39412e404d035f52561dbd562d0bcc6fc9c3488fa3a235e00"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/main.rs",
+      "archive": "phase145-v3/source/main.rs",
+      "sha256": "6246916cc8d875ea1be3642fd76b0b18ed22708b70dac08d252d9f74c2b9d916"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/original0200-pending145-sample.json",
+      "archive": "phase145-v3/source/original0200-pending145-sample.json",
+      "sha256": "377a8df041c3e7fddbd1427d2db5ba593cd35209e3bfbf13076d230de2d21281"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/persistent_reader.rs",
+      "archive": "phase145-v3/source/persistent_reader.rs",
+      "sha256": "1eb6ebaf5d72485189981beaf9a22955ba1ef45656078685bf11874f502f9dec"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/postreader.rs",
+      "archive": "phase145-v3/source/postreader.rs",
+      "sha256": "87fc229858e13581c759997ac6bddce844804454536d2eb3f3a46c9f0fb9f4e2"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/process.rs",
+      "archive": "phase145-v3/source/process.rs",
+      "sha256": "fa26bed67fdf9154df69ee74e34d1657278619b69ef6d194cab5cddf4629306c"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/reader-argv-template.json",
+      "archive": "phase145-v3/source/reader-argv-template.json",
+      "sha256": "457a60b6310a93db3851b8b462a8927f860e6bd6f4a4293636e0f4525f2453bc"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/reader_phase.rs",
+      "archive": "phase145-v3/source/reader_phase.rs",
+      "sha256": "0b9000e970c98b0576d38851e9472fd7bb49f95af7d43fe0eaef8e42f984e2bc"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/storage.rs",
+      "archive": "phase145-v3/source/storage.rs",
+      "sha256": "a4e4f0e02efc57ee3975215ce860b7bd5830f3ad88fc9c44f30a7e8346505fa6"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/successful_reader_retirement.rs",
+      "archive": "phase145-v3/source/successful_reader_retirement.rs",
+      "sha256": "7c5d33fc0581982970673282f1867fab2895e498c60cd2ea7aaa2a0e9b5b2d85"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/successor_roles.rs",
+      "archive": "phase145-v3/source/successor_roles.rs",
+      "sha256": "4a3b8562ddc95c1710bb5b056b8c20d1e41c2d132076564af853f3da7ec3f1e9"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/timers.rs",
+      "archive": "phase145-v3/source/timers.rs",
+      "sha256": "8785ec899c44aadd29b468972cdbe997095e0055564cb6644164fa34f0ece13a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/test-build-ORIGINAL-ARGV.json",
+      "archive": "phase145-v3/test-build-ORIGINAL-ARGV.json",
+      "sha256": "5233b78295681dad2cbc33a9b86ef3d00864161e447c533ae7a69f94449a0c37"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/test-build-ORIGINAL-EXECUTION.json",
+      "archive": "phase145-v3/test-build-ORIGINAL-EXECUTION.json",
+      "sha256": "7bdce3c014575b38096cdd4242b8c114895d523b5b62153cffe2d0227e85d8a8"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/PRODUCTION-NORMAL-SEAL-EXECUTION.json",
+      "archive": "guard0230/PRODUCTION-NORMAL-SEAL-EXECUTION.json",
+      "sha256": "44606aeacac470861217905a00a7b3d748b49afc21225340b65c5725dc51f778"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/PRODUCTION-NORMAL-SEAL-PLAN.json",
+      "archive": "guard0230/PRODUCTION-NORMAL-SEAL-PLAN.json",
+      "sha256": "6b32168a9ff3625c397c335043e6d3b377d1a062d4aef922f3cac13ca5c8cf55"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/ROOT_QA_EXACT_BOOKING.json",
+      "archive": "guard0230/ROOT_QA_EXACT_BOOKING.json",
+      "sha256": "381aa801c2f524e7d8e162e93a9847e691d888b24bde4f26ef3c3112a794d47d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/TEST-NORMAL-SEAL-EXECUTION.json",
+      "archive": "guard0230/TEST-NORMAL-SEAL-EXECUTION.json",
+      "sha256": "26e2426a6a8ac061523221e4f9ddbc0ba0b123450ccb62210e92d176d9907ad3"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/TEST-NORMAL-SEAL-PLAN.json",
+      "archive": "guard0230/TEST-NORMAL-SEAL-PLAN.json",
+      "sha256": "d30ad5347a76348a14620a77bafe7edc019c6c1c573e7399b2641a9e88d3199d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/all61-ORIGINAL-ARGV.json",
+      "archive": "guard0230/all61-ORIGINAL-ARGV.json",
+      "sha256": "52d2a5fcca503cbcdd5849ef12db9f880a770a643c090898a77d0232ffd04d61"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/all61-ORIGINAL-EXECUTION.json",
+      "archive": "guard0230/all61-ORIGINAL-EXECUTION.json",
+      "sha256": "d783c520b03380123c6515377d7efaa0b99480bbbb825cc82e2e4c1e15d3cb50"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/census-all-ORIGINAL-ARGV.json",
+      "archive": "guard0230/census-all-ORIGINAL-ARGV.json",
+      "sha256": "0b9b152a80310aecdf1403cd18a90690a2e809a137857d5d47edd32f3014b525"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/census-all-ORIGINAL-EXECUTION.json",
+      "archive": "guard0230/census-all-ORIGINAL-EXECUTION.json",
+      "sha256": "fffd67c08969f2da87bc66bb6a0a2618bf2336eefd3577e53c13685cb234d3ff"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/census-ignored-ORIGINAL-ARGV.json",
+      "archive": "guard0230/census-ignored-ORIGINAL-ARGV.json",
+      "sha256": "c42b8cea43cb3a2037b04fff826648f7b095c9e4ef70f4884fc922c156ae71a8"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/census-ignored-ORIGINAL-EXECUTION.json",
+      "archive": "guard0230/census-ignored-ORIGINAL-EXECUTION.json",
+      "sha256": "04a13aad22f45831c0a6d0adda68224b7e7765b78a3f682d07f3dcee8e74bac6"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/clippy-prod-ORIGINAL-ARGV.json",
+      "archive": "guard0230/clippy-prod-ORIGINAL-ARGV.json",
+      "sha256": "43a8363ca0fd997eaa291f72b4744327b5d4f4d67b39281dba34497fc01eb037"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/clippy-prod-ORIGINAL-EXECUTION.json",
+      "archive": "guard0230/clippy-prod-ORIGINAL-EXECUTION.json",
+      "sha256": "818c9164301e5f25548dc35e7152a3001cba1dcc98a98e38df06a14ca9ae583e"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/clippy-tests-ORIGINAL-ARGV.json",
+      "archive": "guard0230/clippy-tests-ORIGINAL-ARGV.json",
+      "sha256": "b0bb5a56f108d853fdd4c809d09ad1d0d90d997a69c2221f4cd3277b48ccca51"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/clippy-tests-ORIGINAL-EXECUTION.json",
+      "archive": "guard0230/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "09a128e07ec7a8a242f392b761b2fc9d0e482c4f3b0d93d44259a7f1c2a31d35"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/release-ORIGINAL-ARGV.json",
+      "archive": "guard0230/release-ORIGINAL-ARGV.json",
+      "sha256": "b93fd116b39cb1c6f090c5923ca5f926d82939027b3a64bd6c6f0f39a58f7ac5"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/release-ORIGINAL-EXECUTION.json",
+      "archive": "guard0230/release-ORIGINAL-EXECUTION.json",
+      "sha256": "646bb39bdb5effcfec355e2399a8ae3470e61f45e93b73a02a7446ea7fc3f790"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/source/main.rs",
+      "archive": "guard0230/source/main.rs",
+      "sha256": "5287385aefeb32393fe756289c8ad1b077f1d79ae7adce9f0700a37b0b10c8a7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/test-build-ORIGINAL-ARGV.json",
+      "archive": "guard0230/test-build-ORIGINAL-ARGV.json",
+      "sha256": "3766c41739c6f93c95dce42aa4d9eb063e104a22a351b02d752dce0fc276508d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/test-build-ORIGINAL-EXECUTION.json",
+      "archive": "guard0230/test-build-ORIGINAL-EXECUTION.json",
+      "sha256": "8be4bb92b76aa6fcf041044131918489e9dd8a982a5e0f3d91e6bfe2a3f316ec"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+      "archive": "guard0230/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+      "sha256": "24372aa697437fffb415e7b36aaa9aec7009f6f153a67b7df1e06ec3a136e50f"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW6.json",
+      "archive": "review6/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW6.json",
+      "sha256": "12f903138485d1bd73326bec9792a2c228fa5d0dddeb072c2f4abc1a55e26c35"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/MODEL_BINDING.json",
+      "archive": "review6/MODEL_BINDING.json",
+      "sha256": "5fe8e275da45125061de491fba8278bc39df3e8f370f0c103513c1987bd401a7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/STATUS-SEAL-EXECUTION.json",
+      "archive": "review6/STATUS-SEAL-EXECUTION.json",
+      "sha256": "794cda4e6ef08d5a9d0905dca5309f080bcfc6723ff640105a778ecd505e67f7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/STATUS-SEAL-PLAN.json",
+      "archive": "review6/STATUS-SEAL-PLAN.json",
+      "sha256": "7411f015385c2b193aabb6a84ebd498246ad150abff83cc5ac29992f93bd727d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/status185-event0200-review6.py",
+      "archive": "review6/status185-event0200-review6.py",
+      "sha256": "d7546f5fcfdd981380f843e86cc477835ef4a8084aeccca72bfb0b95795df2ea"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0200-phase-failure-explicit-control-review6-status-event-20261109-v1/AUTHENTICATED-READBACK.json",
+      "archive": "review6-status/AUTHENTICATED-READBACK.json",
+      "sha256": "24f2ca1b11439fcf0f24b37bdc50070c31d15c9b87d1883b6ebcdb6273c50343"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0200-phase-failure-explicit-control-review6-status-event-20261109-v1/TERMINAL-AND-REASSESSMENT.json",
+      "archive": "review6-status/TERMINAL-AND-REASSESSMENT.json",
+      "sha256": "d7ef2f21fe2e97574c75d977451d750e862e9c64dfba20e8ad3416e53dc8854d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0230-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0230_GUARD_DATA512_BOOKING.json",
+      "archive": "guard0230-booking/ROOT_NORMAL6_CURRENT0230_GUARD_DATA512_BOOKING.json",
+      "sha256": "23cd3d03e7e2f67ce854c3b527f6be41e843daa1a97fc4680168f877f422107a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/observer0200-closed-metadata-readonly-finalization-20261109-v1/EXACT_GENERATED_METADATA_FINALIZATION_INTENT.json",
+      "archive": "closed0200-bridge/EXACT_GENERATED_METADATA_FINALIZATION_INTENT.json",
+      "sha256": "bb73aba61651ff385026bf5fb508187c317cc0f6040e40026f36fbe43a5772b4"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/observer0200-closed-metadata-readonly-finalization-20261109-v1/EXACT_GENERATED_METADATA_ORIGINAL_REFERENCE_CHECK.json",
+      "archive": "closed0200-bridge/EXACT_GENERATED_METADATA_ORIGINAL_REFERENCE_CHECK.json",
+      "sha256": "df8f39423d7d8f187bc68394bd4af19e8743848346eb5231e0fefaf1d06bb460"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/observer0200-closed-metadata-readonly-finalization-20261109-v1/EXACT_GENERATED_METADATA_READONLY_FINALIZATION_RECEIPT.json",
+      "archive": "closed0200-bridge/EXACT_GENERATED_METADATA_READONLY_FINALIZATION_RECEIPT.json",
+      "sha256": "5987dfe54848b9f823c0e368dcc1d2fbcad31e7b790682819aa6fd1e02886fec"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/observer0200-closed-metadata-readonly-finalization-20261109-v1/ROOT_GENUINE0200_OBSERVER_BRIDGE_METADATA_FINALIZED.json",
+      "archive": "closed0200-bridge/ROOT_GENUINE0200_OBSERVER_BRIDGE_METADATA_FINALIZED.json",
+      "sha256": "38cef1e763cd862aa6534fcd4b153b9e37012aa751bcd69c909fa852b0280f8b"
+    },
+    {
+      "source": "/tmp/root-prepare-phase145-v3.py",
+      "archive": "operator-source/root-prepare-phase145-v3.py",
+      "sha256": "a7f51a8243024f42501af76f8d8d6dd003b16f0d98ced41ac9b226a84ba69864"
+    },
+    {
+      "source": "/tmp/root-build-reader-phase145-exact-four-v3.py",
+      "archive": "operator-source/root-build-reader-phase145-exact-four-v3.py",
+      "sha256": "e16a1aa8ce445d5b53b2cd8b318280e3319b8b4358d96431c5346fd2128df1da"
+    },
+    {
+      "source": "/tmp/root-qualify-reader-phase145-busy-v3.py",
+      "archive": "operator-source/root-qualify-reader-phase145-busy-v3.py",
+      "sha256": "0594d0cab1f0d4e5b499d079a4e5f9c132fd7455388eeffa217a151650798129"
+    },
+    {
+      "source": "/tmp/root-prepare-current0230-guard-20261109-v1.py",
+      "archive": "operator-source/root-prepare-current0230-guard-20261109-v1.py",
+      "sha256": "20fb7cf28656d63848ce46059c395ba319de8d9dc0736dc283789314b509f38e"
+    },
+    {
+      "source": "/tmp/root-qualify-current0230-guard-20261109-v1.py",
+      "archive": "operator-source/root-qualify-current0230-guard-20261109-v1.py",
+      "sha256": "08c13f17cec96d6feced36ef3433b54f4175efdbea7e3ab2f93d5038b2e86b9f"
+    },
+    {
+      "source": "/tmp/root-prepare0200-phase-event-review6.py",
+      "archive": "operator-source/root-prepare0200-phase-event-review6.py",
+      "sha256": "14fa9041826ed0aaa52befc761ce36e3f71d037a4e872353d7cda3be10af80d6"
+    },
+    {
+      "source": "/tmp/root-finalize-closed0200-bridge-metadata-v1.py",
+      "archive": "operator-source/root-finalize-closed0200-bridge-metadata-v1.py",
+      "sha256": "80c7cc713d3a467a93117d4f00b5638bce5a50efc4118764e2c46af95d233c25"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0200-20261109-v1/FRAME5-R4-capture-PHASE-EXECUTION.json",
+      "archive": "actual0200-failure/FRAME5-R4-capture-PHASE-EXECUTION.json",
+      "sha256": "c781a3cd80b3799d1f47ae38b6821138bb0d5a7bbdb0c600cd7d7b893039ef47"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0200-20261109-v1/ROOT_CURRENT0200_FLEET_ORIGINAL_SUCCESS.json",
+      "archive": "actual0200-failure/ROOT_CURRENT0200_FLEET_ORIGINAL_SUCCESS.json",
+      "sha256": "b54e52a92c250474ed1cf3d7d5070b7cdfaa0a1d858cd5e401e3e2a0e97fe920"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0200-20261109-v1/FRAME5-R4-capability-ORIGINAL-NATIVE-PID1.json",
+      "archive": "actual0200-failure/FRAME5-R4-capability-ORIGINAL-NATIVE-PID1.json",
+      "sha256": "8bd7265dadf01d8cbc438b1d171e87565ce7246da78988a4232212c77ed89af5"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0200-frame-capture-r4-20261109-v24/19-reader-start-phase-native-original-outcome.json",
+      "archive": "actual0200-failure/original-pending145-sample.json",
+      "sha256": "4358d7e430728f52efc28901c63e59ab055a3e2855997f2a1b7a9afaceda7827"
+    }
+  ],
+  "source_archive_not_launch_authority": true
+}

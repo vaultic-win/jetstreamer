@@ -1,0 +1,25 @@
+[workspace]
+members = ["fault-shim"]
+resolver = "3"
+
+[package]
+name = "horizon-epoch168-native-qualification"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+libc = "=0.2.189"
+openssl = "=0.10.78"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.release]
+debug = 0
+incremental = false
+lto = false

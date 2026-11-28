@@ -1,0 +1,185 @@
+{
+  "schema": "horizon-helper31-extra-QA6-closed-normal6-DATA4-retained-v1",
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-typed-peer-helper-qa-20261108-v31/ROOT_HELPER31_EXTRA_QA6_ADDITIVE_DATA4_BOOKING.json",
+    "sha256": "40bbbd11a6c18925e62e0b2db604ceda820f4743095c4cb090b2124251be6bea"
+  },
+  "normal_pool_bytes": 6442450944,
+  "new_QA_memory_released_bytes": 6442450944,
+  "new_resource_credit_bytes": 0,
+  "complete_DATA_bytes": 5133440070292,
+  "all_helper31_QA_actors_terminal_and_drained": true,
+  "actual_terminal_unit_census": [
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-first-lane-combined-helper-clippy-prod-20261108-ready185-v31.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-first-lane-combined-helper-clippy-tests-20261108-ready185-v31.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-first-lane-combined-helper-test-build-20261108-ready185-v31.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-first-lane-combined-helper-release-20261108-ready185-v31.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-first-lane-combined-helper-ordinary-20261108-ready185-v31.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-first-lane-combined-helper-native-publication-20261108-ready185-v31.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-first-lane-helper-regression-actual-terminal145-r3-20261108-ready185-v31.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-first-lane-helper-regression-genuine-current-outer-r3-20261108-ready185-v31.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-first-lane-helper-regression-actual-current-coordinator-r3-20261108-ready185-v31.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-first-lane-helper-regression-actual-terminal-discovery-r3-20261108-ready185-v31.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-h31-actual-terminal145-phase-r3-20261108-v1.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-h31-genuine-current-outer-phase-r3-20261108-v1.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-h31-actual-current-coordinator-phase-r3-20261108-v1.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-h31-actual-terminal-discovery-phase-r3-20261108-v1.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-helper31-actual-original185-typed-ready-control-20261108-v1.service",
+      "Job": ""
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-helper31-actual-original1630-all-peer-sources-control-20261108-v1.service",
+      "Job": ""
+    }
+  ],
+  "qualification": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-typed-peer-helper-qa-20261108-v31/HELPER29-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+    "sha256": "9553d2dd47566a015eb67eff9c137e09a72ec0b2ca7e74a9f3b31567e77b547d"
+  },
+  "production_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-typed-peer-postreader-tools-20261108-v31/deployment-seal-receipt.json",
+    "sha256": "161b91b0018e728f5868170061e4215aff2085f20c74ced816befe8ca61f1659"
+  },
+  "historical_helper30_release_not_recredited": true,
+  "all_old_memory_DATA_and_original185_candidate_promises_retained": true,
+  "replay_launch_authorized": false
+}

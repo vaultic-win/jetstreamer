@@ -1,0 +1,50 @@
+{
+  "actual_same_shared_retirement_primitive_exercised": true,
+  "actual_two_owned_manager_aliases_removed": true,
+  "final_keeper_native": {
+    "ActiveState": "inactive",
+    "Id": "horizon-positive185-reader-positive-cb35709d56014888a1b82931c2a20727-retain.target",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "SubState": "dead"
+  },
+  "final_reader_native": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStartTimestampMonotonic": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "input_body_reads": 0,
+  "intent": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact1330-failed30-reader-retirement-20261108-v27-r2/failed-reader-retirement-intent.json",
+    "sha256": "09b0cf058b546c53f38d942442aaccda695f43d7cb2334689a7ac13577a72901"
+  },
+  "only_failed_reader_reset": true,
+  "only_zero_process_keeper_stopped": true,
+  "original_PID1_journal": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact1330-failed30-reader-retirement-20261108-v27-r2/failed-reader-original-PID1.json",
+    "sha256": "aec761d767bd0f0fd87d71d2984bff24716899b50d3a238b7b36b37424326b4a"
+  },
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v27-publish1330-r2/operation",
+    "sha256": "94ac75d578274420cca98e03935e24691446ad89ce0105641aa69c2c078525ee"
+  },
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "resource_credit_bytes": 0,
+  "schema": "horizon-positive185-failed-reader-manager-retirement-v1",
+  "sealed_packages_and_failed_namespaces_preserved": true,
+  "timer_audit": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact1330-failed30-reader-retirement-20261108-v27-r2/failed-reader-retirement-timer-audit.json",
+    "sha256": "96d39ebf8298d96df9e5ced3bc0b84994adf61922c125e59719f383ff808ad94"
+  }
+}

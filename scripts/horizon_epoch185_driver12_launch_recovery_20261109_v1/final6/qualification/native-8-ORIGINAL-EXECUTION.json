@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest post_main::native_controls::actual_prestart_only_wait_expires_without_clock_reset_or_capture ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.16s\n\n",
+  "stderr": "Running as unit: horizon-positive185-final6-native-8-20261109-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 167ms\nCPU time consumed: 13ms\nMemory peak: 800.0K\nMemory swap peak: 0B\n"
+}

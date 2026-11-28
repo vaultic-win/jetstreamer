@@ -1,0 +1,66 @@
+{
+  "test_only_subset_not_an_authenticatable_receipt": true,
+  "stop": {
+    "epoch": 166,
+    "reason": "DATA-fulfillment-observation-failed",
+    "original_claim": {
+      "producer_unit": "horizon-qualify-166-replacement-local3retry3-20261110-v1.service",
+      "expected_producer_invocation_id": "7fa1849bd3a74fd78d5e3322e2e57016",
+      "expected_controller_invocation_id": "7fa1849bd3a74fd78d5e3322e2e57016"
+    },
+    "original_invocation_children": [],
+    "all_original_promises_retained": true,
+    "resource_credit_bytes": 0,
+    "original_PID1": [
+      {
+        "_PID": "1",
+        "_UID": "0",
+        "UNIT": "horizon-qualify-166-replacement-local3retry3-20261110-v1.service",
+        "INVOCATION_ID": "7fa1849bd3a74fd78d5e3322e2e57016",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448"
+      }
+    ]
+  },
+  "retired": {
+    "owner": "/root",
+    "completion": {
+      "path": "/var/lib/jetstreamer/retry3-scratch166-retirement-20261113-v1/epoch166/completion.json",
+      "sha256": "47f50739d2e674b924e800991ebdfc19017a4847034b0d85f67e9f685d271205"
+    },
+    "scratch_before_physical_bytes": 36101939200,
+    "scratch_after_physical_bytes": 4096,
+    "retired_physical_bytes": 36101935104,
+    "DATA_free_after_bytes": 6400315387904,
+    "scratch_inode_preserved": true,
+    "archives_inputs_original_witnesses_preserved": true,
+    "new_admission_required": true,
+    "no_resource_promise_release": true
+  },
+  "completion": {
+    "schema": "jetstreamer-retry3-scratch166-complete-v1",
+    "scratch_empty": true,
+    "scratch_root_preserved": true,
+    "partial_archive_and_all_inputs_preserved": true,
+    "archive_deletion_authorized": false,
+    "replay_launch_authorized": false,
+    "resource_promise_ending_authorized": false,
+    "resource_credit_bytes": 0,
+    "remote_mutations": false,
+    "r2_mutations": false,
+    "basis": {
+      "source": {
+        "original_retry3_stop_event": {
+          "path": "/var/lib/jetstreamer/retry3-scratch166-retirement-qualification-20261113-v1/ORIGINAL_EPOCH166_STOP_EVIDENCE.json",
+          "sha256": "afc574421f324d5895627709b1cfa8bfa4dbfb724264236eb18879d40b13a544"
+        }
+      },
+      "scratch_identity": {
+        "device": 64512,
+        "gid": 1003,
+        "inode": 103284833,
+        "mode": 448,
+        "uid": 1001
+      }
+    }
+  }
+}

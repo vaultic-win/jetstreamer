@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "--no-block",
+    "start",
+    "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "da9b57fed9f04c9fa1b0c5dba1932488",
+  "program": "/usr/bin/systemctl",
+  "timeout_millis": 5000,
+  "wall_started_at": 1794191992
+}

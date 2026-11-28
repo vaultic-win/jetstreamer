@@ -1,0 +1,40 @@
+{
+  "schema": "horizon237-main-exact-scratch-retirement-acceptance795-v1",
+  "admission": {
+    "path": "/var/lib/jetstreamer/horizon237-main-native-check-and-delete-admission795-v1/admission.json",
+    "sha256": "5cacc1eda7ab0cae927635c4dd16da0df64066f8b8187c91e9239f7d648d0095"
+  },
+  "completion": {
+    "path": "/var/lib/jetstreamer/horizon237-stopped-scratch-retirement-v1/completion.json",
+    "sha256": "ba99bad31a509640dcc548a782063514c3b7db910709949918f439dd41a920e4"
+  },
+  "actual_unit": "horizon-stopped237-delete795-v1.service",
+  "actual_invocation_id": "4d6174709139403ba13efe2820710dc0",
+  "native_terminal_exit_status": 0,
+  "zero_restarts": true,
+  "target": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/state/destination-8c7367f2f955a823f78f02aa3e05000b22d3fdc277987e9f22b4fa5da9a5556d/work/root-cohort-237-237/run-2030542-1793568723686999262/scratch",
+  "scope_sha256": "32dd2ea5b114b9a4fd4ff0bb781ee5364c6876a3f6d3ea9c6325dec3e879e850",
+  "scratch_deleted": true,
+  "qualified_deleted_tree_physical_bytes": 456800903168,
+  "qualified_file_count": 565073,
+  "actual_available_bytes_before": 1392635379712,
+  "actual_available_bytes_after": 1851054665728,
+  "global_available_delta_not_claimed_as_exclusive_scratch_allocation_credit": true,
+  "retained_inputs_and_partial_identity_match_actual_check_exactly": true,
+  "preserved_partial_bytes": 157334577077,
+  "live_effective_mount_proof": {
+    "path": "/var/lib/jetstreamer/horizon237-delete-native795-v1/live-mountinfo.txt",
+    "sha256": "3d4504f45c26138ca8a8ed753b4f244b313886d3f23908853f331be7e1f9dee6",
+    "writable_ancestor": "/home/ubuntu/.jetstreamer-private/qualification-237-general-target1-budget620-v2/state/destination-8c7367f2f955a823f78f02aa3e05000b22d3fdc277987e9f22b4fa5da9a5556d/work/root-cohort-237-237",
+    "scratch_itself_not_a_mountpoint": true
+  },
+  "live_effective_properties": {
+    "path": "/var/lib/jetstreamer/horizon237-delete-native795-v1/live-properties.txt",
+    "sha256": "8c9fa46752b17fdad90afa5e7115273e5c11341893a9a24b141412b9244d9dcc"
+  },
+  "healthy235_and_original_guard_unchanged_through_cleanup": true,
+  "replay_not_started": true,
+  "inputs_copied_or_namespace_created": false,
+  "r2_mutations": false,
+  "next": "Fresh cached237 input and execution admission; preserve this completion without rerunning old237 cleanup after any235 guard generation change."
+}

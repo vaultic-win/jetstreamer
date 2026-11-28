@@ -1,0 +1,12 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-fleet-722adc397ae24bb4b96d452783599f57",
+  "members": [
+    {
+      "mode": 292,
+      "name": "spec.json",
+      "sha256": "3d65e5093eb5f3d59fba7061613e2eef95b60ca5490faf4a146eb338e5b1da87",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-original-r3-20261109-next/enrolled-fleet-source.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

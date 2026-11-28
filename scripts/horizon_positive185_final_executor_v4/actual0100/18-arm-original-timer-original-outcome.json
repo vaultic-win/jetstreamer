@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "start",
+    "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.timer"
+  ],
+  "cleanup_terminal_code": null,
+  "cleanup_terminal_signal": null,
+  "cleanup_wait_error": null,
+  "exit_code": 0,
+  "exit_signal": null,
+  "no_retry_or_clock_reset": true,
+  "original_iid": "9568cb52af154f7d8fbd48e7571770fa",
+  "program": "/usr/bin/systemctl",
+  "stderr_bytes": [],
+  "stderr_overflow": false,
+  "stderr_read_error": null,
+  "stdout_bytes": [],
+  "stdout_overflow": false,
+  "stdout_read_error": null,
+  "wait_error": null,
+  "wall_finished_at": 1794186947
+}

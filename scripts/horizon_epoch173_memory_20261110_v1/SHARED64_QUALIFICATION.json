@@ -1,0 +1,131 @@
+{
+  "schema": "horizon-shared64-owner-census-qualified-report-only-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "sources": {
+    "shared64-owner-census-v1.rs": {
+      "path": "scripts/horizon_epoch173_memory_20261110_v1/source/shared64-owner-census-v1.rs",
+      "sha256": "e38f5a535caa5f3080b5a0c0bf9e67a5652fbb2ea262ae4b2191bc5bc48d9683"
+    },
+    "shared64-owner-census-v2.rs": {
+      "path": "scripts/horizon_epoch173_memory_20261110_v1/source/shared64-owner-census-v2.rs",
+      "sha256": "96fc5d81d0d932e56b889f6a2583ac482957fd9c9d88de2f279ff60eb2fb3b04"
+    },
+    "shared64-owner-census-v3.rs": {
+      "path": "scripts/horizon_epoch173_memory_20261110_v1/source/shared64-owner-census-v3.rs",
+      "sha256": "f063713620ad7b4703fb1611a29a4e285376f66958d6634adf5f8e15db6fa884"
+    }
+  },
+  "failed_versions": {
+    "v1": "production/test built; production clippy failed; physical closed duplicate work retired",
+    "v2": "four compilers passed; ordinary fixture failed; physical closed duplicate work retired"
+  },
+  "qualified_runtime": {
+    "path": "/usr/local/lib/jetstreamer/horizon-shared64-owner-census-tools-20261110-v3/check",
+    "sha256": "8332bb32609c84fd3636fe8689f0ec39e3fc109c494e0d973845063b3c552302"
+  },
+  "four_strict_compiler_configurations_passed": true,
+  "ordinary_tests_passed": 8,
+  "native_before_count": 6870,
+  "native_after_count": 6870,
+  "unknown_before": 0,
+  "unknown_after": 0,
+  "original_request_error": "Nonexistent v2 guard names caused unclassified actual v1 guards. Corrected request only, unique normally sealed R2 plan, same qualified runtime and helper name in a new isolated collected invocation.",
+  "shared64_bytes_retained": 68719476736,
+  "verifier96_bytes_retained": 103079215104,
+  "native16_bytes_retained": 17179869184,
+  "new_memory_or_DATA_credit_bytes": 0,
+  "shared_future_ending_authorized": false,
+  "replay_admission_authorized": false,
+  "next_gate": "Bind every actual/future shared host/system/kernel and uncapped-controller allocation before proposing a lower future reserve. Metadata owner coverage alone is insufficient; no lower shared envelope is selected.",
+  "evidence": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ARTIFACT.json",
+      "sha256": "f87f84ea399e9bbab79441658ed6cebe132e0cca272b750c897acf921b158d3f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ROOT_QUALIFIED_NATIVE_PENDING.json",
+      "sha256": "d3b55b072024a167fee7d12b6ec039cf473031401113a75e7b07c9c9a196bded"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ACTUAL_PLAN.json",
+      "sha256": "4c28729f44c8d3f8be723f17f8d2700bd964ea5a3a32679debf5436e36ceb559"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ACTUAL_SHARED64_OWNER_CENSUS.json",
+      "sha256": "62e5eed48898fd9fa2875bb61f66e9b26fe8d962b7ceb3769b44f09e32145764"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ACTUAL_PLAN-R2.json",
+      "sha256": "6bd360b49b2b7e2e0020ef0625c08f73a874e4f1798e71f1f08e9d1c5664c556"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ACTUAL_SHARED64_OWNER_CENSUS-R2.json",
+      "sha256": "b45dd8e863f9b5e55da580f95731a6ce44777fb4e00bc72615f048bf619e32d7"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ROOT_REQUEST_GUARD_VERSION_CORRECTION_AND_GENUINE_INVOCATIONS.json",
+      "sha256": "36978481c504451eebf01bef4ca38b627923da20ba504732dc1aa25c46c8ba98"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ROOT_NATIVE_R2_CENSUS_DRAINED_NO_SHARED_ENDING_SELECTED.json",
+      "sha256": "14b73efb568079ea38828d2482d028de41bb41ba8eb2d9cd706ed460f1dbccb3"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/production-ORIGINAL-ARGV.json",
+      "sha256": "be4d587b3b8be2141ad45f27a9a39badef55250cbfd457966022bf3f0577c961"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/production-ORIGINAL-EXECUTION.json",
+      "sha256": "8909e2879e91a7a31c4b39f3fd4ada41b95eed0c2ff12ac71038f2a9c36c161e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/build-tests-ORIGINAL-ARGV.json",
+      "sha256": "f96225dfa00fd4b4ea23e19157c1648b38da9549ab95c8103b39e41fb0c7eb20"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/build-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "f6a7467c74025dfec98df40ca3922061d99c47dd3d9426334418a93421b5a470"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/clippy-production-ORIGINAL-ARGV.json",
+      "sha256": "3dd234e61825b2134eedf724dd6cf0d49afb0b180d1d93b352dca5336c5bffb6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "20dd66ccc6f9e763b83b5b49640841bf0424a45ed364a1381bd33fdbd86c44df"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/clippy-tests-ORIGINAL-ARGV.json",
+      "sha256": "ba5abc6f7a72344e015fb8d699716ff23cb74c7b3dbcfa6241d60cc447cc21da"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "dfb0a2fcca40fc25fff55331227f53f79255e2fb15a87f8e4f5e53e2bb91512a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ordinary-tests-ORIGINAL-ARGV.json",
+      "sha256": "e3bcc016ceecf6b0cd44c6dbca0edf9d91b241daa32ac5807ced0db846917473"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ordinary-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "9d233a53178e0a9d520c9aac9a6e5537345f8931e38c38728ac81529c1216a0e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v1/CLOSED_SUPERSEDED_WORK_RETIREMENT_INTENT.json",
+      "sha256": "de4de6666ee7411b88666ef09b5b095c3cbe373514a126b01adac522692628b6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v1/CLOSED_SUPERSEDED_WORK_RETIREMENT_COMPLETE.json",
+      "sha256": "3c578f2a51808f60bb2e85774852a0fe8c62eb7a3d84d3dae9f1f3e2ab8dd675"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v2/CLOSED_SUPERSEDED_WORK_RETIREMENT_INTENT.json",
+      "sha256": "7776cd4001bb62d48359532f49282ba40bed38aada8d6c46db5fb0fec7bb61ef"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v2/CLOSED_SUPERSEDED_WORK_RETIREMENT_COMPLETE.json",
+      "sha256": "0c39868c84ee00d49fd09f03dd9e02fe8bc3057aa2e88f39a37464fd3aafb125"
+    }
+  ]
+}

@@ -1,0 +1,364 @@
+diff --git a/source/cold170_status.py b/source/cold170_status.py
+--- a/source/cold170_status.py
++++ b/source/cold170_status.py
+@@ -34,14 +34,15 @@
+ V24_PACKAGE = 'tools-cold168-retry5-failed166-v24-entry146'
+ V25_PACKAGE = 'tools-cold168-retry5-failed166-v25-entry146'
+ V26_PACKAGE = 'tools-cold168-retry5-failed166-v26-entry146'
++V27_PACKAGE = 'tools-cold168-retry5-failed166-v27-entry146'
+ METERED_FULL = LOCAL.name in ('tools-cold168-retry4-failed166-v6-entry146',
+                              'tools-cold168-retry4-failed166-v7-entry146',
+-                             V13_PACKAGE, V14_PACKAGE, V15_PACKAGE, V16_PACKAGE, V17_PACKAGE, V18_PACKAGE, V19_PACKAGE, V20_PACKAGE, V21_PACKAGE, V22_PACKAGE, V23_PACKAGE, V24_PACKAGE, V25_PACKAGE, V26_PACKAGE)
++                             V13_PACKAGE, V14_PACKAGE, V15_PACKAGE, V16_PACKAGE, V17_PACKAGE, V18_PACKAGE, V19_PACKAGE, V20_PACKAGE, V21_PACKAGE, V22_PACKAGE, V23_PACKAGE, V24_PACKAGE, V25_PACKAGE, V26_PACKAGE, V27_PACKAGE)
+ if METERED_FULL:
+     import full170_status as full170
+
+ RETRY5_168 = LOCAL.name in ('tools-cold168-retry5-failed166-v12-entry146', V13_PACKAGE, V14_PACKAGE,
+-                           V15_PACKAGE, V16_PACKAGE, V17_PACKAGE, V18_PACKAGE, V19_PACKAGE, V20_PACKAGE, V21_PACKAGE, V22_PACKAGE, V23_PACKAGE, V24_PACKAGE, V25_PACKAGE, V26_PACKAGE)
++                           V15_PACKAGE, V16_PACKAGE, V17_PACKAGE, V18_PACKAGE, V19_PACKAGE, V20_PACKAGE, V21_PACKAGE, V22_PACKAGE, V23_PACKAGE, V24_PACKAGE, V25_PACKAGE, V26_PACKAGE, V27_PACKAGE)
+ FAILED166_CADENCE = RETRY5_168 or METERED_FULL or LOCAL.name in (
+     'tools-cold168-retry4-failed166-v1', 'tools-cold168-retry4-failed166-v2',
+     'tools-cold168-retry4-failed166-v3', 'tools-cold168-retry4-failed166-v4-entry146',
+@@ -279,13 +280,13 @@
+     stopped168 = LOCAL.name == 'tools-cold168-retry4-failed166-v11-entry146'
+     c.failed168 = cold168_commit.guard_stop(c.fleet, c.cfg) if stopped168 else None
+     retry5_stop_options = {}
+-    if LOCAL.name in (V18_PACKAGE, V19_PACKAGE, V20_PACKAGE, V21_PACKAGE, V22_PACKAGE, V23_PACKAGE, V24_PACKAGE, V25_PACKAGE, V26_PACKAGE):
++    if LOCAL.name in (V18_PACKAGE, V19_PACKAGE, V20_PACKAGE, V21_PACKAGE, V22_PACKAGE, V23_PACKAGE, V24_PACKAGE, V25_PACKAGE, V26_PACKAGE, V27_PACKAGE):
+         import focused168_status
+         retry5_stop_options = {'focused_successor': c.fleet.get(focused168_status.FIELD)}
+     c.retained168 = (cold168_commit.guard_stop(c.fleet, c.cfg, successor=cold168, **retry5_stop_options)
+                      if RETRY5_168 else c.failed168)
+     c.failed168_retry5 = (cold168_commit.retry5_scan_stop(c.fleet, c.cfg, cold168, **retry5_stop_options)
+-                          if LOCAL.name in (V14_PACKAGE, V15_PACKAGE, V16_PACKAGE, V17_PACKAGE, V18_PACKAGE, V19_PACKAGE, V20_PACKAGE, V21_PACKAGE, V22_PACKAGE, V23_PACKAGE, V24_PACKAGE, V25_PACKAGE, V26_PACKAGE) else None)
++                          if LOCAL.name in (V14_PACKAGE, V15_PACKAGE, V16_PACKAGE, V17_PACKAGE, V18_PACKAGE, V19_PACKAGE, V20_PACKAGE, V21_PACKAGE, V22_PACKAGE, V23_PACKAGE, V24_PACKAGE, V25_PACKAGE, V26_PACKAGE, V27_PACKAGE) else None)
+     terminal168 = (cold168_commit.current(c.fleet, c.cfg)
+                    if cold168_commit and not (stopped168 or RETRY5_168) else None)
+     c.failed170 = failed_route(c.fleet)
+diff --git a/source/full170_status.py b/source/full170_status.py
+--- a/source/full170_status.py
++++ b/source/full170_status.py
+@@ -16,7 +16,7 @@
+                    'tools-cold168-retry5-failed166-v23-entry146',
+                    'tools-cold168-retry5-failed166-v24-entry146',
+                    'tools-cold168-retry5-failed166-v25-entry146',
+-                   'tools-cold168-retry5-failed166-v26-entry146')
++                   'tools-cold168-retry5-failed166-v26-entry146', 'tools-cold168-retry5-failed166-v27-entry146')
+ PACKAGE = 'tools-cold168-retry4-failed166-v6-entry146'
+ if Path(__file__).resolve().parent.name in ('tools-cold168-retry4-failed166-v7-entry146',
+                                            'tools-cold168-retry5-failed166-v13-entry146',
+diff --git a/source/hourly170_cadence.py b/source/hourly170_cadence.py
+--- a/source/hourly170_cadence.py
++++ b/source/hourly170_cadence.py
+@@ -31,7 +31,7 @@
+     "tools-cold168-retry5-failed166-v23-entry146",
+     "tools-cold168-retry5-failed166-v24-entry146",
+     "tools-cold168-retry5-failed166-v25-entry146",
+-    "tools-cold168-retry5-failed166-v26-entry146",
++    "tools-cold168-retry5-failed166-v26-entry146", "tools-cold168-retry5-failed166-v27-entry146",
+ ):
+     PROVIDER = PROVIDER.with_name("tools-homefloor-170-metered-hourly-v8")
+     PROVIDER_SEAL = "e927fbd7c9bd096933e7fea73bbbb82ed5105443afdf3f0c27077398059dcaaf"
+diff --git a/source/joint168_capacity.py b/source/joint168_capacity.py
+--- a/source/joint168_capacity.py
++++ b/source/joint168_capacity.py
+@@ -16,6 +16,16 @@
+ LANE = Path('/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1')
+ RUN = LANE/'full-metered-20261121-v1/joint-checkpoint-reduced-20261126-v1'
+ ALIAS = Path('/run/horizon-full168-joint-reduced-v1')
++WORKER_SCRATCH = RUN/'output/.historical-runtime'
++
++
++def worker_scratch(path):
++    if path.name == 'historical-worker' and path.parent.name == 'bound-worker':
++        parent = path.parent.parent
++        if parent.parent == WORKER_SCRATCH and re.fullmatch(r'jetstreamer-historical-parent-[A-Za-z0-9]+', parent.name):
++            return WORKER_SCRATCH
++    raise ValueError(f'foreign joint 168 worker path: {path}')
++
+ GROUP = '/system.slice/' + UNIT
+ CGROUP = Path('/sys/fs/cgroup') / GROUP.lstrip('/')
+ ENROLLMENT = ROOT/'ACCOUNTING_ENROLLMENT.json'
+@@ -161,7 +171,7 @@
+            and q['incumbent146']['enrollment'] == incumbent['enrollment']
+            and ready['schema'] == 'horizon-epoch168-joint-reduced-observer-enrollment-v1'
+            and ready['consumer_seal'] == status_ref
+-           and ready['native_reader_sha256'] == sha(Path(__file__).resolve())
++           and ready['native_reader_sha256'] == status.get('enrolled_reader_sha256', sha(Path(__file__).resolve()))
+            and ready['private_scope'] == UNIT and ready['full146_enrollment'] == incumbent['enrollment']
+            and ready['prestart_quote'] == e['prestart_quote']
+            and ready['archive_publication_authorized'] is False,
+@@ -273,8 +283,9 @@
+         path = (worker_proc/'exe').readlink()
+         ws = (worker_proc/'exe').stat()
+         parent = int((worker_proc/'stat').read_text().rsplit(')',1)[1].split()[1])
+-        s.need(mode == 'active' and path.name == 'historical-worker' and path.parent.name == 'bound-worker'
+-               and path.is_relative_to(RUN/'private') and parent == pid and ws.st_mode & 0o222 == 0
++        scratch = worker_scratch(path)
++        s.need(mode == 'active' and scratch == WORKER_SCRATCH
++               and parent == pid and stat.S_ISREG(ws.st_mode) and ws.st_mode & 0o222 == 0
+                and (worker_proc/'cgroup').read_text().strip() == '0::'+GROUP
+                and sha(worker_proc/'exe') == WORKER_SHA,
+                'unexpected joint 168 child or historical worker')
+diff --git a/source/joint168_status.py b/source/joint168_status.py
+--- a/source/joint168_status.py
++++ b/source/joint168_status.py
+@@ -10,6 +10,25 @@
+ FIELD = lane.FIELD
+ TERMINAL = lane.ROOT/'TERMINAL.json'
+ ALLOWED_TERMINAL = ('checkpoint-complete', 'failed', 'held-expired')
++V26_ORIGINAL_SEAL = {
++    'path': str(lane.ROOT.parent/'survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v26-entry146/deployment-seal-receipt.json'),
++    'sha256': '2a2959d55d88723fb5b271d3dd772a61e57804142d511f470ec299a68af4b10d',
++}
++V26_READER_SHA = 'b0df15d9250a9a14be886e238258ed51b4b3e7cd832042b839d754d8418b2a52'
++
++def enrolled_observer(e, seal):
++    ready = checked(e['observer_enrollment'])
++    if ready['consumer_seal'] == seal:
++        return {'consumer_seal': seal}
++    need(Path(seal['path']).parent.name == 'tools-cold168-retry5-failed166-v27-entry146'
++         and ready['consumer_seal'] == V26_ORIGINAL_SEAL and ready['native_reader_sha256'] == V26_READER_SHA,
++         'joint 168 observer lacks the exact V26 enrollment predecessor')
++    prior = checked(V26_ORIGINAL_SEAL)
++    member, = (row for row in prior['members'] if row['name'] == 'joint168_capacity.py')
++    need(member['sha256'] == V26_READER_SHA and member['mode'] == '0444',
++         'different original joint 168 reader')
++    return {'consumer_seal': V26_ORIGINAL_SEAL, 'enrolled_reader_sha256': V26_READER_SHA}
++
+
+
+ def bound_at(ref, path):
+@@ -37,7 +56,7 @@
+                    growth_bytes=quote['joint168']['incremental_growth_bytes'],
+                    stop_allowance_bytes=quote['joint168']['stop_allowance_bytes'])
+     incumbent = dict(proposal=paid['proposal'], enrollment=full146['enrollment'])
+-    e, q = lane.enrollment(evidence_reader, ref, request, incumbent, {'consumer_seal': seal})
++    e, q = lane.enrollment(evidence_reader, ref, request, incumbent, enrolled_observer(enrolled, seal))
+     need(e == enrolled and q == quote, 'joint 168 enrollment changed during cadence')
+     return ref, request, e, q
+
+@@ -130,8 +149,7 @@
+
+
+ def observer_row(enrolled, worker):
+-    scratch, = (str(p) for p in Path(worker['path']).parents
+-                if p.name == 'scratch' and p.is_relative_to(lane.RUN/'private'))
++    scratch = str(lane.worker_scratch(Path(worker['path'])))
+     iid = enrolled['actor']['invocation_id']
+     return dict(range='168', producer_unit=lane.UNIT, controller_unit=lane.UNIT,
+                 expected_producer_invocation_id=iid, expected_controller_invocation_id=iid,
+diff --git a/source/status_cycle.py b/source/status_cycle.py
+--- a/source/status_cycle.py
++++ b/source/status_cycle.py
+@@ -25,7 +25,7 @@
+ CURRENT = Path(__file__).resolve()
+ PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
+ RESUMING = CURRENT.parent == ROOT / 'tools-cold168-retry4-resume-v1'
+-RETRY5_CADENCE_VERSIONS = (12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26)
++RETRY5_CADENCE_VERSIONS = (12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27)
+ PUBLICATION_INVOCATIONS = {
+     145: ('horizon-retained-publish-145-20261126-v1.service', '166133c4366c47cdad3caf1748404541'),
+     199: ('horizon-retained-publish-199-20261126-v1.service', 'd12158c94a7a4e53af92671cb4a2a8b9'),
+@@ -38,12 +38,12 @@
+     return name + '-entry146' if version >= 4 else name
+
+
+-FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26)
++FAILED166_VERSION = next((version for version in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27)
+                           if CURRENT.parent == ROOT / failed166_package(version)), 0)
+ FAILED166 = bool(FAILED166_VERSION)
+ RETRY5_168 = FAILED166_VERSION in RETRY5_CADENCE_VERSIONS
+-METERED_FULL170 = FAILED166_VERSION in (6, 7, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26)
+-HOLDING185 = FAILED166_VERSION in (7, 20, 21, 22, 23, 24, 25, 26)
++METERED_FULL170 = FAILED166_VERSION in (6, 7, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27)
++HOLDING185 = FAILED166_VERSION in (7, 20, 21, 22, 23, 24, 25, 26, 27)
+ HOURLY170 = FAILED166 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-hourly170-v1'
+ FAILED170 = HOURLY170 or CURRENT.parent == ROOT / 'tools-cold168-retry4-failed170-v1'
+ assert hashlib.sha256((PACKAGE/'deployment-seal-receipt.json').read_bytes()).hexdigest() == PARENT_SEAL
+@@ -67,15 +67,16 @@
+ if FAILED166_VERSION >= 16:
+     import ready_delivery
+
+-if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26):
++if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26, 27):
+     import focused168_status
+
+ V25 = ROOT/'tools-cold168-retry5-failed166-v25-entry146'
+ V25_SEAL = '7f5315920183929bcded395d6827dfc84eb9c08481e77d26f53da3329e470122'
++V26_SEAL = '2a2959d55d88723fb5b271d3dd772a61e57804142d511f470ec299a68af4b10d'
+ V25_FULL146_SHA = 'c3a870f2e1b73277ce75cfb35ff2a7436dbbd7dcfb3fe4ea2e08db5001d17fef'
+ if FAILED166_VERSION == 25:
+     import full146_status
+-elif FAILED166_VERSION == 26:
++elif FAILED166_VERSION in (26, 27):
+     # The original qualified reader binds the active 146 enrollment to V25's
+     # owner and pathname. Keep that identity across the sole writer handoff.
+     parent = checked(dict(path=str(V25/'deployment-seal-receipt.json'), sha256=V25_SEAL))
+@@ -447,7 +448,7 @@
+
+
+ def epoch143_entry(c):
+-    if FAILED166_VERSION not in (23, 24, 25, 26):
++    if FAILED166_VERSION not in (23, 24, 25, 26, 27):
+         need(ENTRY143_FIELD not in c.fleet, 'epoch 143 entry requires V23 cadence')
+         return None
+     import bounded142
+@@ -506,7 +507,7 @@
+
+ def validate_epoch146_modules(seal):
+     modules = ('bounded142', 'bounded_entry_owners')
+-    if FAILED166_VERSION in (23, 24, 25, 26):
++    if FAILED166_VERSION in (23, 24, 25, 26, 27):
+         modules += ('bounded143',)
+     for name in modules:
+         source = CURRENT.with_name(name + '.py')
+@@ -549,7 +550,7 @@
+     entry = {'entry_lease': bounded_entry['lease']} if bounded_entry is not None else {}
+     census_owners = import_module('bounded_entry_owners') if entry else owners
+     native_owners = c.recovered_owners
+-    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26):
++    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26, 27):
+         prior = fleet.get(focused168_status.FIELD)
+         c.focused168 = focused168_status.observe(prior)
+         if c.focused168 and c.focused168['phase'] != 'held':
+@@ -579,7 +580,7 @@
+             need('146' not in native_owners, 'epoch 146 has multiple native owners')
+             native_owners = dict(native_owners, **{'146': r})
+         full146_status.observer(c)
+-    if FAILED166_VERSION == 26:
++    if FAILED166_VERSION in (26, 27):
+         consumer_seal = bound(CURRENT.parent/'deployment-seal-receipt.json')
+         c.joint168 = joint168_status.observe(c, consumer_seal, cycle.observed_lane)
+         if c.joint168 and c.joint168['phase'] != 'terminal':
+@@ -593,11 +594,11 @@
+     else:
+         census_owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True,
+                                     restored=native_owners,**entry)
+-    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26) and c.focused168:
++    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26, 27) and c.focused168:
+         focused168_status.recheck(c.focused168)
+     if FAILED166_VERSION in (25, 26):
+         full146_status.recheck(c.full146)
+-    if FAILED166_VERSION == 26:
++    if FAILED166_VERSION in (26, 27):
+         joint168_status.recheck(c.joint168)
+     if held170:
+         from full170_status import native
+@@ -663,11 +664,11 @@
+             cap['current_cold168_retry5_startup'] = c.recovered_ref
+         else:
+             cap.pop('current_cold168_retry5_startup', None)
+-    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26) and c.focused168:
++    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26, 27) and c.focused168:
+         cap[focused168_status.FIELD] = c.focused168
+     if FAILED166_VERSION in (25, 26) and c.full146:
+         cap[full146_status.FIELD] = c.full146
+-    if FAILED166_VERSION == 26 and c.joint168:
++    if FAILED166_VERSION in (26, 27) and c.joint168:
+         cap[joint168_status.FIELD] = c.joint168
+     durable(path,witness)
+     return witness
+@@ -772,9 +773,9 @@
+         counts['current_replay_lanes'] += int(c.full146['measured_progress'])
+     diagnostic_count=private136.active(c.private136) if PRIVATE136 else 0
+     diagnostic_count+=int(bool(HOURLY170 and c.hourly170 and c.hourly170.get('row')))
+-    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26) and c.focused168:
++    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26, 27) and c.focused168:
+         diagnostic_count += int(c.focused168['phase'] == 'worker')
+-    if FAILED166_VERSION == 26 and c.joint168:
++    if FAILED166_VERSION in (26, 27) and c.joint168:
+         diagnostic_count += int(c.joint168['phase'] != 'terminal')
+     original=dict(c.prior)
+     original.update(receipts={k:v for k,v in refs.items() if k not in ('140','146')},observer=c.sample_ref,
+@@ -793,7 +794,7 @@
+     return bound(p),bound(complete)
+
+ def holding185_tool():
+-    if FAILED166_VERSION in (21, 22, 23, 24, 25, 26):
++    if FAILED166_VERSION in (21, 22, 23, 24, 25, 26, 27):
+         package = CURRENT.parent
+         seal = checked(bound(package/'deployment-seal-receipt.json'))
+     else:
+@@ -909,7 +910,7 @@
+     ready_audit_growth.reconcile(fleet,observed['audit'],cap,ar)
+     prefix140_storage.reconcile(fleet,cap)
+     cold_workers.install(c,fleet)
+-    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26):
++    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26, 27):
+         focused168_status.install(fleet, c.focused168)
+     if PRIVATE136:
+         private136.install(c,fleet)
+@@ -955,7 +956,7 @@
+         if c.full146:
+             fleet['authenticated_status_count'] = len(a['receipts'])-1
+             fleet['cycle_reconciliation_scope'] += ' Includes the full epoch 146 enrollment.'
+-    if FAILED166_VERSION == 26:
++    if FAILED166_VERSION in (26, 27):
+         joint168_status.install(fleet, c.joint168)
+     return fleet
+
+@@ -1125,7 +1126,7 @@
+             member, = (row for row in seal['members'] if row['name'] == name)
+             need(member['mode'] == '0444' and bound(CURRENT.with_name(name))['sha256'] == member['sha256'],
+                  'unsealed metered epoch 170 receiver')
+-    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26):
++    if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26, 27):
+         path = CURRENT.with_name('focused168_status.py')
+         member, = (row for row in seal['members'] if row['name'] == path.name)
+         need(Path(focused168_status.__file__) == path and member['mode'] == '0444'
+@@ -1135,7 +1136,7 @@
+         member, = (row for row in seal['members'] if row['name'] == path.name)
+         need(Path(full146_status.__file__) == path and member['mode'] == '0444'
+              and bound(path)['sha256'] == member['sha256'], 'unsealed full 146 receiver')
+-    if FAILED166_VERSION == 26:
++    if FAILED166_VERSION in (26, 27):
+         need(Path(full146_status.__file__) == V25/'full146_status.py'
+              and bound(Path(full146_status.__file__))['sha256'] == V25_FULL146_SHA,
+              'different original full 146 reader')
+@@ -1423,7 +1424,7 @@
+                  == cold_workers.cold168_commit.retry5_scan_stop(fleet, cfg, route),
+                  'different prior writer, metered receiver or retry5 stop')
+         retry5_stop_options = {}
+-        if FAILED166_VERSION in (20, 21, 22, 23, 24, 25, 26):
++        if FAILED166_VERSION in (20, 21, 22, 23, 24, 25, 26, 27):
+             retry5_stop_options = {'focused_successor': fleet.get(focused168_status.FIELD)}
+         if FAILED166_VERSION >= 16:
+             previous_ready = checked(incumbent['ready'])
+@@ -1432,8 +1433,9 @@
+                  == cold_workers.cold168_commit.retry5_scan_stop(fleet, cfg, route, **retry5_stop_options),
+                  'ready delivery receiver changed the retry5 stop or metered 170 route')
+             ready_delivery.selected_tool(checked(receipt))
+-        if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26):
++        if FAILED166_VERSION in (18, 19, 20, 21, 22, 23, 24, 25, 26, 27):
+             predecessor_active, predecessor_package = {
++                27: ('c4f3cb5a76a3fc3e838b48ae1b538389371ddbf087beb955eb914f509cc38396', V26_SEAL),
+                 26: ('a406dfa7951da12e26ae07a51853d4d390b495bbbf099375c2a53caa0fe788d2',
+                      V25_SEAL),
+                 25: ('cfbf24db72d1cd74f99fcdd4ff8130dc3166064b6eb4392d8bcc5e87bd2e4844',
+@@ -1458,13 +1460,14 @@
+                  and ready['focused168_receiver'] == bound(CURRENT.with_name('focused168_status.py')),
+                  f'different V{previous_version} cadence predecessor or focused 168 receiver')
+             focused168_status.generation()
+-        if FAILED166_VERSION in (20, 21, 22, 23, 24, 25, 26):
+-            if FAILED166_VERSION in (23, 24, 25, 26):
++        if FAILED166_VERSION in (20, 21, 22, 23, 24, 25, 26, 27):
++            if FAILED166_VERSION in (23, 24, 25, 26, 27):
+                 predecessor = {
+                     23: '414d79a62d46ba9a2aff0e4a5cefdee06b64f36884725e4414ad4bbf89ac4dbf',
+                     24: 'cf825f84363520d2fa9b93916d5eca50d6240648a218016164d9a7f28fef0785',
+                     25: 'fb9db4e77c4dd78a49865d46e903a5c081f332ddc10ffdfc099c366cb3742182',
+                     26: 'fb9db4e77c4dd78a49865d46e903a5c081f332ddc10ffdfc099c366cb3742182',
++                    27: 'fb9db4e77c4dd78a49865d46e903a5c081f332ddc10ffdfc099c366cb3742182',
+                 }[FAILED166_VERSION]
+                 need(previous_ready['focused168_receiver']['sha256'] == predecessor,
+                      'different immutable prior focused receiver')
+@@ -1475,7 +1478,7 @@
+         if FAILED166_VERSION == 25:
+             need(ready['full146_receiver'] == bound(CURRENT.with_name('full146_status.py')),
+                  'V25 handoff omitted the exact full 146 receiver')
+-        if FAILED166_VERSION == 26:
++        if FAILED166_VERSION in (26, 27):
+             need(ready['full146_receiver'] == previous_ready['full146_receiver'] ==
+                  dict(path=str(V25/'full146_status.py'), sha256=V25_FULL146_SHA)
+                  and ready['joint168_receiver'] == bound(CURRENT.with_name('joint168_status.py'))

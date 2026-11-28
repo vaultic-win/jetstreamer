@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-driver13-ordinary-20261109-v1.service; invocation ID: f9ff98a9ea3a4e84914a3dc9aabc8936\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 24ms\nCPU time consumed: 24ms\nMemory peak: 552.0K\nMemory swap peak: 0B\n"
+}

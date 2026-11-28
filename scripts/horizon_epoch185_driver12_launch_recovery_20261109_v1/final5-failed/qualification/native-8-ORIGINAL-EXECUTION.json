@@ -1,0 +1,5 @@
+{
+  "code": 101,
+  "stdout": "\nrunning 1 test\ntest post_main::native_controls::actual_prestart_only_wait_expires_without_clock_reset_or_capture ... FAILED\n\nfailures:\n\nfailures:\n    post_main::native_controls::actual_prestart_only_wait_expires_without_clock_reset_or_capture\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.15s\n\n",
+  "stderr": "Running as unit: horizon-positive185-final5-native-8-20261109-v1.service\n\nthread 'post_main::native_controls::actual_prestart_only_wait_expires_without_clock_reset_or_capture' (3909244) panicked at /home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/source/post_main_native_tests.rs:104:5:\nassertion failed: Instant::now() >= deadline\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=101\nService runtime: 166ms\nCPU time consumed: 13ms\nMemory peak: 840.0K\nMemory swap peak: 0B\n"
+}

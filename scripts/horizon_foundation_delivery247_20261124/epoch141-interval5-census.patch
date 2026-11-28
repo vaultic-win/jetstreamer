@@ -1,0 +1,29 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -1079,8 +1079,8 @@
+         plan["gates"]["296"]["next_action"] = (
+             "Reassess full replay after a measured disk reservation release. "
+             "The repaired production worker is sealed and the bounded failure transaction matched canonical execution.")
+-    active_sequential_intervals = 0
+-    for ordinal, cohort_label in ((2, "-private141"), (3, "-private141-third"), (4, "-private141-fourth")):
++    active_private_intervals = set()
++    for ordinal, cohort_label in ((2, "-private141"), (3, "-private141-third"), (4, "-private141-fourth"), (5, "-private141-fifth")):
+         interval141_launch = V / f"horizon141-foundation-interval{ordinal}-runtime-v1/replay-launch.json"
+         if not interval141_launch.is_file():
+             continue
+@@ -1091,12 +1091,13 @@
+         current = props(private_unit, ["ActiveState", "InvocationID", "MainPID"])
+         if current["ActiveState"] == "active":
+             assert current["InvocationID"] == registration["invocation_id"] and int(current["MainPID"]) > 0
+-            active_sequential_intervals += int(ordinal in (2, 3))
++            active_private_intervals.add(ordinal)
+         assert plan["tracked_units"].count(private_unit) <= 1
+         if private_unit not in plan["tracked_units"]:
+             plan["tracked_units"].append(private_unit)
+         cohort += cohort_label
+-    assert active_sequential_intervals <= 1
++    assert len(active_private_intervals & {2, 3}) <= 1
++    assert len(active_private_intervals & {4, 5}) <= 1
+     binding=record(out/f'seven-owner-plan-{cohort}.json',plan)
+     target=Path(plan['output'])
+     if not target.exists():

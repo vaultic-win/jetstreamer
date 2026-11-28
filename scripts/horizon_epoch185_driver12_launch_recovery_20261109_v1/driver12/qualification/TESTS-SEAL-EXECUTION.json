@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-epoch185-resource-census-tests-20261109-v12\",\"member_count\":2,\"outcome\":\"created\",\"plan_sha256\":\"bf0d299981e924c4ce8f665254d812b8d6fbd2a0a363f706e372d1a5d8b394f3\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

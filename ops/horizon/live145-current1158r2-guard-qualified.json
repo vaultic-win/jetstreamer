@@ -1,0 +1,48 @@
+{
+  "schema": "horizon-current1158r2-guard70-qualified-publication-v1",
+  "source": {
+    "path": "/home/sol/.jetstreamer-private/native1158r2-live145-frame-workflow-source-20261107-v1/guard-src/main.rs",
+    "sha256": "8ab98d56d1794788cd0c71bc0d4f8e2118fb1ec9c61cc9ba5bfa6b3f66745033"
+  },
+  "production": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current1158r2-bound-guard-window-tools-20261107-v1/horizon-current1158r2-guard-window",
+    "sha256": "c6a53808b346695278d81d89c0a42212e842163eb166ee27737e4bced8453b6d"
+  },
+  "ordinary_tests_passed": 70,
+  "all61_original_names_preserved": true,
+  "all67_predecessor_names_preserved": true,
+  "all69_predecessor_names_preserved": true,
+  "all7_original_actors_drained": true,
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current1158r2-bound-guard-window-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "03234c4f5997212c00083d3e730935c8788ba18af0febd6e7649a8dd66581e77"
+  },
+  "actual_artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current1158r2-bound-guard-window-tools-20261107-v1/artifact-proof.json",
+    "sha256": "70c4f245fa5669f05e1640658c5cbd43b4b6f1b3353a1b0891cd359865dbae5a"
+  },
+  "no_replay_authority": true,
+  "published_source": {
+    "path": "scripts/horizon_current1158r2_metadata_guard_v1/main.rs",
+    "sha256": "8ab98d56d1794788cd0c71bc0d4f8e2118fb1ec9c61cc9ba5bfa6b3f66745033"
+  },
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/native1158r2-live145-frame-workflow-source-20261107-v1/GUARD1158R2_FINAL_SOURCE_FREEZE_V1.json",
+    "sha256": "fb0feb2bfe151986a63eca9ba25ebf50c5821599d82258ea7922130b0c4076ee"
+  },
+  "preserved_original1158_failure": {
+    "path": "/home/sol/.jetstreamer-private/native1158-live145-frame-workflow-source-20261107-v1/runtime/ROOT1158_ORIGINAL_FLEET_TEMPLATE_DIGEST_FAILURE_AND_DRAIN.json",
+    "sha256": "0c324f6bc8b958b7fe8cbe6f50f9f6e548241457aaaa74c7b456485b995bd965"
+  },
+  "current_observer": "2026-11-07T11:58:09Z",
+  "complete_DATA_bytes": 5090795196210,
+  "normal_external_pool_bytes": 6442450944,
+  "extra_memory_bytes": 0,
+  "actual_native_fleet_Frame_pending": true,
+  "new_Frame_CLI_full_reader_registration_pending": true,
+  "no_replay_or_release_credit": true,
+  "actual_compiler_and_test_recipes": {
+    "path": "/home/sol/workspace/jetstreamer/scripts/horizon_current1158r2_metadata_guard_v1/qualified-actual-recipes.json",
+    "sha256": "670da84269d7e4c0cfd33ddc62ed1be08083eeff30023d47db10cedac2d49c55"
+  }
+}

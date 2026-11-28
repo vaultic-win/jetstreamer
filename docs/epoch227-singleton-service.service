@@ -1,0 +1,38 @@
+# Dormant review template: requires native/input proof, fleet admission and guard.
+[Unit]
+Description=Horizon epoch 227 capped original-runtime singleton
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=ubuntu
+Group=ubuntu
+Restart=no
+KillMode=control-group
+Delegate=no
+RuntimeMaxSec=259200
+TimeoutStopSec=300
+MemoryHigh=150000000000
+MemoryMax=225000000000
+MemorySwapMax=0
+TasksMax=512
+Nice=10
+IOWeight=50
+CPUWeight=100
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/home/ubuntu/.jetstreamer-private/singleton-227-capped-710f6523-v1
+Environment=TOKIO_WORKER_THREADS=8
+Environment=SOLANA_RAYON_THREADS=16
+Environment=JETSTREAMER_HISTORICAL_POH_THREADS=8
+Environment=RUST_MIN_STACK=67108864
+Environment=JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1
+Environment=JETSTREAMER_PRIVATE_RUN_ROOT=/home/ubuntu/.jetstreamer-private/singleton-227-capped-710f6523-v1/private
+Environment=JETSTREAMER_HISTORICAL_WORKER_V1_6_20=/var/lib/jetstreamer/horizon-227-capped-candidate-710f6523-v1/jetstreamer-historical-worker-v1-6-20
+ExecStartPre=/usr/bin/install -m 0444 /var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1/genesis.tar.bz2 /home/ubuntu/.jetstreamer-private/singleton-227-capped-710f6523-v1/output/genesis.tar.bz2
+ExecStart=/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1/jetstreamer-node 227 /home/ubuntu/.jetstreamer-private/singleton-227-capped-710f6523-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1/preflight227-singleton.json --cohort-manifest-fingerprint=sha256:99fa3de5ed1da720b76e33196d4ef4da9dda57202f12af90eaab60f84f9ecd31 --snapshot-archive=/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1/snapshot-98063464-4TaJaC5esCEWtHp5Fay2aMS9XjA1o9bwQthcvBeSyYbR.tar.zst

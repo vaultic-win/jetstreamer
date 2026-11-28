@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-current0230-guard-compiler-1-clippy-tests-20261109-v1-r2-root-r2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 279ms\nCPU time consumed: 278ms\nMemory peak: 3.5M\nMemory swap peak: 0B\n"
+}

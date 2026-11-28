@@ -1,0 +1,1652 @@
+{
+  "schema": "horizon-readonly-advisory-phase199-static-qualified-v1",
+  "production_artifact": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/qa/planner",
+    "sha256": "a276254fc411b4060cd0c3594939227a0c5c3497f71867b74caba3b0e370eebc"
+  },
+  "exact_source_and_compiler_graph": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "6ba3c2ac666521d843b691806002ac1e5f018270e5390b7efdc3cbda9f650379"
+  },
+  "all_required_tests_passed": true,
+  "native_phase_pending": false,
+  "scope": "Only qualifier/read-original timing route; admission/assembly/replay commands refused",
+  "ordinary_tests_passed": 63,
+  "ignored_tests": 3,
+  "genuine_native_advisory_phase": {
+    "actual_native_phase": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-advisory-phase199-qualification-20261109-v1/actual-reader-start-phase.json",
+      "sha256": "b6a682f1d989f752d32a6ccbb6506e782803c82ba2c5e52875cba255b4f3a637"
+    },
+    "actual_timing": {
+      "actual_monotonic_usec": 2532781226485,
+      "earlier_metadata_wait_samples": [
+        {
+          "actual_monotonic_usec": 2532758715989,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532759226724,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532759737518,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532760248244,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532760758930,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532761269648,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532761780491,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532762291296,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532762802004,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532763312777,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532763823601,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532764334252,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532764845035,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532765355830,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532765866576,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532766377312,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532766888079,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532767398829,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532767909589,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532768420560,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532768931337,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532769442137,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532769952806,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532770463439,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532770974244,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532771495286,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532772006113,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532772516874,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532773027599,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532773538304,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532774048994,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532774559771,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532775084950,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532775595655,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532776106437,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532776617180,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532777127881,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532777638727,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532778149485,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532778659582,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532748943972",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "86a2a45e26fb4c6b9dce82d709f3c974",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 32min 58.894163s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 32min 58.894163s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532779172165,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532778959384",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "59b4b25b01ee44d3bd623ebd03148f92",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 33min 28.910155s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 33min 28.910155s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532779682932,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532778959384",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "59b4b25b01ee44d3bd623ebd03148f92",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 33min 28.910155s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 33min 28.910155s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532780194971,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532778959384",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "59b4b25b01ee44d3bd623ebd03148f92",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 33min 28.910155s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 33min 28.910155s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        },
+        {
+          "actual_monotonic_usec": 2532780705640,
+          "guard": {
+            "ActiveState": "failed",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainCode": "1",
+            "ExecMainExitTimestampMonotonic": "2532778959384",
+            "ExecMainStatus": "1",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+            "InvocationID": "59b4b25b01ee44d3bd623ebd03148f92",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "NRestarts": "0",
+            "Result": "exit-code",
+            "SubState": "failed",
+            "TimersMonotonic": []
+          },
+          "timer": {
+            "ActiveState": "active",
+            "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+            "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+            "Job": "",
+            "LoadState": "loaded",
+            "NextElapseUSecMonotonic": "4w 1d 7h 33min 28.910155s",
+            "Result": "success",
+            "SubState": "waiting",
+            "TimersMonotonic": [
+              "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 33min 28.910155s }",
+              "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+            ],
+            "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+          }
+        }
+      ],
+      "failed_guard_is_not_safety_coverage": true,
+      "guard": {
+        "ActiveState": "failed",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "ExecMainCode": "1",
+        "ExecMainExitTimestampMonotonic": "2532778959384",
+        "ExecMainStatus": "1",
+        "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+        "InvocationID": "59b4b25b01ee44d3bd623ebd03148f92",
+        "Job": "",
+        "LoadState": "loaded",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "exit-code",
+        "SubState": "failed",
+        "TimersMonotonic": []
+      },
+      "guard_exit_monotonic_usec": 2532778959384,
+      "new_resource_samples": 0,
+      "next_guard_deadline_monotonic_usec": 2532808910155,
+      "no_guard_or_timer_mutation": true,
+      "replay_launch_authorized": false,
+      "retained199_advisory_phase": {
+        "exact_native_pair_preserved": true,
+        "guard": {
+          "ActiveState": "inactive",
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "ExecMainCode": "1",
+          "ExecMainExitTimestampMonotonic": "2532779014293",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "638d5266ce594bfda4ff89d4c585b35b",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead",
+          "TimersMonotonic": []
+        },
+        "no_guard_or_timer_mutation": true,
+        "quiet_phase_is_not_rollover_or_replay_authority": true,
+        "timer": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "NextElapseUSecMonotonic": "4w 1d 7h 33min 28.917466s",
+          "Result": "success",
+          "SubState": "waiting",
+          "TimersMonotonic": [
+            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 33min 28.917466s }",
+            "{ OnActiveUSec=1s ; next_elapse=3w 2d 5h 46min 51.141884s }"
+          ],
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      },
+      "schema": "horizon-current-reader-advisory-native-start-phase-v1",
+      "timer": {
+        "ActiveState": "active",
+        "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+        "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+        "Job": "",
+        "LoadState": "loaded",
+        "NextElapseUSecMonotonic": "4w 1d 7h 33min 28.910155s",
+        "Result": "success",
+        "SubState": "waiting",
+        "TimersMonotonic": [
+          "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 33min 28.910155s }",
+          "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+        ],
+        "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+      }
+    },
+    "reader_launched": false,
+    "replay_launch_authorized": false,
+    "resource_samples": 0
+  },
+  "actual_native_phase_execution": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/ACTUAL-NATIVE-PHASE-EXECUTION.json",
+    "sha256": "027e5481212033372a358eb2806d5ded2b44b0a5a89c05946e365bccc6bb76af"
+  },
+  "no_snapshot_equality_relaxed": true,
+  "no_guard_or_timer_mutation": true
+}

@@ -1,0 +1,12 @@
+{
+  "actual_driver12": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_ACTUAL_NORMALLY_SEALED_DRIVER12_BINDINGS.json",
+    "sha256": "f8f5cad6a75a689ae70789c605beb084267212d7482244c0db6e2aba3613f96e"
+  },
+  "all29_externs_preserved": true,
+  "native210_and_native227_retained": true,
+  "source_and_four": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "fb7acde3067b2d7e1ea1b393d0da8165e0d8369456b372ea51973a40343e5fac"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/run_data_after0500_witness_memory_v1.py"
+  ],
+  "bindings": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/ROOT_CURRENT_NATIVE_CONTINUATION_BINDINGS.json",
+    "sha256": "52dd58803f20923e01c1c1f3f92ba8e6319ed2aa68a49d4887bba04f6f592b5e"
+  },
+  "metadata_source": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/run_data_after0500_witness_memory_v1.py",
+    "sha256": "8b9711aae7e698a575855bb66467a1ac16b504076a47264d1d90f066f6c12f63"
+  }
+}

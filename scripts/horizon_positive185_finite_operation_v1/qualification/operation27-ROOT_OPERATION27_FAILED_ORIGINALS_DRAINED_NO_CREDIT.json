@@ -1,0 +1,47 @@
+{
+  "schema": "horizon-operation27-failed-originals-drained-no-credit-v1",
+  "originals": [
+    {
+      "original_execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation-qa-20261108-v27-publish1330-r1/clippy-production-ORIGINAL-EXECUTION.json",
+        "sha256": "60805cef90800b0aac2ad8171dbe6d46fc8158f5cd914f914abfb6e7bcdcace3"
+      },
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ControlGroup": "",
+        "Id": "horizon-positive185-current-operation-clippy-production-20261108-v27-publish1330-r1.service",
+        "ActiveState": "failed",
+        "SubState": "failed",
+        "Job": ""
+      },
+      "failed_source_namespace_preserved": true,
+      "resource_credit_bytes": 0
+    },
+    {
+      "original_execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation-qa-20261108-v27-publish1330-r2/ACTUAL-READER-CONTROL-ORIGINAL-EXECUTION.json",
+        "sha256": "3c63cdb50bbd19f1694b7834303bd165b282384ca5d6b22c5179ef5988821f19"
+      },
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ControlGroup": "",
+        "Id": "horizon-positive185-reader-lifecycle-actual-20261108-v27-publish1330-r2.service",
+        "ActiveState": "failed",
+        "SubState": "failed",
+        "Job": ""
+      },
+      "failed_source_namespace_preserved": true,
+      "resource_credit_bytes": 0
+    }
+  ],
+  "normal_pool_bytes": 6442450944,
+  "complete_DATA_bytes": 5129145102996,
+  "no_source_or_failed_namespace_modified": true,
+  "replay_launch_authorized": false
+}

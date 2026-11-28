@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 6 tests\ntest tests::duplicate_native_fields_reject ... ok\ntest tests::exact_owner_tokens_reject_malformed ... ok\ntest tests::live_foreign_restarted_and_successful_owners_reject ... ok\ntest tests::native_values_remain_strings ... ok\ntest tests::original_terminal_shape_accepts ... ok\ntest tests::reversed_or_zero_clock_rejects ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+  "stderr": "Running as unit: horizon-retire0030-tests-20261109-v2.service; invocation ID: 394f0ece03844548a344953b929bdbaf\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 2ms\nCPU time consumed: 2ms\nMemory peak: 1.0M\nMemory swap peak: 0B\n"
+}

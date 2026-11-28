@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-census0500-plan-20261109-v3\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"a0ea9ba7e94fc37eb00f7a63bfeadfc7251f9c2892d52c13fe21b3583e931022\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n"
+}

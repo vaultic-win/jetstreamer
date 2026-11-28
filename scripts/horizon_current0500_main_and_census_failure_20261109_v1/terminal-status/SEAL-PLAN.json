@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-status185-current0500-cold-failure-tools-20261109-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-current0500-cold-failure-lifecycle-status-source-20261109-v1/status185-current0500-cold-failure.py",
+      "name": "status.py",
+      "sha256": "5229473bcf953854a432ac5c2a8ff32193feb2bf2a93a51bf5aec7f72a316393",
+      "mode": 292
+    }
+  ]
+}

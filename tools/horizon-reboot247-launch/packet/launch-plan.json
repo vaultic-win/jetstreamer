@@ -1,0 +1,22 @@
+{
+  "archive_retirement_authorized": false,
+  "candidate_epoch": 247,
+  "guard_unit": "horizon-247-reboot-20261117-protective-v2.service",
+  "input_auth": {
+    "path": "/var/lib/jetstreamer/horizon247-input-auth0348-accepted-v1/acceptance.json",
+    "sha256": "bd8dfb92dc7bae51af0fbc783de87f894c113da3bc33f775d41508e56813be95"
+  },
+  "maximum_root_physical_bytes": 506191984640,
+  "maximum_worker_vmas": 3500000,
+  "memory_high_bytes": 167361060864,
+  "memory_max_bytes": 251041591296,
+  "operator_deadline_seconds": 50,
+  "producer_unit": "horizon-qualify-247-reboot-20261117-v2.service",
+  "remote_mutations": false,
+  "reuse_original_invocation_authorized": false,
+  "schema": "horizon247-reboot-launch-plan-v1",
+  "setup_seconds": 60,
+  "state_directory": "/var/lib/jetstreamer/horizon247-reboot-20261117-state-v2",
+  "timer_unit": "horizon-247-reboot-20261117-protective-v2.timer",
+  "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2"
+}

@@ -1,0 +1,182 @@
+{
+  "schema": "horizon-positive185-profile-materializer-published-v1",
+  "purpose": "Plan a distinct positive48GiB/original600second185 checkpoint probe using genuine full typed evidence and preserved raw reservations; reject completion claims unsupported by epoch boundary or measured duration.",
+  "source_members": [
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/final_window.rs",
+      "sha256": "f0dc2cd82bc53d7d7c710b6c1ee3b866bb8507ea000f709887bba91806946d26",
+      "bytes": 8318,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/final_window.rs",
+        "sha256": "f0dc2cd82bc53d7d7c710b6c1ee3b866bb8507ea000f709887bba91806946d26"
+      },
+      "predecessor_sha256": null
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/lineage.rs",
+      "sha256": "446e7a4a15cd21c945dbe94c9c77259535a8a29fd751884a974bc3fb6ee5855c",
+      "bytes": 9134,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/lineage.rs",
+        "sha256": "446e7a4a15cd21c945dbe94c9c77259535a8a29fd751884a974bc3fb6ee5855c"
+      },
+      "predecessor_sha256": "446e7a4a15cd21c945dbe94c9c77259535a8a29fd751884a974bc3fb6ee5855c"
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/main.rs",
+      "sha256": "496e025f0d6460461e895e559b90ac841ac01f7e3d58a792ea413c4bb61d9511",
+      "bytes": 16548,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/main.rs",
+        "sha256": "496e025f0d6460461e895e559b90ac841ac01f7e3d58a792ea413c4bb61d9511"
+      },
+      "predecessor_sha256": "8ed7adfe80cdc28be2de65671bafd61b5e4a3f26ea2719983653e6e68676a523"
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/positive.rs",
+      "sha256": "981dd47d307a8873b61dd6105394444901f73e8cca18e3a3a4cb3ecfa1f29b30",
+      "bytes": 18945,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/positive.rs",
+        "sha256": "981dd47d307a8873b61dd6105394444901f73e8cca18e3a3a4cb3ecfa1f29b30"
+      },
+      "predecessor_sha256": null
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/resources.rs",
+      "sha256": "08c19f16dda0d13d9f7e926fed7073dd5ff630723e3d535628813c7802b7a47b",
+      "bytes": 9004,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/resources.rs",
+        "sha256": "08c19f16dda0d13d9f7e926fed7073dd5ff630723e3d535628813c7802b7a47b"
+      },
+      "predecessor_sha256": "c8a38baf9a2a6c57d3d16de0e50e5c7c16feed6f870c901ffe81f3040593f5b0"
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/storage.rs",
+      "sha256": "50d6bbef5d3373bc5f95bf082ff29f79588b8b4ce444e6ba03dd70c02fa40071",
+      "bytes": 3226,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/storage.rs",
+        "sha256": "50d6bbef5d3373bc5f95bf082ff29f79588b8b4ce444e6ba03dd70c02fa40071"
+      },
+      "predecessor_sha256": "50d6bbef5d3373bc5f95bf082ff29f79588b8b4ce444e6ba03dd70c02fa40071"
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/templates/actor.service",
+      "sha256": "30278ba3fdc7c5322f4f269e7aaac4400905a12bddf1f1aa13823b566dac9a51",
+      "bytes": 1860,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/templates/actor.service",
+        "sha256": "30278ba3fdc7c5322f4f269e7aaac4400905a12bddf1f1aa13823b566dac9a51"
+      },
+      "predecessor_sha256": "30278ba3fdc7c5322f4f269e7aaac4400905a12bddf1f1aa13823b566dac9a51"
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/templates/admission.json",
+      "sha256": "073a6a13a543193c6da88238ce0d5f80502d5acd39929237d95abe62fbff9861",
+      "bytes": 2382,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/templates/admission.json",
+        "sha256": "073a6a13a543193c6da88238ce0d5f80502d5acd39929237d95abe62fbff9861"
+      },
+      "predecessor_sha256": "073a6a13a543193c6da88238ce0d5f80502d5acd39929237d95abe62fbff9861"
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/templates/envelope.json",
+      "sha256": "1eaeb843163f8decfe8101328713e95ec7b9e9c382324aec9279dbcce82ffac0",
+      "bytes": 2974,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/templates/envelope.json",
+        "sha256": "1eaeb843163f8decfe8101328713e95ec7b9e9c382324aec9279dbcce82ffac0"
+      },
+      "predecessor_sha256": "1eaeb843163f8decfe8101328713e95ec7b9e9c382324aec9279dbcce82ffac0"
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/templates/guard.service",
+      "sha256": "c8f39e424dd6226266d177455e58434581f2526612e7ff8a74154ecd2fdc9a55",
+      "bytes": 1246,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/templates/guard.service",
+        "sha256": "c8f39e424dd6226266d177455e58434581f2526612e7ff8a74154ecd2fdc9a55"
+      },
+      "predecessor_sha256": "c8f39e424dd6226266d177455e58434581f2526612e7ff8a74154ecd2fdc9a55"
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/templates/guard.timer",
+      "sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57",
+      "bytes": 214,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/templates/guard.timer",
+        "sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57"
+      },
+      "predecessor_sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57"
+    },
+    {
+      "path": "scripts/horizon_positive185_profile_materializer_v1/source/templates/task-spec.json",
+      "sha256": "22567a4994626bb0259b389b46a6eeb830274516a9cfb3ddcf0cba17df62109d",
+      "bytes": 2287,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/source/templates/task-spec.json",
+        "sha256": "22567a4994626bb0259b389b46a6eeb830274516a9cfb3ddcf0cba17df62109d"
+      },
+      "predecessor_sha256": "22567a4994626bb0259b389b46a6eeb830274516a9cfb3ddcf0cba17df62109d"
+    }
+  ],
+  "patch": {
+    "path": "/home/sol/workspace/jetstreamer/scripts/horizon_positive185_profile_materializer_v1/integration.patch",
+    "sha256": "5586c96a489434f3bd516b6a17a38fa66043fbcedd465eb89072ff898097b693"
+  },
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-source-20261107-v1/SOURCE_FREEZE_NOT_QA.json",
+    "sha256": "0aa3f17a9c02f4e41a7572172d4c15749ff7b98acda32a9affc0f491127f68b9"
+  },
+  "compiled_source": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/ROOT_FROZEN_SOURCE_FOR_QA.json",
+    "sha256": "624850567070b1b3d16be8d76f34cb47f5a97552c6b1adc666ea0c730e74d16c"
+  },
+  "production": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-profile-materializer-tools-20261107-v1/planner",
+    "sha256": "e2a9378c8f128f27e3972fd2af06ba1a00f63ad1d17f2e9232d05d91db1f5136"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-profile-materializer-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "5270324c96f40830fbd2405e2bf55f70b185adcac5aa32e630fd5b64d3de8a81"
+  },
+  "artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-profile-materializer-tools-20261107-v1/artifact-proof.json",
+    "sha256": "ca68f8ef84a09fdda51f2779de17221eee39331602e5163c65edb32594bebebf"
+  },
+  "exact_compiler_recipes": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/ROOT_ALL4_PREWRITTEN_COMPILER_RECIPES.json",
+    "sha256": "c97136fc320bdf14da2c5e85d63565b8d44f5c71ddf0df49515dd19ebd1ae38e"
+  },
+  "strict_production_and_test_Clippy_passed": true,
+  "ordinary_tests_passed": 16,
+  "all5original_names_preserved": true,
+  "all6actual_scopes_drained": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-profile-materializer-qa-20261107-v1/ROOT_ALL6_SCOPES_DRAINED_QA_NORMAL_POOL_RETURNED.json",
+    "sha256": "93133b2df7600d41a4e8223ead01fce0d5f5b3f3c0b7742036fcf653dfbf3ac4"
+  },
+  "native_or_resource_observations_performed": false,
+  "normal_external_pool_bytes": 6442450944,
+  "extra_QA_memory_bytes": 0,
+  "retained_new_DATA_bytes": 536870912,
+  "complete_conservative_DATA_bytes": 5083279003442,
+  "actor_memory_bytes": 51539607552,
+  "setup_seconds": 600,
+  "checkpoint_last_slot": 80351283,
+  "epoch_last_slot": 80351999,
+  "existing72h_route_cannot_fund_current114h_estimate": true,
+  "remaining_gates": [
+    "Exact native finite positive executor and real final30second proof/token/sol-read/main-entry transaction",
+    "Fresh native fleet/Frame/fullreader/typed memory/DATA with live145 census and natural guard rollover",
+    "Independent profile admission preserving all live floors and growth claims",
+    "Full epoch boundary80351999 and separately qualified finite runtime/full driver successor"
+  ],
+  "executor_implemented": false,
+  "replay_admission_authorized": false,
+  "replay_lanes_recovered": 0,
+  "full_epoch_completion_claimed": false,
+  "publication_authorized": false
+}

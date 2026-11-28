@@ -1,0 +1,3 @@
+# horizon positive185 finite operation v32
+
+Operation32 selects actual Helper32 for native enrollment as well as capture, enrolled fleet and postreader. Its shared production child-argument builder regression rejects historical Helper13/Fleet27 substitution and retains the exact spec/self hashes and child caps. Strict four compiler stages,59 ordinary tests and nine native controls passed. A test-only disposable timer scope and genuine first-fire barrier correct the pre-fire qualification harness error; all excluded attempts remain bound. This is a bounded prefix route: actual native enrollment, fresh admission, successful guard and useful replay remain required.

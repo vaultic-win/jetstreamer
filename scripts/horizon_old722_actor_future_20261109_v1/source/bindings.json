@@ -1,0 +1,42 @@
+{
+  "task": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/task.json",
+    "sha256": "364915751ba88c4451d9c4d79d38a522ded7633bc55a2b8c279ad2d1032ac239"
+  },
+  "terminal": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/722adc397ae24bb4b96d452783599f57/terminal.json",
+    "sha256": "958ded36e04180675454cef4376bfe02f9d201d63988a6935ac0ff6afdf675e2"
+  },
+  "lifecycle": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/722adc397ae24bb4b96d452783599f57/lifecycle.json",
+    "sha256": "4858cea6ef8d48c05181c50b55365beba7278985d261df85be830fc988829b9a"
+  },
+  "envelope": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-0500-20261109-next/envelope.json",
+    "sha256": "ff8bd6e279fad04843692652ed2ed014455974bb1f8db3a7b00e6bacdb8605bd"
+  },
+  "raw": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/e6a0713f158869752e84560f11f52d52a7f9dfb405038e5ee2d4af031e6b2334-cold185-722adc397ae24bb4b96d452783599f57/raw-accounting.json",
+    "sha256": "d783309cf31a26a572b0ad9113c154e4c86604fe1c8a8f882b17f3a6285f7274"
+  },
+  "failure": {
+    "path": "/home/sol/.jetstreamer-private/capped-root-prefix-185-positive-positive-0500-20261109-next/receipts/failure.json",
+    "sha256": "d67f292bc1520d3dd25120bf2ffcf8bb19394a9bd63d030d19068c6923a5dc2b"
+  },
+  "anchor": {
+    "path": "/home/sol/.jetstreamer-private/epoch169-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD169_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+    "sha256": "48fd8018efb668cf164d4bb8a83b2f4ca087b2e8ad3e71e93606338378b59393"
+  },
+  "actor_fragment": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-0500-20261109-next/horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+    "sha256": "eb0be12a4ea3f8e031521b7e54c3a928048e6e82ddeb6455d2552d50ac63ca0b"
+  },
+  "guard_fragment": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-0500-20261109-next/horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.service",
+    "sha256": "0f4d097eba3d3f2018db711c79858427bcced0bae6ca0b91950c1da39f1a924c"
+  },
+  "timer_fragment": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-0500-20261109-next/horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.timer",
+    "sha256": "daa58f2daba71e60f39a12be48ec87715970b36d68dddcff0ca9079cab6aca09"
+  }
+}

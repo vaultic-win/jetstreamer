@@ -1,0 +1,23 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/recovery-source-qualification-20261110-v4/gcloud-v6/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "2801e4456ab8ae0751f2600c2853261d2a1efa6cd6715f37693aea3320311495"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/recovery-source-qualification-20261110-v4/gcloud-v6/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "f7a86ed032ea75dd1d6c2029009ad980043f7abc004347c88e215649b040db70"
+  },
+  "actual_ordinary_test_count": 23,
+  "replay_launch_authorized": false,
+  "genuine_outer_disposable_fixture": {
+    "path": "/var/lib/jetstreamer/recovery-source-qualification-20261110-v4/gcloud-v6/native-fixture-v1/ROOT_GENUINE_NATIVE_OUTER_FIXTURE_ACCEPTED.json",
+    "sha256": "3b6f94398e6ab25c80983e592858f9bfe8efcdd4f1fcb3402b59a7d0a929c614"
+  },
+  "real_credentials_copied": false,
+  "published_source_sha256": {
+    "copy.rs": "e43ef101327639546accbd5cabe7f7db76a7c4256344afd1bb1b70ca168fbd9a",
+    "group.rs": "5bca043ef1182e5deb995f67a431f0950fd3df112d001dc40dbe702ac5cce6a9",
+    "main.rs": "93e4e6558516edef08d202771284cb84b917605cb310ca2ca52440d6861359d2",
+    "tests.rs": "6bba2925bb8b8ea0665a57f2c752969c221e0f61641550052e0ebb8515964ab9"
+  }
+}

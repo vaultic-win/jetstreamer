@@ -1,0 +1,168 @@
+{
+  "schema": "horizon1061-old220-peer-source-import-v1",
+  "source_packet_manifest_sha256": "edcd68ac8dba21071e30f40406e150bf2c10864beabd3744a62708528be40a42",
+  "source_packet_inherited_normal_manifest_sha256": "440352e5f7dc1dbfaa80aa5793ba890a92b909db812b4bdb07aef78b37c77fe9",
+  "source_packet_scope": "Uncompiled condition-blocked library successor. No native or global retirement acceptance.",
+  "imported_members": [
+    {
+      "path": "Cargo.lock",
+      "bytes": 5114,
+      "sha256": "abc4cc95885d1686c16ece2b586cf2c9f52f6adecf2e31fbcc8f477dae746430"
+    },
+    {
+      "path": "Cargo.toml",
+      "bytes": 289,
+      "sha256": "42b1ac806b4313d7eb2c525b0b60ced1c5bdda474023309db65e4ceb174ba8cc"
+    },
+    {
+      "path": "fixture-bytes.json",
+      "bytes": 3984660,
+      "sha256": "8897ef789725c2239a489bf5dda9cd9e7ff95aa1a9956579e373dc298f7d4207"
+    },
+    {
+      "path": "fixtures/00-horizon-publish-241-postcommit986-v1.service",
+      "bytes": 106782,
+      "sha256": "a8036c37eb39c404bc80a01b786428fcf361c81c08688e3a3110475ba0430ad6"
+    },
+    {
+      "path": "fixtures/02-preflight-233-301-target1-offline-publish300.json",
+      "bytes": 229012,
+      "sha256": "207701a70fad8b6cdee7e848b0e7e5f7e88bbe4648f808fc89a5976b51b3bded"
+    },
+    {
+      "path": "fixtures/04-batch-327aba14d883dcb36bad2e34bc8f47ddf504f2c2811885f69a4f5914970f7cb5.json",
+      "bytes": 9071,
+      "sha256": "05637417e91b49b6045a0a06923a74e0075ffab94e3e6c19f9353630ca954260"
+    },
+    {
+      "path": "fixtures/05-horizon-publish-241-common-mount-probe986-v1.service",
+      "bytes": 106120,
+      "sha256": "6370d2a97c918d77f8114fb2bf5eaea865368015cd639316b5e30aa4607d9926"
+    },
+    {
+      "path": "fixtures/06-namespace-probe.sh",
+      "bytes": 116277,
+      "sha256": "7ead358bb502799d7874a3d98f349792bf766abaf3cd8c36c719958e47323ff6"
+    },
+    {
+      "path": "fixtures/13-batch-327aba14d883dcb36bad2e34bc8f47ddf504f2c2811885f69a4f5914970f7cb5.json",
+      "bytes": 9071,
+      "sha256": "05637417e91b49b6045a0a06923a74e0075ffab94e3e6c19f9353630ca954260"
+    },
+    {
+      "path": "fixtures/14-horizon-restore-next-bootstrap-95039516-v1.service",
+      "bytes": 2499,
+      "sha256": "061d044b7a11d59eefa669555bad251a598f363f7a7a65736194d7dd18e5d42f"
+    },
+    {
+      "path": "fixtures/15-60-use-login-gcloud-session.conf",
+      "bytes": 191,
+      "sha256": "7b309af25057cfaa5ca0a1a4a0a66d151a40e321122bc5269234ea10d139660c"
+    },
+    {
+      "path": "fixtures/16-70-less-conservative-floor.conf",
+      "bytes": 796,
+      "sha256": "58b162fcc00ede312462e5a24adfde1ece99617b9b26f9d7edb7eb991a71dc17"
+    },
+    {
+      "path": "fixtures/17-restore_bound_gcs_snapshot.py",
+      "bytes": 21198,
+      "sha256": "c9eb03e211933e7387eb736a6a484f2a7f09c5eb378687370fd8eb849b8c22cb"
+    },
+    {
+      "path": "fixtures/18-gcloud",
+      "bytes": 6494,
+      "sha256": "03d163265c038e9a67b0760ed98de9b5970c4c9d172dbfec03384939d02d4800"
+    },
+    {
+      "path": "fixtures/19-gcloud.py",
+      "bytes": 6579,
+      "sha256": "c8acc602cebef4ca64ecfdb4f531718dd2dce85a86c735a52530f9555eb02962"
+    },
+    {
+      "path": "fixtures/20-cp.py",
+      "bytes": 3380,
+      "sha256": "64ee6e961c5c7b022712942d1e24d20fc6ac8b9d80241c58a12df7d0f29ffc36"
+    },
+    {
+      "path": "fixtures/21-hash.py",
+      "bytes": 7395,
+      "sha256": "1827d0480cfeed890c7e55f441297578b450f5d8b385447f920ec3abfc5f9e11"
+    },
+    {
+      "path": "fixtures/22-describe.py",
+      "bytes": 4912,
+      "sha256": "ba3dad2e4284af208cce4e31ea85c85c038905a62fc4c6b5421d6d23b7f950b5"
+    },
+    {
+      "path": "fixtures/23-client.py",
+      "bytes": 77004,
+      "sha256": "a8c72d042ee98c13571b8bd8938bde0f43e7f78e3ab20a64928aba88ce76ca07"
+    },
+    {
+      "path": "fixtures/24-horizon-import-233-committed-v2.service",
+      "bytes": 100321,
+      "sha256": "88ed8283376bf7ead6c715f73c6021237d424fec6b57987fb8b93d03243a0c5b"
+    },
+    {
+      "path": "fixtures/26-preflight-233-301-target1-offline-publish300.json",
+      "bytes": 229012,
+      "sha256": "207701a70fad8b6cdee7e848b0e7e5f7e88bbe4648f808fc89a5976b51b3bded"
+    },
+    {
+      "path": "fixtures/28-batch-f550bf9b1238e29445ee28a6197ab1b9a6581967c433b6bdfba18d4e81c9570a.json",
+      "bytes": 9050,
+      "sha256": "9d1b8f8c062d486a6f9a43e10b78f321a5e419a9a0413c8af8c41d08faa16050"
+    },
+    {
+      "path": "fixtures/29-horizon-import-233-common-mount-probe-v2.service",
+      "bytes": 99662,
+      "sha256": "62f974bd1f72808bd20064be096955121a751e717260f2dbbb6132421e06b1eb"
+    },
+    {
+      "path": "fixtures/30-namespace-probe.sh",
+      "bytes": 930,
+      "sha256": "9cbdfe737d6f8ee3c83cd9f32e34ea286a864d59383c3efdb66f06063ff03a44"
+    },
+    {
+      "path": "fixtures/36-batch-f550bf9b1238e29445ee28a6197ab1b9a6581967c433b6bdfba18d4e81c9570a.json",
+      "bytes": 9050,
+      "sha256": "9d1b8f8c062d486a6f9a43e10b78f321a5e419a9a0413c8af8c41d08faa16050"
+    },
+    {
+      "path": "specs.json",
+      "bytes": 35821,
+      "sha256": "5c30715c392a17a915313ed98a5b5e3fb9f0ef866119efd5ea484c44f4079d1e"
+    },
+    {
+      "path": "src/condition_blocked/tests.rs",
+      "bytes": 12164,
+      "sha256": "f63a70daff01568c9766a5ab280188ae1a3098d4693be0675ff06f205becac38"
+    },
+    {
+      "path": "src/condition_blocked.rs",
+      "bytes": 18793,
+      "sha256": "0b88075fb946cfc6b71e1423645e70c5ceec203d05f98382b28760bba12aa20e"
+    },
+    {
+      "path": "src/lib.rs",
+      "bytes": 32683,
+      "sha256": "2ff852d88420580aea7a2aad9d52a0d350ac9ff24f5e4586306b2e0d00332ed8"
+    },
+    {
+      "path": "src/predecessor_summary.rs",
+      "bytes": 5117,
+      "sha256": "5a93f9cfd8b9a141c2faedd6ecf04a9328ae0e95f73d32aa652716fef4e30bff"
+    },
+    {
+      "path": "src/test_support.rs",
+      "bytes": 11603,
+      "sha256": "0d461a79ff68c95c4ab48b96d591f748c88a1e83195ce9257da7043763b38851"
+    },
+    {
+      "path": "src/tests.rs",
+      "bytes": 17904,
+      "sha256": "1e5d60c0679695527c233c7a3498bc96d1ebfba184189a37340bba718321edaa"
+    }
+  ]
+}

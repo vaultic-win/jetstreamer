@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/tmp/continuations0000-helper34-operation36-20261109-v1/prepare-current0000-reader-fixture.py"
+  ],
+  "code": 0,
+  "stdout": "{'reader_spec': {'path': '/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0000-20261109-v1/GENUINE0000_ACCOUNTING_ADAPTER_SOURCE_BUNDLE.json', 'sha256': '95830156b2c062da55541de82f60b743aecf8e4de75024be309be9d4785cd015'}, 'frame': {'path': '/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T000022-witness-terminal145-chain128-v5.json', 'sha256': '0c955d7d8ddba037f05c8ed9757d19b05d1cba498311b01bc8db204f0566c13c'}, 'reader_spec_role': 'Static accounting Sources fixture only; production adapter at original capture clock; no operational full-reader activation'}\n",
+  "stderr": ""
+}

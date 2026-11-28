@@ -1,0 +1,22 @@
+[
+  "systemd-run",
+  "--wait",
+  "--pipe",
+  "--service-type=exec",
+  "--unit=horizon-operation36-r1-current-enrolled-fleet-native-20261108-v3",
+  "-p",
+  "User=root",
+  "-p",
+  "MemoryMax=512M",
+  "-p",
+  "MemorySwapMax=0",
+  "-p",
+  "TasksMax=128",
+  "-p",
+  "RuntimeMaxSec=30",
+  "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tests-20261108-v36-helper34-planner5-r1/tests",
+  "--ignored",
+  "--exact",
+  "successor_roles::actual_enrolled_fleet_role_control::actual_current_enrolled_fleet_uses_driver11_helper_and_preserves_historical_role",
+  "--test-threads=1"
+]

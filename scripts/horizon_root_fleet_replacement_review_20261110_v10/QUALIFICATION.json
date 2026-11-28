@@ -1,0 +1,21 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/recovery-source-qualification-20261110-v4/replacement-fleet-v10/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "417c140caf8a5646b1364fbca5ec220dba49c647aeff00fd629f01f6fd4b50c7"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/recovery-source-qualification-20261110-v4/replacement-fleet-v10/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "8f966425dcda870414bee6d3e26a901824768f8ee1933b5f86409f10834f2053"
+  },
+  "actual_ordinary_test_count": 65,
+  "replay_launch_authorized": false,
+  "published_source_sha256": {
+    "bootstrap.rs": "239800d59817eb40a4484e6d092fc5a604bacde3393ea5d8131977bdca7b804a",
+    "main.rs": "11d29b02adb76a9664a5bc003edd47146878debce7318d8412b3d8a90a5fe108",
+    "memory_target.rs": "ae6ba062ddea8082ef9c6e090cdc58ff250deda853d3675d5e683804cb3f2fda",
+    "replacement.rs": "5e6de3629bbba51562e0c0d1093c877a9a2ecd6dffa41b1117b3f731a91d8b6c",
+    "replacement_tests.rs": "05fd44089c5a382b744b879e17ededdc56bf1d17b111ef3dbe523ef753f73e1b",
+    "replacement_validation.rs": "dd9fee8bfcaf4bc25acbc4385d439f3aeac19e9146672b9d800a13b4e82905fc",
+    "terminal.rs": "58327a9524975ebcd811a66d4929abdd998358b99d7cbc1d8f7ac5d2f618dc2d"
+  }
+}

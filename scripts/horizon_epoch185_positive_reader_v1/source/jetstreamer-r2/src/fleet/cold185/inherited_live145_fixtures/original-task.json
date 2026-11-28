@@ -1,0 +1,690 @@
+{
+  "actor_invocation_id": "dff3a3ef94d943b0bae94634fa9dfc50",
+  "actor_pid": 3754074,
+  "actor_source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+    "sha256": "c53b4c3ab996e3f1dd313aabe6731c10b8fe11cf394fc357897a8d9c143f4bc2"
+  },
+  "actor_start_ticks": 252602505,
+  "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+  "admission": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/admission.json",
+    "sha256": "b884650cccaa6cc3f1a0f670d85a7c35f1a52e4b9e5ee5406cf8b28dd98bfe73"
+  },
+  "admission_value": {
+    "current_frame": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/current-frame.json",
+      "sha256": "abf2964b3204d25bf8d6dbed2b50ff1fe2bf0d2a6e9275ce78de2c88ed2ef1b0"
+    },
+    "current_full_reader": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/current-full-reader.json",
+      "sha256": "5dc207111f484bffe0b711e1911aaab911c13fb938ae12cd76168b8055e1d6b7"
+    },
+    "epoch": 185,
+    "expires_at": 1794194473,
+    "fleet_owner": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/fleet-owner.json",
+      "sha256": "4587d110a43837d2f935f62ace9d76eadff459a0230365a533e626b84a5a5dda"
+    },
+    "full_reader_accepted": true,
+    "issued_at": 1794179353,
+    "memory_max_bytes": 51539607552,
+    "minimum_free_bytes": 5194366530196,
+    "ordinary_full_replay_authorized": false,
+    "phase": "verification",
+    "prefix_only": true,
+    "publication_authorized": false,
+    "raw_obligations_preserved": true,
+    "resource_credit_bytes": 0,
+    "root_acceptance": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/root-acceptance.json",
+      "sha256": "60feb0e285c20676b7c051bcc1f9547720a9aa312cf13324f3a148890a8d1231"
+    },
+    "schema": "horizon-epoch185-root-accepted-native-admission-v1",
+    "status_readback": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/status-readback.json",
+      "sha256": "6831e63d046decaf1dc41df09088a8ec61415aafc5d39e74f4f45bbcb4fd84e9"
+    },
+    "task_owner": "Root",
+    "typed_data": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/typed-data.json",
+      "sha256": "e7559d66be0a33ed04e5505f9ac055830b2fb08bf1dcd7a1ed0b8e39377608fe"
+    },
+    "typed_memory": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/typed-memory.json",
+      "sha256": "97372b4b574a17c0f83d55b040b516a52fedc369542b3996cbe94305f572a5de"
+    },
+    "unit": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service"
+  },
+  "candidate_DATA_bytes": 549890031616,
+  "capacity_credit_bytes": 0,
+  "current": {
+    "current_frame": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/current-frame.json",
+      "sha256": "abf2964b3204d25bf8d6dbed2b50ff1fe2bf0d2a6e9275ce78de2c88ed2ef1b0"
+    },
+    "current_full_reader": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/current-full-reader.json",
+      "sha256": "5dc207111f484bffe0b711e1911aaab911c13fb938ae12cd76168b8055e1d6b7"
+    },
+    "fleet_owner": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/fleet-owner.json",
+      "sha256": "4587d110a43837d2f935f62ace9d76eadff459a0230365a533e626b84a5a5dda"
+    },
+    "root_acceptance": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/root-acceptance.json",
+      "sha256": "60feb0e285c20676b7c051bcc1f9547720a9aa312cf13324f3a148890a8d1231"
+    },
+    "status_readback": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/status-readback.json",
+      "sha256": "6831e63d046decaf1dc41df09088a8ec61415aafc5d39e74f4f45bbcb4fd84e9"
+    },
+    "typed_data": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/typed-data.json",
+      "sha256": "e7559d66be0a33ed04e5505f9ac055830b2fb08bf1dcd7a1ed0b8e39377608fe"
+    },
+    "typed_memory": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/typed-memory.json",
+      "sha256": "97372b4b574a17c0f83d55b040b516a52fedc369542b3996cbe94305f572a5de"
+    }
+  },
+  "current_capture_unix_seconds": 1794179374,
+  "current_task": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/status-readback.json",
+    "sha256": "6831e63d046decaf1dc41df09088a8ec61415aafc5d39e74f4f45bbcb4fd84e9"
+  },
+  "envelope": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json",
+    "sha256": "aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770"
+  },
+  "envelope_value": {
+    "actor_service_path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+    "admission": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/admission.json",
+      "sha256": "b884650cccaa6cc3f1a0f670d85a7c35f1a52e4b9e5ee5406cf8b28dd98bfe73"
+    },
+    "control_root": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-2300-20261108-next",
+    "guard_receipt_root": "/var/lib/jetstreamer/epoch185-cold-guard-v4",
+    "guard_service_path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+    "guard_unit": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+    "limits": {
+      "log": 67108864,
+      "memory": 51539607552,
+      "metadata": 67108864,
+      "output": 137438953472,
+      "scratch": 412316860416,
+      "vmas": 4194304
+    },
+    "plan": {
+      "epoch_hashes": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/epoch-hashes-185.txt",
+        "sha256": "9ef0d882bf9b530abcd77f8aae199a0c2057c06b32a1d738c7443e3e431606fa"
+      },
+      "ledger_directory": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3",
+      "maximum_runtime_seconds": 14400,
+      "minimum_free_bytes": 5194366530196,
+      "node": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/jetstreamer-node",
+        "sha256": "e987401354f0cddbd838b71439768d6ed84baddfe8c0c2b484addec553db1887"
+      },
+      "run_root": "/home/sol/.jetstreamer-private/capped-root-prefix-185-positive-positive-2300-20261108-next",
+      "schema": "horizon-private-epoch185-capped-root-prefix-plan-v4",
+      "snapshot": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/snapshot-79919283-Hozk66F2tKQuhouHceuwU9xZzWaXksnBeU1JBysRBmmf.tar.zst",
+      "target_slot": 80351283,
+      "terminal_slot": 80351283,
+      "unit": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "worker": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/jetstreamer-historical-worker-v1-6-15"
+    },
+    "schema": "horizon-epoch185-guarded-cold-envelope-v4",
+    "self_program": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold",
+    "self_sha256": "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2",
+    "setup_deadline_seconds": 600,
+    "timer_service": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+      "sha256": "01e7394e203b063a6d11986715c12995a6f29ad5cdbdf4acfe07d6c923afa5f9"
+    },
+    "timer_unit": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+    "token_root": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4"
+  },
+  "guard_floor_bytes": 5194366530196,
+  "guard_history": null,
+  "guard_memory_bytes": 268435456,
+  "guard_pending": true,
+  "guard_source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+    "sha256": "bda5fe94d1a5c34ec2ee9df07ae21e2e6128a6c18f830a112d9bc6a24ee440f8"
+  },
+  "guard_unit": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+  "limits": {
+    "log": 67108864,
+    "memory": 51539607552,
+    "metadata": 67108864,
+    "output": 137438953472,
+    "scratch": 412316860416,
+    "vmas": 4194304
+  },
+  "mapped_driver": {
+    "actual_argv": [
+      "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold",
+      "prestart",
+      "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json",
+      "--plan-sha256",
+      "aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770",
+      "--self-sha256",
+      "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2"
+    ],
+    "cgroup": "0::/system.slice/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+    "device": 2304,
+    "inode": 7216488,
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold",
+    "pid": 3754074,
+    "sha256": "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2",
+    "start_ticks": 252602505
+  },
+  "memory_hard_bytes": 51539607552,
+  "minimum_free_bytes": 5194366530196,
+  "native": {
+    "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service": {
+      "ActiveState": "inactive",
+      "AmbientCapabilities": "cap_dac_override cap_sys_ptrace",
+      "CPUQuotaPerSecUSec": "1s",
+      "CapabilityBoundingSet": "cap_dac_override cap_sys_ptrace",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "Delegate": "no",
+      "DropInPaths": "",
+      "Environment": "",
+      "ExecMainCode": "0",
+      "ExecMainStartTimestampMonotonic": "0",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold guard /usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json --plan-sha256 aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770 --self-sha256 bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+      "ExecStartPost": "",
+      "ExecStartPre": "",
+      "ExecStop": "",
+      "ExecStopPost": "",
+      "FragmentPath": "/etc/systemd/system/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "Group": "root",
+      "Id": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "InvocationID": "",
+      "Job": "",
+      "KillMode": "control-group",
+      "LimitFSIZE": "67108864",
+      "LoadState": "loaded",
+      "MainPID": "0",
+      "MemoryAccounting": "yes",
+      "MemoryHigh": "infinity",
+      "MemoryMax": "268435456",
+      "MemorySwapMax": "0",
+      "NRestarts": "0",
+      "NoNewPrivileges": "yes",
+      "PassEnvironment": "",
+      "PrivateNetwork": "yes",
+      "ProtectHome": "read-only",
+      "ProtectSystem": "strict",
+      "RemainAfterExit": "no",
+      "Restart": "no",
+      "Result": "success",
+      "RuntimeMaxUSec": "infinity",
+      "SubState": "dead",
+      "TasksMax": "256",
+      "TimeoutStartUSec": "1min 30s",
+      "TimeoutStopUSec": "15s",
+      "TriggeredBy": "",
+      "Triggers": "",
+      "Type": "oneshot",
+      "UnsetEnvironment": "",
+      "User": "root"
+    },
+    "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer": {
+      "ActiveState": "inactive",
+      "DropInPaths": "",
+      "FragmentPath": "/etc/systemd/system/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+      "Id": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+      "InvocationID": "",
+      "Job": "",
+      "LastTriggerUSecMonotonic": "0",
+      "LoadState": "loaded",
+      "Result": "success",
+      "SubState": "dead",
+      "TimersMonotonic": "{ OnUnitInactiveUSec=30s ; next_elapse=0 }\n{ OnActiveUSec=1s ; next_elapse=0 }",
+      "TriggeredBy": "",
+      "Triggers": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "Unit": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service"
+    },
+    "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service": {
+      "ActiveState": "activating",
+      "AmbientCapabilities": "",
+      "CPUQuotaPerSecUSec": "4s",
+      "CapabilityBoundingSet": "",
+      "ControlGroup": "/system.slice/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "ControlPID": "3754074",
+      "Delegate": "no",
+      "DropInPaths": "",
+      "Environment": "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1",
+      "ExecMainCode": "0",
+      "ExecMainStartTimestampMonotonic": "0",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold /usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json --plan-sha256 aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770 --self-sha256 bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+      "ExecStartPost": "",
+      "ExecStartPre": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold prestart /usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json --plan-sha256 aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770 --self-sha256 bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+      "ExecStop": "",
+      "ExecStopPost": "",
+      "FragmentPath": "/etc/systemd/system/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "Group": "horizon",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "InvocationID": "dff3a3ef94d943b0bae94634fa9dfc50",
+      "Job": "",
+      "KillMode": "control-group",
+      "LimitFSIZE": "137438953472",
+      "LoadState": "loaded",
+      "MainPID": "0",
+      "MemoryAccounting": "yes",
+      "MemoryHigh": "51539607552",
+      "MemoryMax": "51539607552",
+      "MemorySwapMax": "0",
+      "NRestarts": "0",
+      "NoNewPrivileges": "yes",
+      "PassEnvironment": "",
+      "PrivateNetwork": "no",
+      "ProtectHome": "read-only",
+      "ProtectSystem": "strict",
+      "RemainAfterExit": "no",
+      "Restart": "no",
+      "Result": "success",
+      "RuntimeMaxUSec": "4h",
+      "SubState": "start-pre",
+      "TasksMax": "1024",
+      "TimeoutStartUSec": "12min",
+      "TimeoutStopUSec": "10min 20s",
+      "TriggeredBy": "",
+      "Triggers": "",
+      "Type": "exec",
+      "UnsetEnvironment": "",
+      "User": "sol"
+    }
+  },
+  "native_after": {
+    "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service": {
+      "ActiveState": "inactive",
+      "AmbientCapabilities": "cap_dac_override cap_sys_ptrace",
+      "CPUQuotaPerSecUSec": "1s",
+      "CapabilityBoundingSet": "cap_dac_override cap_sys_ptrace",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "Delegate": "no",
+      "DropInPaths": "",
+      "Environment": "",
+      "ExecMainCode": "0",
+      "ExecMainStartTimestampMonotonic": "0",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold guard /usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json --plan-sha256 aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770 --self-sha256 bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+      "ExecStartPost": "",
+      "ExecStartPre": "",
+      "ExecStop": "",
+      "ExecStopPost": "",
+      "FragmentPath": "/etc/systemd/system/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "Group": "root",
+      "Id": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "InvocationID": "",
+      "Job": "",
+      "KillMode": "control-group",
+      "LimitFSIZE": "67108864",
+      "LoadState": "loaded",
+      "MainPID": "0",
+      "MemoryAccounting": "yes",
+      "MemoryHigh": "infinity",
+      "MemoryMax": "268435456",
+      "MemorySwapMax": "0",
+      "NRestarts": "0",
+      "NoNewPrivileges": "yes",
+      "PassEnvironment": "",
+      "PrivateNetwork": "yes",
+      "ProtectHome": "read-only",
+      "ProtectSystem": "strict",
+      "RemainAfterExit": "no",
+      "Restart": "no",
+      "Result": "success",
+      "RuntimeMaxUSec": "infinity",
+      "SubState": "dead",
+      "TasksMax": "256",
+      "TimeoutStartUSec": "1min 30s",
+      "TimeoutStopUSec": "15s",
+      "TriggeredBy": "",
+      "Triggers": "",
+      "Type": "oneshot",
+      "UnsetEnvironment": "",
+      "User": "root"
+    },
+    "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer": {
+      "ActiveState": "inactive",
+      "DropInPaths": "",
+      "FragmentPath": "/etc/systemd/system/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+      "Id": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+      "InvocationID": "",
+      "Job": "",
+      "LastTriggerUSecMonotonic": "0",
+      "LoadState": "loaded",
+      "Result": "success",
+      "SubState": "dead",
+      "TimersMonotonic": "{ OnUnitInactiveUSec=30s ; next_elapse=0 }\n{ OnActiveUSec=1s ; next_elapse=0 }",
+      "TriggeredBy": "",
+      "Triggers": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "Unit": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service"
+    },
+    "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service": {
+      "ActiveState": "activating",
+      "AmbientCapabilities": "",
+      "CPUQuotaPerSecUSec": "4s",
+      "CapabilityBoundingSet": "",
+      "ControlGroup": "/system.slice/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "ControlPID": "3754074",
+      "Delegate": "no",
+      "DropInPaths": "",
+      "Environment": "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1",
+      "ExecMainCode": "0",
+      "ExecMainStartTimestampMonotonic": "0",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold /usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json --plan-sha256 aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770 --self-sha256 bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+      "ExecStartPost": "",
+      "ExecStartPre": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold prestart /usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json --plan-sha256 aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770 --self-sha256 bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+      "ExecStop": "",
+      "ExecStopPost": "",
+      "FragmentPath": "/etc/systemd/system/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "Group": "horizon",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "InvocationID": "dff3a3ef94d943b0bae94634fa9dfc50",
+      "Job": "",
+      "KillMode": "control-group",
+      "LimitFSIZE": "137438953472",
+      "LoadState": "loaded",
+      "MainPID": "0",
+      "MemoryAccounting": "yes",
+      "MemoryHigh": "51539607552",
+      "MemoryMax": "51539607552",
+      "MemorySwapMax": "0",
+      "NRestarts": "0",
+      "NoNewPrivileges": "yes",
+      "PassEnvironment": "",
+      "PrivateNetwork": "no",
+      "ProtectHome": "read-only",
+      "ProtectSystem": "strict",
+      "RemainAfterExit": "no",
+      "Restart": "no",
+      "Result": "success",
+      "RuntimeMaxUSec": "4h",
+      "SubState": "start-pre",
+      "TasksMax": "1024",
+      "TimeoutStartUSec": "12min",
+      "TimeoutStopUSec": "10min 20s",
+      "TriggeredBy": "",
+      "Triggers": "",
+      "Type": "exec",
+      "UnsetEnvironment": "",
+      "User": "sol"
+    }
+  },
+  "native_before": {
+    "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service": {
+      "ActiveState": "inactive",
+      "AmbientCapabilities": "cap_dac_override cap_sys_ptrace",
+      "CPUQuotaPerSecUSec": "1s",
+      "CapabilityBoundingSet": "cap_dac_override cap_sys_ptrace",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "Delegate": "no",
+      "DropInPaths": "",
+      "Environment": "",
+      "ExecMainCode": "0",
+      "ExecMainStartTimestampMonotonic": "0",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold guard /usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json --plan-sha256 aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770 --self-sha256 bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+      "ExecStartPost": "",
+      "ExecStartPre": "",
+      "ExecStop": "",
+      "ExecStopPost": "",
+      "FragmentPath": "/etc/systemd/system/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "Group": "root",
+      "Id": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "InvocationID": "",
+      "Job": "",
+      "KillMode": "control-group",
+      "LimitFSIZE": "67108864",
+      "LoadState": "loaded",
+      "MainPID": "0",
+      "MemoryAccounting": "yes",
+      "MemoryHigh": "infinity",
+      "MemoryMax": "268435456",
+      "MemorySwapMax": "0",
+      "NRestarts": "0",
+      "NoNewPrivileges": "yes",
+      "PassEnvironment": "",
+      "PrivateNetwork": "yes",
+      "ProtectHome": "read-only",
+      "ProtectSystem": "strict",
+      "RemainAfterExit": "no",
+      "Restart": "no",
+      "Result": "success",
+      "RuntimeMaxUSec": "infinity",
+      "SubState": "dead",
+      "TasksMax": "256",
+      "TimeoutStartUSec": "1min 30s",
+      "TimeoutStopUSec": "15s",
+      "TriggeredBy": "",
+      "Triggers": "",
+      "Type": "oneshot",
+      "UnsetEnvironment": "",
+      "User": "root"
+    },
+    "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer": {
+      "ActiveState": "inactive",
+      "DropInPaths": "",
+      "FragmentPath": "/etc/systemd/system/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+      "Id": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+      "InvocationID": "",
+      "Job": "",
+      "LastTriggerUSecMonotonic": "0",
+      "LoadState": "loaded",
+      "Result": "success",
+      "SubState": "dead",
+      "TimersMonotonic": "{ OnUnitInactiveUSec=30s ; next_elapse=0 }\n{ OnActiveUSec=1s ; next_elapse=0 }",
+      "TriggeredBy": "",
+      "Triggers": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "Unit": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service"
+    },
+    "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service": {
+      "ActiveState": "activating",
+      "AmbientCapabilities": "",
+      "CPUQuotaPerSecUSec": "4s",
+      "CapabilityBoundingSet": "",
+      "ControlGroup": "/system.slice/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "ControlPID": "3754074",
+      "Delegate": "no",
+      "DropInPaths": "",
+      "Environment": "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1",
+      "ExecMainCode": "0",
+      "ExecMainStartTimestampMonotonic": "0",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold /usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json --plan-sha256 aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770 --self-sha256 bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+      "ExecStartPost": "",
+      "ExecStartPre": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold prestart /usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json --plan-sha256 aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770 --self-sha256 bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+      "ExecStop": "",
+      "ExecStopPost": "",
+      "FragmentPath": "/etc/systemd/system/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "Group": "horizon",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "InvocationID": "dff3a3ef94d943b0bae94634fa9dfc50",
+      "Job": "",
+      "KillMode": "control-group",
+      "LimitFSIZE": "137438953472",
+      "LoadState": "loaded",
+      "MainPID": "0",
+      "MemoryAccounting": "yes",
+      "MemoryHigh": "51539607552",
+      "MemoryMax": "51539607552",
+      "MemorySwapMax": "0",
+      "NRestarts": "0",
+      "NoNewPrivileges": "yes",
+      "PassEnvironment": "",
+      "PrivateNetwork": "no",
+      "ProtectHome": "read-only",
+      "ProtectSystem": "strict",
+      "RemainAfterExit": "no",
+      "Restart": "no",
+      "Result": "success",
+      "RuntimeMaxUSec": "4h",
+      "SubState": "start-pre",
+      "TasksMax": "1024",
+      "TimeoutStartUSec": "12min",
+      "TimeoutStopUSec": "10min 20s",
+      "TriggeredBy": "",
+      "Triggers": "",
+      "Type": "exec",
+      "UnsetEnvironment": "",
+      "User": "sol"
+    }
+  },
+  "native_spec": {
+    "actor_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "sha256": "c53b4c3ab996e3f1dd313aabe6731c10b8fe11cf394fc357897a8d9c143f4bc2"
+    },
+    "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+    "admission": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/admission.json",
+      "sha256": "b884650cccaa6cc3f1a0f670d85a7c35f1a52e4b9e5ee5406cf8b28dd98bfe73"
+    },
+    "current_task_status": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/status-readback.json",
+      "sha256": "6831e63d046decaf1dc41df09088a8ec61415aafc5d39e74f4f45bbcb4fd84e9"
+    },
+    "envelope": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json",
+      "sha256": "aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770"
+    },
+    "expected_actor_invocation_id": "dff3a3ef94d943b0bae94634fa9dfc50",
+    "guard_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "sha256": "bda5fe94d1a5c34ec2ee9df07ae21e2e6128a6c18f830a112d9bc6a24ee440f8"
+    },
+    "mode": "task-start-pre",
+    "ready": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-2300-20261108-next/ready-dff3a3ef94d943b0bae94634fa9dfc50.json",
+      "sha256": "6011aec9e2f86d96c047ac1c94765d43559159e8239a2bd8944b52934a002891"
+    },
+    "schema": "horizon-epoch185-native-startpre-spec-v1",
+    "timer_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+      "sha256": "01e7394e203b063a6d11986715c12995a6f29ad5cdbdf4acfe07d6c923afa5f9"
+    }
+  },
+  "no_replay_or_publication_or_credit": true,
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261108T230022Z-postcompletion154-v1.json",
+    "sha256": "0bcd7ebd07e97f94eb592cb04bf92541ef4c66246657998788a68b94c5960212"
+  },
+  "original_setup_deadline_unix_seconds": 1794179964,
+  "ready": {
+    "actor_invocation_id": "dff3a3ef94d943b0bae94634fa9dfc50",
+    "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+    "admission_sha256": "b884650cccaa6cc3f1a0f670d85a7c35f1a52e4b9e5ee5406cf8b28dd98bfe73",
+    "driver_sha256": "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2",
+    "epoch": 185,
+    "metadata_and_prerequisites_validated": true,
+    "pid": 3754074,
+    "schema": "horizon-epoch185-worker-ready-v4",
+    "start_ticks": 252602505,
+    "started_at": 1794179364
+  },
+  "ready_binding": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-2300-20261108-next/ready-dff3a3ef94d943b0bae94634fa9dfc50.json",
+    "sha256": "6011aec9e2f86d96c047ac1c94765d43559159e8239a2bd8944b52934a002891"
+  },
+  "ready_sha256": "6011aec9e2f86d96c047ac1c94765d43559159e8239a2bd8944b52934a002891",
+  "recorded_unix_seconds": 1794179374,
+  "release": null,
+  "run_root": "/home/sol/.jetstreamer-private/capped-root-prefix-185-positive-positive-2300-20261108-next",
+  "schema": "horizon-epoch185-genuine-native-startpre-task-v1",
+  "self_sha256": "b445a1fb3717da5b68984d6598d7d75efcf5131f0bc82091af506d586b8f49fd",
+  "setup_deadline_at": 1794179964,
+  "source_bindings": {
+    "actor_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "sha256": "c53b4c3ab996e3f1dd313aabe6731c10b8fe11cf394fc357897a8d9c143f4bc2"
+    },
+    "admission": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/admission.json",
+      "sha256": "b884650cccaa6cc3f1a0f670d85a7c35f1a52e4b9e5ee5406cf8b28dd98bfe73"
+    },
+    "current_frame": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/current-frame.json",
+      "sha256": "abf2964b3204d25bf8d6dbed2b50ff1fe2bf0d2a6e9275ce78de2c88ed2ef1b0"
+    },
+    "current_full_reader": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/current-full-reader.json",
+      "sha256": "5dc207111f484bffe0b711e1911aaab911c13fb938ae12cd76168b8055e1d6b7"
+    },
+    "current_task": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/status-readback.json",
+      "sha256": "6831e63d046decaf1dc41df09088a8ec61415aafc5d39e74f4f45bbcb4fd84e9"
+    },
+    "driver": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold",
+      "sha256": "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2"
+    },
+    "envelope": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-2300-20261108-next/envelope.json",
+      "sha256": "aeecbb5b56d855dac020968720c92701b78b601c58b381aa12e7071e1a1d7770"
+    },
+    "fleet_owner": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/fleet-owner.json",
+      "sha256": "4587d110a43837d2f935f62ace9d76eadff459a0230365a533e626b84a5a5dda"
+    },
+    "guard_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "sha256": "bda5fe94d1a5c34ec2ee9df07ae21e2e6128a6c18f830a112d9bc6a24ee440f8"
+    },
+    "package_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/deployment-seal-receipt.json",
+      "sha256": "834b63769108b5b6f073a5ea9cfb7246464ae7f078dbdc978bcaab381e8e865e"
+    },
+    "ready": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-2300-20261108-next/ready-dff3a3ef94d943b0bae94634fa9dfc50.json",
+      "sha256": "6011aec9e2f86d96c047ac1c94765d43559159e8239a2bd8944b52934a002891"
+    },
+    "root_acceptance": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/root-acceptance.json",
+      "sha256": "60feb0e285c20676b7c051bcc1f9547720a9aa312cf13324f3a148890a8d1231"
+    },
+    "spec": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-task-capture-status-bound-v12-dff3a3ef94d943b0bae94634fa9dfc50/spec.json",
+      "sha256": "4f996c521ac23a4aa7fab941118d06768dc84961e8f6ce8b50df87ddbcfdce8a"
+    },
+    "status_readback": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/status-readback.json",
+      "sha256": "6831e63d046decaf1dc41df09088a8ec61415aafc5d39e74f4f45bbcb4fd84e9"
+    },
+    "timer_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+      "sha256": "01e7394e203b063a6d11986715c12995a6f29ad5cdbdf4acfe07d6c923afa5f9"
+    },
+    "typed_data": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/typed-data.json",
+      "sha256": "e7559d66be0a33ed04e5505f9ac055830b2fb08bf1dcd7a1ed0b8e39377608fe"
+    },
+    "typed_memory": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-2300-20261108-next/typed-memory.json",
+      "sha256": "97372b4b574a17c0f83d55b040b516a52fedc369542b3996cbe94305f572a5de"
+    }
+  },
+  "spec": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-task-capture-status-bound-v12-dff3a3ef94d943b0bae94634fa9dfc50/spec.json",
+    "sha256": "4f996c521ac23a4aa7fab941118d06768dc84961e8f6ce8b50df87ddbcfdce8a"
+  },
+  "stage": "start-pre",
+  "terminal_context": null,
+  "timer_source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-2300-20261108-next/horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer",
+    "sha256": "01e7394e203b063a6d11986715c12995a6f29ad5cdbdf4acfe07d6c923afa5f9"
+  },
+  "timer_unit": "horizon-guard-185-capped-cold-positive-positive-2300-20261108-next.timer"
+}

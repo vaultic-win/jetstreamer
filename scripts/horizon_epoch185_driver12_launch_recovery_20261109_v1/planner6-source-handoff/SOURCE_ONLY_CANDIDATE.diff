@@ -1,0 +1,165 @@
+--- Planner5/lineage.rs
++++ Planner6/lineage.rs
+@@ -9,6 +9,9 @@
+ pub const NATIVE_SHA: &str = "0f1d171bc9fee7a1d06186e62b03e601d575bdcacfa30545cf0c084850f0934c";
+ pub const DRIVER11_NATIVE_PATH: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/jetstreamer-r2";
+ pub const DRIVER11_NATIVE_SHA: &str = "dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389";
++// Current Driver12 consumer role. Historical Driver11/Helper34 stays exact above.
++pub const DRIVER12_NATIVE_PATH: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/jetstreamer-r2";
++pub const DRIVER12_NATIVE_SHA: &str = "5059c749d74f59711ce5ed9642dd2383a4a3b4bb21e3338ff5c1dce77a5a47fa";
+ pub fn tuple(memory: &Value, data: &Value, tuple: &Value) -> Result<Value> {
+     let current = &memory["selection"]["request"]["current"];
+     ensure!(
+@@ -137,7 +140,7 @@
+     );
+     Ok(
+         json!({"image":image,"artifact_qualification":proof,"normal_seal":seal,"artifact_schema":artifact["schema"],
+-  "capture_cold185_startpre_task":path==NATIVE_PATH||path==DRIVER11_NATIVE_PATH,"image_body_rehash_pending_future_readiness":true}),
++  "capture_cold185_startpre_task":path==NATIVE_PATH||path==DRIVER11_NATIVE_PATH||path==DRIVER12_NATIVE_PATH,"image_body_rehash_pending_future_readiness":true}),
+     )
+ }
+ pub fn retained_inputs(seal: &Value, restore: &Value) -> Result<()> {
+@@ -267,3 +270,27 @@
+         assert!(role_identity(&request, DRIVER11_NATIVE_PATH, unresolved).is_err());
+     }
+ }
++
++#[cfg(test)] mod helper35_current_native_role_regression {
++ use super::*;
++ #[test] fn current_helper35_rejects_helper34_and_crossed_paths_digests() {
++  let current=Bound{path:DRIVER12_NATIVE_PATH.into(),sha256:DRIVER12_NATIVE_SHA.into()};
++  role_identity(&current,DRIVER12_NATIVE_PATH,DRIVER12_NATIVE_SHA).unwrap();
++  let previous=Bound{path:DRIVER11_NATIVE_PATH.into(),sha256:DRIVER11_NATIVE_SHA.into()};
++  role_identity(&previous,DRIVER11_NATIVE_PATH,DRIVER11_NATIVE_SHA).unwrap();
++  assert!(role_identity(&previous,DRIVER12_NATIVE_PATH,DRIVER12_NATIVE_SHA).is_err());
++  assert!(role_identity(&current,DRIVER11_NATIVE_PATH,DRIVER11_NATIVE_SHA).is_err());
++  for crossed in [Bound{path:current.path.clone(),sha256:previous.sha256.clone()},Bound{path:previous.path,sha256:current.sha256.clone()},Bound{path:current.path.clone(),sha256:"__UNQUALIFIED_HELPER_IMAGE__".into()}] {
++   assert!(role_identity(&crossed,DRIVER12_NATIVE_PATH,DRIVER12_NATIVE_SHA).is_err());
++  }
++ }
++ #[test] fn actual_normally_sealed_helper35_role_metadata_is_accepted_without_native_or_body_work() {
++  let image=Bound{path:DRIVER12_NATIVE_PATH.into(),sha256:DRIVER12_NATIVE_SHA.into()};
++  let parent=image.path.parent().unwrap();
++  let proof=Bound{path:parent.join("artifact-proof.json"),sha256:"37f368069ea7594369385d600c5618dc1b236e5c011d7ac2689eaede2a10fec3".into()};
++  let seal=Bound{path:parent.join("deployment-seal-receipt.json"),sha256:"eb84418cb0a6bf2e79dfe42fe0b53deaa18d9cc8620863036959cb92453dbf12".into()};
++  let accepted=role(&image,&proof,&seal,DRIVER12_NATIVE_PATH,DRIVER12_NATIVE_SHA).unwrap();
++  assert_eq!(accepted["image"],json!(image));assert_eq!(accepted["capture_cold185_startpre_task"],true);
++  assert_eq!(accepted["image_body_rehash_pending_future_readiness"],true);
++ }
++}
+--- Planner5/positive.rs
++++ Planner6/positive.rs
+@@ -5,7 +5,7 @@
+ use serde_json::{Value, json};
+ use std::{fs::{self, File}, os::unix::fs::{DirBuilderExt, MetadataExt}, path::{Path, PathBuf}};
+ 
+-const ROOT: &str = "/home/sol/.jetstreamer-private/epoch185-helper34-current-witness-planner-qa-20261108-v5";
++const ROOT: &str = "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6";
+ const FULL_READER_PATH: &str = "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2";
+ const FULL_READER_SHA: &str = "d00ee6ad4076c32b90a416efc9236208cd7ee8b64e572d5ad830c9a709eac470";
+ const FULL_READER_ARTIFACT_SHA: &str = "fb6f325b7ce2c62164a30ad9dedb0b044a9974f32383d85bcf647cc317e06429";
+@@ -130,6 +130,29 @@
+         "admission":admission,"envelope":envelope,"actor":actor,"guard":guard,"timer":timer,
+         "task_capture_spec":task,"all_dynamic_bindings_still_required":true,
+         "issued_at_or_expiry_materialized":false,"normal_seal_or_admission_issued":false}))
++}
++// Current production constructor. The exact historical Driver11 constructor and
++// immutable fixtures above remain unchanged; only the three explicit driver
++// selectors in its unissued result are rebound to the qualified current image.
++const CURRENT_DRIVER_PATH: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/epoch185-guarded-cold";
++const CURRENT_DRIVER_SHA: &str = "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e";
++fn current_templates(profile:&Profile,floor:u64,generation:&str)->Result<Value>{
++    let mut value=templates(profile,floor,generation)?;
++    const OLD_PATH:&str="/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold";
++    const OLD_SHA:&str="bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2";
++    ensure!(value["envelope"]["self_program"]==OLD_PATH&&value["envelope"]["self_sha256"]==OLD_SHA,
++        "current template source is not the exact retained Driver11 pair");
++    value["envelope"]["self_program"]=json!(CURRENT_DRIVER_PATH);
++    value["envelope"]["self_sha256"]=json!(CURRENT_DRIVER_SHA);
++    for (field,count) in [("actor",2),("guard",1)]{
++        let raw=value[field].as_str().context("current driver template text")?;
++        ensure!(raw.matches(OLD_PATH).count()==count&&raw.matches(OLD_SHA).count()==count,
++            "current driver template exact selector count changed: {field}");
++        value[field]=json!(raw.replace(OLD_PATH,CURRENT_DRIVER_PATH).replace(OLD_SHA,CURRENT_DRIVER_SHA));
++    }
++    ensure!(!value.to_string().contains(OLD_PATH)&&!value.to_string().contains(OLD_SHA),
++        "historical driver remains selected in current templates");
++    Ok(value)
+ }
+ // Exact operational helper13 witness/terminal145 reader already authenticated by memory4/DATA4.
+ // No caller-selected reader allowlist, image alias or artifact/seal substitution.
+@@ -207,7 +230,7 @@
+     projection["protected_exporter_plan"]=json!(s.protected_exporter_plan);
+     let roles=json!({
+         "accounting":lineage::role(&s.accounting_role.image,&s.accounting_role.artifact,&s.accounting_role.normal_seal,lineage::ACCOUNTING_PATH,lineage::ACCOUNTING_SHA)?,
+-        "native185_capture":lineage::role(&s.native185_capture_role.image,&s.native185_capture_role.artifact,&s.native185_capture_role.normal_seal,lineage::DRIVER11_NATIVE_PATH,lineage::DRIVER11_NATIVE_SHA)?,
++        "native185_capture":lineage::role(&s.native185_capture_role.image,&s.native185_capture_role.artifact,&s.native185_capture_role.normal_seal,lineage::DRIVER12_NATIVE_PATH,lineage::DRIVER12_NATIVE_SHA)?,
+         "current_reader":current_reader_role(&s.full_reader_role)?,
+         "same_new_image_required_for_post_enrollment_reader_and_acceptance":true});
+     let seal=storage::json(&s.input_package_seal)?;let restore=storage::json(&s.original_restore_receipt)?;
+@@ -223,7 +246,7 @@
+         "full_epoch_replay_using_same_century_peer_rate_with25percent_contingency_millis")?;
+     let profile=profile_policy(&s.profile,full_estimate)?;
+     let unissued=if s.profile.purpose==Purpose::FullEpochSuccessor {None}
+-        else {Some(templates(&s.profile,floor,&s.generation)?)};
++        else {Some(current_templates(&s.profile,floor,&s.generation)?)};
+     let sequence=crate::final_window::source_sequence(&s.full_reader_role.image,&s.native185_capture_role.image,&s.native185_capture_role.image);
+     // Planning never issues wall-clock values or treats a stale tuple as fresh.
+     fs::DirBuilder::new().mode(0o700).create(&output_directory)?;
+@@ -389,3 +412,36 @@
+  assert_eq!(v["admission"]["ordinary_full_replay_authorized"],false);
+ }
+ }
++
++#[cfg(test)] mod current_driver12_template_regression {
++ use super::*;
++ fn profile()->Profile{Profile{purpose:Purpose::BoundedNativeProbe,actor_memory_bytes:48u64<<30,setup_deadline_seconds:600,useful_runtime_seconds:14400,estimated_useful_work_millis:413404206}}
++ #[test] fn current_driver12_pair_is_exact_and_historical_driver11_stays_unchanged() {
++  let old=templates(&profile(),5174779130516,"driver-pair-regression").unwrap();
++  let new=current_templates(&profile(),5174779130516,"driver-pair-regression").unwrap();
++  assert_eq!(old["envelope"]["self_program"],"/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold");
++  assert_eq!(old["envelope"]["self_sha256"],"bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2");
++  assert_eq!(new["envelope"]["self_program"],CURRENT_DRIVER_PATH);assert_eq!(new["envelope"]["self_sha256"],CURRENT_DRIVER_SHA);
++  for (field,count) in [("actor",2),("guard",1)] {
++   let text=new[field].as_str().unwrap();assert_eq!(text.matches(CURRENT_DRIVER_PATH).count(),count);assert_eq!(text.matches(CURRENT_DRIVER_SHA).count(),count);
++   assert!(!text.contains("guarded-adapter-v11"));assert!(!text.contains("bdadc547"));
++  }
++  // Revert only the explicit driver selectors and demand exact whole-result
++  // equality: floors, caps, clocks, all templates and authority must be intact.
++  let mut reversed=new.clone();reversed["envelope"]["self_program"]=old["envelope"]["self_program"].clone();reversed["envelope"]["self_sha256"]=old["envelope"]["self_sha256"].clone();
++  for field in ["actor","guard"] {
++   reversed[field]=json!(new[field].as_str().unwrap().replace(CURRENT_DRIVER_PATH,old["envelope"]["self_program"].as_str().unwrap()).replace(CURRENT_DRIVER_SHA,old["envelope"]["self_sha256"].as_str().unwrap()));
++  }
++  assert_eq!(reversed,old);
++  assert_eq!(new["envelope"]["plan"]["terminal_slot"],80351283);assert_eq!(new["envelope"]["limits"]["memory"],48u64<<30);
++  assert_eq!(new["envelope"]["setup_deadline_seconds"],600);assert_eq!(new["admission"]["ordinary_full_replay_authorized"],false);
++  assert_eq!(new["issued_at_or_expiry_materialized"],false);assert_eq!(new["normal_seal_or_admission_issued"],false);
++  let timer=new["timer"].as_str().unwrap();let sha=storage::sha(timer.as_bytes());
++  assert_eq!(new["envelope"]["timer_service"]["sha256"],sha);assert_eq!(new["task_capture_spec"]["native_spec"]["timer_source"]["sha256"],sha);
++ }
++ #[test] fn current_constructor_does_not_authorize_full_epoch_or_extended_clock() {
++  let mut p=profile();p.purpose=Purpose::FullEpochSuccessor;assert!(current_templates(&p,5174779130516,"full-rejected").is_err());
++  assert!(current_templates(&profile(),5174779130516,"../escape").is_err());
++  let mut p=profile();p.setup_deadline_seconds=601;assert!(profile_policy(&p,413404206).is_err());
++ }
++}
+--- Planner5/final_window.rs
++++ Planner6/final_window.rs
+@@ -140,3 +140,17 @@
+         assert!(!contract.to_string().contains("0f1d171bc9fee7a1d06186e62b03e601d575bdcacfa30545cf0c084850f0934c"));
+     }
+ }
++
++#[cfg(test)] mod helper35_current_sequence_regression {
++ use super::*;
++ #[test] fn actual_helper35_is_used_for_all_downstream_stages_prelaunch13_remains_separate() {
++  let prelaunch=Bound{path:"/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2".into(),sha256:"d00ee6ad4076c32b90a416efc9236208cd7ee8b64e572d5ad830c9a709eac470".into()};
++  let current=Bound{path:crate::lineage::DRIVER12_NATIVE_PATH.into(),sha256:crate::lineage::DRIVER12_NATIVE_SHA.into()};
++  let sequence=source_sequence(&prelaunch,&current,&current);
++  assert_eq!(sequence["prelaunch_reader"],json!(prelaunch));assert_eq!(sequence["native_capture"],json!(current));assert_eq!(sequence["post_enrollment_reader"],json!(current));
++  for stage in sequence["stages"].as_array().unwrap(){if let Some(operation)=stage.get("operation"){assert_eq!(operation["program"],json!(current));assert_ne!(operation["program"],json!(prelaunch));}}
++  assert_eq!(sequence["stages"][0]["program"],json!(current));
++  for flag in ["executor_implemented","admission_issued","replay_launch_authorized","publication_authorized"]{assert_eq!(sequence[flag],false);}
++  assert_eq!(sequence["native_calls_performed"],0);
++ }
++}

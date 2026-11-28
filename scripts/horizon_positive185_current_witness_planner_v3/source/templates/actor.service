@@ -1,0 +1,36 @@
+# SOURCE CANDIDATE: replace only __ACTUAL_ENVELOPE_SHA256__, then normal-seal. Never install this unmaterialized file.
+[Unit]
+Description=Epoch 185 original-deadline missing-token native qualification
+[Service]
+Type=exec
+User=sol
+Group=horizon
+Restart=no
+MemoryAccounting=yes
+MemoryHigh=2147483648
+MemoryMax=2147483648
+MemorySwapMax=0
+CPUQuota=400%
+TasksMax=1024
+TimeoutStartSec=120
+RuntimeMaxSec=600
+TimeoutStopSec=620
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=yes
+Environment=JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=no
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/home/sol/.jetstreamer-private/capped-root-prefix-185-missing-token-20261106-v14 /home/sol/.jetstreamer-private/epoch185-cold-control-missing-token-20261106-v14
+StandardOutput=append:/home/sol/.jetstreamer-private/epoch185-cold-control-missing-token-20261106-v14/private-stdout-stderr.log
+StandardError=append:/home/sol/.jetstreamer-private/epoch185-cold-control-missing-token-20261106-v14/private-stdout-stderr.log
+LimitFSIZE=137438953472
+LimitCORE=0
+WorkingDirectory=/home/sol/.jetstreamer-private/capped-root-prefix-185-missing-token-20261106-v14
+ExecStartPre=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v10/epoch185-guarded-cold prestart /usr/local/lib/jetstreamer/horizon-epoch185-missing-token-envelope-20261106-v14/envelope.json --plan-sha256 __ACTUAL_ENVELOPE_SHA256__ --self-sha256 0a7dddaaa5ae049a6a9f6ca103fd8463987d6aff52397a4ece09a43387107e1a
+ExecStart=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v10/epoch185-guarded-cold /usr/local/lib/jetstreamer/horizon-epoch185-missing-token-envelope-20261106-v14/envelope.json --plan-sha256 __ACTUAL_ENVELOPE_SHA256__ --self-sha256 0a7dddaaa5ae049a6a9f6ca103fd8463987d6aff52397a4ece09a43387107e1a

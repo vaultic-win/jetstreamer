@@ -1,0 +1,16 @@
+{
+  "all_eight_originals_success_terminal_and_drained": true,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_bytes": 0,
+  "new_memory_credit_bytes": 0,
+  "complete_DATA_bytes": 5169947292308,
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER12_DATA4_BOOKING.json",
+    "sha256": "ce37f28b24893c55364ed907fd8246d0617c95f4eb9f499e2d874ad17860de09"
+  },
+  "all_previous_source_and_DATA_promises_retained": true,
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/artifact-proof.json",
+    "sha256": "5b08baacff6943fbc544dd05085b391bccda34e6963e0194ae4d05f41e6c937a"
+  }
+}

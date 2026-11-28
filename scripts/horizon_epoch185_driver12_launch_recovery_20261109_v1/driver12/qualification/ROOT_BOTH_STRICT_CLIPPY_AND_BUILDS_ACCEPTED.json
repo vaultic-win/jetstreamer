@@ -1,0 +1,8 @@
+{
+  "all_four_originals_passed": true,
+  "source_and_exact_recipes": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES_R2.json",
+    "sha256": "b7303cf974340e3a16ed9aaecb904d9e15dc8339089b30912ad13da7d7d92f88"
+  },
+  "no_replay_or_publication_authority": true
+}

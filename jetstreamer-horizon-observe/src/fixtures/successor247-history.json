@@ -1,0 +1,264 @@
+{
+  "fleet": {
+    "path": "/home/ubuntu/.codex/diagnostics/horizon-fleet-takeover-v147-20261120-v1/fleet-v1.json",
+    "sha256": "3e0d9a30d07ef0c36e482e85ec1f7143aead003c146bd25cfc4d20dbb8a8a50f"
+  },
+  "observed_fleet_time": "2026-11-20T20:07:44Z",
+  "historical_fleet_rows": [
+    {
+      "current_sidecar_eta_valid": false,
+      "epoch": 247,
+      "evidence": [
+        {
+          "path": "/var/lib/jetstreamer/horizon247-delivery-admission-20261119-v1/review.json",
+          "sha256": "e246fbcd736561f926d3d998b6ad25ba189e829e6852c781b4f286234e9b500a"
+        },
+        {
+          "path": "/home/ubuntu/.codex/diagnostics/horizon-fleet-cycle0010-20261120-v1/delivery247-initial-owner.json",
+          "sha256": "52f5c892af9acef8d2cb273ec6a2a5737facfb504e0d9e2f71f4434720a7a3f9"
+        }
+      ],
+      "expected_invocation_id": "69218e2e0924497ea595a1227a6c31db",
+      "finalization_evidence": null,
+      "grants_launch_or_publication_authority": false,
+      "live": false,
+      "ordinary_replay_claim": false,
+      "phase": "upload-readback",
+      "sampled_at_utc": "2026-11-20T20:07:44Z",
+      "unit": {
+        "ActiveState": "failed",
+        "ControlGroup": "",
+        "ExecMainStatus": "1",
+        "ExecStart": "{ path=/var/lib/jetstreamer/horizon-full265-fast-consumers-20261119-v1/jetstreamer-r2 ; argv[]=/var/lib/jetstreamer/horizon-full265-fast-consumers-20261119-v1/jetstreamer-r2 sync /home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output --epochs 247-247 --receipt-directory /home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/receipts --concurrency 2 --current-reader-plan /var/lib/jetstreamer/horizon-reader-delivery247-251-db1c31fe-20261119-v2/epoch-247-plan.json --current-reader-plan-sha256 cea94f810e84239475726eb49ad1bcd24d058ab91e96f10fb01def2fcbc7472d ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+        "Id": "horizon-upload-247-singleton-20261119-v1.service",
+        "InvocationID": "69218e2e0924497ea595a1227a6c31db",
+        "LoadState": "loaded",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "exit-code",
+        "SubState": "failed",
+        "Type": "simple"
+      }
+    },
+    {
+      "current_sidecar_eta_valid": false,
+      "epoch": 247,
+      "evidence": [
+        {
+          "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/booking.json",
+          "sha256": "f2716aa9619500bed9e722e9a5de23c80f57203d137f6b937d27ba1a9972919e"
+        },
+        {
+          "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/launch.json",
+          "sha256": "0ae7be456361ec2a5870b8ae0907a463cf750ecd07de0b2f45b7252c807e1380"
+        }
+      ],
+      "expected_invocation_id": "3e08307874db424886cd8c46b3ecfba6",
+      "finalization_evidence": null,
+      "grants_launch_or_publication_authority": false,
+      "live": true,
+      "ordinary_replay_claim": false,
+      "phase": "upload-readback",
+      "sampled_at_utc": "2026-11-20T20:07:44Z",
+      "unit": {
+        "ActiveState": "active",
+        "ControlGroup": "/system.slice/horizon-upload-247-staged-680e1173-v1.service",
+        "ExecMainStatus": "0",
+        "ExecStart": "{ path=/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2 ; argv[]=/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2 sync /home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output --epochs 247-247 --receipt-directory /home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/receipts --concurrency 2 --current-reader-plan /var/lib/jetstreamer/horizon247-public-reader-680e1173-v1/epoch-247-plan.json --current-reader-plan-sha256 e9e7234224b04ab9ae03bfa7459344bec37a6bb241c84e98a7e8dbcaa29bdd1e --recover-staged-247 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+        "Id": "horizon-upload-247-staged-680e1173-v1.service",
+        "InvocationID": "3e08307874db424886cd8c46b3ecfba6",
+        "LoadState": "loaded",
+        "MainPID": "2149076",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "running",
+        "Type": "exec"
+      }
+    }
+  ],
+  "historical_active": [
+    {
+      "current_sidecar_eta_valid": false,
+      "epoch": 247,
+      "evidence": [
+        {
+          "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/booking.json",
+          "sha256": "f2716aa9619500bed9e722e9a5de23c80f57203d137f6b937d27ba1a9972919e"
+        },
+        {
+          "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/launch.json",
+          "sha256": "0ae7be456361ec2a5870b8ae0907a463cf750ecd07de0b2f45b7252c807e1380"
+        }
+      ],
+      "expected_invocation_id": "3e08307874db424886cd8c46b3ecfba6",
+      "finalization_evidence": null,
+      "grants_launch_or_publication_authority": false,
+      "live": true,
+      "ordinary_replay_claim": false,
+      "phase": "upload-readback",
+      "sampled_at_utc": "2026-11-20T20:07:44Z",
+      "unit": {
+        "ActiveState": "active",
+        "ControlGroup": "/system.slice/horizon-upload-247-staged-680e1173-v1.service",
+        "ExecMainStatus": "0",
+        "ExecStart": "{ path=/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2 ; argv[]=/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2 sync /home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output --epochs 247-247 --receipt-directory /home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/receipts --concurrency 2 --current-reader-plan /var/lib/jetstreamer/horizon247-public-reader-680e1173-v1/epoch-247-plan.json --current-reader-plan-sha256 e9e7234224b04ab9ae03bfa7459344bec37a6bb241c84e98a7e8dbcaa29bdd1e --recover-staged-247 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+        "Id": "horizon-upload-247-staged-680e1173-v1.service",
+        "InvocationID": "3e08307874db424886cd8c46b3ecfba6",
+        "LoadState": "loaded",
+        "MainPID": "2149076",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "running",
+        "Type": "exec"
+      }
+    }
+  ],
+  "recovery": {
+    "epoch": 247,
+    "current_reader_plan": {
+      "path": "/var/lib/jetstreamer/horizon247-public-reader-99f30641-v1/epoch-247-plan.json",
+      "sha256": "2c9b4723d9bd90ca0e954872ece43364f8e07f277d0d1bb379c92603dee02472"
+    },
+    "recovery_argv": [
+      "/var/lib/jetstreamer/horizon247-public-images-99f30641-v1/jetstreamer-r2",
+      "sync",
+      "/home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output",
+      "--epochs",
+      "247-247",
+      "--receipt-directory",
+      "/home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/receipts",
+      "--concurrency",
+      "2",
+      "--current-reader-plan",
+      "/var/lib/jetstreamer/horizon247-public-reader-99f30641-v1/epoch-247-plan.json",
+      "--current-reader-plan-sha256",
+      "2c9b4723d9bd90ca0e954872ece43364f8e07f277d0d1bb379c92603dee02472",
+      "--recover-staged-247"
+    ],
+    "uploader": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-99f30641-v1/jetstreamer-r2",
+      "sha256": "39bbc3b745a0ce15f615db9c20c0cfbb7d2423a8f62b6adf97093260273de460"
+    },
+    "original_preparation": {
+      "path": "/home/ubuntu/.codex/diagnostics/horizon247-staged-recovery-20261120-v1/preparation.json",
+      "sha256": "fb6f14b5fedac0aa306e4270f0ca8c65823cb863c1df21bccae82abba98072da"
+    },
+    "historical_terminal": {
+      "path": "/var/lib/jetstreamer/horizon247-public-reader-99f30641-v1/original-uploader-terminal.json",
+      "sha256": "c8c3f9f09e84a11c13887628f9bc207bb5eac53c58328f4055b32ba8bb0643d0"
+    },
+    "original_invocation": "69218e2e0924497ea595a1227a6c31db",
+    "original_staged_recovery": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-99f30641-v1/legacy-and-recovery.json",
+      "sha256": "476165cd5529174873cb3e53afbbac2eac3ef89a5040c0fc37b02286d18065d8"
+    },
+    "prior_staged_owner": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-99f30641-v1/prior-staged-owner.json",
+      "sha256": "b53133a0d9f828a5543dece1f343dd39828c96de618dc65095e471ba9ce2cef2"
+    },
+    "prior_staged_terminal_and_drain_required": true,
+    "fresh_authenticated_sha256_and_byte_comparison_required": true,
+    "prior_staged_reservations_released": false,
+    "entry_replay": false,
+    "admission_authorized": false,
+    "publication_authorized": false
+  },
+  "recovery_ref": {
+    "path": "/var/lib/jetstreamer/horizon247-public-reader-99f30641-v1/staged247-recovery.json",
+    "sha256": "649f8e1477c776352c07ef747b59b88bf321c85831ead6d631a94efa7ead22f5"
+  },
+  "previous": {
+    "unit": "horizon-upload-247-staged-680e1173-v1.service",
+    "invocation_id": "3e08307874db424886cd8c46b3ecfba6",
+    "evidence": {
+      "booking": {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/booking.json",
+        "sha256": "f2716aa9619500bed9e722e9a5de23c80f57203d137f6b937d27ba1a9972919e"
+      },
+      "launch": {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/launch.json",
+        "sha256": "0ae7be456361ec2a5870b8ae0907a463cf750ecd07de0b2f45b7252c807e1380"
+      },
+      "claim": {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/pipeline-claim.json",
+        "sha256": "8ef94d868ee29e47f9777aaaa9ba941df11d176334984e5a00f2e713c4a05b80"
+      },
+      "plan": {
+        "path": "/var/lib/jetstreamer/horizon247-public-reader-680e1173-v1/epoch-247-plan.json",
+        "sha256": "e9e7234224b04ab9ae03bfa7459344bec37a6bb241c84e98a7e8dbcaa29bdd1e"
+      }
+    },
+    "state_at_historical_v145_observation": "active",
+    "future_retry_requires_unsuccessful_terminal_and_empty_cgroup": true
+  },
+  "previous_ref": {
+    "path": "/var/lib/jetstreamer/horizon247-public-images-99f30641-v1/prior-staged-owner.json",
+    "sha256": "b53133a0d9f828a5543dece1f343dd39828c96de618dc65095e471ba9ce2cef2"
+  },
+  "original_failure": {
+    "__CURSOR": "s=d048fb8ccd4e4326a91b8c5edb351816;i=9886cf;b=3b17d0055c3a4a0e8841da097e0957b5;m=4fcfe65a82;t=660b90a3d5dab;x=389068eb1b5b6389",
+    "UNIT": "horizon-upload-247-singleton-20261119-v1.service",
+    "__MONOTONIC_TIMESTAMP": "342790396546",
+    "INVOCATION_ID": "69218e2e0924497ea595a1227a6c31db",
+    "_BOOT_ID": "3b17d0055c3a4a0e8841da097e0957b5",
+    "__SEQNUM": "9995983",
+    "MESSAGE_ID": "d9b373ed55a64feb8242e02dbe79a49c",
+    "__SEQNUM_ID": "d048fb8ccd4e4326a91b8c5edb351816",
+    "UNIT_RESULT": "exit-code",
+    "__REALTIME_TIMESTAMP": "1795197717274027",
+    "_PID": "1"
+  },
+  "prior_claim": {
+    "epoch": 247,
+    "phase": "upload-readback",
+    "unit": "horizon-upload-247-staged-680e1173-v1.service",
+    "invocation_id": "3e08307874db424886cd8c46b3ecfba6",
+    "expected_exec_start": "{ path=/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2 ; argv[]=/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/jetstreamer-r2 sync /home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output --epochs 247-247 --receipt-directory /home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/receipts --concurrency 2 --current-reader-plan /var/lib/jetstreamer/horizon247-public-reader-680e1173-v1/epoch-247-plan.json --current-reader-plan-sha256 e9e7234224b04ab9ae03bfa7459344bec37a6bb241c84e98a7e8dbcaa29bdd1e --recover-staged-247 ; ignore_errors=no ; start_time=[Fri 2026-11-20 18:58:29 UTC] ; stop_time=[n/a] ; pid=2149076 ; code=(null) ; status=0/0 }",
+    "evidence": [
+      {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/booking.json",
+        "sha256": "f2716aa9619500bed9e722e9a5de23c80f57203d137f6b937d27ba1a9972919e"
+      },
+      {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-680e1173-v1/launch.json",
+        "sha256": "0ae7be456361ec2a5870b8ae0907a463cf750ecd07de0b2f45b7252c807e1380"
+      }
+    ]
+  },
+  "historical_reservations": {
+    "rows": [
+      {
+        "invocation_id": "69218e2e0924497ea595a1227a6c31db",
+        "maximum_memory_bytes": 7000000000,
+        "minimum_free_bytes": 3000000000000,
+        "release": null,
+        "remaining_disk_growth_bytes": 185370916960,
+        "source": {
+          "path": "/var/lib/jetstreamer/horizon-singleton211-bookings-v133-20261120-v1/booking-delivery247.json",
+          "sha256": "aeb7e93b51a8d8a6dc3ba31f00f79c56e65fbcb7ec3afffecf39bb5c3f148f5d"
+        },
+        "unit": "horizon-upload-247-singleton-20261119-v1.service"
+      },
+      {
+        "unit": "horizon-upload-247-staged-680e1173-v1.service",
+        "invocation_id": "3e08307874db424886cd8c46b3ecfba6",
+        "maximum_memory_bytes": 11274289152,
+        "remaining_disk_growth_bytes": 1073741824,
+        "minimum_free_bytes": 3908104436088,
+        "source": {
+          "path": "/var/lib/jetstreamer/horizon-native257-current-bookings-v145-ops-v1/recovery247-source.json",
+          "sha256": "894935276887541c6be208249be4e0ddd42864f23757a831b6caa01a774e046a"
+        },
+        "release": null
+      }
+    ],
+    "review": {
+      "path": "/var/lib/jetstreamer/horizon-native257-current-bookings-v147-ops-v1/review.json",
+      "sha256": "219d3b5d3508d223d672bdce5fa0e2dba1dedc92c0604c298d11a3fb7a4cc5a8"
+    },
+    "ledger": {
+      "path": "/var/lib/jetstreamer/horizon-native257-current-bookings-v147-ops-v1/current-ledger.json",
+      "sha256": "abd3cfb9247aa005e33d2e9299f71ad485df9cca44febc8308814a62cdc99ca2"
+    }
+  }
+}

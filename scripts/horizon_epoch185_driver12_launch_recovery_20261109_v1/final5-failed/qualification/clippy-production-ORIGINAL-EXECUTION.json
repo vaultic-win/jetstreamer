@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-positive185-final-clippy-production-20261109-v5-postmain.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 481ms\nCPU time consumed: 481ms\nMemory peak: 3.3M\nMemory swap peak: 0B\n"
+}

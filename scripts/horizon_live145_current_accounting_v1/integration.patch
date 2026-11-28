@@ -1,0 +1,2051 @@
+--- /dev/null
++++ b/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/custody.rs
+@@ -0,0 +1,276 @@
++use super::model::{Bound, Identity};
++use anyhow::{Context, Result, ensure};
++use serde_json::Value;
++use sha2::{Digest, Sha256};
++use std::{
++    fs::{self, OpenOptions},
++    io::Read,
++    os::unix::fs::{MetadataExt, OpenOptionsExt},
++    path::Path,
++    time::{SystemTime, UNIX_EPOCH},
++};
++
++pub fn now() -> Result<u64> {
++    Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
++}
++pub fn boottime() -> Result<u64> {
++    let mut t: libc::timespec = unsafe { std::mem::zeroed() };
++    ensure!(
++        unsafe { libc::clock_gettime(libc::CLOCK_BOOTTIME, &mut t) } == 0,
++        "boottime"
++    );
++    u64::try_from(t.tv_sec)?
++        .checked_mul(1000)
++        .context("clock overflow")?
++        .checked_add(u64::try_from(t.tv_nsec)? / 1_000_000)
++        .context("clock overflow")
++}
++pub fn sha(bytes: &[u8]) -> String {
++    format!("{:x}", Sha256::digest(bytes))
++}
++pub fn hex(s: &str, n: usize) -> bool {
++    s.len() == n
++        && s.bytes()
++            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
++}
++pub fn identity(m: &fs::Metadata) -> Identity {
++    Identity {
++        device: m.dev(),
++        inode: m.ino(),
++        bytes: m.len(),
++        mtime_ns: i128::from(m.mtime()) * 1_000_000_000 + i128::from(m.mtime_nsec()),
++        ctime_ns: i128::from(m.ctime()) * 1_000_000_000 + i128::from(m.ctime_nsec()),
++        mode: m.mode(),
++        uid: m.uid(),
++        gid: m.gid(),
++    }
++}
++pub fn frozen_identity(path: &Path) -> Result<Identity> {
++    let m = fs::symlink_metadata(path)?;
++    ensure!(
++        path.is_absolute()
++            && path.canonicalize()? == path
++            && m.is_file()
++            && m.uid() == 0
++            && m.gid() == 0
++            && m.nlink() == 1
++            && m.mode() & 0o222 == 0,
++        "input must be canonical Root-owned frozen regular single-link: {}",
++        path.display()
++    );
++    Ok(identity(&m))
++}
++pub fn bytes(bound: &Bound, maximum: u64, immutable: bool) -> Result<Vec<u8>> {
++    ensure!(hex(&bound.sha256, 64), "bound SHA shape");
++    let before = if immutable {
++        frozen_identity(&bound.path)?
++    } else {
++        let m = fs::symlink_metadata(&bound.path)?;
++        ensure!(
++            bound.path.is_absolute()
++                && bound.path.canonicalize()? == bound.path
++                && m.is_file()
++                && m.uid() == 0
++                && m.gid() == 0
++                && m.nlink() == 1
++                && m.mode() & 0o777 == 0o600,
++            "private evidence custody"
++        );
++        identity(&m)
++    };
++    ensure!(before.bytes <= maximum, "bounded evidence oversized");
++    let mut f = OpenOptions::new()
++        .read(true)
++        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
++        .open(&bound.path)?;
++    ensure!(
++        identity(&f.metadata()?) == before,
++        "opened evidence changed"
++    );
++    let mut b = Vec::new();
++    (&mut f).take(maximum + 1).read_to_end(&mut b)?;
++    ensure!(
++        b.len() as u64 == before.bytes
++            && identity(&f.metadata()?) == before
++            && identity(&fs::symlink_metadata(&bound.path)?) == before
++            && sha(&b) == bound.sha256,
++        "evidence identity/digest changed: {}",
++        bound.path.display()
++    );
++    Ok(b)
++}
++pub fn json(bound: &Bound, immutable: bool) -> Result<Value> {
++    Ok(serde_json::from_slice(&bytes(bound, 8 << 20, immutable)?)?)
++}
++/// Qualified source evidence can be immutable or an owner-private original
++/// receipt. Both paths retain descriptor identity and complete digest checks.
++pub fn evidence(bound: &Bound) -> Result<Value> {
++    let m = fs::symlink_metadata(&bound.path)?;
++    json(bound, m.mode() & 0o222 == 0)
++}
++pub fn binding(path: &Path) -> Result<Bound> {
++    let m = fs::symlink_metadata(path)?;
++    ensure!(
++        m.is_file()
++            && m.uid() == 0
++            && m.gid() == 0
++            && m.nlink() == 1
++            && m.mode() & 0o777 == 0o600
++            && m.len() <= 8 << 20,
++        "private binding custody"
++    );
++    let mut f = OpenOptions::new()
++        .read(true)
++        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
++        .open(path)?;
++    let before = identity(&m);
++    ensure!(identity(&f.metadata()?) == before, "binding open changed");
++    let mut b = Vec::new();
++    (&mut f).take((8 << 20) + 1).read_to_end(&mut b)?;
++    ensure!(
++        b.len() as u64 == before.bytes
++            && identity(&f.metadata()?) == before
++            && identity(&fs::symlink_metadata(path)?) == before,
++        "binding changed"
++    );
++    Ok(Bound {
++        path: path.into(),
++        sha256: sha(&b),
++    })
++}
++pub fn private_directory(path: &Path) -> Result<()> {
++    let m = fs::symlink_metadata(path)?;
++    ensure!(
++        path.is_absolute()
++            && path.canonicalize()? == path
++            && m.is_dir()
++            && m.uid() == 0
++            && m.gid() == 0
++            && m.mode() & 0o777 == 0o700,
++        "private directory custody"
++    );
++    Ok(())
++}
++/// One descriptor-bound snapshot of the mutable guard token. An atomic newer
++/// publication may unlink this inode during the read; its still-fresh complete
++/// payload remains valid. Do not hash then reopen a mutable token pathname.
++pub fn token_snapshot(path: &Path) -> Result<Vec<u8>> {
++    private_directory(path.parent().context("token parent")?)?;
++    let mut file = OpenOptions::new()
++        .read(true)
++        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
++        .open(path)?;
++    let before = file.metadata()?;
++    ensure!(
++        before.is_file()
++            && before.uid() == 0
++            && before.gid() == 0
++            && before.nlink() <= 1
++            && before.mode() & 0o777 == 0o600
++            && before.len() <= 1 << 20,
++        "mutable token custody"
++    );
++    let mut bytes = Vec::new();
++    (&mut file).take((1 << 20) + 1).read_to_end(&mut bytes)?;
++    let after = file.metadata()?;
++    let same_payload = |m: &fs::Metadata| {
++        (
++            m.dev(),
++            m.ino(),
++            m.len(),
++            m.mtime(),
++            m.mtime_nsec(),
++            m.mode(),
++            m.uid(),
++            m.gid(),
++        )
++    };
++    ensure!(
++        bytes.len() as u64 == before.len() && same_payload(&before) == same_payload(&after),
++        "mutable token bytes changed in place"
++    );
++    Ok(bytes)
++}
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::fs::File;
++    #[test]
++    fn digest_shape_rejects_uppercase_truncation_and_shell_text() {
++        assert!(hex(&"a".repeat(64), 64));
++        for s in ["A".repeat(64), "a".repeat(63), ";".repeat(64)] {
++            assert!(!hex(&s, 64));
++        }
++    }
++    fn evidence_fixture(mode: u32) -> (tempfile::TempDir, Bound) {
++        use std::os::unix::fs::PermissionsExt;
++        assert_eq!(
++            unsafe { libc::geteuid() },
++            0,
++            "admitted Root-only synthetic QA"
++        );
++        let dir = tempfile::tempdir().unwrap();
++        let path = dir.path().join("original-witness.json");
++        let payload = br#"{"witness":"original"}"#;
++        fs::write(&path, payload).unwrap();
++        fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
++        (
++            dir,
++            Bound {
++                path,
++                sha256: sha(payload),
++            },
++        )
++    }
++    #[test]
++    fn frozen_original_evidence_accepts_root0400_without_permission_change() {
++        let (_dir, bound) = evidence_fixture(0o400);
++        let before = identity(&fs::symlink_metadata(&bound.path).unwrap());
++        assert_eq!(evidence(&bound).unwrap()["witness"], "original");
++        assert_eq!(
++            identity(&fs::symlink_metadata(&bound.path).unwrap()),
++            before
++        );
++    }
++    #[test]
++    fn mutable_private_evidence_accepts_root0600_without_freezing_original() {
++        let (_dir, bound) = evidence_fixture(0o600);
++        let before = identity(&fs::symlink_metadata(&bound.path).unwrap());
++        assert_eq!(evidence(&bound).unwrap()["witness"], "original");
++        assert_eq!(
++            identity(&fs::symlink_metadata(&bound.path).unwrap()),
++            before
++        );
++    }
++    #[test]
++    fn evidence_rejects_wrong_owner_and_nonprivate_writable_metadata() {
++        use std::os::{fd::AsRawFd, unix::fs::PermissionsExt};
++        let (_dir, bound) = evidence_fixture(0o400);
++        let file = File::open(&bound.path).unwrap();
++        assert_eq!(unsafe { libc::fchown(file.as_raw_fd(), 1001, 1001) }, 0);
++        assert!(evidence(&bound).is_err());
++        assert_eq!(unsafe { libc::fchown(file.as_raw_fd(), 0, 0) }, 0);
++        for mode in [0o640, 0o644, 0o660, 0o666] {
++            fs::set_permissions(&bound.path, fs::Permissions::from_mode(mode)).unwrap();
++            assert!(
++                evidence(&bound).is_err(),
++                "writable/nonprivate mode {mode:o}"
++            );
++        }
++    }
++    #[test]
++    fn evidence_rejects_crossed_original_and_foreign_digest() {
++        let (_dir, bound) = evidence_fixture(0o400);
++        let foreign_path = bound.path.parent().unwrap().join("foreign-witness.json");
++        fs::write(&foreign_path, br#"{"witness":"foreign"}"#).unwrap();
++        use std::os::unix::fs::PermissionsExt;
++        fs::set_permissions(&foreign_path, fs::Permissions::from_mode(0o400)).unwrap();
++        assert!(
++            evidence(&Bound {
++                path: foreign_path,
++                sha256: bound.sha256
++            })
++            .is_err()
++        );
++    }
++}
+--- /dev/null
++++ b/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/fixtures/before.json
+@@ -0,0 +1,35 @@
++{
++  "admission": {
++    "path": "/var/lib/jetstreamer/horizon-epoch145-prefix-extract-shared72h-20261107-v8g1/admission.json",
++    "sha256": "eecfdac8d2b968979c3bf541d75b5362d6b223b8d58da17600b7c4af25664c02"
++  },
++  "at_unix_seconds": 1794037481,
++  "plan": {
++    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-plan-shared72h-20261107-v8g1/plan.json",
++    "sha256": "c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3"
++  },
++  "schema": "horizon-epoch145-actual-pre-read-guard-v1",
++  "token": {
++    "actor_iid": "f37b155136614e0183ba2e9adb8714ef",
++    "actor_pid": 2463122,
++    "actor_start_ticks": 238412403,
++    "actual_available_memory_bytes": 793486536704,
++    "actual_free_bytes": 7070060707840,
++    "admission": {
++      "path": "/var/lib/jetstreamer/horizon-epoch145-prefix-extract-shared72h-20261107-v8g1/admission.json",
++      "sha256": "eecfdac8d2b968979c3bf541d75b5362d6b223b8d58da17600b7c4af25664c02"
++    },
++    "at_boottime_millis": 2384142079,
++    "at_unix_seconds": 1794037480,
++    "guard_iid": "dd3192c4e1f8420eb283d09e6a74e7f9",
++    "guard_pid": 2463244,
++    "guard_start_ticks": 238413276,
++    "plan": {
++      "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-plan-shared72h-20261107-v8g1/plan.json",
++      "sha256": "c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3"
++    },
++    "protected_available_memory_bytes": 642177138688,
++    "protected_free_bytes": 5074152197938,
++    "schema": "horizon-epoch145-private-extractor-native-guard-token-v1"
++  }
++}--- /dev/null
++++ b/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/fixtures/plan.json
+@@ -0,0 +1,89 @@
++{
++  "actor_cpu_quota_micros": 8000000,
++  "actor_memory_bytes": 85899345920,
++  "actor_unit": "horizon-extract145-prefix-shared72h-20261107-v8g1.service",
++  "admission_bridge": {
++    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-admission-bridge-tools-20261106-v6/epoch145-admission-bridge",
++    "sha256": "c17a5cba4133e728bba67452f8e367247a9ac6d0654705730cad96402a65a5f1"
++  },
++  "admission_bridge_seal": {
++    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-admission-bridge-tools-20261106-v6/deployment-seal-receipt.json",
++    "sha256": "78d07c79aef3e4168573bca7a5355bba0d31a392dd63eff8c35c94cfb478f649"
++  },
++  "data_policy": {
++    "path": "/usr/local/lib/jetstreamer/horizon-ended183-DATA-policy-0728-20261107-v1/policy.json",
++    "sha256": "5cec79f4f70a6b0c9d405bc9abfe9cb50e89135410ee72268d7c04b9e4866f15"
++  },
++  "data_policy_seal": {
++    "path": "/usr/local/lib/jetstreamer/horizon-ended183-DATA-policy-0728-20261107-v1/deployment-seal-receipt.json",
++    "sha256": "04ab03ecd95247859ee0c5c50055b6ccd6536b9f2d0e0e09bdce14f2bcb238e9"
++  },
++  "entry_deadline": 1794037695,
++  "execution_deadline": 1794296895,
++  "external_pool_bytes": 6442450944,
++  "generation": "shared72h-20261107-v8g1",
++  "guard_cpu_quota_micros": 1000000,
++  "guard_memory_bytes": 268435456,
++  "guard_unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++  "issued_at": 1794037455,
++  "manifest": {
++    "path": "/home/sol/.jetstreamer-private/epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet.segment.json",
++    "sha256": "a101b885c5d60a13b8567d3968acd0e5177ec4f04669b91333cb9b3c5ca4b96a"
++  },
++  "manifest_identity": {
++    "bytes": 1809,
++    "ctime_ns": 1793948042282301980,
++    "device": 64512,
++    "gid": 0,
++    "inode": 100214429,
++    "mode": 33024,
++    "mtime_ns": 1793921166756994046,
++    "uid": 0
++  },
++  "memory_request": {
++    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-v8g1-parent199-only-request-20261107-v1/request.json",
++    "sha256": "05e58c86b2ca6d90d0c9bcf7ad61b4071d7cfd0e93653f7b5ca795a9d1302aea"
++  },
++  "minimum_available_memory_bytes": 642177138688,
++  "minimum_free_bytes": 5074152197938,
++  "output_directory_identity": {
++    "device": 64512,
++    "inode": 93850201
++  },
++  "output_maximum_bytes": 171798691840,
++  "output_root": "/home/sol/.jetstreamer-private/epoch145-prefix-extract-shared72h-20261107-v8g1",
++  "program": {
++    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/epoch145-prefix-extract",
++    "sha256": "b416b7c932ef781c8d0f863b63b803379dd58cb1affe99dced6a61830a95ad76"
++  },
++  "program_seal": {
++    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/deployment-seal-receipt.json",
++    "sha256": "74ca02fdfc3e0bb97b6567ed295c3053b399ae948ad67cff62ae56ee06e90e17"
++  },
++  "schema": "horizon-epoch145-private-prefix-extractor-plan-v1",
++  "source": {
++    "path": "/home/sol/.jetstreamer-private/epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet",
++    "sha256": "cb8ac0bc47919c22dc7898e068fb43ffac80aceadcacac3ff8f24ef32d3b3353"
++  },
++  "source_identity": {
++    "bytes": 105633748687,
++    "ctime_ns": 1793948042282301980,
++    "device": 64512,
++    "gid": 0,
++    "inode": 100214450,
++    "mode": 33024,
++    "mtime_ns": 1793920387242239342,
++    "uid": 0
++  },
++  "state_directory_identity": {
++    "device": 64512,
++    "inode": 93850202
++  },
++  "state_root": "/var/lib/jetstreamer/horizon-epoch145-prefix-extract-shared72h-20261107-v8g1",
++  "tasks_max": 512,
++  "terminal": {
++    "path": "/home/sol/.jetstreamer-private/cached145-postreplay-handoff-20261105-v1/ROOT_ACTUAL145_CLEAN_TERMINAL_AND_VERIFIED_SEGMENT.json",
++    "sha256": "8fe99753332d62254da147dcf1324bf4834a78d595d55c853228ce3fb469cd9d"
++  },
++  "timer_unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer"
++}
+--- /dev/null
++++ b/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/fixtures/ready.json
+@@ -0,0 +1,16 @@
++{
++  "actor_iid": "f37b155136614e0183ba2e9adb8714ef",
++  "actor_pid": 2463122,
++  "actor_start_ticks": 238412403,
++  "admission": {
++    "path": "/var/lib/jetstreamer/horizon-epoch145-prefix-extract-shared72h-20261107-v8g1/admission.json",
++    "sha256": "eecfdac8d2b968979c3bf541d75b5362d6b223b8d58da17600b7c4af25664c02"
++  },
++  "archive_body_reads_started": false,
++  "at_unix_seconds": 1794037470,
++  "plan": {
++    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-plan-shared72h-20261107-v8g1/plan.json",
++    "sha256": "c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3"
++  },
++  "schema": "horizon-epoch145-private-extractor-ready-v1"
++}--- /dev/null
++++ b/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/model.rs
+@@ -0,0 +1,128 @@
++//! Exact operational plan, without caller-supplied admission booleans.
++use serde::{Deserialize, Serialize};
++use serde_json::Value;
++use std::path::PathBuf;
++
++pub const GIB: u64 = 1 << 30;
++pub const SOURCE: &str = "/home/sol/.jetstreamer-private/epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet";
++pub const MANIFEST: &str = "/home/sol/.jetstreamer-private/epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet.segment.json";
++pub const SOURCE_SHA: &str = "cb8ac0bc47919c22dc7898e068fb43ffac80aceadcacac3ff8f24ef32d3b3353";
++pub const MANIFEST_SHA: &str = "a101b885c5d60a13b8567d3968acd0e5177ec4f04669b91333cb9b3c5ca4b96a";
++pub const WITNESS: &str = "/home/sol/.jetstreamer-private/cached145-postreplay-handoff-20261105-v1/ROOT_ACTUAL145_CLEAN_TERMINAL_AND_VERIFIED_SEGMENT.json";
++pub const WITNESS_SHA: &str = "8fe99753332d62254da147dcf1324bf4834a78d595d55c853228ce3fb469cd9d";
++pub const ORIGINAL_UNIT: &str = "horizon-qualify-145-cached-b2a09f57de39c384.service";
++pub const ORIGINAL_IID: &str = "15ddd220e2144aaa8d7418f73f60768f";
++pub const SOURCE_BYTES: u64 = 105_633_748_687;
++pub const GUARD_MAX_AGE_MILLIS: u64 = 90_000;
++pub const MAX_METADATA_BYTES: u64 = 128 << 20;
++
++#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
++#[serde(deny_unknown_fields)]
++pub struct Bound {
++    pub path: PathBuf,
++    pub sha256: String,
++}
++
++#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
++#[serde(deny_unknown_fields)]
++pub struct Identity {
++    pub device: u64,
++    pub inode: u64,
++    pub bytes: u64,
++    pub mtime_ns: i128,
++    pub ctime_ns: i128,
++    pub mode: u32,
++    pub uid: u32,
++    pub gid: u32,
++}
++
++#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
++#[serde(deny_unknown_fields)]
++pub struct DirectoryIdentity {
++    pub device: u64,
++    pub inode: u64,
++}
++
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(deny_unknown_fields)]
++pub struct Plan {
++    pub schema: String,
++    pub generation: String,
++    pub program: Bound,
++    /// Normal sealer receipt for the executable. Never an execution permit.
++    pub program_seal: Bound,
++    /// Separately sealed Rust process owns the reviewed typed-selector graph.
++    pub admission_bridge: Bound,
++    pub admission_bridge_seal: Bound,
++    pub terminal: Bound,
++    pub source: Bound,
++    pub source_identity: Identity,
++    pub manifest: Bound,
++    pub manifest_identity: Identity,
++    /// Genuine reviewed Request for the existing opaque parent-memory constructor.
++    pub memory_request: Bound,
++    /// Genuine current explicit DATA policy and its normal seal, consumed by the
++    /// existing opaque DATA constructor, not hand-written selected totals.
++    pub data_policy: Bound,
++    pub data_policy_seal: Bound,
++    pub actor_unit: String,
++    pub guard_unit: String,
++    pub timer_unit: String,
++    pub output_root: PathBuf,
++    pub output_directory_identity: DirectoryIdentity,
++    pub state_root: PathBuf,
++    pub state_directory_identity: DirectoryIdentity,
++    pub output_maximum_bytes: u64,
++    pub actor_memory_bytes: u64,
++    pub guard_memory_bytes: u64,
++    pub external_pool_bytes: u64,
++    pub actor_cpu_quota_micros: u64,
++    pub guard_cpu_quota_micros: u64,
++    pub tasks_max: u64,
++    /// Existing ceiling, never a policy lowering another owner's guard.
++    pub minimum_available_memory_bytes: u64,
++    pub minimum_free_bytes: u64,
++    pub issued_at: u64,
++    pub entry_deadline: u64,
++    pub execution_deadline: u64,
++}
++
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(deny_unknown_fields)]
++pub struct Admission {
++    pub schema: String,
++    pub plan: Bound,
++    pub actor_unit: String,
++    pub actor_iid: String,
++    pub actor_pid: u32,
++    pub actor_start_ticks: u64,
++    pub accepted_at: u64,
++    pub accepted_boottime_millis: u64,
++    pub memory_evidence: Value,
++    pub data_evidence: Value,
++    pub existing_memory_bytes: u64,
++    pub protected_existing_data_bytes: u64,
++    pub required_initial_memory_bytes: u64,
++    pub required_initial_data_bytes: u64,
++    pub original_native: Value,
++}
++
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(deny_unknown_fields)]
++pub struct Token {
++    pub schema: String,
++    pub plan: Bound,
++    pub admission: Bound,
++    pub actor_iid: String,
++    pub actor_pid: u32,
++    pub actor_start_ticks: u64,
++    pub guard_iid: String,
++    pub guard_pid: u32,
++    pub guard_start_ticks: u64,
++    pub at_unix_seconds: u64,
++    pub at_boottime_millis: u64,
++    pub protected_free_bytes: u64,
++    pub protected_available_memory_bytes: u64,
++    pub actual_free_bytes: u64,
++    pub actual_available_memory_bytes: u64,
++}
+--- /dev/null
++++ b/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/native.rs
+@@ -0,0 +1,406 @@
++//! Actual native identities and kernel limits, with bounded systemd queries.
++use super::{custody as f, model::*};
++use anyhow::{Context, Result, ensure};
++use serde_json::{Value, json};
++use std::{
++    collections::BTreeMap,
++    ffi::CString,
++    fs,
++    os::unix::fs::MetadataExt,
++    path::{Path, PathBuf},
++    process::Command,
++};
++const FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Job,ExecStart,ExecStartPre,Restart,Type,KillMode,ControlGroup,DropInPaths,User,Group,MemoryMax,MemorySwapMax,TasksMax,Triggers,TimersMonotonic";
++
++fn parse(unit: &str, text: &str) -> Result<Value> {
++    let mut rows = BTreeMap::<String, String>::new();
++    for line in text.lines() {
++        let (k, v) = line.split_once('=').context("native property framing")?;
++        ensure!(
++            FIELDS.split(',').any(|f| f == k),
++            "unexpected native property"
++        );
++        if k == "TimersMonotonic" && unit.ends_with(".timer") {
++            let previous = rows.entry(k.into()).or_default();
++            ensure!(previous.lines().all(|l| l != v), "duplicate timer schedule");
++            if !previous.is_empty() {
++                previous.push('\n');
++            }
++            previous.push_str(v);
++        } else {
++            ensure!(
++                rows.insert(k.into(), v.into()).is_none(),
++                "duplicate native property"
++            );
++        }
++    }
++    let v = json!(rows);
++    ensure!(v["Id"] == unit, "native identity crossed");
++    Ok(v)
++}
++
++#[derive(serde::Deserialize)]
++#[serde(deny_unknown_fields)]
++struct NativeExecStartPre {
++    #[serde(rename = "type")]
++    kind: String,
++    data: Vec<Value>,
++}
++fn empty_exec_start_pre(bytes: &[u8]) -> Result<()> {
++    ensure!(bytes.len() <= 1 << 20, "bounded native pre-start property");
++    let typed: NativeExecStartPre = serde_json::from_slice(bytes)?;
++    ensure!(
++        typed.kind == "a(sasbttttuii)" && typed.data.is_empty(),
++        "actual typed pre-start array is not empty"
++    );
++    Ok(())
++}
++fn dbus_unit_path(unit: &str) -> String {
++    let escaped = unit
++        .bytes()
++        .map(|b| {
++            if b.is_ascii_alphanumeric() {
++                char::from(b).to_string()
++            } else {
++                format!("_{b:02x}")
++            }
++        })
++        .collect::<String>();
++    format!("/org/freedesktop/systemd1/unit/{escaped}")
++}
++pub fn show(unit: &str) -> Result<Value> {
++    ensure!(
++        unit.bytes()
++            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
++            && unit.len() <= 160,
++        "unit syntax"
++    );
++    let out = Command::new("/usr/bin/timeout")
++        .args([
++            "--signal=TERM",
++            "--kill-after=2s",
++            "8s",
++            "/usr/bin/systemctl",
++            "--system",
++            "show",
++            unit,
++            "--no-pager",
++            &format!("--property={FIELDS}"),
++        ])
++        .env_remove("SYSTEMD_HOST")
++        .env_remove("SYSTEMD_BUS_ADDRESS")
++        .env_remove("DBUS_SYSTEM_BUS_ADDRESS")
++        .env("LC_ALL", "C")
++        .output()?;
++    ensure!(out.status.success(), "bounded native query failed: {unit}");
++    let mut parsed = parse(unit, std::str::from_utf8(&out.stdout)?)?;
++    if unit.ends_with(".service") && parsed.get("ExecStartPre").is_none() {
++        let object = dbus_unit_path(unit);
++        let property = Command::new("/usr/bin/timeout")
++            .args([
++                "--signal=TERM",
++                "--kill-after=2s",
++                "8s",
++                "/usr/bin/busctl",
++                "--system",
++                "--json=short",
++                "get-property",
++                "org.freedesktop.systemd1",
++                object.as_str(),
++                "org.freedesktop.systemd1.Service",
++                "ExecStartPre",
++            ])
++            .env_remove("SYSTEMD_HOST")
++            .env_remove("SYSTEMD_BUS_ADDRESS")
++            .env_remove("DBUS_SYSTEM_BUS_ADDRESS")
++            .env("LC_ALL", "C")
++            .output()?;
++        ensure!(
++            property.status.success(),
++            "bounded typed native pre-start query failed"
++        );
++        empty_exec_start_pre(&property.stdout)?;
++        #[cfg(test)]
++        eprintln!(
++            "fixture typed pre-start proof unit={unit} object={object} reply={}",
++            std::str::from_utf8(&property.stdout)?
++        );
++        parsed
++            .as_object_mut()
++            .context("native property object")?
++            .insert("ExecStartPre".into(), json!(""));
++    }
++    Ok(parsed)
++}
++pub fn ticks(pid: u32) -> Result<u64> {
++    let s = fs::read_to_string(format!("/proc/{pid}/stat"))?;
++    Ok(s.rsplit_once(") ")
++        .context("process framing")?
++        .1
++        .split_whitespace()
++        .nth(19)
++        .context("start ticks")?
++        .parse()?)
++}
++fn safe_path(p: &Path) -> Result<&str> {
++    let s = p.to_str().context("path utf8")?;
++    ensure!(
++        p.is_absolute()
++            && s.bytes()
++                .all(|b| b.is_ascii_alphanumeric() || b"/._-".contains(&b)),
++        "native argv path syntax"
++    );
++    Ok(s)
++}
++fn process(pid: u32, start: u64, program: &Bound, cgroup: &str) -> Result<()> {
++    ensure!(
++        pid > 1
++            && ticks(pid)? == start
++            && fs::read_link(format!("/proc/{pid}/exe"))? == program.path,
++        "process identity changed"
++    );
++    let status = fs::read_to_string(format!("/proc/{pid}/status"))?;
++    let uids = status
++        .lines()
++        .find_map(|l| l.strip_prefix("Uid:"))
++        .context("process UIDs")?;
++    ensure!(
++        uids.split_whitespace().collect::<Vec<_>>() == ["0", "0", "0", "0"],
++        "Root actor/guard identity"
++    );
++    ensure!(
++        fs::read_to_string(format!("/proc/{pid}/cgroup"))?.trim() == format!("0::{cgroup}"),
++        "exact cgroup membership"
++    );
++    Ok(())
++}
++pub fn owner(p: &Plan, pb: &Bound, guard: bool, pid: u32, iid: &str, start: u64) -> Result<Value> {
++    ensure!(f::hex(iid, 32), "native IID syntax");
++    let unit = if guard { &p.guard_unit } else { &p.actor_unit };
++    let v = show(unit)?;
++    #[cfg(test)]
++    eprintln!(
++        "fixture native owner snapshot {}",
++        json!({"expected_unit":unit,"expected_iid":iid,"expected_pid":pid,"expected_start_ticks":start,"guard_role":guard,"native":v})
++    );
++    let group = format!("/system.slice/{unit}");
++    let prefix = format!(
++        "{{ path={} ; argv[]={} {} {} --plan-sha256 {} --self-sha256 {} ;",
++        safe_path(&p.program.path)?,
++        safe_path(&p.program.path)?,
++        if guard { "guard" } else { "extract" },
++        safe_path(&pb.path)?,
++        pb.sha256,
++        p.program.sha256
++    );
++    ensure!(
++        v["LoadState"] == "loaded"
++            && v["ActiveState"] == "active"
++            && v["SubState"] == "running"
++            && v["InvocationID"] == iid
++            && v["MainPID"].as_str().and_then(|s| s.parse::<u32>().ok()) == Some(pid)
++            && v["ControlPID"] == "0"
++            && v["NRestarts"] == "0"
++            && v["Job"] == ""
++            && v["Restart"] == "no"
++            && v["Type"] == "exec"
++            && v["KillMode"] == "control-group"
++            && v["ControlGroup"] == group
++            && v["DropInPaths"] == ""
++            && v["ExecStartPre"] == ""
++            && v["User"] == "root"
++            && v["Group"] == "root"
++            && v["ExecStart"]
++                .as_str()
++                .is_some_and(|s| s.starts_with(&prefix) && s.matches("argv[]=").count() == 1),
++        "exact running native actor/guard"
++    );
++    process(pid, start, &p.program, &group)?;
++    let cg = PathBuf::from("/sys/fs/cgroup").join(group.trim_start_matches('/'));
++    ensure!(cg.canonicalize()? == cg, "cgroup path alias");
++    let memory = if guard {
++        p.guard_memory_bytes
++    } else {
++        p.actor_memory_bytes
++    };
++    let cpu = if guard {
++        p.guard_cpu_quota_micros
++    } else {
++        p.actor_cpu_quota_micros
++    };
++    ensure!(
++        fs::read_to_string(cg.join("memory.max"))?.trim() == memory.to_string()
++            && fs::read_to_string(cg.join("memory.swap.max"))?.trim() == "0"
++            && fs::read_to_string(cg.join("pids.max"))?.trim() == p.tasks_max.to_string(),
++        "kernel memory/swap/task bounds"
++    );
++    let cp = fs::read_to_string(cg.join("cpu.max"))?;
++    let parts = cp.split_whitespace().collect::<Vec<_>>();
++    ensure!(
++        parts.len() == 2 && parts[0] != "max",
++        "kernel CPU quota missing"
++    );
++    let quota: u64 = parts[0].parse()?;
++    let period: u64 = parts[1].parse()?;
++    ensure!(
++        quota.checked_mul(1_000_000) == cpu.checked_mul(period),
++        "kernel CPU quota differs"
++    );
++    Ok(v)
++}
++pub fn original() -> Result<Value> {
++    let v = show(ORIGINAL_UNIT)?;
++    ensure!(
++        v["ActiveState"] == "inactive"
++            && v["SubState"] == "dead"
++            && v["InvocationID"] == ""
++            && v["MainPID"] == "0"
++            && v["ControlPID"] == "0"
++            && v["NRestarts"] == "0"
++            && v["Job"] == "",
++        "original145 owner revived"
++    );
++    let cg = Path::new("/sys/fs/cgroup/system.slice").join(ORIGINAL_UNIT);
++    if cg.exists() {
++        ensure!(
++            fs::read_to_string(cg.join("cgroup.procs"))?
++                .trim()
++                .is_empty()
++                && fs::read_to_string(cg.join("cgroup.events"))?
++                    .lines()
++                    .any(|l| l == "populated 0"),
++            "original145 cgroup not drained"
++        );
++    }
++    Ok(v)
++}
++pub fn timer(p: &Plan) -> Result<Value> {
++    let v = show(&p.timer_unit)?;
++    ensure!(
++        v["LoadState"] == "loaded"
++            && v["ActiveState"] == "active"
++            && matches!(v["SubState"].as_str(), Some("waiting" | "running"))
++            && v["Triggers"] == p.guard_unit
++            && v["DropInPaths"] == "",
++        "native guard timer not armed"
++    );
++    let schedules = v["TimersMonotonic"]
++        .as_str()
++        .context("native timer schedules")?
++        .lines()
++        .collect::<Vec<_>>();
++    ensure!(
++        schedules.len() == 2
++            && schedules
++                .iter()
++                .filter(|s| s.starts_with("{ OnActiveUSec=1s ; next_elapse=") && s.ends_with(" }"))
++                .count()
++                == 1
++            && schedules
++                .iter()
++                .filter(
++                    |s| s.starts_with("{ OnUnitActiveUSec=30s ; next_elapse=") && s.ends_with(" }")
++                )
++                .count()
++                == 1,
++        "native original guard cadence"
++    );
++    Ok(v)
++}
++pub fn resources(p: &Plan, a: &Admission) -> Result<(u64, u64)> {
++    directories(p)?;
++    let c = CString::new("/home/sol")?;
++    let mut s: libc::statvfs = unsafe { std::mem::zeroed() };
++    ensure!(
++        unsafe { libc::statvfs(c.as_ptr(), &mut s) } == 0,
++        "free-space statvfs"
++    );
++    let free = s
++        .f_bavail
++        .checked_mul(s.f_frsize)
++        .context("free-space overflow")?;
++    let text = fs::read_to_string("/proc/meminfo")?;
++    let avail = text
++        .lines()
++        .find_map(|l| l.strip_prefix("MemAvailable:"))
++        .context("MemAvailable")?
++        .split_whitespace()
++        .next()
++        .context("MemAvailable integer")?
++        .parse::<u64>()?
++        .checked_mul(1024)
++        .context("memory overflow")?;
++    ensure!(
++        free >= a.required_initial_data_bytes.max(p.minimum_free_bytes)
++            && avail
++                >= a.required_initial_memory_bytes
++                    .max(p.minimum_available_memory_bytes),
++        "protected DATA/memory floor breached"
++    );
++    ensure!(
++        f::now()? <= p.execution_deadline,
++        "original execution deadline expired"
++    );
++    Ok((free, avail))
++}
++pub fn directories(p: &Plan) -> Result<()> {
++    let home = fs::metadata("/home/sol")?;
++    for (path, expected) in [
++        (&p.output_root, &p.output_directory_identity),
++        (&p.state_root, &p.state_directory_identity),
++    ] {
++        f::private_directory(path)?;
++        let m = fs::symlink_metadata(path)?;
++        ensure!(
++            m.dev() == expected.device && m.ino() == expected.inode && m.dev() == home.dev(),
++            "admitted directory inode or budget filesystem changed"
++        );
++    }
++    Ok(())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn duplicate_native_identity_cannot_hide_restart() {
++        assert!(parse("x.service", "Id=x.service\nNRestarts=0\nNRestarts=1\n").is_err());
++    }
++    #[test]
++    fn timer_parser_preserves_both_native_schedules_without_duplicate_loss() {
++        let v=parse("x.timer","Id=x.timer\nTimersMonotonic={ OnActiveUSec=1s ; next_elapse=1s }\nTimersMonotonic={ OnUnitActiveUSec=30s ; next_elapse=30s }\n").unwrap();
++        assert_eq!(v["TimersMonotonic"].as_str().unwrap().lines().count(), 2);
++        assert!(
++            parse(
++                "x.timer",
++                "Id=x.timer\nTimersMonotonic=a\nTimersMonotonic=a\n"
++            )
++            .is_err()
++        );
++    }
++    #[test]
++    fn native_argv_cannot_inject_additional_arguments() {
++        assert!(safe_path(Path::new("/a --flag")).is_err());
++    }
++    #[test]
++    fn typed_empty_prestart_requires_exact_actual_empty_array() {
++        empty_exec_start_pre(br#"{"type":"a(sasbttttuii)","data":[]}"#).unwrap();
++        for raw in [
++            br#"{}"#.as_slice(),
++            br#"{"type":"s","data":[]}"#,
++            br#"{"type":"a(sasbttttuii)","data":[["/bin/true"]]}"#,
++            br#"{"type":"a(sasbttttuii)","data":null}"#,
++            br#"{"type":"a(sasbttttuii)","data":[],"extra":true}"#,
++            br#"{"type":"s","type":"a(sasbttttuii)","data":[]}"#,
++        ] {
++            assert!(empty_exec_start_pre(raw).is_err());
++        }
++    }
++    #[test]
++    fn native_dbus_unit_path_escapes_underscore_dash_and_dot_exactly() {
++        assert_eq!(
++            dbus_unit_path("horizon-actor_1.service"),
++            "/org/freedesktop/systemd1/unit/horizon_2dactor_5f1_2eservice"
++        );
++    }
++}
+--- /dev/null
++++ b/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix/tests.rs
+@@ -0,0 +1,348 @@
++use super::*;
++fn fixture() -> (Selector, model::Plan, model::Admission, Value, Value) {
++    let p: model::Plan = serde_json::from_str(include_str!("fixtures/plan.json")).unwrap();
++    let ready: Value = serde_json::from_str(include_str!("fixtures/ready.json")).unwrap();
++    let before: Value = serde_json::from_str(include_str!("fixtures/before.json")).unwrap();
++    let b = |path: &str, sha: &str| BoundFile {
++        path: path.into(),
++        sha256: sha.into(),
++    };
++    let s = Selector {
++        plan: b(PLAN, PLAN_SHA),
++        ready: b(
++            &format!("{STATE}/ready.json"),
++            "d8cd0712b4ee180fa10d3d977b6981a40846d7cd5f78698fd4a0bf9ad938457b",
++        ),
++        admission: b(
++            &format!("{STATE}/admission.json"),
++            "eecfdac8d2b968979c3bf541d75b5362d6b223b8d58da17600b7c4af25664c02",
++        ),
++        guard_before_source: b(
++            &format!("{STATE}/guard-before-source-read.json"),
++            "3410e0ea3c4fbbfe911185e893f9c79eb246a6cf419ecea7f567ac03ae79c53d",
++        ),
++    };
++    let a:model::Admission=serde_json::from_value(json!({"schema":"horizon-epoch145-private-extraction-typed-admission-v1",
++        "plan":old(&s.plan),"actor_unit":ACTOR,"actor_iid":IID,"actor_pid":2463122,"actor_start_ticks":238412403u64,
++        "accepted_at":1794037470u64,"accepted_boottime_millis":2384124000u64,"memory_evidence":null,"data_evidence":null,
++        "existing_memory_bytes":1,"protected_existing_data_bytes":1,"required_initial_memory_bytes":MEMORY_FLOOR,
++        "required_initial_data_bytes":DATA_FLOOR,"original_native":null})).unwrap();
++    (s, p, a, ready, before)
++}
++fn running_actor() -> Value {
++    json!({"Id":ACTOR,"InvocationID":IID,"LoadState":"loaded","ActiveState":"active","SubState":"running",
++        "MainPID":"2463122","NRestarts":"0","Restart":"no","Type":"exec","MemoryMax":(80u64<<30).to_string(),
++        "MemorySwapMax":"0","TasksMax":"512","CPUQuotaPerSecUSec":"8s","ExecStart":format!("{} ignore_errors=no ; }}",command("extract"))})
++}
++fn completed_guard() -> Value {
++    json!({"Id":GUARD,"InvocationID":"d".repeat(32),"LoadState":"loaded","ActiveState":"inactive","SubState":"dead",
++        "MainPID":"0","NRestarts":"0","Restart":"no","Type":"exec","User":"root","MemoryMax":(256u64<<20).to_string(),
++        "MemorySwapMax":"0","TasksMax":"512","CPUQuotaPerSecUSec":"1s","ExecStart":format!("{} ignore_errors=no ; code=exited ; status=0/0 }}",command("guard")),
++        "ControlGroup":"","Result":"success","ExecMainCode":"1","ExecMainStatus":"0"})
++}
++fn capture() -> Value {
++    let (s, p, _, _, before) = fixture();
++    json!({"peer":peer(&s,&p,&running_actor()),"plan":binding(&s.plan),"actor_native":running_actor(),
++        "captured_at":1794037500u64,"token":before["token"]})
++}
++#[test]
++fn exact_original_selector_and_first_guard_bind_without_runtime_reads() {
++    let (s, p, a, r, b) = fixture();
++    exact(&s).unwrap();
++    let ab: model::Bound = serde_json::from_value(r["admission"].clone()).unwrap();
++    plan_shape(&p, &a, &r, &b, &old(&s.plan), &ab, 1794037500).unwrap();
++}
++#[test]
++fn crossed_original_selector_or_mutated_program_and_deadline_fail() {
++    let (mut s, p, a, r, b) = fixture();
++    s.plan.sha256 = "a".repeat(64);
++    assert!(exact(&s).is_err());
++    let (s, _, _, _, _) = fixture();
++    let ab = serde_json::from_value(r["admission"].clone()).unwrap();
++    for (field, value) in [
++        ("minimum_free_bytes", json!(DATA_FLOOR - 1)),
++        ("minimum_available_memory_bytes", json!(0)),
++        ("execution_deadline", json!(1794296896u64)),
++        ("actor_memory_bytes", json!(1)),
++    ] {
++        let mut bad = serde_json::to_value(&p).unwrap();
++        bad[field] = value;
++        let bad = serde_json::from_value(bad).unwrap();
++        assert!(plan_shape(&bad, &a, &r, &b, &old(&s.plan), &ab, 1794037500).is_err());
++    }
++    assert!(plan_shape(&p, &a, &r, &b, &old(&s.plan), &ab, p.execution_deadline + 1).is_err());
++}
++#[test]
++fn token_monotonic_age_actor_plan_and_both_floors_fail_closed() {
++    let (s, p, a, r, b) = fixture();
++    let ab = serde_json::from_value(r["admission"].clone()).unwrap();
++    let t: model::Token = serde_json::from_value(b["token"].clone()).unwrap();
++    token(
++        &t,
++        &p,
++        &a,
++        &old(&s.plan),
++        &ab,
++        t.at_unix_seconds + 90,
++        t.at_boottime_millis + 90000,
++    )
++    .unwrap();
++    assert!(
++        token(
++            &t,
++            &p,
++            &a,
++            &old(&s.plan),
++            &ab,
++            t.at_unix_seconds + 91,
++            t.at_boottime_millis + 90001
++        )
++        .is_err()
++    );
++    for (k, v) in [
++        ("actor_iid", json!("f".repeat(32))),
++        ("protected_free_bytes", json!(DATA_FLOOR - 1)),
++        ("protected_available_memory_bytes", json!(0)),
++        ("actual_free_bytes", json!(0)),
++        ("actor_start_ticks", json!(1)),
++    ] {
++        let mut bad = serde_json::to_value(&t).unwrap();
++        bad[k] = v;
++        let bad = serde_json::from_value(bad).unwrap();
++        assert!(
++            token(
++                &bad,
++                &p,
++                &a,
++                &old(&s.plan),
++                &ab,
++                t.at_unix_seconds,
++                t.at_boottime_millis
++            )
++            .is_err()
++        );
++    }
++    assert!(
++        token(
++            &t,
++            &p,
++            &a,
++            &old(&s.plan),
++            &ab,
++            t.at_unix_seconds - 1,
++            t.at_boottime_millis
++        )
++        .is_err()
++    );
++}
++#[test]
++fn periodic_guard_success_or_exact_running_fire_only() {
++    let done = completed_guard();
++    guard_native(&done).unwrap();
++    let mut running = done.clone();
++    running["InvocationID"] = json!("e".repeat(32));
++    running["MainPID"] = json!("2464000");
++    running["ActiveState"] = json!("active");
++    running["SubState"] = json!("running");
++    running["ControlGroup"] = json!(format!("/system.slice/{GUARD}"));
++    guard_native(&running).unwrap();
++    for (k, v) in [
++        ("Result", json!("exit-code")),
++        ("ExecMainStatus", json!("1")),
++        ("NRestarts", json!("1")),
++        ("MemoryMax", json!("1")),
++        ("ExecStart", json!("foreign command")),
++    ] {
++        let mut bad = done.clone();
++        bad[k] = v;
++        assert!(guard_native(&bad).is_err());
++    }
++}
++#[test]
++fn timer_iid_unarmed_and_actor_restart_or_command_injection_reject() {
++    let (_, _, a, _, _) = fixture();
++    actor_native(&running_actor(), &a).unwrap();
++    let mut bad = running_actor();
++    bad["NRestarts"] = json!("1");
++    assert!(actor_native(&bad, &a).is_err());
++    bad = running_actor();
++    bad["ExecStart"] = json!(command("extract").replace(" ;", " injected ;"));
++    assert!(actor_native(&bad, &a).is_err());
++    let t = json!({"Id":TIMER,"LoadState":"loaded","InvocationID":TIMER_IID,"ActiveState":"active","SubState":"running","Triggers":GUARD});
++    timer_native(&t).unwrap();
++    for (k, v) in [
++        ("InvocationID", json!("b".repeat(32))),
++        ("ActiveState", json!("inactive")),
++        ("Triggers", json!("foreign.service")),
++    ] {
++        let mut bad = t.clone();
++        bad[k] = v;
++        assert!(timer_native(&bad).is_err());
++    }
++}
++#[test]
++fn independent_actor_guard_and_source_data_reach_actual_growth_and_memory_sums_once() {
++    let c = capture();
++    let p = c["peer"].clone();
++    peer_shape(&p).unwrap();
++    assert_eq!(p["memory_max_bytes"], MEMORY);
++    assert_eq!(p["external_pool_charged_by_this_peer_bytes"], 0);
++    assert_eq!(p["retained185_source_DATA_bytes"], 4u64 << 30);
++    let old = core::Obligation {
++        claim_key: "retained-other".into(),
++        epoch: 199,
++        producer_invocation_id: "a".repeat(32),
++        outstanding_bytes: 7,
++    };
++    let (rows, floor) =
++        super::super::protect(std::slice::from_ref(&old), 0, 0, std::slice::from_ref(&p)).unwrap();
++    assert_eq!(rows[0].claim_key, old.claim_key);
++    assert_eq!(rows[0].outstanding_bytes, 7);
++    assert_eq!(rows[1].outstanding_bytes, DATA);
++    assert!(rows[1].claim_key.starts_with("live145-prefix-export/"));
++    assert!(floor >= super::super::DATA_FLOOR + DATA);
++    assert_eq!(
++        super::super::active_trial_memory_promises(&[Some(&p)]).unwrap(),
++        MEMORY
++    );
++    assert!(super::super::protect(&rows, 0, 0, std::slice::from_ref(&p)).is_err());
++    assert!(super::super::active_trial_memory_promises(&[Some(&p), Some(&p)]).is_err());
++}
++#[test]
++fn zero_credit_and_independent_pool_cannot_be_relabelled() {
++    let p = capture()["peer"].clone();
++    for (k, v) in [
++        ("credit_bytes", json!(1)),
++        ("resource_release_qualified", json!(true)),
++        ("native_pool_suballocation", json!(true)),
++        ("memory_max_bytes", json!(80u64 << 30)),
++        ("data_reservation_bytes", json!(160u64 << 30)),
++        ("reserved_guard_memory_bytes", json!(0)),
++    ] {
++        let mut bad = p.clone();
++        bad[k] = v;
++        assert!(peer_shape(&bad).is_err());
++    }
++}
++#[test]
++fn rollover_comparison_preserves_raw_records_and_all_foreign_rows() {
++    let c = capture();
++    let mut other = c.clone();
++    other["captured_at"] = json!(1794037501u64);
++    other["token"]["at_boottime_millis"] =
++        json!(number(&c, "/token/at_boottime_millis").unwrap() + 1);
++    stable(Some(&c), Some(&other)).unwrap();
++    let mut left = json!({"foreign.service":{"InvocationID":"keep raw"}});
++    left[ACTOR] = running_actor();
++    left[GUARD] = completed_guard();
++    let mut right = left.clone();
++    right[GUARD]["InvocationID"] = json!("e".repeat(32));
++    let raw = (left.clone(), right.clone());
++    assert_eq!(
++        comparison(&left, Some(&c)).unwrap(),
++        comparison(&right, Some(&other)).unwrap()
++    );
++    assert_eq!(raw, (left.clone(), right.clone()));
++    let mut foreign = right.clone();
++    foreign["foreign.service"]["InvocationID"] = json!("changed");
++    assert_ne!(
++        comparison(&left, Some(&c)).unwrap(),
++        comparison(&foreign, Some(&other)).unwrap()
++    );
++    assert!(stable(Some(&c), None).is_err());
++    assert!(stable(None, Some(&c)).is_err());
++}
++#[test]
++fn positive185_enforces_live_memory_runway_and_full_new_data_floor() {
++    let c = capture();
++    let memory = (8u64 << 30) + (256u64 << 20);
++    let candidate =
++        json!({"peers":[{"memory_max_bytes":memory}],"guard_floor_bytes":DATA_FLOOR+(4u64<<30)});
++    let required = MEMORY_FLOOR + MEMORY + memory + (6u64 << 30);
++    // Round up to the observer's real KiB unit; one fewer KiB cannot fit.
++    let kib = required.div_ceil(1024);
++    let o = json!({"host_memory":{"conservative_available_kib":kib}});
++    candidate_fit(Some(&candidate), Some(&c), &o).unwrap();
++    let mut bad = o.clone();
++    bad["host_memory"]["conservative_available_kib"] = json!(kib - 1);
++    assert!(candidate_fit(Some(&candidate), Some(&c), &bad).is_err());
++    let mut bad = candidate.clone();
++    bad["guard_floor_bytes"] = json!(DATA_FLOOR - 1);
++    assert!(candidate_fit(Some(&bad), Some(&c), &o).is_err());
++    let mut bad = candidate;
++    bad["peers"][0]["memory_max_bytes"] = json!(u64::MAX);
++    assert!(candidate_fit(Some(&bad), Some(&c), &o).is_err());
++}
++#[test]
++fn optional_absence_never_creates_a_peer_credit_or_current_guard() {
++    assert!(peers(None).is_empty());
++    assert_eq!(cpu(None), 0);
++    assert_eq!(guard_floor(None), 0);
++    assert_eq!(retained_data_floor(99, None).unwrap(), 99);
++    required_selector(false, false).unwrap();
++    required_selector(true, true).unwrap();
++    assert!(required_selector(false, true).is_err());
++    assert!(!guard_discovered(GUARD, &completed_guard(), None).unwrap());
++}
++#[test]
++fn retained_data_floor_keeps_new_source_four_gib_and_never_reduces_a_larger_floor() {
++    let c = capture();
++    assert_eq!(
++        retained_data_floor(0, Some(&c)).unwrap(),
++        DATA_FLOOR + (4u64 << 30)
++    );
++    assert_eq!(retained_data_floor(u64::MAX, Some(&c)).unwrap(), u64::MAX);
++}
++
++#[test]
++#[ignore = "requires the actual unchanged v8g1 exporter and genuine periodic guard"]
++fn actual_live_v8g1_capture_and_natural_guard_rollover_preserve_all_debt() -> Result<()> {
++    ensure!(unsafe { libc::geteuid() } == 0, "Root read-only native qualification required");
++    let (selector, _, _, _, _) = fixture();
++    let before = actual(Some(&selector), custody::now()?)?
++        .context("actual live145 first native accounting capture")?;
++    peer_shape(&before["peer"])?;
++    ensure!(before["actor_native"]["InvocationID"] == IID
++        && before["peer"]["memory_max_bytes"] == MEMORY
++        && before["peer"]["data_reservation_bytes"] == DATA
++        && before["archive_body_reads"] == false
++        && before["memory_or_DATA_credit_bytes"] == 0,
++        "first actual live145 capture changed owner, debt or authority");
++    let raw_before = json!({ACTOR:before["actor_native"], GUARD:before["guard_native"]});
++    // Wait for the already armed periodic guard; no service/timer operation,
++    // host-resource read, publication, receipt mutation or producer action.
++    std::thread::sleep(std::time::Duration::from_secs(45));
++    let after = actual(Some(&selector), custody::now()?)?
++        .context("actual live145 second native accounting capture")?;
++    stable(Some(&before), Some(&after))?;
++    ensure!(before["token"]["guard_iid"] != after["token"]["guard_iid"]
++        && number(&after, "/token/at_boottime_millis")?
++            > number(&before, "/token/at_boottime_millis")?,
++        "qualification did not observe a genuine new guard token");
++    let raw_after = json!({ACTOR:after["actor_native"], GUARD:after["guard_native"]});
++    ensure!(comparison(&raw_before, Some(&before))?
++        == comparison(&raw_after, Some(&after))?,
++        "actual periodic guard rollover changed protected owner/debt comparison");
++    println!("{}", json!({"schema":"live145-actual-readonly-native-rollover-test-v1",
++        "before":before,"after":after,"original_actor_unchanged":true,
++        "genuine_periodic_guard_rollover_observed":true,
++        "archive_body_reads":false,"resource_credit_bytes":0,
++        "service_or_timer_mutations":false,"replay_launch_authorized":false}));
++    Ok(())
++}
++
++#[test]
++fn historical_guard_comparison_preserves_legacy_scope_and_rejects_dropped_live_debt() {
++    let current = capture();
++    assert!(!comparison_scope(false, None, None).unwrap());
++    assert!(comparison_scope(true, Some(&current), Some(&current)).unwrap());
++    for (declared, a, b) in [
++        (false, Some(&current), None), (false, None, Some(&current)),
++        (false, Some(&current), Some(&current)), (true, None, None),
++        (true, Some(&current), None), (true, None, Some(&current)),
++    ] {
++        assert!(comparison_scope(declared, a, b).is_err());
++    }
++    // Actual current construction has the independent deployment-presence gate.
++    assert!(required_selector(false, true).is_err());
++}
+--- /dev/null
++++ b/jetstreamer-r2/src/fleet/epoch186/accounting/live145_prefix.rs
+@@ -0,0 +1,630 @@
++//! Additive accounting for the exact healthy v8g1 private exporter.
++//! This authenticates the already admitted actor; it never launches, writes,
++//! publishes, restarts, retires or renews its original admission/deadline.
++use super::*;
++#[allow(dead_code)]
++#[path = "live145_prefix/custody.rs"]
++mod custody;
++#[allow(dead_code)]
++#[path = "live145_prefix/model.rs"]
++mod model;
++#[allow(dead_code)]
++#[path = "live145_prefix/native.rs"]
++mod native;
++
++pub(super) const ACTOR: &str = "horizon-extract145-prefix-shared72h-20261107-v8g1.service";
++pub(super) const GUARD: &str = "horizon-guard145-prefix-shared72h-20261107-v8g1.service";
++pub(super) const TIMER: &str = "horizon-guard145-prefix-shared72h-20261107-v8g1.timer";
++const IID: &str = "f37b155136614e0183ba2e9adb8714ef";
++const TIMER_IID: &str = "f6f2308db2dc47be8f470030fb587b90";
++const PLAN: &str = "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-plan-shared72h-20261107-v8g1/plan.json";
++const PLAN_SHA: &str = "c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3";
++const PROGRAM: &str = "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/epoch145-prefix-extract";
++const PROGRAM_SHA: &str = "b416b7c932ef781c8d0f863b63b803379dd58cb1affe99dced6a61830a95ad76";
++const STATE: &str =
++    "/home/sol/.jetstreamer-private/epoch145-prefix-extract-shared72h-20261107-v8g1-state";
++pub(super) const MEMORY: u64 = (80 << 30) + (256 << 20);
++pub(super) const DATA: u64 = (160 << 30) + (128 << 20) + RETAINED_185_SOURCE_DATA;
++pub(super) const DATA_FLOOR: u64 = 5_074_152_197_938;
++pub(super) const MEMORY_FLOOR: u64 = 642_177_138_688;
++pub(super) const CPU: u64 = 9_000_000;
++// Already booked source DATA is retained independently of the exporter output.
++const RETAINED_185_SOURCE_DATA: u64 = 4 << 30;
++const SOURCE_BOOKING: &str = "/home/sol/.jetstreamer-private/epoch185-positive-current-reader-integration-source-20261107-v1/SOURCE_ONLY_COPY_BOOKING.json";
++const SOURCE_BOOKING_SHA: &str = "69a2b96fc43a742d599f87391c683e6a91130172b4d4465657d681afe7aab370";
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++pub(super) struct Selector {
++    plan: BoundFile,
++    ready: BoundFile,
++    admission: BoundFile,
++    guard_before_source: BoundFile,
++}
++fn old(b: &BoundFile) -> model::Bound {
++    model::Bound {
++        path: b.path.clone(),
++        sha256: b.sha256.clone(),
++    }
++}
++fn value(b: &BoundFile, immutable: bool) -> Result<Value> {
++    io::unique_json(&custody::bytes(&old(b), 8 << 20, immutable)?)
++}
++fn exact(s: &Selector) -> Result<()> {
++    for (bound, path, sha) in [
++        (&s.plan, PLAN.to_owned(), PLAN_SHA),
++        (
++            &s.ready,
++            format!("{STATE}/ready.json"),
++            "d8cd0712b4ee180fa10d3d977b6981a40846d7cd5f78698fd4a0bf9ad938457b",
++        ),
++        (
++            &s.admission,
++            format!("{STATE}/admission.json"),
++            "eecfdac8d2b968979c3bf541d75b5362d6b223b8d58da17600b7c4af25664c02",
++        ),
++        (
++            &s.guard_before_source,
++            format!("{STATE}/guard-before-source-read.json"),
++            "3410e0ea3c4fbbfe911185e893f9c79eb246a6cf419ecea7f567ac03ae79c53d",
++        ),
++    ] {
++        ensure!(
++            bound.path == Path::new(&path) && bound.sha256 == sha,
++            "live145 selector crosses original v8g1 evidence"
++        );
++    }
++    Ok(())
++}
++fn token(
++    t: &model::Token,
++    p: &model::Plan,
++    a: &model::Admission,
++    pb: &model::Bound,
++    ab: &model::Bound,
++    clock: u64,
++    boot: u64,
++) -> Result<()> {
++    ensure!(
++        t.schema == "horizon-epoch145-private-extractor-native-guard-token-v1"
++            && t.plan == *pb
++            && t.admission == *ab
++            && t.actor_iid == IID
++            && t.actor_iid == a.actor_iid
++            && t.actor_pid == a.actor_pid
++            && t.actor_start_ticks == a.actor_start_ticks
++            && custody::hex(&t.guard_iid, 32)
++            && t.guard_pid > 1
++            && t.guard_start_ticks > 0
++            && t.at_unix_seconds >= a.accepted_at
++            && t.at_unix_seconds <= clock
++            && t.at_boottime_millis >= a.accepted_boottime_millis
++            && t.at_boottime_millis <= boot
++            && boot
++                .checked_sub(t.at_boottime_millis)
++                .is_some_and(|n| n <= 90_000)
++            && t.protected_free_bytes == DATA_FLOOR
++            && t.protected_free_bytes == p.minimum_free_bytes.max(a.required_initial_data_bytes)
++            && t.protected_available_memory_bytes == MEMORY_FLOOR
++            && t.protected_available_memory_bytes
++                == p.minimum_available_memory_bytes
++                    .max(a.required_initial_memory_bytes)
++            && t.actual_free_bytes >= t.protected_free_bytes
++            && t.actual_available_memory_bytes >= t.protected_available_memory_bytes,
++        "live145 crossed, stale, future, lowered-floor or failed token"
++    );
++    Ok(())
++}
++fn command(mode: &str) -> String {
++    format!(
++        "{{ path={PROGRAM} ; argv[]={PROGRAM} {mode} {PLAN} --plan-sha256 {PLAN_SHA} --self-sha256 {PROGRAM_SHA} ;"
++    )
++}
++fn guard_native(v: &Value) -> Result<()> {
++    let expected_guard_memory = (256u64 << 20).to_string();
++    ensure!(
++        v["Id"] == GUARD
++            && v["LoadState"] == "loaded"
++            && v["NRestarts"] == "0"
++            && v["Restart"] == "no"
++            && v["Type"] == "exec"
++            && v["User"] == "root"
++            && v["MemoryMax"].as_str() == Some(expected_guard_memory.as_str())
++            && v["MemorySwapMax"] == "0"
++            && v["TasksMax"] == "512"
++            && v["CPUQuotaPerSecUSec"] == "1s"
++            && v["InvocationID"]
++                .as_str()
++                .is_some_and(|s| custody::hex(s, 32))
++            && v["ExecStart"].as_str().is_some_and(
++                |s| s.starts_with(&command("guard")) && s.matches("argv[]=").count() == 1
++            ),
++        "live145 foreign periodic guard command or kernel limits"
++    );
++    let active = v["ActiveState"] == "active"
++        && v["SubState"] == "running"
++        && v["MainPID"]
++            .as_str()
++            .and_then(|s| s.parse::<u32>().ok())
++            .is_some_and(|n| n > 1)
++        && v["ControlGroup"] == format!("/system.slice/{GUARD}");
++    let completed = v["ActiveState"] == "inactive"
++        && v["SubState"] == "dead"
++        && v["MainPID"] == "0"
++        && v["ControlGroup"] == ""
++        && v["Result"] == "success"
++        && v["ExecMainCode"] == "1"
++        && v["ExecMainStatus"] == "0";
++    ensure!(
++        active || completed,
++        "live145 guard failed, queued, restarting or unknown lifecycle"
++    );
++    Ok(())
++}
++fn timer_native(v: &Value) -> Result<()> {
++    ensure!(
++        v["Id"] == TIMER
++            && v["LoadState"] == "loaded"
++            && v["InvocationID"] == TIMER_IID
++            && v["ActiveState"] == "active"
++            && matches!(v["SubState"].as_str(), Some("waiting" | "running"))
++            && v["Triggers"] == GUARD,
++        "live145 timer changed identity or is unarmed"
++    );
++    Ok(())
++}
++fn actor_native(v: &Value, a: &model::Admission) -> Result<()> {
++    let expected_pid = a.actor_pid.to_string();
++    let expected_actor_memory = (80u64 << 30).to_string();
++    ensure!(
++        v["Id"] == ACTOR
++            && v["InvocationID"] == IID
++            && v["LoadState"] == "loaded"
++            && v["ActiveState"] == "active"
++            && v["SubState"] == "running"
++            && v["MainPID"].as_str() == Some(expected_pid.as_str())
++            && v["NRestarts"] == "0"
++            && v["Restart"] == "no"
++            && v["Type"] == "exec"
++            && v["MemoryMax"].as_str() == Some(expected_actor_memory.as_str())
++            && v["MemorySwapMax"] == "0"
++            && v["TasksMax"] == "512"
++            && v["CPUQuotaPerSecUSec"] == "8s"
++            && v["ExecStart"].as_str().is_some_and(
++                |s| s.starts_with(&command("extract")) && s.matches("argv[]=").count() == 1
++            ),
++        "live145 exporter owner, command, restart or hard bounds changed"
++    );
++    Ok(())
++}
++fn plan_shape(
++    p: &model::Plan,
++    a: &model::Admission,
++    ready: &Value,
++    before: &Value,
++    pb: &model::Bound,
++    ab: &model::Bound,
++    clock: u64,
++) -> Result<()> {
++    ensure!(
++        p.schema == "horizon-epoch145-private-prefix-extractor-plan-v1"
++            && p.actor_unit == ACTOR
++            && p.guard_unit == GUARD
++            && p.timer_unit == TIMER
++            && p.program.path == Path::new(PROGRAM)
++            && p.program.sha256 == PROGRAM_SHA
++            && p.actor_memory_bytes == 80u64 << 30
++            && p.guard_memory_bytes == 256u64 << 20
++            && p.external_pool_bytes == 6u64 << 30
++            && p.output_maximum_bytes == 160u64 << 30
++            && p.minimum_free_bytes == DATA_FLOOR
++            && p.minimum_available_memory_bytes == MEMORY_FLOOR
++            && p.source.path == Path::new(model::SOURCE)
++            && p.source.sha256 == model::SOURCE_SHA
++            && p.manifest.path == Path::new(model::MANIFEST)
++            && p.manifest.sha256 == model::MANIFEST_SHA
++            && p.execution_deadline == 1_794_296_895
++            && clock <= p.execution_deadline
++            && a.schema == "horizon-epoch145-private-extraction-typed-admission-v1"
++            && a.plan == *pb
++            && a.actor_unit == ACTOR
++            && a.actor_iid == IID
++            && a.accepted_at >= p.issued_at
++            && a.accepted_at <= p.entry_deadline
++            && a.required_initial_memory_bytes <= MEMORY_FLOOR
++            && a.required_initial_data_bytes <= DATA_FLOOR
++            && ready["schema"] == "horizon-epoch145-private-extractor-ready-v1"
++            && ready["plan"] == json!(pb)
++            && ready["admission"] == json!(ab)
++            && ready["actor_iid"] == IID
++            && ready["actor_pid"] == a.actor_pid
++            && ready["actor_start_ticks"] == a.actor_start_ticks
++            && ready["archive_body_reads_started"] == false
++            && before["schema"] == "horizon-epoch145-actual-pre-read-guard-v1"
++            && before["plan"] == json!(pb)
++            && before["admission"] == json!(ab),
++        "live145 original plan/readiness/admission/source custody changed"
++    );
++    let initial: model::Token = serde_json::from_value(before["token"].clone())?;
++    ensure!(
++        initial.at_unix_seconds <= p.entry_deadline,
++        "live145 first guard missed original entry"
++    );
++    token(
++        &initial,
++        p,
++        a,
++        pb,
++        ab,
++        initial.at_unix_seconds,
++        initial.at_boottime_millis,
++    )
++}
++fn sealed_program(p: &model::Plan) -> Result<()> {
++    custody::bytes(&p.program, 128 << 20, true)?;
++    let seal = custody::json(&p.program_seal, true)?;
++    ensure!(
++        seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
++            && seal["destination"]
++                == p.program
++                    .path
++                    .parent()
++                    .context("live145 program parent")?
++                    .to_string_lossy()
++                    .as_ref()
++            && seal["members"].as_array().is_some_and(|rows| rows
++                .iter()
++                .filter(|r| r["name"] == "epoch145-prefix-extract"
++                    && r["sha256"] == PROGRAM_SHA
++                    && r["mode"] == "0555")
++                .count()
++                == 1),
++        "live145 actual program seal differs"
++    );
++    Ok(())
++}
++fn peer(s: &Selector, p: &model::Plan, actor: &Value) -> Value {
++    json!({"unit":ACTOR,"invocation_id":IID,"state":"active-private-canonical-prefix-export",
++        "memory_max_bytes":MEMORY,"actual_actor_memory_hard_limit_bytes":80u64<<30,
++        "reserved_guard_memory_bytes":256u64<<20,"data_reservation_bytes":DATA,
++        "native_pool_suballocation":false,"external_pool_charged_by_this_peer_bytes":0,
++        "guard_unit":GUARD,"timer_unit":TIMER,"timer_invocation_id":TIMER_IID,
++        "guard_floor_bytes":DATA_FLOOR,"minimum_available_memory_bytes":MEMORY_FLOOR,
++        "live145_prefix_export":binding(&s.plan),"source_bindings":[binding(&s.plan),binding(&s.ready),binding(&s.admission),binding(&s.guard_before_source),json!(p.program),json!(p.program_seal),json!({"path":SOURCE_BOOKING,"sha256":SOURCE_BOOKING_SHA})],
++        "retained185_source_DATA_bytes":RETAINED_185_SOURCE_DATA,"output_DATA_bytes":160u64<<30,"metadata_DATA_bytes":128u64<<20,
++        "original_source":p.source,"original_failed_partial_retained_bytes":41_966_206_710u64,
++        "original_failed_output_reservation_retained_bytes":160u64<<30,
++        "no_original_source_or_failed_attempt_credit":true,"credit_bytes":0,
++        "resource_release_qualified":false,"native":actor})
++}
++pub(super) fn peer_shape(v: &Value) -> Result<()> {
++    ensure!(
++        v["unit"] == ACTOR
++            && v["invocation_id"] == IID
++            && v["memory_max_bytes"] == MEMORY
++            && v["data_reservation_bytes"] == DATA
++            && v["reserved_guard_memory_bytes"] == 256u64 << 20
++            && v["actual_actor_memory_hard_limit_bytes"] == 80u64 << 30
++            && v["native_pool_suballocation"] == false
++            && v["external_pool_charged_by_this_peer_bytes"] == 0
++            && v["guard_floor_bytes"] == DATA_FLOOR
++            && v["minimum_available_memory_bytes"] == MEMORY_FLOOR
++            && v["credit_bytes"] == 0
++            && v["resource_release_qualified"] == false
++            && v["live145_prefix_export"] == json!({"path":PLAN,"sha256":PLAN_SHA}),
++        "live145 peer omits, aliases, releases or double-charges an independent promise"
++    );
++    Ok(())
++}
++fn required_selector(selected: bool, deployed: bool) -> Result<()> {
++    ensure!(
++        selected || !deployed,
++        "deployed live145 attempt requires explicit accounting, including after terminality; no implicit debt release"
++    );
++    Ok(())
++}
++pub(super) fn actual(selector: Option<&Selector>, clock: u64) -> Result<Option<Value>> {
++    let deployed = match fs::symlink_metadata(PLAN) {
++        Ok(_) => true,
++        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
++        Err(e) => return Err(e.into()),
++    };
++    required_selector(selector.is_some(), deployed)?;
++    let Some(s) = selector else {
++        return Ok(None);
++    };
++    exact(s)?;
++    let source_booking = protected_generated(&BoundFile {
++        path: SOURCE_BOOKING.into(),
++        sha256: SOURCE_BOOKING_SHA.into(),
++    })?;
++    ensure!(
++        source_booking["additional_whole_phase_DATA_allowance_bytes"] == RETAINED_185_SOURCE_DATA
++            && source_booking["future_admission_must_add_this_DATA_once"] == true
++            && source_booking["normal_pool_bytes_retained"] == 6u64 << 30,
++        "live145 independent185 source DATA promise changed"
++    );
++    let raw_plan = value(&s.plan, true)?;
++    let p: model::Plan = serde_json::from_value(raw_plan)?;
++    let a: model::Admission = serde_json::from_value(value(&s.admission, false)?)?;
++    let ready = value(&s.ready, false)?;
++    let before = value(&s.guard_before_source, false)?;
++    let pb = old(&s.plan);
++    // The actor sees the immutable /var/lib projection; the reader uses its
++    // canonical /home backing without requiring a privileged remount.
++    let ab = model::Bound {
++        path: p.state_root.join("admission.json"),
++        sha256: s.admission.sha256.clone(),
++    };
++    plan_shape(&p, &a, &ready, &before, &pb, &ab, clock)?;
++    sealed_program(&p)?;
++    ensure!(
++        custody::frozen_identity(&p.source.path)? == p.source_identity
++            && custody::frozen_identity(&p.manifest.path)? == p.manifest_identity,
++        "live145 retained source/manifest metadata changed"
++    );
++    for (path, identity) in [
++        (Path::new(STATE), &p.state_directory_identity),
++        (p.output_root.as_path(), &p.output_directory_identity),
++    ] {
++        custody::private_directory(path)?;
++        let m = fs::symlink_metadata(path)?;
++        ensure!(
++            m.dev() == identity.device
++                && m.ino() == identity.inode
++                && m.dev() == fs::metadata("/home/sol")?.dev(),
++            "live145 state/output inode or budget filesystem changed"
++        );
++    }
++    for name in [
++        "extraction-complete.json",
++        "extraction-failure.json",
++        "watchdog-failure.json",
++    ] {
++        match fs::symlink_metadata(Path::new(STATE).join(name)) {
++            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
++            Err(e) => return Err(e.into()),
++            Ok(_) => anyhow::bail!(
++                "live145 reached a terminal phase; retain debt until a qualified lifecycle consumer exists"
++            ),
++        }
++    }
++    native::owner(&p, &pb, false, a.actor_pid, IID, a.actor_start_ticks)?;
++    native::original()?;
++    let timer = native::timer(&p)?;
++    timer_native(&timer)?;
++    let actor = io::properties(ACTOR)?;
++    actor_native(&actor, &a)?;
++    let bytes = custody::token_snapshot(&Path::new(STATE).join("guard-latest.json"))?;
++    let token_value = io::unique_json(&bytes)?;
++    let current: model::Token = serde_json::from_value(token_value.clone())?;
++    let captured_at = custody::now()?;
++    ensure!(
++        captured_at <= p.execution_deadline,
++        "live145 immutable execution deadline expired"
++    );
++    let boot = custody::boottime()?;
++    token(&current, &p, &a, &pb, &ab, captured_at, boot)?;
++    let guard = io::properties(GUARD)?;
++    guard_native(&guard)?;
++    // The reviewed native reader also authenticates the actual typed empty
++    // pre-start array. A completed guard may not hide a drop-in or pre-hook.
++    let guard_full = native::show(GUARD)?;
++    ensure!(
++        guard_full["DropInPaths"] == ""
++            && guard_full["ExecStartPre"] == ""
++            && guard_full["ControlPID"] == "0"
++            && guard_full["Job"] == ""
++            && guard_full["User"] == "root"
++            && guard_full["Group"] == "root"
++            && guard_full["InvocationID"] == guard["InvocationID"]
++            && guard_full["MainPID"] == guard["MainPID"],
++        "live145 periodic guard custody changed or contains a pre-hook"
++    );
++    if guard["ActiveState"] == "active" {
++        let pid: u32 = string(&guard, "/MainPID")?.parse()?;
++        native::owner(
++            &p,
++            &pb,
++            true,
++            pid,
++            string(&guard, "/InvocationID")?,
++            native::ticks(pid)?,
++        )?;
++    } else {
++        ensure!(
++            guard["InvocationID"] == current.guard_iid,
++            "live145 completed guard is not the actual fresh token writer"
++        );
++        let cg = Path::new("/sys/fs/cgroup/system.slice").join(GUARD);
++        if cg.exists() {
++            ensure!(
++                fs::read_to_string(cg.join("cgroup.procs"))?
++                    .trim()
++                    .is_empty()
++                    && fs::read_to_string(cg.join("cgroup.events"))?
++                        .lines()
++                        .any(|s| s == "populated 0"),
++                "live145 completed guard cgroup remains populated"
++            );
++        }
++    }
++    ensure!(
++        io::properties(ACTOR)? == actor,
++        "live145 actor changed during finite capture"
++    );
++    let timer_after = native::timer(&p)?;
++    timer_native(&timer_after)?;
++    for key in [
++        "Id",
++        "InvocationID",
++        "LoadState",
++        "ActiveState",
++        "Triggers",
++        "DropInPaths",
++        "Job",
++    ] {
++        ensure!(
++            timer[key] == timer_after[key],
++            "live145 timer identity/definition changed"
++        );
++    }
++    let row = peer(s, &p, &actor);
++    peer_shape(&row)?;
++    Ok(Some(
++        json!({"schema":"live145-v8g1-current-accounting-capture-v1","captured_at":captured_at,
++        "captured_boottime_millis":boot,"plan":binding(&s.plan),"peer":row,"token":token_value,
++        "token_sha256":custody::sha(&bytes),"actor_native":actor,"guard_native":guard,"timer_native":timer,
++        "archive_body_reads":false,"memory_or_DATA_credit_bytes":0,"replay_launch_authorized":false}),
++    ))
++}
++pub(super) fn peers(v: Option<&Value>) -> Vec<Value> {
++    v.map(|v| vec![v["peer"].clone()]).unwrap_or_default()
++}
++pub(super) fn guard_floor(v: Option<&Value>) -> u64 {
++    if v.is_some() { DATA_FLOOR } else { 0 }
++}
++pub(super) fn cpu(v: Option<&Value>) -> u64 {
++    if v.is_some() { CPU } else { 0 }
++}
++pub(super) fn disjoint(
++    v: Option<&Value>,
++    owners: &[core::Owner],
++    guards: &[GuardSpec],
++) -> Result<()> {
++    if v.is_none() {
++        return Ok(());
++    }
++    ensure!(
++        !owners
++            .iter()
++            .any(|o| [ACTOR, GUARD, TIMER].contains(&o.unit.as_str()) || o.iid == IID)
++            && !guards.iter().any(|g| g.unit == GUARD || g.timer == TIMER),
++        "live145 typed peer aliases an existing owner/guard charge"
++    );
++    Ok(())
++}
++/// Historical guard comparisons do not certify current live coverage. Current
++/// accounting construction still requires the deployed selector in actual().
++/// A declared live scope must carry both authenticated capture endpoints.
++pub(super) fn comparison_scope(declared: bool, a: Option<&Value>, b: Option<&Value>) -> Result<bool> {
++    ensure!((declared && a.is_some() && b.is_some())
++        || (!declared && a.is_none() && b.is_none()),
++        "live145 comparison source/capture scope crossed; no dropped live debt");
++    Ok(declared)
++}
++pub(super) fn stable(a: Option<&Value>, b: Option<&Value>) -> Result<()> {
++    match (a, b) {
++        (None, None) => Ok(()),
++        (Some(a), Some(b)) => {
++            peer_shape(&a["peer"])?;
++            peer_shape(&b["peer"])?;
++            ensure!(
++                a["peer"] == b["peer"]
++                    && a["plan"] == b["plan"]
++                    && number(a, "/captured_at")? <= number(b, "/captured_at")?
++                    && number(a, "/token/at_boottime_millis")?
++                        <= number(b, "/token/at_boottime_millis")?,
++                "live145 actor/source/floors changed or token time reversed"
++            );
++            Ok(())
++        }
++        _ => anyhow::bail!("live145 appeared/disappeared during accounting; no automatic release"),
++    }
++}
++pub(super) fn guard_discovered(
++    name: &str,
++    native: &Value,
++    current: Option<&Value>,
++) -> Result<bool> {
++    if name != GUARD || current.is_none() {
++        return Ok(false);
++    }
++    guard_native(native)?;
++    Ok(true)
++}
++/// Comparison views only. The report retains every raw native snapshot and
++/// captured token. Ordinary guard fires may change their IID/PID/exit fields.
++pub(super) fn comparison(v: &Value, current: Option<&Value>) -> Result<Value> {
++    let mut result = v.as_object().context("live145 comparison object")?.clone();
++    let Some(current) = current else {
++        return Ok(v.clone());
++    };
++    peer_shape(&current["peer"])?;
++    if let Some(actor) = result.get(ACTOR) {
++        ensure!(
++            *actor == current["actor_native"],
++            "live145 native actor differs from authenticated peer"
++        );
++    }
++    if let Some(guard) = result.get(GUARD) {
++        guard_native(guard)?;
++        result.insert(
++            GUARD.into(),
++            json!({"Id":GUARD,"original_actor_iid":IID,
++            "plan":current["plan"],"memory_reserved_in_actor_peer_bytes":256u64<<20,
++            "exact_periodic_guard_authenticated":true}),
++        );
++    }
++    if let Some(timer) = result.get(TIMER) {
++        timer_native(timer)?;
++        // Waiting/running is the sole timer variation. Definition and IID stay raw.
++        let mut timer = timer.as_object().context("live145 timer object")?.clone();
++        timer.insert("SubState".into(), json!("armed"));
++        result.insert(TIMER.into(), json!(timer));
++    }
++    Ok(json!(result))
++}
++/// Enforced inside the positive185 full reader, before its worker can open.
++/// Existing typed memory constructors consume the independent actor+guard peer;
++/// this extra gate also preserves the live exporter's MemAvailable runway.
++/// No source-bound irreclaimable RSS credit exists here, so retain its full
++/// remaining hard promise conservatively instead of borrowing that runway.
++pub(super) fn candidate_fit(
++    current185: Option<&Value>,
++    live: Option<&Value>,
++    observer: &Value,
++) -> Result<()> {
++    let (Some(candidate), Some(live)) = (current185, live) else {
++        return Ok(());
++    };
++    peer_shape(&live["peer"])?;
++    let peers = candidate["peers"]
++        .as_array()
++        .context("live145 candidate185 peers")?;
++    let candidate_memory = peers.iter().try_fold(0u64, |n, p| {
++        n.checked_add(number(p, "/memory_max_bytes")?)
++            .context("live145 candidate memory overflow")
++    })?;
++    let required = MEMORY_FLOOR
++        .checked_add(MEMORY)
++        .and_then(|n| n.checked_add(candidate_memory))
++        .and_then(|n| n.checked_add(6u64 << 30))
++        .context("live145 protected memory runway overflow")?;
++    let available = number(observer, "/host_memory/conservative_available_kib")?
++        .checked_mul(1024)
++        .context("live145 observed available overflow")?;
++    ensure!(
++        candidate_memory > 0
++            && available >= required
++            && number(candidate, "/guard_floor_bytes")? >= DATA_FLOOR + RETAINED_185_SOURCE_DATA,
++        "positive185 would breach live145 memory runway or inherited DATA floor"
++    );
++    Ok(())
++}
++pub(super) fn retained_data_floor(base: u64, live: Option<&Value>) -> Result<u64> {
++    if live.is_none() {
++        return Ok(base);
++    }
++    // The separately booked integration source phase is not present in old raw
++    // accounting. Retain its entire4GiB once in the live supplement floor.
++    Ok(base.max(
++        DATA_FLOOR
++            .checked_add(RETAINED_185_SOURCE_DATA)
++            .context("live145 source floor overflow")?,
++    ))
++}
++
++#[cfg(test)]
++#[path = "live145_prefix/tests.rs"]
++mod tests;
+--- a/jetstreamer-r2/src/fleet/epoch186/accounting.rs
++++ b/jetstreamer-r2/src/fleet/epoch186/accounting.rs
+@@ -18,0 +19 @@
++mod live145_prefix;
+@@ -60,0 +62,2 @@
++    #[serde(default)]
++    live145_prefix_export: Option<live145_prefix::Selector>,
+@@ -927 +930,4 @@
+-        let (epoch, prefix) = if !peer["cold185_registration"].is_null() {
++        let (epoch, prefix) = if unit == live145_prefix::ACTOR {
++            live145_prefix::peer_shape(peer)?;
++            (145, "live145-prefix-export")
++        } else if !peer["cold185_registration"].is_null() {
+@@ -1214,0 +1221 @@
++        "epoch145-prefix-extract",
+@@ -1240,0 +1248,2 @@
++        "horizon-extract145-prefix-",
++        "horizon-guard145-prefix-",
+@@ -1339,0 +1349 @@
++    live145_current: Option<&Value>,
+@@ -1367,0 +1378,4 @@
++        if live145_prefix::guard_discovered(name, &native, live145_current)? {
++            observed.insert(name.to_owned(), native);
++            continue;
++        }
+@@ -1446,0 +1461,8 @@
++    // A periodic fire must not change discovery membership. Both raw states
++    // survive in the report; only authenticated comparison views vary.
++    if live145_current.is_some() && !observed.contains_key(live145_prefix::GUARD) {
++        let native = io::properties(live145_prefix::GUARD)?;
++        ensure!(live145_prefix::guard_discovered(live145_prefix::GUARD, &native, live145_current)?,
++            "live145 periodic guard lacks its typed live owner");
++        observed.insert(live145_prefix::GUARD.to_owned(), native);
++    }
+@@ -1542,0 +1565,4 @@
++    let live145_before = live145_prefix::actual(s.live145_prefix_export.as_ref(), now()?)?;
++    live145_prefix::disjoint(live145_before.as_ref(), &expected, &s.guards)?;
++    live145_prefix::candidate_fit(cold185_before.as_ref(), live145_before.as_ref(), &loaded.observer)?;
++    let live145_peers_before = live145_prefix::peers(live145_before.as_ref());
+@@ -1604,0 +1631 @@
++        .chain(live145_peers_before.iter())
+@@ -1641,0 +1669 @@
++        live145_before.as_ref(),
+@@ -1658,0 +1687,4 @@
++    if live145_before.is_some() {
++        names.insert(live145_prefix::GUARD.into());
++        names.insert(live145_prefix::TIMER.into());
++    }
+@@ -1662,0 +1695 @@
++        .and_then(|n| n.checked_add(live145_prefix::cpu(live145_before.as_ref())))
+@@ -1689,0 +1723 @@
++    let guard_maximum = guard_maximum.max(live145_prefix::guard_floor(live145_before.as_ref()));
+@@ -1789,0 +1824 @@
++    let protected = live145_prefix::retained_data_floor(protected, live145_before.as_ref())?;
+@@ -1932,0 +1968,4 @@
++    let live145_after = live145_prefix::actual(s.live145_prefix_export.as_ref(), now()?)?;
++    live145_prefix::stable(live145_before.as_ref(), live145_after.as_ref())?;
++    live145_prefix::candidate_fit(cold185_after.as_ref(), live145_after.as_ref(), &reread.observer)?;
++    let live145_peers_after = live145_prefix::peers(live145_after.as_ref());
+@@ -2004,0 +2044 @@
++        .chain(live145_peers_after.iter())
+@@ -2039,0 +2080 @@
++        live145_after.as_ref(),
+@@ -2092,0 +2134 @@
++        .and_then(|n| n.checked_add(live145_prefix::cpu(live145_after.as_ref())))
+@@ -2149,0 +2192,2 @@
++    let comparison_before = live145_prefix::comparison(&comparison_before, live145_before.as_ref())?;
++    let comparison_after = live145_prefix::comparison(&comparison_after, live145_after.as_ref())?;
+@@ -2167,0 +2212,2 @@
++    let discovery_comparison_before = live145_prefix::comparison(&discovery_comparison_before, live145_before.as_ref())?;
++    let discovery_comparison_after = live145_prefix::comparison(&discovery_comparison_after, live145_after.as_ref())?;
+@@ -2238,0 +2285,3 @@
++    report["live145_prefix_export_before"] = json!(live145_before);
++    report["live145_prefix_export_after"] = json!(live145_after);
++    report["live145_minimum_available_memory_bytes"] = json!(if live145_after.is_some() { live145_prefix::MEMORY_FLOOR } else { 0 });
+@@ -2278,0 +2328 @@
++        live145_peers_after.first(),
+@@ -2592,0 +2643,13 @@
++    let live_a = a.get("live145_prefix_export_after").filter(|v| !v.is_null());
++    let live_b = b.get("live145_prefix_export_after").filter(|v| !v.is_null());
++    let live_now = if live145_prefix::comparison_scope(
++        s.live145_prefix_export.is_some(), live_a, live_b,
++    )? {
++        live145_prefix::actual(s.live145_prefix_export.as_ref(), now()?)?
++    } else {
++        None
++    };
++    live145_prefix::stable(live_a, live_b)?;
++    live145_prefix::stable(live_b, live_now.as_ref())?;
++    let ca = live145_prefix::comparison(&ca, live_a)?;
++    let cb = live145_prefix::comparison(&cb, live_b)?;
+@@ -4348,0 +4412,9 @@
++
++#[cfg(test)]
++#[test]
++fn live145_exporter_and_guard_cannot_be_ignored_or_borrow_an_unrelated_name() {
++    assert!(requires_typed_allocation("horizon-extract145-prefix-any.service", "/foreign"));
++    assert!(requires_typed_allocation("horizon-guard145-prefix-any.service", "/foreign"));
++    assert!(requires_typed_allocation("unrelated.service", "/sealed/epoch145-prefix-extract extract /plan"));
++    assert!(!requires_typed_allocation("unrelated.service", "/usr/bin/unrelated"));
++}

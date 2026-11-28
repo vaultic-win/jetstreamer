@@ -1,0 +1,7 @@
+{
+  "end_epoch": 223,
+  "manifest_fingerprint": "sha256:297713c184876238f6a9126d860687d6bbf2434bc3efcf181b0019bd5547dba5",
+  "schema": "jetstreamer-root-cohort-run-v1",
+  "start_epoch": 223,
+  "status": "running-private"
+}

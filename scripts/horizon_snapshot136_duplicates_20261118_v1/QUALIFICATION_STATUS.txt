@@ -1,0 +1,40 @@
+Six epoch136 obsolete snapshot candidates: audit completed, no deletion implemented or performed.
+
+Exact candidate roots (append /reproduction/inputs/snapshot-59176548-J6ef2VSpLh1ofwD4zXGLAJkNs4i6yZ5JzTr5qG1jBSNN.tar.zst):
+/home/sol/.jetstreamer-private/epoch136-hourly-suffix-run-parent-20261027-v2
+/home/sol/.jetstreamer-private/epoch136-hourly-suffix-run-parent-20261027-v3
+/home/sol/.jetstreamer-private/epoch136-hourly-suffix-run-parent-20261027-v4
+/home/sol/.jetstreamer-private/epoch136-hourly-suffix-run-parent-20261027-v5
+/home/sol/.jetstreamer-private/epoch136-hourly-suffix-run-parent-20261027-v7
+/home/sol/.jetstreamer-private/epoch136-hourly-suffix-run-parent-20261027-v8
+
+Allocated bytes total: 19021778944 (17.72 GiB).
+Each snapshot length: 3170290207; six distinct single-linked immutable files.
+All six fully hashed equal the retained input:
+/home/sol/.jetstreamer-private/epoch136-hourly-snapshot-input-20261027-v1/transfer/attempt-v1/snapshot-59176548-J6ef2VSpLh1ofwD4zXGLAJkNs4i6yZ5JzTr5qG1jBSNN.tar.zst
+SHA256 14d16801fc2da62aaa4a3384e04963ec0bb9741c0c1f2911decf51aa11ca6f51.
+
+Read-only receipt:
+/home/sol/horizon-disk-audit-20261116T2052Z/snapshot136-six-copy-audit-20261118-v3.json
+Censused 7517 loaded systemd units and 2244 static reference files.
+No candidate-root process cmdline/environment/maps/cwd/root/exe references;
+no candidate-inode open descriptors in both before/after process censuses.
+No nonterminal direct unit consumers or unit consumers of matched static files.
+All 15 direct matching units are terminal; six original replay owners failed,
+MainPID=0 ControlPID=0 Job empty Restart=no. Linked units have no TriggeredBy.
+
+NOT FULL DELETION QUALIFICATION: static reference census currently follows only
+one direct unit->matched-file edge. Historical retained136 v2/v3/v7 readers
+explicitly require the snapshot in exact input inventories, for example:
+/usr/local/lib/jetstreamer/horizon-epoch136-charge-retry-0005-lifecycle-tools-20261102-v4/source-jetstreamer-r2__src__fleet__epoch186__accounting__retained136_v3_growth_state.rs lines316-328.
+Equivalent v2 lines178-189, v7 lines328-339. Their packages/receipts are retained.
+Before deletion root must prove these are historical-only in current live/staged
+consumer graphs or qualify their replacement. No reservation ending is claimed.
+Deleting based solely on matching SHA and dead original replay is not sufficient.
+
+Rust auditor supports read-only receipt creation only, deliberately has no unlink.
+2 tests and Clippy -D warnings pass. First audit attempts rejected ESRCH for
+kernel threads and zombies; corrected to recognize native flags/state before
+accepting their absent mm. Final audit completed successfully. Final source has
+formatting/Clippy-only change after the run. No service or R2 mutations; no Git
+operations. Source publication and independent exact deletion gate remain root's.

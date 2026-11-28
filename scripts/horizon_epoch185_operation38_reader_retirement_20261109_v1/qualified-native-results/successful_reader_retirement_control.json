@@ -1,0 +1,57 @@
+{
+  "actual_same_shared_retirement_primitive_exercised": true,
+  "actual_successful_original_pidfd_wait": {
+    "actual_original_pidfd_exit_event": true,
+    "not_a_new_resource_observation": true,
+    "original_iid": "4ee12ffad7624862851e4d7aa69d4a79",
+    "original_pid": 3919760
+  },
+  "actual_two_owned_manager_aliases_removed": true,
+  "final_keeper_native": {
+    "ActiveState": "inactive",
+    "Id": "horizon-positive185-reader-retire-positive-success-retire-v38-driver12-helper35-r1-retain.target",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "SubState": "dead"
+  },
+  "final_reader_native": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStartTimestampMonotonic": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-positive185-reader-retirement-control-positive-success-retire-v38-driver12-helper35-r1.service",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "input_body_reads": 0,
+  "intent": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-successful-reader-retirement-control-native2-20261109-v38-driver12-helper35-r1/successful-reader-retirement-intent.json",
+    "sha256": "30bda2328a1dc803847708781266b76ae3879615125e662316b49b51b94ffb35"
+  },
+  "only_successfully_completed_reader_retired": true,
+  "only_zero_process_keeper_stopped": true,
+  "original_PID1_journal": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-successful-reader-retirement-control-native2-20261109-v38-driver12-helper35-r1/successful-reader-original-PID1.json",
+    "sha256": "f01667cfb353e7aa00bd69c9aee41623062b4376bb851828fa0b74e506ff08e6"
+  },
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-candidate-20261109-v38-driver12-helper35-r1/operation",
+    "sha256": "c014b3d29ff2629ef0778975234fc92cc54be591d7e55d4f9d625bc5f9061fd8"
+  },
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "reset_failed_called": false,
+  "resource_credit_bytes": 0,
+  "schema": "horizon-positive185-successful-reader-retirement-native-control-v1",
+  "sealed_packages_and_successful_namespaces_preserved": true,
+  "timer_audit": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-successful-reader-retirement-control-native2-20261109-v38-driver12-helper35-r1/successful-reader-retirement-timer-audit.json",
+    "sha256": "34e04500b56f3aafa7e964c8605fcfb57c7e3a95075411d41b71c9e0bd8f55bd"
+  }
+}

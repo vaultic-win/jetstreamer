@@ -1,0 +1,1005 @@
+--- a/source/post-stop-fit
++++ b/source/post-stop-fit
+@@ -57,7 +57,11 @@
+     D / "tools-homefloor-170-metered-hourly-v3",
+ )
+ FULL170_RETRY5_V10 = HERE == D / "tools-homefloor-170-full-metered-v7"
+-FULL146 = HERE in (
++JOINT168 = HERE in (D / "tools-homefloor-170-full-metered-independent-v20-joint168",
++                    D / "tools-homefloor-170-full-metered-independent-v20-joint168-prestart")
++JOINT168_REQUEST = None
++joint168_cadence_seal = None
++FULL146 = JOINT168 or HERE in (
+     D / "tools-homefloor-170-full-metered-independent-v18-full146",
+     D / "tools-homefloor-170-full-metered-independent-v19-full146",
+ )
+@@ -203,6 +207,27 @@
+     if FULL146:
+         full146_capacity = runpy.run_path(str(HERE / "full146_capacity.py"))
+         full146_cadence_seal = s.ref(full146_capacity["V25_SEAL"], full146_capacity["V25"])
++    if JOINT168:
++        joint168_capacity = runpy.run_path(str(HERE / "joint168_capacity.py"))
++        binding = HERE / "v26-joint168-cadence.json"
++        if binding.exists():
++            seal, _ = s.read(HERE / "deployment-seal-receipt.json")
++            member, = (m for m in seal["members"] if m["name"] == binding.name and m["mode"] == "0444")
++            link, _ = s.read(binding, member["sha256"])
++            receiver = Path(full146_cadence_seal["path"]).parent.with_name(
++                "tools-cold168-retry5-failed166-v26-entry146")
++            expected_path = receiver / "deployment-seal-receipt.json"
++            s.need(link["schema"] == "horizon-v26-joint168-capacity-generation-v1"
++                   and link["predecessor"] == full146_cadence_seal
++                   and link["cadence_seal"]["path"] == str(expected_path)
++                   and link["receiver_sha256"] == joint168_capacity["sha"](HERE / "joint168_capacity.py"),
++                   "unknown joint 168 observer successor")
++            joint168_cadence_seal = link["cadence_seal"]
++            loader["load_package"](receiver, joint168_cadence_seal["sha256"])
++            receiver_seal = s.bound(joint168_cadence_seal, expected_path)
++            s.need(any(m["name"] == "joint168_capacity.py" and m["mode"] == "0444"
++                       and m["sha256"] == link["receiver_sha256"] for m in receiver_seal["members"]),
++                   "observer does not use the exact native joint 168 reader")
+     if BOUNDED143:
+         bounded143 = runpy.run_path(str(HERE / "bounded143.py"))
+     observation = R / "prefix140-status-cadence-20261122-v1/cadence-tools"
+@@ -337,6 +362,8 @@
+         rows.remove(focused)
+     if FULL146:
+         rows = full146_capacity["fleet_roster"](s, f, rows)
++    if JOINT168:
++        rows = joint168_capacity["fleet_roster"](s, f, rows)
+     if CURRENT_HOURLY169:
+         rows, _ = hourly169["roster"](f)
+     elif HOURLY169:
+@@ -1306,7 +1333,7 @@
+
+
+ def census(peers,replacements,extra,c136,own,stops,hourly=None,entry_lease=None,hourly170_owner=None,repro166=None,
+-           focused168=None, entry143=False, full146=None):
++           focused168=None, entry143=False, full146=None, joint168=None):
+     expect={v["unit"]:v["processes"] for v in peers.values()}
+     expect.update({v["producer_unit"]:v["processes"] for v in replacements.values()})
+     if extra and extra["actor"]:
+@@ -1348,6 +1375,11 @@
+         unit = full146_capacity["UNIT"]
+         s.need(unit not in expect and own == 145, "duplicate full epoch 146 booking")
+         expect[unit] = full146["processes"]
++    if joint168 is not None and joint168["processes"]:
++        unit = joint168_capacity["UNIT"]
++        s.need(unit not in expect and own == 145 and full146 and full146["mode"] == "active",
++               "duplicate joint epoch 168 booking or missing full 146")
++        expect[unit] = joint168["processes"]
+     s.need(fit.units()==set(expect),"foreign qualifier unit")
+     for u,prs in expect.items():
+         members=fit.members(u);expected=tuple(sorted(p[0] for p in prs))
+@@ -1501,6 +1533,11 @@
+                                     adopted = writer168v4["registered_failed166_rejoin"](
+                                         scope, adopted, 25, binary=fit.binary,
+                                         v20_seal=full146_cadence_seal)
++                                    if joint168_cadence_seal and (R / "survivor172-cadence-20261122-v1"
++                                            / "FAILED166_CADENCE_V26_ACTIVE.json").exists():
++                                        adopted = writer168v4["registered_failed166_rejoin"](
++                                            scope, adopted, 26, binary=fit.binary,
++                                            v20_seal=joint168_cadence_seal)
+                         return publication168["registered_writer"](scope, adopted) if PUBLISH168 else adopted
+                     if HOURLY170_CADENCE and (
+                         R / "survivor172-cadence-20261122-v1/HOURLY170_CADENCE_ACTIVE.json"
+@@ -1765,6 +1802,18 @@
+     return {"observation": receipt, "terminal": terminal}
+
+
++def inspect_joint168(actor, status, *, measured=None):
++    if JOINT168_REQUEST is None:
++        return None
++    s.need(actor and actor["mode"] == "active", "joint 168 requires exact active epoch 146")
++    incumbent = dict(proposal=FULL146_REQUEST["proposal"], enrollment=actor["enrollment"])
++    s.need(JOINT168_REQUEST["mode"] == "prestart" or
++           joint168_cadence_seal is not None and status["consumer_seal"] == joint168_cadence_seal,
++           "live joint 168 requires its sealed sole V26 observer")
++    return joint168_capacity["inspect"](s, JOINT168_REQUEST, incumbent, status, tree_size,
++                                        measured=measured)
++
++
+ def capture_once(epoch,ref,prestart136=None,hourly170_mode=None,full170_mode=None,repro166_mode=None,hourly169_owner=None,*,serial_holder_pid=None):
+     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
+     closed_before=None
+@@ -1805,7 +1854,9 @@
+     closed169=focused169_terminal(f,rows)
+     closed172=full172_terminal(f,rows)
+     peers=survivors(rows,ledger);status=registered_status()
+-    epoch146_actor = full146_capacity["inspect"](s, fit, FULL146_REQUEST, ref, f, status) if FULL146 else None
++    epoch146_actor = full146_capacity["inspect"](
++        s, fit, FULL146_REQUEST, ref, f, status, successor=joint168_cadence_seal) if FULL146 else None
++    joint168_actor = inspect_joint168(epoch146_actor, status)
+     focused168 = None
+     if FULL170_FOCUSED168_ACTIVE:
+         s.need(active170, "focused epoch 168 price requires active full epoch 170")
+@@ -2049,7 +2100,7 @@
+     entry143 = epoch143_lease is not None
+     entry_lease = epoch143_lease if entry143 else entry_lease
+     population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner,repro166,
+-                                   focused168, entry143, epoch146_actor)
++                                   focused168, entry143, epoch146_actor, joint168_actor)
+     if closed169:books["169"]=focused169_booking(closed169)
+     if closed172:books["172"]=full172_booking(closed172)
+     raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
+@@ -2080,11 +2131,14 @@
+     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
+     s.need(fleet_head(ref)[1]==fleet_rows and phase145(epoch, ref, serial_holder_pid=serial_holder_pid)==phase and registered_status()==status and
+            census(peers,rep,extra,c136,epoch,census_stops,hourly,entry_lease,hourly170_owner,repro166,
+-                  focused168, entry143, epoch146_actor)==(population,qualification),
++                  focused168, entry143, epoch146_actor, joint168_actor)==(population,qualification),
+            "capacity generation changed during collection")
+     if FULL146:
+         full146_capacity["check_same"](s, epoch146_actor, full146_capacity["inspect"](
+-            s, fit, FULL146_REQUEST, ref, f, status))
++            s, fit, FULL146_REQUEST, ref, f, status, successor=joint168_cadence_seal))
++    if joint168_actor is not None:
++        joint168_actor = joint168_capacity["pair"](s, joint168_actor,
++                                                  inspect_joint168(epoch146_actor, status))
+     if prestart136 is None and not c136["occupied"]:
+         s.need(registered136(f,status["registration"])==c136,"136 idle or release generation changed during collection")
+     if prestart136 is not None:
+@@ -2190,6 +2244,8 @@
+         population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
+     if FULL146:
+         native["full146_census"] = epoch146_actor
++    if joint168_actor is not None:
++        native["joint168_census"] = joint168_actor
+     if FULL170 or REPRO166:
+         # At zero remaining growth, the same paid tree has realized its full
+         # allowance. Re-evaluate the existing absolute floors and every other
+@@ -2464,14 +2520,27 @@
+             if FULL170_HOLDING185:
+                 price = json.loads(subprocess.check_output([holding_program, "active-price"],
+                     input=json.dumps(dict(before=holding_before, native=price, cadence_seal=(
+-                        full146_cadence_seal if FULL146 else bounded143_cadence_seal if BOUNDED143
++                        status["consumer_seal"] if FULL146 else bounded143_cadence_seal if BOUNDED143
+                         else holding_cadence_seal))).encode(),
+                     timeout=30))
+             if FULL146:
+                 basis = price["full146_census"]
+                 full146_capacity["check_same"](s, basis, full146_capacity["inspect"](
+-                    s, fit, FULL146_REQUEST, ref, fleet, status))
++                    s, fit, FULL146_REQUEST, ref, fleet, status, successor=joint168_cadence_seal))
++                joint = price.pop("joint168_census", None)
++                if joint is not None:
++                    joint = joint168_capacity["pair"](s, joint, inspect_joint168(
++                        basis, status, measured=joint["physical"]))
++                    joined = dict(price["population"])
++                    unit = joint168_capacity["UNIT"]
++                    booked = price["population"].pop(unit, None)
++                    pids = [row[:2] for row in joint["processes"]]
++                    s.need((booked is None and not pids) or booked == pids,
++                           "joint 168 was not included in the complete native census")
+                 price = full146_capacity["project"](s, price, basis, FULL146_REQUEST)
++                if joint is not None:
++                    price = joint168_capacity["project"](s, price, joint, JOINT168_REQUEST)
++                    price["joined_native_population"] = joined
+             return price
+         return native
+     if HOURLY169:
+@@ -2563,7 +2632,7 @@
+     if args and args[0].startswith("--full170="):
+         full170_mode = args.pop(0).split("=", 1)[1]
+     if FULL146:
+-        s.need(len(args) == 6 and args[0] == "--full146-request" and args[1].startswith("/"),
++        s.need(len(args) >= 6 and args[0] == "--full146-request" and args[1].startswith("/"),
+                "usage: post-stop-fit --full170=active --full146-request REQUEST SHA256 145 FLEET SHA256")
+         FULL146_REQUEST = bound(s.ref(Path(args[1]), args[2]))
+         args = args[3:]
+@@ -2571,6 +2640,11 @@
+                and FULL146_REQUEST["schema"] == "horizon-epoch146-full-accounting-request-v1"
+                and FULL146_REQUEST["mode"] in ("prestart", "held", "active"),
+                "invalid full 146 accounting request")
++    if JOINT168 and args[:1] == ["--joint168-request"]:
++        s.need(len(args) == 6 and args[1].startswith("/") and FULL146_REQUEST["mode"] == "active",
++               "usage: ... --full146-request REQUEST SHA256 --joint168-request REQUEST SHA256 145 FLEET SHA256")
++        JOINT168_REQUEST = joint168_capacity["request_args"](s, s.ref(Path(args[1]), args[2]))
++        args = args[3:]
+     repro166_mode = None
+     if args and args[0].startswith("--repro166="):
+         repro166_mode = args.pop(0).split("=", 1)[1]
+--- a/source/full146_capacity.py
++++ b/source/full146_capacity.py
+@@ -56,9 +56,11 @@
+     return [r for r in rows if r['epoch'] != 146]
+
+
+-def writer(s, fit, status):
++def writer(s, fit, status, successor=None):
+     expected = s.ref(V25_SEAL, V25)
+-    s.need(status['consumer_seal'] == expected, 'full 146 requires the sole V25 cadence')
++    s.need(status['consumer_seal'] == expected or
++           successor is not None and status['consumer_seal'] == successor,
++           'full 146 requires the sole V25 cadence or its bound successor')
+     seal = read(s, expected)
+     path = V25_SEAL.with_name('full146_status.py')
+     member, = (m for m in seal['members'] if m['name'] == path.name)
+@@ -80,11 +82,11 @@
+     return timer
+
+
+-def inspect(s, fit, request, fleet_ref, fleet, status):
++def inspect(s, fit, request, fleet_ref, fleet, status, *, successor=None):
+     mode = request['mode']
+     s.need('epoch146_bounded_entry_lease' not in fleet and not fit.members(OLD_UNIT),
+            'bounded 146 is still live or booked')
+-    route = writer(s, fit, status)
++    route = writer(s, fit, status, successor)
+     c = SimpleNamespace(fleet_ref=fleet_ref, fleet=fleet, entry146=None, sample_ref=fleet['observer'],
+                         cfg={'diagnostic_replays': []}, sample={'diagnostic_replays': []}, rows={})
+     row = route['observe'](c, None)
+--- a/source/retry4_status.py
++++ b/source/retry4_status.py
+@@ -33,11 +33,13 @@
+     21: '7b22721ef8963947b01df8c460b7ccbb9747f32b1b78a74df4b9302bed9ffe57',
+     22: 'c84ab255d833bc5a99569b23f67abdc2fe3bd4f2712cdb8dacce447dea7c942a',
+     23: '4d93755c570f885637cfb70c111ded8ac765df5eddc3fbec4daceb00cc59dc00',
++    25: '7f5315920183929bcded395d6827dfc84eb9c08481e77d26f53da3329e470122',
+     24: '312d387a80ee5d8700acd180e2634938c80f15acc3d5efa056be026f767c1613',
+     19: '7d16eec16a3687c02b48b6eff5782f730226d7778724490f7247da4306989b8a',
+ }
+ FOCUSED168_RECEIVERS = {
+     23: 'cf825f84363520d2fa9b93916d5eca50d6240648a218016164d9a7f28fef0785',
++    26: 'fb9db4e77c4dd78a49865d46e903a5c081f332ddc10ffdfc099c366cb3742182',
+     25: 'fb9db4e77c4dd78a49865d46e903a5c081f332ddc10ffdfc099c366cb3742182',
+     24: 'fb9db4e77c4dd78a49865d46e903a5c081f332ddc10ffdfc099c366cb3742182',
+     18: '6714c031f0b07736337f682f01b980f2e553c71b40f95b563cd28dad1d691bdb',
+@@ -267,7 +269,7 @@
+ def registered_failed166_rejoin(s, prior, version=2, *, binary=None, v20_seal=None):
+     old_package, old_seal, old_iid, old = prior
+     s.need(version in (2, 3, 4, 5, 6, 7, 8, 11, 12, 13) or 14 <= version <= 19
+-           or version in (20, 21, 22, 23, 24, 25) and v20_seal is not None,
++           or version in (20, 21, 22, 23, 24, 25, 26) and v20_seal is not None,
+            'unknown epoch 166 cadence rejoin')
+     def package_for(generation):
+         attempt = 5 if generation >= 12 else 4
+@@ -335,7 +337,7 @@
+         prior_ready = s.bound(previous['ready'], STATUS / f'FAILED166_CADENCE_V{predecessor}_READY.json')
+         receiver = package / 'full170_status.py'
+         member, = (m for m in seal['members'] if m['name'] == receiver.name and m['mode'] == '0444')
+-        expected = (v20_seal if version in (20, 21, 22, 23, 24, 25) else
++        expected = (v20_seal if version in (20, 21, 22, 23, 24, 25, 26) else
+                     s.ref(package/'deployment-seal-receipt.json', DELIVERY_CADENCE_SEALS[version]))
+         s.need(binary is not None and old_seal['sha256'] == DELIVERY_CADENCE_SEALS[predecessor]
+                and ready['package'] == expected
+--- a/source/full170_capacity.py
++++ b/source/full170_capacity.py
+@@ -459,6 +459,7 @@
+                 'tools-cold168-retry5-failed166-v23-entry146': 23,
+                 'tools-cold168-retry5-failed166-v24-entry146': 24,
+                 'tools-cold168-retry5-failed166-v25-entry146': 25,
++                'tools-cold168-retry5-failed166-v26-entry146': 26,
+             }.get(package, 17)
+         ready = require_v13(s, status, version=version)
+         if v14:
+--- a/source/focused168_capacity.py
++++ b/source/focused168_capacity.py
+@@ -9,7 +9,8 @@
+ PROFILES = {"tools-cold168-retry5-failed166-v19-entry146", "tools-cold168-retry5-failed166-v20-entry146",
+             "tools-cold168-retry5-failed166-v21-entry146", "tools-cold168-retry5-failed166-v22-entry146",
+             "tools-cold168-retry5-failed166-v23-entry146", "tools-cold168-retry5-failed166-v24-entry146",
+-            "tools-cold168-retry5-failed166-v25-entry146"}
++            "tools-cold168-retry5-failed166-v25-entry146",
++            "tools-cold168-retry5-failed166-v26-entry146"}
+ FLEET_FIELD = "current_cold168_retry6_focused"
+ TERMINAL_FIELD = "current_cold168_retry6_terminal"
+ TERMINAL_SHA = "5e67a984da9df5350bfce86060557a18603dbac5a18a06747c272922d14b7b71"
+@@ -30,7 +31,8 @@
+     fit.binary(script, member["sha256"])
+     if TERMINAL_FIELD in fleet:
+         s.need(allow_terminal and package.name in ("tools-cold168-retry5-failed166-v24-entry146",
+-                                                       "tools-cold168-retry5-failed166-v25-entry146")
++                                                       "tools-cold168-retry5-failed166-v25-entry146",
++                                                       "tools-cold168-retry5-failed166-v26-entry146")
+                and not fleet.get(FLEET_FIELD), "foreign or overlapping focused epoch 168 terminal transition")
+         return inspect_terminal(s, script, fleet, authority)
+     code = (
+--- /dev/null
++++ b/source/joint168_capacity.py
+@@ -0,0 +1,439 @@
++"""Read-only reduced joint epoch 168 census and incremental capacity projection."""
++
++import hashlib
++import json
++import os
++from pathlib import Path
++import re
++import stat
++import time
++
++GIB = 1 << 30
++UNIT = 'horizon-qualify-168-joint-checkpoint-reduced-20261126-v1.service'
++TIMER = 'horizon-guard-168-joint-checkpoint-reduced-20261126-v1.timer'
++SERVICE = TIMER.removesuffix('.timer') + '.service'
++ROOT = Path('/var/lib/jetstreamer/horizon_runtime_data/epoch168-joint-checkpoint-reduced-run-20261126-v1')
++LANE = Path('/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1')
++RUN = LANE/'full-metered-20261121-v1/joint-checkpoint-reduced-20261126-v1'
++ALIAS = Path('/run/horizon-full168-joint-reduced-v1')
++GROUP = '/system.slice/' + UNIT
++CGROUP = Path('/sys/fs/cgroup') / GROUP.lstrip('/')
++ENROLLMENT = ROOT/'ACCOUNTING_ENROLLMENT.json'
++RELEASE = ROOT/'AUTHORIZED_RELEASE.json'
++REQUEST_SCHEMA = 'horizon-epoch168-joint-reduced-capacity-request-v1'
++OUTPUT_SCHEMA = 'horizon-epoch168-joint-reduced-combined-fit-v1'
++FIELD = 'current_joint168_checkpoint'
++START_IID = '8335cc04ab4947109edac899552ac2f8'
++FOCUS_IID = '913443d7f9f44d7e9d3e0eec420acfab'
++V19_SEAL = '07d761337541dcf93af5cdb87720503ce17e4ec619f995da68d8a6a4e3169102'
++TEMPLATE_SHA = '1741b4dd226d9f8ad59f7e85087393e0890bb10fb4189e5a398b167d140fab33'
++NODE_SHA = 'a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65'
++WORKER_SHA = 'b0219574172b54b251b4f2feda6285ca3b6bee5f2830a0d46e69ee8ea2275541'
++GUARD_SHA = 'fbb7b0c31689ce3d5bbd3a3db3635450114e630b629ae0ec272f501bf7d01a61'
++GUARD = Path('/var/lib/jetstreamer/horizon_runtime_data/epoch168-cold-guard-20261126-v6/tools/guard')
++RETIRE_SCOPE = (
++    LANE/'full-metered-20261121-v1/cold-retry4-20261123/private'
++    /'destination-ab320aeb1bd39ca9218ae95ef9e9b04e92f493e106c9a0e0b70582f6f568f51e'
++    /'work/root-cohort-168-168/run-916123-1795399774038214572/scratch/.historical-runtime'
++    /'jetstreamer-historical-parent-ORHVvd/jetstreamer-historical-v1.5.6-0dEL1J/accounts-state')
++UNIT_FIELDS = ('Id', 'InvocationID', 'ActiveState', 'SubState', 'MainPID', 'ControlPID',
++               'ControlGroup', 'Job', 'NRestarts', 'Restart', 'KillMode')
++TERMINAL_FIELDS = ('Id', 'InvocationID', 'ActiveState', 'MainPID', 'ControlPID', 'Job')
++
++
++def sha(path):
++    with path.open('rb') as source:
++        return hashlib.file_digest(source, 'sha256').hexdigest()
++
++
++def read(s, ref):
++    return s.bound(ref, Path(ref['path']))
++
++
++def request_args(s, ref):
++    request = read(s, ref)
++    need = {'schema','mode','retirement','growth_bytes','stop_allowance_bytes','enrollment','guard'}
++    s.need(set(request) == need and request['schema'] == REQUEST_SCHEMA
++           and request['mode'] in ('prestart', 'held', 'active')
++           and all(type(request[k]) is int and 0 < request[k] < 1 << 64
++                   for k in ('growth_bytes','stop_allowance_bytes'))
++           and ((request['enrollment'] is None and request['guard'] is None)
++                if request['mode'] == 'prestart' else request['enrollment'] is not None),
++           'different reduced joint 168 accounting request')
++    return request
++
++
++def retirement(s, ref):
++    receipt = read(s, ref)
++    m = RETIRE_SCOPE.lstat()
++    s.need(receipt['schema'] == 'horizon168-retry4-stopped-accounts-complete-v1'
++           and receipt['original_iid'] == FOCUS_IID and receipt['scope'] == str(RETIRE_SCOPE)
++           and receipt['scope_empty'] is True and receipt['archive_or_snapshot_removed'] is False
++           and receipt['resource_credit_bytes'] == 0 and receipt['entries_removed_this_invocation'] >= 0
++           and receipt['retired_tree_before_bytes'] > receipt['scope_root_remaining_bytes']
++           and m.st_ino == 105381896 and stat.S_ISDIR(m.st_mode)
++           and RETIRE_SCOPE.resolve() == RETIRE_SCOPE and not any(RETIRE_SCOPE.iterdir()),
++           'joint 168 requires the qualified completed retry4 AccountsDb retirement')
++    return ref
++
++
++def availability():
++    vfs = os.statvfs(LANE)
++    memory, = (line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines()
++               if line.startswith('MemAvailable:'))
++    return dict(available_home=vfs.f_bavail * vfs.f_frsize, available_ram=int(memory) * 1024)
++
++
++def process_members(cgroup):
++    if not cgroup.is_dir():
++        return set()
++    return {int(pid) for f in cgroup.rglob('cgroup.procs') for pid in f.read_text().split()}
++
++
++def props(unit, fields):
++    from owners import show
++    return show(unit, fields)
++
++
++def require_idle(s):
++    for name in (UNIT, TIMER, SERVICE):
++        unit = props(name, TERMINAL_FIELDS)
++        group = Path('/sys/fs/cgroup/system.slice')/name
++        s.need(unit['Id'] == name and unit['ActiveState'] in ('inactive','failed')
++               and unit['MainPID'] in ('','0') and unit['ControlPID'] in ('','0')
++               and not unit['Job'] and not process_members(group),
++               'joint 168 native unit, timer, or guard is already occupied')
++
++
++def load_payload(s, enrolled, quote):
++    p = read(s, enrolled['payload'])
++    template = Path(__file__).resolve().with_name('joint168-scope-template.json')
++    s.need(sha(template) == TEMPLATE_SHA, 'joint 168 normalized scope template changed')
++    expected = json.loads(template.read_bytes())
++    expected['caps']['whole_tree_bytes'] = quote['joint168']['whole_tree_cap_bytes']
++    expected['accounting_basis'] = dict(
++        prestart_quote_sha256=enrolled['prestart_quote']['sha256'],
++        retired_scope_sha256=quote['retirement']['sha256'],
++        baseline_physical_bytes=quote['joint168']['baseline_physical_bytes'],
++        incremental_growth_bytes=quote['joint168']['incremental_growth_bytes'],
++        stop_allowance_bytes=quote['joint168']['stop_allowance_bytes'])
++    s.need(p == expected, 'dynamic joint 168 payload changed its sealed inputs or booking')
++    return p
++
++
++def enrollment(s, ref, request, incumbent, status):
++    s.need(ref['path'] == str(ENROLLMENT), 'unexpected joint 168 enrollment pathname')
++    e = read(s, ref)
++    q = read(s, e['prestart_quote'])
++    status_ref = status['consumer_seal']
++    ready = read(s, e['observer_enrollment'])
++    ready_at = e['actor']['ready_at']
++    s.need(e['schema'] == 'horizon-epoch168-joint-reduced-accounting-enrollment-v1'
++           and q['schema'] == OUTPUT_SCHEMA and q['mode'] == 'prestart' and q['fit']['fits'] is True
++           and q['resource_credit_bytes'] == 0 and q['replay_launch_authorized'] is False
++           and q['recorded_unix_seconds'] <= ready_at <= q['recorded_unix_seconds'] + 900
++           and q['retirement'] == request['retirement']
++           and q['joint168']['incremental_growth_bytes'] == request['growth_bytes']
++           and q['joint168']['stop_allowance_bytes'] == request['stop_allowance_bytes']
++           and q['incumbent146']['proposal'] == incumbent['proposal']
++           and q['incumbent146']['enrollment'] == incumbent['enrollment']
++           and ready['schema'] == 'horizon-epoch168-joint-reduced-observer-enrollment-v1'
++           and ready['consumer_seal'] == status_ref
++           and ready['native_reader_sha256'] == sha(Path(__file__).resolve())
++           and ready['private_scope'] == UNIT and ready['full146_enrollment'] == incumbent['enrollment']
++           and ready['prestart_quote'] == e['prestart_quote']
++           and ready['archive_publication_authorized'] is False,
++           'joint 168 did not inherit its scoped fit and exact sole observer')
++    return e, q
++
++
++def cgroup_limits(dir, expected_cpu, expected_ram):
++    quota, period = (int(v) for v in (dir/'cpu.max').read_text().split())
++    return (quota * 1_000_000 == period * expected_cpu
++            and (dir/'memory.max').read_text().strip() == str(expected_ram)
++            and (dir/'memory.swap.max').read_text().strip() == '0')
++
++
++def proc_argv(proc):
++    return [os.fsdecode(value) for value in (proc/'cmdline').read_bytes().rstrip(b'\0').split(b'\0')]
++
++
++def env_of(proc):
++    return dict(os.fsdecode(v).split('=', 1) for v in (proc/'environ').read_bytes().split(b'\0') if v)
++
++
++def file_id(meta):
++    return [meta.st_dev, meta.st_ino, meta.st_size, meta.st_mtime_ns, meta.st_ctime_ns]
++
++
++def projections(s, proc_root, payload, ref):
++    for row in payload['read_only_projections']:
++        target = proc_root / Path(row['target']).relative_to('/')
++        origin = Path(row['source']['path'])
++        get = target.stat()
++        s.need(stat.S_ISREG(get.st_mode) and os.statvfs(target).f_flag & os.ST_RDONLY
++               and file_id(get) == row['source']['identity'] == file_id(origin.lstat()),
++               'joint 168 changed read-only projection: '+row['target'])
++    projected_payload = proc_root/ALIAS.relative_to('/')/'payload.json'
++    s.need(projected_payload.samefile(ref['path']) and os.statvfs(projected_payload).f_flag & os.ST_RDONLY
++           and sha(projected_payload) == ref['sha256'], 'joint 168 payload mount changed')
++
++
++def log_binding(s, proc, enrolled):
++    log = Path(enrolled['append_log']['path'])
++    m = log.lstat()
++    s.need(log == RUN/'producer.log' and log.resolve() == log and stat.S_ISREG(m.st_mode)
++           and m.st_uid == 0 and m.st_nlink == 1 and m.st_mode & 0o077 == 0
++           and [m.st_dev,m.st_ino] == [enrolled['append_log'][k] for k in ('device','inode')],
++           'different joint 168 append log')
++    for fd in ('1','2'):
++        flags = dict(line.split(':',1) for line in (proc/'fdinfo'/fd).read_text().splitlines())
++        s.need((proc/'fd'/fd).samefile(log) and int(flags['flags'],8) & os.O_APPEND,
++               'joint 168 output lost the enrolled append sink')
++    with log.open('rb') as f:
++        s.need(os.path.samestat(os.fstat(f.fileno()),m), 'joint 168 append log changed')
++        events = [json.loads(line) for line in f.read(16384).splitlines()
++                  if line.startswith(b'{') and b'"phase":"worker-ready"' in line]
++    a = enrolled['actor']
++    expected = dict(phase='worker-ready',epoch=168,producer_invocation_id=a['invocation_id'],
++                    producer_pid=a['pid'],producer_start_ticks=a['start_ticks'],
++                    worker_ready_unix_seconds=a['ready_at'],payload_sha256=enrolled['payload']['sha256'])
++    s.need(events == [expected], 'joint 168 missing exact native worker-ready event')
++
++
++def native(s, e, p, mode):
++    from owners import ticks
++    a = e['actor']
++    u = props(UNIT, UNIT_FIELDS)
++    pid = a['pid']
++    proc = Path('/proc')/str(pid)
++    members = process_members(CGROUP)
++    s.need(u['Id'] == UNIT and u['ActiveState'] == 'active' and u['SubState'] == 'running'
++           and u['InvocationID'] == a['invocation_id'] and u['MainPID'] == str(pid)
++           and re.fullmatch('[a-f0-9]{32}',a['invocation_id']) and int(a['invocation_id'],16)
++           and Path('/proc/sys/kernel/random/boot_id').read_text().strip() == a['boot_id']
++           and ticks(pid) == a['start_ticks'] and u['ControlGroup'] == GROUP
++           and (proc/'cgroup').read_text().strip() == '0::'+GROUP
++           and u['ControlPID'] == u['NRestarts'] == '0' and not u['Job']
++           and u['Restart'] == 'no' and u['KillMode'] == 'control-group'
++           and cgroup_limits(CGROUP,1_750_000,63*GIB)
++           and (CGROUP/'memory.high').read_text().strip() == str(60*GIB)
++           and pid in members and len(members) <= 2, 'joint 168 manager/cgroup or process incarnation changed')
++    projections(s,proc/'root',p,e['payload'])
++    log_binding(s,proc,e)
++    gate = proc/'root'/ALIAS.relative_to('/')/'gate.py'
++    s.need(gate.samefile(e['gate']['path']) and os.statvfs(gate).f_flag & os.ST_RDONLY
++           and sha(gate) == e['gate']['sha256'], 'joint 168 projected gate changed')
++    args = proc_argv(proc)
++    env = env_of(proc)
++    s.need(all(env.get(k) == v for k,v in p['environment'].items())
++           and env.get('HORIZON_FULL168_PAYLOAD_SHA256') == e['payload']['sha256']
++           and env.get('INVOCATION_ID') == a['invocation_id'], 'joint 168 scoped environment changed')
++    if mode == 'held':
++        s.need(members == {pid} and (proc/'exe').samefile('/usr/bin/python3')
++               and args == ['/usr/bin/python3','-IB',str(ALIAS/'gate.py'),*p['regular_node_argv']],
++               'unexpected joint 168 held process')
++    else:
++        main = proc/'root'/ALIAS.relative_to('/')/'jetstreamer-node'
++        permit = proc/'root'/ALIAS.relative_to('/')/'barrier/allow'
++        pm = permit.lstat()
++        s.need((proc/'exe').samefile(main) and sha(proc/'exe') == NODE_SHA and args == p['regular_node_argv']
++               and stat.S_ISREG(pm.st_mode) and pm.st_uid == 0 and pm.st_nlink == 1
++               and stat.S_IMODE(pm.st_mode) == 0o444 and pm.st_size == 32
++               and os.statvfs(permit).f_flag & os.ST_RDONLY and permit.read_bytes() == a['invocation_id'].encode(),
++               'joint 168 native exec changed the exact held invocation or permit')
++    main_stat = (proc/'exe').stat()
++    processes = [[pid,a['start_ticks'],main_stat.st_dev,main_stat.st_ino]]
++    worker = None
++    if members != {pid}:
++        who, = members - {pid}
++        worker_proc = Path('/proc')/str(who)
++        path = (worker_proc/'exe').readlink()
++        ws = (worker_proc/'exe').stat()
++        parent = int((worker_proc/'stat').read_text().rsplit(')',1)[1].split()[1])
++        s.need(mode == 'active' and path.name == 'historical-worker' and path.parent.name == 'bound-worker'
++               and path.is_relative_to(RUN/'private') and parent == pid and ws.st_mode & 0o222 == 0
++               and (worker_proc/'cgroup').read_text().strip() == '0::'+GROUP
++               and sha(worker_proc/'exe') == WORKER_SHA,
++               'unexpected joint 168 child or historical worker')
++        worker = dict(pid=who,start_ticks=ticks(who),path=str(path),device=ws.st_dev,inode=ws.st_ino)
++        processes.append([who,worker['start_ticks'],ws.st_dev,ws.st_ino])
++    s.need(process_members(CGROUP) == members and props(UNIT,UNIT_FIELDS) == u and ticks(pid) == a['start_ticks'],
++           'joint 168 exec or worker turnover during native census')
++    return u, processes, worker
++
++
++def protective(s, requested, e, q, worker):
++    a = e['actor']
++    plan = read(s, requested['plan'])
++    sample = read(s, requested['sample'])
++    tr = props(TIMER, ('Id','InvocationID','ActiveState','SubState','Job','Triggers'))
++    limits = q['joint168']
++    command = props(SERVICE, ('Id','ExecStart','TriggeredBy','CPUQuotaPerSecUSec','MemoryMax','MemorySwapMax'))
++    expected_workers = [] if worker is None else [worker['pid']]
++    witness_time = a['ready_at']
++    if worker:
++        boot, = (int(row.split()[1]) for row in Path('/proc/stat').read_text().splitlines() if row.startswith('btime '))
++        witness_time = max(witness_time,boot + worker['start_ticks']//os.sysconf('SC_CLK_TCK'))
++    walk = sample['root_physical_observation']
++    s.need(plan['schema'] == 'jetstreamer-horizon-standalone-guard-plan-v1'
++           and plan['unit'] == UNIT and plan['invocation_id'] == a['invocation_id']
++           and plan['worker_root'] == str(LANE) and plan['filesystem'] == '/home/sol'
++           and plan['maximum_root_physical_bytes'] == limits['whole_tree_cap_bytes']
++           and plan['minimum_free_bytes'] == limits['guard_floor_bytes']
++           and plan['maximum_worker_vmas'] == 3_500_000
++           and plan['receipt_directory'] == str(ROOT/'guard-receipts')
++           and tr['Id'] == TIMER and tr['ActiveState'] == 'active' and tr['SubState'] in ('waiting','running')
++           and tr['InvocationID'] == requested['timer_invocation_id'] and tr['Triggers'] == SERVICE and not tr['Job']
++           and command['Id'] == SERVICE and command['TriggeredBy'] == TIMER
++           and command['CPUQuotaPerSecUSec'] == '250ms'
++           and command['MemoryMax'] == str(GIB) and command['MemorySwapMax'] == '0'
++           and str(GUARD) in command['ExecStart'] and requested['plan']['path'] in command['ExecStart']
++           and requested['plan']['sha256'] in command['ExecStart'] and GUARD_SHA in command['ExecStart']
++           and sample['schema'] == 'jetstreamer-horizon-standalone-guard-sample-v1'
++           and sample.get('guard_sha256',sample.get('self_sha256')) == GUARD_SHA
++           and sample['plan'] == requested['plan']['path'] and sample['plan_sha256'] == requested['plan']['sha256']
++           and requested['sample']['path'] == str(ROOT/'guard-receipts'/f"sample-{sample['guard_invocation_id']}.json")
++           and sample['producer_invocation_id'] == sample['producer']['invocation_id'] == a['invocation_id']
++           and sample['producer']['pid'] == a['pid'] and sample['producer']['cgroup'] == GROUP
++           and sample['producer']['active'] == 'active' and sample['producer']['restarts'] == 0
++           and sample['recorded_unix_seconds'] >= witness_time
++           and 0 <= time.time()-sample['recorded_unix_seconds'] <= 120
++           and sample['producer_stop_enabled'] is True and sample['trip_reason'] is None
++           and sample['worker_observation_error'] is sample['root_physical_observation_error'] is None
++           and [row[0] for row in sample['workers']] == expected_workers
++           and all(0 < row[1] <= plan['maximum_worker_vmas'] for row in sample['workers'])
++           and sample['minimum_free_bytes'] == plan['minimum_free_bytes']
++           and sample['maximum_root_physical_bytes'] == plan['maximum_root_physical_bytes']
++           and sample['available_bytes'] >= plan['minimum_free_bytes']
++           and walk['exceeds_budget'] is False
++           and all(walk[k]['vanished_entries'] == 0 and 0 < walk[k]['physical_bytes'] <= limits['whole_tree_cap_bytes']
++                   for k in ('first','second')),
++           'joint 168 guard is stale, over cap, crossed or not stop-enabled')
++    return dict(physical=min(walk[k]['physical_bytes'] for k in ('first','second')),
++                available=sample['available_bytes'], floor=plan['minimum_free_bytes'],
++                plan=requested['plan'],sample=requested['sample'],timer_invocation_id=tr['InvocationID'])
++
++
++def validate_release(s, e, q, request, guard):
++    record, ref = s.read(RELEASE)
++    held = read(s, record['post_guard_fit'])
++    a = e['actor']
++    fit_guard = held['native_joint168']['guard']
++    permit = Path('/proc')/str(a['pid'])/'root'/ALIAS.relative_to('/')/'barrier/allow'
++    s.need(record['schema'] == 'horizon-epoch168-joint-reduced-authorized-release-v1'
++           and record['enrollment'] == request['enrollment']
++           and record['producer_invocation_id'] == a['invocation_id']
++           and record['permit_sha256'] == sha(permit)
++           and held['schema'] == OUTPUT_SCHEMA and held['mode'] == 'held' and held['fit']['fits'] is True
++           and held['native_joint168']['prestart'] == e['prestart_quote']
++           and held['native_joint168']['enrollment'] == request['enrollment']
++           and held['native_joint168']['actor'] == a and held['native_joint168']['worker'] is None
++           and held['retirement'] == q['retirement']
++           and held['joint168']['whole_tree_cap_bytes'] == q['joint168']['whole_tree_cap_bytes']
++           and held['joint168']['guard_floor_bytes'] == guard['floor']
++           and fit_guard and fit_guard['plan'] == guard['plan']
++           and fit_guard['timer_invocation_id'] == guard['timer_invocation_id']
++           and a['ready_at'] <= held['recorded_unix_seconds'] <= a['ready_at'] + 180,
++           'missing exact jointly priced held release or crossed guard')
++    return ref
++
++
++def inspect(s, request, incumbent, status, tree_size, *, measured=None):
++    rr = retirement(s, request['retirement'])
++    mode = request['mode']
++    if mode == 'prestart':
++        s.need(not ENROLLMENT.exists(), 'joint 168 has an outstanding enrollment')
++        require_idle(s)
++        physical = tree_size(LANE,None) if measured is None else measured
++        return dict(mode=mode,retirement=rr,physical=physical,processes=[],**availability())
++    e,q = enrollment(s,request['enrollment'],request,incumbent,status)
++    p = load_payload(s,e,q)
++    unit, processes, worker = native(s,e,p,mode)
++    if request['guard'] is None:
++        s.need(mode == 'held', 'released joint 168 requires live protective guard evidence')
++        protected = None
++        physical = tree_size(LANE,None) if measured is None else measured
++    else:
++        protected = protective(s,request['guard'],e,q,worker)
++        physical = protected['physical']
++    release = validate_release(s,e,q,request,protected) if mode == 'active' else None
++    return dict(mode=mode,retirement=rr,physical=physical,processes=processes,unit=unit,worker=worker,release=release,
++                actor=e['actor'],enrollment=request['enrollment'],prestart=e['prestart_quote'],
++                first_fit=q['joint168'],guard=protected,**availability())
++
++
++def pair(s, first, second):
++    volatile = {'available_home','available_ram'}
++    s.need({k:v for k,v in first.items() if k not in volatile} ==
++           {k:v for k,v in second.items() if k not in volatile},
++           'joint 168 allocation, worker, or protection changed during full census')
++    return dict(first, **{k:min(first[k],second[k]) for k in volatile})
++
++
++def project(s, full146, candidate, request):
++    fit = full146['fit']
++    active = full146['active_full146']
++    promised = full146['pending_epoch168_followup']
++    s.need(full146['schema'] == 'horizon-epoch146-full-accounted-fit-v1'
++           and active['mode'] == 'active' and active['phase'] in ('bootstrap','worker')
++           and active['actor']['producer_invocation_id'] == START_IID
++           and full146['resource_credit_bytes'] == 0 and full146['replay_launch_authorized'] is False
++           and promised == dict(cpu_quota_micros=2_000_000,memory_bytes=8*GIB,additive_home_bytes=0)
++           and fit['existing_cpu_quota_micros'] == fit['projected_cpu_quota_micros'] == 64_000_000
++           and fit['donor_cpu_quota_micros_used'] == 9_250_000
++           and fit['donor_memory_bytes_used'] == 69*GIB
++           and fit['projected_required_memory_bytes'] == fit['existing_required_memory_bytes'] + 8*GIB
++           and full146['retained_168_disk_bytes'] == full146['bookings']['168']['remaining_bytes'] > 0
++           and fit['projected_home_floor_bytes'] ==
++           max(fit['existing_home_floor_bytes'],full146['pending_guard']['minimum_free_bytes'])
++           + full146['bookings']['146']['remaining_bytes'], 'joint 168 altered the existing 146 owner or reserved promises')
++    baseline = (candidate['physical'] if candidate['mode'] == 'prestart'
++                else candidate['first_fit']['baseline_physical_bytes'])
++    grow,stop = request['growth_bytes'],request['stop_allowance_bytes']
++    cap = baseline + grow
++    floor = fit['projected_home_floor_bytes'] + stop
++    armed = floor if candidate['mode'] == 'prestart' else candidate['first_fit']['guard_floor_bytes']
++    highest_charge = candidate['physical']
++    # Preserve the full remaining absolute cap even if a measured allocation shrinks.
++    remaining = cap-highest_charge
++    available_home = min(fit['available_home_bytes'],candidate['available_home'],
++                         (candidate.get('guard') or {}).get('available',fit['available_home_bytes']))
++    available_ram = min(fit['available_memory_bytes'],candidate['available_ram'])
++    required_home = max(floor,armed) + max(0,remaining)
++    basis = fit['projected_required_memory_bytes']
++    required_ram = basis + 56*GIB
++    s.need(0 < baseline < cap < 1 << 64 and 0 < highest_charge,
++           'invalid measured joint 168 whole-lane baseline or growth')
++    return dict(schema=OUTPUT_SCHEMA,mode=candidate['mode'],fleet=full146['fleet'],
++                recorded_unix_seconds=full146['recorded_unix_seconds'],retirement=candidate['retirement'],
++                incumbent146=dict(proposal=full146['proposal'],enrollment=active['enrollment']),
++                full146=full146, joint168=dict(unit=UNIT,whole_tree_cap_bytes=cap,
++                    baseline_physical_bytes=baseline,incremental_growth_bytes=grow,stop_allowance_bytes=stop,
++                    measured_physical_bytes=highest_charge,remaining_home_bytes=max(0,remaining),
++                    guard_floor_bytes=armed,producer_cpu_quota_micros=1_750_000,guard_cpu_quota_micros=250_000,
++                    producer_memory_bytes=63*GIB,guard_memory_bytes=GIB),
++                native_joint168=candidate,
++                fit=dict(fits=fit['fits'] and remaining>=0 and floor<=armed
++                         and required_home<=available_home and required_ram<=available_ram,
++                         required_home_bytes=required_home,available_home_bytes=available_home,
++                         home_shortfall_bytes=max(0,required_home-available_home),
++                         guard_floor_shortfall_bytes=max(0,floor-armed),
++                         whole_tree_over_cap_bytes=max(0,-remaining),
++                         required_available_memory_bytes=required_ram,available_memory_bytes=available_ram,
++                         memory_shortfall_bytes=max(0,required_ram-available_ram),
++                         extra_cpu_quota_micros=0,extra_memory_bytes=56*GIB),
++                resource_credit_bytes=0,replay_launch_authorized=False,archive_publication_authorized=False)
++
++
++def fleet_roster(s, fleet, rows):
++    current = fleet.get(FIELD)
++    selected = [row for row in rows if row.get('unit', {}).get('Id') == UNIT]
++    if current is None or current['phase'] == 'terminal':
++        s.need(not selected, 'joint 168 appears in fleet without an active roster')
++    else:
++        s.need(current['epoch'] == 168 and selected == [current]
++               and current in fleet['actual_active_private_diagnostics']
++               and current['archive_publication_authorized'] is False,
++               'changed joint 168 private roster')
++    return [row for row in rows if row.get('unit', {}).get('Id') != UNIT]
+--- /dev/null
++++ b/source/joint168-scope-template.json
+@@ -0,0 +1,180 @@
++{
++  "archive_publication_authorized": false,
++  "bootstrap_slot": 72991436,
++  "caps": {
++    "guard_cpu_quota_usec_per_sec": 250000,
++    "guard_memory_bytes": 1073741824,
++    "producer_cpu_quota_usec_per_sec": 1750000,
++    "producer_memory_bytes": 67645734912,
++    "producer_memory_high_bytes": 64424509440,
++    "swap_bytes": 0,
++    "whole_tree_bytes": 481036337152
++  },
++  "environment": {
++    "HOME": "/home/sol",
++    "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME": "1",
++    "JETSTREAMER_ARCHIVE_BACKEND": "http",
++    "JETSTREAMER_CLEAR_ACCOUNTS_ON_START": "true",
++    "JETSTREAMER_COMPACT_INDEX_BASE_URL": "https://files.old-faithful.net/",
++    "JETSTREAMER_ENFORCE_ARCHIVE_HASH": "1",
++    "JETSTREAMER_HISTORICAL_POH_THREADS": "2",
++    "JETSTREAMER_HISTORICAL_REAP_TIMEOUT_SECS": "600",
++    "JETSTREAMER_HISTORICAL_TRACE_EPOCH168": "1",
++    "JETSTREAMER_HISTORICAL_WORKER_V1_5_6": "/run/horizon-full168-joint-reduced-v1/jetstreamer-historical-worker-v1-5-6",
++    "JETSTREAMER_HTTP_BASE_URL": "https://files.old-faithful.net/",
++    "JETSTREAMER_LOAD_FROM_DIR": "0",
++    "JETSTREAMER_NETWORK_CAPACITY_MB": "1024",
++    "JETSTREAMER_PRIVATE_RUN_ROOT": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/joint-checkpoint-reduced-20261126-v1/private",
++    "JETSTREAMER_PRUNE_EPOCH_SNAPSHOTS": "0",
++    "JETSTREAMER_RIPGET_THREADS": "4",
++    "JETSTREAMER_SKIP_SNAPSHOT_VERIFY": "0",
++    "JETSTREAMER_THREADS": "4",
++    "JETSTREAMER_VERIFY_SNAPSHOTS": "1",
++    "LANG": "C.UTF-8",
++    "LOGNAME": "sol",
++    "PATH": "/usr/lib/google-cloud-sdk/bin:/usr/bin:/bin",
++    "RAYON_NUM_THREADS": "2",
++    "RUST_BACKTRACE": "1",
++    "RUST_LOG": "info,solana_metrics=off,solana_runtime::bank=warn,solana_runtime::accounts_db=warn",
++    "SOLANA_RAYON_THREADS": "2",
++    "USER": "sol",
++    "XDG_CONFIG_HOME": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/config"
++  },
++  "epoch": 168,
++  "expected_checkpoint_slots": [
++    72991436,
++    72994766,
++    73007829
++  ],
++  "guard_timer": "horizon-guard-168-joint-checkpoint-reduced-20261126-v1.timer",
++  "joint_input_custody": {
++    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-joint-checkpoint-source-20261126-v1/AUTHENTICATED_JOINT_INPUT_CUSTODY.json",
++    "sha256": "f7190f18649ff7b5495ade88309423089c6de1da040942a8fcbfef27e5c67b92"
++  },
++  "normalized_overlap": {
++    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-normalized-overlap-acceptance-20261126-v1/NORMALIZED_OVERLAP_ACCEPTED.json",
++    "sha256": "bd4f7980a3653c393832640fb7bbead7b62f0543aa66846baa456f4de0a63c20"
++  },
++  "producer_unit": "horizon-qualify-168-joint-checkpoint-reduced-20261126-v1.service",
++  "read_only_projections": [
++    {
++      "source": {
++        "identity": [
++          2304,
++          7220081,
++          47753136,
++          1794243485517098363,
++          1794243485518098368
++        ],
++        "path": "/usr/local/lib/jetstreamer/horizon-independent168-singleton-package-20261109-v1/jetstreamer-node",
++        "sha256": "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65"
++      },
++      "target": "/run/horizon-full168-joint-reduced-v1/jetstreamer-node"
++    },
++    {
++      "source": {
++        "identity": [
++          64512,
++          101134948,
++          9376224,
++          1795187197736583903,
++          1795187197738583914
++        ],
++        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch172-full-replay-20261120-v1/inputs-v1/jetstreamer-historical-worker-v1-5-6",
++        "sha256": "b0219574172b54b251b4f2feda6285ca3b6bee5f2830a0d46e69ee8ea2275541"
++      },
++      "target": "/run/horizon-full168-joint-reduced-v1/jetstreamer-historical-worker-v1-5-6"
++    },
++    {
++      "source": {
++        "identity": [
++          64512,
++          102319235,
++          213,
++          1795721446228301352,
++          1795721446228301352
++        ],
++        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-joint-checkpoint-source-20261126-v1/epoch-hashes.txt",
++        "sha256": "fa3e775126ba250f3ec79c11dae4600cde75006bfb20b963fec731ec74659249"
++      },
++      "target": "/run/horizon-full168-joint-reduced-v1/epoch-hashes.txt"
++    },
++    {
++      "source": {
++        "identity": [
++          64512,
++          103875385,
++          20144,
++          1794247171653684863,
++          1794247171653684863
++        ],
++        "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/output/genesis.tar.bz2",
++        "sha256": "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"
++      },
++      "target": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/joint-checkpoint-reduced-20261126-v1/output/genesis.tar.bz2"
++    },
++    {
++      "source": {
++        "identity": [
++          64512,
++          104146058,
++          4362826998,
++          1794247389003628431,
++          1794247389315629786
++        ],
++        "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/output/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-cid-to-offset-and-size.index",
++        "sha256": "448056720a7fa7040c8ae0549e1142efb58190d0abc8a587320393fb133fc533"
++      },
++      "target": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/joint-checkpoint-reduced-20261126-v1/output/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-cid-to-offset-and-size.index"
++    },
++    {
++      "source": {
++        "identity": [
++          64512,
++          104141091,
++          15210704,
++          1794247357057489674,
++          1794247357065489709
++        ],
++        "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/output/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-slot-to-cid.index",
++        "sha256": "17c705d901c6eaa710998b6706d06a892d16273e05227848a515870544ed4097"
++      },
++      "target": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/joint-checkpoint-reduced-20261126-v1/output/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-slot-to-cid.index"
++    },
++    {
++      "source": {
++        "identity": [
++          64512,
++          118628833,
++          2115805359,
++          1795721299836588457,
++          1795721356120861450
++        ],
++        "path": "/home/sol/.jetstreamer-private/epoch168-checkpoint-proof-20261126.S7qG2dS6/snapshot-72991436-ByNZCiixM5iveRZh2urjzgFDEwCenqnpDL4okbBCf2WH.tar.zst",
++        "sha256": "e34b19db48028e7862f152a966873c95cb9424d08e094c7af126c0d70cc33793"
++      },
++      "target": "/run/horizon-full168-joint-reduced-v1/snapshot-72991436-ByNZCiixM5iveRZh2urjzgFDEwCenqnpDL4okbBCf2WH.tar.zst"
++    }
++  ],
++  "regular_node_argv": [
++    "/run/horizon-full168-joint-reduced-v1/jetstreamer-node",
++    "168",
++    "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/joint-checkpoint-reduced-20261126-v1/output",
++    "--verify",
++    "--qualification-end-slot=73007829",
++    "--snapshot-archive=/run/horizon-full168-joint-reduced-v1/snapshot-72991436-ByNZCiixM5iveRZh2urjzgFDEwCenqnpDL4okbBCf2WH.tar.zst",
++    "--epoch-hashes=/run/horizon-full168-joint-reduced-v1/epoch-hashes.txt",
++    "--horizon-output=/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/joint-checkpoint-reduced-20261126-v1/output/epoch-168-joint-checkpoints.jet"
++  ],
++  "replay_launch_authorized": false,
++  "replay_slots": [
++    72991437,
++    73007829
++  ],
++  "resource_credit_bytes": 0,
++  "retry6_terminal": {
++    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-retry6-rebook-20261126-v1/FOCUSED_TERMINAL.json",
++    "sha256": "5e67a984da9df5350bfce86060557a18603dbac5a18a06747c272922d14b7b71"
++  },
++  "schema": "horizon-epoch168-joint-reduced-focused-payload-v1"
++}
+--- a/holding/replay_price.rs
++++ b/holding/replay_price.rs
+@@ -10,6 +10,7 @@
+ const CADENCE23: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v23-entry146/deployment-seal-receipt.json";
+ const CADENCE24: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v24-entry146/deployment-seal-receipt.json";
+ const CADENCE25: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v25-entry146/deployment-seal-receipt.json";
++const CADENCE26: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v26-entry146/deployment-seal-receipt.json";
+ const FULL170_UNIT: &str = "horizon-qualify-170-full-metered-20261124-v1.service";
+ const FOCUSED168_UNIT: &str = "horizon-qualify-168-full-metered-cold-v6-20261126.service";
+
+@@ -21,7 +22,7 @@
+     let focused = &q["focused168_retry6"];
+     matches!(
+         q["status_registration"]["consumer_seal"]["path"].as_str(),
+-        Some(CADENCE24 | CADENCE25)
++        Some(CADENCE24 | CADENCE25 | CADENCE26)
+     ) && focused["terminal"] == ref_for(Path::new(FOCUSED168_TERMINAL), FOCUSED168_TERMINAL_SHA)
+         && focused["resource_credit_bytes"] == 0
+         && focused["processes"].as_array().is_some_and(Vec::is_empty)
+@@ -32,7 +33,7 @@
+     if q["epoch"] != 170
+         || !matches!(
+             q["status_registration"]["consumer_seal"]["path"].as_str(),
+-            Some(CADENCE20 | CADENCE21 | CADENCE22 | CADENCE23 | CADENCE24 | CADENCE25)
++            Some(CADENCE20 | CADENCE21 | CADENCE22 | CADENCE23 | CADENCE24 | CADENCE25 | CADENCE26)
+         )
+     {
+         return Ok(false);
+@@ -273,7 +274,13 @@
+             quote["status_registration"]["consumer_seal"] == *cadence
+                 && matches!(
+                     cadence_path,
+-                    CADENCE20 | CADENCE21 | CADENCE22 | CADENCE23 | CADENCE24 | CADENCE25
++                    CADENCE20
++                        | CADENCE21
++                        | CADENCE22
++                        | CADENCE23
++                        | CADENCE24
++                        | CADENCE25
++                        | CADENCE26
+                 )
+                 && active_cadence_basis(&quote)?,
+             "occupied epoch 185 requires the sealed active fleet price"
+--- a/scope/gate.py
++++ b/scope/gate.py
+@@ -77,6 +77,16 @@
+         index_leaf / "epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-cid-to-offset-and-size.index",
+         index_leaf / "epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-slot-to-cid.index",
+     }
++    basis = payload["accounting_basis"]
++    need(
++        set(basis) == {"prestart_quote_sha256", "retired_scope_sha256", "baseline_physical_bytes",
++                       "incremental_growth_bytes", "stop_allowance_bytes"}
++        and all(re.fullmatch("[a-f0-9]{64}", basis[key]) for key in ("prestart_quote_sha256", "retired_scope_sha256"))
++        and all(type(basis[key]) is int and 0 < basis[key] < 1 << 64
++                for key in ("baseline_physical_bytes", "incremental_growth_bytes", "stop_allowance_bytes"))
++        and basis["baseline_physical_bytes"] + basis["incremental_growth_bytes"] < 1 << 64,
++        "different joint focused dynamic growth booking",
++    )
+     rows = payload["read_only_projections"]
+     targets = {Path(row["target"]): row["source"] for row in rows}
+     need(
+@@ -93,7 +103,7 @@
+             "producer_memory_high_bytes": 60 << 30,
+             "guard_memory_bytes": 1 << 30,
+             "swap_bytes": 0,
+-            "whole_tree_bytes": 448 << 30,
++            "whole_tree_bytes": basis["baseline_physical_bytes"] + basis["incremental_growth_bytes"],
+         }
+         and len(rows) == len(targets) == len(expected_targets)
+         and targets.keys() == expected_targets
+@@ -160,6 +170,11 @@
+     output = RUN / "output" / "epoch-168-joint-checkpoints.jet"
+     require_fresh_output(output)
+
++    stat_fields = Path("/proc/self/stat").read_text().rsplit(")", 1)[1].split()
++    print(json.dumps(dict(phase="worker-ready", epoch=168, producer_invocation_id=iid, producer_pid=os.getpid(),
++                          producer_start_ticks=int(stat_fields[19]), worker_ready_unix_seconds=int(time.time()),
++                          payload_sha256=os.environ["HORIZON_FULL168_PAYLOAD_SHA256"]),
++                     sort_keys=True, separators=(",", ":")), flush=True)
+     deadline = time.monotonic() + 180
+     permit = ALIAS / "barrier" / "allow"
+     while time.monotonic() < deadline:

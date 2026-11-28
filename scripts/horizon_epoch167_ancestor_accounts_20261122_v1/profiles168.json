@@ -1,0 +1,156 @@
+{
+  "admission": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/ACTUAL_ADMISSION_AND_PROTECTION.json",
+    "sha256": "d2553d0008fa8e43500633e1f916daf4f9609f51eba0be60475c1e3293c9db56"
+  },
+  "launch": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/SESSION_PRODUCER_ARGV.json",
+    "sha256": "39d2e97f8f6962984f1ec9672a4701fe0772e3a63a72465b8d945d59eab7b4fa"
+  },
+  "payload": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/inputs-v1/payload.json",
+    "sha256": "6c56c0cad87c9d22ca72ad8e2cf97cb0cc0c5e1b4d1d01e4f051dfc01875b240"
+  },
+  "profiles": {
+    "full-metered": {
+      "cohort_sha256": "99dd7c12d3e65698cd4aa7496f873b16fbb828ed7fd62fbaba46a2da027a5ef8",
+      "expected_bytes": 55596150784,
+      "expected_entries": 395832,
+      "iid": "9cebb1d022124fb08588e93e055d5446",
+      "inode": 109775327,
+      "leases": [
+        {
+          "identity": [
+            64512,
+            101135013,
+            0,
+            1791494730459052358,
+            1791494730459052358
+          ],
+          "links": 1,
+          "path": "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock"
+        },
+        {
+          "identity": [
+            64512,
+            109323419,
+            0,
+            1795261937663063742,
+            1795261937663063742
+          ],
+          "links": 1,
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/private/destination-5bd040760baa4f45854ef3420d18f981d3e80d5acaf485ab90d59cd3b1620fe9/locks/epoch-168.lock"
+        }
+      ],
+      "preserved": [
+        {
+          "identity": [
+            64512,
+            109314444,
+            51889766680,
+            1795367762776267487,
+            1795367762776267487
+          ],
+          "links": 1,
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/private/destination-5bd040760baa4f45854ef3420d18f981d3e80d5acaf485ab90d59cd3b1620fe9/work/root-cohort-168-168/run-3879578-1795261941214288823/archives/epoch-168.jet"
+        },
+        {
+          "identity": [
+            64512,
+            104141334,
+            2029219745,
+            1794247159477632042,
+            1794247160396636029
+          ],
+          "links": 1,
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/private/destination-38f108e9d00d485f8ed68d9e7caaeb0a1570f35891271acc1ddc6e75b942e5ad/work/root-cohort-168-168/run-14201-1794247152158421923/inputs/snapshot-72575704-Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx.tar.zst"
+        },
+        {
+          "identity": [
+            64512,
+            104804528,
+            42215375916,
+            1795249077620618153,
+            1795249077620618153
+          ],
+          "links": 1,
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/replacement-local1-20261110-v1/trace-local3-20261120-v1/epoch-168.diagnostic.jet"
+        },
+        {
+          "identity": [
+            64512,
+            109323517,
+            222,
+            1795261941213080458,
+            1795261941213080458
+          ],
+          "links": 1,
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/private/destination-5bd040760baa4f45854ef3420d18f981d3e80d5acaf485ab90d59cd3b1620fe9/work/root-cohort-168-168/run-3879578-1795261941214288823/cohort-state.json"
+        },
+        {
+          "identity": [
+            64512,
+            109775325,
+            39105107,
+            1617780517000000000,
+            1795261998068349148
+          ],
+          "links": 1,
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/private/destination-5bd040760baa4f45854ef3420d18f981d3e80d5acaf485ab90d59cd3b1620fe9/work/root-cohort-168-168/run-3879578-1795261941214288823/scratch/.historical-runtime/jetstreamer-historical-parent-c76dFB/jetstreamer-historical-v1.5.6-mqX9Zr/unpacked/snapshots/72575704/72575704"
+        },
+        {
+          "identity": [
+            64512,
+            103350639,
+            10882234,
+            1795367812999539964,
+            1795367812999539964
+          ],
+          "links": 1,
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/producer.log"
+        },
+        {
+          "identity": [
+            64512,
+            109323872,
+            9376224,
+            1795261950191122765,
+            1795261950191122765
+          ],
+          "links": 1,
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/private/destination-5bd040760baa4f45854ef3420d18f981d3e80d5acaf485ab90d59cd3b1620fe9/work/root-cohort-168-168/run-3879578-1795261941214288823/scratch/.historical-runtime/jetstreamer-historical-parent-c76dFB/bound-worker/historical-worker"
+        },
+        {
+          "identity": [
+            64512,
+            109323876,
+            2029219745,
+            1795261952776134955,
+            1795261952776134955
+          ],
+          "links": 1,
+          "path": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/private/destination-5bd040760baa4f45854ef3420d18f981d3e80d5acaf485ab90d59cd3b1620fe9/work/root-cohort-168-168/run-3879578-1795261941214288823/scratch/.historical-runtime/jetstreamer-historical-parent-c76dFB/bound-bootstrap/snapshot-72575704-Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx.tar.zst"
+        }
+      ],
+      "shards": {
+        "0": 109775328,
+        "1": 109775329,
+        "2": 109775330,
+        "3": 109775331
+      },
+      "target": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/private/destination-5bd040760baa4f45854ef3420d18f981d3e80d5acaf485ab90d59cd3b1620fe9/work/root-cohort-168-168/run-3879578-1795261941214288823/scratch/.historical-runtime/jetstreamer-historical-parent-c76dFB/jetstreamer-historical-v1.5.6-mqX9Zr/accounts-state"
+    }
+  },
+  "stop": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/guard-receipts/stop-completion.json",
+    "sha256": "1fba7a686be4387737b8c7776a5ed92a59bff82c15ced77496e9214c94710f62"
+  },
+  "witness": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry10-guard384-20261121-v1/NATIVE_WITNESS.json",
+    "sha256": "0527ef33a3ab247462e03c44d515cda2b1273e2f99b5d69f0cb9a73f6b93eba5"
+  },
+  "worker": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/FIRST_PROTECTED_WORKER.json",
+    "sha256": "f0881354a940f74fff699c5de9d205c427a3d0414672ce41133e28a2bd0428c6"
+  }
+}

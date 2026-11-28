@@ -1,0 +1,12 @@
+[package]
+default-run = "horizon-native257-fit"
+name = "horizon-native257-fit"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+anyhow = "1"
+horizon-singleton211-launch = { path = "../singleton211-launch" }

@@ -1,0 +1,15 @@
+{
+  "README.md": "ab628433e2a80ede130a2608ac23c7a4bdabe537197fce1ab0e37e77c696e6a6",
+  "qualification/PRODUCTION-ORIGINAL-QUALIFICATION.json": "3e41f783f89b05c94fb5059c8e41f594d3fdc92a7b0bb222b9ae547e5a3abe79",
+  "qualification/PRODUCTION-SEAL-ORIGINAL-EXECUTION.json": "da9c6969dfda791613a027e1aabffbf26a42c2e94850ff9c93806f3bd3a67f5a",
+  "qualification/SOURCE_AND_EXACT4_FROZEN_RECIPES.json": "8d354286b03f8170cd6a4ea6cad70857839c02a665d855d3e70c4599fc71ecec",
+  "source/client.rs": "83f7344ab46118d41ac8293eefd2b2b67a9b1ddf200ffbd17a7965cd99edb32d",
+  "source/driver.rs": "f94bb8c2196800f5f88b691d78c17aef9e8a4ed5c8f2ba57e553f3f1592a2fd1",
+  "source/io.rs": "a6b6734ab38cc3377839e9933a838d7a7dea858b4757b8249f9ec06e418b1b7d",
+  "source/lifecycle.rs": "595094359669a18e7569f7011dbebef0ee763ae54ef2f4758fe5346ee036a039",
+  "source/native_control.rs": "fd6c2104e646f1c6d13793161d853cc0248bb5b3741e09a73a92736c85c5b101",
+  "source/package.rs": "fd7c661303772421877d0540d340fd1ea54cfd1e96401be282d0153c176e32cb",
+  "source/parent-argv.json": "5ab2eba9845346a8606957c4401d144c5981fb1583a4157c734aa2ca5cd635ab",
+  "source/pure.rs": "50443780163ed13d33c5759eb43d8edf0b86f0fef12295c27da245386927da41",
+  "source/schemas.rs": "72074efba919f6e0a7483fdb7fbea8be79041b8d5d486a2cc1a3779b1584a3e9"
+}

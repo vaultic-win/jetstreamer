@@ -1,0 +1,145 @@
+//! A separately qualified post-enrollment reader. Prelaunch memory/DATA readers
+//! remain exact13; an unresolved successor pin never falls back to that image.
+use crate::*;
+pub(super) const PATH: &str = crate::successor_roles::HELPER35_PATH;
+// Root supplied actual qualified Helper35 and its normal seal.
+// Historical Helper34 remains separately pinned; no prior-image fallback.
+const QUALIFIED_SHA: Option<&str> = crate::successor_roles::HELPER35_SHA;
+
+fn selected(path: &str, sha: Option<&str>) -> Result<Bound> {
+    let sha = sha.context("actual qualified postreader35 image SHA is unresolved")?;
+    ensure!(
+        path == PATH && storage::hex(sha, 64) && sha != HELPER_SHA && sha != FLEET_HELPER_SHA && path != crate::successor_roles::HELPER34_PATH && Some(sha) != crate::successor_roles::HELPER34_SHA,
+        "postreader35 cannot alias prelaunch13/fleet27 or an unknown image path/pin"
+    );
+    Ok(fixed(path, sha))
+}
+pub(super) fn image() -> Result<Bound> {
+    selected(PATH, QUALIFIED_SHA)
+}
+fn image_is_exact(actual: &Value, expected: &Bound) -> Result<()> {
+    ensure!(
+        *actual == json!(expected) && *actual != json!(fixed(HELPER, HELPER_SHA)),
+        "post-enrollment reader crossed exact successor image or borrowed prelaunch13"
+    );
+    Ok(())
+}
+pub(super) fn require_reader_image(actual: &Value) -> Result<()> {
+    image_is_exact(actual, &image()?)
+}
+pub(super) fn role() -> Result<Value> {
+    let image = image()?;
+    let role = crate::role(
+        image.path.to_str().context("postreader image UTF8")?,
+        &image.sha256,
+    )?;
+    let proof = storage::json(&binding(&role["artifact"])?)?;
+    ensure!(
+        proof["production_artifact"]["sha256"] == image.sha256
+            && proof["all_required_tests_passed"] == true
+            && proof["genuine_current_complete_outer_adapter_passed"] == true
+            && proof["replay_launch_authorized"] == false,
+        "postreader35 needs actual exact-image strict/native/complete-outer qualification"
+    );
+    storage::bytes(&image, 128 << 20, true)?;
+    Ok(role)
+}
+fn reader_argv_for(image: &Bound, spec: &Bound) -> Vec<String> {
+    vec![
+        image.path.display().to_string(),
+        "read-failed4-current-accounting".into(),
+        spec.path.display().to_string(),
+        "--spec-sha256".into(),
+        spec.sha256.clone(),
+        "--self-sha256".into(),
+        image.sha256.clone(),
+    ]
+}
+pub(super) fn reader_argv(spec: &Bound) -> Result<Vec<String>> {
+    Ok(reader_argv_for(&image()?, spec))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn unresolved_successor_never_falls_back_to_prelaunch_or_fleet_reader() {
+        assert!(selected(PATH, None).is_err());
+        for sha in ["", "unresolved", HELPER_SHA, FLEET_HELPER_SHA] {
+            assert!(selected(PATH, Some(sha)).is_err());
+        }
+        assert!(selected(PATH, Some(&"A".repeat(64))).is_err());
+    }
+    #[test]
+    fn role_constructor_rejects_foreign_path_even_with_canonical_test_pin() {
+        let pin = "a".repeat(64); // Pure fixture, never a qualified actual image.
+        assert!(selected(PATH, Some(&pin)).is_ok());
+        for path in [
+            HELPER,
+            FLEET_HELPER,
+            "/tmp/jetstreamer-r2",
+            "../jetstreamer-r2",
+        ] {
+            assert!(selected(path, Some(&pin)).is_err());
+        }
+    }
+    #[test]
+    fn postreader_proof_rejects_prelaunch13_crossed_digest_and_fleet27() {
+        let selected = selected(PATH, Some(&"a".repeat(64))).unwrap();
+        image_is_exact(&json!(selected), &selected).unwrap();
+        assert!(image_is_exact(&json!(fixed(HELPER, HELPER_SHA)), &selected).is_err());
+        assert!(image_is_exact(&json!(fixed(FLEET_HELPER, FLEET_HELPER_SHA)), &selected).is_err());
+        assert!(image_is_exact(&json!(fixed(PATH, &"b".repeat(64))), &selected).is_err());
+    }
+    #[test]
+    fn production_reader_argv_binds_successor_without_changing_spec_or_cli() {
+        let selected = selected(PATH, Some(&"a".repeat(64))).unwrap();
+        let spec = fixed(
+            "/usr/local/lib/jetstreamer/fixture/spec.json",
+            &"b".repeat(64),
+        );
+        let argv = reader_argv_for(&selected, &spec);
+        assert_eq!(
+            argv,
+            vec![
+                PATH.to_owned(),
+                "read-failed4-current-accounting".into(),
+                spec.path.display().to_string(),
+                "--spec-sha256".into(),
+                spec.sha256,
+                "--self-sha256".into(),
+                selected.sha256
+            ]
+        );
+        assert!(
+            !argv.iter().any(|a| a == HELPER
+                || a == HELPER_SHA
+                || a == FLEET_HELPER
+                || a == FLEET_HELPER_SHA)
+        );
+    }
+}
+
+#[cfg(test)]
+mod helper34_reader_pair_regression {
+    use super::*;
+    #[test]
+    fn historical33_image_and_crossed_pairs_cannot_replace_selected_reader() {
+        let current = selected(PATH, QUALIFIED_SHA).unwrap();
+        let old = fixed("/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tools-20261108-v33/jetstreamer-r2", "b445a1fb3717da5b68984d6598d7d75efcf5131f0bc82091af506d586b8f49fd");
+        image_is_exact(&json!(current), &current).unwrap();
+        assert!(image_is_exact(&json!(old), &current).is_err());
+        assert!(image_is_exact(&json!(fixed(PATH, &old.sha256)), &current).is_err());
+        assert!(image_is_exact(&json!(fixed(old.path.to_str().unwrap(), &current.sha256)), &current).is_err());
+    }
+}
+
+#[cfg(test)] mod helper35_reader_pair_regression {
+ use super::*;
+ #[test] fn current_helper35_rejects_historical34_and_crossed_pairs() {
+  let current=image().unwrap();
+  let old=fixed(crate::successor_roles::HELPER34_PATH,crate::successor_roles::HELPER34_SHA.unwrap());
+  image_is_exact(&json!(current),&current).unwrap();
+  for b in [old.clone(),fixed(PATH,&old.sha256),fixed(old.path.to_str().unwrap(),&current.sha256)] {assert!(image_is_exact(&json!(b),&current).is_err());}
+ }
+}

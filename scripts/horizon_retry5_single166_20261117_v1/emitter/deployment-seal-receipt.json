@@ -1,0 +1,69 @@
+{
+  "schema": "jetstreamer-sealed-deployment-receipt-v1",
+  "plan_sha256": "a90bd1a0cfe80bda663e484c1b5551d1c50d40e4c4176711dc9b16744c6ac528",
+  "sealer_sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+  "destination": "/usr/local/lib/jetstreamer/horizon-retry4-single166-peerfix-source-20261114-v1/emitter",
+  "members": [
+    {
+      "source": "/tmp/root-retry4-single166-peerfix-source-20261114-v1/emitter/emitter.rs",
+      "name": "emitter.rs",
+      "sha256": "20f57e29f7c9528945c12d5903279752d3f3e4001ed269b3b60f9c6f7c5be822",
+      "bytes": 43149,
+      "mode": "0444"
+    },
+    {
+      "source": "/tmp/root-retry4-single166-peerfix-source-20261114-v1/emitter/epoch166.PLAN.SOURCE_TEMPLATE.json",
+      "name": "epoch166.PLAN.SOURCE_TEMPLATE.json",
+      "sha256": "f03ac3345e7b382e0c9c72826c908a4f858c70efe3995830076b8ac2abb13c08",
+      "bytes": 5434,
+      "mode": "0444"
+    },
+    {
+      "source": "/tmp/root-retry4-single166-peerfix-source-20261114-v1/emitter/epoch166.RETRY4_PLAN.SOURCE_TEMPLATE.json",
+      "name": "epoch166.RETRY4_PLAN.SOURCE_TEMPLATE.json",
+      "sha256": "58bd338ae33eacb5d7f96b5d961aa118f5731c068c437e99ae000b221f456950",
+      "bytes": 6160,
+      "mode": "0444"
+    },
+    {
+      "source": "/tmp/root-retry4-single166-peerfix-source-20261114-v1/emitter/epoch167.PLAN.SOURCE_TEMPLATE.json",
+      "name": "epoch167.PLAN.SOURCE_TEMPLATE.json",
+      "sha256": "7ef4447c23e5189fef7c5039d21bb6568d6f923e33ea0a2c857f7364e5495d39",
+      "bytes": 5434,
+      "mode": "0444"
+    },
+    {
+      "source": "/tmp/root-retry4-single166-peerfix-source-20261114-v1/emitter/epoch169.PLAN.SOURCE_TEMPLATE.json",
+      "name": "epoch169.PLAN.SOURCE_TEMPLATE.json",
+      "sha256": "d9b03c431dd0f60100473ed9300252a5862e709f2998c3fe789468a22571c20c",
+      "bytes": 5428,
+      "mode": "0444"
+    },
+    {
+      "source": "/tmp/root-retry4-single166-peerfix-source-20261114-v1/emitter/epoch170.PLAN.SOURCE_TEMPLATE.json",
+      "name": "epoch170.PLAN.SOURCE_TEMPLATE.json",
+      "sha256": "d3d1cdf2e3010220d441c7d10821be044ef4eedb5ddc8f9939abc40c5c6c74d0",
+      "bytes": 5294,
+      "mode": "0444"
+    },
+    {
+      "source": "/tmp/root-retry4-single166-peerfix-source-20261114-v1/emitter/inventory-count-regression.json",
+      "name": "inventory-count-regression.json",
+      "sha256": "d91eafe37ac889e5784be7f3f76ed39d42e3b5d550190ce70387dfa0357f2a7c",
+      "bytes": 34556,
+      "mode": "0444"
+    },
+    {
+      "source": "/tmp/root-retry4-single166-peerfix-source-20261114-v1/emitter/retry2-stopped-profiles.json",
+      "name": "retry2-stopped-profiles.json",
+      "sha256": "b4d024aaefdc975cd16b474015aadedb3e802e4ae2fe0e824b7b9a35fd5dfea5",
+      "bytes": 7670,
+      "mode": "0444"
+    }
+  ],
+  "created_unix_seconds": 1794645601,
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "remote_mutations": false,
+  "r2_mutations": false
+}

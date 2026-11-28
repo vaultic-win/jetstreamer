@@ -1,0 +1,60 @@
+{
+  "schema": "horizon-fulfilled-anon-memory-qualified-source-v1",
+  "source_sha256": "ba147a91c72fb2f38f0163a7902c3ff430fa7ac287e7f1697bde61cf0ec1b28a",
+  "four_compiler_configurations_passed": true,
+  "ordinary_tests_passed": 6,
+  "genuine_native_v3_epoch171_admission_check_passed": true,
+  "original_hard_memory_promises_preserved_bytes": 645972897792,
+  "candidate_additive_hard_memory_bytes": 74088185856,
+  "additional_host_headroom_bytes": 17179869184,
+  "resident_anon_already_counted_in_existing_caps_bytes": 38596710400,
+  "required_available_memory_bytes": 698644242432,
+  "available_memory_bytes": 727522947072,
+  "hard_promises_released_bytes": 0,
+  "resource_credit_bytes": 0,
+  "replay_launch_authorized": false,
+  "archive_or_R2_mutation_authorized": false,
+  "scope": "Exact epoch171 admission from the original 01:00 five-owner context; expired evidence cannot admit another lane.",
+  "receipts": [
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/FULFILLED-ANON-V3-ARTIFACT.json",
+      "sha256": "2e8e3e8c6fa8ac062558397854697e42b6869e6f78ddd29196802f703e733c83"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/FULFILLED-ANON-V3-SOURCE-SEAL-EXECUTION.json",
+      "sha256": "b876ae612b24425e4d31f09b61a2c23f55b5813816d486ea47981be3af5d7d28"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/FULFILLED-ANON-V3-RUNTIME-SEAL-EXECUTION.json",
+      "sha256": "cd83c9ad63d22210e306ec674721fbb2571adf9cb390107afe70ac88ba332d24"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_FULFILLED_ANON_V3_FOUR_COMPILERS_AND_SIX_TESTS_PASSED_NATIVE_PENDING.json",
+      "sha256": "95043bac440d0f281385b6e2d05defb18075a90f7359e931f54451de8b1e2086"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/FULFILLED-ANON-V3-clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "1091a3f9d7f439c487a250e72b98b3f457ef6963f33e8d7f61a8a8a4c5a34de1"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/FULFILLED-ANON-V3-clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "92157bf69613905dd01ffc1dac6f8fa786385a16ff603e521020a98dcbc79cfc"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/FULFILLED-ANON-V3-production-ORIGINAL-EXECUTION.json",
+      "sha256": "44b26e7187b39f8a2e985d9aaccb7b6818209991ae46d594b2064ab5008e829c"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/FULFILLED-ANON-V3-build-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "f3d7c9f48820c537789952ba277d0922e578e321a497b09f8bfe3191342d5312"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/FULFILLED-ANON-V3-TESTS-ORIGINAL-EXECUTION.json",
+      "sha256": "75958dbdc8920bfcc93ba12a59f49f45ed1e97431a89c05449b62a9d7809a5f0"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch171-independent-singleton-20261110-v1/ACTUAL171_FULFILLED_ANON_ADMISSION_POINT.json",
+      "sha256": "2a8faf51fc2eeab9496cb5f0f72731262fe72e6bdde1247e0c6582fc20fdce53"
+    }
+  ]
+}

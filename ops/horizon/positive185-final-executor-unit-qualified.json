@@ -1,0 +1,99 @@
+{
+  "schema": "horizon-positive185-postreader-final-executor-unit-qualified-publication-v1",
+  "purpose": "Execute a finite original post-reader proof/seal/sol-read/first-timer/token/main-entry transaction with fixed commands, unchanged600second setup and original30second proof freshness.",
+  "source_members": [
+    {
+      "path": "scripts/horizon_positive185_final_transaction_v1/source/transaction.rs",
+      "sha256": "c1647c15f98f043ea2f9467bdb89c937e80a617142fa1900a3c4b16d4bb5dd78",
+      "bytes": 21742,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-transaction-qa-20261107-v1/source/transaction.rs",
+        "sha256": "c1647c15f98f043ea2f9467bdb89c937e80a617142fa1900a3c4b16d4bb5dd78"
+      }
+    },
+    {
+      "path": "scripts/horizon_positive185_final_transaction_v1/source/storage.rs",
+      "sha256": "50d6bbef5d3373bc5f95bf082ff29f79588b8b4ce444e6ba03dd70c02fa40071",
+      "bytes": 3226,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-transaction-qa-20261107-v1/source/storage.rs",
+        "sha256": "50d6bbef5d3373bc5f95bf082ff29f79588b8b4ce444e6ba03dd70c02fa40071"
+      }
+    },
+    {
+      "path": "scripts/horizon_positive185_final_transaction_v1/source/process.rs",
+      "sha256": "3335e4a914d3d80914bade3dc12199b30f1089c77cc05e4422ca0d7b2c1ffe80",
+      "bytes": 12022,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-transaction-qa-20261107-v1/source/process.rs",
+        "sha256": "3335e4a914d3d80914bade3dc12199b30f1089c77cc05e4422ca0d7b2c1ffe80"
+      }
+    },
+    {
+      "path": "scripts/horizon_positive185_final_transaction_v1/source/events.rs",
+      "sha256": "1a9eb8143e15ee79832de4c95de01f2327055bb0ec310ab1bea10f9d45cf3aee",
+      "bytes": 9422,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-transaction-qa-20261107-v1/source/events.rs",
+        "sha256": "1a9eb8143e15ee79832de4c95de01f2327055bb0ec310ab1bea10f9d45cf3aee"
+      }
+    },
+    {
+      "path": "scripts/horizon_positive185_final_transaction_v1/source/main.rs",
+      "sha256": "a426575712ba019b8c8ee6fa6b6feb23ecd8a680e55bf3db151025a2021d57ca",
+      "bytes": 16504,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-transaction-qa-20261107-v1/source/main.rs",
+        "sha256": "a426575712ba019b8c8ee6fa6b6feb23ecd8a680e55bf3db151025a2021d57ca"
+      }
+    }
+  ],
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-transaction-qa-20261107-v1/ROOT_EXECUTOR_SOURCE_FREEZE_V2_LINT_REPAIRS.json",
+    "sha256": "711431086ebd5a10d4c182051d35d6f0f1c697ec79fc92f413f1921471474138"
+  },
+  "production": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261107-v1/horizon-positive185-final",
+    "sha256": "c71aaab50391ac6fde77e45a47e60b39e3ccf51e806ddb59544115f03d7cd21d"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "12bb09ba3708a20d4484375f24a4e5c5d6e90525256968182107b998568eb136"
+  },
+  "artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261107-v1/artifact-proof.json",
+    "sha256": "01a98879782d2ad9ed0bbdbdfe73992bf9eb09dc6e2086f26835d2abcdbbb71a"
+  },
+  "exact_compiler_recipes": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-transaction-qa-20261107-v1/ROOT_V2_ALL4_EXECUTOR_COMPILER_RECIPES.json",
+    "sha256": "96cde97ca01f74e02104dd2ace755189d5e94944b7bc0f37c22de2f84c06e52d"
+  },
+  "ordinary_tests_passed": 15,
+  "strict_production_and_test_Clippy_passed": true,
+  "all15_authored_names_preserved": true,
+  "all7_actual_QA_scopes_drained": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-transaction-qa-20261107-v1/ROOT_ALL7_EXECUTOR_QA_SCOPES_DRAINED_NORMAL_SLOT_RETURNED.json",
+    "sha256": "c4c2095a3d1767231b387bc2cf130b9704f65a847e49d7104fed42ce431b1ac0"
+  },
+  "original_Clippy_failure_preserved": true,
+  "setup_seconds": 600,
+  "final_original_receipt_window_seconds": 30,
+  "unit_tests_include_actual_own_child_pidfd_reap_and_timeout": true,
+  "normal_external_pool_bytes": 6442450944,
+  "extra_executor_QA_memory_bytes": 0,
+  "executor_DATA_bytes_retained": 536870912,
+  "complete_conservative_DATA_bytes": 5090258325298,
+  "remaining_gates": [
+    "Same independently qualified shared-helper image must execute original full reader and every acceptance/lifecycle command",
+    "Preserve native ancestor/identity checks while supporting the original0600generated fleet writer",
+    "Actual fixed namespace/capability profile and eight-file sol read qualification",
+    "Genuine native first timer guard, token and actual main-entry timing inside every original30second receipt clock",
+    "Root owns independently admitted original600second upstream activation/task/enrollment/fleet/reader",
+    "Full80351999epoch boundary and finite runtime successor remain separate from old80351283checkpoint route"
+  ],
+  "actual_native_positive_release_qualified": false,
+  "replay_launch_authorized": false,
+  "publication_authorized": false,
+  "replay_lanes_recovered": 0,
+  "goal_active_and_incomplete": true
+}

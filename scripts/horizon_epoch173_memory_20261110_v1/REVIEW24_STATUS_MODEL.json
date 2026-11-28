@@ -1,0 +1,22 @@
+{
+  "schema": "horizon-epoch185-review24-current-model-evidence-v1",
+  "new_native_authority": false,
+  "additional_qualification_millis": 60536000,
+  "control_forecast_utc": "2026-11-10T09:55:00Z",
+  "qualification_forecast_utc": "2026-11-10T10:19:18Z",
+  "original_anchors_and_full_replay_preserved": true,
+  "evidence": [
+    {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review24-model-20261110-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW24.json",
+      "sha256": "cb430c5a672a9b7ebdd73d22d345693f1eb81089e41432617e8b7913dfc46430"
+    },
+    {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review24-model-20261110-v1/MODEL_BINDING.json",
+      "sha256": "1c54415142266aa3977c71a58557cbc2262d550e5e9ab949f27f7d7d11f7eca3"
+    },
+    {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review24-model-20261110-v1/AUTHENTICATED185_EVENT_READBACK.json",
+      "sha256": "f7eade6ac5f27c0beef855418892511cc0cb352040ed0d8ef6b394a70721da59"
+    }
+  ]
+}

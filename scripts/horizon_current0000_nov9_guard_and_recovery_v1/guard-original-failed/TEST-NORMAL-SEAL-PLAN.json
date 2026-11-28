@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-current0000-bound-guard-window-tests-20261109-v1",
+  "members": [
+    {
+      "name": "guard-tests",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0000-window-20261109-v1/work/tests",
+      "sha256": "8f54a35734bfb6bfc81914cb6c40ab794f60e62d2f12678f760a4d2e62aeee92",
+      "mode": 365
+    }
+  ]
+}

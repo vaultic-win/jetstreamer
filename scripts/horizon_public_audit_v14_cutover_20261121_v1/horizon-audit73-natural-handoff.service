@@ -1,0 +1,24 @@
+[Unit]
+Description=Adopt the closed Horizon epoch 73 public replay report
+After=network-online.target
+ConditionPathExists=!/var/lib/jetstreamer/horizon_runtime_data/public-audit73-observer-20261121-v1/PUBLIC_OWNER.json
+RequiresMountsFor=/var/lib/jetstreamer/horizon_runtime_data/public-audit73-observer-20261121-v1
+
+[Service]
+Type=oneshot
+Slice=horizonaudit.slice
+User=root
+UMask=0077
+WorkingDirectory=/var/lib/jetstreamer/horizon_runtime_data/public-audit73-observer-20261121-v1
+ExecStart=/var/lib/jetstreamer/horizon_runtime_data/public-audit73-observer-20261121-v1/cutover-package/audit73-cutover cut
+ExecStopPost=/var/lib/jetstreamer/horizon_runtime_data/public-audit73-observer-20261121-v1/cutover-package/audit73-cutover recover
+TimeoutStartSec=90
+TimeoutStopSec=60
+CPUQuota=100%
+MemoryMax=256M
+MemorySwapMax=0
+TasksMax=24
+Nice=10
+RestrictAddressFamilies=AF_UNIX
+StandardOutput=journal
+StandardError=journal

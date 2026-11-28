@@ -1,0 +1,14 @@
+{
+  "after_status": {
+    "elapsed_execution_millis": 702000,
+    "epoch": 185,
+    "estimated_remaining_millis": 505731206,
+    "jet_size_bytes": 0,
+    "phase": "verification",
+    "sampled_at_utc": "2026-11-09T02:51:35Z"
+  },
+  "receipt": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109025135.json",
+    "sha256": "a2af0594c931207367d6f507aa238cb25a4d8feee65ac9848a3cdff45987c111"
+  }
+}

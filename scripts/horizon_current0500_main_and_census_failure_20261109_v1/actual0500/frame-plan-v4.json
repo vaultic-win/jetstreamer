@@ -1,0 +1,52 @@
+{
+  "cohort183_transition": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0500-chain128-frame-plan-20261109-v5/transition.json",
+    "sha256": "d15ceaa07b068dd0e9da5480c40feb4c0f7e61c7fb33a07f659d58b2f308802e"
+  },
+  "correction191": {
+    "path": "/var/lib/jetstreamer/horizon-DATA-growth-closures-v1/c5bf2df3f569845d8694231a7d2ece86e74e62e9ee88c47677734c45aeacefb6-ea93199ed2fa470d99de248c2a10b246-accounting-correction-v1/correction.json",
+    "sha256": "78deb8cd152a904f5b2891c87261a150821df4dd043c24b8f12b1614624c9d79"
+  },
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T050022Z-witness-terminal145-v1.json",
+    "sha256": "1a330c37645d7a1c0bdce6cef2861ba6a445cfd0bec08e411df5906dc60fd583"
+  },
+  "fleet_owner": {
+    "unit": "horizon-first-lane-current0500-fleet-20261109-v1.service",
+    "invocation_id": "997f7cd2d2b9405b8dd0b74f882af5d8"
+  },
+  "fleet_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0500-fleet-plan-20261109-v1/fleet-plan.json",
+    "sha256": "8e7141bc68802af127583727dffd3fa5760236211081c903ab66aaca9c77106a"
+  },
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+    "sha256": "ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079"
+  },
+  "observer_owner": {
+    "unit": "horizon-visible-primary-observer050022-20261109-v1.service",
+    "invocation_id": "081b80830020496a8f167984f8c4c037"
+  },
+  "output": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json",
+  "prior_completion": {
+    "path": "/var/lib/jetstreamer/horizon-routine-cycles-101-200-v2/20261029T082000Z-cohort152-delivery-terminal191-repair141-suffix136-20261028-v1/completion.json",
+    "sha256": "0a7a345426d52918cd02a7bbe387361a83a706972aa6b7f024e717a6efac32f4"
+  },
+  "prior_fleet_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0430-fleet-plan-20261109-v1-r4/fleet-plan.json",
+    "sha256": "516908cd210cb412cc693f6d0cb3cca627f8d57dee70aec9ff74dbc33bccb36f"
+  },
+  "prior_parent": {
+    "path": "/usr/local/lib/jetstreamer/horizon-cadence-20261029T082000Z-native-parent-v1/frame-acceptance.json",
+    "sha256": "82a4bb9b8d6c49cea140b6c65ec8f6705e1dba8c1bcc574b6d5e3b68a37eea67"
+  },
+  "prior_recovery": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T043022-witness-terminal145-chain128-v5.json",
+    "sha256": "55fda127febcffca00788cb6023a494f7c31e88a65eb0cdaba58d2dbc5e9ea83"
+  },
+  "schema": "jetstreamer-horizon-recovered-resource-frame-plan-v1",
+  "transition": {
+    "path": "/usr/local/lib/jetstreamer/horizon-terminal155156-observer-transition-20261029-v1/transition.json",
+    "sha256": "fd8bde044a28796a8cc867442e09c2b49a5cf09985667053ecb956b423430da9"
+  }
+}

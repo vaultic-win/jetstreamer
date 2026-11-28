@@ -1,0 +1,19 @@
+[Unit]
+Description=Verify natural completion of the cold retry13 epoch 170 producer
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+UMask=0077
+CPUQuota=25%
+CPUWeight=10
+MemoryMax=128M
+MemorySwapMax=0
+TasksMax=16
+TimeoutStartSec=350
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=read-only
+NoNewPrivileges=yes
+ReadWritePaths=/var/lib/jetstreamer/horizon_runtime_data/epoch170-cold-delivery-20261122-v13
+ExecStart=/var/lib/jetstreamer/horizon_runtime_data/epoch170-cold-delivery-20261122-v13/terminal-tools/terminal170 wait-record

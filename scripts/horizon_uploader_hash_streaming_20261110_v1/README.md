@@ -1,0 +1,7 @@
+# Constant-memory multipart hashing
+
+A remote multipart part size of zero previously left the hash loop's remaining byte count unchanged while it appended digests indefinitely. Hashing now rejects zero before opening the archive. For positive part sizes, it feeds each part's MD5 and SHA256 digest directly into the final digest accumulators, retaining the existing8MiB read-buffer maximum without retaining one digest row per part. Multipart ETag and composite SHA256 representations are unchanged.
+
+Three focused regressions passed: the existing complete hash/ETag proof, zero-size rejection before I/O for empty/nonempty identities, and compatibility with the earlier vector-based combination for empty, single-part and many-part archives. The extracted real function/test bodies also passed production/test Rustc and Clippy with warnings denied, inside a512MiB native callback using seven exact libraries from the proven uploader graph. Only imports, public visibility and formatting differ in this isolated test library.
+
+This is focused function verification. The complete current uploader application and any successor runtime still need their normal build, artifact and deployment qualification. The live uploader remains unchanged; sidecar/control-body bounds, allocator/runtime obligations, a whole-service cap and the complete shared-role ledger remain open. No shared64 reduction, replay admission or new resource credit follows from this patch. Failed setup/path attempts and the corrected native executions remain bound in `QUALIFICATION.json`.

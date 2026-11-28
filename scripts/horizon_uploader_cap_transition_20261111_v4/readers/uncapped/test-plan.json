@@ -1,0 +1,65 @@
+{
+  "schema": "horizon-uploader-freeze-census-plan-v1",
+  "unit": "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+  "invocation_id": "7ac4617f73ab4f979a8527cce461c6a4",
+  "main_pid": 3204661,
+  "start_ticks": 1,
+  "kind": "coordinator",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-r2-rust-20261017-v3-auth-only/jetstreamer-r2-progressive",
+    "sha256": "1eede7d15cec7e5b1907ee44328caf2b20457ca8513472ca17e83fe3e08f9087"
+  },
+  "wrapper": {
+    "path": "/usr/local/lib/jetstreamer/horizon-cohort183-uploader-transition-20261029-v2/upload-progressive.zsh",
+    "sha256": "d9b3bc9c64664b17f9da7275834abb01f7e00fec4d2257c8aa92156d185e07f3"
+  },
+  "command_line": [
+    "/usr/local/lib/jetstreamer/horizon-r2-rust-20261017-v3-auth-only/jetstreamer-r2-progressive",
+    "/usr/local/lib/jetstreamer/horizon-r2-rust-20261017-v3-auth-only/jetstreamer-r2",
+    "/home/sol/horizon",
+    "/home/sol/.jetstreamer-private/r2-receipts",
+    "101",
+    "200",
+    "--poll-seconds=300",
+    "--concurrency=4",
+    "--legacy-part-size-mib=5",
+    "--delete-local",
+    "--local-mutation-lock=/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock",
+    "--full-receipt-directory=/home/sol/.jetstreamer-private/final-audits/epochs-101-200-parallel-v1/receipts",
+    "--full-verifier-sha256=9a7df94b4cbb5b60e6d869ce959cba6a02130d5942a3442eeaef9c18a558eb39,51bb4a90dcac0a2475b46b2820470c3a53a0a541720a233dac288934cc864336,1ca95efa1b02e45a24409c1431a177c75712177406ccd4220fd26068788b1319,5fc5640254f6a065e96bf73ad951c9dacd57aa963b87a4379e1f27c6ebeb3574",
+    "--full-verifier-script-sha256=a64fed21248715b2214292ea961a82afc5367a34b337d35afdbbc48d62c04bed,e225f8309d19af230cc189ab6e43296d37795693085299c269ab51af6991ab39,ff77c131d1ec377c2fc08ffbf78266a3004cbc209ca1becee43256c8961c0727",
+    "--plugin-receipt-directory=/home/sol/.jetstreamer-private/horizon-plugin-current-101-200-v2/receipts",
+    "--plugin-pipeline-sha256=9f4abe27011b04d0c33cb3e24d0d9bc14dbce9f46528f22c4bde367af97a7070,831151d939a51690fedff391a792055e06efadd7ebb83fd46732feddbd07d394,e20892a111f8e26c8e25561a939eaf171771789753059100510c936d92092137",
+    "--plugin-verifier-script-sha256=966fba1a0a08715db2e328532662450ec432f5dfe42dc3af076db56a14c6e1cf,738cc186a6d701d051c7c2b84371f023aee69ffc25fc208c0eab7bb85f05c2cf,e225f8309d19af230cc189ab6e43296d37795693085299c269ab51af6991ab39,ff77c131d1ec377c2fc08ffbf78266a3004cbc209ca1becee43256c8961c0727",
+    "--boundary-receipt-directory=/home/sol/.jetstreamer-private/horizon-boundary-audit-101-200-v1/receipts",
+    "--boundary-verifier-sha256=2cd38370fc4087ac0f01c0c9429296757affc4317a694be868b1553b627ddfc3,1b1aefd7b6b2df169fa41179da37f9eb556764f589f301dfa622d83f06e11e94",
+    "--boundary-verifier-script-sha256=f62cfdbfd3f8aa57981afa9fc5e1c513f1b852d48c2d0b815894dd544c241322,24de5d678f6723d28b1161f4904119ff5952d7ba92a1b794ead32efd03058e80",
+    "--defer-epochs=129-132",
+    "--defer-epochs=136-147",
+    "--defer-epochs=152-157",
+    "--defer-epochs=183-194"
+  ],
+  "expected_exec_start": "{ path=/usr/local/lib/jetstreamer/horizon-cohort183-uploader-transition-20261029-v2/upload-progressive.zsh ; argv[]=/usr/local/lib/jetstreamer/horizon-cohort183-uploader-transition-20261029-v2/upload-progressive.zsh ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+  "expected_control_group": "/system.slice/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+  "memory_max": "infinity",
+  "uid": 1001,
+  "gid": 1003,
+  "sleep_child": null,
+  "frozen": false,
+  "pre_freeze_receipt": null,
+  "output": "/var/lib/jetstreamer/horizon-uploader-freeze-fence-20261103-v1/pre-freeze.json",
+  "source_files": [
+    {
+      "path": "/etc/systemd/system/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+      "sha256": "84f38e11624b2e6f1a5a39a6118f806990d0b88b3d2c372b30e3dcdba605fa62"
+    },
+    {
+      "path": "/etc/systemd/system/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service.d/50-native198-receipts.conf",
+      "sha256": "d30674cd19a0a702f201eb0f0100d31594ff180d7613fdc6eadbfeac60600640"
+    },
+    {
+      "path": "/etc/systemd/system/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service.d/60-native183-receipts.conf",
+      "sha256": "d2a82a817becf0cf30be4cb3cff98bdffbe62b1ea7513b1f7de0978046aad5fe"
+    }
+  ]
+}

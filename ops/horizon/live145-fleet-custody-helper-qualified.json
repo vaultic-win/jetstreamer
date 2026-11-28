@@ -1,0 +1,138 @@
+{
+  "schema": "horizon-live145-fleet-and-original-writer-custody-helper-qualified-publication-v1",
+  "purpose": "Authenticate exact live145 actor/guard/timer across native guard rollover and read original Root0600 fleet writer bytes without weakening native ancestors, identity or digest checks.",
+  "source_members": [
+    {
+      "path": "scripts/horizon_live145_fleet_custody_v1/source/jetstreamer-r2/src/fleet.rs",
+      "sha256": "30e07247f7527981bb493f1ab9ef0f5c522792d628528c34638208daae12782f",
+      "bytes": 353670,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet.rs",
+        "sha256": "30e07247f7527981bb493f1ab9ef0f5c522792d628528c34638208daae12782f"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet.rs",
+        "sha256": "24882740e50609e43d5fa6a08d9bd2e55ea0158315a0ffb4418598bce0782514"
+      }
+    },
+    {
+      "path": "scripts/horizon_live145_fleet_custody_v1/source/jetstreamer-r2/src/fleet/live145_fleet.rs",
+      "sha256": "de7b06a201228d466c3bb44b7fc3df59531b2502a165121702bed4b4bc3e3d74",
+      "bytes": 3244,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/live145_fleet.rs",
+        "sha256": "de7b06a201228d466c3bb44b7fc3df59531b2502a165121702bed4b4bc3e3d74"
+      },
+      "predecessor": null
+    },
+    {
+      "path": "scripts/horizon_live145_fleet_custody_v1/source/jetstreamer-r2/src/fleet/cached145_entry.rs",
+      "sha256": "2f7f311f4e925475ac27b22ad142f83b352a032031bf1f8d0988df20ccc28763",
+      "bytes": 20346,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/cached145_entry.rs",
+        "sha256": "2f7f311f4e925475ac27b22ad142f83b352a032031bf1f8d0988df20ccc28763"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/cached145_entry.rs",
+        "sha256": "d71138112d309db6ce5f48cc83c9769c7fde4df2f8a30039138f07f98c966094"
+      }
+    },
+    {
+      "path": "scripts/horizon_live145_fleet_custody_v1/source/jetstreamer-r2/src/fleet/cached145_entry_tests.rs",
+      "sha256": "0807f18a76a6b01836ccd1e0a8b810813eeb563a3895d629e2ba16ed64d92640",
+      "bytes": 11776,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/cached145_entry_tests.rs",
+        "sha256": "0807f18a76a6b01836ccd1e0a8b810813eeb563a3895d629e2ba16ed64d92640"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/cached145_entry_tests.rs",
+        "sha256": "99c8d5f3dac2456ceef42f3e402cf8b620922c6e4ffeb042e3ae0331da2233cc"
+      }
+    },
+    {
+      "path": "scripts/horizon_live145_fleet_custody_v1/source/jetstreamer-r2/src/fleet/cold185/lifecycle.rs",
+      "sha256": "a5c14135558ecad39fb7b2836175f286359052670c604bb7986a500d32c6285b",
+      "bytes": 27926,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/cold185/lifecycle.rs",
+        "sha256": "a5c14135558ecad39fb7b2836175f286359052670c604bb7986a500d32c6285b"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/cold185/lifecycle.rs",
+        "sha256": "189d082ce0440739bb3e9de12b64b38b0fa171934f39770652fbfd851c8d5150"
+      }
+    },
+    {
+      "path": "scripts/horizon_live145_fleet_custody_v1/source/jetstreamer-r2/src/fleet/cold185/native.rs",
+      "sha256": "51eec193721405c39e659ae7226ec85ec1f9b911ecc794ebc300610dd2a06b23",
+      "bytes": 48318,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/cold185/native.rs",
+        "sha256": "51eec193721405c39e659ae7226ec85ec1f9b911ecc794ebc300610dd2a06b23"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/cold185/native.rs",
+        "sha256": "27a9d81e3c54252b25e8dd25b0da95fcafab89b728561c149fd4d791a1cc4461"
+      }
+    },
+    {
+      "path": "scripts/horizon_live145_fleet_custody_v1/source/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs",
+      "sha256": "5236b328b0d7371988d24713dcb4ea975c3f84af854e0d1bae118b7640e66b89",
+      "bytes": 57623,
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs",
+        "sha256": "5236b328b0d7371988d24713dcb4ea975c3f84af854e0d1bae118b7640e66b89"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/live145-prefix-current-accounting-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs",
+        "sha256": "029695a29d6a9561e46576f5b9af16c84e902912ae9891c18c503fbd8c32bce5"
+      }
+    }
+  ],
+  "patch": {
+    "path": "/home/sol/workspace/jetstreamer/scripts/horizon_live145_fleet_custody_v1/integration.patch",
+    "sha256": "74d4b719da1a1ca7e9487854312d9af043c2b842905590cea52c5384e3cfd1e2"
+  },
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/ROOT_INTEGRATED_SOURCE_FREEZE_V4_EAGER_SHAPES.json",
+    "sha256": "9f5c4007fb97b137c5fea7fcafd6809301baa199a0abfed263a5c76d636311a1"
+  },
+  "artifact": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-fleet-custody-current-helper-tools-20261107-v1/jetstreamer-r2",
+    "sha256": "be589f314c1e5f2ff6799800d39ca02e348c8e2e36779f6bdaf247d56d245405"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-fleet-custody-current-helper-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "36ef14388327b0a429572915956fa9eeb5e83a582e161154fb53123448b8291e"
+  },
+  "actual_artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-fleet-custody-current-helper-tools-20261107-v1/compile-and-qa-proof.json",
+    "sha256": "e2b249ef86ee915b88758d3a52cbff86c030c1fe24ffb776d0fbcf92165090f8"
+  },
+  "features": [
+    "native210-small",
+    "native227-small"
+  ],
+  "ordinary_tests_passed": 2861,
+  "ignored_tests_retained": 114,
+  "original2853_ordinary_and114_ignored_names_proof": {
+    "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/ROOT_V4_COMPILED_ALL2853_ORDINARY114_IGNORED_CONSERVED.json",
+    "sha256": "2ea8efca85c9c26f16230039f13bd8fe9d79cf5d9274414d772faeca0833df89"
+  },
+  "all26_original_scopes_drained": {
+    "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/ROOT_ALL26_ORIGINAL_SCOPES_DRAINED_QA6GiB_CLOSED.json",
+    "sha256": "45d052c658506a7a70872529b556c686db5f84eb88487bf9ef8a136089adf226"
+  },
+  "two_original_failures_preserved": true,
+  "actual_native_checks_passed": 2,
+  "new_Frame_CLI_reader_registration_enabled": false,
+  "next_action": "Qualify distinct1158 metadata guard, capture genuine fleet/Frame with CLI7d4888, then register and qualify full reader using the same final helper as positive185 acceptance.",
+  "complete_DATA_bytes_after_new_guard_metadata_booking": 5090795196210,
+  "extra_helper_QA_memory_bytes": 0,
+  "normal_external_pool_bytes": 6442450944,
+  "executing_replay_lanes": 0,
+  "desired_memory_selected_lanes": 5,
+  "no_replay_or_publication_authority": true
+}

@@ -1,0 +1,78 @@
+{
+  "schema": "horizon-live145-production-timer-census-qualified-publication-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-production-census-helper-tools-20261107-v1/jetstreamer-r2",
+    "sha256": "c30499854352258d30fcbc7e405821c0484f327e38f6611e92ffb96e2574028e"
+  },
+  "artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-production-census-helper-tools-20261107-v1/compile-and-qa-proof.json",
+    "sha256": "2c8351824aa2788d04bc7c103ed1623efc0de2e4676a9a177b077a0517be918d"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-production-census-helper-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "d9e0aa974f448130658a7671dab9203feb1c3e9650bdf3f004cd42eaeddf0b33"
+  },
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/live145-production-census-helper-qualification-20261107-v1/ROOT_PRODUCTION_TIMER_NAMESPACE_SOURCE_FREEZE_V1.json",
+    "sha256": "9e2fb6e4f0682fd131b39f7c6d6a538437e14adff849bbf7f279e051a6a5d037"
+  },
+  "all14_drains": {
+    "path": "/home/sol/.jetstreamer-private/live145-production-census-helper-qualification-20261107-v1/ROOT_ALL14_ORIGINAL_SCOPES_DRAINED_EXTRA_QA6GiB_CLOSED.json",
+    "sha256": "a334c003285eedb085864a8774f4b2bf14833e7f5244864717b93c6244d73a8c"
+  },
+  "native_production_census_control": {
+    "path": "/home/sol/.jetstreamer-private/live145-production-census-helper-qualification-20261107-v1/native-production-census-ORIGINAL_EXECUTION.json",
+    "sha256": "eefd746e2366fe860fbb5c47b9fc0880ac6252575f3e57a2ece2f18f17c7f02f"
+  },
+  "ordinary_tests_passed": 2862,
+  "ignored_tests_retained": 115,
+  "all3_explicit_native_controls_passed": true,
+  "extra_QA6GiB_closed": true,
+  "normal_external_pool_bytes": 6442450944,
+  "complete_DATA_bytes": 5095090163506,
+  "new_Frame_CLI_reader_registration_enabled": false,
+  "no_replay_or_release_credit": true,
+  "problem": "The production fleet unit observer rejected the exact live145 guard timer before reaching the qualified family adapter.",
+  "result": "Accept only that exact timer through the existing unit observer; preserve full native actor/guard/timer proof, all historical names and every guard/resource obligation.",
+  "source_members": [
+    {
+      "path": "scripts/horizon_live145_production_census_v1/source/jetstreamer-r2/src/fleet.rs",
+      "sha256": "13a4389a2792dd28a5ccec41e203b68cb11bc19ad7c9edfd024c2a42f2e5385d",
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-production-census-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet.rs",
+        "sha256": "13a4389a2792dd28a5ccec41e203b68cb11bc19ad7c9edfd024c2a42f2e5385d"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet.rs",
+        "sha256": "30e07247f7527981bb493f1ab9ef0f5c522792d628528c34638208daae12782f"
+      }
+    },
+    {
+      "path": "scripts/horizon_live145_production_census_v1/source/jetstreamer-r2/src/fleet/live145_fleet.rs",
+      "sha256": "7ad92bceaab55552fce91a8357664ec4f48a934b5e29b4f829773311592a93a7",
+      "qualified_source": {
+        "path": "/home/sol/.jetstreamer-private/live145-production-census-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/live145_fleet.rs",
+        "sha256": "7ad92bceaab55552fce91a8357664ec4f48a934b5e29b4f829773311592a93a7"
+      },
+      "predecessor": {
+        "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/helper-source/jetstreamer-r2/src/fleet/live145_fleet.rs",
+        "sha256": "de7b06a201228d466c3bb44b7fc3df59531b2502a165121702bed4b4bc3e3d74"
+      }
+    }
+  ],
+  "integration_patch": {
+    "path": "/home/sol/workspace/jetstreamer/scripts/horizon_live145_production_census_v1/integration.patch",
+    "sha256": "00e40bbfa6efea5e2c4736b27c75df206c2df408e1b6dd831c9420009d14d7bd"
+  },
+  "base_qualified_helper": {
+    "path": "/home/sol/.jetstreamer-private/live145-fleet-combined-helper-qualification-20261107-v1/ROOT_V4_PRODUCTION_HELPER_ARTIFACT_AND_ALL_QA_ACCEPTED.json",
+    "sha256": "e2b249ef86ee915b88758d3a52cbff86c030c1fe24ffb776d0fbcf92165090f8"
+  },
+  "original_native_failure": {
+    "path": "/home/sol/.jetstreamer-private/native1158r2-live145-frame-workflow-source-20261107-v1/runtime/ROOT1158R2_ORIGINAL_FLEET_TIMER_NAMESPACE_FAILURE_AND_DRAIN.json",
+    "sha256": "e3e99d86110b2d86aed7f9c6c56b29403842a620074f47006da2ffc26e375a47"
+  },
+  "next_action": "Bind and qualify distinct1228 metadata guard, then capture genuinefleet/Frame. NewCLI reader registration and fullreader/typed memory/DATA remain gated.",
+  "executing_replay_lanes": 0,
+  "desired_memory_selected_lanes": 5
+}

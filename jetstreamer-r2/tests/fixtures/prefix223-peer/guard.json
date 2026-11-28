@@ -1,0 +1,65 @@
+{
+  "available_bytes": 2579889836032,
+  "bounded_canary": null,
+  "bounded_measurement": false,
+  "canary_target_error": null,
+  "canary_target_stop_valid": false,
+  "guard_invocation_id": "2323abbecef84131b41546157a026172",
+  "guard_sha256": "044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f",
+  "maximum_root_physical_bytes": 471798691840,
+  "maximum_worker_vmas": 3500000,
+  "minimum_free_bytes": 2000000000000,
+  "native_main": null,
+  "plan": "/var/lib/jetstreamer/horizon-native223-prefix-guard-actual-v1/guard-plan.json",
+  "plan_sha256": "03021fe17498a242a99ee9a73a8a8ad8f47260c8189921d0b092370edbee4766",
+  "producer": {
+    "active": "active",
+    "cgroup": "/system.slice/horizon-qualify-223-v1620-root-prefix-resource-full-v1.service",
+    "delegated": false,
+    "invocation_id": "e70aaf097e7c4583b216aba454145910",
+    "kill_mode": "control-group",
+    "load_state": "loaded",
+    "pid": 386102,
+    "restart_policy": "no",
+    "restarts": 0,
+    "result": "success",
+    "sub": "running"
+  },
+  "producer_invocation_id": "e70aaf097e7c4583b216aba454145910",
+  "producer_stop_enabled": true,
+  "r2_mutations": false,
+  "recorded_unix_seconds": 1792806491,
+  "remote_mutations": false,
+  "root_physical_observation": {
+    "conservative_physical_bytes": 9146310656,
+    "exceeds_budget": false,
+    "first": {
+      "directories": 19,
+      "entries": 108657,
+      "physical_bytes": 8861675520,
+      "symlinks": 0,
+      "vanished_entries": 0
+    },
+    "maximum_physical_bytes": 471798691840,
+    "second": {
+      "directories": 19,
+      "entries": 112228,
+      "physical_bytes": 9146310656,
+      "symlinks": 0,
+      "vanished_entries": 0
+    }
+  },
+  "root_physical_observation_error": null,
+  "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+  "scratch_deleted": false,
+  "target_handoff": null,
+  "target_handoff_error": null,
+  "trip_reason": null,
+  "worker_observation_error": null,
+  "workers": [
+    [
+      386181,
+      50
+    ]
+  ]
+}

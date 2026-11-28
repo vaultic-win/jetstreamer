@@ -1,0 +1,7 @@
+{
+  "code": 1,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-epoch167-authenticated-source-metadata-20261109-v1.service\nERROR: (gcloud.storage.objects.describe) Unable to create private file [/home/sol/.config/gcloud/credentials.db]: [Errno 30] Read-only file system: '/home/sol/.config/gcloud/credentials.db'\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=1\nService runtime: 452ms\nCPU time consumed: 450ms\nMemory peak: 1.2M\nMemory swap peak: 0B\n",
+  "body_transfer": false,
+  "replay_or_input_acquisition_authorized": false
+}

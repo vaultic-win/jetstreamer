@@ -1,0 +1,24 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/work/v31-jetstreamer-r2",
+      "name": "jetstreamer-r2",
+      "sha256": "5059c749d74f59711ce5ed9642dd2383a4a3b4bb21e3338ff5c1dce77a5a47fa",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "name": "artifact-proof.json",
+      "sha256": "37f368069ea7594369385d600c5618dc1b236e5c011d7ac2689eaede2a10fec3",
+      "mode": 292
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/SOURCE_AND_EXACT4_FINAL_GRAPH_H35.json",
+      "name": "source-and-recipes.json",
+      "sha256": "2aa0af187d158995a5af022e21cdcccd8884d679f6d2c0bfbd66b7c322721ae8",
+      "mode": 292
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "candidate": "solana-v1.6.25",
+  "status": "private-full-span-qualification-only-unqualified",
+  "feature": "epoch224-v1-6-25-qualification",
+  "upstream": {
+    "tag": "v1.6.25",
+    "commit": "7de8a55b54d3e11058b82f9483bb405d143b455c"
+  },
+  "admission": {
+    "target_epoch": 224,
+    "bootstrap_snapshot_slot": 96767522,
+    "first_entry_slot": 96767523,
+    "output_slot_start": 96768000,
+    "canonical_target_end_slot": 97199999,
+    "terminal_root_slot": 97631459,
+    "max_slot_exclusive": 97631460,
+    "verification_tail_epoch": 225,
+    "verification_tail_private": true,
+    "ordinary_replay_allowed": false,
+    "root_checkpoint_cohort_allowed": false,
+    "recovery_allowed": false,
+    "canonical_sidecar_allowed": false
+  },
+  "checkpoints": [
+    {
+      "slot": 96767522,
+      "accounts_hash": "3SdyhqCuei4esVf8imz8A2rPB1z83sAK3KHbtKefJDS7",
+      "generation": 1632093412056045
+    },
+    {
+      "slot": 97199617,
+      "accounts_hash": "HE57JmgvEeZjBKN8cfTLrmyCbUnptJ9PWjUdTzgxSSdi",
+      "generation": 1632314379282380
+    },
+    {
+      "slot": 97631459,
+      "accounts_hash": "EXCmpk8xjtzsow8EH56CQJzQncMgiF6D1s9DJ3pw9q8d",
+      "generation": 1632545325132907
+    }
+  ],
+  "bounded_comparison": {
+    "diagnostic_worker_sha256": "ce11632f4ffdf9764c8c3158e692c096efebe349e8fe35274d8f2808f08d9b68",
+    "invocation_id": "230ba3113aab4862b678e5671401616a",
+    "journal_sha256": "3e0982f50b5db6ad1e1920adb1b54d63ca2cbb654a872e38fb459ba61aac4c00",
+    "prior_v1_6_20_failure": {"slot": 96767526, "entry": 8, "transaction": 7, "error": "InstructionError Custom(2)"},
+    "later_accepted_batch_start": {"slot": 96767526, "entry": 1106},
+    "terminal_reason": "intentional build-bound rejection of slot 96767527",
+    "full_checkpoint_qualification_passed": false
+  },
+  "publication_gate": "No promotion or publication. Commit and push reviewed source and tests, seal and capability-probe exact binaries, pass fresh admission and invocation-bound guards, reproduce every canonical checkpoint through the terminal root, independently reread the complete private artifact, then separately review registry promotion for epoch 224 only. Ordinary production still requires full, current-plugin, boundary and authenticated R2 gates."
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "horizon-normal6-current0200-guard-booking-v1",
+  "owner": "/root",
+  "previous": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/ROOT_NORMAL6_OPERATION37_DATA512_BOOKING.json",
+    "sha256": "4a3035f075a3828ebb174ac0627b0ec7946d0f77c9903940191d8296084f1d55"
+  },
+  "previous_retained_DATA_lower_bound_bytes": 5164041712276,
+  "new_retained_DATA_bytes": 536870912,
+  "complete_DATA_bytes": 5164578583188,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA5_closed_before_guard_build": true,
+  "all_failed_original_actor_and_DATA_promises_retained": true,
+  "guard0130_was_not_booked_or_built": true,
+  "no_replay_or_resource_credit": true
+}

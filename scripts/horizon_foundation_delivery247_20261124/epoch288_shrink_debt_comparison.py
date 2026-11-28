@@ -1,0 +1,1170 @@
+"""Prepare the private, bounded epoch 288 shrink-debt comparison."""
+
+import argparse
+import ast
+from datetime import datetime, timezone
+import fcntl
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import stat
+import subprocess
+import tempfile
+import time
+
+
+V = Path('/var/lib/jetstreamer')
+CONTROL = V / 'horizon-seven-publication-controller-v222'
+SOURCE = Path('/home/ubuntu/workspace/jetstreamer')
+SOURCE_DIRECTORY = Path('scripts/horizon_foundation_delivery247_20261124')
+ORIGINAL = V / 'horizon288-full-v303'
+ORIGINAL_ROOT = Path('/home/ubuntu/.jetstreamer-private/qualification-288-root-v303')
+PREPARATION = V / 'horizon288-worker-shrink-debt-v327'
+PACKAGE = V / 'horizon288-shrink-debt-comparison-v327'
+FULL_PACKAGE = V / 'horizon288-full-shrink-debt-v1'
+FULL_UNIT = 'horizon-qualify-288-root-shrink-debt-v1.service'
+RECEIPTS = PACKAGE / 'guard-receipts'
+TOKENS = V / 'horizon288-shrink-debt-comparison-tokens-v327'
+RUN = Path('/home/ubuntu/.jetstreamer-private/qualification-288-shrink-debt-compare-v327')
+UNIT = 'horizon-perf-epoch288-shrink-debt@v327.service'
+GUARD_UNIT = 'horizon-288-shrink-debt-protective-v327.service'
+CAP = 501_073_741_824
+FLOOR = 3_770_104_987_645
+MEMORY = 225_000_000_000
+CPUS = frozenset(range(64, 72))
+ADAPTER = 'diagnostic288_shrink_debt'
+PLAN_SHA = 'b345c5da0e420df8455793e5c1373fcd20dc385aabd85901a1818566ff7db30d'
+TERMINAL229 = V / 'horizon229-trace-ram-v325/terminal.json'
+TIMER_CORRECTION229 = TERMINAL229.with_name('terminal-timer-correction.json')
+RETIREMENT288 = V / 'horizon288-unpacked-retirement-v328/batch-039-completion.json'
+BANK_DELTA229_UNIT = 'horizon-perf-epoch229-bank-delta@v334.service'
+BANK_DELTA229_GUARDS = V / 'horizon229-bank-delta-v334/guard-receipts'
+DEMOTION229_GUARDS = {
+    f'horizon-qualify-229-called-program-demotion-v{attempt}.service':
+        V / f'horizon229-called-program-demotion-v{attempt}/guard-receipts'
+    for attempt in (1, 2)
+}
+EXTRACT226_UNIT = 'horizon-qualify-226-checkpoint-continuation-extract-v2.service'
+EXTRACT226_BROKER = 'foundation-226-original225-broker-v2.service'
+EXTRACT226_STATE = V / 'horizon226-extract-v2'
+LAYERED226_STATE = V / 'horizon226-extract-v3'
+LAYERED226_UNIT = 'horizon-qualify-226-checkpoint-continuation-extract-v3.service'
+LAYERED226_BROKER = 'foundation-226-original225-broker-v3.service'
+LAYERED226_LAUNCH_SHA = '30f1fd1a0009ff63c22f1aac39438caf570acaddfaf90bd656331e2895294df8'
+STAGING292_HELPER = V / 'horizon292-appendvec-restage-capacity-v308/epoch226_layered_capacity.py'
+STAGING292_HELPER_SHA = 'b77c611c5bc628779787dffed0b53f4e19c82179372f1b0154558edffd4e2976'
+PARK292_UNIT = 'foundation-292-appendvec-custody-v308.service'
+PARK292_START = V / 'horizon292-closed-appendvec-staging-v308/custody-start.json'
+STAGE228_UNIT = 'foundation-228-sparse-bundle-v1.service'
+STAGE228 = V / 'horizon228-private-guest-staging-v1'
+STAGE229_UNIT = 'foundation-229-closed-accounts-stage-v1.service'
+STAGE229 = V / 'horizon229-v1-accounts-custody-v1'
+STAGE229_BUNDLE = STAGE229 / 'epoch-229-closed-accounts.pax.zst'
+STAGE229_CAP = 96 << 30
+STAGE229_METADATA = 64 << 20
+STAGE288_UNIT = 'foundation-288-appendvec-stage-v2.service'
+STAGE288 = V / 'horizon288-closed-appendvec-study-v1'
+HOLDING288_UNITS = {
+    STAGE288_UNIT: ('staging-start-v2.json', 'staging-start-v1', '112', 98 << 30),
+    'foundation-288-appendvec-custody-v1.service': ('custody-start.json', 'custody-start-v1', '113-114', 2 << 30),
+    'horizon-restore-288-appendvec-stream-v1.service': (
+        'comparison-start.json', 'comparison-start-v1', '113-114', 2 << 30),
+}
+BOOTSTRAP231_UNIT = 'foundation-231-capped-bootstrap-parity-v2.service'
+BOOTSTRAP231 = V / 'horizon231-capped-bootstrap-parity-v2'
+BOOTSTRAP230_UNIT = 'foundation-230-capped-bootstrap-v1.service'
+BOOTSTRAP230 = V / 'horizon230-native-restart-v1'
+BOOTSTRAP_CPUS = '118-121'
+BOOTSTRAP_MEMORY = 160 << 30
+TAIL230_BUILD_UNIT = 'foundation-230-final-tail-parent-build-v1.service'
+TAIL230_BUILD = V / 'horizon230-final-tail-parent-build-v1'
+TAIL230_UNIT = 'horizon-qualify-230-final-tail-v1.service'
+TAIL230_STATE = V / 'horizon230-final-tail-v1'
+TAIL230_MOUNT = Path('/home/ubuntu/.jetstreamer-private/epoch230-final-tail-tmpfs-v1')
+TAIL230_HANDOFF_BYTES = 150_000_000_000
+PUBLIC_AUDIT = V / 'horizon-foundation-public-audit-148-156-v1'
+PUBLIC_AUDIT_RELEASE_SHA = 'ea750bf0be9c6742af0ca1503e8cba094594557e1b5225ad8ff93f693f2a344d'
+SUFFIX226_UNIT = 'horizon-qualify-226-checkpoint-continuation-suffix-v1.service'
+SUFFIX226_STATE = V / 'horizon226-suffix-v1'
+CONTINUATION230_GUARDS = {
+    f'horizon-qualify-230-checkpoint-continuation-fit-v{attempt}.service':
+        V / f'horizon230-checkpoint-continuation-fit-v{attempt}/guard-receipts'
+    for attempt in (2, 3)
+}
+CONTINUATION230_GUARDS[TAIL230_UNIT] = TAIL230_STATE / 'guard-receipts'
+RAM_TMPFS_FLOOR = 2 << 30
+REPLAY231 = V / 'horizon231-capped-replay-v1'
+REPLAY231_UNIT = 'horizon-perf-epoch231-capped-replay@v1.service'
+STOCK231 = V / 'horizon231-stock-warmup-v1'
+STOCK231_UNIT = 'horizon-perf-epoch231-stock-warmup@v1.service'
+STOCK231_MOUNT = Path('/home/ubuntu/.jetstreamer-private/epoch231-stock-warmup-tmpfs-v1')
+DEMOTION231 = V / 'horizon231-demotion-v1'
+DEMOTION231_UNIT = 'horizon-perf-epoch231-program-demotion@v1.service'
+DEMOTION231_MOUNT = Path('/home/ubuntu/.jetstreamer-private/epoch231-demotion-tmpfs-v1')
+REPLAY231_PACKAGES = {REPLAY231_UNIT: REPLAY231, STOCK231_UNIT: STOCK231, DEMOTION231_UNIT: DEMOTION231}
+RAM_QUOTES = {
+    229: (Path('/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v1'),
+          170_000_000_000, 395_000_000_000, frozenset(range(80, 88))),
+    230: (Path('/home/ubuntu/.jetstreamer-private/epoch230-continuation-tmpfs-v1'),
+          150_000_000_000, MEMORY, frozenset(range(72, 80))),
+    231: (Path('/home/ubuntu/.jetstreamer-private/epoch231-capped-replay-tmpfs-v1'),
+          150_000_000_000, MEMORY, frozenset(range(40, 48))),
+}
+DEMOTION229_RETRY = (Path('/home/ubuntu/.jetstreamer-private/epoch229-demotion-tmpfs-v2'),
+                     425_000_000_000, 475_000_000_000, frozenset(range(80, 88)))
+GUARDS = {
+    226: V / 'horizon226-extract-v2/guard-receipts',
+    229: V / 'horizon229-trace-ram-v325/guard-receipts',
+    230: V / 'horizon230-program-demotion-ram-v328/guard-receipts',
+    231: REPLAY231 / 'guard-receipts',
+    252: V / 'horizon252-regional-full-guard-receipts-v1',
+    257: V / 'horizon257-full-guard-receipts-v1',
+    261: V / 'horizon261-full-guard-receipts-v1',
+    288: RECEIPTS,
+    292: V / 'horizon292-full-guard-receipts-v322',
+}
+
+
+def binding(path):
+    with path.open('rb') as stream:
+        return dict(path=str(path), sha256=hashlib.file_digest(stream, 'sha256').hexdigest())
+
+
+def checked(reference):
+    path = Path(reference['path'])
+    info = path.stat()
+    assert path.resolve() == path and stat.S_ISREG(info.st_mode)
+    assert info.st_uid == 0 and not info.st_mode & 0o222
+    assert binding(path)['sha256'] == reference['sha256'], path
+    if 'device' in reference:
+        assert (info.st_dev, info.st_ino, info.st_size) == (
+            reference['device'], reference['inode'], reference.get('size', reference.get('bytes'))), path
+    return path
+
+
+def read(reference):
+    return json.loads(checked(reference).read_bytes())
+
+
+def read_guard_sample(path):
+    with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW), 'rb') as stream:
+        before = os.fstat(stream.fileno())
+        assert before.st_uid == 0 and stat.S_ISREG(before.st_mode)
+        assert stat.S_IMODE(before.st_mode) in (0o400, 0o600)
+        raw = stream.read()
+        after = os.fstat(stream.fileno())
+    assert len(raw) == before.st_size == after.st_size
+    assert (before.st_mtime_ns, before.st_ctime_ns) == (after.st_mtime_ns, after.st_ctime_ns)
+    return json.loads(raw), dict(path=str(path), sha256=hashlib.sha256(raw).hexdigest())
+
+
+def fixed(path, sha):
+    return dict(path=str(path), sha256=sha)
+
+
+def plan_inputs():
+    proposed = fixed(PREPARATION / 'guarded-comparison-plan.json', PLAN_SHA)
+    plan = read(proposed)
+    assert plan['schema'] == 'foundation-epoch288-guarded-storage-comparison-plan-v327'
+    assert (plan['epoch'], plan['bootstrap_slot'], plan['threshold_slot'], plan['verification_slot']) == (
+        288, 124415782, 124429562, 124435861)
+    assert plan['argv'] == [plan['node']['path'], '288', str(RUN / 'output'), '--verify',
+                            f"--snapshot-archive={plan['bootstrap']['path']}", f'--epoch-hashes={RUN}/epoch-hashes.txt',
+                            '--qualification-end-slot=124435861',
+                            f'--horizon-output={RUN}/output/epoch-288-shrink-debt-control.jet']
+    assert plan['maximum_comparison_cap_bytes'] == plan['previous_peak_limit_bytes'] == CAP
+    assert plan['original_root_physical_bytes'] > CAP
+    assert plan['requires_fresh_capacity'] and not plan['publication_authorized']
+    candidate = read(plan['candidate'])
+    assert candidate['sealed_worker'] == plan['worker'] and candidate['epoch'] == 288
+    assert not candidate['production_replay_started'] and not candidate['live_storage_comparison_passed']
+    source = read(fixed(ORIGINAL / 'namespace-inputs.json',
+                        'fdf7516c0661bf46be894b9ff3b2e8e5c9816ded47a4fcbc343c517573630feb'))
+    assert (source['node'], source['snapshot']) == (plan['node'], plan['bootstrap'])
+    checked(plan['worker'])
+    checked(plan['node'])
+    checked(source['map'])
+    bootstrap = plan['bootstrap']
+    path = Path(bootstrap['path'])
+    stamp = path.stat()
+    # Preserve the already qualified bootstrap's exact read-only inode. The
+    # replay also compares the initialized account hash with the pinned root.
+    assert path.resolve() == path and stat.S_ISREG(stamp.st_mode)
+    assert (stamp.st_dev, stamp.st_ino, stamp.st_size, stamp.st_uid, stat.S_IMODE(stamp.st_mode)) == (
+        bootstrap['device'], bootstrap['inode'], bootstrap['bytes'], bootstrap['uid'], bootstrap['mode'])
+    mounts = plan['same_source_mounts']
+    expected = {p.replace(str(ORIGINAL_ROOT), str(RUN)): row for p, row in source['bindings'].items()}
+    expected[str(RUN / 'epoch-hashes.txt')] = mounts[str(RUN / 'epoch-hashes.txt')]
+    assert mounts == expected
+    for row in mounts.values():
+        checked(row)
+    names = checked(mounts[str(RUN / 'epoch-hashes.txt')]).read_text().splitlines()
+    checkpoint_ref = plan['checkpoint_receipt']
+    checkpoint_path = Path(checkpoint_ref['path'])
+    stamp = checkpoint_path.stat()
+    # This authenticated GCS receipt was sealed by the login user.
+    assert checkpoint_path.resolve() == checkpoint_path and stamp.st_uid == 1000 and not stamp.st_mode & 0o222
+    assert binding(checkpoint_path) == checkpoint_ref
+    checkpoint = json.loads(checkpoint_path.read_bytes())
+    basename, generation = checkpoint['versioned_uri'].rsplit('/', 1)[1].rsplit('#', 1)
+    assert generation == '1647637015038234' and checkpoint['exact_generation_metadata_matches']
+    assert checkpoint['finalized_slot']['id'] == plan['verification_slot']
+    assert names == [path.name, basename]
+    terminal = read(plan['terminal'])
+    assert terminal['epoch'] == 288 and terminal['root_preserved'] and not terminal['publication_authorized']
+    assert terminal['root_physical_bytes_at_trip'] == plan['original_root_physical_bytes']
+    return proposed, plan, source
+
+
+def rendered_unit(plan, source):
+    predecessor = fixed(ORIGINAL / 'producer.service',
+                        '0a4b8ccf9d5b25889a5b74cbf515be4ae3e406da302a1ad02eb46a358a947a2c')
+    base = checked(predecessor).read_text().replace(str(ORIGINAL_ROOT), str(RUN))
+    replacement = {
+        'Description': 'Private epoch 288 bounded shrink-debt comparison',
+        'AllowedCPUs': '64-71',
+        'CPUAffinity': '64-71',
+        'ReadOnlyPaths': ' '.join(map(str, (TOKENS, RUN / 'output/compact-indexes',
+                                         plan['bootstrap']['path'], Path(plan['node']['path']).parent,
+                                         plan['worker']['path'], source['map']['path']))),
+        'BindReadOnlyPaths': ' '.join(f'{row["path"]}:{dest}' for dest, row in plan['same_source_mounts'].items()),
+        'ExecStart': shlex.join(plan['argv']),
+    }
+    for key, new in replacement.items():
+        old, = (line for line in base.splitlines() if line.startswith(key + '='))
+        base = base.replace(old, key + '=' + new)
+    worker, = (line for line in base.splitlines() if line.startswith('Environment="JETSTREAMER_HISTORICAL_WORKER_V1_8_11='))
+    base = base.replace(worker, f'Environment="JETSTREAMER_HISTORICAL_WORKER_V1_8_11={plan["worker"]["path"]}"')
+    fields = base.splitlines()
+    assert f'MemoryMax={MEMORY}' in fields and 'CPUQuota=800%' in fields and 'Restart=no' in fields
+    assert f'Environment="JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256={source["map"]["sha256"]}"' in fields
+    assert str(ORIGINAL_ROOT) not in base and '--root-checkpoint-cohort' not in base
+    return base
+
+
+def static_guard_plan():
+    return dict(schema='jetstreamer-horizon-standalone-guard-plan-v1', unit=UNIT,
+                invocation_id='0' * 32, filesystem='/', worker_root=str(RUN),
+                receipt_directory=str(RECEIPTS), maximum_worker_vmas=3_500_000,
+                minimum_free_bytes=FLOOR, maximum_root_physical_bytes=CAP)
+
+
+def load_existing():
+    prior = V / 'horizon292-full-v322/admit.py'
+    spec = importlib.util.spec_from_file_location('accepted_entry', prior)
+    kit = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(kit)
+    return kit
+
+
+def stopped_diagnostic229(row, ops):
+    terminal_ref = fixed(TERMINAL229, '1c9b2aa1cfd21c57bcfc9f91a6d94bd458ca8ad94a57c3073148299671cdc9bd')
+    terminal = read(terminal_ref)
+    state = terminal['producer']
+    assert terminal['epoch'] == 229 and terminal['schema'] == 'foundation-epoch229-slot-hash-v325-terminal'
+    assert not terminal['publication_authorized'] and row['phase'] == 'diagnostic-qualification'
+    assert row['launch_receipt_sha256'] == terminal['registration']['sha256']
+    assert (state['Id'], state['InvocationID']) == (row['producer']['Id'], row['producer']['InvocationID'])
+    assert state['ActiveState'] == 'failed' and state['MainPID'] == state['ControlPID'] == '0'
+    assert not state['ControlGroup'] and ops.props(state['Id'], list(state)) == state
+    correction_ref = fixed(TIMER_CORRECTION229, '9a9bd77d1eb3c54a4cfab6f861fa85660b85496359c881804cd72bfea6f0fb64')
+    correction = read(correction_ref)
+    assert correction['original_terminal'] == terminal_ref and correction['invocation_id'] == state['InvocationID']
+    token = read(correction['launch_token'])
+    clock = correction['guard_timer_before']
+    assert clock['InvocationID'] == token['guard_timer_invocation'] and token['invocation_id'] == state['InvocationID']
+    for name, recorded in ((clock['Unit'], correction['guard_service_drained']),
+                           (clock['Id'], correction['guard_timer_drained'])):
+        assert recorded['ActiveState'] == 'inactive' and not recorded['Job']
+        assert ops.props(name, list(recorded)) == recorded
+    return dict(terminal=terminal_ref, timer_correction=correction_ref)
+
+
+def extraction226_scope():
+    layered = LAYERED226_STATE / 'fleet-launch.json'
+    if layered.exists():
+        launch = read(fixed(layered, LAYERED226_LAUNCH_SHA))
+        assert (launch['unit'], launch['broker_unit']) == (LAYERED226_UNIT, LAYERED226_BROKER)
+        return LAYERED226_STATE, LAYERED226_UNIT, LAYERED226_BROKER
+    return EXTRACT226_STATE, EXTRACT226_UNIT, EXTRACT226_BROKER
+
+
+def completed_extraction226(ops, state, producer, broker):
+    path = state / 'control/success-drain-completion.json'
+    if not path.exists():
+        return None
+    receipt = binding(path)
+    row = read(receipt)
+    assert row['schema'] == 'foundation-epoch226-extraction-success-drain-v1'
+    assert row['epoch'] == 226 and row['prefix_retained'] is True and row['remote_mutations'] is False
+    intent = read(row['intent'])
+    assert intent['schema'] == 'foundation-epoch226-extraction-success-drain-intent-v1'
+    assert row['handoff'] == intent['handoff']
+    launch = read(intent['original_launch'])
+    assert (launch['epoch'], launch['operation'], launch['unit'], launch['broker_unit']) == (
+        226, 'extract', producer, broker)
+    assert intent['original_launch'] == binding(state / 'fleet-launch.json')
+    assert (row['producer']['Id'], row['after']['broker']['Id']) == (producer, broker)
+    for unit in (producer, broker):
+        current = ops.props(unit, ['ActiveState', 'MainPID', 'ControlPID', 'ControlGroup', 'Job'])
+        assert current['ActiveState'] in ('inactive', 'failed') and current['MainPID'] == current['ControlPID'] == '0'
+        assert not current['ControlGroup'] and not current['Job']
+        assert not (Path('/sys/fs/cgroup/system.slice') / unit).exists()
+    return dict(completion=receipt, launch=intent['original_launch'], invocation_id=launch['invocation_id'])
+
+
+def latest_accepted_fleet(kit):
+    prefix = 'horizon-foundation-seven-lane-v'
+    completed = (path for path in kit.measure.DIAGNOSTICS.glob(prefix + '*')
+                 if path.name.removeprefix(prefix).isdigit() and (path / 'completion.json').is_file())
+    directory = max(completed, key=lambda path: int(path.name.removeprefix(prefix)))
+    completion = binding(directory / 'completion.json')
+    done = read(completion)
+    fleet_ref = done['fleet']
+    fleet_path = directory / 'fleet.json'
+    assert fleet_ref['path'] == str(fleet_path) and fleet_path.resolve() == fleet_path
+    metadata = fleet_path.stat()
+    assert stat.S_ISREG(metadata.st_mode) and metadata.st_uid == 0 and not metadata.st_mode & 0o022
+    fleet = kit.ops.bound(fleet_ref)
+    assert (fleet['first_epoch'], fleet['last_epoch'], len(fleet['epochs'])) == (201, 300, 100)
+    assert fleet['inventory']['anomalies'] == 0
+    assert (fleet['observer_receipt'], fleet['observer_sha256']) == (done['observer']['path'], done['observer']['sha256'])
+    sampled = datetime.fromisoformat(fleet['sampled_at_utc']).timestamp()
+    assert 0 <= time.time() - sampled < 1800, 'accepted campaign observation is stale'
+    return completion, fleet_ref, fleet
+
+
+def active_292_custody(ops):
+    owner = ops.props(PARK292_UNIT, [
+        'Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID', 'ControlGroup',
+        'AllowedCPUs', 'MemoryMax', 'MemoryCurrent', 'NRestarts',
+    ])
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup']
+        assert not (Path('/sys/fs/cgroup/system.slice') / PARK292_UNIT).exists()
+        return None
+    start_ref = binding(PARK292_START)
+    start = read(start_ref)
+    intent = read(start['intent'])
+    assert owner['ActiveState'] == 'active' and owner['SubState'] == 'running'
+    assert start['schema'] == 'foundation-epoch292-appendvec-custody-start-v1'
+    assert intent['schema'] == 'foundation-epoch292-appendvec-custody-start-intent-v1'
+    assert start['epoch'] == intent['epoch'] == 292
+    assert owner['Id'] == intent['unit'] == PARK292_UNIT and start['verified_executed_binary']
+    assert {key: owner[key] for key in start['owner']} == start['owner']
+    binary = checked(intent['binary'])
+    assert Path(f"/proc/{int(owner['MainPID'])}/exe").resolve(strict=True) == binary
+    booked = intent['capacity']
+    assert booked['booked_nvme_metadata_bytes'] == 64 << 20
+    assert booked['candidate_memory_bytes'] == int(owner['MemoryMax']) == 2 << 30
+    assert not start['local_retirement_authorized'] and not intent['local_retirement_authorized']
+    return dict(start=start_ref, owner=owner, remaining_bytes=booked['booked_nvme_metadata_bytes'])
+
+
+def active_228_staging(ops):
+    owner = ops.props(STAGE228_UNIT, [
+        'Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID', 'ControlGroup',
+        'AllowedCPUs', 'MemoryMax', 'MemoryCurrent', 'IOReadBandwidthMax',
+    ])
+    group = Path('/sys/fs/cgroup/system.slice') / STAGE228_UNIT
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
+        return None
+    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (STAGE228_UNIT, 'active', 'running')
+    assert owner['ControlGroup'] == '/system.slice/' + STAGE228_UNIT and int(owner['MainPID']) > 0
+    start_ref = binding(STAGE228 / 'start.properties')
+    start = dict(line.split('=', 1) for line in checked(start_ref).read_text().splitlines())
+    assert {key: owner[key] for key in start} == start
+    fit_ref = binding(STAGE228 / 'fit.json')
+    fit = read(fit_ref)
+    assert fit['schema'] == 'foundation-epoch228-sparse-staging-fit-v1'
+    assert int(owner['MemoryMax']) == fit['candidate_memory_max_bytes'] == 130 << 30
+    assert owner['AllowedCPUs'] == '58-59' and owner['IOReadBandwidthMax'] == '/dev/nvme0n1p1 150000000'
+    assert fit['candidate_tmpfs_bytes'] == 128 << 30 and not fit['publication_authorized'] and not fit['r2_mutations']
+    return dict(start=start_ref, fit=fit_ref, owner=owner)
+
+
+def active_288_holding(ops, unit):
+    record, schema, cpus, memory = HOLDING288_UNITS[unit]
+    owner = ops.props(unit, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
+                            'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
+    group = Path('/sys/fs/cgroup/system.slice') / unit
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
+        return None
+    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (unit, 'active', 'running')
+    start_ref = binding(STAGE288 / record)
+    start = read(start_ref)
+    assert start['schema'] == 'foundation-epoch288-appendvec-' + schema
+    assert owner['ControlGroup'] == '/system.slice/' + unit
+    assert all(owner[key] == start['owner'][key] for key in ('InvocationID', 'MainPID', 'ControlGroup'))
+    binary = checked(start['binary'])
+    assert Path('/proc', owner['MainPID'], 'exe').samefile(binary)
+    assert int(owner['MemoryMax']) == start['memory_max_bytes'] == memory
+    assert owner['AllowedCPUs'] == start['cpus'] == cpus
+    if unit == STAGE288_UNIT:
+        assert start['remote_mutations'] is False
+    else:
+        assert start['canonical_archive_mutations'] is False
+    return dict(start=start_ref, owner=owner)
+
+
+def active_229_staging(ops):
+    owner = ops.props(STAGE229_UNIT, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
+                                     'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
+    group = Path('/sys/fs/cgroup/system.slice') / STAGE229_UNIT
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
+        return None
+    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (STAGE229_UNIT, 'active', 'running')
+    assert owner['ControlGroup'] == '/system.slice/' + STAGE229_UNIT
+    start_ref = binding(STAGE229 / 'start.json')
+    start = read(start_ref)
+    assert start['schema'] == 'foundation-epoch229-local-accounts-stage-start-v1'
+    assert all(owner[key] == start['owner'][key] for key in ('InvocationID', 'MainPID', 'ControlGroup'))
+    assert Path('/proc', owner['MainPID'], 'exe').samefile(checked(start['binary']))
+    admission = read(start['admission'])
+    assert admission['schema'] == 'foundation-epoch229-local-accounts-stage-admission-v1'
+    assert admission['unit'] == STAGE229_UNIT and admission['admitted'] is True
+    assert admission['maximum_bundle_bytes'] == STAGE229_CAP
+    assert int(owner['MemoryMax']) == 2 << 30 and owner['AllowedCPUs'] == '78-79'
+    assert start['retirement_authorized'] is False and start['remote_mutations'] is False
+    allocated = 0
+    for path in (STAGE229_BUNDLE, STAGE229_BUNDLE.with_suffix('.zst.part')):
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            continue
+        assert stat.S_ISREG(metadata.st_mode) and metadata.st_dev == STAGE229.stat().st_dev
+        assert metadata.st_uid == 0 and metadata.st_nlink in (1, 2) and metadata.st_size <= STAGE229_CAP
+        allocated = max(allocated, metadata.st_blocks * 512)
+    remaining = max(0, STAGE229_CAP - allocated) + STAGE229_METADATA
+    return dict(start=start_ref, owner=owner, remaining_bytes=remaining)
+
+
+def active_bootstrap(ops, unit, state, schema):
+    owner = ops.props(unit, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
+                                        'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
+    group = Path('/sys/fs/cgroup/system.slice') / unit
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
+        return None
+    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (unit, 'active', 'running')
+    start_ref = binding(state / 'start.json')
+    start = read(start_ref)
+    assert start['schema'] == schema
+    assert owner['ControlGroup'] == '/system.slice/' + unit
+    assert all(owner[key] == start['owner'][key] for key in ('InvocationID', 'MainPID', 'ControlGroup'))
+    assert Path('/proc', owner['MainPID'], 'exe').samefile(checked(start['binary']))
+    assert int(owner['MemoryMax']) == start['memory_max_bytes'] == BOOTSTRAP_MEMORY
+    assert owner['AllowedCPUs'] == start['cpus'] == BOOTSTRAP_CPUS
+    assert start['replay_launch_authorized'] is False
+    return dict(start=start_ref, owner=owner)
+
+
+def active_230_tail_build(ops):
+    unit = TAIL230_BUILD_UNIT
+    owner = ops.props(unit, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
+                             'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
+    group = Path('/sys/fs/cgroup/system.slice') / unit
+    if owner['ActiveState'] in ('inactive', 'failed'):
+        assert owner['MainPID'] == '0' and not owner['ControlGroup'] and not group.exists()
+        return None
+    assert (owner['Id'], owner['ActiveState'], owner['SubState']) == (unit, 'active', 'running')
+    start_ref = binding(TAIL230_BUILD / 'start.json')
+    start = read(start_ref)
+    admission = read(start['admission'])
+    assert all(owner[key] == start['owner'][key] for key in ('MainPID', 'InvocationID', 'ControlGroup'))
+    assert owner['ControlGroup'] == '/system.slice/' + unit and owner['AllowedCPUs'] == '16-17'
+    assert int(owner['MemoryMax']) == admission['memory_reserve_bytes'] == 24 << 30
+    assert admission['epoch'] == 230 and admission['unit'] == unit
+    assert Path('/proc', owner['MainPID'], 'exe').samefile('/usr/bin/bash')
+    assert admission['replay_launch_authorized'] is False and admission['publication_authorized'] is False
+    assert admission['output_reserve_bytes'] == 1 << 30
+    return dict(start=start_ref, owner=owner, remaining_disk_bytes=admission['output_reserve_bytes'])
+
+
+def active_public_audit(helper, census):
+    units = [name for name in census if name.startswith('foundation-public-audit-')]
+    if not units:
+        return None
+    unit, = units
+    match = re.fullmatch(r'foundation-public-audit-epoch(14[89]|15[0-6])-256-cap1-v1\.service', unit)
+    assert match, unit
+    epoch = int(match[1])
+    launch_ref = binding(PUBLIC_AUDIT / f'launch-{epoch}.json')
+    launch = read(launch_ref)
+    admission = read(fixed(PUBLIC_AUDIT / f'admission-{epoch}.json', launch['admission_sha256']))
+    assert launch['schema'] == 'horizon-foundation-public-audit-launch-v1'
+    assert admission['schema'] == 'horizon-foundation-public-audit-admission-v1'
+    assert launch['unit'] == unit and launch['epoch'] == admission['epoch'] == epoch
+    assert admission['release_sha256'] == PUBLIC_AUDIT_RELEASE_SHA
+    assert admission['archive_scratch_bytes'] == admission['swap_max_bytes'] == 0
+    assert admission['remote_writes_authorized'] is False
+    owner = helper.active_props(unit, launch['launch']['InvocationID'])
+    for key in ('MainPID', 'ControlGroup', 'AllowedCPUs', 'MemoryMax'):
+        assert owner[key] == launch['launch'][key], (unit, key)
+    assert owner['AllowedCPUs'] == admission['requested_cpus'] == '60-63'
+    assert int(owner['MemoryMax']) == admission['requested_memory_max_bytes'] == 16 << 30
+    reader = checked(fixed(Path(admission['argv'][0]), admission['reader_sha256']))
+    assert Path('/proc', owner['MainPID'], 'exe').samefile(reader)
+    return dict(launch=launch_ref, owner=owner)
+
+
+def capacity(kit, candidate_epoch=288, *, demotion_retry=False, replay231='capped', stage229=False,
+             probe230=False, tail230=False):
+    assert not demotion_retry or candidate_epoch == 229
+    assert replay231 == 'capped' or candidate_epoch == 231
+    assert not stage229 or (candidate_epoch == 229 and not demotion_retry)
+    assert not probe230 or candidate_epoch == 230
+    assert not tail230 or (candidate_epoch == 230 and not probe230)
+    ram_quote = None if stage229 or probe230 else (DEMOTION229_RETRY if demotion_retry else RAM_QUOTES.get(candidate_epoch))
+    if candidate_epoch == 231:
+        mount = {'capped': RAM_QUOTES[231][0], 'stock': STOCK231_MOUNT, 'demotion': DEMOTION231_MOUNT}[replay231]
+        ram_quote = (mount, *RAM_QUOTES[231][1:])
+    if tail230:
+        ram_quote = (TAIL230_MOUNT, *RAM_QUOTES[230][1:])
+    extract_state, extract_unit, extract_broker = extraction226_scope()
+    terminal226 = completed_extraction226(kit.ops, extract_state, extract_unit, extract_broker)
+    if candidate_epoch == 226:
+        assert terminal226 is not None, 'epoch 226 extraction and its broker have not drained'
+        profile = read(binding(SUFFIX226_STATE / 'static-prestart-qualification.json'))
+        assert profile['epoch'] == 226 and profile['unit'] == SUFFIX226_UNIT and profile['guard_static_validation']['validated']
+        guard = read(profile['guard_plan_fixture'])
+        assert guard['unit'] == SUFFIX226_UNIT and guard['minimum_free_bytes'] == FLOOR
+        candidate_disk = guard['maximum_root_physical_bytes']
+        template = checked(profile['producer_template']).read_text().splitlines()
+        memory, = [line.split('=', 1)[1] for line in template if line.startswith('MemoryMax=')]
+        affinity, = [line.split('=', 1)[1] for line in template if line.startswith('AllowedCPUs=')]
+        candidate_memory = int(memory)
+        candidate_cpus = kit.measure.source.helper.cpus(affinity)
+    elif stage229:
+        candidate_disk, candidate_memory, candidate_cpus = STAGE229_CAP + STAGE229_METADATA, 2 << 30, {78, 79}
+    elif probe230:
+        candidate_disk, candidate_memory = 64 << 20, BOOTSTRAP_MEMORY
+        candidate_cpus = kit.measure.source.helper.cpus(BOOTSTRAP_CPUS)
+    elif ram_quote is not None:
+        _, _, candidate_memory, candidate_cpus = ram_quote
+        candidate_disk = TAIL230_HANDOFF_BYTES if tail230 else 0
+        if tail230:
+            candidate_memory += 1 << 30
+    else:
+        candidate_disk, candidate_memory, candidate_cpus = CAP, MEMORY, CPUS
+    completion, fleet_ref, fleet = latest_accepted_fleet(kit)
+    assert [(r['epoch'], r['state']) for r in fleet['inventory']['entries'] if r['epoch'] == candidate_epoch] == [(candidate_epoch, 'missing')]
+    helper = kit.measure.source.helper
+    owners, growth, guard_paths, reconciled = {}, {}, {}, {}
+    for row in fleet['active']:
+        epoch, producer = row['epoch'], row['producer']
+        assert epoch in GUARDS and epoch not in owners and epoch not in reconciled
+        if epoch == 229 and producer['InvocationID'] == '505abb8828c54c138078e97f9277b817':
+            reconciled[epoch] = stopped_diagnostic229(row, kit.ops)
+            continue
+        if producer['Id'] == extract_unit and terminal226 is not None:
+            assert epoch == 226 and row['phase'] == 'private-held-extraction'
+            assert producer['InvocationID'] == terminal226['invocation_id']
+            assert row['launch_receipt_sha256'] == terminal226['launch']['sha256']
+            reconciled[epoch] = terminal226
+            continue
+        assert epoch != candidate_epoch, 'comparison candidate already has a live owner'
+        owner = helper.active_props(producer['Id'], producer['InvocationID'])
+        assert owner['MainPID'] == producer['MainPID']
+        owners[epoch] = owner
+        if epoch == 231:
+            package = REPLAY231_PACKAGES[producer['Id']]
+            loaded = read(binding(package / 'cadence-registration.json'))
+            assert row['phase'] == 'diagnostic-qualification' and row['scratch_path'] == loaded['run_root']
+            assert loaded['unit'] == producer['Id'] and loaded['epoch'] == 231
+            assert loaded['invocation_id'] == owner['InvocationID'] and loaded['main_pid'] == int(owner['MainPID'])
+            assert loaded['canonical_epoch_publication_authorized'] is False
+            assert loaded['guard_plan'] == binding(package / 'guard-plan.json')
+        if epoch == 288:
+            full = producer['Id'] == FULL_UNIT
+            root = FULL_PACKAGE if full else PACKAGE
+            registration = binding(root / 'cadence-registration.json')
+            launched = read(registration)
+            if full:
+                assert row['phase'] == 'replay' and Path(row['scratch_path']).is_relative_to(launched['run_root'])
+                assert launched['kind'] == 'epoch288-full-shrink-debt-replay'
+            else:
+                assert row['phase'] == 'diagnostic-qualification' and row['scratch_path'] == str(RUN)
+            assert launched['epoch'] == 288 and launched['unit'] == producer['Id'] == (FULL_UNIT if full else UNIT)
+            assert launched['invocation_id'] == owner['InvocationID']
+            assert launched['main_pid'] == int(owner['MainPID'])
+            assert launched['canonical_epoch_publication_authorized'] is False
+            assert launched['guard_plan'] == binding(root / 'guard-plan.json')
+        if producer['Id'] == BANK_DELTA229_UNIT:
+            guard_paths[epoch] = BANK_DELTA229_GUARDS
+        elif producer['Id'] in DEMOTION229_GUARDS:
+            guard_paths[epoch] = DEMOTION229_GUARDS[producer['Id']]
+        elif producer['Id'] == SUFFIX226_UNIT:
+            guard_paths[epoch] = SUFFIX226_STATE / 'guard-receipts'
+        elif producer['Id'] == extract_unit:
+            guard_paths[epoch] = extract_state / 'guard-receipts'
+        elif producer['Id'] in CONTINUATION230_GUARDS:
+            guard_paths[epoch] = CONTINUATION230_GUARDS[producer['Id']]
+        elif epoch == 231:
+            guard_paths[epoch] = package / 'guard-receipts'
+        elif producer['Id'] == FULL_UNIT:
+            guard_paths[epoch] = FULL_PACKAGE / 'guard-receipts'
+        else:
+            guard_paths[epoch] = GUARDS[epoch]
+        growth[epoch] = kit.measure.source.growth_for(epoch, owner, guard_paths[epoch])
+        if epoch == 288:
+            sample = kit.ops.bound(growth[epoch]['sample'])
+            assert sample['plan_sha256'] == launched['guard_plan']['sha256']
+            assert growth[epoch]['cap_bytes'] == CAP and growth[epoch]['floor_bytes'] == FLOOR
+    broker = None
+    live = list(owners.values())
+    if terminal226 is None:
+        broker_record = kit.ops.bound(kit.ops.ref(extract_state / 'held-broker.json'))
+        broker = kit.ops.props(extract_broker, ['Id', 'ActiveState', 'SubState', 'MainPID', 'InvocationID',
+                                                  'ControlGroup', 'AllowedCPUs', 'MemoryMax', 'MemoryCurrent'])
+        assert (broker['ActiveState'], broker['SubState'], int(broker['MainPID'])) == ('active', 'running', broker_record['broker_pid'])
+        live.append(broker)
+    custody = active_292_custody(kit.ops)
+    if custody is not None:
+        live.append(custody['owner'])
+    stage228 = active_228_staging(kit.ops)
+    if stage228 is not None:
+        live.append(stage228['owner'])
+    accounts_stage = active_229_staging(kit.ops)
+    if accounts_stage is not None:
+        live.append(accounts_stage['owner'])
+    holding288 = {unit: item for unit in HOLDING288_UNITS
+                  if (item := active_288_holding(kit.ops, unit)) is not None}
+    assert len(holding288) <= 1, 'epoch 288 holding phases overlap'
+    live.extend(item['owner'] for item in holding288.values())
+    bootstrap231 = active_bootstrap(kit.ops, BOOTSTRAP231_UNIT, BOOTSTRAP231,
+                                    'foundation-epoch231-capped-bootstrap-parity-start-v1')
+    bootstrap230 = active_bootstrap(kit.ops, BOOTSTRAP230_UNIT, BOOTSTRAP230,
+                                    'foundation-epoch230-capped-bootstrap-start-v1')
+    live.extend(bootstrap['owner'] for bootstrap in (bootstrap231, bootstrap230) if bootstrap is not None)
+    tail230_build = active_230_tail_build(kit.ops)
+    if tail230_build is not None:
+        live.append(tail230_build['owner'])
+    census = subprocess.check_output(['systemctl', 'list-units', '--type=service', '--state=running,activating',
+        '--no-pager', '--no-legend', '--plain', 'horizon-qualify-*', 'horizon-perf-*', 'horizon-upload-*',
+        'horizon-restore-*', 'foundation-*-broker-*', 'foundation-public-audit-*',
+        'foundation-*-ext4-*', PARK292_UNIT, STAGE228_UNIT, STAGE229_UNIT, 'foundation-288-appendvec-*',
+        'foundation-231-capped-bootstrap-parity-*', BOOTSTRAP230_UNIT, TAIL230_BUILD_UNIT],
+        text=True, timeout=10)
+    listed_units = {line.split()[0] for line in census.splitlines() if line.strip()}
+    public_audit = active_public_audit(helper, listed_units)
+    if public_audit is not None:
+        live.append(public_audit['owner'])
+    assert listed_units == {row['Id'] for row in live}, census
+    assert all(r['AllowedCPUs'] and not (candidate_cpus & helper.cpus(r['AllowedCPUs'])) for r in live)
+    mem = {k: int(value.split()[0]) * 1024 for k, value in
+           (line.split(':', 1) for line in Path('/proc/meminfo').read_text().splitlines())
+           if k in ('MemAvailable', 'MemTotal')}
+    memory_commitments = sum(max(0, int(row['MemoryMax']) - int(row['MemoryCurrent'])) for row in live)
+    memory_room = mem['MemAvailable'] - mem['MemTotal'] // 10 - memory_commitments
+    tail230_running = 230 in owners and owners[230]['Id'] == TAIL230_UNIT
+    if tail230_running:
+        memory_room -= 1 << 30
+    root_device = Path('/').stat().st_dev
+    for epoch in RAM_QUOTES:
+        if epoch in growth:
+            diagnostic = kit.ops.bound(kit.ops.ref(guard_paths[epoch].parent / 'guard-plan.json'))
+            assert Path(diagnostic['filesystem']).stat().st_dev != root_device
+    disk_growth = {epoch: row for epoch, row in growth.items() if epoch not in RAM_QUOTES}
+    floor = max(row['floor_bytes'] for row in disk_growth.values())
+    assert floor == FLOOR
+    device = os.statvfs(RUN.parent)
+    assert RUN.parent.stat().st_dev == root_device
+    free = device.f_bavail * device.f_frsize
+    protected = floor + sum(row['remaining_growth_bytes'] for row in disk_growth.values()) + helper.PUBLICATION_SCRATCH
+    if custody is not None:
+        protected += custody['remaining_bytes']
+    if holding288:
+        protected += 64 << 20
+    if accounts_stage is not None:
+        protected += accounts_stage['remaining_bytes']
+    if tail230_build is not None:
+        protected += tail230_build['remaining_disk_bytes']
+    if tail230_running:
+        protected += TAIL230_HANDOFF_BYTES
+    staging = None
+    if extract_state == LAYERED226_STATE:
+        source = checked(fixed(STAGING292_HELPER, STAGING292_HELPER_SHA))
+        spec = importlib.util.spec_from_file_location('funded292_staging', source)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        start, owner, disk, memory = module.staging_cost(kit.ops, root_device, device.f_frsize)
+        assert custody is None or (owner['ActiveState'] == 'inactive' and disk == memory == 0)
+        protected += disk
+        memory_room -= memory
+        staging = dict(start=start, owner=owner, remaining_bytes=disk, memory_cap=memory)
+    retirement_ref = None
+    if candidate_epoch == 288:
+        retirement_ref = fixed(RETIREMENT288, '7867cca9dea1f76def23cae3630941d73ae36241e6637bc6e212458f5b3ee008')
+        retirement = read(retirement_ref)
+        retired = read(retirement['check'])
+        assert retirement['retirement_complete'] and retirement['end'] == retired['matching_files'] == 322833
+        assert retired['matching_allocated_bytes'] == 51_918_905_344 and retired['protected_files'] == 7757
+    result = dict(epoch=candidate_epoch, fleet=fleet_ref, completion=completion, sampled_unix_seconds=int(time.time()),
+                live_units=owners, broker=broker, guards=growth, free_bytes=free, protected_disk_bytes=protected,
+                reconciled_terminal_owners=reconciled, selective_retirement=retirement_ref, extraction226_terminal=terminal226,
+                staging292=staging, custody292=custody, staging228=stage228, staging229=accounts_stage,
+                staging288=holding288.get(STAGE288_UNIT), holding288=holding288, bootstrap231=bootstrap231,
+                bootstrap230=bootstrap230, tail230_build=tail230_build,
+                public_audit=public_audit,
+                guard_minimum_free_bytes=floor, memory_room_bytes=memory_room, candidate_cap_bytes=candidate_disk,
+                candidate_memory_max_bytes=candidate_memory, candidate_cpus=sorted(candidate_cpus),
+                disk_shortfall_bytes=max(0, protected + candidate_disk - free),
+                memory_shortfall_bytes=max(0, candidate_memory - memory_room),
+                publication_authorized=False)
+    if ram_quote is not None:
+        filesystem, peak, _, _ = ram_quote
+        assert filesystem.is_mount() and filesystem.stat().st_dev != root_device
+        mount = os.statvfs(filesystem)
+        tmpfs_available_bytes = mount.f_bavail * mount.f_frsize
+        result.update(tmpfs_available_bytes=tmpfs_available_bytes, candidate_ram_cap_bytes=peak,
+                      tmpfs_shortfall_bytes=max(0, peak + RAM_TMPFS_FLOOR - tmpfs_available_bytes))
+    return result
+
+
+def cadence_changes():
+    marker = 'diagnostic229_slot_hash_ram'
+    plan_hook = '    inactive229.adopt({}, plan[\'gates\'][\'230\'][\'evidence\'], epoch=230)'
+    replacements = {
+        'cycle.py': [(f'import {marker}\n', f'import {marker}\nimport {ADAPTER}\n'),
+                     (f"cfg['diagnostic_replays'] += {marker}.configuration()",
+                      f"cfg['diagnostic_replays'] += {marker}.configuration()\ncfg['diagnostic_replays'] += {ADAPTER}.configuration()"),
+                     (plan_hook, plan_hook + f'\n    {ADAPTER}.gate(plan)'),
+                     (f'and not {marker}.owns(r)', f'and not {marker}.owns(r) and not {ADAPTER}.owns(r)')],
+        'native_binding_replays.py': [(f'import {marker}\n', f'import {marker}\nimport {ADAPTER}\n'),
+                                      (f', {marker}', f', {ADAPTER}, {marker}')],
+    }
+    changes = {}
+    for filename, substitutions in replacements.items():
+        path = CONTROL / filename
+        old = path.read_text()
+        new = old
+        for before, after in substitutions:
+            assert new.count(before) == 1, (filename, before)
+            new = new.replace(before, after)
+        ast.parse(new, filename=filename)
+        changes[filename] = (old, new)
+    return changes
+
+
+def remote_source(guard_source, *, full=False):
+    prefix = ['runuser', '-u', 'ubuntu', '--', 'git', '-C', str(SOURCE)]
+
+    def git(*args):
+        return subprocess.check_output([*prefix, *args], timeout=15)
+
+    branch = git('rev-parse', 'origin/account-updates').decode().strip()
+    for revision in ('83659c40', 'e66470be', guard_source['commit']):
+        git('merge-base', '--is-ancestor', revision, branch)
+    launcher = Path(__file__)
+    adapter = launcher.with_name(ADAPTER + '.py')
+    parent = launcher.parent.stat()
+    assert parent.st_uid == 0 and not parent.st_mode & 0o222
+    if not full:
+        for file in (launcher, adapter):
+            relative = SOURCE_DIRECTORY / file.name
+            committed = git('show', f'{branch}:{relative}')
+            checked(fixed(file, hashlib.sha256(committed).hexdigest()))
+    sources = guard_source['compiled_source_sha256']
+    expected = {f'jetstreamer-utils/src/horizon_standalone_guard_{part}.rs' for part in ('bin', 'handoff', 'native227', 'root')}
+    assert set(sources) == expected
+    for name, digest in sources.items():
+        committed = git('show', f"{guard_source['commit']}:{name}")
+        assert hashlib.sha256(committed).hexdigest() == digest, name
+    return branch
+
+
+def sealed_file(path, content, mode=0o400):
+    with path.open('xb') as out:
+        os.fchmod(out.fileno(), mode)
+        out.write(content)
+        out.flush()
+        os.fsync(out.fileno())
+    descriptor = os.open(path.parent, os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    return binding(path)
+
+
+def create_private_tree(mounts):
+    RUN.mkdir(mode=0o700)
+    for relative in ('tmp/isolated-empty-gcloud', 'state', 'output/compact-indexes/287', 'output/compact-indexes/288'):
+        (RUN / relative).mkdir(parents=True, mode=0o700)
+    for destination in map(Path, mounts):
+        if destination.is_relative_to(RUN):
+            destination.touch(mode=0o400, exist_ok=False)
+    for path in [RUN, *RUN.rglob('*')]:
+        os.chown(path, 1000, 1000)
+
+
+NAMESPACE_PROBE = r'''
+import hashlib, json, os, sys
+from pathlib import Path
+data = json.loads(sys.argv[1]); assert os.getuid() == 1000
+for destination, row in data['mounts'].items():
+    path = Path(destination); st = path.stat()
+    assert os.statvfs(path).f_flag & os.ST_RDONLY, path
+    if 'device' in row:
+        assert (st.st_dev, st.st_ino, st.st_size) == (row['device'], row['inode'], row['size']), path
+    with path.open('rb') as stream:
+        assert hashlib.file_digest(stream, 'sha256').hexdigest() == row['sha256'], path
+for item in ('worker', 'node'):
+    row = data[item]; image = Path(row['path'])
+    assert os.statvfs(image).f_flag & os.ST_RDONLY and os.access(image, os.X_OK)
+    with image.open('rb') as stream:
+        assert hashlib.file_digest(stream, 'sha256').hexdigest() == row['sha256'], image
+row = data['snapshot']; path = Path(row['path']); st = path.stat()
+assert os.statvfs(path).f_flag & os.ST_RDONLY
+assert (st.st_dev, st.st_ino, st.st_size) == (row['device'], row['inode'], row['bytes'])
+assert os.environ['JETSTREAMER_HISTORICAL_WORKER_V1_8_11'] == data['worker']['path']
+assert os.environ['JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256'] == data['manifest']['sha256']
+assert os.access(data['root'] + '/state', os.W_OK)
+print(json.dumps(dict(namespace_verified=True, replay_started=False, mounts=len(data['mounts']))))
+'''
+
+
+def prepare(kit, guard_source_ref):
+    guard_source_receipt = read(guard_source_ref)
+    branch = remote_source(guard_source_receipt)
+    guard = checked(guard_source_receipt['guard'])
+    proposed, plan, source = plan_inputs()
+    PACKAGE.mkdir(mode=0o700)
+    RECEIPTS.mkdir(mode=0o700)
+    TOKENS.mkdir(mode=0o755)
+    TOKENS.chmod(0o755)
+    old_token = fixed(V / 'horizon288-full-tokens-v303/pre-start.sh',
+                      '14c316bf3fc8ff28800c9b7bb673f42f95995a2a2b1ac0b9654c36c0a83832e0')
+    token = sealed_file(TOKENS / 'pre-start.sh', checked(old_token).read_bytes(), 0o555)
+    create_private_tree(plan['same_source_mounts'])
+    producer = sealed_file(PACKAGE / 'producer.service', rendered_unit(plan, source).encode())
+    static = kit.ops.funds.put(PACKAGE / 'static-guard-plan.json', static_guard_plan())
+    guard_sha = guard_source_receipt['guard']['sha256']
+    verdict = json.loads(subprocess.check_output([guard, static['path'], '--plan-sha256', static['sha256'],
+        '--self-sha256', guard_sha, '--validate-plan-only'], timeout=20))
+    assert verdict['validated'] and verdict['plan_sha256'] == static['sha256'] and verdict['self_sha256'] == guard_sha
+    properties, argv = kit.startup.start_props(UNIT, Path(producer['path']))
+    assert argv == plan['argv']
+    mount_properties = tuple('--property=' + key + '=' for key in (
+        'ReadWritePaths', 'ReadOnlyPaths', 'BindReadOnlyPaths', 'ProtectHome', 'ProtectSystem', 'WorkingDirectory'))
+    namespace_properties = [p for p in properties if p.startswith((*mount_properties, '--setenv='))]
+    probe = dict(mounts=plan['same_source_mounts'], worker=plan['worker'], node=plan['node'],
+                 manifest=source['map'], snapshot=plan['bootstrap'], root=str(RUN))
+    command = ['systemd-run', '--quiet', '--wait', '--pipe', '--collect', '--unit=foundation-288-shrink-debt-namespace-v327',
+        '--property=Type=exec', '--property=User=ubuntu', '--property=Group=ubuntu', '--property=PrivateNetwork=yes',
+        '--property=NoNewPrivileges=yes', '--property=CPUQuota=100%', '--property=MemoryMax=1G',
+        '--property=MemorySwapMax=0', '--property=RuntimeMaxSec=25', *namespace_properties,
+        '--', '/usr/bin/python3', '-I', '-B', '-c', NAMESPACE_PROBE, json.dumps(probe)]
+    result = json.loads(subprocess.check_output(command, timeout=35))
+    assert result['namespace_verified'] and not result['replay_started']
+    return kit.ops.funds.put(PACKAGE / 'profile.json', dict(epoch=288, proposal=proposed, argv=argv,
+        producer=producer, token=token, guard=guard_source_receipt['guard'], guard_provenance=guard_source_ref,
+        branch=branch, guard_template=static, guard_validation=verdict, namespace=result, publication_authorized=False))
+
+
+def deploy_cadence(kit):
+    adapter = Path(__file__).with_name(ADAPTER + '.py')
+    target = CONTROL / adapter.name
+    changes = cadence_changes()
+    assert not target.exists()
+    old = [sealed_file(PACKAGE / (name + '.previous'), original.encode()) for name, (original, _) in changes.items()]
+    installed = [sealed_file(target, adapter.read_bytes())]
+    for name, (_, content) in changes.items():
+        with tempfile.NamedTemporaryFile(dir=CONTROL, delete=False) as out:
+            os.fchmod(out.fileno(), 0o400)
+            out.write(content.encode())
+            out.flush()
+            os.fsync(out.fileno())
+        path = CONTROL / name
+        os.replace(out.name, path)
+        installed.append(binding(path))
+    descriptor = os.open(CONTROL, os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    return kit.ops.funds.put(PACKAGE / 'cadence-deployment.json', dict(previous=old, installed=installed))
+
+
+def deploy_full_cadence(kit):
+    launcher = Path(__file__)
+    adapter = launcher.with_name('rooted288.py')
+    seal_ref = binding(launcher.with_name('deployment-seal-receipt.json'))
+    seal = read(seal_ref)
+    assert seal['schema'] == 'jetstreamer-sealed-deployment-receipt-v1'
+    assert seal['destination'] == str(launcher.parent) and not seal['replay_launch_authorized']
+    members = {member['name']: member['sha256'] for member in seal['members']}
+    for path in (launcher, adapter):
+        checked(fixed(path, members[path.name]))
+
+    target = CONTROL / adapter.name
+    expected = subprocess.check_output(['runuser', '-u', 'ubuntu', '--', 'git', '-C', str(SOURCE),
+        'show', f'origin/account-updates:{SOURCE_DIRECTORY / adapter.name}'], timeout=15)
+    old = target.read_bytes()
+    assert old == expected
+    candidate = adapter.read_bytes()
+    ast.parse(candidate, filename=adapter.name)
+    backup = sealed_file(FULL_PACKAGE / 'rooted288.py.previous', old)
+    with tempfile.NamedTemporaryFile(dir=CONTROL, delete=False) as out:
+        os.fchmod(out.fileno(), 0o400)
+        out.write(candidate)
+        out.flush()
+        os.fsync(out.fileno())
+    os.replace(out.name, target)
+    descriptor = os.open(CONTROL, os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    return kit.ops.funds.put(FULL_PACKAGE / 'cadence-deployment.json',
+        dict(previous=backup, installed=binding(target), seal=seal_ref, publication_authorized=False))
+
+
+def launch_full(kit, profile_ref):
+    assert profile_ref['path'] == str(FULL_PACKAGE / 'profile.json')
+    profile = read(profile_ref)
+    assert profile['schema'] == 'foundation-epoch288-full-shrink-debt-profile-v1'
+    assert profile['epoch'] == 288 and profile['unit'] == FULL_UNIT
+    assert profile['replay_started'] is False and profile['publication_authorized'] is False
+    assert profile['cpu_affinity'] == sorted(CPUS)
+    assert (profile['disk_cap_bytes'], profile['memory_max_bytes']) == (CAP, MEMORY)
+    namespace = read(profile['namespace'])
+    assert namespace['result'] == dict(namespace_verified=True, replay_started=False, mounts=9)
+    assert namespace['argv'] == profile['argv'] and namespace['verification_terminal'] == 124846819
+    run_root = Path(profile['run_root'])
+    assert run_root == Path('/home/ubuntu/.jetstreamer-private/qualification-288-full-shrink-debt-v1')
+    assert profile['argv'][:5] == [profile['node']['path'], '288', str(run_root / 'output'),
+                                   '--verify', '--root-checkpoint-cohort']
+    guard_unit = profile['guard_unit']
+    assert guard_unit == 'horizon-288-full-shrink-debt-protective-v1.service'
+    guard_plan = read(profile['guard_template'])
+    assert (guard_plan['unit'], guard_plan['worker_root']) == (FULL_UNIT, str(run_root))
+    assert (guard_plan['minimum_free_bytes'], guard_plan['maximum_root_physical_bytes']) == (FLOOR, CAP)
+    assert guard_plan['receipt_directory'] == profile['guard_receipts'] == str(FULL_PACKAGE / 'guard-receipts')
+    assert profile['tokens'] == str(V / 'horizon288-full-shrink-debt-tokens-v1')
+    assert profile['static_guard_validation']['validated']
+    assert not any(Path(profile['guard_receipts']).iterdir())
+    assert list(Path(profile['tokens']).iterdir()) == [Path(profile['token']['path'])]
+    for key in ('node', 'worker', 'producer', 'guard', 'token'):
+        checked(profile[key])
+    _, bounded, source = plan_inputs()
+    assert profile['worker'] == bounded['worker'] and profile['node'] == source['node']
+    assert profile['snapshot'] == source['snapshot']
+    assert namespace['mounts'] == {path.replace(str(ORIGINAL_ROOT), str(run_root)): row
+                                   for path, row in source['bindings'].items()}
+    comparison = read(profile['comparison'])
+    assert comparison['registration'] == binding(PACKAGE / 'cadence-registration.json')
+    assert comparison['candidate_terminal_checkpoint_passed'] and comparison['full_epoch_resource_qualified'] is False
+    assert comparison['candidate_archive']['last_slot'] == 124435861
+    prior = read(binding(PACKAGE / 'profile.json'))
+    guard_provenance = read(prior['guard_provenance'])
+    assert guard_provenance['guard'] == profile['guard']
+    remote_source(guard_provenance, full=True)
+    for unit in (FULL_UNIT, guard_unit, guard_unit.replace('.service', '.timer')):
+        assert kit.ops.props(unit, ['LoadState', 'ActiveState', 'Job']) == {
+            'LoadState': 'not-found', 'ActiveState': 'inactive', 'Job': ''}, unit
+    assert not (FULL_PACKAGE / 'admission.json').exists()
+    inventory = exact_inventory(kit)
+    fit = capacity(kit)
+    assert fit['disk_shortfall_bytes'] == fit['memory_shortfall_bytes'] == 0, fit
+    deployment = deploy_full_cadence(kit)
+    fit = capacity(kit)
+    return guarded_start(kit, profile_ref, fit, inventory, deployment, full=True)
+
+
+def exact_inventory(kit):
+    image = kit.ops.checked_image(kit.ops.R2)
+    command = ['systemd-run', '--quiet', '--wait', '--pipe', '--collect', '--unit=foundation-288-shrink-debt-inventory-v327',
+        '--property=Type=exec', '--property=EnvironmentFile=/etc/jetstreamer/horizon-r2-upload.env',
+        '--setenv=TOKIO_WORKER_THREADS=2', '--', image, 'inventory', '/home/ubuntu/horizon', '--epochs', '288-288',
+        '--receipt-directory', str(kit.measure.PRIVATE / 'r2-receipts')]
+    result = json.loads(subprocess.check_output(command, timeout=45))
+    row, = result['entries']
+    assert result['schema'] == 'jetstreamer-horizon-r2-inventory-v1' and result['anomalies'] == 0
+    assert (row['epoch'], row['state']) == (288, 'missing')
+    return row
+
+
+def guarded_start(kit, profile_ref, fit, inventory, deployment, *, full=False):
+    profile = read(profile_ref)
+    if full:
+        unit = FULL_UNIT
+        package = FULL_PACKAGE
+        guard_unit = profile['guard_unit']
+        receipts = Path(profile['guard_receipts'])
+        tokens = Path(profile['tokens'])
+        run_root = Path(profile['run_root'])
+        worker = profile['worker']
+    else:
+        unit, package, guard_unit, receipts, tokens, run_root = UNIT, PACKAGE, GUARD_UNIT, RECEIPTS, TOKENS, RUN
+        worker = read(profile['proposal'])['worker']
+    assert time.time() - fit['sampled_unix_seconds'] < 20
+    assert fit['disk_shortfall_bytes'] == fit['memory_shortfall_bytes'] == 0
+    registration = package / 'cadence-registration.json'
+    ops, runner, startup = kit.ops, kit.replay, kit.startup
+    timer = guard_unit.replace('.service', '.timer')
+    admission = ops.funds.put(package / 'admission.json', dict(epoch=288, profile=profile_ref, fit=fit, inventory=inventory,
+        deployment=deployment, admitted=True, publication_authorized=False))
+    properties, argv = startup.start_props(unit, checked(profile['producer']))
+    assert argv == profile['argv']
+    properties.append(f'--property=ExecStartPre=/usr/bin/bash {checked(profile["token"])} 60 {tokens}')
+    startup.systemd_run(unit, properties, argv, '--slice=system.slice')
+
+    def held():
+        state = ops.props(unit, ['InvocationID', 'ActiveState', 'SubState', 'MainPID', 'ControlPID'])
+        return state if (state['ActiveState'], state['SubState'], state['MainPID']) == ('activating', 'start-pre', '0') and int(state['ControlPID']) > 0 else None
+
+    invocation = startup.until(held, 12)['InvocationID']
+    guard = profile['guard']
+    template = read(profile['guard_template'])
+    plan = ops.funds.put(package / 'guard-plan.json', dict(template, invocation_id=invocation))
+    guard_properties = ['--property=Type=oneshot', '--property=User=root', '--property=UMask=0077',
+        '--property=Restart=no', '--property=MemoryMax=1G', '--property=MemorySwapMax=0', '--property=CPUQuota=100%',
+        '--property=TasksMax=256', '--property=TimeoutStartSec=90', '--property=ProtectSystem=strict',
+        '--property=ProtectHome=read-only', '--property=PrivateNetwork=yes', '--property=NoNewPrivileges=yes',
+        '--property=CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE',
+        '--property=AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE', f'--property=ReadWritePaths={receipts}']
+    runner.PRODUCER, runner.GUARD_UNIT, runner.TIMER, runner.RECEIPTS = unit, guard_unit, timer, receipts
+    runner.GUARD_SHA = guard['sha256']
+    startup.systemd_run(guard_unit, guard_properties, [guard['path'], plan['path'], '--plan-sha256', plan['sha256'],
+        '--self-sha256', guard['sha256']], '--on-active=1s', '--on-unit-inactive=60s', '--timer-property=AccuracySec=1s',
+        '--timer-property=RandomizedDelaySec=0')
+    first, sample = startup.until(lambda: runner.first_guard(invocation, plan), 35)
+    clock, next_guard = startup.until(runner.timer_ready, 12)
+    assert held()['InvocationID'] == invocation and sample['root_physical_observation_error'] is None
+    token_dir = tokens / invocation
+    token_dir.mkdir(mode=0o755)
+    token_dir.chmod(0o755)
+    token = ops.funds.put(token_dir / 'guard-admission.json', dict(epoch=288, unit=unit, invocation_id=invocation,
+        first_guard=first, guard_plan=plan, guard_timer_invocation=clock['InvocationID'],
+        next_guard_monotonic_usec=next_guard, admission=admission, publication_authorized=False))
+
+    def started():
+        state = ops.props(unit, ['Id', 'InvocationID', 'MainPID', 'ActiveState', 'SubState', 'NRestarts', 'LoadState', 'Result'])
+        if (state['ActiveState'], state['SubState']) != ('active', 'running'):
+            return None
+        assert state['InvocationID'] == invocation and state['NRestarts'] == '0'
+        pid = int(state['MainPID'])
+        assert pid > 0 and (Path('/proc') / str(pid) / 'exe').samefile(argv[0])
+        for path in sorted(receipts.glob('sample-*.json'), key=lambda p: p.stat().st_mtime_ns, reverse=True):
+            observation, ref = read_guard_sample(path)
+            assert observation['producer_invocation_id'] == invocation and observation['plan_sha256'] == plan['sha256']
+            assert observation['guard_sha256'] == guard['sha256'] and observation['trip_reason'] is None
+            if observation['producer']['active'] == 'active' and observation['workers']:
+                assert observation['producer']['pid'] == pid and observation['worker_observation_error'] is None
+                (worker_pid, _), = observation['workers']
+                process = Path('/proc') / str(worker_pid)
+                assert (process / 'exe').readlink().is_relative_to(run_root)
+                assert f'0::/system.slice/{unit}' in (process / 'cgroup').read_text().splitlines()
+                assert binding(process / 'exe')['sha256'] == worker['sha256']
+                return state, pid, worker_pid, observation, ref
+        return None
+
+    state, pid, worker_pid, observation, original_guard = startup.until(started, 220)
+    active_guard = ops.funds.put(package / 'active-guard.json', observation)
+    identity = dict(unit=unit, active_state='active', sub_state='running', main_pid=pid, invocation_id=invocation,
+                    restarts=0, load_state=state['LoadState'], result=state['Result'])
+    scope = dict(kind='epoch288-bounded-shrink-debt-storage-comparison', target_slot=124429562, terminal_slot=124435861)
+    if full:
+        manager = ops.props(unit, ['InvocationID', 'ExecStart', 'ExecMainStartTimestamp'])
+        assert manager['InvocationID'] == invocation
+        started_at = datetime.strptime(manager['ExecMainStartTimestamp'], '%a %Y-%m-%d %H:%M:%S UTC').replace(tzinfo=timezone.utc)
+        scope = dict(kind='epoch288-full-shrink-debt-replay', terminal_slot=124846819,
+                     started_unix_seconds=int(started_at.timestamp()), expected_exec_start=manager['ExecStart'])
+    return ops.funds.put(registration, dict(schema='jetstreamer-historical-performance-launch-receipt-v1',
+        epoch=288, unit=unit, invocation_id=invocation, main_pid=pid,
+        node_path=argv[0], worker=worker, worker_pid=worker_pid, run_root=str(run_root),
+        bootstrap_slot=124415782, **scope,
+        launched=True, entry_replay_requested=True, canonical_epoch_publication_authorized=False, remote_mutations=False,
+        r2_mutations=False, admission=admission, guard_plan=plan, launch_token=token, active_guard=active_guard,
+        evidence=dict(units=[identity], original_guard_sample=original_guard)))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', choices=('inspect', 'capacity', 'capacity-suffix226', 'capacity-continuation230',
+                                          'capacity-demotion229', 'capacity-demotion229-retry',
+                                          'capacity-stage229', 'capacity-bootstrap230',
+                                          'capacity-replay231', 'capacity-stock231', 'capacity-demotion231',
+                                          'prepare', 'launch', 'launch-full'))
+    parser.add_argument('reference', nargs='?')
+    parser.add_argument('sha256', nargs='?')
+    options = parser.parse_args()
+    assert os.geteuid() == 0 and __debug__
+    if options.action == 'capacity':
+        print(json.dumps(capacity(load_existing())))
+        return
+    if options.action == 'capacity-suffix226':
+        print(json.dumps(capacity(load_existing(), candidate_epoch=226)))
+        return
+    if options.action == 'capacity-continuation230':
+        print(json.dumps(capacity(load_existing(), candidate_epoch=230)))
+        return
+    if options.action == 'capacity-stage229':
+        print(json.dumps(capacity(load_existing(), candidate_epoch=229, stage229=True)))
+        return
+    if options.action == 'capacity-bootstrap230':
+        print(json.dumps(capacity(load_existing(), candidate_epoch=230, probe230=True)))
+        return
+    if options.action in ('capacity-replay231', 'capacity-stock231', 'capacity-demotion231'):
+        variant = options.action.removeprefix('capacity-').removesuffix('231')
+        print(json.dumps(capacity(load_existing(), candidate_epoch=231,
+                                  replay231='capped' if variant == 'replay' else variant)))
+        return
+    if options.action in ('capacity-demotion229', 'capacity-demotion229-retry'):
+        print(json.dumps(capacity(load_existing(), candidate_epoch=229,
+                                  demotion_retry=options.action.endswith('-retry'))))
+        return
+    if options.action in ('prepare', 'launch', 'launch-full'):
+        kit = load_existing()
+        assert os.environ['CODEX_THREAD_ID'] == kit.replay.THREAD
+        os.umask(0o077)
+        assert options.reference and options.sha256
+        ref = fixed(Path(options.reference), options.sha256)
+        with kit.partition.take(), (CONTROL / 'cycle.lock').open('a+b') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            assert kit.partition.locked(kit.partition.LOCK, os.getpid())
+            assert kit.ops.props('foundation-publication-cadence-v222.service', ['ActiveState', 'Job']) == {
+                'ActiveState': 'inactive', 'Job': ''}
+            if options.action == 'prepare':
+                print(json.dumps(prepare(kit, ref)))
+                return
+            if options.action == 'launch-full':
+                print(json.dumps(launch_full(kit, ref)))
+                return
+            assert ref['path'] == str(PACKAGE / 'profile.json')
+            profile = read(ref)
+            assert profile['epoch'] == 288 and not profile['publication_authorized'] and profile['namespace']['namespace_verified']
+            remote_source(read(profile['guard_provenance']))
+            assert checked(profile['guard']) and checked(profile['producer']) and checked(profile['token'])
+            assert not any(RECEIPTS.iterdir()) and list(TOKENS.iterdir()) == [Path(profile['token']['path'])]
+            assert not (PACKAGE / 'admission.json').exists()
+            for unit in (UNIT, GUARD_UNIT, GUARD_UNIT.replace('.service', '.timer')):
+                assert kit.ops.props(unit, ['LoadState', 'ActiveState', 'Job']) == {
+                    'LoadState': 'not-found', 'ActiveState': 'inactive', 'Job': ''}, unit
+            plan_inputs()
+            inventory = exact_inventory(kit)
+            fit = capacity(kit)
+            assert fit['disk_shortfall_bytes'] == fit['memory_shortfall_bytes'] == 0, fit
+            deployment = deploy_cadence(kit)
+            fit = capacity(kit)
+            print(json.dumps(guarded_start(kit, ref, fit, inventory, deployment)))
+            return
+    proposed, plan, source = plan_inputs()
+    service = rendered_unit(plan, source)
+    changes = cadence_changes()
+    print(json.dumps(dict(plan=proposed, service=service, controller_sources=sorted(changes),
+                          guard_unit=GUARD_UNIT, static_guard_plan=static_guard_plan(),
+                          replay_started=False, publication_authorized=False)))
+
+
+if __name__ == '__main__':
+    main()

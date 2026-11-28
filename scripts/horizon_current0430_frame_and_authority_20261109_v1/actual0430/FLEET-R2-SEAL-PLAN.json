@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-first-lane-current0430-fleet-plan-20261109-v1-r2",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0430-20261109-v1/fleet-plan-r2.json",
+      "name": "fleet-plan.json",
+      "sha256": "d9e1706dc35a28a5ddd041ab2846da47bd61ca966b48152620066aa754ec9ab5",
+      "mode": 292
+    }
+  ]
+}

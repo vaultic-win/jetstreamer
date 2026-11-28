@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/views-normal-seal-plan.json",
+    "--plan-sha256",
+    "76a0586e16edd170160dd9aad2390d7942b3277f37d311b225e5fd18e5cac2a7",
+    "--self-sha256",
+    "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "722adc397ae24bb4b96d452783599f57",
+  "program": "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment",
+  "timeout_millis": 5000,
+  "wall_started_at": 1794201320
+}

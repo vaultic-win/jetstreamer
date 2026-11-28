@@ -1,0 +1,22 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/cold130-backed-retire-qualification-20261110-v4/cold130-backed-retire-v4/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "a8892fe1f00e6ccc2f306c5c3e8965779a99d157e6c149d85de8ad1574d0277b"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/cold130-backed-retire-qualification-20261110-v4/cold130-backed-retire-v4/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "bccddc012c0891865d1ad4303c18282a084d85d681a82a8c8241d64074db99a7"
+  },
+  "actual_ordinary_test_count": 27,
+  "published_source_sha256": {
+    "main.rs": "329de6da45ff72d3d266322dc52367cc5abe4c741433f12d3ae0ccdce6bff67b",
+    "atomic_fs.rs": "9bcc67b55609a9d1c5b6954bcb0e6c016dc3fae8079c60eab6cbe3271967be51",
+    "canonical.rs": "8bd114edd5c9993e54e686b2233f8acd4f9e2f8eb0d56b3f507e40458dfaed61",
+    "closure.rs": "4c063496bb554c3e21e881ac44de6880aa432973cc003391224c80cdab66f461",
+    "process_references.rs": "3a40d454911072bc03318248e14b5edbae44c0c5bc6f7bf78ec5669cc84172e2",
+    "transaction.rs": "75388efd7b9e9d16f4745f2082c29c8ed70ec36b463d5d1299927e79be882cd1"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0
+}

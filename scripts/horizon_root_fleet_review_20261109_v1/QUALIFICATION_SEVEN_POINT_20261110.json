@@ -1,0 +1,69 @@
+{
+  "schema": "horizon-Root-seven-owner-operating-point-qualification-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "source_members": {
+    "main.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/main.rs",
+      "sha256": "318c1d19a72c8eb0ffb4a97ab5fc6977904ad932ea47ead70693a4b2570eb646"
+    },
+    "memory_target.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/memory_target.rs",
+      "sha256": "ae6ba062ddea8082ef9c6e090cdc58ff250deda853d3675d5e683804cb3f2fda"
+    },
+    "bootstrap.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/bootstrap.rs",
+      "sha256": "e1947abf37376265415f155452b5be745ed563bde89734a3711b0b8ddfe4f031"
+    }
+  },
+  "source_generation": 10,
+  "runtime_generation": 8,
+  "four_strict_compiler_configurations_passed": true,
+  "ordinary_tests_passed": 43,
+  "native_full100row19status_seven_owner_review_passed": true,
+  "proven_replay_count": 7,
+  "memory_selected_target": 14,
+  "ready_pairs": 70,
+  "remaining_epochs": 30,
+  "original_producer_worker_identities_unchanged": true,
+  "hard_memory_and_OOM_deltas_zero": true,
+  "counter_resets_zero": true,
+  "host_full_memory_pressure_fraction": 0.0001255093384974077,
+  "total_transactions_per_second": 6645.563574809992,
+  "no_eighth_replay_admission": true,
+  "no_new_resource_or_archive_authority": true,
+  "evidence": [
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V10_SOURCE_AND_EXACT_REUSED_LIBRARY_FREEZE.json",
+      "sha256": "8932cc7f31a4bb6b61605ee4af6eb19c03c1a3ddd2b132eb4f2cc79fbef78dbf"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V10_CONTROL_CALLBACK_QA_DRAINED.json",
+      "sha256": "fda66032c6a3183a09fff92cec464efb8019201af6010ff06ea80b49fe26b69e"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_EXPLICIT_STANDARD_SEVEN_LANE_OPERATING_REVIEW_060022.json",
+      "sha256": "7557864eedc0ed6451cddd6730528a4a6b31688f6db4ab8d2bd00da73211ef23"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/NATIVE-REVIEW-060022-V8-ORIGINAL-EXECUTION.json",
+      "sha256": "da5fe5dfe18f95dcef7c021f0e3f01bd681a4df6253e4bb1b8224c29bb3bb6b0"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_060022_RUST_V8.json",
+      "sha256": "bc193843407ab8da3b38ea8e07b160d3883475302579a46548ce5eab767f9394"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_060022_NATIVE_V8_DRAINED_EXISTING_NORMAL10_RESTORED.json",
+      "sha256": "65a3e55cbbbf75ab5fd9ddcca5cf6eeb6b111f4634e697731a1c190a7fc2b75b"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_CLOSED_WORK_V7_V8_RETIREMENT_INTENT.json",
+      "sha256": "ac3d170c0702aa935090f9ef02dd8f16984ea2c2d0626f6dcab5d20459a6e2cf"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_CLOSED_WORK_V7_V8_RETIREMENT_COMPLETE.json",
+      "sha256": "eb1960cdfb31f243e487cbf5c01bb7a0029bc8419e38e9e16fa88ceffa1f448f"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+[Unit]
+Description=Observe the native audit child and committed archive prefix
+ConditionPathExists=!/var/lib/jetstreamer/horizon_runtime_data/public-audit73-observer-20261121-v1/PUBLIC_OWNER.json
+RequiresMountsFor=/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1
+
+[Path]
+PathChanged=/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/state/child.json
+PathChanged=/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/state/public-stream-v1/results
+PathChanged=/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/state/public-stream-v1/attempts
+Unit=horizon-audit73-natural-handoff.service
+
+[Install]
+WantedBy=multi-user.target

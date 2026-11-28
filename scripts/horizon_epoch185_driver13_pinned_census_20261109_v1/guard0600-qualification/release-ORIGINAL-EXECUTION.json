@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-current0600-guard-compiler-3-release-20261109-v1-r2-root-r2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 2.205s\nCPU time consumed: 2.438s\nMemory peak: 3.8M\nMemory swap peak: 0B\n"
+}

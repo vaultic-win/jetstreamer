@@ -1,0 +1,345 @@
+{
+  "coordinated_observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T040022Z-postcompletion154-v1.json",
+    "sha256": "3c06e946f1d031dd459feda5dd90d9f4a25f91dd0c29d81006b53ab66342836f"
+  },
+  "current_cycle_reassessment": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+  "latest_authenticated_status_by_epoch": {
+    "136": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-136.status-correction-20261109033231.json",
+      "sha256": "a34378cffecc0d8624825d159ee90d557c070ae9566e8603017cc8986368b578"
+    },
+    "137": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-137.status-correction-20261109033231.json",
+      "sha256": "eabe4f2bbd7315b485c9807c22ac2c60dab98daeed21c7a141386e30354a8adb"
+    },
+    "141": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-141.status-correction-20261109033231.json",
+      "sha256": "2c3d821109770e07eab72d4d964cc4d32716f53e06e77cf6cf33ff9b95e07d1b"
+    },
+    "145": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-145.status-correction-20261109033231.json",
+      "sha256": "c8eca71cc88c4c73ff538b17c8c9ac5f40c60a8fe3b2c908e1ef93c1cb1e258a"
+    },
+    "159": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-159.status-correction-20261109033231.json",
+      "sha256": "bd8b762ca36f4365285ec99bfa5d2ed1863faadfa61690a8a485b5dfc86c8ea6"
+    },
+    "161": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-161.status-correction-20261109033231.json",
+      "sha256": "74c578953a3b0d45d08d4006041e6907ee5d5ab0c5b4aa4879adb64557a41cbb"
+    },
+    "163": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-163.status-correction-20261109033231.json",
+      "sha256": "ec804dac040efe4532ca5a050408579c76bf9989b6e82484531d54d4cb498dfd"
+    },
+    "185": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109033231.json",
+      "sha256": "f83d77d6e6c7e6ae7a06aecb5c67aee446c1c58185a475fceb865609cc26d957"
+    },
+    "186": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-186.status-correction-20261109033231.json",
+      "sha256": "df591b5dab481c2a0667602ec43b39a461598f0b472cf32cf8c28835aca0bf01"
+    },
+    "199": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-199.status-correction-20261109033231.json",
+      "sha256": "d4e27d52f7571927110e70dfd99e667100c4a0b02eae02cfa866dc5b42a5711b"
+    },
+    "200": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-200.status-correction-20261109033231.json",
+      "sha256": "9010ec82ba4b844c2e553e6eb0bdadd9a25d62feb26860d59e5cdfbba479ea2d"
+    }
+  },
+  "owner_review_approved_by_main": true,
+  "owner_updates_by_epoch": {
+    "136": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Finish combined shared-helper and canonical-publisher integration using the qualified timer library and CLI, then advance fresh epoch 136 charge-recovery admission and enrollment. Preserve the original hourly-charge failure and all retained obligations.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-136.status-correction-20261107153407.json",
+        "sha256": "0a7160759bc9e54830fa41543720ffe8e54bab0497b421354a2fc9e2a4f8159f"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      }
+    },
+    "137": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Qualify a distinct exact-input admission envelope for the retained g3 transfer artifacts; the earlier comparable build exceeded its original time and memory limits. Preserve first-entry, release and original failure gates before any consumption or replay.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-137.status-correction-20261107153407.json",
+        "sha256": "1ad4352a77f8d46abe1ac60fbda073636f21b92d40ec335a3a712530341e4ce3"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      }
+    },
+    "141": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Continue canonical epoch 141 input, terminal-root and runtime repair. Preserve retained DATA and CPU obligations; any memory-retirement selection and replay still require complete fresh candidate admission.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-141.status-correction-20261107153407.json",
+        "sha256": "07f53db9330daf9381bc239c93bc4ff1ab5b11132c7ea0a8c83c8741dd73a714"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      }
+    },
+    "145": {
+      "current_internal_stage": "terminal-native-guard-recovery",
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Diagnose original145 v8g1 guard reference closure failure at17:33, preserve all sources/partial and original outcome, qualify recovery exporter and fresh admission before retry. No live replay or export claimed.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-145.status-correction-20261107153407.json",
+        "sha256": "ca4b0fef5685b7511ccf27f0d09c6070e30ebe24f4116123d278558fdda4bc00"
+      },
+      "terminal_event": {
+        "path": "/home/sol/.jetstreamer-private/actual173022-terminal145-status-recovery-20261107-v2/ROOT_ORIGINAL145_TERMINAL_FAILURE_AND_NO_RELEASE.json",
+        "sha256": "00298147c0c204fcd957814ec33f8bdddf1ab1faf34dd21f9b76949a7690afa2"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      }
+    },
+    "159": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Continue trusted source-shred, hidden-PoH and exact-state qualification from the retained successful metadata audit. Preserve its 5,774 requests, 17,322 post-gap targets, 44,102 skipped slots and 61,424 boundaries as metadata evidence; canonical replay and delivery remain unqualified.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-159.status-correction-20261107153407.json",
+        "sha256": "555f75ec76ae1203766f143034a4476d4ba6026be76bba5726e375406d170307"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      }
+    },
+    "161": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Preserve the epoch 161 retained family and completed reader, memory and DATA evidence. After combined shared-helper integration, restore a fresh complete typed tuple before any new candidate admission or producer enrollment.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-161.status-correction-20261107153407.json",
+        "sha256": "4ec083cc2d0c224597bf3e3900cae2011cad0024621c5dadc9d14ecf523ad444"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      }
+    },
+    "163": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Refreshed login validated for exact generation; qualified Rust downloader verified1901405026 compressed bytes with CRC32C/MD5/SHA256 and stable before/after generation metadata. Continue native48/helper qualification, explicit original199 witness-reader integration, fresh complete accounting and guarded replay.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-163.status-correction-20261107153407.json",
+        "sha256": "6354f540471418df3d92d983844529ed051f835069c628522009884dc4ed5dad"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      }
+    },
+    "185": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261107155014.json",
+        "sha256": "676075762409b0e7705c250c0c90f11c562e5012c13221f8e0a7b2ffbfe3555a"
+      },
+      "qualified_state_copy": {
+        "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_STATE_CAPTURE_EXACT_BYTES_AND_UNCHANGED_GUARD_ACCEPTED.json",
+        "sha256": "68e08cced670a337cd5173e03605f465d73c8095fa7fa183244b20ab91c5b950"
+      },
+      "qualified_witness": {
+        "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_ACTUAL_FULL_INPUT_WITNESS_ACCEPTED_CONSUMER_INTEGRATION_PENDING.json",
+        "sha256": "c728698afbbb6dac654b3e3c14428622e51c1e58a53392a4f241e2a451312eb2"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "fixed_work_eta_model": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review7-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW7.json",
+        "sha256": "6fa0bc5c379a47d66e72add1ee72a994c76389f8bce73f945f493f0eab1d358c"
+      },
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      },
+      "actual_Helper34_QA5_closure": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+        "sha256": "1cbf8c099c1f3fe5e5e4f53534194fe883435509be25966908fa529c748b9acf"
+      }
+    },
+    "186": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Qualify retained capped-singleton runtime, continuing-floor accounting and exact registrations. The root 128 guard still needs a production-enforced allocation or write-rate ceiling before its overshoot can be established; preserve existing DATA and all earlier failures.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-186.status-correction-20261107153407.json",
+        "sha256": "eaf50364bf83120499172689fab709d3508c36c3f5aac9b02e33d13b2de89026"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      }
+    },
+    "199": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Preserve the failed cohort output, original live controller and read-only FD 9. Advance distinct HTTP 500 recovery admission, guard enrollment and bounded retry integration after fresh accounting and exact-input gates; the original failed producer is not a live replay.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-199.status-correction-20261107153407.json",
+        "sha256": "513d0b4b9ea374aa751926cf55690cff9ae4c924a2deca9c1dbd6bbae0ffb4f6"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      }
+    },
+    "200": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "Nov9 04:00 recovery. Actual replay0 target5. Driver12 resource-census repair and Helper35 ACTUALLYqualified and normally sealed. H35 four compiler stages2938ordinary126ignored all retainedH34controls and genuine0230Frame complete outer adapter passed; freshQA5closed, normal6GiBextraQA0. Final5 four compilers37ordinary9ignored and native0-7 passed; native8 prestart-only fixed deadline control FAILED at Instant::now>=deadline. Final5 NOT qualified, production not sealed. Likely poll floor submillisecond early timeout; Final6 narrow successor source diagnosis delegated, all original22/30/600 clocks and original failure preserved. Planner6 and Operation38 independent source tasks; no launch until actual qualification/current guard/fresh admission. Canonical retainedDATA5174779130516 includes Final5DATA512MiB once; no P6/O38/guard0400 charges. ActualReview7 deadline04:43:21 retains same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. Original0230Main failed02:47:53 own resourceguardENOENT with zeroOOM counters; actual qualified terminal retained, completed reader not yet retired. Last genuineFrame/resources0230; 0300/0330/0400 are observer/status-only until full current chain qualified. Sole active controller Root; otherhost200-300three lanes and original199FDs protected. Prepare next executable launch dependencies directly; source/build not replay.",
+      "current_task": "Retain epoch 200 input custody, failed cohort lineage and original controller state. Advance the distinct HTTP 500 recovery admission and enrollment with bounded retries, while preserving every independent verification and sidecar gate.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-200.status-correction-20261107153407.json",
+        "sha256": "27d15f81d1bcc8b3a3f0a9fecb96f67d360c308a4d660727f4f64bcac6574008"
+      },
+      "actual_Helper34_fresh_extraQA5_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+        "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+      },
+      "complete_current_DATA_bytes": 5174779130516,
+      "current_complete_DATA_authority": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/ROOT_NORMAL6_FINAL5_DATA512_BOOKING.json",
+        "sha256": "1d515325c612e2eaee5a563a3a744731db8b37682dc4c32ab2962b736f748f91"
+      }
+    }
+  },
+  "parts_by_epoch": {
+    "136": {
+      "remaining_until_prior_authenticated_planning_arrival": 821905797
+    },
+    "137": {
+      "remaining_until_prior_authenticated_planning_arrival": 314856000
+    },
+    "141": {
+      "remaining_until_prior_authenticated_planning_arrival": 455256000
+    },
+    "145": {
+      "guard_process_reference_failure_diagnosis_and_qualified_recovery": 0,
+      "independent_full_plugin_boundary": 0,
+      "source_validation_and_fresh_guarded_export": 108262000,
+      "uncertainty_contingency": 0,
+      "upload_readback_sidecar": 21600000
+    },
+    "159": {
+      "remaining_until_prior_authenticated_planning_arrival": 433656000
+    },
+    "161": {
+      "complete_epoch_replay_and_checkpoint_qualification": 345600000,
+      "full_plugin_boundary_and_authenticated_delivery": 43200000,
+      "recovery_and_queue_contingency": 1656000,
+      "remaining_distinct_successor_and_history_integration": 14400000,
+      "remaining_input_qualification_and_package_admission": 43200000,
+      "retained161_all_original_failure_families_reader_journal_repair_and_requalification_millis": 9000000
+    },
+    "163": {
+      "remaining_until_prior_authenticated_planning_arrival": 304056000
+    },
+    "185": {
+      "archive_close_full_plugin_boundary_verification_millis": 21600000,
+      "bootstrap_load_and_warmup_millis": 3600000,
+      "current_fleet_order_repair_and_launch_controls_millis": 650000,
+      "fresh_full_reader_memory_DATA_and_replay_admission_millis": 3600000,
+      "full_boundary_runtime_native_Frame_successor_qualification_millis": 46021000,
+      "full_epoch_replay_using_same_century_peer_rate_with25percent_contingency_millis": 413404206,
+      "upload_whole_object_readback_and_sidecar_commit_millis": 14400000
+    },
+    "186": {
+      "remaining_until_prior_authenticated_planning_arrival": 462456000
+    },
+    "199": {
+      "remaining_until_prior_authenticated_planning_arrival": 395856000
+    },
+    "200": {
+      "remaining_until_prior_authenticated_planning_arrival": 395856000
+    }
+  },
+  "schema": "horizon-main-status-planning-review-v1",
+  "predecessor_review": {
+    "path": "/home/sol/.jetstreamer-private/actual033022-visible-root-acceptance-20261109-v1/status-estimate-review033022.json",
+    "sha256": "582632deef407646b283761af656a2a97bb77722bda2dded02659d06d0142e3b"
+  },
+  "latest_completed_event_readback": {
+    "path": "/home/sol/.jetstreamer-private/current0230-explicit-control-review7-status-event-20261109-v1/AUTHENTICATED-READBACK.json",
+    "sha256": "eba6818602d992f0dc1d4e2e1c06d0ca317f929523feb16af5853c82814847c5"
+  }
+}

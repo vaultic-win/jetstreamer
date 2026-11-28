@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "epoch": 203,
+  "output_slot_start": 88127581,
+  "output_slot_count": 419,
+  "runtime": {
+    "generation_profile": "jetstreamer-node/0.9.0/old-faithful-to-horizon-v2@ed66145bd39157c083c5f389857dc4718c2cffc4",
+    "runtime_profile": "solana-v1.6.16",
+    "runtime_admission": "candidate",
+    "runtime_revision": "86c26f843276581509c3434acc2efbf4202c44e0",
+    "runtime_toolchain": "rustc 1.51.0 (2fd73fabe 2021-03-23); target=x86_64-unknown-linux-gnu",
+    "runtime_target": "x86_64-unknown-linux-gnu",
+    "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
+  },
+  "worker_executable_sha256": "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc",
+  "archive_sha256": "c3b34173473268950e08e7f1022dd4bc194ab7502fcd6251059c2fbf07fa9615",
+  "bootstrap_archive_sha256": "d3114597ce25c3efaa4a96899ab3e9437c51cb9086d4166639f0ad2ae0613ee6",
+  "bootstrap": {
+    "slot": 88127580,
+    "bank_hash": "HQsCRRQpkS5jFqV3uuDgYixHzxMyiNC1veZWoaNrKJFE",
+    "accounts_hash": "4SeHmKHQrHot4gwifo1bnvDKXZwGELk2vSenotTx9oqf",
+    "last_blockhash": "6WC8FMZqDs7EPqUsZg7SvzWBzPkiwdCLpMPxnkzFgwbr",
+    "capitalization": 499961377837934321,
+    "transaction_count": 21750482415,
+    "tick_height": 5640165184,
+    "slot_complete": true,
+    "write_count": 0,
+    "next_write_version": 83354404203
+  },
+  "terminal": {
+    "slot": 88127999,
+    "bank_hash": "DWVaD73fzmPiigayVKeDqPbGPkJeiCaXWV36eH15Kn4D",
+    "accounts_hash": "E1vVAj3L7bFJyttCduuSk7sNEDssFWhd9Zf29ghLjUeP",
+    "last_blockhash": "8eVbfSWY2UX4KW1ms9y7TJNmJEfc5DfFoXa5iF5W7XgR",
+    "capitalization": 499961377335811827,
+    "transaction_count": 21750645003,
+    "tick_height": 5640192000,
+    "slot_complete": true,
+    "write_count": 576,
+    "next_write_version": 83354994541
+  },
+  "emitted_raw_write_versions": {
+    "start": 83354404203,
+    "end": 83354994541
+  }
+}

@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the original metered batch receipt for epoch 168
+
+[Path]
+PathExistsGlob=/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/private/destination-5bd040760baa4f45854ef3420d18f981d3e80d5acaf485ab90d59cd3b1620fe9/evidence/archive-batches/destination-000000000000fc00-00000000062900a3/batch-*.json
+Unit=horizon-168-metered-committed.service
+
+[Install]
+WantedBy=multi-user.target

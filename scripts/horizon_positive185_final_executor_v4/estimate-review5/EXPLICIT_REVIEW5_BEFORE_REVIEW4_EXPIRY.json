@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-09T01:25:00Z",
+  "review4_deadline_utc": "2026-11-09T01:28:36Z",
+  "review4_not_yet_expired": true,
+  "review5_control_deadline_utc": "2026-11-09T02:25:00Z",
+  "new_remaining_millis": 3600000,
+  "original_native_leases_unchanged": true,
+  "model": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review5-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW5.json",
+    "sha256": "08720c9def3712b29d4b3e8022e7e74134df4dc42655fa7eb5431d5555321b30"
+  }
+}

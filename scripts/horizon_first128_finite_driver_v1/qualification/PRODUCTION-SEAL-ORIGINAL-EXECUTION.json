@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment",
+    "/home/sol/.jetstreamer-private/first128-driver-qa-20261108-v3/PRODUCTION-SEAL-PLAN.json",
+    "--plan-sha256",
+    "9ac54d84a2556c505c0bd3f0ea1a6d5b6531b1197ef85b15a95df698b4f4fd98",
+    "--self-sha256",
+    "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+  ],
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-first128-finite-driver-tools-20261108-v3\",\"member_count\":3,\"outcome\":\"created\",\"plan_sha256\":\"9ac54d84a2556c505c0bd3f0ea1a6d5b6531b1197ef85b15a95df698b4f4fd98\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

@@ -1,0 +1,30 @@
+{
+  "helper": {
+    "path": "/usr/local/lib/jetstreamer/horizon-holding-candidate-20261023-v1/jetstreamer-r2",
+    "sha256": "909248d8e4c1db4c3cd89e1a4f15205b4a59d442494f35b7635038152025bb7e"
+  },
+  "invocation_id": "afc04ba6096f4826836919c2020dcdc6",
+  "native": {
+    "ActiveState": "active",
+    "ControlPID": "0",
+    "DropInPaths": "",
+    "ExecMainStatus": "0",
+    "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-holding-candidate-20261023-v1/jetstreamer-r2 ; argv[]=/usr/local/lib/jetstreamer/horizon-holding-candidate-20261023-v1/jetstreamer-r2 holding-park /usr/local/lib/jetstreamer/horizon-closed166-retry6-holding-plan-20261119-v1/plan.json --spec-sha256 a835a7adf66726ffbdc07eb13def1b917a9de799ff3dc9062ad7441cd182c640 --self-sha256 909248d8e4c1db4c3cd89e1a4f15205b4a59d442494f35b7635038152025bb7e ; ignore_errors=no ; start_time=[Thu 2026-11-19 08:31:40 UTC] ; stop_time=[Thu 2026-11-19 09:24:53 UTC] ; pid=1905099 ; code=exited ; status=0 }",
+    "FragmentPath": "/run/systemd/transient/horizon-closed166-retry6-park-20261119-v1.service",
+    "Id": "horizon-closed166-retry6-park-20261119-v1.service",
+    "InvocationID": "afc04ba6096f4826836919c2020dcdc6",
+    "Job": "",
+    "LoadState": "loaded",
+    "MainPID": "0",
+    "Restart": "no",
+    "Result": "success",
+    "SubState": "exited",
+    "TriggeredBy": ""
+  },
+  "park_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-closed166-retry6-holding-plan-20261119-v1/plan.json",
+    "sha256": "a835a7adf66726ffbdc07eb13def1b917a9de799ff3dc9062ad7441cd182c640"
+  },
+  "schema": "horizon-closed166-retry6-park-terminal-v1",
+  "unit": "horizon-closed166-retry6-park-20261119-v1.service"
+}

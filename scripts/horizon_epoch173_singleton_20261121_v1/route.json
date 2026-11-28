@@ -1,0 +1,118 @@
+{
+  "schema": "epoch173-singleton-immutable-input-route-v2",
+  "argv": [
+    "/usr/local/lib/jetstreamer/horizon-independent173-singleton-package-20261110-v1/jetstreamer-node",
+    "173",
+    "/home/sol/.jetstreamer-private/epoch173-standard-lane-20261110-v1/full-local-20261121-v1/ledger",
+    "--verify",
+    "--root-checkpoint-cohort",
+    "--cohort-manifest=/usr/local/lib/jetstreamer/horizon-independent173-singleton-package-20261110-v1/preflight-173-v4.json",
+    "--cohort-manifest-fingerprint=sha256:41325d910ad0326283caadd340aef7a69a9f2ed7445c15fc13335675699f74f1",
+    "--snapshot-archive=/home/sol/.jetstreamer-private/epoch173-standard-lane-20261110-v1/full-local-20261121-v1/inputs/snapshot-74735808-AidamuGgg4SUPR9zna68M1nWTXaP6dBSkgf3WarrL6yc.tar.zst"
+  ],
+  "environment": {
+    "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME": "1",
+    "JETSTREAMER_ARCHIVE_BACKEND": "http",
+    "JETSTREAMER_CLEAR_ACCOUNTS_ON_START": "true",
+    "JETSTREAMER_COMPACT_INDEX_BASE_URL": "https://files.old-faithful.net/",
+    "JETSTREAMER_ENFORCE_ARCHIVE_HASH": "1",
+    "JETSTREAMER_HISTORICAL_POH_THREADS": "10",
+    "JETSTREAMER_HISTORICAL_REAP_TIMEOUT_SECS": "600",
+    "JETSTREAMER_HISTORICAL_WORKER_V1_5_6": "/usr/local/lib/jetstreamer/horizon-independent173-singleton-package-20261110-v1/jetstreamer-historical-worker-v1-5-6",
+    "JETSTREAMER_HTTP_BASE_URL": "https://files.old-faithful.net/",
+    "JETSTREAMER_LOAD_FROM_DIR": "0",
+    "JETSTREAMER_NETWORK_CAPACITY_MB": "1024",
+    "JETSTREAMER_PRIVATE_RUN_ROOT": "/home/sol/.jetstreamer-private/epoch173-standard-lane-20261110-v1/full-local-20261121-v1/private",
+    "JETSTREAMER_PRUNE_EPOCH_SNAPSHOTS": "0",
+    "JETSTREAMER_RIPGET_THREADS": "12",
+    "JETSTREAMER_SKIP_SNAPSHOT_VERIFY": "0",
+    "JETSTREAMER_THREADS": "12",
+    "JETSTREAMER_VERIFY_SNAPSHOTS": "1",
+    "RAYON_NUM_THREADS": "10",
+    "SOLANA_RAYON_THREADS": "32"
+  },
+  "service_user": "sol",
+  "service_group": "horizon",
+  "writable_lane_mount": "/home/sol/.jetstreamer-private/epoch173-standard-lane-20261110-v1/full-local-20261121-v1",
+  "read_only_input_directory": "/home/sol/.jetstreamer-private/epoch173-standard-lane-20261110-v1/full-local-20261121-v1/inputs",
+  "read_only_file_binds": [
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch173-bootstrap-20261121-v1/inputs/snapshot-74735808-AidamuGgg4SUPR9zna68M1nWTXaP6dBSkgf3WarrL6yc.tar.zst:/home/sol/.jetstreamer-private/epoch173-standard-lane-20261110-v1/full-local-20261121-v1/inputs/snapshot-74735808-AidamuGgg4SUPR9zna68M1nWTXaP6dBSkgf3WarrL6yc.tar.zst",
+    "/usr/local/lib/jetstreamer/horizon-standard-local-input172-20261110-v1/genesis.tar.bz2:/home/sol/.jetstreamer-private/epoch173-standard-lane-20261110-v1/full-local-20261121-v1/ledger/genesis.tar.bz2"
+  ],
+  "node": {
+    "path": "/usr/local/lib/jetstreamer/horizon-independent173-singleton-package-20261110-v1/jetstreamer-node",
+    "sha256": "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65"
+  },
+  "worker": {
+    "path": "/usr/local/lib/jetstreamer/horizon-independent173-singleton-package-20261110-v1/jetstreamer-historical-worker-v1-5-6",
+    "sha256": "cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819"
+  },
+  "manifest": {
+    "path": "/usr/local/lib/jetstreamer/horizon-independent173-singleton-package-20261110-v1/preflight-173-v4.json",
+    "sha256": "b214ea92b55a01b61c791e8aeb3448b4ce90c1118d8c62574376910ea22fddca"
+  },
+  "manifest_fingerprint": "sha256:41325d910ad0326283caadd340aef7a69a9f2ed7445c15fc13335675699f74f1",
+  "source_ancestor": "e6f48efe2749d35d6875fdd3cbd7f6f4379adf75",
+  "snapshot": {
+    "device": 64512,
+    "evidence": "/var/lib/jetstreamer/horizon_runtime_data/epoch173-bootstrap-20261121-v1/SEALED_LOCAL_INPUT.json",
+    "evidence_sha256": "e23b9b88132ed2e3685cfea48163979d96db67ef469c28edd60a2b0347b0eee6",
+    "generation": 1634787554356719,
+    "inode": 103237066,
+    "length": 2341977058,
+    "path": "/home/sol/.jetstreamer-private/epoch173-standard-lane-20261110-v1/full-local-20261121-v1/inputs/snapshot-74735808-AidamuGgg4SUPR9zna68M1nWTXaP6dBSkgf3WarrL6yc.tar.zst",
+    "sha256": "c1d22f44b8a50a3057479898c8df8380e5adc063dd97a50e13e6ab910e8697d3"
+  },
+  "genesis": {
+    "path": "/usr/local/lib/jetstreamer/horizon-standard-local-input172-20261110-v1/genesis.tar.bz2",
+    "sha256": "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"
+  },
+  "preceding_slots_after_bootstrap_inclusive": [
+    74735809,
+    74735999
+  ],
+  "normal_full_replay_range_inclusive": [
+    74736000,
+    75167999
+  ],
+  "mandatory_final_root": 75167662,
+  "trailing_slot_count": 337,
+  "replay_admitted": false,
+  "qualification": {
+    "object_sha256": "40a87f6f0db1012772c292fdce705cc2c8b2a16aacfa03eae1d4820e0f6e8f2e",
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch173-native-route-20261121-v1/NATIVE_BOOTSTRAP_PROJECTION_QUALIFICATION.json",
+    "service": "horizon-epoch173-sealed-native-qualification-20261121-v2.service",
+    "invocation": "ba252691034c43328cc80dda956e11f4",
+    "node_accepted_entire_local_bootstrap": true,
+    "final_checkpoint_count": 1,
+    "runtime_profile": "solana-v1.5.6",
+    "expected_denial": "File too large (os error 27) while creating the private bound worker under the QA-only 2 MiB file ceiling",
+    "worker_started": false,
+    "full_epoch_replayed": false,
+    "archive_created": false
+  },
+  "guard_profile": {
+    "executable": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-recovery-20261120-v1/guard-v1/guard",
+    "sha256": "b2271db6f25696612c388297db3a10852f7911560887f67dcb404392d91f7016",
+    "plan_schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+    "producer_unit": "horizon-qualify-173-full-local-20261121-v1.service",
+    "filesystem": "/home/sol",
+    "worker_root": "/home/sol/.jetstreamer-private/epoch173-standard-lane-20261110-v1",
+    "maximum_worker_vmas": 3500000,
+    "maximum_root_physical_bytes": 309237645312,
+    "timer_on_active_seconds": 1,
+    "timer_on_unit_inactive_seconds": 5,
+    "timer_accuracy_seconds": 1,
+    "admission_fields": [
+      "current protected free-space floor including guard margin",
+      "new actor invocation ID",
+      "root-owned receipt directory"
+    ],
+    "qualification": {
+      "static_receipt_sha256": "ea21aa878bce89a1d6fc443c8e41bc8aa6ef848ddb93cdace6c6c44b861bf873",
+      "validated": true,
+      "samples": 0,
+      "protective_guard_proven": false
+    }
+  }
+}

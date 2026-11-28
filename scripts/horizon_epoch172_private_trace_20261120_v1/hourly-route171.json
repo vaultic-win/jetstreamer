@@ -1,0 +1,78 @@
+{
+  "epoch": 171,
+  "target": 73982256,
+  "bootstrap": {
+    "name": "73871673/hourly/snapshot-73981325-5fCq23m77eJRuui54UCmP57ztKsr8rssDyS1W1pDXhdh.tar.zst",
+    "generation": "1634786185055851",
+    "size": "2098520149",
+    "md5Hash": "7KCzv4QjIZkgBo1sDo+Riw==",
+    "crc32c": "YWUHBg==",
+    "bucket": "mainnet-beta-ledger-asia-sg1",
+    "slot": 73981325
+  },
+  "checkpoint": {
+    "name": "73871796/hourly/snapshot-73982523-AieXwhswWimj4ErHcoPnAXdBqXLc4gB1xXV3wkXcMC9y.tar.zst",
+    "generation": "1634787141906047",
+    "size": "2099334961",
+    "md5Hash": "Qdc7dxNgQGbNmbTP7eWCMg==",
+    "crc32c": "v1Fk1w==",
+    "bucket": "mainnet-beta-ledger-europe-fr2",
+    "slot": 73982523
+  },
+  "slots_to_failure": 931,
+  "slots_beyond_failure": 267,
+  "prefix_bytes": 262144,
+  "prefix_sha256": "5f44b5fcaf3fba9b69f5eeeec482ee6756ef5a812b9ffe6e6a5980ce95058c54",
+  "prefix_tar_headers": [
+    [
+      "accounts/",
+      0
+    ],
+    [
+      "accounts/73779518.1106675516",
+      20480
+    ],
+    [
+      "accounts/73658300.1106654956",
+      16384
+    ],
+    [
+      "accounts/73655393.1106033119",
+      20480
+    ],
+    [
+      "accounts/73752583.1106539952",
+      20480
+    ],
+    [
+      "accounts/73919808.1106850796",
+      24576
+    ],
+    [
+      "accounts/73949373.1106908084",
+      20480
+    ],
+    [
+      "accounts/73679653.1106654448",
+      16384
+    ],
+    [
+      "accounts/73928972.1106868393",
+      77824
+    ],
+    [
+      "accounts/73586570.1106477660",
+      16384
+    ],
+    [
+      "accounts/73632622.1106704680",
+      20480
+    ],
+    [
+      "accounts/73814970.1106635513",
+      20480
+    ]
+  ],
+  "full_archive_verified": false,
+  "bank_restored": false
+}

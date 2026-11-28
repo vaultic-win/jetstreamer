@@ -1,0 +1,51 @@
+{
+  "schema": "horizon-helper31-typed-peer-extra-QA6-additive-DATA4-booking-v1",
+  "actual1630_typed_resource_projection": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-witness-planner-source-20261108-v2/generated-positive-40d41ca8cee9ffe110795f6cdeae59cb95cd08d5606af1eda52f382b48e0aa08-a02607c23eebe6e67ff66db06e64097367175468950a241757abaaea93ae7363/RESOURCE_PLAN_NOT_ADMISSION.json",
+    "sha256": "8ea57e3fe6a44451a0de66a10ab82d4edc352591bf94a0e6465ab953b8070446"
+  },
+  "actual_issued_original_envelope": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-1630-20261108-next/envelope.json",
+    "sha256": "48f00cd85ccc8598eae6ceb3bf4fb56cf6c0081b181e8ce31134cfc3ba8afbc9"
+  },
+  "actual_original_expiry_and_drain": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1630-original-r3-20261108-next/ROOT_ACTUAL1630_ORIGINAL_SETUP_EXPIRED_AND_DRAINED.json",
+    "sha256": "19b8a02bd3aa2f4a11be822c4d23d71d90a9e53a75739548b9df67e88c6500f2"
+  },
+  "original48GiB_and_all_raw_historical_debt_and_candidate_DATA_retained": true,
+  "effective_existing_memory_bytes": 429675499520,
+  "current_admitted_actor_memory_bytes": 51539607552,
+  "current_guard_memory_bytes": 268435456,
+  "normal_pool_bytes": 6442450944,
+  "new_extra_QA6_bytes": 6442450944,
+  "total_pool_bytes": 12884901888,
+  "actual_current_plus_new_QA_bytes": 494368444416,
+  "host_total_bytes": 810902843392,
+  "headroom_bytes": 316534398976,
+  "available_memory_bytes": 787887992832,
+  "coordinated_observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261108T163022Z-postcompletion154-v1.json",
+    "sha256": "cfeb8c07f0113ffa27e64ff6220b6cef3dbc9b6c2d36a07b69bbc6e1a987a011"
+  },
+  "new_additive_retained_DATA_bytes": 4294967296,
+  "previous_complete_DATA_lower_bound_bytes": 5129145102996,
+  "complete_DATA_lower_bound_bytes": 5133440070292,
+  "previous_actual_complete_conservative_raw_DATA_bytes": 5250737975956,
+  "complete_conservative_raw_DATA_bytes": 5255032943252,
+  "required_DATA_including_still_retained185_candidate_bytes": 5804922974868,
+  "available_DATA_bytes": 6977006129152,
+  "serial_compiler_or_ordinary_bytes": 8589934592,
+  "observer_bytes": 2147483648,
+  "status_bytes": 536870912,
+  "Root_bytes": 536870912,
+  "maximum_overlap_bytes": 11811160064,
+  "actual_previous_helper30_QA6_closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-ready-custody-helper-qa-20261108-v30/ROOT_HELPER30_EXTRA_QA6_CLOSED_NORMAL6_RETAINED.json",
+    "sha256": "5e45f23fe98393a2d9cdd891478558c299826e4d869dd75a5d715fb36a0b1cdd"
+  },
+  "no_previous_QA_release_recredited": true,
+  "new_resource_credit_bytes": 0,
+  "replay_launch_authorized": false,
+  "publication_authorized": false,
+  "scope": "Existing exact Helper30 compiler workflow, same native210-small/native227-small extern union, typed original199/failed4 peer validators only; compiler/native phases serialize; no full-epoch or protected payload access"
+}

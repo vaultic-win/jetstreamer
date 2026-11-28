@@ -1,0 +1,28 @@
+[package]
+name = "horizon-167-ancestor-accounts-retire"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[features]
+retry8_167 = []
+independent166 = []
+standard170 = []
+metered168 = []
+metered168_retry4 = []
+metered170_full = []
+
+[dependencies]
+anyhow = "1"
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "retire"
+path = "main.rs"

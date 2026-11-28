@@ -1,0 +1,25 @@
+[Unit]
+Description=Finite retained-native16 isolated full census transition
+[Service]
+Type=exec
+User=root
+Group=root
+Slice=horizon_uploader_cap_transition_20261111_v2.slice
+UMask=0022
+MemoryAccounting=yes
+MemoryMax=536870912
+MemorySwapMax=0
+TasksMax=128
+Restart=no
+RuntimeMaxSec=160s
+TimeoutStopSec=30s
+KillMode=control-group
+LimitFSIZE=4194304
+LimitCORE=0
+NoNewPrivileges=yes
+PrivateNetwork=yes
+ProtectControlGroups=yes
+# Needs native systemctl, systemd-run, the normal sealer, /proc and readonly proofs.
+# Write gates are exact source files/plans; Root must qualify any further sandbox.
+ExecStart=/usr/local/lib/jetstreamer/horizon-uploader-cap-transition-controller-20261111-v4/runner execute ROOT_SEALED_RUN_PLAN ROOT_ACTUAL_RUN_PLAN_SHA ROOT_ACTUAL_SELF_SHA
+ExecStopPost=/usr/local/lib/jetstreamer/horizon-uploader-cap-transition-controller-20261111-v4/runner cleanup ROOT_SEALED_RUN_PLAN ROOT_ACTUAL_RUN_PLAN_SHA ROOT_ACTUAL_SELF_SHA

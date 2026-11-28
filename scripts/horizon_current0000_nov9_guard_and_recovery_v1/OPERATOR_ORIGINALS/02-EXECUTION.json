@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/tmp/continuations0000-helper34-operation36-20261109-v1/execute-current0000-cli-witness-v5-r3.py"
+  ],
+  "code": 0,
+  "stdout": "Qualified original guard phase authenticated for0000 capability\ncapability 0 Running as unit: horizon-first-lane-current0000-chain128-witness-frame-capability-r3-20261109-v5.service; invocation ID: 447c284bcee24f75a24558696e32ac35\n \nQualified original guard phase authenticated for0000 capture\ncapture 0 Running as unit: horizon-first-lane-current0000-chain128-witness-frame-capture-r3-20261109-v5.service; invocation ID: 373db4fe799b4ba799d171a5b846bb6d\n \nGENUINE FRAME CAPTURE {'path': '/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T000022-witness-terminal145-chain128-v5.json', 'sha256': '0c955d7d8ddba037f05c8ed9757d19b05d1cba498311b01bc8db204f0566c13c'}\n",
+  "stderr": ""
+}

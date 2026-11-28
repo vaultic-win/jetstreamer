@@ -1,0 +1,18 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-reader-phase145-busy-candidate-20261109-v3",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/qa/planner",
+      "name": "operation",
+      "sha256": "267231b1daf19b5c8b958dc718357552c619147b4ace56c8eb781360c700f237",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/STATIC-QUALIFIED-NATIVE-PENDING.json",
+      "name": "artifact-proof.json",
+      "sha256": "25d594f430cf58cba30d408d8507c6a7aa1b6292a1d62f9fcc0ea02ca430bd20",
+      "mode": 292
+    }
+  ]
+}

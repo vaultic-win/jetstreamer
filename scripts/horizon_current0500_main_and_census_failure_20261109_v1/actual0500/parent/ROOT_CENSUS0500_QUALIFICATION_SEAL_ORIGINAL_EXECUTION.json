@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-parent-memory-census0500-qualification-20261109-v1\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"427dc3806dae689bc6e84a82012732bc1a68fd1ecaadb397a1eaab81c3e1c2b5\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n"
+}

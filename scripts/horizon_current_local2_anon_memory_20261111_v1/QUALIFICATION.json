@@ -1,0 +1,48 @@
+{
+  "schema": "horizon-current-local2-anon-memory-source-and-native-qualification-v1",
+  "source_sha256": {
+    "main.rs": "9a902996d6de87b5b92508f346265ac16d81492695e7bc97af9750ce229bf3b0",
+    "local2_owners.rs": "60d4627db837ed1aa8ac235fd4060b995f839e0e92d2069651bcd60ecff891a9",
+    "local2_owners_tests.rs": "1b9e7161926f6576b352507e27ee342a4ff3b29e86cf0f221cf5d29275fd1176",
+    "local2-owners.json": "7de1cff572c4f5ed4a09550c852e4b00bdc8fbb65f825a2e60703106f91d395b",
+    "data_guard_reader.rs": "9462ae6dba8588a8424e0f74f0f0c70e45d5e7ef12fc81e2ed2c4090171c4886",
+    "interrupted_recovery.rs": "537f3d120a76373d1eeec3e4f36984c6131b4ace02058c82ae28d8c96206b3c7",
+    "data-guard-registrations.json": "c48928594cfa2526403fc616fac6112b42b35e6511bd686fa4a4b5ae95fc3f99"
+  },
+  "exact_accepted_compiler_graph": {
+    "path": "/var/lib/jetstreamer/current-local2-anon-memory-qualification-20261111-v1/current-local2-anon-memory-v1/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "891d0d29b73c996582e5e855c51385e93abb1d224ca6aa781a29dfdf9b96e373"
+  },
+  "four_strict_and_52_test_result": {
+    "path": "/var/lib/jetstreamer/current-local2-anon-memory-qualification-20261111-v1/current-local2-anon-memory-v1/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "818e1e4fcc6945ab0fbcce5955b6c930c86bd7caf2bc98936772770539231b83"
+  },
+  "normal_source_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-fulfilled-anon-host-kernel-memory-source-20261111-v1/deployment-seal-receipt.json",
+    "sha256": "335495c6b719fcbc91e000441ef46a99af33fc7ca593da72fa8aa8a1f396a318"
+  },
+  "runtime": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-fulfilled-anon-host-kernel-memory-tools-20261110-v1/check",
+    "sha256": "ed0b6215b9def0725f0c2b69678cf5ac0a3a826db1642f4fe3f79bb64cdf4fee"
+  },
+  "normal_runtime_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-fulfilled-anon-host-kernel-memory-tools-20261110-v1/deployment-seal-receipt.json",
+    "sha256": "a6e451803532aa66d7373adb7a6770cf845d71bc0a7d257c9db9431e3657f842"
+  },
+  "actual_native_acceptance": {
+    "path": "/var/lib/jetstreamer/current-local2-anon-memory-qualification-20261111-v1/native-v1/ROOT_ACTUAL_CURRENT_OWNER_MEMORY_QUALIFICATION.json",
+    "sha256": "fa9b08183d40fe7111bc6fb188a2367f870a94c48494418c6b8ffd99834d2cb7"
+  },
+  "actual_original_native_terminal_and_drain": {
+    "path": "/var/lib/jetstreamer/current-local2-anon-memory-qualification-20261111-v1/native-v1/ROOT_NATIVE_CALLBACK_DRAINED_ORIGINAL_PID1_TERMINAL.json",
+    "sha256": "a6894d8e12111f47f616771ded2fe338d6c370a095e2a95ad714a33ea2be7966"
+  },
+  "required_available_memory_bytes": 773038161920,
+  "actual_conservative_available_memory_bytes": 691166310400,
+  "remaining_shortfall_bytes": 81871851520,
+  "candidate_fits": false,
+  "future_whole_service_shared_role_bound_qualified": false,
+  "native_Frame_or_full_Reader_authority": false,
+  "replay_launch_authorized": false,
+  "resource_credit_bytes": 0
+}

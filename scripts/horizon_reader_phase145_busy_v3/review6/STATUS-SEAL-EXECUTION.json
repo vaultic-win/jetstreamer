@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-status185-phase-event0200-review6-tools-20261109-v1\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"7411f015385c2b193aabb6a84ebd498246ad150abff83cc5ac29992f93bd727d\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

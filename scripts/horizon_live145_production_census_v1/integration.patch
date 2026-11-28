@@ -1,0 +1,38 @@
+--- a/jetstreamer-r2/src/fleet.rs
++++ b/jetstreamer-r2/src/fleet.rs
+@@ -2584,0 +2585 @@
++        || name == horizon_recovered_resource_frame_typed_bridge_v1::live145_frame::FAMILY[2]
+@@ -2717,0 +2719,15 @@
++            assert!(!observed_unit_name(name), "{name}");
++        }
++    }
++
++    #[test]
++    fn exact_live145_guard_timer_is_observable_without_opening_a_timer_namespace() {
++        let timer = horizon_recovered_resource_frame_typed_bridge_v1::live145_frame::FAMILY[2];
++        assert!(observed_unit_name(timer));
++        for name in ["horizon-guard145-prefix-shared72h-20261107-v8g2.timer",
++            "horizon-extract145-prefix-shared72h-20261107-v8g1.timer",
++            "horizon-guard145-prefix-shared72h-20261107-v8g1.socket",
++            "../horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++            "horizon-guard145-prefix-shared72h-20261107-v8g1.timer/extra",
++            "horizon-guard145-prefix-shared72h-20261107-v8g1.timer\n",
++            "foreign.timer"] {
+--- a/jetstreamer-r2/src/fleet/live145_fleet.rs
++++ b/jetstreamer-r2/src/fleet/live145_fleet.rs
+@@ -43,0 +44,15 @@
++
++#[cfg(test)] mod production_census_tests {
++ use super::*;
++ #[test]
++ #[ignore = "Root-only readonly production census for exact live145 actor/guard/timer"]
++ fn actual_production_unit_census_accepts_complete_live145_family_and_authenticates_it() {
++  let mut raw=NativeCensus::new();
++  for role in contract::FAMILY { raw.insert(role.to_owned(),crate::fleet::unit(role).unwrap()); }
++  let plan=serde_json::json!({"tracked_units":contract::FAMILY});
++  let (proof,projected)=capture_native(&plan,&raw).unwrap();
++  assert!(proof.is_some());assert!(projected.is_empty());
++  assert_eq!(raw.len(),3);assert!(raw.contains_key(contract::FAMILY[2]));
++  println!("{}",serde_json::json!({"raw_production_census":raw,"authenticated_live145":proof,"archive_body_reads":false,"replay_admission_authorized":false,"memory_or_DATA_credit_bytes":0}));
++ }
++}

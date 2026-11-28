@@ -1,0 +1,39 @@
+{
+  "schema": "horizon-helper34-fresh-extra-QA5-serial-compiler8-and-observer2-booking-v1",
+  "accepted_same_end_capacity": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current2300-20261108-v1/ROOT_CURRENT2300_READONLY_POOL_CAPACITY.json",
+    "sha256": "ed05cc5fd359a7c9fad4d57b0b211aaa2b1b958cd757880dfa4a329245085540"
+  },
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261108T230022Z-postcompletion154-v1.json",
+    "sha256": "0bcd7ebd07e97f94eb592cb04bf92541ef4c66246657998788a68b94c5960212"
+  },
+  "comparable_retained_guard_floor_basis": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver11-helper-qa-20261108-v32/ROOT_EXTRA_QA6_ADDITIVE_DATA4_BOOKING.json",
+    "sha256": "4bef891750ab7364a212e9f9bd377f94698e1229c93c2bd20484ed5f0fba5124"
+  },
+  "normal_pool_bytes": 6442450944,
+  "new_extra_QA5_bytes": 5368709120,
+  "total_external_pool_bytes": 11811160064,
+  "one_serial_compiler_bytes": 8589934592,
+  "ordinary_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "total_overlap_bytes": 11811160064,
+  "minimum_live145_and_retained185_with_external11_bytes": 791695687680,
+  "actual_conservative_MemAvailable_bytes": 793126514688,
+  "guard_runway_headroom_bytes": 1430827008,
+  "total_reserved_bytes_with_extra5": 804556038144,
+  "host_total_bytes": 810902843392,
+  "new_additive_retained_DATA_bytes": 4294967296,
+  "previous_complete_DATA_lower_bound_bytes": 5154378035860,
+  "complete_DATA_lower_bound_bytes": 5158673003156,
+  "conservative_available_DATA_bytes": 6973691551744,
+  "disk_reserve_bytes": 429496729600,
+  "all_old_memory_DATA_and_original185_candidate_promises_retained": true,
+  "no_credit_from_old_QA_releases": true,
+  "no_replay_launch_or_publication": true,
+  "kernel_limits_set_before_first_instruction": true,
+  "no_new_guard_bound_or_armed_after_activation": true,
+  "observer_can_overlap_eightGiB_compiler": true,
+  "serial_compiler_only": true
+}

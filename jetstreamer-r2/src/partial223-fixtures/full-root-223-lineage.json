@@ -1,0 +1,55 @@
+{
+  "schema": "jetstreamer-horizon-open-epoch-repair-v1",
+  "epoch": 223,
+  "open": true,
+  "close_only_after_verified_r2_ready_pair": true,
+  "state": "failed-needs-repair",
+  "unit": "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service",
+  "invocation_id": "e70aaf097e7c4583b216aba454145910",
+  "failure": {
+    "kind": "historical-execution-mismatch",
+    "slot": 96544588,
+    "entry": 4,
+    "transaction": 0,
+    "instruction_index": 0,
+    "expected": "None",
+    "actual": "InstructionError Custom(2)",
+    "signature": "4P2u3JnCkqkaDMG4TC4o2mLVckYmt3MCYzdUvNpTu7RAz3kTfVyPrRzVnchncRpTdBv8nsrCJX9kxVXiAmUxrNtD",
+    "first_failure_utc": "2026-10-25T03:56:14.591149589Z",
+    "terminal_exit_status": 1
+  },
+  "evidence": [
+    {
+      "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/native223-prefix-failure-20261025T035615Z-e70a-v1/complete-pid1-journal.jsonl",
+      "sha256": "58e40c27ef840b8843b531d4ce372e955ae55c878638651979672904706c627f"
+    },
+    {
+      "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/native223-prefix-failure-20261025T035615Z-e70a-v1/failure-excerpt.jsonl",
+      "sha256": "a4e2387263d9acc150c7220c43047e507e6216144b89f0ad711070cd2549f223"
+    },
+    {
+      "path": "/home/ubuntu/workspace/jetstreamer/.codex/tmp-readiness/native223-prefix-failure-20261025T035615Z-e70a-v1/terminal-properties.txt",
+      "sha256": "f788fba4257783ecb4b612405594a3aeadbdfbd2b419c78fa4d007bfbc027aa1"
+    },
+    {
+      "path": "/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1/receipts/failure.json",
+      "sha256": "b8e8950e4578996a5d52e903478b8bf533c15da7352b8b2243ff42495b5ee62a"
+    }
+  ],
+  "retained_artifacts": {
+    "partial_archive": "/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1/output/epoch-223.jet",
+    "observed_size_bytes": 62978346422,
+    "body_hashed": false,
+    "canonical_manifest_present": false,
+    "qualified": false,
+    "receipt_archive_length_field": 0,
+    "discrepancy": "The runner failure receipt reports archive_length 0, while actual retained regular file metadata is 62,978,346,422 bytes. Preserve both; the failure receipt is not an archive inventory or completeness proof."
+  },
+  "next_action": "Preserve the failed original invocation, failure receipt, partial archive and scratch. Authenticate terminal/empty-cgroup/no-reference/no-pending-owner proof and retire the exact stale status through supported conditional cleanup. Diagnose the exact failing transaction and parent Bank hash before any narrowly bounded compatibility experiment; never restart unchanged or bypass transaction verification.",
+  "publication_authorized": false,
+  "remote_mutations": false,
+  "r2_mutations": false,
+  "original_unit": "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service",
+  "original_invocation_id": "e70aaf097e7c4583b216aba454145910",
+  "repaired": false
+}

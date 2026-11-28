@@ -1,0 +1,40 @@
+{
+  "actual_MemAvailable_bytes": 793078263808,
+  "actual_affinity_CPU_count": 64,
+  "actual_free_DATA_bytes": 6946183675904,
+  "actual_free_inodes": 462597578,
+  "actual_full_reader_accepted": true,
+  "actual_raw_obligations_preserved": true,
+  "all_independent_phases_counted_once": true,
+  "candidate_actor_memory_bytes": 51539607552,
+  "creation_deadline": 1794201225,
+  "epoch": 185,
+  "future_guard_memory_bytes": 268435456,
+  "host_total_bytes": 810902843392,
+  "issued_at": 1794201105,
+  "minimum_available_memory_bytes": 700427632640,
+  "ordinary_full_replay_authorized": false,
+  "original_complete_tuple": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current0500-reviewed-metadata-20261109-v1/CURRENT_COMPLETED_TUPLE_AT0500.json",
+    "sha256": "6aca366cc60d74244e59947c6b087667df70deea3734d8183caf2f80f14fc52f"
+  },
+  "projected_memory_bytes": 488333795328,
+  "publication_authorized": false,
+  "qualified_planner_manifest": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/generated-positive-6aca366cc60d74244e59947c6b087667df70deea3734d8183caf2f80f14fc52f-e8d5d625ef385b8b8023b70d22137fc54f84b43d232e08d5b05552ee14ff0818/PLAN_MANIFEST_NOT_ADMISSION.json",
+    "sha256": "7e06adad059f707fda1991515aa045cdf575a83b2ec917a81326294ffd5288de"
+  },
+  "qualified_route": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v38-driver12-helper35-r1-r3/route.json",
+    "sha256": "6cb073558ad5e38f7b842c5690c5c8f82ef530db2b77ab92b68be4a73004ea00"
+  },
+  "required_CPU_micros": 18000000,
+  "required_DATA_bytes": 5767342011028,
+  "resource_credit_bytes": 0,
+  "schema": "horizon-epoch185-independent-Root-positive-admission-acceptance-v1",
+  "source_admission_checks": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261109-v38-driver12-helper35-r1/operation",
+    "sha256": "c014b3d29ff2629ef0778975234fc92cc54be591d7e55d4f9d625bc5f9061fd8"
+  },
+  "unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service"
+}

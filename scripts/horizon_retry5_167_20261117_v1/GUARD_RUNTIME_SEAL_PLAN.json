@@ -1,0 +1,18 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch167-retry5-cap512-data-guard-20261117-v1",
+  "members": [
+    {
+      "mode": 365,
+      "name": "guard",
+      "sha256": "5d53a2da4be9c50073421d4c8748cc519722734e0815a2b52c3e0e873fb3601f",
+      "source": "/home/sol/.jetstreamer-private/private183-holding-shared64-20261115-v1/build/epoch167-retry5-guard-production"
+    },
+    {
+      "mode": 292,
+      "name": "artifact-proof.json",
+      "sha256": "15334ddfd24a5614206ccb581180a70caa5112cff70a8f213000888a5089cd39",
+      "source": "/var/lib/jetstreamer/epoch167-retry5-cap512-guard-qualification-20261117-v1/artifact-proof.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

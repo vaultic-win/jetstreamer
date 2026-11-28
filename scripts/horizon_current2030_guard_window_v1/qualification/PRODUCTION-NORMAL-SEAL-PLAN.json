@@ -1,0 +1,18 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-current2030-bound-guard-window-tools-20261108-v1",
+  "members": [
+    {
+      "name": "horizon-current2030-guard-window",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current2030-window-20261108-v1/work/horizon-current2030-guard-window",
+      "sha256": "246abecace03237dc818511f450515a5e0ea0edb6912b32c48e92812151d33c3",
+      "mode": 365
+    },
+    {
+      "name": "artifact-proof.json",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current2030-window-20261108-v1/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+      "sha256": "e555dc3c528e4f0be9a7ad1fce939e937f385f13ddb2c93017edad81fc082f39",
+      "mode": 292
+    }
+  ]
+}

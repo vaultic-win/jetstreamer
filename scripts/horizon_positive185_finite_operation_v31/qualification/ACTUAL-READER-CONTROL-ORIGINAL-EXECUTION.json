@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-positive185-reader-lifecycle-actual-20261108-v31-driver11-r3.service\npositive185 upstream original: No such file or directory (os error 2)\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=1\nService runtime: 19ms\nCPU time consumed: 17ms\nMemory peak: 5.0M\nMemory swap peak: 0B\n"
+}

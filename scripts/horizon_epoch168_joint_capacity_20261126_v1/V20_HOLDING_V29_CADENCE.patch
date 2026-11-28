@@ -1,0 +1,97 @@
+--- a/holding/replay_price.rs
++++ b/holding/replay_price.rs
+@@ -11,6 +11,8 @@
+ const CADENCE24: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v24-entry146/deployment-seal-receipt.json";
+ const CADENCE25: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v25-entry146/deployment-seal-receipt.json";
+ const CADENCE26: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v26-entry146/deployment-seal-receipt.json";
++const CADENCE29: &str = "/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v29-entry146/deployment-seal-receipt.json";
++const CADENCE29_SHA: &str = "e043840f2a5a756a7fb8272e2ccffcda7ab94de05307041e75578f6de1f036f9";
+ const FULL170_UNIT: &str = "horizon-qualify-170-full-metered-20261124-v1.service";
+ const FOCUSED168_UNIT: &str = "horizon-qualify-168-full-metered-cold-v6-20261126.service";
+ 
+@@ -22,7 +24,7 @@
+     let focused = &q["focused168_retry6"];
+     matches!(
+         q["status_registration"]["consumer_seal"]["path"].as_str(),
+-        Some(CADENCE24 | CADENCE25 | CADENCE26)
++        Some(CADENCE24 | CADENCE25 | CADENCE26 | CADENCE29)
+     ) && focused["terminal"] == ref_for(Path::new(FOCUSED168_TERMINAL), FOCUSED168_TERMINAL_SHA)
+         && focused["resource_credit_bytes"] == 0
+         && focused["processes"].as_array().is_some_and(Vec::is_empty)
+@@ -33,11 +35,29 @@
+     if q["epoch"] != 170
+         || !matches!(
+             q["status_registration"]["consumer_seal"]["path"].as_str(),
+-            Some(CADENCE20 | CADENCE21 | CADENCE22 | CADENCE23 | CADENCE24 | CADENCE25 | CADENCE26)
++            Some(
++                CADENCE20
++                    | CADENCE21
++                    | CADENCE22
++                    | CADENCE23
++                    | CADENCE24
++                    | CADENCE25
++                    | CADENCE26
++                    | CADENCE29
++            )
+         )
+     {
+         return Ok(false);
+     }
++    let registration = &q["status_registration"];
++    if registration["consumer_seal"]["path"] == CADENCE29
++        && (registration["consumer_seal"] != ref_for(Path::new(CADENCE29), CADENCE29_SHA)
++            || registration["invocation_id"] != "bcd03cb00ab84669a665d7587c1388a4"
++            || registration["pid"] != 3955941
++            || registration["start_ticks"] != 409198298)
++    {
++        return Ok(false);
++    }
+     let full = &q["epoch170_metered_full"];
+     let actor = &q["candidate"];
+     let focus = &q["focused168_retry6"];
+@@ -281,6 +301,7 @@
+                         | CADENCE24
+                         | CADENCE25
+                         | CADENCE26
++                        | CADENCE29
+                 )
+                 && active_cadence_basis(&quote)?,
+             "occupied epoch 185 requires the sealed active fleet price"
+@@ -371,6 +392,37 @@
+     }
+ 
+     #[test]
++    fn recovered_joint_writer_preserves_the_terminal_booking() {
++        let (mut quote, fleet, book, review) = active_fixture();
++        quote["status_registration"] = json!({
++            "consumer_seal":ref_for(Path::new(CADENCE29), CADENCE29_SHA),
++            "invocation_id":"bcd03cb00ab84669a665d7587c1388a4", "pid":3955941, "start_ticks":409198298
++        });
++        quote["population"]
++            .as_object_mut()
++            .unwrap()
++            .remove(FOCUSED168_UNIT);
++        quote["focused168_retry6"]["terminal"] =
++            ref_for(Path::new(FOCUSED168_TERMINAL), FOCUSED168_TERMINAL_SHA);
++        quote["focused168_retry6"]["resource_credit_bytes"] = json!(0);
++        quote["focused168_retry6"]["processes"] = json!([]);
++        assert!(active_cadence_basis(&quote).unwrap());
++        for (pointer, value) in [
++            ("/status_registration/invocation_id", json!("other")),
++            ("/status_registration/pid", json!(3955942)),
++            ("/status_registration/start_ticks", json!(409198299)),
++            ("/status_registration/consumer_seal/sha256", json!("other")),
++            ("/focused168_retry6/resource_credit_bytes", json!(1)),
++        ] {
++            let mut crossed = quote.clone();
++            *crossed.pointer_mut(pointer).unwrap() = value;
++            assert!(!active_cadence_basis(&crossed).unwrap(), "{}", pointer);
++        }
++        active_booking(&mut quote, &fleet, &book, &review).unwrap();
++        assert_eq!(quote["complete_required_HOME_bytes"], 1142);
++    }
++
++    #[test]
+     fn terminal_focused168_preserves_the_prior_floor_and_serial_reservation() {
+         let (mut quote, fleet, book, review) = active_fixture();
+         quote["status_registration"]["consumer_seal"]["path"] = json!(CADENCE24);

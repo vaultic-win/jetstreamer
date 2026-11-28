@@ -1,0 +1,27 @@
+{
+  "schema": "jetstreamer-sealed-deployment-receipt-v1",
+  "plan_sha256": "40c1be88a6c485c030b88c2b416bd2abfe924126784b2b87c0b2a95a1d2bac58",
+  "sealer_sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+  "destination": "/usr/local/lib/jetstreamer/horizon-live145-nested-predecessor-frame-library-tools-20261107-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/live145-nested-predecessor-frame-qualification-20261107-v1/library-work/libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
+      "name": "libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
+      "sha256": "664a54f1a362c7d806f7f207414cb05bb9eec694f8421cca9c96fc7bb73ca604",
+      "bytes": 22990120,
+      "mode": "0444"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/live145-nested-predecessor-frame-qualification-20261107-v1/library-artifact-proof.json",
+      "name": "artifact-proof.json",
+      "sha256": "72ca4ff61582f6a0a4f0c96c45abbbc2e0febdd9ceec48d5d7aa973879f41e54",
+      "bytes": 6683,
+      "mode": "0444"
+    }
+  ],
+  "created_unix_seconds": 1794056440,
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "remote_mutations": false,
+  "r2_mutations": false
+}

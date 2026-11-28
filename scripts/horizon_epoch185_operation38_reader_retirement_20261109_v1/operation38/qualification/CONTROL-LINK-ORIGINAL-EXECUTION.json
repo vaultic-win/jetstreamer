@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "systemctl",
+    "link",
+    "/usr/local/lib/jetstreamer/operation38-coherence-control-20261109-v1/horizon-operation32-coherence-disposable-20261108-v38-r1.service",
+    "/usr/local/lib/jetstreamer/operation38-coherence-control-20261109-v1/horizon-operation32-coherence-disposable-20261108-v38-r1.timer"
+  ],
+  "code": 0,
+  "stdout": "",
+  "stderr": "Created symlink /etc/systemd/system/horizon-operation32-coherence-disposable-20261108-v38-r1.service \u2192 /usr/local/lib/jetstreamer/operation38-coherence-control-20261109-v1/horizon-operation32-coherence-disposable-20261108-v38-r1.service.\nCreated symlink /etc/systemd/system/horizon-operation32-coherence-disposable-20261108-v38-r1.timer \u2192 /usr/local/lib/jetstreamer/operation38-coherence-control-20261109-v1/horizon-operation32-coherence-disposable-20261108-v38-r1.timer.\n"
+}

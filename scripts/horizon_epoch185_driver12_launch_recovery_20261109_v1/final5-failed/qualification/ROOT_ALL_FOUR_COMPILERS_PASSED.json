@@ -1,0 +1,8 @@
+{
+  "all_four_compilers_passed": true,
+  "source_and_exact_recipes": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final5-postmain-driver12-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "b3ce2aab128212f86f8358260321401ab4db2f22f904747325b874b81b65e8d0"
+  },
+  "no_replay_or_publication_authority": true
+}

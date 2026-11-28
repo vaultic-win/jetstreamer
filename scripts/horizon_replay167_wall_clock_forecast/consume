@@ -1,0 +1,50 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+pkg=$(realpath "$(dirname "$0")")
+base=/var/lib/jetstreamer/horizon_runtime_data
+(cd "$pkg" && sha256sum --check --status SHA256SUMS)
+# prepare acquires the existing controller lock before deriving a new fleet.
+# Once the one-shot preparation has committed, hold that same lock through the loop.
+[[ $# == 2 ]] || exit 2
+exec 9>>"$base/stable-cadence-controller-20261120-v1/consumer.lock"
+flock -n 9
+fleet=$1
+sha=$2
+if [[ "$fleet" == "$base/root204959-live166167170-20261120-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json" &&
+      "$sha" == d0d537f25764799ed48242ed6a33a487712f77c5af7f9d5cd3043caf891db98d &&
+      $(date +%s) -lt $(date -d '2026-11-20T21:18:45Z' +%s) ]]; then
+    systemd-run --quiet --collect --wait --unit=horizon-status-167-rolling-correction-20261120-v1 \
+        -p UMask=0077 -p EnvironmentFile=/etc/jetstreamer/horizon-r2.env \
+        /usr/bin/python3 -B "$pkg/publish167.py" "$fleet" "$sha"
+fi
+while true; do
+    meta=$(/usr/bin/python3 -B "$pkg/describe.py" "$fleet" "$sha")
+    next_fleet="$(jq -er .out <<<"$meta")/ROOT_COMPLETE_OPERATIONAL_FLEET.json"
+    if [[ -e "$next_fleet" ]]; then
+        next=$(/usr/bin/python3 -B "$pkg/verify-head.py" "$next_fleet" "$fleet" "$sha")
+        fleet=$(jq -er .path <<<"$next")
+        sha=$(jq -er .sha256 <<<"$next")
+        continue
+    fi
+    timer=$(jq -er .timer <<<"$meta")
+    sample=$(jq -er .sample <<<"$meta")
+    due=$(date --date="$(jq -er .due <<<"$meta")" +%s)
+    service="${timer%.timer}.service"
+    now=$(date +%s)
+    if (( now < due )); then
+        [[ $(systemctl show "$timer" -p ActiveState --value) == active ]]
+        sleep "$(( due - now + 2 ))"
+    fi
+    while true; do
+        state=$(systemctl show "$service" -p ActiveState --value)
+        if [[ -s "$sample" && "$state" == inactive ]]; then break; fi
+        [[ "$state" != failed ]] && (( $(date +%s) < due + 300 )) || exit 1
+        sleep 3
+    done
+    read -r binding _ < <(sha256sum -- "$sample")
+    "$pkg/run-cycle.sh" "$fleet" "$sha" "$binding"
+    fleet="$(jq -er .out <<<"$meta")/ROOT_COMPLETE_OPERATIONAL_FLEET.json"
+    [[ -s "$fleet" && $(stat -c %u "$fleet") == 0 ]]
+    read -r sha _ < <(sha256sum -- "$fleet")
+done

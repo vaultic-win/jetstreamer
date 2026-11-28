@@ -1,0 +1,34 @@
+{
+  "schema": "horizon-actual-qualified-operation36-inherited-census-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v36-helper34-planner5-r1/operation",
+    "sha256": "369170f2c3e10b21e5c3edae79c1301bdd829d6637c306a52f01dee6c97485f9"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v36-helper34-planner5-r1/artifact-proof.json",
+    "sha256": "1ef1cce242de7aa86bf678d9b27e281eb79889a6deb4b4621acb4200d053fe02"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v36-helper34-planner5-r1/deployment-seal-receipt.json",
+    "sha256": "20375e59614793e2092acb2ddd5b59c60c9f755719e7a338686c4f14f3ed8e72"
+  },
+  "qualified_route": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v36-helper34-planner5-r1-r3/route.json",
+    "sha256": "ed588b8535629dcfc8de1786d0e36aec426af7322bfc7d63a0027fe608d8b143"
+  },
+  "capability": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v36-helper34-planner5-r1-r3/capability.json",
+    "sha256": "87ea849072164626b0b7a9cf39926c772681d0096a4f4f3045eda7a48895f294"
+  },
+  "reader_lifecycle_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v36-helper34-planner5-r1/completion.json",
+    "sha256": "f7fdf35509a8c13ecdd5e8a0d9f4dabcf2e7eba9ae6eb4c162437bfcb15fc254"
+  },
+  "successful_reader_retirement_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-successful-reader-retirement-control-positive-success-retire-v36-helper34-planner5-r1/completion.json",
+    "sha256": "7fb1a8cada1f90cbee7a08a869f6083155863ecbe4e53e3699d10162ffc1690e"
+  },
+  "normal6_retained": true,
+  "complete_DATA_lower_bound_bytes": 5160283615892,
+  "fresh_original_guard_and_admission_still_required": true
+}

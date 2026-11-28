@@ -1,0 +1,123 @@
+{
+  "schema": "horizon-seven-conservative-correction-guards-qualified-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "healthy_original_producers_preserved": true,
+  "producer_restarts": 0,
+  "no_guard_gap": true,
+  "previous_floor_bytes": 5783162011442,
+  "new_floor_bytes": 6264131239730,
+  "restored_reserve_bytes": 480969228288,
+  "complete_corrected_memory_bytes": 759789531136,
+  "complete_corrected_DATA_bytes": 6582025928498,
+  "native16_temporary_guard_suballocation_drained": true,
+  "normal_pool_bytes": 10737418240,
+  "new_resource_credit_bytes": 0,
+  "effective_native_Frame_and_full_Reader_correction_pending": true,
+  "new_replay_admission_authorized": false,
+  "handoffs": [
+    {
+      "epoch": 166,
+      "producer_invocation_id": "06c7b420f92d42a6b0743ba578bcd8b6",
+      "producer_pid": "4188448",
+      "new_guard_timer": "horizon-guard-166-standard-duplicate722-correction-20261110-v1.timer",
+      "timer_invocation_id": "9e0525c51d3442adb7729a6de6971cf4",
+      "proof": {
+        "path": "/home/sol/.jetstreamer-private/epoch166-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "d63b1e3b471bdfb3ee516704adbb40f1d153e74ba9fa20a2654226f76cf7fd71"
+      }
+    },
+    {
+      "epoch": 167,
+      "producer_invocation_id": "efd81d59a4584013a93d0d020e49852e",
+      "producer_pid": "713",
+      "new_guard_timer": "horizon-guard-167-standard-duplicate722-correction-20261110-v1.timer",
+      "timer_invocation_id": "a1d62239568d4ddc936814aad39b2a9c",
+      "proof": {
+        "path": "/home/sol/.jetstreamer-private/epoch167-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "dd55ae3e642b0d4fed4c5c41dfaf108fa978c02090c4e41d8e6b94f9487a3dc4"
+      }
+    },
+    {
+      "epoch": 168,
+      "producer_invocation_id": "e1050eb5e99a4a159630c881e0dd5eb3",
+      "producer_pid": "14201",
+      "new_guard_timer": "horizon-guard-168-standard-duplicate722-correction-20261110-v1.timer",
+      "timer_invocation_id": "acb82678feac42ccaf67b1fb99bff73a",
+      "proof": {
+        "path": "/home/sol/.jetstreamer-private/epoch168-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "24238687c47237c8aaf20195d07ebffd321bc34827bb2c522dc814b4cc57c2b9"
+      }
+    },
+    {
+      "epoch": 169,
+      "producer_invocation_id": "ca4d6b8da24c4e92a4c75419edae6f1d",
+      "producer_pid": "50818",
+      "new_guard_timer": "horizon-guard-169-standard-duplicate722-correction-20261110-v1.timer",
+      "timer_invocation_id": "e2ea4ed1de2a4eaaa42c06adc0c8b388",
+      "proof": {
+        "path": "/home/sol/.jetstreamer-private/epoch169-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "ce7ce6093ae90868b699d94e68d0c80341ce2da2a442af66b4396aa30e1a2622"
+      }
+    },
+    {
+      "epoch": 170,
+      "producer_invocation_id": "1950530fc73b4a519f5327749f0036b7",
+      "producer_pid": "86457",
+      "new_guard_timer": "horizon-guard-170-standard-duplicate722-correction-20261110-v1.timer",
+      "timer_invocation_id": "9bad08c78ed24713915f680c91c6c602",
+      "proof": {
+        "path": "/home/sol/.jetstreamer-private/epoch170-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "36a77c8ecbda6f19b1a24a820f99a89dabab97721475585a0cd57ff68a68fe35"
+      }
+    },
+    {
+      "epoch": 171,
+      "producer_invocation_id": "3b0694043e374b0488ee9a81762e210d",
+      "producer_pid": "243865",
+      "new_guard_timer": "horizon-guard-171-standard-duplicate722-correction-20261110-v1.timer",
+      "timer_invocation_id": "d06af5a349b74b88b1f00d859bf4f444",
+      "proof": {
+        "path": "/home/sol/.jetstreamer-private/epoch171-independent-singleton-20261110-v1/duplicate722-correction-current-guard-handoff-20261110-v1/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "5fc6ae6ffc8044e94ad063200e21c4e69814c74b3fd0f1f3edc96b4d236c729b"
+      }
+    },
+    {
+      "epoch": 172,
+      "producer_invocation_id": "6aa8bc6036b34c57ababa2d5855b2098",
+      "producer_pid": "431228",
+      "new_guard_timer": "horizon-guard-172-standard-duplicate722-correction-20261110-v1.timer",
+      "timer_invocation_id": "7f61fcfa42e94115ac6ec3605b222899",
+      "proof": {
+        "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/duplicate722-correction-current-guard-handoff-20261110-v1/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "042c756c52a34bc20a44f5a719755fa91226b0db8edbc12b8cf8f4b28db01f43"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_CORRECTED_SEVEN_GUARDS_ACCEPTED_EFFECTIVE_CONSUMERS_PENDING.json",
+      "sha256": "49104d297f00b35181cd905b66e93161dfd3eeed9fb06b2aac58aa2abf08b764"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/seven-guards-duplicate722-correction-20261110-v1/ROOT_ALL_SEVEN_CONTINUOUS_GUARD_HANDOFFS_COMPLETE.json",
+      "sha256": "547be3e963ccdcf3467e0b976e86fa570c0923645cfd1dffd63585b5466ee134"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/seven-guards-duplicate722-correction-20261110-v1/ROOT_EXISTING_NATIVE16_SERIAL_EXTRA_GUARD1_BOOKING.json",
+      "sha256": "8ed803bb5de23883f284580ca13abf22360f702d7c6bedaab41478bf938ff315"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_080022_RUST_V8.json",
+      "sha256": "bfb091266a0228992567041b98e4c14698caf2d1f1f24602ecce7bbffe4ca873"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/shared64-owner-census-qa-v3/ROOT_CLOSED_SHARED64_V3_WORK_RETIREMENT_COMPLETE.json",
+      "sha256": "154880751aabf836d60adf3c0d22a1edb839d22eacb20218ad6cb3a3156bfff8"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/duplicate722-authority-audit-qa-v2/ROOT_CLOSED_DUPLICATE722_V2_WORK_RETIREMENT_COMPLETE.json",
+      "sha256": "1db9930443b5c78fda31bf6c0d970d5513d55ca9a06c7b3f2c0d406c98dce306"
+    }
+  ]
+}

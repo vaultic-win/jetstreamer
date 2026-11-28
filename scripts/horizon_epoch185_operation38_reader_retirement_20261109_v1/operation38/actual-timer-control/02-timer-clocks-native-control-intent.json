@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "--system",
+    "--json=short",
+    "get-property",
+    "org.freedesktop.systemd1",
+    "/org/freedesktop/systemd1/unit/horizon_2doperation32_2dcoherence_2ddisposable_2d20261108_2dv38_2dr1_2etimer",
+    "org.freedesktop.systemd1.Timer",
+    "NextElapseUSecMonotonic",
+    "NextElapseUSecRealtime",
+    "LastTriggerUSecMonotonic"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "457ed3342ead4b0ba73b4126538af3b4",
+  "program": "/usr/bin/busctl",
+  "timeout_millis": 5000,
+  "wall_started_at": 1794198058
+}

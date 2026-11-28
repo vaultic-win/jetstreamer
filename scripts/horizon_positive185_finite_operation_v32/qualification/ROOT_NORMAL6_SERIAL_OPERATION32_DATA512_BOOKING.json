@@ -1,0 +1,15 @@
+{
+  "schema": "horizon-operation32-enrollment32-serial-normal6-booking-v1",
+  "previous_retained_DATA_lower_bound_bytes": 5144177488532,
+  "new_additive_retained_DATA_bytes": 536870912,
+  "complete_DATA_lower_bound_bytes": 5144714359444,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_open_bytes": 0,
+  "ordinary_and_native_control_serial": true,
+  "original2000_enrollment_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual2000-original-r3-20261108-next/1769-enroll-original-task-original-outcome.json",
+    "sha256": "f1732b5861f99393f494ff34e244bb652abf040c21f20cb00a9465e39616bfe1"
+  },
+  "no_actor_restart_or_clock_extension": true,
+  "no_resource_credit": true
+}

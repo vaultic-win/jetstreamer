@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch for natural completion of the existing Horizon ready-range audit
+After=local-fs.target horizon-ready-output-mounts-20261121-v1.service
+
+[Path]
+PathChanged=/var/lib/jetstreamer/horizon_runtime_data/ready-range-audit-20261121-v1/accepted
+Unit=horizon-public-0-100-current-20261122-v1.service
+
+[Install]
+WantedBy=multi-user.target

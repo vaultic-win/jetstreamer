@@ -1,0 +1,19 @@
+
+running 14 tests
+test adapter::resource_census::native_controls::actual_native_complete_censuses_survive_unlink_and_owned_pid_exit ... ok
+test adapter::resource_census::pinned_inode_tests::a_replaced_file_name_requires_a_new_complete_pass_and_counts_its_replacement ... ok
+test adapter::resource_census::pinned_inode_tests::actual_native_pinned_inode_census_charges_concurrent_unlinks ... ok
+test adapter::resource_census::pinned_inode_tests::every_discovered_account_can_unlink_after_pin_without_zero_charge ... ok
+test adapter::resource_census::pinned_inode_tests::held_directory_does_not_hide_a_replaced_root_or_symlink ... ok
+test adapter::resource_census::pinned_inode_tests::inode_pinned_before_unlink_is_charged_without_restarting_the_whole_tree ... ok
+test adapter::resource_census::pinned_inode_tests::retries_read_a_fresh_directory_stream_instead_of_reusing_its_eof_offset ... ok
+test adapter::resource_census::pinned_inode_tests::unlinked_pinned_inode_still_enforces_the_original_ceiling ... ok
+test adapter::resource_census::tests::disappearing_child_requires_a_new_complete_pass ... ok
+test adapter::resource_census::tests::live_pid_without_maps_is_not_a_zero_usage_process ... ok
+test adapter::resource_census::tests::lost_or_replaced_root_never_gets_retry_credit ... ok
+test adapter::resource_census::tests::missing_maps_requires_proven_exit_and_absent_membership ... ok
+test adapter::resource_census::tests::perpetual_file_churn_hits_same_finite_retry_bound ... ok
+test adapter::resource_census::tests::symlink_and_ceiling_errors_are_never_transient ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.01s
+

@@ -1,0 +1,27 @@
+{
+  "schema": "horizon-actual-qualified-current0500-guard-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current0500-bound-guard-window-tools-20261109-v1/horizon-current0500-guard-window",
+    "sha256": "a95dfb9e3416fa66d4bf8abbbf173889e2ecbdff8ad0bdb684c04a91e7d9667f"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current0500-bound-guard-window-tools-20261109-v1/artifact-proof.json",
+    "sha256": "bb7a3d7b0b4ceafc8a0e198fbde0b61955f4fcb01f79b30602fb4d3162e4623d"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current0500-bound-guard-window-tools-20261109-v1/deployment-seal-receipt.json",
+    "sha256": "54a4f3b348c9128acd7ad76c42b546f628e6c66a0381d4796738d7cbe5022d7c"
+  },
+  "actual_QA_proof": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0500-window-20261109-v1/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+    "sha256": "bb7a3d7b0b4ceafc8a0e198fbde0b61955f4fcb01f79b30602fb4d3162e4623d"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/current0500-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0500_GUARD_DATA512_BOOKING.json",
+    "sha256": "de8c8de6f7114359f0a66db4f1c9273d2be827984325231977809712eb4b3e0c"
+  },
+  "complete_DATA_bytes": 5177463485076,
+  "native_current_guard_window_still_required": true,
+  "replay_launch_authorized": false,
+  "resource_credit_bytes": 0
+}

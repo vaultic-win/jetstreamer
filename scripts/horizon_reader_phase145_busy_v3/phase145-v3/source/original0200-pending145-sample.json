@@ -1,0 +1,16 @@
+{
+  "MainPID": "3856994",
+  "ControlPID": "0",
+  "Result": "success",
+  "NRestarts": "0",
+  "ExecMainExitTimestampMonotonic": "0",
+  "ExecMainCode": "0",
+  "ExecMainStatus": "0",
+  "ControlGroup": "/system.slice/horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+  "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+  "LoadState": "loaded",
+  "ActiveState": "activating",
+  "SubState": "start",
+  "Job": "41040174",
+  "InvocationID": "3b709456ea89492ab963b9dea7905abd"
+}

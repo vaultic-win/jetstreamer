@@ -1,0 +1,24 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/work/v31-jetstreamer-r2",
+      "name": "jetstreamer-r2",
+      "sha256": "dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "name": "artifact-proof.json",
+      "sha256": "7d4e4128da8a2e889cbfa21dcb51246977c05ef77a72e69368ee267eb7b414e4",
+      "mode": 292
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "name": "source-and-recipes.json",
+      "sha256": "9d7f2565ab1f33c85bc3a0d6f9597806c28906e8eebe58d7225605619545772d",
+      "mode": 292
+    }
+  ]
+}

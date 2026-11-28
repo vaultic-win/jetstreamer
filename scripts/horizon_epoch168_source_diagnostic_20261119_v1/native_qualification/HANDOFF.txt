@@ -1,0 +1,39 @@
+Epoch 168 native transport harness handoff — 2026-11-19
+Owner of this source packet: /root/next_disjoint_lane_review
+Operational/build/qualification owner: /root
+
+Scope: only this new native_qualification directory was edited for this task.
+No production capture source changes, parent workspace changes, build, test,
+native service, resource observation, commit or remote operation was performed.
+
+Read README.md for the exact fixture design, invocation, funding/capability
+requirements, dependency limits and uncovered controls. SOURCE_INVENTORY.json
+binds the authored files and inspected requirements/capture source by SHA-256.
+An inventory is source provenance only, not compiler or native acceptance.
+
+Implemented: independent Rust harness and test-only Rust cdylib fault shim;
+fresh network/mount namespaces; unchanged sealed capture image and fixed URLs;
+real TLS endpoints and proxy trap; 55 authored serial controls; successful
+baseline prerequisite; child/server cleanup on errors; actual rejection reason,
+connection, wire-write, marker/custody and exit checks; retained failure evidence.
+
+No synthetic positive guard or execution receipts. Root supplies the real
+funding contract and normally sealed images. Fixture outputs explicitly deny
+provider-source, admission, publication and replay authority. The raw capture
+completion metadata inside the fixture tree MUST NOT be promoted or reused.
+
+Completed source checks: manual review and offline Cargo metadata resolution.
+The final SOURCE_INVENTORY.json records additional actual static checks.
+Not performed: compilation, Clippy, formatter, unit tests, native controls,
+capability probes, native-library inspection, runtime booking or invocation.
+
+Root's next dependency: review/freeze this packet, separately admit its complete
+build graph and harness/shim outputs, then qualify the actual guarded fixture
+scope. Keep all failed cases and original funding deadlines. All 55 controls
+must genuinely execute and pass before reporting this suite accepted.
+
+Remaining coverage is listed in README.md: production sandbox/guard proof,
+/proc/self/exe pathname-replacement race, extra custody permutations and
+application-level body overflow are not established by this packet. No
+production change is currently proposed; absent fixture capabilities must
+fail rather than weaken the production client or campaign gates.
