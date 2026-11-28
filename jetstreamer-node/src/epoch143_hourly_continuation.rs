@@ -28,7 +28,7 @@ const FIRST_IID: &str = "4514e85834c34152ae0ecfde8a42001d";
 const PREFIX: &str =
     "/home/sol/.jetstreamer-private/epoch143-first-hourly-20261127-v1/epoch-143-first-hourly.jet";
 const RUN: &str = "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1";
-const UNIT: &str = "horizon-qualify-143-second-hourly-20261128-v1.service";
+const UNIT: &str = "horizon-qualify-143-second-hourly-20261128-v2.service";
 const QUALIFICATION: QualificationPlan = QualificationPlan {
     epoch: 143,
     bootstrap_slot: BOOT,
@@ -110,6 +110,10 @@ impl RestartProof for Restart {
 
     fn snapshot_size(&self) -> u64 {
         SNAPSHOT_BYTES
+    }
+
+    fn restored_verification(&self) -> Result<historical_replay::RestoredCheckpointTrust, String> {
+        Ok(historical_replay::RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(END))
     }
 
     fn covers_trusted_root(&self, _: u64, _: u64, _: u64, _: u64) -> bool {
