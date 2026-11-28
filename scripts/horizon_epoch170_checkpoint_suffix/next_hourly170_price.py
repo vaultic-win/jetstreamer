@@ -41,10 +41,12 @@ def geometry(whole, previous_guard, drawdown):
     raw = native["raw"]
     available = whole["available_home"]
     remaining143 = whole["epoch143_remaining_replay_home"]
-    floor143 = whole["epoch143_installed_guard_floor"] or 0
+    dormant143 = (whole.get("epoch143_dormant_tree") or {}).get("physical_bytes", 0)
+    floor143 = whole.get("epoch143_installed_guard_floor") or 0
     peers = whole["observed_sibling_guard_floors"]
     need(whole["available_ram"] - whole["required_ram"] == whole["ram_margin"]
-         and 0 <= remaining143 <= 64 * GIB and raw["guarded_hourly_remaining"] == remaining143
+         and 0 <= remaining143 + dormant143 <= 64 * GIB and remaining143 >= 0 and dormant143 >= 0
+         and raw["guarded_hourly_remaining"] == remaining143 + dormant143
          and whole["epoch143_protected_runway_required_home"] ==
              max(whole["required_home"], whole["epoch143_protected_sibling_floor"] + remaining143),
          "shared RAM or protected 143 geometry changed")
