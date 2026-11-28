@@ -22,8 +22,8 @@
 +        diagnostic296_meter.register_following_266_retry(plan)
 +        preflight = bound(release["preflight"])
 +        failed_start = preflight["prior_failed_start"]
-+        failed = bound(failed_start)
-+        assert failed["failure_before_first_bank"] and failed["guard_drained"]
++        failed_window = bound(failed_start)
++        assert failed_window["failure_before_first_bank"] and failed_window["guard_drained"]
 +        add(plan["gates"]["266"], release_ref, release["preflight"], failed_start)
      active_private_intervals = set()
      for ordinal, cohort_label in ((2, "-private141"), (3, "-private141-third"), (4, "-private141-fourth"), (5, "-private141-fifth"), (6, "-private141-sixth"), (7, "-private141-seventh"), (8, "-private141-eighth")):
