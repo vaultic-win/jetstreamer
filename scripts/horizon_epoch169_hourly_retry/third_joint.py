@@ -14,7 +14,8 @@ import time
 BASE=Path("/var/lib/jetstreamer/horizon_runtime_data")
 ATTEMPT=BASE/"epoch169-hourly-retry-20261128-v3"
 OP=ATTEMPT/"operator-v1"
-DIR=ATTEMPT/"issuer-v2"
+DIR=ATTEMPT/"issuer-v3"
+EARLIER_ISSUER="61fe3e066485d9bd64a210dea9c3a4bdd4244635529b7f162ed811a828038844"
 OLDER=BASE/"epoch169-hourly-retry-20261128-v2/issuer-v1"
 SCOPES=BASE/"epoch162-first-hourly-completion-20261127-v2"
 SCOPE="7668d6747cfe67bfbfbc5d0db14331d8db57a73b1fb4d3d6a12820dc08a56daf"
@@ -39,6 +40,14 @@ def install(owner, provider, digest, revision, observed):
     c,q=owner["c"],owner["quote"]
     _,scope=c.read(ATTEMPT/"SCOPE.json",SCOPE)
     qualification=q.verified_provider(provider,digest)
+    earlier=ATTEMPT/"issuer-v2"
+    previous,receipt=c.read(earlier/"deployment-seal-receipt.json",EARLIER_ISSUER)
+    native_sources={m["name"]:m["sha256"] for m in previous["members"]}
+    old,_=c.read(earlier/"SOURCE.json",native_sources["SOURCE.json"])
+    c.need(previous["destination"]==str(earlier) and old["scope"]==scope and
+           old["common_provider"]!=qualification and
+           not any(os.path.lexists(ATTEMPT/name) for name in ("HELD_GATE.json","GUARD_PLAN.json","START_INTENT.json","GRANT.json")),
+           "third 169 is already issued or the provider did not change")
     c.need(provider.parent==SCOPES and provider.name.startswith("issued-price-v") and
            (provider/"retry169_peer.py").is_file() and hashlib.sha256((provider/"retry169_peer.py").read_bytes()).hexdigest()==THIRD_PEER,
            "different common provider or 169 observer")
@@ -53,7 +62,8 @@ def install(owner, provider, digest, revision, observed):
     (stage/"first_progress.py").write_bytes(report)
     _,stop=c.read(ATTEMPT.parent/"epoch169-hourly-retry-20261128-v2/WORKER_ALIAS_STOP.json",STOP)
     c.recorded(stage/"SOURCE.json",dict(schema="horizon-169-third-joint-registration-v1",scope=scope,operator=OPERATOR,
-        second_guard_stop=stop,common_provider=qualification,third_peer_sha256=THIRD_PEER,source_commit=revision,
+        second_guard_stop=stop,common_provider=qualification,previous_issuer=receipt,previous_provider=old["common_provider"],
+        third_peer_sha256=THIRD_PEER,source_commit=revision,
         remote_observed=observed,remote_contains_commit=True,producer_mutations=False,canonical_publication_authorized=False))
     members=[dict(name=p.name,source=str(p),sha256=hashlib.sha256(p.read_bytes()).hexdigest(),mode=0o444) for p in sorted(stage.iterdir())]
     ref=c.recorded(ATTEMPT/f"ISSUER_PLAN_{time.time_ns()}.json",dict(schema="jetstreamer-sealed-deployment-plan-v1",
