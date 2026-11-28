@@ -100,6 +100,77 @@ def terminal(actor, profile=EPOCH143):
     }
 
 
+FAILED_BOOTSTRAP_IID = "03ba8900c208428e81f98314e72f6685"
+FAILED_BOOTSTRAP_ACTOR = "d0b82212bddc871d7b4a5ba07272d323332c875b11805b2e0c610ef2e5630d7c"
+FAILED_BOOTSTRAP_TERMINAL = "48a3d3002e8bd990c69cfc5a551776929fcfa5462275c90a24e1a3f99b24eaa3"
+FAILED_BOOTSTRAP_FLEET = "a73a1fdd37b149409a01762d9ac82024fc353681080d07646df05c5a8617c8be"
+RETRY_BOOKER_SEAL = "fa9e315142bf57e2aca0bd456444caae5921655b47d12c71095cf20919b704d3"
+RETRY_GATE_SHA = "c5656f1867ede9b8b33e12e890eae3ba97c572bcaf76d9b45b86aafd0b5cde63"
+RETRY_HISTORY = "retained_143_bootstrap_failure"
+
+
+def bootstrap_history(profile):
+    base = profile.base
+    archive = base / f"failed-{FAILED_BOOTSTRAP_IID}"
+    terminal_ref = dict(path=str(archive / "NATIVE_TERMINAL.json"), sha256=FAILED_BOOTSTRAP_TERMINAL)
+    fleet_ref = dict(path=str(base.parent / "root014808-live166167170-20261128-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json"),
+                     sha256=FAILED_BOOTSTRAP_FLEET)
+    archived = dict(path=str(archive / "HELD_OWNER.json"), sha256=FAILED_BOOTSTRAP_ACTOR)
+    terminal_row = checked(terminal_ref)
+    old = checked(fleet_ref)[profile.field]
+    actor = checked(archived)
+    need(old["phase"] == "terminal" and old["held_owner"] == terminal_row["held_owner"]
+         and old["held_owner"]["sha256"] == archived["sha256"] and old["actor"] == actor
+         and old["native_terminal"] == terminal_row["pid1"]
+         and actor["producer_invocation_id"] == terminal_row["invocation_id"] == FAILED_BOOTSTRAP_IID
+         and not terminal_row["worker_progress"] and not terminal_row["archive_present"]
+         and not terminal_row["resource_credit_bytes"], "different archived 143 bootstrap failure")
+    receipt = archive / "RECONCILED.json"
+    reconciliation = None
+    if receipt.exists():
+        reconciliation = bound(receipt)
+        settled = checked(reconciliation)
+        need(settled["schema"] == "horizon-epoch143-bootstrap-failure-reconciled-v1"
+             and settled["failed_invocation"] == FAILED_BOOTSTRAP_IID and settled["released_gate_drained"]
+             and settled["terminal"] == terminal_ref and settled["accepted_fleet"] == fleet_ref
+             and settled["original_held_owner"] == old["held_owner"] and settled["archived_held_owner"] == archived
+             and not settled["resource_credit_bytes"] and not settled["archive_publication_authorized"],
+             "different 143 bootstrap reconciled receipt")
+    return dict(terminal=terminal_ref, accepted_fleet=fleet_ref, archived_held_owner=archived,
+                reconciliation=reconciliation), old
+
+
+def retry_booking(booking, profile):
+    package = profile.base / "booking-price-v52"
+    seal = checked(dict(path=str(package / "deployment-seal-receipt.json"), sha256=RETRY_BOOKER_SEAL))
+    members = {member["name"]: member["sha256"] for member in seal["members"]}
+    for field, name in (("sealed_operator", "launch-first-hourly143.sh"), ("sealed_price", "price_hourly143.py")):
+        ref = dict(path=str(package / name), sha256=members[name])
+        need(booking[field] == ref == bound(package / name), "143 retry changed its sealed booking member")
+    writer_ref = booking["writer_active"]
+    writer_package = profile.base.parent / "survivor172-cadence-20261122-v1/tools-cold168-retry5-failed166-v52-entry146"
+    need(writer_ref["path"] == str(writer_package.parent / "FAILED166_CADENCE_V52_ACTIVE.json"),
+         "143 retry uses another cadence generation")
+    active = checked(writer_ref)
+    ready = checked(active["ready"])
+    need(seal["destination"] == str(package) and booking["writer"] == active["new"]
+         and active["new"]["program"] == str(writer_package / "status_cycle.py")
+         and booking["sealed_reader"] == ready["hourly_reader"] == bound(writer_package / "first_hourly143.py"),
+         "143 retry lost its exact reader or writer")
+
+
+def corrected_gate(exe, actor, profile):
+    if profile.epoch != 143:
+        return False
+    candidate = profile.base / "tools-bootstrap-v2/hold-143"
+    if not candidate.is_file() or not exe.samefile(candidate):
+        return False
+    need(bound(candidate)["sha256"] == RETRY_GATE_SHA
+         and stat.S_IMODE(candidate.stat().st_mode) == 0o555, "different corrected 143 gate image")
+    retry_booking(checked(actor["booking"]), profile)
+    return True
+
+
 def live_actor(manager, actor, profile=EPOCH143):
     pid = actor["producer_pid"]
     need(
@@ -112,7 +183,11 @@ def live_actor(manager, actor, profile=EPOCH143):
         f"{profile.epoch} producer or hard limits changed",
     )
     exe = Path(f"/proc/{pid}/exe")
-    if exe.samefile(profile.base / f"tools-v1/hold-{profile.epoch}"):
+    retry = profile.epoch == 143 and Path(checked(actor["booking"])["sealed_operator"]["path"]).parent == (
+        profile.base / "booking-price-v52"
+    )
+    held = corrected_gate(exe, actor, profile) if retry else exe.samefile(profile.base / f"tools-v1/hold-{profile.epoch}")
+    if held:
         return False
     need(exe.samefile(profile.node), f"{profile.epoch} producer executable differs from the sealed node")
     permit = profile.base / "barrier/allow"
@@ -188,11 +263,33 @@ def observe(context, profile=EPOCH143):
     idle = manager["ActiveState"] in ("inactive", "failed")
     active_receipt = profile.base / "HELD_OWNER.json"
     prior = context.fleet.get(profile.field)
-    if not active_receipt.exists():
+    receipt_ref = bound(active_receipt) if active_receipt.exists() else None
+    history = None
+    if profile.epoch == 143 and prior:
+        old_actor = prior["held_owner"]["sha256"] == FAILED_BOOTSTRAP_ACTOR
+        if (old_actor and prior["held_owner"] != receipt_ref) or RETRY_HISTORY in prior:
+            history, earlier = bootstrap_history(profile)
+            if old_actor:
+                need(prior["phase"] == "terminal" and prior["actor"] == earlier["actor"]
+                     and prior["native_terminal"] == earlier["native_terminal"],
+                     "143 retry has no exact accepted terminal predecessor")
+                if receipt_ref is None:
+                    need(idle and manager["MainPID"] == manager["ControlPID"] == "0"
+                         and not manager["Job"] and not process_ids(profile)
+                         and manager["InvocationID"] in ("", FAILED_BOOTSTRAP_IID),
+                         "archived 143 terminal crossed another native owner")
+                    return dict(earlier, unit=manager, observer=context.sample_ref,
+                                held_owner=history["archived_held_owner"], **{RETRY_HISTORY: history})
+                need(history["reconciliation"] is not None, "143 retry preceded reconciliation")
+                prior = None
+            else:
+                need(history["reconciliation"] is not None and prior[RETRY_HISTORY] == history,
+                     "143 retry lost its retained bootstrap failure")
+    if receipt_ref is None:
         need(idle and not manager.get("Job") and not prior and not process_ids(profile),
              f"{profile.epoch} owner has no accepted receipt")
         return None
-    actor_ref = bound(active_receipt)
+    actor_ref = receipt_ref
     actor = checked(actor_ref)
     contract = checked(profile.contract)
     need(
@@ -219,6 +316,10 @@ def observe(context, profile=EPOCH143):
     row = dict(epoch=profile.epoch, unit=manager, actor=actor, held_owner=actor_ref, observer=context.sample_ref,
                observer_config=None, worker=None, transaction_replay_claimed=False,
                canonical_replay_claimed=False, archive_publication_authorized=False, resource_credit_bytes=0)
+    if history is not None:
+        need(actor["producer_invocation_id"] != FAILED_BOOTSTRAP_IID, "143 retry reused its failed invocation")
+        retry_booking(booking, profile)
+        row[RETRY_HISTORY] = history
     if idle:
         need(
             manager["MainPID"] == "0" and not manager["Job"] and not process_ids(profile)
