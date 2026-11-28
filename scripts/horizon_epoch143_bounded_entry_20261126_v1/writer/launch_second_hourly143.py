@@ -96,11 +96,15 @@ def checked_roster(booking, *, held=None):
     quote = json.loads(run("/usr/bin/python3", "-IB", "-c",
                            "import json,runpy,sys; print(json.dumps(runpy.run_path(sys.argv[1])['whole_roster']()))",
                            booking["price"]["path"]))
+    stages = "HELD" if held else "PRESTART"
+    if not quote["fits"] or quote["home_margin"] <= 0 or quote["ram_margin"] <= 0:
+        refused = durable(BASE / f"{stages}_REFUSED_{time.time_ns()}.json", quote)
+        raise ValueError(f"ordinary {stages} quote refused at {refused['path']}, "
+                         f"HOME {quote['home_margin']}, RAM {quote['ram_margin']} bytes")
     closed = quote["closed_143"]
     observed = quote["base_169"]["native"]["raw"]["replacement143"]
     need(quote["fleet"] == booking["fleet"] and quote["writer"] == booking["writer"] and quote["fits"]
          and not quote["resource_credit_bytes"] and not quote["preparation_only"]
-         and quote["home_margin"] > 0 and quote["ram_margin"] > 0
          and closed["acceptance"] == booking["closure"] and closed["retained_home"] == TREE + EVIDENCE
          and closed["retained_ram"] == MEMORY + GIB and closed["cpu_quota_micros"] == 3_000_000,
          "ordinary quote rejected the second interval or changed the host roster")
@@ -202,6 +206,9 @@ def launch(contract_ref, writer_ref, price_seal, guard_seal):
     quote = checked_roster(booking)
     need(0 < quote["guard_floor"] <= quote["required_home"] < quote["available_home"],
          "invalid native prestart floor")
+    # Ensure room for the guard process and a fresh whole-host memory sample
+    # before creating any invocation-specific state.
+    need(quote["ram_margin"] >= GIB, "prestart margin is smaller than the 1 GiB guard budget")
     floor_buffer = min(GIB, quote["home_margin"] // 4)
     floor = quote["guard_floor"] + floor_buffer
     need(floor_buffer < quote["available_home"] - quote["required_home"], "guard floor buffer does not fit")
@@ -279,7 +286,7 @@ def launch(contract_ref, writer_ref, price_seal, guard_seal):
         held = checked_roster(booking, held=actor)
         durable(BASE / "POST_GUARD_SCREEN.json", held)
         enrollment(booking)
-        need(held["guard_floor"] <= floor and held["required_home"] + floor - held["guard_floor"] <= held["available_home"]
+        need(held["epoch143_installed_guard_floor"] == floor and held["guard_floor"] <= floor and held["required_home"] + floor - held["guard_floor"] <= held["available_home"]
              and props(UNIT, *owner) == owner and props(GUARD + ".timer", *timer) == timer
              and (process / "exe").samefile(gate["path"]) and not (RECEIPTS / "stop-intent.json").exists(),
              "held quote, producer or guard advanced before permission")
