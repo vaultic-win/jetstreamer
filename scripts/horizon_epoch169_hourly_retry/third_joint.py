@@ -14,7 +14,7 @@ import time
 BASE=Path("/var/lib/jetstreamer/horizon_runtime_data")
 ATTEMPT=BASE/"epoch169-hourly-retry-20261128-v3"
 OP=ATTEMPT/"operator-v1"
-DIR=ATTEMPT/"issuer-v1"
+DIR=ATTEMPT/"issuer-v2"
 OLDER=BASE/"epoch169-hourly-retry-20261128-v2/issuer-v1"
 SCOPES=BASE/"epoch162-first-hourly-completion-20261127-v2"
 SCOPE="7668d6747cfe67bfbfbc5d0db14331d8db57a73b1fb4d3d6a12820dc08a56daf"
