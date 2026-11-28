@@ -1,6 +1,6 @@
-//! Release the two authenticated bootstrap caches after their consumers and guards close.
+//! Release authenticated epoch 230 bootstrap caches after their consumers and guards close.
 use super::{
-    appendvec292::failed::no_readers,
+    appendvec292::failed::{StoppedReference, no_readers},
     snapshot296::{BoundCache, evict_cache},
     *,
 };
@@ -84,24 +84,93 @@ const SECOND: Window = Window {
     timer: "horizon-230-middle-hourly-second-protective-v1.timer",
 };
 
+const VOTE: Window = Window {
+    slot: 99_430_284,
+    end: 99_437_433,
+    cache: "/home/ubuntu/.jetstreamer-private/epoch230-mismatch-99430284-v1.OjKV2hXf",
+    name: "snapshot-99430284-BNZTcU9y17US1ucG9dMqKdL2PgUpQou2PPDArWKrBoWu.tar.zst",
+    size: 10_243_100_016,
+    owner: 1000,
+    sha: "4b0b16de74ba067d18eeec76326390c767d5fa0389083e5e837c27d5c37befeb",
+    generation: 1_633_485_628_677_598,
+    bucket: "mainnet-beta-ledger-us-ny5",
+    prefix: "99360309/hourly",
+    crc32c: "vDpQxg==",
+    md5: "2Tz0guFk4bbzOj88Yo+j6w==",
+    etag: "CN67kpXYtPMCEAE=",
+    restore_sha: "e9663e5eaeae578acbaec85f32fe1b6da0d07a0043b75c0294fd99b17a74de82",
+    closure: (
+        "/var/lib/jetstreamer/horizon230-vote-boundary-runtime-v1/terminal.json",
+        "6ba3d174d03109316e58b7e043d7daa9fa0e4ae29bfb1ab7b6424601bc96cdea",
+        "foundation-epoch230-vote-boundary-terminal-v1",
+    ),
+    native: None,
+    playback: "/var/lib/jetstreamer/horizon230-vote-boundary-poh-readback-v1/receipt.json",
+    archive_sha: "72e506f3cd9f5db0c0d932bc9ce32e6547c64058305d1a3d3d7cae577ecf8f73",
+    unit: "horizon-perf-epoch230-vote-boundary@v1.service",
+    timer: "horizon-230-vote-boundary-protective-v1.timer",
+};
+
+const VOTE_FAILED_READER: &str = "horizon-perf-epoch230-bounded-mismatch@v2.service";
+const VOTE_FAILED_RECIPE_SHA: &str =
+    "2ad8d278829a46aa2d4ed58c24c3987f08bdefccf3c04a1eec9f35bed81136f9";
+
 pub(super) fn for_command(command: &str) -> Option<&'static Window> {
     match command {
+        "--check-bootstrap-230-99430284" | "--retire-bootstrap-230-99430284" => Some(&VOTE),
         "--check-bootstrap-230-99461591" | "--retire-bootstrap-230-99461591" => Some(&V1627),
         "--check-bootstrap-230-99476782" | "--retire-bootstrap-230-99476782" => Some(&SECOND),
         _ => None,
     }
 }
 
-fn terminal(window: &Window) -> Result<(Value, Value)> {
+fn vote_terminal(closed: &Value, played: &Value) -> Result<(Value, Value)> {
+    const INVOCATION: &str = "5c3f5abbfd8048f39f61fe9bbc73c1f5";
+    const ARCHIVE: &str = "/var/lib/jetstreamer/horizon230-vote-boundary-sealed-segment-v1/epoch-230-vote-boundary-demotion-diagnostic.jet";
+    const END_HASH: &str = "FPZQp7MtEYAgjjbWHtJGnbf9biFai7GDndKejnQXgPFP";
+    let exit: Binding = serde_json::from_value(closed["manager_exit"].clone())?;
+    let exit: Value = read_bound(&exit.path, &exit.sha256, JSON_LIMIT)?;
+    let validation: Binding = serde_json::from_value(closed["validation"].clone())?;
+    let validation: Value = read_bound(&validation.path, &validation.sha256, JSON_LIMIT)?;
+    ensure!(
+        closed["invocation_id"] == INVOCATION
+            && closed["canonical_slots"] == json!([VOTE.slot + 1, VOTE.end])
+            && closed["archive"]["path"] == ARCHIVE
+            && closed["archive"]["sha256"] == VOTE.archive_sha
+            && exit["_PID"] == "1"
+            && exit["UNIT"] == VOTE.unit
+            && exit["INVOCATION_ID"] == INVOCATION
+            && exit["MESSAGE"] == format!("{}: Deactivated successfully.", VOTE.unit)
+            && validation["validation"] == "pass"
+            && validation["output_slot_start"] == VOTE.slot + 1
+            && validation["output_slot_count"] == VOTE.end - VOTE.slot
+            && validation["terminal_slot"] == VOTE.end
+            && validation["archive_sha256"] == VOTE.archive_sha
+            && validation["archive_bytes"] == closed["archive_bytes"]
+            && played["archive_identity"]["length"] == closed["archive_bytes"]
+            && played["closure_sha256"] == VOTE.closure.1,
+        "vote-boundary segment or manager exit does not match the sealed run"
+    );
+    let mut archive = closed["archive"].clone();
+    archive["identity"] = played["archive_identity"].clone();
+    Ok((archive, json!({"slot":VOTE.end,"last_blockhash":END_HASH})))
+}
+
+fn terminal(window: &Window, played: &Value) -> Result<(Value, Value)> {
     let (path, sha, schema) = window.closure;
     let closed: Value = read_bound(Path::new(path), sha, JSON_LIMIT)?;
     ensure!(
         closed["schema"] == schema
-            && closed["unit"] == window.unit
             && closed["guard_drained"] == true
-            && closed["state"] == "local-segment-committed"
             && closed["publication_authorized"] == false,
         "epoch 230 window is not closed"
+    );
+    if window.slot == VOTE.slot {
+        return vote_terminal(&closed, played);
+    }
+    ensure!(
+        closed["unit"] == window.unit && closed["state"] == "local-segment-committed",
+        "epoch 230 window did not commit a local segment"
     );
     let (body, checkpoint) = if let Some((path, sha)) = window.native {
         ensure!(
@@ -191,13 +260,13 @@ pub(super) fn run(
             && restore["file"]["md5_base64"] == window.md5,
         "prior restore differs from the pinned epoch 230 generation"
     );
-    let (archive, edge) = terminal(window)?;
     let reader: Binding = serde_json::from_value(proof["playback"].clone())?;
     ensure!(
         reader.path == Path::new(window.playback),
         "foreign epoch 230 playback path"
     );
     let played: Value = read_bound(&reader.path, &reader.sha256, JSON_LIMIT)?;
+    let (archive, edge) = terminal(window, &played)?;
     ensure!(
         played["schema"] == "foundation-epoch230-closed-window-full-poh-v1"
             && played["first_slot"] == window.slot + 1
@@ -253,7 +322,29 @@ pub(super) fn run(
         terminal_unit(window.unit)?;
         terminal_unit(window.timer)?;
         assert_no_nested_mount(&path)?;
-        let report = no_readers(Path::new(window.cache), &path, &[])?;
+        let stopped: &[(&str, &str, StoppedReference)] = if window.slot == VOTE.slot {
+            terminal_unit("horizon-230-bounded-mismatch-protective-v2.timer")?;
+            let fragment = Path::new("/run/systemd/transient").join(VOTE_FAILED_READER);
+            if fragment.try_exists()? {
+                let mut recipe = open_regular(&fragment)?;
+                let meta = recipe.metadata()?;
+                ensure!(
+                    meta.uid() == 0
+                        && meta.mode() & 0o022 == 0
+                        && digest(&mut recipe)? == VOTE_FAILED_RECIPE_SHA
+                        && identity(&meta) == identity(&fragment.symlink_metadata()?),
+                    "changed failed vote-boundary reader definition"
+                );
+            }
+            &[(
+                VOTE_FAILED_READER,
+                "b02e106a069b4cc080bdc5b8a948fe55",
+                StoppedReference::Direct(VOTE_FAILED_RECIPE_SHA),
+            )]
+        } else {
+            &[]
+        };
+        let report = no_readers(Path::new(window.cache), &path, stopped)?;
         Ok((report["scheduled"].clone(), report["processes"].clone()))
     };
     let context = json!({"source":path,"source_sha256":window.sha,"terminal_sha256":window.closure.1,
