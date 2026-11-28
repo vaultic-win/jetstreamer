@@ -1,6 +1,9 @@
 //! Encrypted holding for the exact closed epoch 224 resource canary.
 use super::*;
 
+#[path = "holding_foundation_canary224/recovery.rs"]
+mod recovery;
+
 pub(super) const CHECK: &str = "holding-foundation-224-canary-check";
 pub(super) const PARK: &str = "holding-foundation-224-canary-park";
 const ROOT: &str = "/var/lib/jetstreamer/horizon224-canary-native-custody-v1";
@@ -80,25 +83,26 @@ fn verify_evidence(closure: &Bound, closed: &Value, proof: &Value) -> Result<()>
     Ok(())
 }
 
+fn expected_source() -> Stamp {
+    Stamp {
+        device: 66305,
+        inode: 24588968,
+        length: CLEAR_BYTES,
+        uid: 1000,
+        gid: 1000,
+        mode: 0o644,
+        links: 1,
+        mtime_ns: 1_792_521_525_449_462_811,
+        ctime_ns: 1_792_521_525_449_462_811,
+    }
+}
+
 fn source() -> Result<Stamp> {
     let path = Path::new(SOURCE);
     let info = fs::symlink_metadata(path)?;
     let stamp = Stamp::of(&info);
     ensure!(
-        info.is_file()
-            && path.canonicalize()? == path
-            && stamp
-                == Stamp {
-                    device: 66305,
-                    inode: 24588968,
-                    length: CLEAR_BYTES,
-                    uid: 1000,
-                    gid: 1000,
-                    mode: 0o644,
-                    links: 1,
-                    mtime_ns: 1_792_521_525_449_462_811,
-                    ctime_ns: 1_792_521_525_449_462_811,
-                },
+        info.is_file() && path.canonicalize()? == path && stamp == expected_source(),
         "epoch 224 canary identity changed"
     );
     Ok(stamp)
@@ -136,7 +140,18 @@ fn verify_drained() -> Result<()> {
     Ok(())
 }
 
+pub(super) fn command(action: &str) -> bool {
+    matches!(action, CHECK | PARK | recovery::RECHECK | recovery::RESTORE)
+}
+
+fn encrypted_key() -> String {
+    format!("{SUBPREFIX}encrypted-canary224/{CLEAR_SHA}.blob")
+}
+
 pub(super) async fn run(action: &str, value: Value, spec: &Bound) -> Result<()> {
+    if matches!(action, recovery::RECHECK | recovery::RESTORE) {
+        return recovery::run(action, value, spec).await;
+    }
     let plan: Plan = serde_json::from_value(value)?;
     ensure!(
         plan.schema == "foundation-epoch224-canary-custody-plan-v1",
@@ -168,7 +183,7 @@ pub(super) async fn run(action: &str, value: Value, spec: &Bound) -> Result<()> 
     let r2 = r2_config_from_env()?;
     ensure!(r2.bucket == BUCKET, "foreign epoch 224 holding bucket");
     let client = s3_client(&r2);
-    let object_key = format!("{SUBPREFIX}encrypted-canary224/{CLEAR_SHA}.blob");
+    let object_key = encrypted_key();
     let intent = |sha: &str, length: u64| {
         let name = format!("canary224-intent-{}-{sha}.json", spec.sha256);
         let value = json!({"schema":"foundation-epoch224-encrypted-canary-intent-v1",
