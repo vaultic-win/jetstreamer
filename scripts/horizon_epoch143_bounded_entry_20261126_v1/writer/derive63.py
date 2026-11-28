@@ -105,6 +105,12 @@ def stage(folder, contract_ref):
         members[name] = dict(name=name, source=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest(), mode=0o444)
 
     add("status_cycle.py", cycle((OLD / "status_cycle.py").read_text()))
+    older = (OLD / "transition_v58.py").read_text()
+    anchor = '    prior_ram = second_ram.retained_population(fleet, checked(fleet["sole_next_observer"]))'
+    older = one(older, anchor, """    import ram170_third_status as third_ram
+    config = third_ram.history_config(fleet, checked(fleet["sole_next_observer"]))
+    prior_ram = second_ram.retained_population(fleet, config)""")
+    add("transition_v58.py", older)
     for name in ("transition_v63.py", "second_hourly143.py", "hourly143_status.py"):
         add(name, (SOURCE / name).read_text())
     add("second_hourly143_scope.py", "\n".join([
