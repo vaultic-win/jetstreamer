@@ -1,19 +1,19 @@
 --- cycle.py
 +++ cycle.py
-@@ -175,2 +175,3 @@
+@@ -189,2 +189,3 @@
  import diagnostic226_suffix
 +import diagnostic226_assembly
  import diagnostic296_meter
-@@ -377,2 +378,3 @@
+@@ -391,2 +392,3 @@
  cfg['diagnostic_replays'] += diagnostic226_suffix.configuration()
 +cfg['diagnostic_replays'] += diagnostic226_assembly.configuration()
  cfg['diagnostic_replays'] += diagnostic296_meter.configuration()
-@@ -666,2 +668,4 @@
+@@ -680,2 +682,4 @@
          cohort += '-observed296-focused'
 +    if any(item['producer_unit'] == diagnostic226_assembly.UNIT for item in cfg['diagnostic_replays']):
 +        cohort += '-assembly226'
      ordinary_296 = 296 in guarded_replays.by_epoch(cfg['replays'])
-@@ -1290,2 +1294,14 @@
+@@ -1313,2 +1317,14 @@
          add(plan["gates"]["266"], release_ref, release["preflight"], failed_start)
 +    assembly_226_release = V / "horizon226-assembly-fleet-v1/acceptance.json"
 +    if assembly_226_release.is_file():
@@ -28,7 +28,7 @@
 +        diagnostic226_assembly.register(plan)
 +        add(plan["gates"]["226"], assembly_ref, assembly_fleet["preflight"])
      active_private_intervals = set()
-@@ -1327,3 +1343,4 @@
+@@ -1350,3 +1366,4 @@
      ordinary = [r for r in f['active'] if r['phase'] != EXTRACTION226_PHASE and not diagnostic229.owns(r) and not diagnostic229_bounded.owns(r) and not diagnostic229_bounded_retry.owns(r) and not diagnostic271_trace.owns(r) and not diagnostic271_europe.owns(r) and not diagnostic271_boundary.owns(r) and not diagnostic271_reward_tuples.owns(r) and not diagnostic271_stake_inputs.owns(r) and not diagnostic230_slot_hashes.owns(r) and not diagnostic230_bank_trace.owns(r) and not diagnostic229_slot_hash_ram.owns(r) and not diagnostic288_shrink_debt.owns(r) and not diagnostic230_program_demotion_ram.owns(r) and not diagnostic229_bank_delta.owns(r)
 -                and not diagnostic226_suffix.owns(r) and not diagnostic230_checkpoint_continuation.owns(r)
 +                and not diagnostic226_suffix.owns(r) and not diagnostic226_assembly.owns(r)

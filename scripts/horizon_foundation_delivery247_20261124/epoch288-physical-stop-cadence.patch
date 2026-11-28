@@ -1,0 +1,31 @@
+--- cycle.py
++++ cycle.py
+@@ -155,2 +155,16 @@
+         statuses[288] = recent
++physical_288 = V/'horizon288-full-shrink-debt-v1/physical-budget-stop-v1'
++physical_288_terminal = physical_288/'terminal.json'
++physical_288_status = physical_288/'completion.json'
++if physical_288_status.is_file() and 288 in statuses:
++    update_288 = ref(physical_288_status)
++    corrected_288 = bound(update_288)
++    change_288 = bound(corrected_288['intent'])
++    previous_288 = bound(statuses[288])
++    assert change_288['terminal'] == ref(physical_288_terminal)
++    assert corrected_288['authenticated_exact_byte_readback'] and corrected_288['key'] == 'epoch-288.epoch-status.json'
++    assert bound(corrected_288['readback'])['phase'] == 'verification'
++    if previous_288['etag'] == change_288['previous_etag']:
++        assert previous_288['readback']['sha256'] == change_288['previous_readback']['sha256']
++        statuses[288] = update_288
+ import inactive229
+@@ -891,2 +905,11 @@
+     diagnostic288_shrink_debt.gate(plan)
++    if physical_288_terminal.is_file():
++        stopped_288_ref = sealed_226_file(physical_288_terminal)
++        stopped_288 = bound(stopped_288_ref)
++        assert stopped_288['schema'] == 'foundation-epoch288-physical-budget-stop-v1'
++        assert stopped_288['guard_drained'] and not stopped_288['publication_authorized']
++        gate_288 = plan['gates']['288']
++        add(gate_288, stopped_288_ref, stopped_288['guard_trip'])
++        gate_288['state'] = 'failed-needs-repair'
++        gate_288['next_action'] = 'Qualify the retained private prefix and a guarded checkpoint recovery after the physical-budget stop.'
+     fleet_image = register_226(plan)

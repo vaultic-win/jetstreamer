@@ -88,6 +88,11 @@ const CADENCE_LOCK: &str =
 const STANDARD_GUARD: &str =
     "/var/lib/jetstreamer/horizon251-published-guard-20261118-v1/horizon251-standalone-guard";
 const GUARD_288: &str = "/var/lib/jetstreamer/horizon288-shrink-debt-comparison-tools-v327/guard";
+const REPLAY_288: &str = "horizon-qualify-288-root-shrink-debt-v1.service";
+const STOP_288: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon288-full-shrink-debt-v1/physical-budget-stop-v1/terminal.json",
+    "fe0895438e423135c37541fcfab74452e75be1d0661d7fa8bc25899f1515c6a6",
+);
 const GUARD_ENV_261: &str = "/var/lib/jetstreamer/horizon261-full-guard-v1/guard.env";
 const GUARD_ENV_262: &str = "/var/lib/jetstreamer/horizon262-full-guard-v1/guard.env";
 const GUARD_ENV_296: &str = "/var/lib/jetstreamer/horizon296-full-retry-guard-v1/guard.env";
@@ -1162,6 +1167,35 @@ fn fleet_roster<'a>(
     Ok(roster)
 }
 
+fn physical_stop_288(n: &mut Native, booking: &Value) -> Result<Option<Bound>> {
+    if !Path::new(STOP_288.0).try_exists()? {
+        return Ok(None);
+    }
+    let reference = Bound::new(STOP_288.0, STOP_288.1);
+    let stopped = reference.sealed()?;
+    let launch = binding(&stopped["launch"])?.sealed()?;
+    let trip = binding(&stopped["guard_trip"])?.sealed()?;
+    let invocation = text(&stopped, "invocation_id")?;
+    let pid = text(&booking["owners"][REPLAY_288], "MainPID")?.parse::<u64>()?;
+    ensure!(
+        stopped["schema"] == "foundation-epoch288-physical-budget-stop-v1"
+            && stopped["epoch"] == 288 && stopped["unit"] == REPLAY_288
+            && stopped["guard_drained"] == true && stopped["publication_authorized"] == false
+            && launch["unit"] == REPLAY_288 && launch["invocation_id"] == invocation
+            && booking["owners"][REPLAY_288]["InvocationID"] == invocation
+            && trip["producer_invocation_id"] == invocation && trip["producer"]["pid"] == pid
+            && trip["trip_reason"] == "root-physical-budget" && trip["producer_stop_enabled"] == true
+            && trip["root_physical_observation"]["exceeds_budget"] == true
+            && trip["plan_sha256"] == launch["guard_plan"]["sha256"]
+            && stopped["pid1_stop"]["UNIT"] == REPLAY_288
+            && stopped["pid1_stop"]["INVOCATION_ID"] == invocation
+            && stopped["pid1_stop"]["_PID"] == "1",
+        "epoch 288 stop does not match the booked invocation and guard"
+    );
+    focused::drained(n, REPLAY_288, "horizon-288-full-shrink-debt-protective-v1", invocation)?;
+    Ok(Some(reference))
+}
+
 #[cfg(test)]
 mod roster_tests {
     use super::*;
@@ -1692,6 +1726,14 @@ fn measure(
     if closed_257.is_some() {
         released_replays.insert(257, UPLOAD_257);
     }
+    let closed_288 = if quote.is_some() {
+        physical_stop_288(n, &booking)?
+    } else {
+        None
+    };
+    if closed_288.is_some() {
+        released_replays.insert(288, REPLAY_288);
+    }
     let before = listed_owners(n)?;
     let active_holding_296 = before
         .contains(holding296::UNIT)
@@ -1806,6 +1848,17 @@ fn measure(
     let mut closed_predecessor_266 = None;
     let mut closed_window_266 = None;
     let rows = admission_fleet["active"].as_array_mut().context("Foundation active roster")?;
+    if let Some(reference) = &closed_288 {
+        let stopped = reference.sealed()?;
+        if let Some(index) = rows.iter().position(|row| row["epoch"] == 288) {
+            ensure!(
+                rows[index]["producer"]["Id"] == REPLAY_288
+                    && rows[index]["producer"]["InvocationID"] == stopped["invocation_id"],
+                "epoch 288 fleet owner differs from the physical stop"
+            );
+            rows.remove(index);
+        }
+    }
     let suffix_226_transition = if let Some(replay) = live_replays.get(&226)
         && replay.unit == suffix226::UNIT
         && !rows.iter().any(|row| row["epoch"] == 226)
@@ -2170,6 +2223,7 @@ fn measure(
         if (guard_epoch == 230 && closed_230.is_some() && focused.is_none())
             || (guard_epoch == 252 && closed_replay252.is_some())
             || (guard_epoch == 261 && closed_replay.is_some())
+            || (guard_epoch == 288 && closed_288.is_some())
         {
             continue;
         }
@@ -2252,6 +2306,12 @@ fn measure(
         ensure!(
             terminal_replay_230(n, &booking)? == closed_230,
             "epoch 230 terminal changed during roster binding"
+        );
+    }
+    if let Some(expected) = &closed_288 {
+        ensure!(
+            physical_stop_288(n, &booking)?.as_ref() == Some(expected),
+            "epoch 288 stop changed during roster binding"
         );
     }
     if let Some((row, proof)) = &closed_v1627_230 {
@@ -2577,6 +2637,7 @@ fn measure(
         "owners":on_host_owners,"periodic_guards":guards,"local_allocation":allocation,"capacity":fit,
         "controller":controller_owner,"candidate_held":held.is_some(),"admission_issued":false,
         "closed_middle_replay":closed_230,
+        "closed_physical_288":closed_288,
         "closed_first_7871_replay":closed_first_7871,
         "closed_v1627_230_replay":closed_v1627_230.map(|(_, proof)| proof),
         "closed_retry_next_v1627_230_replay":closed_retry_next_v1627_230.map(|(_, proof)| proof),
