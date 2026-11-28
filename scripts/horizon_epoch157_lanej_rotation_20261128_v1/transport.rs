@@ -231,5 +231,5 @@ pub(super) fn fixture(fit: &Value) -> Result<Value> {
         "real restoration exceeds the paid slot"
     );
     let q = json!({"passed":true,"scope":"single-copy authenticated original-path 157 lane-j restoration","target":SRC,"fixture_invocation":iid,"operator_seal":ours()?,"native_fixture":restored,"reference_186":reference(&Path::new(OLD).parent().unwrap().join("RESTORE_FIXTURE_ACCEPTED.json"))?,"interrupted_unnamed":true,"no_clobber":true,"wrong_etag":412,"idempotent":true,"retained_original_metadata":true,"charged_bytes":LENGTH+META,"paid_slot":123350028052u64,"future_command":"restore under fresh 157 serial holding admission","fixture_source":pinned(Path::new(GENESIS),GEN_SHA),"publication_authorized":false});
-    stable(&root("RESTORE_QUALIFICATION.json"), &q)
+    stable(&qualification()?, &q)
 }

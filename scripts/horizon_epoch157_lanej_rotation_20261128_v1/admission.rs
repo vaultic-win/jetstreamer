@@ -106,7 +106,8 @@ pub(super) fn holder(unit: &str) -> Result<Value> {
         "restore"
     };
     let path = intake(phase, unit)?;
-    let a = bound(&reference(&path)?)?;
+    let admission = reference(&path)?;
+    let a = bound(&admission)?;
     let seal = ours()?;
     ensure!(
         a["operator_seal"] == seal
@@ -127,9 +128,20 @@ pub(super) fn holder(unit: &str) -> Result<Value> {
     let pid = s["MainPID"].parse::<u32>()?;
     let iid = &s["InvocationID"];
     let (mem, cpu) = limits(phase)?;
+    let start_name = path
+        .file_name()
+        .and_then(|v| v.to_str())
+        .context("native admission basename")?
+        .replacen("_ADMISSION_", "_START_", 1);
+    let start_ref = reference(&root(&start_name))?;
+    let start = bound(&start_ref)?;
     ensure!(
         iid.len() == 32
             && pid > 1
+            && start["unit"] == unit
+            && start["invocation"] == *iid
+            && start["native"]["MainPID"] == s["MainPID"]
+            && start["admission"] == admission
             && s["ActiveState"] == "active"
             && s["Id"] == unit
             && s["Job"].is_empty()
@@ -167,7 +179,7 @@ pub(super) fn holder(unit: &str) -> Result<Value> {
         "kernel holding scope changed"
     );
     Ok(
-        json!({"phase":phase,"admission":reference(&path)?,"native":s,"expected":reference(&root("park-package-v1/expected.json"))?,"resource_credit_bytes":0}),
+        json!({"phase":phase,"admission":admission,"start":start_ref,"native":s,"expected":reference(&root("park-package-v1/expected.json"))?,"resource_credit_bytes":0}),
     )
 }
 pub(super) fn dispatch(phase: &str, provider: &str, sha: &str) -> Result<Value> {
@@ -195,10 +207,7 @@ pub(super) fn dispatch(phase: &str, provider: &str, sha: &str) -> Result<Value> 
             budget = LENGTH + META;
             floor = floor0.max(required.saturating_sub(budget));
         } else {
-            ensure!(
-                root("RESTORE_QUALIFICATION.json").is_file(),
-                "fixture is not accepted"
-            );
+            ensure!(qualification()?.is_file(), "fixture is not accepted");
         }
     } else {
         let u = &q["closed_167_suballocations"]["unassigned"];

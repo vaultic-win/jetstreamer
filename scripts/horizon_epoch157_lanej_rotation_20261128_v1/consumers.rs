@@ -64,6 +64,36 @@ fn properties(s: &str) -> BTreeMap<String, String> {
         })
         .collect()
 }
+fn entry_points(p: &BTreeMap<String, String>) -> Result<String> {
+    let id = p.get("Id").context("missing unit ID")?;
+    let mut fields = vec!["FragmentPath", "DropInPaths", "Triggers", "TriggeredBy"];
+    if id.ends_with(".service") {
+        fields.extend([
+            "ExecStart",
+            "ExecStartPre",
+            "ExecStartPost",
+            "ExecCondition",
+            "WorkingDirectory",
+        ]);
+    } else if id.ends_with(".timer") {
+        fields.push("Unit");
+    } else if id.ends_with(".path") {
+        fields.extend(["Unit", "Paths"]);
+    } else if id.ends_with(".socket") {
+        fields.push("Listen");
+    } else {
+        anyhow::bail!("unrecognized unit type {id}");
+    }
+    fields
+        .into_iter()
+        .map(|field| {
+            p.get(field)
+                .map(String::as_str)
+                .with_context(|| format!("{id} lacks {field}"))
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(|values| values.join(" "))
+}
 fn tokens(s: &str) -> impl Iterator<Item = &str> {
     s.split(|c: char| c.is_ascii_whitespace() || "\\\"'(){}[]=,;|:".contains(c))
         .filter(|n| n.starts_with('/'))
@@ -363,7 +393,7 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
     let mut cache = BTreeMap::new();
     let mut matches = Vec::new();
     let mut hits = Vec::new();
-    let fields = "Id,ActiveState,SubState,Job,ControlPID,MainPID,ExecStart,ExecStartPre,ExecStartPost,ExecCondition,WorkingDirectory,FragmentPath,DropInPaths,Triggers,TriggeredBy";
+    let fields = "Id,ActiveState,SubState,Job,ControlPID,MainPID,ExecStart,ExecStartPre,ExecStartPost,ExecCondition,WorkingDirectory,FragmentPath,DropInPaths,Triggers,TriggeredBy,Unit,Paths,Listen";
     for slice in potential.chunks(120) {
         let mut args = vec!["show", "--all", "-p", fields, "--"];
         args.extend_from_slice(slice);
@@ -373,16 +403,7 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
             if matches!(p["ActiveState"].as_str(), "inactive" | "failed") {
                 continue;
             }
-            let projection = format!(
-                "{} {} {} {} {} {} {}",
-                p["ExecStart"],
-                p["ExecStartPre"],
-                p["ExecStartPost"],
-                p["ExecCondition"],
-                p["WorkingDirectory"],
-                p["FragmentPath"],
-                p["DropInPaths"]
-            );
+            let projection = entry_points(&p)?;
             let direct = terms(&projection);
             let nested = artifacts(&projection, &mut cache)?;
             if direct.is_empty() && nested.is_empty() {
@@ -444,5 +465,23 @@ mod tests {
         assert!(!material(Path::new(
             "/home/sol/.jetstreamer-private/credentials/plan.json"
         )));
+    }
+    #[test]
+    fn pid1_activation_units_have_distinct_entry_properties() {
+        let common =
+            "FragmentPath=/etc/systemd/system/a\nDropInPaths=\nTriggers=a.service\nTriggeredBy=\n";
+        for (kind, fields) in [
+            ("timer", "Unit=a.service"),
+            ("path", "Unit=a.service\nPaths=/some/trigger (PathChanged)"),
+            ("socket", "Listen=/run/a.socket (Stream)"),
+            (
+                "service",
+                "ExecStart=/bin/true\nExecStartPre=\nExecStartPost=\nExecCondition=\nWorkingDirectory=/tmp",
+            ),
+        ] {
+            let p = properties(&format!("{common}Id=a.{kind}\n{fields}"));
+            assert!(entry_points(&p).unwrap().contains("a.service"));
+            assert!(entry_points(&properties(&format!("{common}Id=a.{kind}"))).is_err());
+        }
     }
 }

@@ -40,7 +40,7 @@ const SNAP: &str = "/usr/local/lib/jetstreamer/deploy-epochs155-157-runtime-boun
 const GLOBAL: &str = "/run/horizon-epoch171-to136-g1.operation.lock";
 const ELOCK: &str = "/home/sol/.jetstreamer-private/epochs150-173-20260923-v2/lane-j/private/destination-67fe8253649bb21cdfcde32bbdba73b67debf3c2a0cc74384f9a2ff472807c61/locks/epoch-157.lock";
 const OK: &str = "7ad2d189f7e94e70a38c781354912448";
-const FAIL: &str = "be02cf6855d2428ba40df7e9d022f03d";
+const FAIL: &str = "d9b373ed55a64feb8242e02dbe79a49c";
 fn root(p: &str) -> PathBuf {
     Path::new(ROOT).join(p)
 }
@@ -82,6 +82,12 @@ fn ours() -> Result<Value> {
         "use sealed 157 operator"
     );
     Ok(s)
+}
+fn qualification() -> Result<PathBuf> {
+    Ok(root(&format!(
+        "RESTORE_QUALIFICATION_{}.json",
+        word(&ours()?, "sha256")?
+    )))
 }
 fn identity(m: &fs::Metadata) -> Value {
     json!({"device":m.dev(),"inode":m.ino(),"allocated":m.blocks()*512,"length":m.len(),"gid":m.gid(),"uid":m.uid(),"mode":m.mode()&0o7777,"links":m.nlink(),"mtime_ns":m.mtime() as i128*1000000000+m.mtime_nsec() as i128,"ctime_ns":m.ctime() as i128*1000000000+m.ctime_nsec() as i128})
@@ -383,7 +389,8 @@ fn retire() -> Result<Value> {
     let (unit, iid) = role()?;
     let s = screen()?;
     let e = expected()?;
-    let fc = bound(&reference(&root("RESTORE_QUALIFICATION.json"))?)?;
+    let qualified = reference(&qualification()?)?;
+    let fc = bound(&qualified)?;
     ensure!(
         fc["passed"] == true && fc["target"] == SRC && fc["operator_seal"] == ours()?,
         "missing qualified restore route"
@@ -483,7 +490,7 @@ fn retire() -> Result<Value> {
     let before = num(&i, "before")?;
     receipt(
         &retire,
-        &json!({"epoch":157,"source":SRC,"sha256":e["sha256"],"removed_original_inode":original["inode"],"allocated_bytes_removed":ALLOC,"available_before":before,"available_after":after,"measured_net_free_bytes":i128::from(after)-i128::from(before),"conservative_capacity_bytes":ALLOC.min(after.saturating_sub(before)),"admission":fit["provider"],"move":iref,"unlink":reference(&unlink)?,"restoration":reference(&root("RESTORE_QUALIFICATION.json"))?,"custody":remote["custody"],"initial_census":guard_before,"preserved":prior,"canonical_publication":false}),
+        &json!({"epoch":157,"source":SRC,"sha256":e["sha256"],"removed_original_inode":original["inode"],"allocated_bytes_removed":ALLOC,"available_before":before,"available_after":after,"measured_net_free_bytes":i128::from(after)-i128::from(before),"conservative_capacity_bytes":ALLOC.min(after.saturating_sub(before)),"admission":fit["provider"],"move":iref,"unlink":reference(&unlink)?,"restoration":qualified,"custody":remote["custody"],"initial_census":guard_before,"preserved":prior,"canonical_publication":false}),
     )
 }
 fn main() -> Result<()> {
