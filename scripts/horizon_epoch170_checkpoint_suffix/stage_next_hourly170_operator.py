@@ -107,7 +107,7 @@ def stage(provider,writer,revision_number):
         persist(path,raw)
         files[name] = path,0o444
     files["binding.json"] = Path(bindings["path"]),0o444
-    plan = {1: "OPERATOR_PLAN.json", 2: "REBOUND_OPERATOR_PLAN.json", 3: "OPERATOR_V3_PLAN.json"}[generation]
+    plan = {1: "OPERATOR_PLAN.json", 2: "REBOUND_OPERATOR_PLAN.json", 3: "OPERATOR_V3_PLAN.json", 4: "OPERATOR_V4_PLAN.json"}[generation]
     return seal(destination,files,ROOT/plan)
 
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     parser.add_argument("provider_sha256")
     parser.add_argument("v75_owner_sha256")
     parser.add_argument("--price-version", type=int, default=37)
-    parser.add_argument("--operator-revision", type=int, choices=(2,3), default=2)
+    parser.add_argument("--operator-revision", type=int, choices=(2,3,4), default=2)
     args = parser.parse_args()
     base = RT/f"epoch162-first-hourly-completion-20261127-v2/issued-price-v{args.price_version}"
     writer = RT/"survivor172-cadence-20261122-v1/FAILED166_CADENCE_V75_ACTIVE.json"
