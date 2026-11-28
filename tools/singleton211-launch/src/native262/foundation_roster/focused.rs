@@ -673,6 +673,65 @@ pub(super) fn v1627_230_drained(n: &mut Native, row: &Value) -> Result<Option<Bo
     Ok(Some(reference))
 }
 
+pub(super) fn retry_next_v1627_230_drained(n: &mut Native, row: &Value) -> Result<Option<Bound>> {
+    const INVOCATION: &str = "a90c6797427a495894f69eb5b496767f";
+    const LAUNCH_SHA: &str = "ef63ef51cdc5c44a7315b56f9696116295090b06e55db806261c56c40f5bc20d";
+    const TERMINAL: &str = "/var/lib/jetstreamer/horizon230-next-v1627-retry-terminal-collector-v2/evidence/terminal-evidence.json";
+    let spec = &RETRY_NEXT_V1627_230;
+    let state = Path::new(spec.state);
+    let path = state.join("terminal.json");
+    if !path.try_exists()? {
+        return Ok(None);
+    }
+    let reference = Bound::new(&path, hash(&path)?);
+    let receipt = reference.sealed()?;
+    let launch = Bound::new(state.join("cadence-registration.json"), LAUNCH_SHA);
+    launch.sealed()?;
+    let terminal_ref = binding(&receipt["native_terminal"])?;
+    ensure!(terminal_ref.path == Path::new(TERMINAL), "foreign epoch 230 retry terminal");
+    let terminal = terminal_ref.sealed()?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim().replace('-', "");
+    let pid = text(&row["producer"], "MainPID")?.parse::<u64>()?;
+    ensure!(
+        row["epoch"] == spec.epoch
+            && row["phase"] == "diagnostic-qualification"
+            && row["producer"]["Id"] == spec.unit
+            && row["producer"]["InvocationID"] == INVOCATION
+            && row["launch_receipt"] == json!(launch.path)
+            && row["launch_receipt_sha256"] == launch.sha256
+            && receipt["schema"] == "foundation-epoch230-next-v1627-retry-drain-v2"
+            && receipt["state"] == "local-segment-committed"
+            && receipt["epoch"] == spec.epoch
+            && receipt["unit"] == spec.unit
+            && receipt["invocation_id"] == INVOCATION
+            && receipt["launch"] == json!(launch)
+            && receipt["guard_drained"] == true
+            && receipt["publication_authorized"] == false
+            && terminal["schema"] == "foundation-epoch230-next-v1627-retry-terminal-evidence-v2"
+            && terminal["epoch"] == spec.epoch
+            && terminal["unit"] == spec.unit
+            && terminal["invocation_id"] == INVOCATION
+            && terminal["producer_pid"] == pid
+            && terminal["boot_id"] == boot
+            && terminal["launch"] == json!(launch)
+            && terminal["producer_exit_status"] == 0
+            && terminal["producer_drained"] == true
+            && terminal["native_manifest_complete_verified"] == true
+            && terminal["first_slot"] == spec.first
+            && terminal["last_slot"] == spec.last
+            && terminal["slot_count"] == spec.last - spec.first + 1
+            && terminal["terminal_checkpoint"]["slot"] == spec.last
+            && terminal["adjacent_checkpoints"]["consensus_fields_match"] == true
+            && terminal["publication_authorized"] == false,
+        "closed epoch 230 retry no longer binds the accepted fleet and verified endpoint"
+    );
+    let archive = Path::new(spec.root).join("work/output/epoch-230-slots-99468090-99476782.jet");
+    check_terminal_output(&archive, &terminal["archive"])?;
+    check_terminal_output(&archive.with_extension("jet.segment.json"), &terminal["segment_manifest"])?;
+    drained(n, spec.unit, spec.guard, INVOCATION)?;
+    Ok(Some(reference))
+}
+
 fn check_terminal_output(path: &Path, output: &Value) -> Result<()> {
     let archive = fs::symlink_metadata(path)?;
     let identity = &output["identity"];

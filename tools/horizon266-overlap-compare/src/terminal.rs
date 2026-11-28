@@ -901,6 +901,10 @@ pub(super) fn finish_window266_terminal(launch_sha: &str, successor: bool) -> Re
     window266::finish(window266_scope(successor), launch_sha)
 }
 
+pub(super) fn finish_retry_next_v1627_terminal(launch_sha: &str, invocation: &str) -> Result<Value> {
+    window230::finish_retry(&window230::retry_next_v1627(launch_sha, invocation)?)
+}
+
 pub(super) fn collect_window266_terminal(
     launch_sha: &str,
     exit_sha: &str,

@@ -425,6 +425,121 @@ pub(super) fn collect(
     )
 }
 
+pub(super) fn finish_retry(window: &Window<'_>) -> Result<Value> {
+    const GUARD: &str = "horizon-230-next-v1627-99468089-protective-v2.service";
+    const TIMER: &str = "horizon-230-next-v1627-99468089-protective-v2.timer";
+    const TERMINAL: &str = "/var/lib/jetstreamer/horizon230-next-v1627-retry-terminal-collector-v2/evidence/terminal-evidence.json";
+    require_root()?;
+    let _lock = predecessor::lock_cadence()?;
+    let (launch_ref, launch, pid) = load_launch(window)?;
+    let (native, terminal) = predecessor::sealed_document(Path::new(TERMINAL))?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim().replace('-', "");
+    ensure!(
+        terminal["schema"] == window.receipt_schema
+            && terminal["epoch"] == 230
+            && terminal["unit"] == window.unit
+            && terminal["launch"] == json!(launch_ref)
+            && terminal["invocation_id"] == window.invocation
+            && terminal["producer_pid"] == pid
+            && terminal["boot_id"] == boot
+            && terminal["producer_exit_status"] == 0
+            && terminal["producer_drained"] == true
+            && terminal["native_manifest_complete_verified"] == true
+            && terminal["adjacent_checkpoints"]["consensus_fields_match"] == true
+            && terminal["first_slot"] == window.bootstrap + 1
+            && terminal["last_slot"] == window.last
+            && terminal["slot_count"] == window.last - window.bootstrap
+            && terminal["terminal_checkpoint"]["slot"] == window.last
+            && terminal["publication_authorized"] == false,
+        "epoch 230 retry terminal differs from the original verified invocation"
+    );
+    let exit_ref: Reference = serde_json::from_value(terminal["pid1_exit"].clone())?;
+    ensure!(exit_ref.path == Path::new(window.exit_path), "foreign epoch 230 retry PID1 proof");
+    let captured = exit::read_window230(window, &exit_ref, &launch_ref, pid, &boot)?;
+    let group = format!("/system.slice/{}", window.unit);
+    let archive = Path::new(window.archive);
+    let manifest = archive.with_extension("jet.segment.json");
+    let verify = || -> Result<UnitState> {
+        let current = unit_state(window.unit)?;
+        clean_exit(&current, Some(&captured), window.unit, window.invocation, pid, producer_drained(&group)?)?;
+        for (key, path) in [("archive", archive), ("segment_manifest", manifest.as_path())] {
+            let output = &terminal[key];
+            let identity: FileIdentity = serde_json::from_value(output["identity"].clone())?;
+            ensure!(output["path"] == json!(path)
+                && hex(string(output, "sha256")?, 64)
+                && open_source(path)?.1 == identity,
+                "epoch 230 retry {key} changed after native verification");
+        }
+        ensure!(native.read()? == terminal && launch_ref.read()? == launch, "epoch 230 retry evidence changed");
+        Ok(current)
+    };
+    verify()?;
+    let token_ref: Reference = serde_json::from_value(launch["launch_token"].clone())?;
+    let token = token_ref.read()?;
+    let timer_invocation = string(&token, "guard_timer_invocation")?;
+    ensure!(token["unit"] == window.unit && token["invocation_id"] == window.invocation
+        && token["guard_plan"] == launch["guard_plan"] && hex(timer_invocation, 32),
+        "epoch 230 retry guard token differs");
+    let state = Path::new(window.state);
+    let completion = state.join("terminal.json");
+    let intent = state.join("terminal-drain-intent.json");
+    let expected = json!({
+        "schema":"foundation-epoch230-next-v1627-retry-drain-intent-v2",
+        "unit":window.unit,"invocation_id":window.invocation,"launch":launch_ref,
+        "pid1_exit":exit_ref,"native_terminal":native,"guard_plan":launch["guard_plan"],
+        "guard_timer_invocation":timer_invocation,"publication_authorized":false,
+    });
+    let timer = predecessor::timer_state(TIMER)?;
+    let active = timer.get("ActiveState").is_some_and(|value| value == "active");
+    ensure!(timer.get("Id").is_some_and(|value| value == TIMER)
+        && timer.get("Job").is_some_and(String::is_empty)
+        && if active {
+            timer.get("Unit").is_some_and(|value| value == GUARD)
+                && timer.get("InvocationID").is_some_and(|value| value == timer_invocation)
+        } else {
+            timer.get("ActiveState").is_some_and(|value| value == "inactive")
+        }, "epoch 230 retry guard timer ownership changed");
+    if completion.try_exists()? {
+        let (reference, done) = predecessor::sealed_document(&completion)?;
+        ensure!(!active && done["schema"] == "foundation-epoch230-next-v1627-retry-drain-v2"
+            && done["launch"] == json!(launch_ref) && done["native_terminal"] == json!(native)
+            && done["invocation_id"] == window.invocation && done["guard_drained"] == true,
+            "existing epoch 230 retry closure changed");
+        predecessor::guard_drained(GUARD)?;
+        return Ok(json!({"terminal":reference,"already_completed":true}));
+    }
+    let intent = if intent.try_exists()? {
+        let (reference, prior) = predecessor::sealed_document(&intent)?;
+        ensure!(prior == expected, "epoch 230 retry stop intent changed");
+        reference
+    } else {
+        ensure!(active, "epoch 230 retry guard timer stopped without a recorded intent");
+        predecessor::seal_in_state(&intent, &expected)?
+    };
+    if active {
+        command("/usr/bin/systemctl", &["--system", "stop", TIMER])?;
+    }
+    let timer_after = predecessor::timer_state(TIMER)?;
+    ensure!(timer_after.get("ActiveState").is_some_and(|value| value == "inactive")
+        && timer_after.get("Job").is_some_and(String::is_empty),
+        "epoch 230 retry guard timer has not drained");
+    let mut guard_after = predecessor::guard_drained(GUARD);
+    for _ in 0..12 {
+        if guard_after.is_ok() { break; }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        guard_after = predecessor::guard_drained(GUARD);
+    }
+    let terminal = predecessor::seal_in_state(&completion, &json!({
+        "schema":"foundation-epoch230-next-v1627-retry-drain-v2","epoch":230,
+        "unit":window.unit,"invocation_id":window.invocation,"launch":launch_ref,
+        "pid1_exit":exit_ref,"native_terminal":native,"intent":intent,"timer_after":timer_after,
+        "guard_after":guard_after?,"producer":verify()?,"guard_drained":true,
+        "state":"local-segment-committed","publication_authorized":false,
+        "next_action":"Bind the verified private window to the epoch 230 continuation.",
+    }))?;
+    Ok(json!({"terminal":terminal,"already_completed":false}))
+}
+
 #[cfg(test)]
 #[test]
 fn adjacent_checkpoint_binds_consensus_but_allows_distinct_runtime_cursors() {
