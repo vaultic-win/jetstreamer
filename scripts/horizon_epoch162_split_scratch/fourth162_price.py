@@ -66,6 +66,16 @@ def next_price(source):
     return one(source,'protected_170_runway=runway170','protected_169_runway=runway169,protected_170_runway=runway170')
 
 
+def compact_residency(original):
+    # Use the same two kernel observations and lower-bound arithmetic as the
+    # independent 170 reader. The 169 worker has a different hard cgroup cap.
+    start = original.index("def memory(")
+    end = original.index("def sample(core, live, owner):")
+    checks = original[start:end].rstrip()
+    return ('"""Bracket the compact epoch 169 worker with the issued 48 GiB hard limit and 44 GiB scratch."""\n'
+            'LIMIT = 48 << 30\nSCRATCH_LIMIT = 44 << 30\n\n\n'+checks+'\n')
+
+
 def build(files, interface, info, revision):
     need(interface["sha256"] == INTERFACE_SHA and info["unit"] == UNIT and info["previous"]["sha256"] == PRIOR_SHA,
          "different fourth 162 operator")
@@ -85,6 +95,9 @@ def build(files, interface, info, revision):
 
     files["fourth162_peer.py"] = next_peer(files["third162_peer.py"][0].decode(),interface,info).encode(),0o444
     files["fourth162_price.py"] = next_price(files["third162_price.py"][0].decode()).encode(),0o444
+    files["compact169_residency.py"] = compact_residency(files["ram170_residency.py"][0].decode()).encode(),0o444
+    edit("adjacent169_peer.py",'memory = runpy.run_path(str(Path(__file__).with_name("ram170_residency.py")))',
+         'memory = runpy.run_path(str(Path(__file__).with_name("compact169_residency.py")))')
     # Project only the exact new actor out of older 162 readers. The prior
     # third package and its custody evidence remain independently callable.
     old = '''def third_peer():
@@ -111,7 +124,7 @@ def third_peer():
     edit("after_stop.py",anchor,anchor+"\n    native['fourth_162_before'] = first['fourth_162']")
     edit("successor_price.py",'"horizon-qualify-162-third-replay-20261128-v1.service"),',
          '"horizon-qualify-162-third-replay-20261128-v1.service","horizon-qualify-162-fourth-replay-20261128-v1.service"),')
-    edit("capacity.py","'adjacent169_peer.py','adjacent169_price.py'}","'adjacent169_peer.py','adjacent169_price.py','fourth162_peer.py','fourth162_price.py'}")
+    edit("capacity.py","'adjacent169_peer.py','adjacent169_price.py'}","'adjacent169_peer.py','adjacent169_price.py','fourth162_peer.py','fourth162_price.py','compact169_residency.py'}")
     edit("capacity.py","third162=False, adjacent169=False):","third162=False, adjacent169=False, fourth162=False):")
     anchor = "    third['apply_resident'](base,final,early_third,later_third)"
     edit("capacity.py",anchor,anchor+'''

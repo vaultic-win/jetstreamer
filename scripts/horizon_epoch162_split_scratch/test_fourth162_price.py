@@ -3,7 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 import unittest
 
-from fourth162_price import next_price
+from fourth162_price import compact_residency, next_price
 from fourth162_writer import router
 from test_third162_price import G, MEASURED, OUTPUT, calculated
 
@@ -74,6 +74,21 @@ class FourthPlacement(unittest.TestCase):
             geometry(q,held="other")
         q["observed_sibling_guard_floors"].append(fair+1)
         self.assertFalse(geometry(q,held="our")["fits"])
+
+    def test_compact169_and_original170_enforce_their_own_limits(self):
+        original = (HERE.parent/"horizon_epoch170_checkpoint_suffix/ram170_residency.py").read_text()
+        compact,epoch170 = {},{}
+        exec(compile(compact_residency(original),"compact169_residency.py","exec"),compact)
+        exec(compile(original,"ram170_residency.py","exec"),epoch170)
+        for reader,cap,other in ((compact,48*G,56*G),(epoch170,56*G,48*G)):
+            first = dict(maximum=cap,swap_max=0,swap_current=0,anon=17*G,shmem=30*G,current=45*G)
+            last = dict(first,anon=15*G,shmem=28*G)
+            self.assertEqual(reader["lower"](first,last,16*G,27*G),42*G)
+            self.assertRaises(ValueError,reader["lower"],first,dict(last,maximum=other),16*G,27*G)
+            self.assertRaises(ValueError,reader["lower"],dict(first,maximum=other),last,16*G,27*G)
+            self.assertRaises(ValueError,reader["lower"],first,dict(last,swap_current=1),16*G,27*G)
+            self.assertRaises(ValueError,reader["lower"],dict(first,swap_max=1),last,16*G,27*G)
+            self.assertRaises(ValueError,reader["lower"],first,last,16*G,reader["SCRATCH_LIMIT"]+1)
 
     def test_custody_and_status_keys_belong_to_adjacent_intervals(self):
         code = router((HERE/"third162_route.py").read_text())

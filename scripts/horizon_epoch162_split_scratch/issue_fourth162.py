@@ -42,6 +42,29 @@ def seal(layout, revision):
                        predecessor=dict(path=str(p.OLD/"deployment-seal-receipt.json"),sha256=p.PIN)),0o400)
 
 
+def proposal(layout,revision):
+    registered = layout.pinned(BASE/"FOURTH_SHARED_PRICE_V35.json")[0]
+    directory = p.NEW
+    interface,info = contract(p.INTERFACE_SHA)
+    layout.need(registered["source_commit"] == revision and registered["interface"] == interface and latest_provider() == directory,
+                "different fourth provider for prospective placement")
+    shared = runpy.run_path(str(directory/"capacity.py"))
+    price = runpy.run_path(str(directory/"fourth162_price.py"))
+    whole = shared["complete_roster"](False,fourth162=True)
+    proof = layout.bound(price["HISTORY"])
+    fs = os.statvfs(BASE)
+    home = fs.f_bavail*fs.f_frsize
+    ram = next(int(line.split()[1])*1024 for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemAvailable:"))
+    layout.need(whole["package"] == registered["package"] and whole["fourth_162_predecessor"] == info["previous"] and not whole["preparation_only"],
+                "different native fourth proposal")
+    result = price["geometry"](whole,"prestart",None,home,ram,proof["worst_observed_90s_free_byte_decrease"],proposal=True)
+    evidence = layout.save(BASE/("FOURTH_NATIVE_PROPOSAL_"+str(time.time_ns())+".json"),
+                           dict(interface=interface,bootstrap=info["bootstrap"],terminal=info["terminal"],
+                                source_commit=revision,whole_roster=whole,available_home=home,available_ram=ram,
+                                geometry=result,enrollment_issued=False,production_started=False),0o400)
+    return dict(proposal=evidence,**result)
+
+
 def spec(layout,revision):
     root,_ = layout.pinned(BASE/"FOURTH_SHARED_PRICE_V35.json")
     interface,info = contract(p.INTERFACE_SHA)
@@ -75,6 +98,8 @@ def issue(mode,revision):
         fcntl.flock(lock,fcntl.LOCK_EX)
         if mode == "seal":
             return dict(shared_price=seal(layout,revision))
+        if mode == "proposal":
+            return proposal(layout,revision)
         entry = spec(layout,revision)
         if layout.DATA.exists():
             old,ref = layout.pinned(launch["ENROLL"])
@@ -97,7 +122,7 @@ def issue(mode,revision):
 
 if __name__=="__main__":
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode",choices=["seal","quote","launch"])
+    parser.add_argument("mode",choices=["seal","proposal","quote","launch"])
     parser.add_argument("revision")
     args=parser.parse_args()
     print(json.dumps(issue(args.mode,args.revision),sort_keys=True),flush=True)
