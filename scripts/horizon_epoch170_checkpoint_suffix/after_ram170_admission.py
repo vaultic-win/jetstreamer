@@ -30,7 +30,8 @@ def need(predicate, message):
 
 
 def receiver(core, directory):
-    # This authenticates the third RAM receiver and its support dependencies before import.
+    # First bind the original support modules, including the sealed evidence reader.
+    runpy.run_path(str(directory / "gap170_capacity.py"))["receiver"](core)
     runpy.run_path(str(directory / "ram170_live.py"))["receiver"](core)
     seal, _ = core.read(RECEIVER / "deployment-seal-receipt.json",SEAL)
     rows = {m["name"]:m["sha256"] for m in seal["members"]}
@@ -108,18 +109,30 @@ def rotated(whole):
     ram_delta = joint["producer_allowance"] - cost["producer_memory_max"]
     required_home = whole["required_home"] + home_delta
     required_ram = whole["required_ram"] + ram_delta
-    margin = min(whole["home_margin"] - home_delta,whole["available_home"] - required_home)
+    # V21 checks 143's installed absolute floor separately from its complete
+    # growing commitments. Only the latter grows when the 170 profile rotates.
+    margin_before_floor = whole.get("epoch143_pre_floor_home_margin", whole["home_margin"])
+    installed = whole.get("epoch143_installed_guard_floor")
+    floor_ok = True
+    margin = min(margin_before_floor - home_delta, whole["available_home"] - required_home)
+    if installed is not None:
+        floor_margin = whole["available_home"] - installed
+        need("epoch143_pre_floor_home_margin" in whole
+             and whole["home_margin"] == min(margin_before_floor, floor_margin),
+             "inconsistent independent 143 guard floor")
+        floor_ok = floor_margin > 0
+        margin = min(margin, floor_margin)
     ram = whole["available_ram"] - required_ram
     base = whole["base_169"]
     peer_resident = whole["second_162_accounting"]["resident_lower_bytes"]
     # These are the four independent tests in V20's 162 reconciliation. The
     # subsequent 167 allocation can only lower the final HOME margin.
     known_fit = min(base["home_margin"], base["ram_margin"] + peer_resident,
-                    whole["home_margin"], whole["ram_margin"]) >= 0
+                    margin_before_floor, whole["ram_margin"]) >= 0 and floor_ok
     need(known_fit == whole["fits"], "an additional shared admission condition needs reconciliation")
     other_fit = base["home_margin"] >= home_delta and base["ram_margin"] + peer_resident >= ram_delta
     return dict(required_home=required_home,required_ram=required_ram,home_margin=margin,ram_margin=ram,
-                fits=other_fit and min(margin,ram) >= 0,guard_floor=whole["guard_floor"])
+                fits=other_fit and floor_ok and min(margin,ram) >= 0,guard_floor=whole["guard_floor"])
 
 
 def booking(core, directory):

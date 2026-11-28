@@ -37,6 +37,18 @@ class IncrementalBooking(unittest.TestCase):
         self.assertEqual((quote["home_margin"],quote["ram_margin"],quote["guard_floor"]),(52*G,33*G,700*G))
         self.assertTrue(quote["fits"])
 
+    def test_absolute_143_floor_is_checked_once_with_strict_headroom(self):
+        q = base()
+        q.update(epoch143_installed_guard_floor=790*G, epoch143_pre_floor_home_margin=80*G, home_margin=10*G)
+        changed = price.rotated(q)
+        self.assertEqual(changed["home_margin"], 10*G)
+        self.assertTrue(changed["fits"])
+        q.update(epoch143_installed_guard_floor=800*G, home_margin=0, fits=False)
+        self.assertFalse(price.rotated(q)["fits"])
+        q["home_margin"] = G
+        with self.assertRaisesRegex(ValueError, "inconsistent independent 143"):
+            price.rotated(q)
+
     def test_registered_held_profile_is_charged_only_once(self):
         q=base()
         with patch.object(price,"booking",return_value=None):
