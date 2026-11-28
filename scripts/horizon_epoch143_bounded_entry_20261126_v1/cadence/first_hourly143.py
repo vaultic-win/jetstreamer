@@ -11,7 +11,8 @@ from evidence import bound, checked, need
 
 class FirstHourlyProfile:
     def __init__(self, epoch, *, bootstrap, terminal, tree_gib, producer_ram_gib,
-                 contract_sha, node, worker_sha, interval="first", date="20261127"):
+                 contract_sha, node, worker_sha, interval="first", date="20261127",
+                 version=1, run=None, field=None):
         self.epoch = epoch
         self.bootstrap = bootstrap
         self.terminal = terminal
@@ -20,14 +21,14 @@ class FirstHourlyProfile:
         self.node = Path(node)
         self.worker_sha = worker_sha
         self.interval = interval
-        suffix = f"{epoch}-{interval}-hourly-{date}-v1"
+        suffix = f"{epoch}-{interval}-hourly-{date}-v{version}"
         name = f"epoch{suffix}"
         self.base = Path("/var/lib/jetstreamer/horizon_runtime_data") / name
-        self.run = Path("/home/sol/.jetstreamer-private") / name
+        self.run = Path(run) if run else Path("/home/sol/.jetstreamer-private") / name
         self.unit = f"horizon-qualify-{suffix}.service"
         self.guard_timer = f"horizon-guard-{suffix}.timer"
         self.cgroup = f"/system.slice/{self.unit}"
-        self.field = f"current_private{epoch}_{interval}_hourly"
+        self.field = field or f"current_private{epoch}_{interval}_hourly"
         self.contract = {"path": str(self.base / "contract-v1/LAUNCH_PROFILE.json"), "sha256": contract_sha}
 
 

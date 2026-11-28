@@ -17,7 +17,6 @@ PROFILE = FirstHourlyProfile(
     interval="second", date="20261128",
 )
 PROGRESS = PROFILE.base / "FIRST_PROTECTED_PROGRESS.json"
-START = PROFILE.bootstrap + 1
 PROGRESS_FIELD = "private143_second_first_progress"
 ACTOR_FIELD = "private143_second_held"
 
@@ -48,7 +47,7 @@ def status_row(rows):
     return next(row for profile, row in reversed(rows) if profile.epoch == 143 and row is not None)
 
 
-def baseline(previous):
+def baseline(previous, profiles=(PROFILE,)):
     latest = checked(previous) if previous else {}
     if ACTOR_FIELD not in latest:
         return first.baseline(previous)
@@ -57,7 +56,7 @@ def baseline(previous):
     need(latest["private143_origin"] == origin and latest["private143_held"] == first.HELD
          and latest["epoch"] == PROFILE.epoch and latest["key"] == first.KEY
          and latest["authenticated_readback"] and latest["conditional_header"] == "If-Match"
-         and actor["contract"] == PROFILE.contract and actor["unit"] == PROFILE.unit
+         and any(actor["contract"] == profile.contract and actor["unit"] == profile.unit for profile in profiles)
          and actor["closure"] == PREFIX,
          "different epoch 143 successor status chain")
     if latest.get(PROGRESS_FIELD):
@@ -68,46 +67,47 @@ def baseline(previous):
     return previous
 
 
-def forecast(c, row, old):
+def forecast(c, row, old, profile=PROFILE):
     if row["unit"]["Id"] == EPOCH143.unit:
         return first.forecast(c, row, old)
     need(old and old["private143_held"] == first.HELD, "missing authenticated epoch 143 status predecessor")
+    progress_path = profile.base / "FIRST_PROTECTED_PROGRESS.json"
     actor = row["actor"]
     iid = actor["producer_invocation_id"]
     is_worker = row["phase"] == "worker"
     has_progress = row.get("transaction_replay_claimed", False)
     predecessor = old["after_status"]
     age = round((c.now - utc(predecessor["sampled_at_utc"])).total_seconds() * 1000)
-    need(age >= 0 and predecessor["epoch"] == PROFILE.epoch and row["epoch"] == PROFILE.epoch,
+    need(age >= 0 and predecessor["epoch"] == profile.epoch and row["epoch"] == profile.epoch,
          "epoch 143 forecast crossed the accepted clock")
     evidence = old.get(PROGRESS_FIELD) if old.get(ACTOR_FIELD) == row["held_owner"] else None
     if has_progress:
-        evidence = bound(PROGRESS)
+        evidence = bound(progress_path)
         progress = checked(evidence)
         need(progress["held_owner"] == row["held_owner"] and progress["producer_invocation_id"] == iid
              and progress["worker_pid"] == row["worker"]["pid"]
              and progress["worker_start_ticks"] == row["worker"]["start_ticks"]
-             and START <= progress["slot"] <= progress["last_requested_slot"] == PROFILE.terminal,
+             and profile.bootstrap < progress["slot"] <= progress["last_requested_slot"] == profile.terminal,
              "epoch 143 protected progress belongs to another worker")
     if is_worker:
-        part = split_wire.archive(row, Path(checked(PROFILE.contract)["prepared_output_file"]))
+        part = split_wire.archive(row, Path(checked(profile.contract)["prepared_output_file"]))
     else:
         part = None
     size = part["size"] if part else predecessor["jet_size_bytes"]
-    quote = delivery_eta.estimate(c, PROFILE.epoch, size)
+    quote = delivery_eta.estimate(c, profile.epoch, size)
     planning = dict(old["planning_milliseconds"])
     planning["verified_delivery"] = quote["total_millis"]
     rate = old.get("recorded_rate")
     if has_progress:
-        sample = first.recorded_pair(row, progress, c.now, profile=PROFILE, first_path=PROGRESS)
+        sample = first.recorded_pair(row, progress, c.now, profile=profile, first_path=progress_path)
         if sample:
             rate = sample
         slot = sample["slot"] if sample else progress["slot"]
-        planning["current_interval"] = math.ceil((PROFILE.terminal - slot) * 1000 / rate["slots_per_second"])
+        planning["current_interval"] = math.ceil((profile.terminal - slot) * 1000 / rate["slots_per_second"])
     elif row["phase"] == "terminal":
         planning["current_interval"] = 0
     phase = "replay" if is_worker and has_progress else "verification"
-    report = dict(epoch=PROFILE.epoch, phase=phase, jet_size_bytes=size, sampled_at_utc=c.stamp,
+    report = dict(epoch=profile.epoch, phase=phase, jet_size_bytes=size, sampled_at_utc=c.stamp,
                   elapsed_execution_millis=predecessor["elapsed_execution_millis"] + age,
                   estimated_remaining_millis=sum(planning.values()))
     return report, {

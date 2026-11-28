@@ -202,6 +202,7 @@ def launch(contract_ref, writer_ref, price_seal, guard_seal):
         need(props(unit, "LoadState")["LoadState"] == "not-found", "native unit already exists " + unit)
     booking = make_booking(contract_ref, contract, writer_ref, price_seal)
     booking["guard_seal"] = guard_seal
+    booking["failed_second_hourly"] = contract["failed_second_hourly"]
     enrollment(booking)
     quote = checked_roster(booking)
     need(0 < quote["guard_floor"] <= quote["required_home"] < quote["available_home"],
