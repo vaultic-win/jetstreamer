@@ -4,6 +4,8 @@ use horizon_singleton211_launch::native262::foundation_roster::{self, assembly22
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
 const RELEASE: &str = "/var/lib/jetstreamer/horizon226-assembly-fleet-v1/acceptance.json";
+const LAUNCHER_RELEASE: &str = "/var/lib/jetstreamer/horizon226-assembly-launcher-v2/acceptance.json";
+const MAX_LAUNCHER_BYTES: u64 = 128 << 20;
 const PRESTART: &str = "/var/lib/jetstreamer/horizon226-suffix-v1/pre-start.sh";
 const PRESTART_SHA: &str = "14c316bf3fc8ff28800c9b7bb673f42f95995a2a2b1ac0b9654c36c0a83832e0";
 const LEASE: &str = "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-226.lock";
@@ -89,6 +91,7 @@ fn static_inputs() -> Result<(Value, Value, Value)> {
 
 fn installed() -> Result<()> {
     let release = suffix::document(Path::new(RELEASE))?;
+    let launcher = suffix::document(Path::new(LAUNCHER_RELEASE))?;
     let executable = env::current_exe()?;
     let control = Path::new(drain::CYCLE_LOCK)
         .parent()
@@ -98,9 +101,12 @@ fn installed() -> Result<()> {
             && release["assembly_only_no_replay"] == true
             && release["publication_authorized"] == false
             && release["preflight"] == json!({"path":spec::PREFLIGHT.0,"sha256":spec::PREFLIGHT.1})
-            && release["fleet"] == private157::file_binding(&executable)?,
+            && launcher["schema"] == "foundation-epoch226-private-assembly-launcher-release-v2"
+            && launcher["controller_release"] == private157::file_binding(Path::new(RELEASE))?
+            && launcher["publication_authorized"] == false,
         "epoch 226 private assembly launcher is outside the accepted fleet release"
     );
+    suffix::bytes(&launcher["launcher"], &executable, MAX_LAUNCHER_BYTES)?;
     for name in [
         "cycle.py",
         "native_binding_replays.py",
@@ -393,18 +399,22 @@ pub(crate) fn run() -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == 0
             && args.len() == 3
-            && matches!(args[2].as_str(), "--check" | "--apply"),
-        "usage: jetstreamer-r2 launch-epoch226-assembly --check|--apply"
+            && matches!(args[2].as_str(), "--check" | "--check-installed" | "--apply"),
+        "usage: jetstreamer-r2 launch-epoch226-assembly --check|--check-installed|--apply"
     );
     let (preflight, handoff, mut guard) = static_inputs()?;
-    if args[2] == "--check" {
+    if args[2] != "--apply" {
+        let installed_checked = args[2] == "--check-installed";
+        if installed_checked {
+            installed()?;
+        }
         service_args(
             &preflight,
             &json!({"path":path("plan.json"),"sha256":"a".repeat(64)}),
         )?;
         println!(
             "{}",
-            json!({"epoch":226,"static_inputs_verified":true,"assembly_only_no_replay":true,"launched":false})
+            json!({"epoch":226,"static_inputs_verified":true,"installed_checked":installed_checked,"assembly_only_no_replay":true,"launched":false})
         );
         return Ok(());
     }
