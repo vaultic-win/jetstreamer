@@ -2,10 +2,14 @@
 import ast
 import json
 from pathlib import Path
+import sys
 
 from derive_serial157_v23 import f, once, read_package
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent/"horizon_epoch157_lanej_rotation_20261128_v1"))
+from derive_157_audit import integrate as integrate_157_audit
+
 OLD = f.ROOT/"epoch162-first-hourly-completion-20261127-v2/issued-price-v27"
 NEW = OLD.with_name("issued-price-v28")
 V26 = dict(path=str(OLD.with_name("issued-price-v26")/"deployment-seal-receipt.json"),
@@ -32,6 +36,12 @@ def members(stage, revision, prior_seal, scope, receiver):
         content,mode = files[name]
         files[name] = once(content.decode(),old,new).encode(),mode
 
+    integrate_157_audit(files)
+    anchor = "    custody = runpy.run_path(str(STOPPED.parent / 'serial157_operator.py'))['account'](booked, core)"
+    edit("capacity.py", anchor, anchor + '''
+    audits = base['accounting']['verification168_listener']['audits']
+    need(audits['reclamation157'] == custody['epoch157_lanej_rotation']['metadata'],
+         'epoch 157 audit owner changed before its existing sublease was reconciled')''')
     edit("capacity.py","'price143_floor_retry.py','reclamation_price.py'}","'price143_floor_retry.py','reclamation_price.py','after_floor170_price.py'}")
     edit("capacity.py","def complete_roster(prep143):","def complete_roster(prep143, *, hourly170=False):")
     edit("capacity.py","    booked = after_ram['account'](merged, core, STOPPED.parent)",'''    replacement = runpy.run_path(str(STOPPED.parent/'after_floor170_price.py'))
