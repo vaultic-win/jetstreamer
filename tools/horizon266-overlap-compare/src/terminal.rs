@@ -1,7 +1,7 @@
 use super::*;
 mod exit;
 mod predecessor;
-mod v1627;
+mod window230;
 use anyhow::bail;
 use jetstreamer_horizon::archive::{BlockNotification, Consumption, EntryRecord, SlotVisitor};
 use segment_manifest::{SegmentManifestError, read_and_validate_seekable_segment_manifest};
@@ -846,8 +846,12 @@ pub(super) fn finish_predecessor(launch_sha: &str) -> Result<Value> {
     predecessor::finish(launch_sha, false)
 }
 
+pub(super) fn collect_adjacent230_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {
+    window230::collect(&window230::ADJACENT, exit, digest, destination)
+}
+
 pub(super) fn collect_v1627_terminal(exit: &Path, digest: &str, destination: &Path) -> Result<Value> {
-    v1627::collect(exit, digest, destination)
+    window230::collect(&window230::V1627, exit, digest, destination)
 }
 
 pub(super) fn collect(

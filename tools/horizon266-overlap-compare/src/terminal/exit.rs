@@ -235,22 +235,36 @@ pub(super) fn capture(launch_sha: &str, destination: &Path) -> Result<Value> {
 }
 
 pub(super) fn capture_v1627(launch_sha: &str, destination: &Path) -> Result<Value> {
-    use super::v1627::{IID, LAUNCH_SHA, NODE, UNIT, load_launch};
+    capture_window230(&window230::V1627, launch_sha, destination)
+}
+
+pub(super) fn capture_adjacent230(launch_sha: &str, destination: &Path) -> Result<Value> {
+    capture_window230(&window230::ADJACENT, launch_sha, destination)
+}
+
+fn capture_window230(
+    window: &window230::Window,
+    launch_sha: &str,
+    destination: &Path,
+) -> Result<Value> {
     require_root()?;
     let parent = destination_parent(destination)?;
-    ensure!(launch_sha == LAUNCH_SHA, "foreign epoch 230 launch receipt");
-    let (reference, launch, pid) = load_launch()?;
+    ensure!(
+        launch_sha == window.launch_sha,
+        "foreign epoch 230 launch receipt"
+    );
+    let (reference, launch, pid) = window230::load_launch(window)?;
     let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
         .trim()
         .replace('-', "");
     ensure!(hex(&boot_id, 32), "invalid running boot ID");
     let producer = Producer {
-        unit: UNIT,
-        invocation: IID,
+        unit: window.unit,
+        invocation: window.invocation,
         pid,
-        node: Path::new(NODE),
+        node: Path::new(window.node),
     };
-    let (_held, properties) = capture_properties(&producer, 14_500_000)?;
+    let (_held, properties) = capture_properties(&producer, window.capture_timeout_ms)?;
     ensure!(
         reference.read()? == launch,
         "epoch 230 launch changed during capture"
@@ -259,78 +273,10 @@ pub(super) fn capture_v1627(launch_sha: &str, destination: &Path) -> Result<Valu
         parent,
         destination,
         &Capture {
-            schema: super::v1627::EXIT_SCHEMA.to_owned(),
+            schema: window.exit_schema.to_owned(),
             launch: reference,
             boot_id,
-            producer_invocation: IID.to_owned(),
-            producer_pid: pid,
-            properties,
-        },
-    )
-}
-
-pub(super) fn capture_adjacent230(launch_sha: &str, destination: &Path) -> Result<Value> {
-    const STATE: &str = "/var/lib/jetstreamer/horizon230-adjacent-99445304-runtime-v1";
-    const UNIT: &str = "horizon-qualify-230-adjacent-99445304-v1.service";
-    const NODE: &str =
-        "/var/lib/jetstreamer/horizon230-continuation-stock-10eaffb0-v1/jetstreamer-node";
-    const RECEIPT: &str = "aeaa1889903df19f737eed77bcd38e0df66f61b268ee1b38afe834b6bb28964f";
-    const PROFILE: &str = "d01cf1c1a583c41e885ea74f57aea21a5e5178554e94bca16d01674a5bff1d1b";
-
-    require_root()?;
-    let parent = destination_parent(destination)?;
-    ensure!(
-        launch_sha == RECEIPT,
-        "foreign adjacent epoch 230 launch receipt"
-    );
-    let state = Path::new(STATE);
-    let reference = Reference::new(state.join("cadence-registration.json"), launch_sha);
-    let launch = reference.read()?;
-    let invocation = string(&launch, "invocation_id")?;
-    let pid: u32 = serde_json::from_value(launch["main_pid"].clone())?;
-    let guard: Reference = serde_json::from_value(launch["active_guard"].clone())?;
-    let sample = guard.read_guard_sample(&state.join("guard-receipts"))?;
-    ensure!(
-        launch["schema"] == "jetstreamer-historical-performance-launch-receipt-v1"
-            && launch["kind"] == "epoch230-private-adjacent-99445304-window"
-            && launch["epoch"] == 230
-            && launch["unit"] == UNIT
-            && launch["node_path"] == NODE
-            && launch["profile"] == json!(Reference::new(state.join("profile.json"), PROFILE))
-            && launch["launched"] == true
-            && launch["canonical_epoch_publication_authorized"] == false
-            && pid > 1
-            && hex(invocation, 32)
-            && sample["producer"]["pid"] == pid
-            && sample["producer_invocation_id"] == invocation
-            && sample["plan_sha256"] == launch["guard_plan"]["sha256"]
-            && sample["producer_stop_enabled"] == true
-            && sample["trip_reason"].is_null(),
-        "adjacent epoch 230 launch or guard does not bind the exact producer"
-    );
-    let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
-        .trim()
-        .replace('-', "");
-    ensure!(hex(&boot_id, 32), "invalid running boot ID");
-    let producer = Producer {
-        unit: UNIT,
-        invocation,
-        pid,
-        node: Path::new(NODE),
-    };
-    let (_held, properties) = capture_properties(&producer, 86_460_000)?;
-    ensure!(
-        reference.read()? == launch,
-        "adjacent epoch 230 launch changed during capture"
-    );
-    persist_capture(
-        parent,
-        destination,
-        &Capture {
-            schema: "foundation-epoch230-adjacent-window-pid1-exit-v1".to_owned(),
-            launch: reference,
-            boot_id,
-            producer_invocation: invocation.to_owned(),
+            producer_invocation: window.invocation.to_owned(),
             producer_pid: pid,
             properties,
         },
@@ -445,27 +391,27 @@ pub(super) fn read(reference: &Reference, admitted: &Admitted) -> Result<UnitSta
     Ok(capture.properties)
 }
 
-pub(super) fn read_v1627(
+pub(super) fn read_window230(
+    window: &window230::Window,
     reference: &Reference,
     launch: &Reference,
     pid: u32,
     boot: &str,
 ) -> Result<UnitState> {
-    use super::v1627::{EXIT_SCHEMA, IID, NODE, UNIT};
     let saved: Capture = serde_json::from_value(reference.read()?)?;
     ensure!(
-        saved.schema == EXIT_SCHEMA
+        saved.schema == window.exit_schema
             && &saved.launch == launch
             && saved.boot_id == boot
             && saved.producer_pid == pid
-            && saved.producer_invocation == IID,
+            && saved.producer_invocation == window.invocation,
         "foreign epoch 230 PID1 exit capture"
     );
     let producer = Producer {
-        unit: UNIT,
-        invocation: IID,
+        unit: window.unit,
+        invocation: window.invocation,
         pid,
-        node: Path::new(NODE),
+        node: Path::new(window.node),
     };
     ensure_unit(&saved.properties, &producer)?;
     Ok(saved.properties)
