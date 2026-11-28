@@ -16,7 +16,7 @@ use anyhow::{Context, Result, ensure};
 use custody::{Bound, Opened, bound, digest, reference};
 use scope::Inputs;
 use serde_json::{Value, json};
-use std::{env, fs, path::Path};
+use std::{env, fs, os::unix::fs::MetadataExt, path::Path};
 
 const CONTROL: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch168-exact-private-verification-20261127-v1";
@@ -57,6 +57,21 @@ fn validate_reports(
     ];
     scan::validate_semantics(assembled, inputs, &text, &report, &args)?;
     Ok(report["report"].clone())
+}
+
+fn report_window(modified: u128, changed: u128, native: &Value) -> Result<()> {
+    let journal = &native["journal"];
+    let begin = journal["full_poh"]["at_realtime_usec"]
+        .as_u64()
+        .context("native playback start")?;
+    let end = journal["closing_diff"]["at_realtime_usec"]
+        .as_u64()
+        .context("native closing source refusal")?;
+    ensure!(
+        u128::from(begin) <= modified && modified <= changed && changed <= u128::from(end),
+        "plugin report dates fall outside the original native playback"
+    );
+    Ok(())
 }
 
 fn reconcile(tip: &str) -> Result<Value> {
@@ -154,7 +169,18 @@ fn reconcile(tip: &str) -> Result<Value> {
         output.join("full.stdout"),
         "4939aadc1f25160b7d41ae573ba6e1bb8d7cb15336f01a38520b00a51d3d5c78",
     );
-    let plugin = bound(&output.join("plugin.json"))?;
+    let plugin_path = output.join("plugin.json");
+    let mut plugin_file = Opened::open(&plugin_path)?;
+    let plugin = pin(&plugin_path, &plugin_file.hash()?);
+    let stat = fs::symlink_metadata(&plugin_path)?;
+    let unix_usec = |seconds: i64, nanos: i64| -> Result<u128> {
+        Ok(u128::try_from(seconds)? * 1_000_000 + u128::try_from(nanos)? / 1_000)
+    };
+    report_window(
+        unix_usec(stat.mtime(), stat.mtime_nsec())?,
+        unix_usec(stat.ctime(), stat.ctime_nsec())?,
+        &native,
+    )?;
     let counters = validate_reports(&inputs, &assembled, &full, &plugin)?;
     let diagnostics = ["full.stderr", "playback.stdout", "playback.stderr"]
         .iter()
@@ -162,6 +188,7 @@ fn reconcile(tip: &str) -> Result<Value> {
         .collect::<Result<Vec<_>>>()?;
     let sources = source::review(tip, &inputs)?;
     archive.unchanged()?;
+    plugin_file.unchanged()?;
     ensure!(
         bound(&plugin.path)? == plugin,
         "plugin report changed during review"
@@ -174,7 +201,7 @@ fn reconcile(tip: &str) -> Result<Value> {
         "terminal":native,"assembly":assembly,"archive":archive_path,"archive_stamp":archive.start,
         "archive_sha256":assembled["archive_sha256"],"expectation":inputs.scope.expectation,
         "provenance_sha256":assembled["provenance_sha256"],"reader_branch_at_entry":ad["reader_branch"],
-        "current_reader":sources,"full_stdout":full,"plugin":plugin,"diagnostics":diagnostics,
+        "current_reader":sources,"full_stdout":full,"plugin":plugin,"plugin_stamp":plugin_file.start,"diagnostics":diagnostics,
         "counters":counters,"normalized_writes":assembled["normalized_writes"],
         "canonical_writes":false,"publication_authorized":false}),
     )
@@ -183,6 +210,15 @@ fn reconcile(tip: &str) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_reports_within_the_native_playback_window_qualify() {
+        let native = json!({"journal":{"full_poh":{"at_realtime_usec":10},"closing_diff":{"at_realtime_usec":20}}});
+        assert!(report_window(10, 20, &native).is_ok());
+        assert!(report_window(9, 15, &native).is_err());
+        assert!(report_window(19, 21, &native).is_err());
+        assert!(report_window(18, 17, &native).is_err());
+    }
 
     #[test]
     #[ignore = "needs the original root-owned qualification on Anza"]

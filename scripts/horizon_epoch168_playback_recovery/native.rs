@@ -63,8 +63,13 @@ fn event(row: &Value) -> Result<Value> {
         .as_str()
         .context("journal clock")?
         .parse::<u64>()?;
+    let realtime = row["__REALTIME_TIMESTAMP"]
+        .as_str()
+        .context("journal wall clock")?
+        .parse::<u64>()?;
     Ok(
-        json!({"at_monotonic_usec":time, "message":row["MESSAGE"], "cursor":row["__CURSOR"].as_str().context("journal cursor")?}),
+        json!({"at_monotonic_usec":time, "at_realtime_usec":realtime, "message":row["MESSAGE"],
+            "cursor":row["__CURSOR"].as_str().context("journal cursor")?}),
     )
 }
 
@@ -220,6 +225,7 @@ mod tests {
             r["_BOOT_ID"] = json!(BOOT);
             r["_UID"] = json!("0");
             r["__MONOTONIC_TIMESTAMP"] = json!(index.to_string());
+            r["__REALTIME_TIMESTAMP"] = json!(index.to_string());
             r["__CURSOR"] = json!(index.to_string());
             if r["_PID"] == PID {
                 r["_SYSTEMD_UNIT"] = json!(UNIT);
