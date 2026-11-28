@@ -328,6 +328,9 @@ pub(super) const SUCCESSOR_WINDOW_266: Focused = Focused {
     profile_sha: "eacf3e685a72ad196734b20d7a8a00924176cb6e324aea6ce52f55a983e1fc30",
     ..WINDOW_266
 };
+pub(super) const SUCCESSOR_WINDOW_266_LAUNCH_SHA: &str =
+    "e298867828c5d729d1e3a646f55cdfa3e67978e48ddc290bcc069ee6be8aa00c";
+
 const WINDOW_266_CUSTODY: (&str, &str) = (
     "/var/lib/jetstreamer/horizon266-next-114929697-intake-v2/custody.json",
     "98c28740a2bdb0f707624a07046fa8a316dd37ea225f31770cf410d5fd0b7001",
@@ -837,68 +840,97 @@ pub(super) fn next_v1627_predecessor(n: &mut Native) -> Result<Bound> {
     Ok(reference)
 }
 
-pub(super) fn window_266_drained(n: &mut Native, row: &Value) -> Result<Option<Bound>> {
-    const INVOCATION: &str = "b092a57c368a46a6bb367359b9fd7aae";
-    const LAUNCH_SHA: &str = "6a60c3ca7b40c7b7ef9e7f6235b1168ad2dc863a60ca49aa4dff993da94b7e73";
-    const NATIVE: &str = "/var/lib/jetstreamer/horizon266-window-terminal-collector-v1/evidence/terminal-evidence.json";
-    let state = Path::new(WINDOW_266.state);
+pub(super) fn window_266_drained(
+    n: &mut Native,
+    spec: &Focused,
+    row: Option<&Value>,
+) -> Result<Option<Bound>> {
+    let (invocation, launch_sha, native, accounts_hash) = match spec.unit {
+        unit if unit == WINDOW_266.unit => (
+            "b092a57c368a46a6bb367359b9fd7aae",
+            "6a60c3ca7b40c7b7ef9e7f6235b1168ad2dc863a60ca49aa4dff993da94b7e73",
+            "/var/lib/jetstreamer/horizon266-window-terminal-collector-v1/evidence/terminal-evidence.json",
+            "GqAWTNQiWMCFTZLC1N3SXe2NmykFDcMQdn4Saj4ALSCA",
+        ),
+        unit if unit == SUCCESSOR_WINDOW_266.unit => (
+            "30d5c22c2aeb486f9936264b89c33008",
+            SUCCESSOR_WINDOW_266_LAUNCH_SHA,
+            "/var/lib/jetstreamer/horizon266-successor-window-terminal-collector-v1/evidence/terminal-evidence.json",
+            "6yDbxQ1pi5QgyLa7byJ7SnRRbh3ekSHeYkSVUDCnbyDt",
+        ),
+        _ => bail!("unsupported epoch 266 checkpoint window"),
+    };
+    let state = Path::new(spec.state);
     let path = state.join("terminal.json");
     if !path.try_exists()? {
         return Ok(None);
     }
     let reference = Bound::new(&path, hash(&path)?);
     let receipt = reference.sealed()?;
-    let launch = Bound::new(state.join("cadence-registration.json"), LAUNCH_SHA);
-    launch.sealed()?;
+    let launch = Bound::new(state.join("cadence-registration.json"), launch_sha);
+    let registration = launch.sealed()?;
+    let pid = num(&registration, "main_pid")?;
+    ensure!(
+        registration["unit"] == spec.unit && registration["invocation_id"] == invocation && pid > 0,
+        "epoch 266 window registration differs from the closed owner"
+    );
+    if let Some(row) = row {
+        ensure!(
+            row["epoch"] == spec.epoch
+                && row["phase"] == "diagnostic-qualification"
+                && row["producer"]["Id"] == spec.unit
+                && row["producer"]["InvocationID"] == invocation
+                && text(&row["producer"], "MainPID")?.parse::<u64>()? == pid
+                && row["launch_receipt"] == json!(launch.path)
+                && row["launch_receipt_sha256"] == launch.sha256,
+            "closed epoch 266 evidence does not bind the sampled checkpoint window"
+        );
+    }
     let terminal_ref = binding(&receipt["native_terminal"])?;
     ensure!(
-        terminal_ref.path == Path::new(NATIVE),
+        terminal_ref.path == Path::new(native),
         "foreign epoch 266 window terminal source"
     );
     let terminal = terminal_ref.sealed()?;
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
         .trim()
         .replace('-', "");
-    let pid = text(&row["producer"], "MainPID")?.parse::<u64>()?;
     ensure!(
-        row["epoch"] == WINDOW_266.epoch
-            && row["phase"] == "diagnostic-qualification"
-            && row["producer"]["Id"] == WINDOW_266.unit
-            && row["producer"]["InvocationID"] == INVOCATION
-            && row["launch_receipt"] == json!(launch.path)
-            && row["launch_receipt_sha256"] == launch.sha256
-            && receipt["schema"] == "foundation-epoch266-private-window-drain-v1"
+        receipt["schema"] == "foundation-epoch266-private-window-drain-v1"
             && receipt["state"] == "local-segment-committed"
-            && receipt["unit"] == WINDOW_266.unit
-            && receipt["invocation_id"] == INVOCATION
+            && receipt["unit"] == spec.unit
+            && receipt["invocation_id"] == invocation
             && receipt["launch"] == json!(launch)
             && receipt["guard_drained"] == true
             && receipt["publication_authorized"] == false
             && terminal["schema"] == "foundation-epoch266-private-window-terminal-evidence-v1"
             && terminal["launch"] == json!(launch)
-            && terminal["unit"] == WINDOW_266.unit
-            && terminal["invocation_id"] == INVOCATION
+            && terminal["unit"] == spec.unit
+            && terminal["invocation_id"] == invocation
             && terminal["producer_pid"] == pid
             && terminal["boot_id"] == boot
             && terminal["producer_exit_status"] == 0
             && terminal["producer_drained"] == true
             && terminal["native_manifest_complete_verified"] == true
             && terminal["predecessor_consensus_fields_match"] == true
-            && terminal["first_slot"] == WINDOW_266.first
-            && terminal["last_slot"] == WINDOW_266.last
-            && terminal["slot_count"] == WINDOW_266.last - WINDOW_266.first + 1
-            && terminal["terminal_checkpoint"]["slot"] == WINDOW_266.last
+            && terminal["first_slot"] == spec.first
+            && terminal["last_slot"] == spec.last
+            && terminal["slot_count"] == spec.last - spec.first + 1
+            && terminal["terminal_checkpoint"]["slot"] == spec.last
+            && terminal["terminal_checkpoint"]["accounts_hash"] == accounts_hash
             && terminal["original_epoch_root_still_required"] == true
             && terminal["publication_authorized"] == false,
-        "closed epoch 266 evidence does not bind the sampled checkpoint window"
+        "epoch 266 checkpoint window did not verify and drain"
     );
-    let archive = Path::new(WINDOW_266.root).join("output/epoch-266-slots-114929698-114936474.jet");
+    let archive = Path::new(spec.root).join(format!(
+        "output/epoch-266-slots-{}-{}.jet", spec.first, spec.last
+    ));
     check_terminal_output(&archive, &terminal["archive"])?;
     check_terminal_output(
         &archive.with_extension("jet.segment.json"),
         &terminal["segment_manifest"],
     )?;
-    drained(n, WINDOW_266.unit, WINDOW_266.guard, INVOCATION)?;
+    drained(n, spec.unit, spec.guard, invocation)?;
     Ok(Some(reference))
 }
 
