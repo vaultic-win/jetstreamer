@@ -57,7 +57,6 @@ def members(stage, revision):
     edit("successor_price.py", anchor, """        archive_publication_authorized=False,resource_credit_bytes=0,
         **({"after_ram170_tree": after_ram_tree} if after_ram_tree is not None else {}))""")
     files["after_ram170_tree.py"] = (HERE / "after_ram170_tree.py").read_bytes(), 0o444
-    files["serial157_operator.py"] = (HERE / "serial157_operators.py").read_bytes(), 0o444
     history = json.loads(files["SOURCE.json"][0])
     history.update(revision=revision, prior_shared_price=PREVIOUS)
     files["SOURCE.json"] = ((json.dumps(history, indent=2) + "\n").encode(), 0o444)

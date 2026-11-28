@@ -1,15 +1,12 @@
 """Exercise the live price with hard links, sparse files and changing scratch names."""
 import copy
-import json
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
 
 import after_ram170_tree as tree
-import serial157_operators as holders
 
 
 def run(*args):
@@ -97,27 +94,6 @@ class PhysicalSamples(unittest.TestCase):
     def test_different_issued_scope_fails_before_any_read(self):
         with self.assertRaisesRegex(ValueError, "different 170 tree owner"):
             tree.observe(dict(unit=tree.UNIT, phase="worker", interface={}), None, None, None, None)
-
-
-class SerialImages(unittest.TestCase):
-    class Core:
-        need = staticmethod(tree.need)
-
-    def test_each_admission_dispatches_its_own_sealed_holder(self):
-        unit = "horizon-closed157-retire-lanej-123.service"
-        ref = {"path": str(holders.BASE / "RETIRE_ADMISSION_123.json"), "sha256": "0" * 64}
-        core = self.Core()
-        row = dict(phase="retire", native={"Id": unit}, admission=ref, resource_credit_bytes=0)
-        core.cmd = lambda *args: json.dumps(row)
-        for seal in (holders.PRIOR, holders.CURRENT):
-            core.read = lambda path: (dict(unit=unit, phase="retire", operator_seal=seal), ref)
-            with self.subTest(seal=seal), patch.object(holders, "registered", return_value=Path("/bin/test")) as checked:
-                self.assertEqual(holders.holder(core, {unit}), row)
-                checked.assert_called_once_with(core, seal)
-
-    def test_unknown_operator_cannot_take_the_shared_slot(self):
-        with self.assertRaisesRegex(ValueError, "unregistered lane-j"):
-            holders.registered(self.Core(), dict(path=holders.CURRENT["path"], sha256="0" * 64))
 
 
 if __name__ == "__main__":
