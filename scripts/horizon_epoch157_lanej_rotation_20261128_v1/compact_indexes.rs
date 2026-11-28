@@ -30,6 +30,7 @@ const RETAINED_INODE: u64 = 118_555_036;
 const DEAD: &str = "jetstreamer-holding-scratch185-execute-0946-20261024-v2.service";
 const DEAD_HASH: &str = "a0aff45bab4df5b3be53d4eddec3d5d97e2acadfd1ceac9c24e2896e480802a9";
 mod lane_cache;
+mod retry_cache;
 
 #[derive(Clone, Copy)]
 struct Owner {
@@ -100,105 +101,31 @@ fn index_path(owner: &Owner) -> PathBuf {
         .join(INDEX)
 }
 
-fn lock(path: &Path, dev: u64, ino: u64) -> Result<File> {
-    ensure!(
-        path.canonicalize()? == path,
-        "indirect lock {}",
-        path.display()
-    );
-    let f = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(path)?;
-    let s = f.metadata()?;
-    ensure!(
-        s.is_file() && s.dev() == dev && s.ino() == ino && s.nlink() == 1,
-        "lock identity {}",
-        path.display()
-    );
-    ensure!(
-        unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-        "lock busy {}",
-        path.display()
-    );
-    Ok(f)
+include!("index_files.rs");
+fn index_stamp(o: &Owner) -> Result<Value> {
+    file_stamp(
+        &index_path(o),
+        o.index_inode,
+        if o.index_inode == RETAINED_INODE {
+            4
+        } else {
+            1
+        },
+        SIZE,
+    )
 }
-
-fn index_stamp(owner: &Owner) -> Result<Value> {
-    let p = index_path(owner);
-    ensure!(p.canonicalize()? == p, "indirect index");
-    let s = fs::symlink_metadata(p)?;
-    let kept = owner.index_inode == RETAINED_INODE;
-    ensure!(
-        s.is_file()
-            && (
-                s.dev(),
-                s.ino(),
-                s.nlink(),
-                s.len(),
-                s.uid(),
-                s.gid(),
-                s.mode()
-            ) == (
-                64512,
-                owner.index_inode,
-                if kept { 4 } else { 1 },
-                SIZE,
-                1001,
-                1003,
-                0o100600
-            ),
-        "index identity {}",
-        owner.name
-    );
-    Ok(json!([
-        s.dev(),
-        s.ino(),
-        s.nlink(),
-        s.len(),
-        s.blocks(),
-        s.mtime(),
-        s.mtime_nsec(),
-        s.ctime(),
-        s.ctime_nsec()
-    ]))
-}
-
-fn hash_index(owner: &Owner) -> Result<Value> {
-    let before = index_stamp(owner)?;
-    let file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(index_path(owner))?;
-    ensure!(file.metadata()?.ino() == owner.index_inode, "changed open");
-    let mut h = Sha256::new();
-    let mut bytes = 0;
-    let mut buf = vec![0; 1 << 20];
-    let mut f = file.take(SIZE + 1);
-    loop {
-        let n = f.read(&mut buf)?;
-        if n == 0 {
-            break;
-        }
-        h.update(&buf[..n]);
-        bytes += n as u64;
-        if bytes % (32 << 20) == 0 {
-            unsafe {
-                libc::posix_fadvise(
-                    f.get_ref().as_raw_fd(),
-                    (bytes - (32 << 20)) as i64,
-                    32 << 20,
-                    libc::POSIX_FADV_DONTNEED,
-                );
-            }
-        }
-    }
-    ensure!(
-        bytes == SIZE && format!("{:x}", h.finalize()) == HASH && index_stamp(owner)? == before,
-        "index content {}",
-        owner.name
-    );
-    Ok(before)
+fn hash_index(o: &Owner) -> Result<Value> {
+    file_hash(
+        &index_path(o),
+        o.index_inode,
+        if o.index_inode == RETAINED_INODE {
+            4
+        } else {
+            1
+        },
+        SIZE,
+        HASH,
+    )
 }
 
 fn lineage() -> Result<Vec<Value>> {
@@ -319,105 +246,20 @@ fn staged() -> Result<Value> {
 }
 
 fn kernel(owners: &[Owner; 6], lane_scope: bool) -> Result<Vec<Value>> {
-    let mut results = Vec::new();
-    for owner in &owners[..2] {
-        let root = if lane_scope {
-            owner_path(owner).join("output/compact-indexes/157")
-        } else {
-            owner_path(owner)
-        };
-        let scan = process_references::scan(Path::new("/proc"), &root)?;
-        ensure!(
-            scan.references.is_empty(),
-            "live owner {}: {:?}",
-            owner.name,
-            scan.references
-        );
-        results.push(json!({"root":root,"processes":scan.inspected_processes}));
-    }
-    // A subdirectory or file bind rooted under a qualification tree can conceal its host path.
-    let ids: Vec<PathBuf> = owners[..2]
+    let roots = owners[..2]
         .iter()
-        .map(|p| {
-            let base = owner_path(p);
-            let root = if lane_scope {
-                base.join("output/compact-indexes/157")
+        .map(|o| {
+            if lane_scope {
+                owner_path(o).join("output/compact-indexes/157")
             } else {
-                base
-            };
-            Path::new("/").join(root.strip_prefix("/home/sol").unwrap())
+                owner_path(o)
+            }
         })
-        .collect();
-    let mut namespaces = BTreeSet::new();
-    for proc in fs::read_dir("/proc")? {
-        let p = proc?.path();
-        if !p
-            .file_name()
-            .unwrap()
-            .as_encoded_bytes()
-            .iter()
-            .all(u8::is_ascii_digit)
-        {
-            continue;
-        }
-        let census = (|| -> std::io::Result<()> {
-            // Inode checks also cover descriptors and mappings reached through a bind of an ancestor.
-            for fd in fs::read_dir(p.join("fd"))? {
-                match fs::metadata(fd?.path()) {
-                    Ok(m)
-                        if m.dev() == 64512 && owners.iter().any(|o| o.index_inode == m.ino()) =>
-                    {
-                        return Err(std::io::Error::other("an epoch 157 index is open"));
-                    }
-                    Ok(_) => (),
-                    Err(e)
-                        if e.kind() == ErrorKind::NotFound
-                            || e.raw_os_error() == Some(libc::ESRCH) =>
-                    {
-                        ()
-                    }
-                    Err(e) => return Err(e),
-                }
-            }
-            let mut maps = BufReader::new(File::open(p.join("maps"))?);
-            let mut line = String::new();
-            while maps.read_line(&mut line)? > 0 {
-                let mut f = line.split_ascii_whitespace();
-                if let (Some(device), Some(inode)) = (f.nth(3), f.next()) {
-                    if device == "fc:00"
-                        && inode
-                            .parse::<u64>()
-                            .is_ok_and(|i| owners.iter().any(|o| o.index_inode == i))
-                    {
-                        return Err(std::io::Error::other("an epoch 157 index is mapped"));
-                    }
-                }
-                line.clear();
-            }
-            let ns = fs::metadata(p.join("ns/mnt"))?.ino();
-            if namespaces.contains(&ns) {
-                return Ok(());
-            }
-            let info = fs::read_to_string(p.join("mountinfo"))?;
-            for line in info.lines() {
-                let mut cols = line.split_ascii_whitespace();
-                let f = cols.nth(3).unwrap_or("");
-                if ids.iter().any(|id| Path::new(f).starts_with(id)) {
-                    return Err(std::io::Error::other(
-                        "qualification cache mounted in a namespace",
-                    ));
-                }
-            }
-            namespaces.insert(ns);
-            Ok(())
-        })();
-        if let Err(e) = census {
-            if e.kind() != ErrorKind::NotFound && e.raw_os_error() != Some(libc::ESRCH) {
-                return Err(e.into());
-            }
-        }
-    }
-    Ok(results)
+        .collect::<Vec<_>>();
+    kernel_references(
+        &roots,
+        &owners.iter().map(|o| o.index_inode).collect::<Vec<_>>(),
+    )
 }
 
 fn free() -> Result<u64> {
@@ -571,41 +413,25 @@ fn run(mode: &str) -> Result<Value> {
         "different retirement intent"
     );
     let mut removed = 0;
+    let intent_ref = evidence::reference(&flag)?;
     for (i, owner) in owners[..2].iter().enumerate() {
-        let path = index_path(owner);
-        let receipt = base.join(format!("REMOVED_{}.json", owner.index_inode));
-        if receipt.try_exists()? {
-            ensure!(!path.try_exists()?, "retired target reappeared");
-            continue;
-        }
-        match fs::symlink_metadata(&path) {
-            Ok(_) => {
+        remove_checked(
+            &index_path(owner),
+            owner.index_inode,
+            &base,
+            &intent_ref,
+            || {
                 let stamp = index_stamp(owner)?;
-                ensure!(stamp == proof["targets"][i], "changed selected inode");
                 ensure!(
-                    index_stamp(&owners[2])? == retained,
-                    "changed retained inode"
+                    stamp == proof["targets"][i] && index_stamp(&owners[2])? == retained,
+                    "qualified target or retained index changed"
                 );
                 if let Some(v) = &fence {
                     v.check()?;
                 }
-                let allocation = stamp[4].as_u64().context("blocks")? * 512;
-                fs::remove_file(&path)?;
-                File::open(path.parent().context("parent")?)?.sync_all()?;
-                ensure!(!path.try_exists()?, "retirement did not remove target");
-                evidence::receipt(
-                    &receipt,
-                    &json!({"path":path,"inode":owner.index_inode,"unlinked_allocation":allocation,"intent":evidence::reference(&flag)?}),
-                )?;
-            }
-            Err(e) if e.kind() == ErrorKind::NotFound => {
-                evidence::receipt(
-                    &receipt,
-                    &json!({"path":path,"inode":owner.index_inode,"unlinked_allocation":0,"recovered_absence":true,"intent":evidence::reference(&flag)?}),
-                )?;
-            }
-            Err(e) => return Err(e.into()),
-        }
+                Ok(stamp[4].as_u64().context("allocated blocks")? * 512)
+            },
+        )?;
     }
     let mut details = Vec::new();
     for o in &owners[..2] {
@@ -637,7 +463,12 @@ fn main() -> Result<()> {
         args.len() == 2,
         "usage: retire check|retire|check-lanes|retire-lanes"
     );
-    println!("{}", run(&args[1])?);
+    let mode = args[1].as_str();
+    let result = match mode {
+        m if m.ends_with("-170") || m.contains("-170-") => retry_cache::run(mode)?,
+        _ => run(mode)?,
+    };
+    println!("{}", result);
     Ok(())
 }
 
