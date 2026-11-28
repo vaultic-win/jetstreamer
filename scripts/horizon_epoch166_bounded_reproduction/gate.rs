@@ -15,6 +15,7 @@ use std::{
     epoch141_first_hourly,
     epoch141_third_hourly,
     epoch143_first_hourly,
+    epoch143_second_hourly,
     epoch162_second_hourly
 )))]
 mod route {
@@ -96,6 +97,18 @@ mod route {
         "bootstrap/snapshot-61775538-65YRW5KRaq6JezqoEc9rUqnmgfp7TjVw3koFbnMtbuun.tar.zst";
     pub(super) const TERMINAL_SLOT: u64 = 61_787_631;
     pub(super) const NODE: &str = "/usr/local/lib/jetstreamer/deploy-epochs144-147-upgradeable-loader-20261016-v1/jetstreamer-node";
+}
+
+#[cfg(epoch143_second_hourly)]
+mod route {
+    pub(super) const EPOCH: u64 = 143;
+    pub(super) const UNIT: &str = "horizon-qualify-143-second-hourly-20261128-v1.service";
+    pub(super) const ALIAS: &str = "/run/horizon143-second-hourly";
+    pub(super) const RUN: &str =
+        "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1";
+    pub(super) const SNAPSHOT: &str =
+        "input/snapshot-61787631-2y3Q8vdnvB77rU4KHomsesrMWeTPrh9hsp9shn1uEwus.tar.zst";
+    pub(super) const TERMINAL_SLOT: u64 = 61_794_627;
 }
 
 #[cfg(epoch141_first_hourly)]
@@ -213,7 +226,7 @@ compile_error!("the short epoch 170 bridge must use the epoch 170 suffix gate");
 #[cfg(all(epoch170_continuation_short, not(epoch170_continuation)))]
 compile_error!("the short epoch 170 continuation requires its own gate");
 
-#[cfg(not(epoch140_suffix))]
+#[cfg(not(any(epoch140_suffix, epoch143_second_hourly)))]
 fn replay_args() -> Vec<String> {
     #[cfg(not(any(
         epoch170_bridge,
@@ -332,13 +345,17 @@ fn check_bootstrap_binding(args: &[String]) -> io::Result<()> {
         .iter()
         .find_map(|argument| argument.strip_prefix("--snapshot-archive="))
         .ok_or_else(|| io::Error::other("missing epoch 143 snapshot argument"))?;
+    checked_143_snapshot(path, 3_714_834_246)
+}
+
+#[cfg(any(epoch143_first_hourly, epoch143_second_hourly))]
+fn checked_143_snapshot(path: &str, bytes: u64) -> io::Result<()> {
     let mut snapshot = fs::File::open(path)
         .map_err(|error| io::Error::new(error.kind(), format!("{path}: {error}")))?;
     let metadata = snapshot.metadata()?;
     let mut header = [0; 4];
     io::Read::read_exact(&mut snapshot, &mut header)?;
-    if !metadata.is_file() || metadata.len() != 3_714_834_246 || header != [0x28, 0xb5, 0x2f, 0xfd]
-    {
+    if !metadata.is_file() || metadata.len() != bytes || header != [0x28, 0xb5, 0x2f, 0xfd] {
         return Err(io::Error::other(format!(
             "different epoch 143 snapshot at {path}"
         )));
@@ -352,10 +369,29 @@ fn check_bootstrap_binding(args: &[String]) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(epoch143_second_hourly)]
+fn second_hourly_args(digest: &str) -> io::Result<Vec<String>> {
+    if digest.len() != 64
+        || !digest
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        || !digest.bytes().any(|b| b != b'0')
+    {
+        return Err(io::Error::other("invalid second epoch 143 plan digest"));
+    }
+    Ok(vec![
+        EPOCH.to_string(),
+        RUN.into(),
+        "--verify".into(),
+        format!("--epoch143-hourly-plan={ALIAS}/plan.json"),
+        format!("--epoch143-hourly-plan-sha256={digest}"),
+    ])
+}
+
 fn main() -> io::Result<()> {
     #[cfg(epoch140_suffix)]
     let (executable, args) = recording_command()?;
-    #[cfg(not(any(epoch140_suffix, epoch143_first_hourly)))]
+    #[cfg(not(any(epoch140_suffix, epoch143_first_hourly, epoch143_second_hourly)))]
     let (executable, args) = (format!("{ALIAS}/jetstreamer-node"), replay_args());
     #[cfg(epoch143_first_hourly)]
     let (executable, args) = (NODE, replay_args());
@@ -365,7 +401,23 @@ fn main() -> io::Result<()> {
     {
         return check_bootstrap_binding(&args);
     }
-    #[cfg(not(epoch140_suffix))]
+    #[cfg(epoch143_second_hourly)]
+    let (executable, args) = {
+        let arguments = env::args().skip(1).collect::<Vec<_>>();
+        let [argument] = arguments.as_slice() else {
+            return Err(io::Error::other(
+                "expected the epoch 143 hourly plan digest",
+            ));
+        };
+        let snapshot = format!("{RUN}/{SNAPSHOT}");
+        if argument == "--check-bootstrap-binding" {
+            return checked_143_snapshot(&snapshot, 2_350_018_921);
+        }
+        let args = second_hourly_args(argument)?;
+        checked_143_snapshot(&snapshot, 2_350_018_921)?;
+        (format!("{ALIAS}/jetstreamer-node"), args)
+    };
+    #[cfg(not(any(epoch140_suffix, epoch143_second_hourly)))]
     if env::args_os().len() != 1 {
         return Err(io::Error::other(format!(
             "unexpected epoch {EPOCH} gate arguments"
@@ -429,7 +481,20 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(epoch140_suffix))]
+    #[cfg(epoch143_second_hourly)]
+    fn second_hourly_uses_exact_plan_and_private_run() {
+        let digest = "b".repeat(64);
+        let args = second_hourly_args(&digest).unwrap();
+        assert_eq!(&args[..3], ["143", RUN, "--verify"]);
+        assert_eq!(
+            args[3],
+            "--epoch143-hourly-plan=/run/horizon143-second-hourly/plan.json"
+        );
+        assert!(second_hourly_args(&"0".repeat(64)).is_err());
+    }
+
+    #[test]
+    #[cfg(not(any(epoch140_suffix, epoch143_second_hourly)))]
     fn replay_uses_the_pinned_snapshot_and_private_bounded_output() {
         let args = replay_args();
         assert_eq!(args[0], EPOCH.to_string());
@@ -573,7 +638,10 @@ mod tests {
             assert!(
                 args[5].ends_with("/from-73760367-to-73766969-v1/ledger/epoch-170.diagnostic.jet")
             );
-            #[cfg(all(epoch170_gap_ram_retry, not(any(epoch170_gap_ram_second, epoch170_gap_ram_third))))]
+            #[cfg(all(
+                epoch170_gap_ram_retry,
+                not(any(epoch170_gap_ram_second, epoch170_gap_ram_third))
+            ))]
             assert!(
                 UNIT.contains("-73760367-ram-")
                     && args[5].ends_with(
