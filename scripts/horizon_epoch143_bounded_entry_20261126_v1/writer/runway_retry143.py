@@ -1,5 +1,5 @@
 """Keep the unreleased floor check alongside its successor in the epoch 143 history."""
-from evidence import bound, checked, need
+from evidence import checked, need
 from first_hourly143 import FirstHourlyProfile, observe, terminal
 import floor_retry143 as older
 import second_hourly143 as second
@@ -13,7 +13,7 @@ PROFILE = FirstHourlyProfile(
     tree_gib=64, producer_ram_gib=40, contract_sha=CONTRACT_SHA, node=NODE,
     worker_sha=older.PROFILE.worker_sha, interval="second", date="20261128",
     version=UNIT_VERSION, run=older.PROFILE.run,
-    field="current_private143_second_hourly_runway_retry",
+    field="current_private143_second_hourly_held_retry",
     evidence_base=EVIDENCE_BASE, guard_timer=GUARD_TIMER,
 )
 

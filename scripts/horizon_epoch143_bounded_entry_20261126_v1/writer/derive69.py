@@ -99,6 +99,14 @@ def stage(directory, contract_sha, guard_timer):
     census = one(census, "            following.previous({profile.field: row})",
                  "            following.previous({profile.field: row})\n        elif profile is following.PROFILE:\n            runway.previous({profile.field: row})")
     add("hourly_population.py", census)
+    # The previous 170 reader sees the observer assignment for its own interval.
+    # Authenticate and project the newly recorded successor through its native adapter first.
+    before = '    config = checked(fleet["sole_next_observer"])\n    if fleet.get(following.FIELD):'
+    after = ('    config = checked(fleet["sole_next_observer"])\n'
+             '    import after_floor170_status as latest170\n'
+             '    config = latest170.history_config(fleet, config)\n'
+             '    if fleet.get(following.FIELD):')
+    add("transition_v58.py", one(original("transition_v58.py"), before, after))
     # Only the second-162 adapter interprets that single historical 162 diagnostic slot.
     # Later adapters must continue checking the original fleet pointer and its full roster.
     prev = one(original("transition_v62.py"),"def native_assignments(fleet):\n    earlier =",
