@@ -80,13 +80,18 @@ def account(whole, core):
     active = metadata or (holding if holding and holding["phase"] == "retire" else None)
     charge = dict(home_bytes=0, ram_bytes=0, cpu_micros_per_second=0)
     if active:
-        core.need(whole["epoch167_private_assembly"]["phase"] == "unbooked", "unreleased 157 sublease at 167 assembly")
+        assembly = whole["epoch167_private_assembly"]
+        core.need(assembly["phase"] == "unbooked", "unreleased 157 sublease at 167 assembly")
         charge["home_bytes"] = META
         if metadata:
             charge["ram_bytes"], charge["cpu_micros_per_second"] = LIMITS[metadata["phase"]]
         unused = whole["closed_167_suballocations"]["unassigned"]
         core.need(all(unused[k] >= n for k,n in charge.items()), "157 sublease exceeds its 167 reservation")
         whole["closed_167_suballocations"]["unassigned"] = {k:n-charge[k] for k,n in unused.items()}
+        # The native assembler admits only an unbooked unit. Its compute can still fit
+        # beside some 157 phases, but both need exclusive custody of this reservation.
+        assembly["phase"] = "subleased-to-157"
+        assembly["exclusive_owner"] = active["start"]
     whole["epoch157_lanej_rotation"] = dict(operator_seal=SEAL, holder=holding, metadata=metadata,
             serial_slot_bytes=123350028052, sublease=charge, resource_credit_bytes=0)
     return whole

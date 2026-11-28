@@ -77,12 +77,89 @@ def projection(kind, common, detail):
         parts.append(detail["WorkingDirectory"])
     return "\n".join(str(s) for s in parts)
 "#;
+const INERT_ACTIVATIONS: &str = r#"
+import datetime, os
+def expired_timer(common, timer, target):
+    never = (1 << 64) - 1
+    if not (common["Transient"] and common["UnitFileState"] == "transient"
+            and common["ActiveState"] == "active" and common["SubState"] == "running"
+            and not common["Job"][0] and not common["TriggeredBy"] and timer["Unit"] == target
+            and timer["LastTriggerUSec"] > 0 and timer["LastTriggerUSecMonotonic"] > 0
+            and timer["NextElapseUSecRealtime"] == timer["NextElapseUSecMonotonic"] == never):
+        return None
+    calendar, mono = timer["TimersCalendar"], timer["TimersMonotonic"]
+    if len(calendar) + len(mono) != 1:
+        return None
+    if calendar:
+        base, spec, next_time = calendar[0]
+        try:
+            scheduled = datetime.datetime.strptime(str(spec), "%Y-%m-%d %H:%M:%S UTC").replace(tzinfo=datetime.timezone.utc)
+        except ValueError:
+            return None
+        if base != "OnCalendar" or next_time != 0 or scheduled.timestamp() > timer["LastTriggerUSec"] / 1e6 + 1:
+            return None
+        schedule = str(spec)
+    else:
+        base, duration, next_time = mono[0]
+        if base not in ("OnActiveUSec","OnBootUSec") or next_time != 0 or duration <= 0:
+            return None
+        schedule = str(base) + "=" + str(duration)
+    return {"timer":str(common["Id"]), "schedule":schedule,
+            "last_trigger_usec":int(timer["LastTriggerUSec"]), "next_realtime_and_monotonic":"infinity"}
+
+def exited_service(common, svc):
+    if not (common["Transient"] and common["UnitFileState"] == "transient"
+            and common["ActiveState"] == "active" and common["SubState"] == "exited"
+            and not common["Job"][0] and svc["RemainAfterExit"] and svc["Restart"] == "no"
+            and svc["Result"] == "success" and not svc["MainPID"] and not svc["ControlPID"]
+            and not any(svc.get(k,()) for k in ("ExecStop", "ExecStopPost", "ExecReload"))):
+        return False
+    group = str(svc.get("ControlGroup",""))
+    if group:
+        events = "/sys/fs/cgroup" + group + "/cgroup.events"
+        try:
+            with open(events) as f:
+                if "populated 0" not in f.read().splitlines():
+                    return False
+        except FileNotFoundError:
+            return not os.path.lexists("/sys/fs/cgroup" + group)
+    return True
+
+def closed_activation(kind, common, detail, fetch):
+    if kind == "Service" and common["SubState"] == "exited":
+        if not exited_service(common, detail):
+            return None
+        timers = []
+        for source in common["TriggeredBy"]:
+            if not source.endswith(".timer"):
+                return None
+            up, tp = fetch(source,"Timer")
+            proof = expired_timer(up,tp,common["Id"])
+            if proof is None:
+                return None
+            timers.append(proof)
+        return {"service":str(common["Id"]), "invocation":bytes(common["InvocationID"]).hex(), "expired_triggers":timers}
+    if kind == "Timer" and common["SubState"] == "running":
+        target = detail["Unit"]
+        proof = expired_timer(common,detail,target)
+        if not proof or not target.endswith(".service"):
+            return None
+        up, sp = fetch(target,"Service")
+        if not exited_service(up,sp) or list(up["TriggeredBy"]) != [common["Id"]]:
+            return None
+        return {"service":str(target), "invocation":bytes(up["InvocationID"]).hex(), "expired_triggers":[proof]}
+    return None
+"#;
 const NATIVE_UNITS: &str = r#"
 import dbus, json, sys
 bus = dbus.SystemBus()
 service = "org.freedesktop.systemd1"
 manager = dbus.Interface(bus.get_object(service, "/org/freedesktop/systemd1", introspect=False), service + ".Manager")
 rows = []
+def fetch(name, kind):
+    path = manager.GetUnit(str(name))
+    p = dbus.Interface(bus.get_object(service, path, introspect=False), "org.freedesktop.DBus.Properties")
+    return p.GetAll(service + ".Unit"), p.GetAll(service + "." + kind)
 for unit in sys.argv[1:]:
     kind = unit.rsplit(".", 1)[1].capitalize()
     if kind not in ("Service", "Timer", "Path", "Socket"):
@@ -97,6 +174,12 @@ for unit in sys.argv[1:]:
         if row["state"] not in ("inactive", "failed"):
             detail = props.GetAll(service + "." + kind)
             row["projection"] = projection(kind, common, detail)
+            try:
+                row["closed"] = closed_activation(kind, common, detail, fetch)
+            except dbus.DBusException as exc:
+                if exc.get_dbus_name() not in ("org.freedesktop.systemd1.NoSuchUnit", "org.freedesktop.DBus.Error.UnknownObject"):
+                    raise
+                row["closed"] = None
         rows.append(row)
     except dbus.DBusException as error:
         if error.get_dbus_name() not in ("org.freedesktop.systemd1.NoSuchUnit", "org.freedesktop.DBus.Error.UnknownObject"):
@@ -110,9 +193,10 @@ struct NativePlan {
     state: String,
     sub: String,
     projection: String,
+    closed: Option<Value>,
 }
 fn native_plans(units: &[&str]) -> Result<Vec<NativePlan>> {
-    let program = format!("{UNIT_PROJECTION}\n{NATIVE_UNITS}");
+    let program = format!("{UNIT_PROJECTION}\n{INERT_ACTIVATIONS}\n{NATIVE_UNITS}");
     let mut args = vec!["-IB", "-c", &program];
     args.extend_from_slice(units);
     let rows: Vec<NativePlan> = serde_json::from_str(&command("/usr/bin/python3", &args)?)?;
@@ -360,6 +444,28 @@ fn idle_controller(u: &str) -> Result<Value> {
     );
     Ok(json!(q))
 }
+// A complete census has many paths in common across services. Keep its compact bytes
+// once and bind them into each retirement checkpoint by digest.
+const CENSUS_CAP: usize = 3 << 20;
+fn save_census(path: &Path, proof: &Value) -> Result<Value> {
+    let mut bytes = serde_json::to_vec(proof)?;
+    bytes.push(b'\n');
+    ensure!(
+        bytes.len() <= CENSUS_CAP,
+        "census exceeded its evidence budget"
+    );
+    evidence::publish(path, &bytes, 0o400)?;
+    reference(path)
+}
+pub(super) fn retirement_census(unit: &str, stage: &str) -> Result<Value> {
+    let (native, iid) = role()?;
+    ensure!(
+        native == unit && matches!(stage, "INITIAL" | "FINAL"),
+        "foreign retirement census"
+    );
+    let proof = census(Some(unit))?;
+    save_census(&root(&format!("RETIRE_{stage}_CENSUS_{iid}.json")), &proof)
+}
 pub(super) fn census(own: Option<&str>) -> Result<Value> {
     let o = ours()?;
     let known = [
@@ -447,6 +553,7 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
     let mut matches = Vec::new();
     let mut hits = Vec::new();
     let mut plan_catalog: BTreeMap<PathBuf, (usize, Vec<&'static str>)> = BTreeMap::new();
+    let mut plan_sets: BTreeMap<Vec<usize>, usize> = BTreeMap::new();
     for (batch, slice) in potential.chunks(32).enumerate() {
         for plan in native_plans(slice)? {
             if matches!(plan.state.as_str(), "inactive" | "failed" | "gone") {
@@ -483,8 +590,13 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
                 let entry = plan_catalog.entry(path).or_insert((next_id, terms));
                 ids.push(entry.0);
             }
-            let row = json!({"unit":unit,"state":plan.state,"sub":plan.sub,"direct":direct,"plans":ids,"terminal_validator":unit==VUNIT,"ledger_only":historical});
-            if !owned && !historical {
+            ids.sort_unstable();
+            ids.dedup();
+            let next_set = plan_sets.len();
+            let set = *plan_sets.entry(ids).or_insert(next_set);
+            let dormant = direct.is_empty() && plan.closed.is_some();
+            let row = json!({"unit":unit,"state":plan.state,"sub":plan.sub,"direct":direct,"plan_set":set,"terminal_validator":unit==VUNIT,"ledger_only":historical,"closed_activation":plan.closed});
+            if !owned && !historical && !dormant {
                 hits.push(matches.len())
             }
             matches.push(row);
@@ -497,11 +609,22 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
             );
         }
     }
+    let mut indexed_sets = vec![Vec::new(); plan_sets.len()];
+    for (members, index) in plan_sets {
+        let mut ranges: Vec<[usize; 2]> = Vec::new();
+        for id in members {
+            match ranges.last_mut() {
+                Some([_, end]) if end.checked_add(1) == Some(id) => *end = id,
+                _ => ranges.push([id, id]),
+            }
+        }
+        indexed_sets[index] = ranges;
+    }
     if !hits.is_empty() {
         let (_, iid) = role()?;
-        let evidence = receipt(
+        let evidence = save_census(
             &root(&format!("CENSUS_BLOCKS_{iid}.json")),
-            &json!({"unresolved_indices":hits,"contributing_units":matches,"plan_catalog":plan_catalog,"definitions":definitions,"checked":potential.len()}),
+            &json!({"unresolved_indices":hits,"contributing_units":matches,"plan_catalog":plan_catalog,"plan_set_inclusive_ranges":indexed_sets,"definitions":definitions,"checked":potential.len()}),
         )?;
         anyhow::bail!(
             "{} unresolved staged consumers, evidence {}",
@@ -510,13 +633,38 @@ pub(super) fn census(own: Option<&str>) -> Result<Value> {
         );
     }
     let live = kernel(own)?;
-    Ok(
-        json!({"operator_seal":o,"original_static_and_producer":known,"parked_original_reserve":reserve,"stopped_original_timer":timer,"original_validator":v,"preserved":validation,"systemd_units_seen":listing.lines().count(),"runnable_units":potential.len(),"resolved_material":cache.examined,"checked_definitions":definitions,"runnable_matches":matches,"plan_catalog":plan_catalog,"kernel":live}),
-    )
+    let proof = json!({"operator_seal":o,"original_static_and_producer":known,"parked_original_reserve":reserve,"stopped_original_timer":timer,"original_validator":v,"preserved":validation,"systemd_units_seen":listing.lines().count(),"runnable_units":potential.len(),"resolved_material":cache.examined,"checked_definitions":definitions,"runnable_matches":matches,"plan_catalog":plan_catalog,"plan_set_inclusive_ranges":indexed_sets,"kernel":live});
+    if own.is_none() {
+        ensure!(
+            serde_json::to_vec(&proof)?.len() < CENSUS_CAP,
+            "census exceeded its stdout budget"
+        );
+    }
+    Ok(proof)
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn an_armed_timer_or_pending_stop_cannot_be_exempted() {
+        let verify = r#"
+u=dict(Id="once.timer",Transient=True,UnitFileState="transient",ActiveState="active",SubState="running", Job=[0],TriggeredBy=[])
+t=dict(Unit="once.service",LastTriggerUSec=2,LastTriggerUSecMonotonic=2,NextElapseUSecRealtime=2**64-1,NextElapseUSecMonotonic=2**64-1,TimersCalendar=[],TimersMonotonic=[("OnActiveUSec",1,0)])
+assert expired_timer(u,t,"once.service")
+assert not expired_timer(u,dict(t, NextElapseUSecRealtime=4),"once.service")
+assert not expired_timer(u,dict(t, TimersMonotonic=[("OnUnitActiveUSec",2,0)]),"once.service")
+s=dict(RemainAfterExit=True,Restart="no",Result="success",MainPID=0,ControlPID=0)
+q=dict(u,Id="once.service",SubState="exited")
+assert exited_service(q,s)
+assert not exited_service(q,dict(s,ExecStop=[("/bin/true",[])]))
+assert not exited_service(q,dict(s,ControlPID=4))
+"#;
+        command(
+            "/usr/bin/python3",
+            &["-IB", "-c", &format!("{INERT_ACTIVATIONS}\n{verify}")],
+        )
+        .unwrap();
+    }
     #[test]
     fn original_segment_reference_matches_without_broad_epoch_text() {
         assert!(terms(SRC).contains(&"original_path"));

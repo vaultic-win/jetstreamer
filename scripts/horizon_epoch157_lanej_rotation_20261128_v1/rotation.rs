@@ -409,7 +409,7 @@ fn retire() -> Result<Value> {
         return reference(&retire);
     }
     let prior = preserved()?;
-    let guard_before = consumers::census(Some(&unit))?;
+    let guard_before = consumers::retirement_census(&unit, "INITIAL")?;
     let intent = root("MOVE_INTENT.json");
     if !intent.exists() {
         stamp_bound(src, original, false)?;
@@ -452,7 +452,7 @@ fn retire() -> Result<Value> {
         stamp_bound(p, original, renamed)?;
         // Serialize the last reference census and namespace transition with fleet launches.
         let _op = global()?;
-        let last = consumers::census(Some(&unit))?;
+        let last = consumers::retirement_census(&unit, "FINAL")?;
         ensure!(preserved()? == prior, "preserved identities changed");
         if !renamed {
             move_exact(src, &q)?
