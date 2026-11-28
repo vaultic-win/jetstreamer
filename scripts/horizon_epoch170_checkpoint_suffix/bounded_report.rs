@@ -43,7 +43,17 @@ fn checked_votes(points: &[Value]) -> Result<Vec<Value>> {
     Ok(signed)
 }
 
-pub(super) fn run() -> Result<()> {
+pub(super) fn previous_segment(release: &Value) -> Result<(Value, Value)> {
+    let reference = release["closed_comparison"].clone();
+    let old = evidence::bound(&reference)?;
+    let prior = old["checkpoints"]
+        .as_array()
+        .and_then(|p| p.last())
+        .context("prior endpoint")?;
+    Ok((reference, prior.clone()))
+}
+
+pub(super) fn run(predecessor: fn(&Value) -> Result<(Value, Value)>) -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     ensure!(
         args.len() == 1 && matches!(args[0].as_str(), "capture-exit" | "bootstrap" | "closed"),
@@ -115,14 +125,10 @@ pub(super) fn run() -> Result<()> {
         &HASHES,
         if closed { SLOTS.len() } else { 1 },
     )?;
-    let old = evidence::bound(&release["closed_comparison"])?;
-    let prior = old["checkpoints"]
-        .as_array()
-        .and_then(|p| p.last())
-        .context("prior endpoint")?;
+    let (predecessor, prior) = predecessor(&release)?;
     agree(
         &points[0],
-        prior,
+        &prior,
         &[
             "slot",
             "bank_hash",
@@ -135,7 +141,7 @@ pub(super) fn run() -> Result<()> {
         ],
     )?;
     let snapshot_counter_delta = i128::from(evidence::num(&points[0], "next_write_version")?)
-        - i128::from(evidence::num(prior, "next_write_version")?);
+        - i128::from(evidence::num(&prior, "next_write_version")?);
     let report = if closed {
         let signed = checked_votes(&points)?;
         let endpoint = points.last().context("missing endpoint")?;
@@ -161,7 +167,7 @@ pub(super) fn run() -> Result<()> {
     println!(
         "{}",
         serde_json::to_string(
-            &json!({"schema":"horizon-170-successor-closed-checkpoint-comparison-v1","release":release_ref,"actor":release["actor"],"interface":release["interface"],"predecessor":release["closed_comparison"],"checkpoints":points,"snapshot_restart_raw_counter_delta":snapshot_counter_delta.to_string(),"evidence":report,"canonical_publication_authorized":false})
+            &json!({"schema":"horizon-170-successor-closed-checkpoint-comparison-v1","release":release_ref,"actor":release["actor"],"interface":release["interface"],"predecessor":predecessor,"checkpoints":points,"snapshot_restart_raw_counter_delta":snapshot_counter_delta.to_string(),"evidence":report,"canonical_publication_authorized":false})
         )?
     );
     Ok(())

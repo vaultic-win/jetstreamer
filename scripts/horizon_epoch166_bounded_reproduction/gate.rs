@@ -133,7 +133,10 @@ mod route {
 #[cfg(all(epoch170_continuation, epoch170_from_73766969))]
 mod route {
     pub(super) const EPOCH: u64 = 170;
+    #[cfg(not(epoch170_after_checkpoint_gap))]
     pub(super) const UNIT: &str = "horizon-qualify-170-from-73766969-20261127-v1.service";
+    #[cfg(epoch170_after_checkpoint_gap)]
+    pub(super) const UNIT: &str = "horizon-qualify-170-from-73766969-gap-20261128-v1.service";
     pub(super) const ALIAS: &str = "/run/horizon-170-from-73766969-v1";
     pub(super) const SNAPSHOT: &str =
         "snapshot-73766969-9mYMWeKx1ZWjsBcGLUhmDGbdkY2GMCmdFnE6UxfAeQjW.tar.zst";
@@ -519,6 +522,10 @@ mod tests {
         #[cfg(epoch170_from_73766969)]
         {
             assert_eq!(EPOCH, 170);
+            #[cfg(epoch170_after_checkpoint_gap)]
+            assert_eq!(UNIT, "horizon-qualify-170-from-73766969-gap-20261128-v1.service");
+            #[cfg(not(epoch170_after_checkpoint_gap))]
+            assert_eq!(UNIT, "horizon-qualify-170-from-73766969-20261127-v1.service");
             assert!(args[3].starts_with(
                 "--snapshot-archive=/run/horizon-170-from-73766969-v1/snapshot-73766969-"
             ));

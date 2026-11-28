@@ -27,3 +27,7 @@ path = "bounded_checkpoints.rs"
 [[bin]]
 name = "following-checkpoints"
 path = "following_checkpoints.rs"
+
+[[bin]]
+name = "gap-checkpoints"
+path = "gap_checkpoints.rs"

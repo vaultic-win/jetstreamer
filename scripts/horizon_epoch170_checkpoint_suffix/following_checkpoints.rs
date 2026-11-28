@@ -42,5 +42,5 @@ const SIGNED_CHECKPOINTS: &[(u64, &str)] = &[
 ];
 
 fn main() -> anyhow::Result<()> {
-    bounded_report::run()
+    bounded_report::run(bounded_report::previous_segment)
 }
