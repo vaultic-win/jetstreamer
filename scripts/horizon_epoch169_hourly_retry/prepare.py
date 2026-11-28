@@ -111,7 +111,7 @@ def static_files(staging):
     contents={"gate.py":gate(),"watch.py":watcher(),"actor.py":actor(),c.UNIT:service(),TERMINAL:old_watcher,
               "scratch_mount.py":file_text(OLD/"scratch_mount.py","84d0e9595c355e8a75e73d63f2d9153db9164ef2e74b8508ef4d3c161a0a2fdd")}
     for name in ("contract.py","namespace.py","custody.py","quote.py","observe.py","cadence.py",
-                 "issuer.py","roster.py","prepare.py"):
+                 "issuer.py","roster.py","prepare.py","writer_receipt.py"):
         contents[name]=(HERE/name).read_text()
     members=[]
     for name,data in contents.items():

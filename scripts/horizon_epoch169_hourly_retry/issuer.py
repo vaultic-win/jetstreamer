@@ -19,6 +19,7 @@ import namespace
 import observe
 import prepare
 import quote
+from writer_receipt import read_active_writer
 
 DEP=prepare.DEPLOY
 ROSTER=c.CONTROL/"roster-v1"
@@ -96,7 +97,7 @@ def funded(scope,scope_ref):
     q=quote.calculate(core["base_for_retry_only"](),scope["predecessor"],loan)
     c.need(quote.returned_loan()==loan and c.identity(path.lstat())==signature, "loan or predecessor changed")
     current=q["whole_roster"]["writer"]
-    active=quote.bound(current)
+    active=read_active_writer(c,current)
     ready=quote.bound(active["ready"])
     c.need(ready.get("private169_retry_scope")==scope_ref and ready.get("private169_retry_cadence")==scope["cadence_source"]
            and not active["producer_mutations"], "active cadence writer has not enrolled this retry")

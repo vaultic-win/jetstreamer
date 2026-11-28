@@ -6,15 +6,18 @@ import json
 from pathlib import Path
 import runpy
 import stat
+import sys
 import time
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from writer_receipt import read_active_writer
 
 RT=Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT=RT/"epoch169-hourly-retry-20261128-v1"
 OPERATOR=ROOT/"operator-v1"
 PARENT=ROOT/"roster-v1"
 PEER=RT/"epoch162-first-hourly-completion-20261127-v2/issued-price-v8-prestart"
-DEPLOY=ROOT/"joint-issuer-v1"
+DEPLOY=ROOT/"joint-issuer-v2"
 BASE_SCOPE="eb589f4c2c51dcf75314d50d7074a9411d034e6bd3f6a8bd826705ca4a1feb3a"
 BASE_OPERATOR="8e87b305ba3957ca579a9eafa696eb2410f2498869c31922a8460dc5935943ed"
 BASE_ROSTER="c07e0827f8bc7fe26e46f644b03e0012def68ad666a026df243a1238cd52c353"
@@ -88,7 +91,7 @@ def jointly_funded(owner, scope, ref, *, preliminary=False):
     c.need(loan==quote.returned_loan() and identity==c.identity(partial.lstat()), "retroactive loan or custody change")
     writer=whole["writer"]
     if not preliminary:
-        active=quote.bound(writer)
+        active=read_active_writer(c,writer)
         ready=quote.bound(active["ready"])
         c.need(ready.get("private169_retry_scope")==ref and ready.get("private169_retry_cadence")==scope["cadence_source"]
                and not active["producer_mutations"], "active cadence did not enroll the epoch 169 retry")
