@@ -4,12 +4,12 @@ from pathlib import Path
 from evidence import BASE, bound, checked, need
 from transition import clock
 import transition_v75 as prior
+from transition_v74 import assembly
 import next_hourly170_status as route
 
 V75_OWNER = None
 V75_PACKAGE = None
 V75_READY_SHA = None
-assembly = prior.assembly
 
 
 def native_assignments(fleet):

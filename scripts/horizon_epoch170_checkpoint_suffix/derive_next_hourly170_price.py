@@ -48,6 +48,12 @@ def members(stage, revision, old, prior_seal, scope, observer):
     old_check = "    core.need(hourly170['stable'](hourly170['owner'](core,fleet,directory))==hourly170['stable'](hourly)"
     edit("after_stop.py",old_check,old_check+"""
               and next_hourly_ops['stable'](next_hourly_ops['owner'](core,fleet))==next_hourly_ops['stable'](next_hourly)""")
+    writer = "            writer_package = 'tools-cold168-retry5-failed166-v69-entry146-r2'"
+    edit("following_peers.py",writer,writer+"""
+        elif version == 76:
+            writer_package = 'tools-cold168-retry5-failed166-v76-entry146-r2'""")
+    paths = "    dirs.append(writer / 'tools-cold168-retry5-failed166-v69-entry146-r2')"
+    edit("following_peers.py",paths,paths+"\n    dirs.append(writer / 'tools-cold168-retry5-failed166-v76-entry146-r2')")
     edit("price143_floor_retry.py",'"adjacent_169_owner", "after_floor170")',
          '"adjacent_169_owner", "after_floor170", "next_hourly170")')
     edit("price143_floor_retry.py",'newer = native.get("after_floor170")',

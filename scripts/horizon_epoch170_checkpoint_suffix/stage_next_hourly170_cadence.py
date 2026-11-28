@@ -16,7 +16,7 @@ from closed_successor import persist
 
 WRITER = RUNTIME/"survivor172-cadence-20261122-v1"
 OLD = WRITER/"tools-cold168-retry5-failed166-v75-entry146"
-NEW = OLD.with_name("tools-cold168-retry5-failed166-v76-entry146")
+NEW = OLD.with_name("tools-cold168-retry5-failed166-v76-entry146-r2")
 
 
 def lift(source, before=75, after=76):
@@ -81,6 +81,7 @@ def stage(scope,previous,owner):
              "unpublished V76 source "+path.name)
     updates = members(scope)
     code = lift(source["status_cycle.py"][0].decode())
+    code = once(code,"    if version in (46, 69):","    if version in (46, 69, 76):")
     updates["status_cycle.py"] = enroll_cycle(code,76).encode()
     updates["transition_v76.py"] = versioned_transition(owner,previous,active["ready"]["sha256"])
     cut = source["cutover75.py"][0].decode()
@@ -88,6 +89,8 @@ def stage(scope,previous,owner):
     old_active = read(ready["old_owner"])
     old_seal = read(old_active["ready"])["package"]["sha256"]
     cut = once(cut,old_seal,previous["sha256"])
+    cut = once(cut,'NEW = BASE / "tools-cold168-retry5-failed166-v76-entry146"',
+               "NEW = BASE / "+repr(NEW.name))
     cut = once(cut,ready["old_owner"]["sha256"],owner["sha256"])
     updates["cutover76.py"] = cut.encode()
     for name in ("full170_status.py","cold170_status.py","joint168_status.py"):
@@ -95,7 +98,7 @@ def stage(scope,previous,owner):
         anchor = repr(OLD.name)+")"
         need(anchor in text,"missing V75 program allowlist "+name)
         updates[name] = text.replace(anchor,repr(OLD.name)+", "+repr(NEW.name)+")").encode()
-    path = ROOT/"writer-v76-source"
+    path = ROOT/"writer-v76-r2-source"
     path.mkdir(mode=0o700,exist_ok=True)
     need(path.resolve(strict=True)==path and path.stat().st_uid==0 and not path.stat().st_mode & 0o077,
          "unsafe V76 source stage")
