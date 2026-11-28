@@ -9,6 +9,8 @@ mod appendvec288;
 mod appendvec292;
 #[path = "holding_foundation_accounts229.rs"]
 mod accounts229;
+#[path = "holding_foundation_canary224.rs"]
+mod canary224;
 #[path = "holding_foundation_ext4_228.rs"]
 mod ext4_228;
 #[path = "holding_foundation_openpgp.rs"]
@@ -1016,7 +1018,7 @@ async fn restore(client: &Client, p: RestoreSpec, spec: &Bound) -> Result<()> {
 }
 
 pub(super) fn command(s: &str) -> bool {
-    matches!(s, accounts229::ACTION | accounts229::RECHECK | accounts229::RESTORE | failed296::CHECK | failed296::ACTION | failed296::RECHECK) || ext4_228::command(s) || appendvec288::command(s) || appendvec292::command(s) || matches!(
+    matches!(s, accounts229::ACTION | accounts229::RECHECK | accounts229::RESTORE | failed296::CHECK | failed296::ACTION | failed296::RECHECK | canary224::CHECK | canary224::PARK) || ext4_228::command(s) || appendvec288::command(s) || appendvec292::command(s) || matches!(
         s,
         "holding-foundation-private-inspect"
             | "holding-foundation-private-inspect-old-v2-237"
@@ -1069,6 +1071,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     }
     if matches!(action, failed296::CHECK | failed296::ACTION) {
         return failed296::run(action, v, spec).await;
+    }
+    if matches!(action, canary224::CHECK | canary224::PARK) {
+        return canary224::run(action, v, spec).await;
     }
     if action == accounts229::ACTION {
         return accounts229::run(v, spec).await;
