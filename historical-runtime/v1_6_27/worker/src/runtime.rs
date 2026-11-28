@@ -55,11 +55,30 @@ fn fee_load_diagnostics(
     }
     text
 }
-// Private differential on the generation-pinned epoch 230 sources.
+// Private differential on the generation-pinned epoch 230 sources. The
+// bootstrap selects the bounds for this worker for the rest of the invocation.
 pub(crate) const MIN_SUPPORTED_SNAPSHOT_SLOT: u64 = 99_461_591;
-const MIN_SUPPORTED_ENTRY_SLOT: u64 = MIN_SUPPORTED_SNAPSHOT_SLOT + 1;
-const MAX_SUPPORTED_SLOT_EXCLUSIVE: u64 = 99_468_090;
-const EXPECTED_SNAPSHOT_ACCOUNTS_HASH: &str = "9Hgyrxkc5h5mkAwPL7rUGASHZFMByNzE1TYmCPb4z4e7";
+
+#[derive(Clone, Copy)]
+struct CandidateWindow {
+    bootstrap: u64,
+    terminal: u64,
+    accounts_hash: &'static str,
+}
+
+const WINDOWS: [CandidateWindow; 2] = [
+    CandidateWindow {
+        bootstrap: MIN_SUPPORTED_SNAPSHOT_SLOT,
+        terminal: 99_468_089,
+        accounts_hash: "9Hgyrxkc5h5mkAwPL7rUGASHZFMByNzE1TYmCPb4z4e7",
+    },
+    CandidateWindow {
+        bootstrap: 99_468_089,
+        terminal: 99_476_782,
+        accounts_hash: "5kWV3NT4f15DCB3XkmiYSLu9a1H88XK4GYGEV54nimcQ",
+    },
+];
+
 const POH_THREADS_ENV: &str = "JETSTREAMER_HISTORICAL_POH_THREADS";
 const WAVE_METRICS_ENV: &str = "JETSTREAMER_HISTORICAL_WAVE_METRICS";
 const WAVE_METRICS_REPORT_INTERVAL_TRANSACTIONS: u64 = 1_000_000;
@@ -82,7 +101,7 @@ pub struct RuntimeState {
     tick_hash_count: u64,
     leader_schedules: HashMap<u64, Vec<Pubkey>>,
     poh_pool: ThreadPool,
-    enforce_candidate_range: bool,
+    candidate_window: Option<CandidateWindow>,
     last_accounts_clean_block_height: u64,
     accounts_shrink_consumed_budget: usize,
     execution_wave_metrics: ExecutionWaveMetrics,
@@ -182,15 +201,15 @@ impl RuntimeState {
         let poh_pool = build_poh_pool()?;
         let additional_builtins = mainnet_additional_builtins();
 
-        let (bank, source) = match initial_state {
+        let (bank, source, candidate_window) = match initial_state {
             jetstreamer_historical_protocol::InitialState::SnapshotArchive { archive_path } => {
                 let archive_path_ref = Path::new(archive_path);
                 let (archive_slot, archive_hash, _) =
                     snapshot::parse_archive_identity(archive_path_ref)?;
                 // Reject out-of-era archives from their committed filename
                 // before spending resources extracting or decoding them.
-                validate_candidate_snapshot_slot(archive_slot)?;
-                if archive_hash.to_string() != EXPECTED_SNAPSHOT_ACCOUNTS_HASH {
+                let window = candidate_window(archive_slot)?;
+                if archive_hash.to_string() != window.accounts_hash {
                     return Err(
                         "epoch 230 diagnostic snapshot filename accounts hash differs".into(),
                     );
@@ -201,21 +220,20 @@ impl RuntimeState {
                     &genesis,
                     &additional_builtins,
                 )?;
-                validate_candidate_snapshot_slot(loaded.bank.slot())?;
-                if loaded.expected_accounts_hash.to_string() != EXPECTED_SNAPSHOT_ACCOUNTS_HASH {
+                if loaded.bank.slot() != window.bootstrap {
+                    return Err("epoch 230 decoded snapshot slot differs from the selected bootstrap".into());
+                }
+                if loaded.expected_accounts_hash.to_string() != window.accounts_hash {
                     return Err("epoch 230 diagnostic snapshot accounts hash differs".into());
                 }
                 let source = InitializedSource::SnapshotArchive {
                     archive_path: archive_path.clone(),
                     expected_accounts_hash: loaded.expected_accounts_hash.as_ref().to_vec(),
                 };
-                (loaded.bank, source)
+                (loaded.bank, source, window)
             }
             jetstreamer_historical_protocol::InitialState::Genesis => {
-                return Err(format!(
-                    "Solana v1.6.27 candidate requires a snapshot in {}..{}",
-                    MIN_SUPPORTED_SNAPSHOT_SLOT, MAX_SUPPORTED_SLOT_EXCLUSIVE
-                ));
+                return Err("Solana v1.6.27 candidate requires an exact epoch 230 snapshot".into());
             }
         };
         let write_cursor = bank.accounts().accounts_db.next_write_version();
@@ -240,7 +258,7 @@ impl RuntimeState {
                 tick_hash_count: 0,
                 leader_schedules: HashMap::new(),
                 poh_pool,
-                enforce_candidate_range: true,
+                candidate_window: Some(candidate_window),
                 last_accounts_clean_block_height: 0,
                 accounts_shrink_consumed_budget: 0,
                 execution_wave_metrics: ExecutionWaveMetrics::new(
@@ -298,9 +316,9 @@ impl RuntimeState {
             )));
         }
 
-        if self.enforce_candidate_range {
+        if let Some(window) = self.candidate_window {
             for request in &requests {
-                validate_candidate_entry_slot(request.slot)
+                window.validate_entry(request.slot)
                     .map_err(ProcessEntriesError::Runtime)?;
             }
         }
@@ -824,7 +842,7 @@ impl RuntimeState {
             tick_hash_count: 0,
             leader_schedules: HashMap::new(),
             poh_pool: build_poh_pool().unwrap(),
-            enforce_candidate_range: false,
+            candidate_window: None,
             last_accounts_clean_block_height: 0,
             accounts_shrink_consumed_budget: 0,
             execution_wave_metrics: ExecutionWaveMetrics::new(false),
@@ -832,24 +850,24 @@ impl RuntimeState {
     }
 }
 
-fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
-    if slot != MIN_SUPPORTED_SNAPSHOT_SLOT {
-        return Err(format!(
-            "Solana v1.6.27 epoch 230 diagnostic requires snapshot slot {}",
-            MIN_SUPPORTED_SNAPSHOT_SLOT
-        ));
-    }
-    Ok(())
+fn candidate_window(slot: u64) -> Result<CandidateWindow, String> {
+    WINDOWS.iter().copied().find(|window| window.bootstrap == slot).ok_or_else(|| {
+        format!("Solana v1.6.27 epoch 230 diagnostic has no pinned snapshot at slot {}", slot)
+    })
 }
 
-fn validate_candidate_entry_slot(slot: u64) -> Result<(), String> {
-    if !(MIN_SUPPORTED_ENTRY_SLOT..MAX_SUPPORTED_SLOT_EXCLUSIVE).contains(&slot) {
-        return Err(format!(
-            "Solana v1.6.27 candidate entry slot {} is outside {}..{}",
-            slot, MIN_SUPPORTED_ENTRY_SLOT, MAX_SUPPORTED_SLOT_EXCLUSIVE
-        ));
+impl CandidateWindow {
+    fn validate_entry(self, slot: u64) -> Result<(), String> {
+        if !(self.bootstrap + 1..=self.terminal).contains(&slot) {
+            return Err(format!(
+                "Solana v1.6.27 candidate entry slot {} is outside {}..={}",
+                slot,
+                self.bootstrap + 1,
+                self.terminal,
+            ));
+        }
+        Ok(())
     }
-    Ok(())
 }
 
 fn build_poh_pool() -> Result<ThreadPool, String> {
@@ -1578,44 +1596,36 @@ mod tests {
     }
 
     #[test]
-    fn candidate_range_is_closed_at_both_ends() {
-        assert!(validate_candidate_snapshot_slot(MIN_SUPPORTED_SNAPSHOT_SLOT).is_ok());
-        for &slot in &[
-            MIN_SUPPORTED_SNAPSHOT_SLOT - 1,
-            MIN_SUPPORTED_SNAPSHOT_SLOT + 1,
-        ] {
-            assert!(validate_candidate_snapshot_slot(slot).is_err());
+    fn exact_bootstrap_binds_its_hash_and_closes_the_entry_window() {
+        for window in &WINDOWS {
+            let selected = candidate_window(window.bootstrap).unwrap();
+            assert_eq!(selected.bootstrap, window.bootstrap);
+            assert_eq!(selected.accounts_hash, window.accounts_hash);
+            assert!(candidate_window(window.bootstrap - 1).is_err());
+            assert!(candidate_window(window.bootstrap + 1).is_err());
+            assert!(selected.validate_entry(window.bootstrap + 1).is_ok());
+            assert!(selected.validate_entry(window.terminal).is_ok());
+            assert!(selected.validate_entry(window.bootstrap).is_err());
+            assert!(selected.validate_entry(window.terminal + 1).is_err());
         }
-        assert!(validate_candidate_entry_slot(MIN_SUPPORTED_ENTRY_SLOT).is_ok());
-        assert!(validate_candidate_entry_slot(MAX_SUPPORTED_SLOT_EXCLUSIVE - 1).is_ok());
-        assert!(validate_candidate_entry_slot(MIN_SUPPORTED_ENTRY_SLOT - 1).is_err());
-        assert!(validate_candidate_entry_slot(MAX_SUPPORTED_SLOT_EXCLUSIVE).is_err());
+        assert_eq!(WINDOWS[0].terminal, WINDOWS[1].bootstrap);
     }
 
     #[test]
     fn out_of_scope_batch_is_rejected_before_decode_or_bank_mutation() {
         let (mut state, _) = test_state(2, Some(4));
-        state.enforce_candidate_range = true;
-        let before = (
-            state.bank.slot(),
-            state.bank.tick_height(),
-            state.write_cursor,
-        );
-        for &rejected in &[MIN_SUPPORTED_SNAPSHOT_SLOT, MAX_SUPPORTED_SLOT_EXCLUSIVE] {
-            let mut first = request_for(&state, MIN_SUPPORTED_ENTRY_SLOT, 0, 1, &[]);
-            first.transactions = vec![vec![255]];
-            let last = request_for(&state, rejected, 0, 1, &[]);
-            let error = state.process_entries(vec![first, last]).unwrap_err();
-            assert!(error.contains("outside"), "{}", error);
-            assert_eq!(
-                before,
-                (
-                    state.bank.slot(),
-                    state.bank.tick_height(),
-                    state.write_cursor
-                )
-            );
-            assert_eq!(state.next_entry_index, 0);
+        let before = (state.bank.slot(), state.bank.tick_height(), state.write_cursor);
+        for &window in &WINDOWS {
+            state.candidate_window = Some(window);
+            for &rejected in &[window.bootstrap, window.terminal + 1] {
+                let mut first = request_for(&state, window.bootstrap + 1, 0, 1, &[]);
+                first.transactions = vec![vec![255]];
+                let last = request_for(&state, rejected, 0, 1, &[]);
+                let error = state.process_entries(vec![first, last]).unwrap_err();
+                assert!(error.contains("outside"), "{}", error);
+                assert_eq!(before, (state.bank.slot(), state.bank.tick_height(), state.write_cursor));
+                assert_eq!(state.next_entry_index, 0);
+            }
         }
     }
 
