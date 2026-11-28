@@ -14,11 +14,11 @@ import time
 
 
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
-BASE = RT / "epoch143-second-hourly-20261128-v1"
-RUN = Path("/home/sol/.jetstreamer-private") / BASE.name
-ALIAS = Path("/run/horizon143-second-hourly")
-UNIT = "horizon-qualify-143-second-hourly-20261128-v1.service"
-GUARD = "horizon-guard-143-second-hourly-20261128-v1"
+BASE = RT / "epoch143-second-hourly-20261128-v2"
+RUN = Path("/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1")
+ALIAS = Path("/run/horizon143-second-hourly-v2")
+UNIT = "horizon-qualify-143-second-hourly-20261128-v2.service"
+GUARD = "horizon-guard-143-second-hourly-20261128-v2"
 LOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 TREE = 64 << 30
 MEMORY = 40 << 30
@@ -126,7 +126,7 @@ def enrollment(booking):
     timer = props(booking["timer"]["unit"], "ActiveState", "SubState", "InvocationID", "Job")
     need(manager == dict(ActiveState="active", MainPID=str(native["pid"]), InvocationID=native["invocation_id"], Job="")
          and timer == dict(ActiveState="active", SubState="waiting", InvocationID=booking["timer"]["invocation_id"], Job="")
-         and fleet["sole_next_timer"] == booking["timer"]["unit"] and ready["second_hourly143_contract"] == booking["contract"]
+         and fleet["sole_next_timer"] == booking["timer"]["unit"] and ready["second_hourly143_retry_contract"] == booking["contract"]
          and ready["second_hourly143_prefix"] == booking["closure"], "writer or observer enrollment changed")
     return fleet
 
@@ -163,7 +163,7 @@ def make_booking(contract_ref, contract, writer_ref, price_seal):
     need(now + 120 < due, "the armed observer is due inside admission")
     need(due - now <= 1800 and (dt.datetime.now(dt.timezone.utc) - dt.datetime.fromtimestamp(
          head.stat().st_mtime, tz=dt.timezone.utc)).total_seconds() < 1800, "old observer roster")
-    need(ready["second_hourly143_contract"] == contract_ref, "V63 did not register the exact contract")
+    need(ready["second_hourly143_retry_contract"] == contract_ref, "V63 did not register the exact contract")
     price = member(Path(price_seal["path"]).parent, "capacity.py", price_seal)
     return dict(
         schema="horizon-143-second-hourly-booking-v1", unit=UNIT, tree=str(RUN),

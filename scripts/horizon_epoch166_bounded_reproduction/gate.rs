@@ -102,8 +102,14 @@ mod route {
 #[cfg(epoch143_second_hourly)]
 mod route {
     pub(super) const EPOCH: u64 = 143;
+    #[cfg(not(epoch143_second_hourly_retry))]
     pub(super) const UNIT: &str = "horizon-qualify-143-second-hourly-20261128-v1.service";
+    #[cfg(epoch143_second_hourly_retry)]
+    pub(super) const UNIT: &str = "horizon-qualify-143-second-hourly-20261128-v2.service";
+    #[cfg(not(epoch143_second_hourly_retry))]
     pub(super) const ALIAS: &str = "/run/horizon143-second-hourly";
+    #[cfg(epoch143_second_hourly_retry)]
+    pub(super) const ALIAS: &str = "/run/horizon143-second-hourly-v2";
     pub(super) const RUN: &str =
         "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1";
     pub(super) const SNAPSHOT: &str =
@@ -488,7 +494,7 @@ mod tests {
         assert_eq!(&args[..3], ["143", RUN, "--verify"]);
         assert_eq!(
             args[3],
-            "--epoch143-hourly-plan=/run/horizon143-second-hourly/plan.json"
+            format!("--epoch143-hourly-plan={ALIAS}/plan.json")
         );
         assert!(second_hourly_args(&"0".repeat(64)).is_err());
     }

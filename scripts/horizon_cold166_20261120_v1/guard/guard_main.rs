@@ -640,7 +640,11 @@ fn supported_unit(plan: &Plan) -> bool {
     if plan.unit == "horizon-qualify-143-first-hourly-20261127-v1.service" {
         return cfg!(feature = "epoch143-first-hourly");
     }
-    if plan.unit == "horizon-qualify-143-second-hourly-20261128-v1.service" {
+    if matches!(
+        plan.unit.as_str(),
+        "horizon-qualify-143-second-hourly-20261128-v1.service"
+            | "horizon-qualify-143-second-hourly-20261128-v2.service"
+    ) {
         return cfg!(feature = "epoch143-second-hourly");
     }
     if plan.unit == "horizon-qualify-162-second-replay-20261128-v3.service" {
@@ -799,15 +803,21 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
             64_u64 << 30,
         ),
         #[cfg(feature = "epoch143-second-hourly")]
-        "horizon-qualify-143-second-hourly-20261128-v1.service" => {
+        "horizon-qualify-143-second-hourly-20261128-v1.service"
+        | "horizon-qualify-143-second-hourly-20261128-v2.service" => {
             const TREE_CAP: u64 = 64 << 30;
             ensure!(
                 plan.maximum_root_physical_bytes == Some(TREE_CAP),
                 "epoch 143 second hourly replay requires its 64 GiB guard cap"
             );
+            let receipts = if plan.unit == "horizon-qualify-143-second-hourly-20261128-v1.service" {
+                "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v1/guard-receipts"
+            } else {
+                "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v2/guard-receipts"
+            };
             (
                 "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1",
-                "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v1/guard-receipts",
+                receipts,
                 9_470_567_509_909,
                 TREE_CAP,
             )
