@@ -1,0 +1,227 @@
+{
+  "profiles": {
+    "after-ram": {
+      "closure": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73766969-gap-20261128-v1/THIRD_TERMINAL_AND_CUSTODY.json",
+        "sha256": "9b19751acffdde6dad4714f0079dd7e3bd7a9949fcdfbbc9fc9e8e74013680fd"
+      },
+      "contract": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73766969-gap-20261128-v1/AFTER_RAM_WRITER_INTERFACE.json",
+        "sha256": "1f8f41eb9e393c0c6d3238cceae5849caf6b806538a1c1f311b747cf9131749c"
+      },
+      "drain": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73766969-gap-20261128-v1/AFTER_RAM_FLOOR_STOP_DRAIN.json",
+        "sha256": "2f99cf89c5add2bc2c3e9ddc8af300aa6f08578bdc2ca2e4367d8665db88c683"
+      },
+      "expected_bytes": 21702422528,
+      "expected_entries": 392399,
+      "iid": "e589078414194de38fe902a9df0f5b0c",
+      "inode": 119603206,
+      "protected": {
+        "bank": {
+          "gid": 1003,
+          "identity": [
+            64512,
+            119603204,
+            41062975,
+            1618478261000000000,
+            1795854702880710088
+          ],
+          "links": 1,
+          "mode": "0o644",
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73766969-to-73787145-v1/scratch/.historical-runtime/jetstreamer-historical-parent-Ai9ZGd/jetstreamer-historical-v1.5.6-ycPc6p/unpacked/snapshots/73766969/73766969",
+          "uid": 1001
+        },
+        "bootstrap": {
+          "gid": 1001,
+          "identity": [
+            64512,
+            97855128,
+            2149673902,
+            1795812929599978064,
+            1795812947248067136
+          ],
+          "links": 1,
+          "mode": "0o600",
+          "path": "/home/sol/.jetstreamer-private/epoch170-next-source-20261127.WhR6XLzL/payload/snapshot-73766969-9mYMWeKx1ZWjsBcGLUhmDGbdkY2GMCmdFnE6UxfAeQjW.tar.zst",
+          "sha256": "7de9fd4205ee8241c4bc5aaec54523199f749fa2b73eb3322508fc3adba9706f",
+          "uid": 1001
+        },
+        "bound_worker": {
+          "gid": 1003,
+          "identity": [
+            64512,
+            118035970,
+            9376224,
+            1795854661414591200,
+            1795854661414591200
+          ],
+          "links": 1,
+          "mode": "0o555",
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73766969-to-73787145-v1/scratch/.historical-runtime/jetstreamer-historical-parent-Ai9ZGd/bound-worker/historical-worker",
+          "sha256": "b0219574172b54b251b4f2feda6285ca3b6bee5f2830a0d46e69ee8ea2275541",
+          "uid": 1001
+        },
+        "log": {
+          "gid": 0,
+          "identity": [
+            64512,
+            117309671,
+            78901,
+            1795855704907791231,
+            1795855704907791231
+          ],
+          "links": 1,
+          "mode": "0o600",
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73766969-to-73787145-v1/producer.log",
+          "sha256": "6ae1a0eddd31d47a9a7b9673dc87af98d49a2732b7bd393cdac2a68aeee0954a",
+          "uid": 0
+        },
+        "node": {
+          "gid": 0,
+          "identity": [
+            64512,
+            101262175,
+            65296952,
+            1795228396417782001,
+            1795228879812212643
+          ],
+          "links": 1,
+          "mode": "0o555",
+          "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch167-local-index-successor-20261121-v1/deployment/jetstreamer-node",
+          "sha256": "6b0f3089c1c1108dbbbea76a06625d3b285de647f83b50791ead121e1af81699",
+          "uid": 0
+        },
+        "partial": {
+          "gid": 1003,
+          "identity": [
+            64512,
+            117309882,
+            203066302,
+            1795855643228504428,
+            1795855643228504428
+          ],
+          "links": 1,
+          "mode": "0o600",
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73766969-to-73787145-v1/ledger/epoch-170.diagnostic.jet",
+          "sha256": "8ffdbd7df6759ff9b6846b6325294898377afe71fcd7e0f8b10788c5d5662f45",
+          "uid": 1001
+        },
+        "predecessor_archive": {
+          "gid": 1003,
+          "identity": [
+            64512,
+            119019088,
+            1846811482,
+            1795854480140909595,
+            1795854480140909595
+          ],
+          "links": 1,
+          "mode": "0o600",
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73760367-to-73766969-ram-v3/ledger/epoch-170.diagnostic.jet",
+          "sha256": "7cf371455e378937d4e1be812a97cf94d84c30d65af1628f71c36f05afbb6a74",
+          "uid": 1001
+        },
+        "predecessor_manifest": {
+          "gid": 1003,
+          "identity": [
+            64512,
+            119015474,
+            1806,
+            1795854500315017230,
+            1795854500316017236
+          ],
+          "links": 1,
+          "mode": "0o600",
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73760367-to-73766969-ram-v3/ledger/epoch-170.diagnostic.jet.segment.json",
+          "sha256": "d865aa578cc7ec5832d17c9d3e82215300f3f7422e44d1f6474c16aa97128734",
+          "uid": 1001
+        }
+      },
+      "restore": {
+        "archive_and_bank_preserved": true,
+        "cold_initialization": "HistoricalInitialization::SnapshotArchive",
+        "in_place_native_bank_resume": false,
+        "node_build": {
+          "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch167-local-index-successor-20261121-v1/deployment/build-proof.json",
+          "sha256": "b62b59a38f02d1c60da9c583eaffaa91aad4045f71eca9325093970cf1c00ecd"
+        },
+        "node_source_commit": "5b8cdc8c0b1e95cd7900f7b154e1729426010d39",
+        "required_bootstrap": 73766969,
+        "runtime_creation": "make_private_work_dir / tempdir_in",
+        "same_process_carried_state_only": true,
+        "source_paths": {
+          "jetstreamer-node/src/historical.rs": "ec56a3b37a3e8de13017ab85e1399123f8b40cafa2fe38e8127ee1c8b10bb2e3",
+          "jetstreamer-node/src/main.rs": "3f94a3f9236e3c8363615d391039f240ace748231e60e7b0ce0cf6a6af8e0181"
+        },
+        "source_review": [
+          "main.rs:12438-12592 only a carried in-process worker skips restoring the snapshot; the sealed private singleton has no carried predecessor.",
+          "historical.rs:1398-1446 allocates a fresh private work dir and binds SnapshotArchive. historical.rs:1549-1553 initializes it with the fresh scratch. historical.rs:3749-3763 implements tempdir_in.",
+          "The retained only Bank snapshot directory belongs to 73766969. The stopped scratch is a child of that invocation\u2019s fresh historical temporary directory. The bounded service starts the singleton from the pinned bootstrap."
+        ]
+      },
+      "shards": {
+        "0": 119603207,
+        "1": 119603208,
+        "2": 119603209,
+        "3": 119603210
+      },
+      "source": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73766969-20261127-v1/package/following-input.json",
+        "sha256": "91c694b955490a1cca74cd4c9323f25b74b2272aa54214d9ca0d1d95ccb92943"
+      },
+      "target": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73766969-to-73787145-v1/scratch/.historical-runtime/jetstreamer-historical-parent-Ai9ZGd/jetstreamer-historical-v1.5.6-ycPc6p/accounts-state",
+      "terminal": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-from-73766969-gap-20261128-v1/AFTER_RAM_FLOOR_STOP_CUSTODY.json",
+        "sha256": "21a333d8be96e870a3c5d1d8f088c5d0e2965a29b26e254a2f3b68092e2a9c2b"
+      },
+      "unit": "horizon-qualify-170-from-73766969-20261127-v1.service"
+    }
+  },
+  "scope": {
+    "leases": {
+      "exact_epoch": {
+        "gid": 1003,
+        "identity": [
+          64512,
+          118035861,
+          0,
+          1795854657574580550,
+          1795854657574580550
+        ],
+        "links": 1,
+        "mode": "0o600",
+        "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/metered-hourly-20261124-v1/from-73766969-to-73787145-v1/private/state/destination-b8c926f23636bef09db9e15741acd3de4fa70ef483a4e6aa004a47a96447a212/locks/epoch-170.lock",
+        "uid": 1001
+      },
+      "global_operation": {
+        "gid": 0,
+        "identity": [
+          26,
+          3453440,
+          0,
+          1795169932336156440,
+          1795169932336156440
+        ],
+        "links": 1,
+        "mode": "0o600",
+        "path": "/run/horizon-epoch171-to136-g1.operation.lock",
+        "uid": 0
+      },
+      "local_mutation": {
+        "gid": 1003,
+        "identity": [
+          64512,
+          101135013,
+          0,
+          1791494730459052358,
+          1791494730459052358
+        ],
+        "links": 1,
+        "mode": "0o600",
+        "path": "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock",
+        "uid": 1001
+      }
+    }
+  }
+}

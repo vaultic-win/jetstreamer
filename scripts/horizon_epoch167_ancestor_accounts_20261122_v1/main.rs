@@ -18,7 +18,7 @@ use std::{
 
 #[cfg(any(
     all(
-        any(feature = "retry8_167", feature = "floor_143"),
+        any(feature = "retry8_167", feature = "floor_143", feature = "floor_170"),
         any(
             feature = "independent166",
             feature = "standard170",
@@ -27,7 +27,11 @@ use std::{
             feature = "metered170_full"
         )
     ),
-    all(feature = "floor_143", feature = "retry8_167"),
+    all(feature = "floor_143", feature = "floor_170"),
+    all(
+        any(feature = "floor_143", feature = "floor_170"),
+        feature = "retry8_167"
+    ),
     all(feature = "independent166", feature = "standard170"),
     all(
         feature = "metered170_full",
@@ -60,7 +64,8 @@ compile_error!("select one epoch profile");
     feature = "metered168_retry4",
     feature = "metered170_full",
     feature = "retry8_167",
-    feature = "floor_143"
+    feature = "floor_143",
+    feature = "floor_170"
 )))]
 const BASE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch167-ancestor-accounts-20261122-v2";
@@ -71,6 +76,9 @@ mod cold166;
 use cold166 as specific;
 #[cfg(feature = "floor_143")]
 #[path = "closed143_floor.rs"]
+mod specific;
+#[cfg(feature = "floor_170")]
+#[path = "closed170_floor.rs"]
 mod specific;
 #[cfg(feature = "retry8_167")]
 #[path = "closed167_retry8.rs"]
@@ -83,7 +91,8 @@ mod specific;
     feature = "metered168_retry4",
     feature = "metered170_full",
     feature = "retry8_167",
-    feature = "floor_143"
+    feature = "floor_143",
+    feature = "floor_170"
 ))]
 mod retirement_evidence;
 #[cfg(feature = "metered168_retry4")]
@@ -100,7 +109,8 @@ mod specific;
     feature = "metered168_retry4",
     feature = "metered170_full",
     feature = "retry8_167",
-    feature = "floor_143"
+    feature = "floor_143",
+    feature = "floor_170"
 ))]
 use specific::{BASE, CHECK_SCHEMA, COMPLETE_SCHEMA, PROFILE, gates};
 #[cfg(not(any(
@@ -110,7 +120,8 @@ use specific::{BASE, CHECK_SCHEMA, COMPLETE_SCHEMA, PROFILE, gates};
     feature = "metered168_retry4",
     feature = "metered170_full",
     feature = "retry8_167",
-    feature = "floor_143"
+    feature = "floor_143",
+    feature = "floor_170"
 )))]
 const PROFILE: &[u8] = include_bytes!("profiles.json");
 #[cfg(not(any(
@@ -120,7 +131,8 @@ const PROFILE: &[u8] = include_bytes!("profiles.json");
     feature = "metered168_retry4",
     feature = "metered170_full",
     feature = "retry8_167",
-    feature = "floor_143"
+    feature = "floor_143",
+    feature = "floor_170"
 )))]
 const CHECK_SCHEMA: &str = "horizon167-closed-accounts-check-v1";
 #[cfg(not(any(
@@ -130,7 +142,8 @@ const CHECK_SCHEMA: &str = "horizon167-closed-accounts-check-v1";
     feature = "metered168_retry4",
     feature = "metered170_full",
     feature = "retry8_167",
-    feature = "floor_143"
+    feature = "floor_143",
+    feature = "floor_170"
 )))]
 const COMPLETE_SCHEMA: &str = "horizon167-closed-accounts-complete-v1";
 
@@ -394,7 +407,8 @@ fn ancestor_gates(p: &Value, manifest: &Value, allowed_attempts: &[&str]) -> Res
     feature = "metered168_retry4",
     feature = "metered170_full",
     feature = "retry8_167",
-    feature = "floor_143"
+    feature = "floor_143",
+    feature = "floor_170"
 )))]
 fn gates(p: &Value, manifest: &Value) -> Result<Value> {
     ancestor_gates(p, manifest, &["local3retry5", "local3retry7"])
@@ -443,7 +457,8 @@ fn witness_disjoint(target: &Path, reference: &Value) -> Result<()> {
     feature = "metered168_retry4",
     feature = "metered170_full",
     feature = "retry8_167",
-    feature = "floor_143"
+    feature = "floor_143",
+    feature = "floor_170"
 ))]
 fn appendvec_name(path: &str, directory: bool) -> bool {
     let shard = |s: &str| matches!(s, "0" | "1" | "2" | "3");
@@ -465,7 +480,8 @@ fn appendvec_name(path: &str, directory: bool) -> bool {
     feature = "metered168_retry4",
     feature = "metered170_full",
     feature = "retry8_167",
-    feature = "floor_143"
+    feature = "floor_143",
+    feature = "floor_170"
 ))]
 fn check_appendvecs(
     p: &Value,
@@ -587,7 +603,8 @@ fn run() -> Result<()> {
         feature = "metered168_retry4",
         feature = "metered170_full",
         feature = "retry8_167",
-        feature = "floor_143"
+        feature = "floor_143",
+        feature = "floor_170"
     ))]
     specific::verify_campaign_lock(&epoch_lock, &manifest)?;
     ensure!(
@@ -601,14 +618,16 @@ fn run() -> Result<()> {
         feature = "metered168_retry4",
         feature = "metered170_full",
         feature = "retry8_167",
-        feature = "floor_143"
+        feature = "floor_143",
+        feature = "floor_170"
     ))]
     let _leases = specific::leases(&manifest)?;
     #[cfg(not(any(
         feature = "metered168_retry4",
         feature = "metered170_full",
         feature = "retry8_167",
-        feature = "floor_143"
+        feature = "floor_143",
+        feature = "floor_170"
     )))]
     let anchors = gates(p, &manifest)?;
     let target = Path::new(string(p, "target")?);
@@ -617,7 +636,8 @@ fn run() -> Result<()> {
         feature = "metered168_retry4",
         feature = "metered170_full",
         feature = "retry8_167",
-        feature = "floor_143"
+        feature = "floor_143",
+        feature = "floor_170"
     ))]
     let anchors = gates(p, &manifest)?;
     if mode == "inspect" {
@@ -642,7 +662,8 @@ fn run() -> Result<()> {
         feature = "metered168_retry4",
         feature = "metered170_full",
         feature = "retry8_167",
-        feature = "floor_143"
+        feature = "floor_143",
+        feature = "floor_170"
     ))]
     specific::verify_image(base, &image)?;
     let conf = sha(PROFILE);
@@ -677,7 +698,8 @@ fn run() -> Result<()> {
             feature = "metered168_retry4",
             feature = "metered170_full",
             feature = "retry8_167",
-            feature = "floor_143"
+            feature = "floor_143",
+            feature = "floor_170"
         )))]
         ensure!(
             p["expected_bytes"] == allocated && p["expected_entries"] == (first.len() - 1) as u64,
@@ -690,7 +712,8 @@ fn run() -> Result<()> {
             feature = "metered168_retry4",
             feature = "metered170_full",
             feature = "retry8_167",
-            feature = "floor_143"
+            feature = "floor_143",
+            feature = "floor_170"
         ))]
         specific::check_inventory(p, &manifest, &first, allocated)?;
         drop(second);
@@ -710,7 +733,8 @@ fn run() -> Result<()> {
             feature = "metered168_retry4",
             feature = "metered170_full",
             feature = "retry8_167",
-            feature = "floor_143"
+            feature = "floor_143",
+            feature = "floor_170"
         )) {
             ensure!(gates(p, &manifest)? == anchors, "pre-check anchors changed");
             scan(target)?
@@ -725,7 +749,8 @@ fn run() -> Result<()> {
             feature = "metered168_retry4",
             feature = "metered170_full",
             feature = "retry8_167",
-            feature = "floor_143"
+            feature = "floor_143",
+            feature = "floor_170"
         ))]
         let check = {
             let mut measured = check;
@@ -768,7 +793,8 @@ fn run() -> Result<()> {
         feature = "metered168_retry4",
         feature = "metered170_full",
         feature = "retry8_167",
-        feature = "floor_143"
+        feature = "floor_143",
+        feature = "floor_170"
     )))]
     if !resuming {
         output(&dir, "INTENT.json", &serde_json::to_vec_pretty(&intent)?)?
@@ -777,7 +803,8 @@ fn run() -> Result<()> {
         feature = "metered168_retry4",
         feature = "metered170_full",
         feature = "retry8_167",
-        feature = "floor_143"
+        feature = "floor_143",
+        feature = "floor_170"
     ))]
     ensure!(
         gates(p, &manifest)? == anchors,
@@ -788,7 +815,8 @@ fn run() -> Result<()> {
         feature = "metered168_retry4",
         feature = "metered170_full",
         feature = "retry8_167",
-        feature = "floor_143"
+        feature = "floor_143",
+        feature = "floor_170"
     ))]
     if !resuming {
         output(&dir, "INTENT.json", &serde_json::to_vec_pretty(&intent)?)?
@@ -803,7 +831,8 @@ fn run() -> Result<()> {
         feature = "metered168_retry4",
         feature = "metered170_full",
         feature = "retry8_167",
-        feature = "floor_143"
+        feature = "floor_143",
+        feature = "floor_170"
     ))]
     let allocated = &prior["allocated_bytes"];
     #[cfg(not(any(
@@ -813,7 +842,8 @@ fn run() -> Result<()> {
         feature = "metered168_retry4",
         feature = "metered170_full",
         feature = "retry8_167",
-        feature = "floor_143"
+        feature = "floor_143",
+        feature = "floor_170"
     )))]
     let allocated = &p["expected_bytes"];
     let complete = json!({"schema":COMPLETE_SCHEMA,"attempt":attempt,"scope":target,"original_iid":p["iid"],"scope_empty":true,"entries_removed_this_invocation":removed,"check_sha256":intent["check_sha256"],"intent_sha256":sha(&read(&ip,1<<20)?),"retired_tree_before_bytes":allocated,"scope_root_remaining_bytes":fd.metadata()?.blocks()*512,"archive_or_snapshot_removed":false,"resource_credit_bytes":0});

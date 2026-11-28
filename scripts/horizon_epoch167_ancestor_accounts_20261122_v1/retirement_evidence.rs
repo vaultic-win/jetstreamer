@@ -175,3 +175,39 @@ fn read_staged_unit(path: &Path) -> Result<Vec<u8>> {
     );
     Ok(bytes)
 }
+
+#[cfg(any(feature = "floor_143", feature = "floor_170"))]
+pub(super) fn drained(name: &str) -> Result<()> {
+    let output = Command::new("/usr/bin/systemctl")
+        .args([
+            "show",
+            "--all",
+            "-p",
+            "Id,LoadState,ActiveState,MainPID,ControlPID,ControlGroup,Job",
+            name,
+        ])
+        .output()?;
+    let values = std::str::from_utf8(&output.stdout)?
+        .lines()
+        .map(|line| line.split_once('=').context("malformed unit state"))
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    ensure!(
+        output.status.success()
+            || output.status.code() == Some(4) && values.get("LoadState") == Some(&"not-found"),
+        "native state unavailable for {name}"
+    );
+    ensure!(
+        values.get("Id") == Some(&name)
+            && values.get("ActiveState") == Some(&"inactive")
+            && values.get("Job") == Some(&"")
+            && values.get("ControlGroup").is_none_or(|v| v.is_empty())
+            && ["MainPID", "ControlPID"]
+                .iter()
+                .all(|k| values.get(k).is_none_or(|v| *v == "0"))
+            && !Path::new("/sys/fs/cgroup/system.slice")
+                .join(name)
+                .try_exists()?,
+        "old invocation, guard or timer active: {name}"
+    );
+    Ok(())
+}

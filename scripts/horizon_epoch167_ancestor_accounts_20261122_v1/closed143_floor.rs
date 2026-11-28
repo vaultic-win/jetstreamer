@@ -1,5 +1,7 @@
 //! Retire only the four stopped AccountsDb shards from this private 143 invocation.
-use super::retirement_evidence::{digest, open_input, path, pinned_path, staged_references};
+use super::retirement_evidence::{
+    digest, drained, open_input, path, pinned_path, staged_references,
+};
 pub(super) use super::retirement_evidence::{verify_campaign_lock, verify_image};
 use super::*;
 use std::os::fd::AsRawFd;
@@ -20,41 +22,6 @@ pub(super) fn leases(manifest: &Value) -> Result<Vec<File>> {
         "local mutation lease held"
     );
     Ok(vec![lock])
-}
-
-fn drained(name: &str) -> Result<()> {
-    let output = Command::new("/usr/bin/systemctl")
-        .args([
-            "show",
-            "--all",
-            "-p",
-            "Id,LoadState,ActiveState,MainPID,ControlPID,ControlGroup,Job",
-            name,
-        ])
-        .output()?;
-    let values = std::str::from_utf8(&output.stdout)?
-        .lines()
-        .map(|line| line.split_once('=').context("malformed unit state"))
-        .collect::<Result<BTreeMap<_, _>>>()?;
-    ensure!(
-        output.status.success()
-            || output.status.code() == Some(4) && values.get("LoadState") == Some(&"not-found"),
-        "native state unavailable for {name}"
-    );
-    ensure!(
-        values.get("Id") == Some(&name)
-            && values.get("ActiveState") == Some(&"inactive")
-            && values.get("Job") == Some(&"")
-            && values.get("ControlGroup").is_none_or(|v| v.is_empty())
-            && ["MainPID", "ControlPID"]
-                .iter()
-                .all(|k| values.get(k).is_none_or(|v| *v == "0"))
-            && !Path::new("/sys/fs/cgroup/system.slice")
-                .join(name)
-                .try_exists()?,
-        "old invocation, guard or timer active: {name}"
-    );
-    Ok(())
 }
 
 pub(super) fn gates(p: &Value, _: &Value) -> Result<Value> {
