@@ -208,7 +208,7 @@ const NEXT_266_PAYLOAD: u64 = 15_514_070_431;
 const NEXT_266_CPU: &str = "32";
 const NEXT_266_EXCLUSIVE: &str = "32,96";
 const NEXT_266_METADATA: (&str, &str) = (
-    "/home/ubuntu/.jetstreamer-private/epoch230-adjacent-terminal.yUvsaRlv/next-bootstrap-readback.oTJVTCti/266.json",
+    "/var/lib/jetstreamer/horizon266-next-input-metadata-v1/gcs-metadata.json",
     "1403b662c15e1d33b558f77c4f2e7da18b268b005b0ea23d684b57001bb34008",
 );
 
@@ -219,7 +219,9 @@ fn next_266_intake() -> Result<Bound> {
     );
     let seam = seam_ref.sealed()?;
     let following = binding(&seam["following_terminal"])?.sealed()?;
-    let metadata = Bound::new(NEXT_266_METADATA.0, NEXT_266_METADATA.1).json()?;
+    let metadata = Bound::new(NEXT_266_METADATA.0, NEXT_266_METADATA.1)
+        .sealed()
+        .context("read the sealed epoch 266 bootstrap metadata")?;
     let name = "114910768/hourly/snapshot-114929697-BevfHbX1MRE8ySXdbzp8WZB5i4W1spPhbsZ8UEUhU7di.tar.zst";
     let bucket = "mainnet-beta-ledger-us-ny5";
     let generation = "1641767198731933";
