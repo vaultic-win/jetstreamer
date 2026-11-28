@@ -1750,6 +1750,15 @@ fn measure(
         !matches!(&quote, Some(Quote::Holding288(_))) || active_holding_288.is_none(),
         "epoch 288 custody is already running"
     );
+    let active_verifier_226 = before
+        .contains(assembly226::VERIFY_UNIT)
+        .then(|| assembly226::verification::live(n))
+        .transpose()?;
+    ensure!(
+        active_verifier_226.is_none()
+            || !matches!(&quote, Some(Quote::Suffix226(_) | Quote::Suffix226Preview | Quote::Assembly226(_) | Quote::Verify226(_))),
+        "epoch 226 verification is already running"
+    );
     let active_restore_266 = before
         .contains(restore266::UNIT)
         .then(|| restore266::active(n))
@@ -1761,6 +1770,7 @@ fn measure(
     let auxiliary = [
         (holding296::UNIT, active_holding_296.as_ref()),
         (holding288::UNIT, active_holding_288.as_ref()),
+        (assembly226::VERIFY_UNIT, active_verifier_226.as_ref()),
         (restore266::UNIT, active_restore_266.as_ref()),
         (capture266::UNIT, active_capture_266.as_ref()),
     ];
@@ -1862,6 +1872,7 @@ fn measure(
     let mut closed_window_266 = None;
     let rows = admission_fleet["active"].as_array_mut().context("Foundation active roster")?;
     holding288::account_observation(rows, active_holding_288.as_ref().map(|park| &park.owner))?;
+    assembly226::verification::account_observation(n, rows, active_verifier_226.as_ref())?;
     if quote.is_some()
         && !live_replays.contains_key(&226)
         && let Some(index) = rows.iter().position(|row| row["producer"]["Id"] == assembly226::UNIT)
@@ -2174,6 +2185,13 @@ fn measure(
             "epoch {epoch} overlaps the epoch 288 custody physical cores"
         );
     }
+    if active_verifier_226.is_some() {
+        replay296::verify_cpu_group("14,16-23", &assembly_exclusive)?;
+        ensure!(
+            exclusive.is_disjoint(&assembly_exclusive),
+            "epoch {epoch} overlaps epoch 226 verification physical cores"
+        );
+    }
     if active_restore_266.is_some() {
         ensure!(exclusive.is_disjoint(&units::parse_cpu_list("32-39,96-103")?),
             "epoch {epoch} overlaps the epoch 266 checkpoint's physical cores");
@@ -2464,6 +2482,7 @@ fn measure(
         .try_fold(0, |total, replay| capacity::add(total, replay.receipt_disk))?;
     let holding_296_disk = active_holding_296.as_ref().map_or(0, |_| holding296::RECEIPT_DISK);
     let holding_288_disk = active_holding_288.as_ref().map_or(0, |_| holding288::RECEIPT_BYTES);
+    let verification_226_disk = active_verifier_226.as_ref().map_or(0, |_| assembly226::RECEIPTS);
     let restore_266_disk = active_restore_266.as_ref().map_or(0, |_| restore266::RECEIPT_DISK);
     let interval_141_disk = active_interval_141.len() as u64 * interval141::DISK;
     let shares_suffix = copy_230 || next_266 || matches!(&quote, Some(Quote::Focused(scope, _))
@@ -2487,7 +2506,7 @@ fn measure(
                 capacity::add(capacity::add(replay_disk, restore_266_disk)?, capacity::add(holding_296_disk, interval_141_disk)?)?,
             )?,
         )?,
-        capacity::add(capacity::add(growth, pending_suffix_disk)?, holding_288_disk)?,
+        capacity::add(capacity::add(growth, pending_suffix_disk)?, capacity::add(holding_288_disk, verification_226_disk)?)?,
     )?;
     let (candidate_disk, candidate) = match &quote {
         Some(Quote::Interval141(_)) => private_141.as_ref().context("private 141 inputs")?.resources()?,
@@ -2689,6 +2708,7 @@ fn measure(
         "closed_window_266_replay":closed_window_266.map(|(_, _, proof)| proof),
         "closed_extraction_226":extraction_drain,
         "active_suffix_226_registration":live_replays.get(&226).filter(|r| r.unit == suffix226::UNIT).map(|r| &r.reference),
+        "active_verification_226_launch":active_verifier_226.as_ref().map(|r| &r.launch),
         "active_assembly_226_registration":live_replays.get(&226).filter(|r| r.unit == assembly226::UNIT).map(|r| &r.reference),
         "accepted_suffix_226_transition":suffix_226_transition,
         "accepted_assembly_226_transition":assembly_226_transition,
@@ -2904,6 +2924,13 @@ pub fn quote_226_assembly() -> Result<Value> {
     let mut native = witness_226(Path::new(assembly226::STATE))?;
     let preparation = assembly226::preparation(&mut native)?;
     measure(&mut native, None, Some(Quote::Assembly226(preparation)))
+}
+
+/// Price the closed epoch 226 verifier while the caller holds the cadence lock.
+pub fn quote_226_verification() -> Result<Value> {
+    let mut native = witness_226(Path::new(assembly226::STATE))?;
+    let terminal = assembly226::closed(&mut native)?;
+    measure(&mut native, None, Some(Quote::Verify226(terminal)))
 }
 
 pub fn quote_226_suffix(drain_path: &Path, drain_sha256: &str) -> Result<Value> {

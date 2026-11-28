@@ -1,0 +1,94 @@
+--- cycle.py
++++ cycle.py
+@@ -189,6 +189,7 @@
+ import diagnostic226_suffix
+ import diagnostic226_assembly
+ import holding288_resource
++import verification226_resource
+ import diagnostic296_meter
+ import publication_handoff
+ import delivery261
+@@ -259,11 +260,24 @@
+     assert release['claim'] == ref(V / 'horizon257-current-reader-delivery-v1/pipeline-claim.json')
+     return Path(publication_handoff.checked_image(release[kind]))
+ 
++def verification226_rss_release():
++    document = verification226_resource.ROOT / "acceptance.json"
++    release = bound(sealed_226_file(document))
++    assert release["schema"] == "foundation-epoch226-verification-fleet-release-v1"
++    assert release["publication_authorized"] is False
++    assert release["controller"] == sealed_226_file(Path(__file__))
++    assert release["configuration"] == sealed_226_file(Path(verification226_resource.__file__))
++    assert release["native_binding"] == sealed_226_file(Path(__file__).with_name("native_binding_replays.py"))
++    assert release["runner"]["path"] == str(verification226_resource.ROOT / "jetstreamer-r2")
++    assert release["observer"]["path"] == str(verification226_resource.ROOT / "jetstreamer-horizon-observe")
++    return release
++
+ def holding_rss_release():
+     root = V / "horizon288-custody-resource-v2"
+     release = bound(sealed_226_file(root / "acceptance.json"))
+     assert release["schema"] == "foundation-epoch288-custody-resource-release-v1"
+-    assert release["controller"] == sealed_226_file(Path(__file__))
++    verifier = verification226_rss_release()
++    assert verifier["previous_controller"] == release["controller"]
+     assert release["configuration"] == sealed_226_file(Path(holding288_resource.__file__))
+     images = V / "horizon288-custody-resource-v1"
+     assert release["observer"]["path"] == str(images / "jetstreamer-horizon-observe")
+@@ -282,6 +296,8 @@
+     return release
+ 
+ def observe_image():
++    if any(row["unit"] == verification226_resource.UNIT for row in cfg.get("native_input_diagnostics", [])):
++        return Path(publication_handoff.checked_image(verification226_rss_release()["observer"]))
+     if any(row["unit"] == holding288_resource.UNIT for row in cfg.get("native_input_diagnostics", [])):
+         return Path(publication_handoff.checked_image(holding_rss_release()["observer"]))
+     if any(row["unit"] == diagnostic226_assembly.UNIT for row in cfg.get("native_input_diagnostics", [])):
+@@ -479,7 +495,8 @@
+             cfg["delivery257_claim"] = config257
+     if native262_origin is not None:
+         native262_cadence.configure(cfg, native262_origin)
+-    native_resources = diagnostic226_assembly.configuration() + holding288_resource.configuration()
++    native_resources = (diagnostic226_assembly.configuration() + holding288_resource.configuration()
++                        + verification226_resource.configuration())
+     if native_resources:
+         cfg.setdefault("native_input_diagnostics", []).extend(native_resources)
+     for epoch, registration in current_reader_deliveries.items():
+@@ -1369,6 +1386,11 @@
+         holding_release = holding_rss_release()
+         assert publication_handoff.checked_image(holding_release["predecessor_fleet"]) == str(fleet_image)
+         fleet_image = Path(publication_handoff.checked_image(holding_release["fleet"]))
++    if verification226_resource.register(plan):
++        verifier_release = verification226_rss_release()
++        candidates = (verifier_release["predecessor_fleet"], holding_rss_release()["fleet"])
++        assert str(fleet_image) in {publication_handoff.checked_image(image) for image in candidates}
++        fleet_image = Path(publication_handoff.checked_image(verifier_release["runner"]))
+     active_private_intervals = set()
+     for ordinal, cohort_label in ((2, "-private141"), (3, "-private141-third"), (4, "-private141-fourth"), (5, "-private141-fifth"), (6, "-private141-sixth"), (7, "-private141-seventh"), (8, "-private141-eighth")):
+         interval141_launch = V / f"horizon141-foundation-interval{ordinal}-runtime-v1/replay-launch.json"
+@@ -1409,7 +1431,7 @@
+                 and not diagnostic226_suffix.owns(r) and not diagnostic226_assembly.owns(r)
+                 and not diagnostic230_checkpoint_continuation.owns(r)
+                 and not diagnostic296_meter.owns(r) and not native262_cadence.owns(r)
+-                and not holding288_resource.owns(r)]
++                and not holding288_resource.owns(r) and not verification226_resource.owns(r)]
+     ordinary = [row for row in ordinary
+                 if not (row['epoch'] == 257 and row['phase'] == 'upload-readback'
+                         and row["unit"]["Id"] in (delivery257_retry.PREVIOUS_UNIT, delivery257_retry.UNIT))]
+--- native_binding_replays.py
++++ native_binding_replays.py
+@@ -48,6 +48,7 @@
+ import diagnostic296_meter
+ import native262_cadence
+ import holding288_resource
++import verification226_resource
+ diagnostic_handlers = (diagnostic229, diagnostic229_bounded, diagnostic229_bounded_retry, diagnostic271_trace, diagnostic271_europe, diagnostic271_boundary, diagnostic271_reward_tuples, diagnostic271_stake_inputs, diagnostic230_slot_hashes, diagnostic230_bank_trace, diagnostic288_shrink_debt, diagnostic229_slot_hash_ram, diagnostic230_program_demotion_ram, diagnostic230_checkpoint_continuation, diagnostic229_bank_delta, diagnostic226_suffix, diagnostic226_assembly, diagnostic296_meter)
+ ordinary = [r for r in f['active'] if r not in sample_publishers and r not in extract226
+             and not (r['epoch'] == 257 and r['phase'] == 'upload-readback'
+@@ -55,6 +56,7 @@
+             and not any(delivery261.owns(r, e) for e in (252, 261))
+             and not native262_cadence.owns(r)
+             and not holding288_resource.owns(r)
++            and not verification226_resource.owns(r)
+             and not any(handler.owns(r) for handler in diagnostic_handlers)]
+ guarded_replays.validate_fleet(ordinary, bound(obs)['replays'])
+ live = {int(k): v for k, v in states['active_claims'].items()}

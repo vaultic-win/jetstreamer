@@ -1,7 +1,7 @@
 //! Independent verification of the closed 226 assembly through a read-only view.
 use super::*;
 
-const STATE: &str = "/var/lib/jetstreamer/horizon226-postassembly-verification-v1";
+pub(crate) mod launch;
 const EXPECTATION: &str =
     "/var/lib/jetstreamer/horizon226-assembly-verification-evidence-v1/epoch-226.json";
 const EXPECTATION_SHA: &str = "b71374bb2129aa8deb82d49477cbcebd29a9713d7785d706d001c9cd0a6e0b7f";
@@ -59,7 +59,7 @@ fn stable_hash(archive: &Path) -> Result<(String, FileIdentity)> {
     Ok((hex_lower(&digest.finalize()), before))
 }
 
-fn capacity(plan: &Value, terminal: &Value) -> Result<()> {
+fn fit(plan: &Value, terminal: &Value) -> Result<()> {
     let fit_path = PathBuf::from(
         plan["roster"]["path"]
             .as_str()
@@ -88,10 +88,29 @@ fn capacity(plan: &Value, terminal: &Value) -> Result<()> {
                     .context("missing verifier disk floor")?,
         "epoch 226 verification lacks a fresh protected roster"
     );
+    Ok(())
+}
+
+fn capacity(plan: &Value, plan_ref: &Value) -> Result<()> {
+    let launch_path = Path::new(spec::VERIFY_STATE).join("cadence-registration.json");
+    let record = suffix::wait(45, "epoch 226 verifier registration", || {
+        launch_path
+            .try_exists()?
+            .then(|| suffix::document(&launch_path))
+            .transpose()
+    })?;
+    fit(plan, &plan["terminal"])?;
     let current = drain::show(spec::VERIFY_UNIT)?;
     let iid = env::var("INVOCATION_ID")?;
     ensure!(
-        current["Id"] == spec::VERIFY_UNIT
+        record["schema"] == spec::VERIFY_LAUNCH
+            && record["epoch"] == 226
+            && record["plan"] == *plan_ref
+            && record["publication_authorized"] == false
+            && record["actual"]["Id"] == current["Id"]
+            && record["actual"]["InvocationID"] == current["InvocationID"]
+            && record["actual"]["MainPID"] == current["MainPID"]
+            && current["Id"] == spec::VERIFY_UNIT
             && current["ActiveState"] == "active"
             && current["SubState"] == "running"
             && current["InvocationID"] == iid
@@ -113,7 +132,7 @@ pub(crate) fn run() -> Result<()> {
             && args[5] == "--self-sha256",
         "usage: jetstreamer-r2 verify-epoch226-assembly PLAN --plan-sha256 HEX --self-sha256 HEX [--check]"
     );
-    let state = Path::new(STATE);
+    let state = Path::new(spec::VERIFY_STATE);
     let state_info = state.symlink_metadata()?;
     ensure!(
         state.canonicalize()? == state
@@ -140,7 +159,7 @@ pub(crate) fn run() -> Result<()> {
     let (_, exit) = drain::clean_success(spec::UNIT, iid)?;
     let archive = archive_identity()?.context("epoch 226 archive missing")?;
     ensure!(
-        plan["schema"] == "foundation-epoch226-assembly-verification-plan-v1"
+        plan["schema"] == spec::VERIFY_PLAN
             && terminal["schema"] == "foundation-epoch226-assembly-terminal-v1"
             && terminal["guard_drained"] == true
             && terminal["scope"]["pid1_exit"] == exit
@@ -186,7 +205,7 @@ pub(crate) fn run() -> Result<()> {
         );
         return Ok(());
     }
-    capacity(&plan, &plan["terminal"])?;
+    capacity(&plan, &plan_ref)?;
     let expected_sha = terminal["scope"]["archive_sha256"]
         .as_str()
         .context("archive digest missing")?;

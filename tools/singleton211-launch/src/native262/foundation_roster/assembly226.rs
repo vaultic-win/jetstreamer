@@ -16,6 +16,22 @@ pub const MEMORY: u64 = CAP;
 pub const VERIFY_MEMORY: u64 = 128 << 30;
 pub const VERIFY_UNIT: &str = "foundation-226-assembly-read-verification-v1.service";
 pub const VERIFY_SCHEMA: &str = "foundation-epoch226-assembly-verification-roster-v1";
+pub const VERIFY_STATE: &str = "/var/lib/jetstreamer/horizon226-postassembly-verification-v1";
+pub const VERIFY_RELEASE: &str =
+    "/var/lib/jetstreamer/horizon226-verification-fleet-v1/acceptance.json";
+pub const VERIFY_IMAGE: &str =
+    "/var/lib/jetstreamer/horizon226-verification-fleet-v1/jetstreamer-r2";
+pub const VERIFY_PLAN: &str = "foundation-epoch226-assembly-verification-plan-v1";
+pub const VERIFY_LAUNCH: &str = "foundation-epoch226-assembly-verification-launch-v1";
+pub const VERIFY_PHASE: &str = "private-assembly-verification";
+pub(super) mod verification;
+
+/// Return the immutable verifier registration and its exact file binding.
+pub fn verification_registration() -> Result<(Value, Value)> {
+    let (reference, row) = verification::registration()?;
+    Ok((json!(reference), row))
+}
+
 pub const ROSTER_SCHEMA: &str = "foundation-epoch226-private-assembly-roster-v1";
 pub const REGISTRATION_SCHEMA: &str = "foundation-epoch226-private-assembly-launch-v1";
 pub const NODE: (&str, &str) = (

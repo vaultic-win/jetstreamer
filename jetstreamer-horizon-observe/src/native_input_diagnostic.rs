@@ -1,5 +1,39 @@
 //! Closed native input telemetry. No entry progress or qualification evidence.
 use super::*;
+
+const VERIFY_226_UNIT: &str = "foundation-226-assembly-read-verification-v1.service";
+const VERIFY_226_ROOT: &str = "/var/lib/jetstreamer/horizon226-postassembly-verification-v1";
+const VERIFY_226_RUNNER: &str = "/var/lib/jetstreamer/horizon226-verification-fleet-v1/jetstreamer-r2";
+const VERIFY_226_RELEASE: &str = "/var/lib/jetstreamer/horizon226-verification-fleet-v1/acceptance.json";
+
+fn verification226_digest() -> Result<String> {
+    let path = Path::new(VERIFY_226_RELEASE);
+    let file = path.symlink_metadata()?;
+    ensure!(
+        path.canonicalize()? == path
+            && file.is_file()
+            && file.uid() == 0
+            && file.nlink() == 1
+            && file.mode() & 0o222 == 0
+            && file.len() <= 64 * 1024,
+        "unsafe epoch 226 verification resource release"
+    );
+    let release: Value = serde_json::from_reader(File::open(path)?)?;
+    let runner = &release["runner"];
+    ensure!(
+        release["schema"] == "foundation-epoch226-verification-fleet-release-v1"
+            && release["publication_authorized"] == false
+            && runner["path"] == VERIFY_226_RUNNER,
+        "foreign epoch 226 verification resource release"
+    );
+    let hash = runner["sha256"].as_str().context("missing epoch 226 verifier image digest")?;
+    ensure!(
+        hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+        "invalid epoch 226 verifier image digest"
+    );
+    Ok(hash.into())
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct NativeConfig {
@@ -16,7 +50,12 @@ impl NativeConfig {
         if self.epoch == 288 {
             return holding288::validate(self);
         }
+        let verifier_digest;
         let tuple = match self.epoch {
+            226 if self.unit == VERIFY_226_UNIT => {
+                verifier_digest = verification226_digest()?;
+                (VERIFY_226_UNIT, VERIFY_226_ROOT, VERIFY_226_RUNNER, verifier_digest.as_str())
+            }
             207 => (
                 "archive-207-v1616-native-input-actual-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input207-v1616-capped-v1/scratch",
@@ -177,7 +216,7 @@ fn identity(u: &UnitObservation, n: &NativeConfig) -> Result<()> {
         rss["census_stable"] == true
             && rss["error"].is_null()
             && rss["processes"].as_array().is_some_and(|v| {
-                if matches!(n.epoch, 212 | 257 | 261 | 262 | 265 | 266) {
+                if n.unit == VERIFY_226_UNIT || matches!(n.epoch, 212 | 257 | 261 | 262 | 265 | 266) {
                     (1..=2).contains(&v.len())
                         && v.iter().filter(|p| p["pid"] == n.main_pid).count() == 1
                 } else {
@@ -264,7 +303,7 @@ fn same_file(a: &fs::Metadata, b: &fs::Metadata) -> bool {
         && a.mtime_nsec() == b.mtime_nsec()
 }
 fn bootstrap_child(n: &NativeConfig, u: &UnitObservation) -> Result<Value> {
-    if !matches!(n.epoch, 212 | 257 | 261 | 262 | 265 | 266) {
+    if n.unit != VERIFY_226_UNIT && !matches!(n.epoch, 212 | 257 | 261 | 262 | 265 | 266) {
         return Ok(Value::Null);
     }
     let rss = serde_json::to_value(&u.rss)?;
@@ -292,7 +331,19 @@ fn bootstrap_child(n: &NativeConfig, u: &UnitObservation) -> Result<Value> {
                 == format!("0::/system.slice/{}", n.unit),
         "bootstrap foreign child parent/start/cgroup"
     );
-    let (worker, sha) = if n.epoch == 212 {
+    let (worker, sha) = if n.unit == VERIFY_226_UNIT {
+        match fs::read_link(proc.join("exe"))?.to_str() {
+            Some("/var/lib/jetstreamer/horizon-public-images-f14f41d9-v1/verify_archive") => (
+                "/var/lib/jetstreamer/horizon-public-images-f14f41d9-v1/verify_archive",
+                "6848c44a949221f87312ed250b66f908e6e06e5f35e487b9ed7dad7333e1d773",
+            ),
+            Some("/var/lib/jetstreamer/horizon-public-images-f14f41d9-v1/horizon_pipeline") => (
+                "/var/lib/jetstreamer/horizon-public-images-f14f41d9-v1/horizon_pipeline",
+                "e6af181f8271836ce30655ff4bc8646761a882528ccd38d63d1113a6d31b095b",
+            ),
+            _ => return Err(anyhow!("unknown epoch 226 verification child image")),
+        }
+    } else if n.epoch == 212 {
         (
             "/var/lib/jetstreamer/horizon-singleton211-production-worker-1c89b6a214f9487b-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget",
             "1c89b6a214f9487babfd9dc121ade06037b371fbfcc3243f0e6ec67b6b961c41",

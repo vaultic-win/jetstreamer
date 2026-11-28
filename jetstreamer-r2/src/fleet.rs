@@ -161,6 +161,7 @@ pub(super) fn validate_native261_inactive(
 }
 mod full211_status;
 mod holding288;
+mod verification226;
 mod native265;
 mod native265_capture;
 mod native265_event;
@@ -827,6 +828,9 @@ pub(super) fn pipeline_unit_range(
     phase: &str,
     unit: &str,
 ) -> Result<std::ops::RangeInclusive<u64>> {
+    if verification226::scope(phase, unit) {
+        return Ok(226..=226);
+    }
     if holding288::scope(phase, unit) {
         return Ok(288..=288);
     }
@@ -3270,6 +3274,9 @@ pub(super) async fn run() -> Result<()> {
     }
     for claim in &plan.pipeline_claims {
         validate_pipeline_claim(claim, plan.first_epoch, plan.last_epoch)?;
+        if verification226::scope(&claim.phase, &claim.unit) {
+            verification226::validate(claim)?;
+        }
         if holding288::scope(&claim.phase, &claim.unit) {
             holding288::validate(claim)?;
         }
@@ -3663,7 +3670,8 @@ pub(super) async fn run() -> Result<()> {
             };
             (live, proof)
         };
-        let private_scan = holding288::scope(&claim.phase, &claim.unit)
+        let private_scan = verification226::scope(&claim.phase, &claim.unit)
+            || holding288::scope(&claim.phase, &claim.unit)
             || super::repair141::scope(&claim.phase, &claim.unit)
             || private144_scan::scope(&claim.phase, &claim.unit)
             || native209::scope(&claim.phase, &claim.unit)
@@ -3697,7 +3705,8 @@ pub(super) async fn run() -> Result<()> {
             ensure!(
                 if private_scan {
                     plan.gates[&claim.epoch].state == "blocked-qualification"
-                        || ((holding288::scope(&claim.phase, &claim.unit)
+                        || ((verification226::scope(&claim.phase, &claim.unit)
+                            || holding288::scope(&claim.phase, &claim.unit)
                             || super::repair141::scope(&claim.phase, &claim.unit)
                             || tail223_scan::scope(&claim.phase, &claim.unit)
                             || native209::scope(&claim.phase, &claim.unit)

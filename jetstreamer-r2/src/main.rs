@@ -3948,6 +3948,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("finish-epoch226-assembly") {
         return fleet::extract226::assembly::terminal::run();
     }
+    if env::args().nth(1).as_deref() == Some("launch-epoch226-verification") {
+        return fleet::extract226::assembly::verify::launch::run();
+    }
     if env::args().nth(1).as_deref() == Some("verify-epoch226-assembly") {
         return fleet::extract226::assembly::verify::run();
     }
