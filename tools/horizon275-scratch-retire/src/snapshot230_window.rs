@@ -114,6 +114,8 @@ const VOTE: Window = Window {
 const VOTE_FAILED_READER: &str = "horizon-perf-epoch230-bounded-mismatch@v2.service";
 const VOTE_FAILED_RECIPE_SHA: &str =
     "2ad8d278829a46aa2d4ed58c24c3987f08bdefccf3c04a1eec9f35bed81136f9";
+const VOTE_FAILED_SCAN_SHA: &str =
+    "90cbe85747a5f86227651fb474285d71dde6a3dcb4941132f3a9f192c0dbc411";
 
 pub(super) fn for_command(command: &str) -> Option<&'static Window> {
     match command {
@@ -339,7 +341,7 @@ pub(super) fn run(
             &[(
                 VOTE_FAILED_READER,
                 "b02e106a069b4cc080bdc5b8a948fe55",
-                StoppedReference::Direct(VOTE_FAILED_RECIPE_SHA),
+                StoppedReference::Direct(VOTE_FAILED_SCAN_SHA),
             )]
         } else {
             &[]
