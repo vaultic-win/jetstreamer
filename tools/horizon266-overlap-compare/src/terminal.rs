@@ -855,6 +855,10 @@ pub(super) fn capture_window266_exit(launch_sha: &str, destination: &Path) -> Re
     exit::capture_window266(launch_sha, destination)
 }
 
+pub(super) fn finish_window266_terminal(launch_sha: &str) -> Result<Value> {
+    window266::finish(launch_sha)
+}
+
 pub(super) fn collect_window266_terminal(
     launch_sha: &str,
     exit_sha: &str,

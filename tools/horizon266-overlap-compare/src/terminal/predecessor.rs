@@ -272,7 +272,7 @@ const TIMER: &str = "horizon-266-original-predecessor-protective-v1.timer";
 const CADENCE_LOCK: &str =
     "/var/lib/jetstreamer/horizon-seven-publication-controller-v222/cycle.lock";
 
-fn sealed_document(path: &Path) -> Result<(Reference, Value)> {
+pub(super) fn sealed_document(path: &Path) -> Result<(Reference, Value)> {
     let (file, identity) = open(path)?;
     let reference = Reference::new(path, &digest(&read_small(&file, identity)?));
     let document = reference.read()?;
@@ -280,7 +280,7 @@ fn sealed_document(path: &Path) -> Result<(Reference, Value)> {
     Ok((reference, document))
 }
 
-fn seal_in_state(path: &Path, value: &Value) -> Result<Reference> {
+pub(super) fn seal_in_state(path: &Path, value: &Value) -> Result<Reference> {
     let parent = path.parent().context("epoch 266 evidence parent")?;
     let stage = stage_package(parent)?;
     let staged = stage.path().join("receipt.json");
@@ -290,13 +290,13 @@ fn seal_in_state(path: &Path, value: &Value) -> Result<Reference> {
     Ok(Reference::new(path, &reference.sha256))
 }
 
-fn timer_state() -> Result<UnitState> {
+pub(super) fn timer_state(timer: &str) -> Result<UnitState> {
     let output = command(
         "/usr/bin/systemctl",
         &[
             "--system",
             "show",
-            TIMER,
+            timer,
             "--property=Id,ActiveState,Job,InvocationID,Unit",
         ],
     )?;
@@ -307,8 +307,8 @@ fn timer_state() -> Result<UnitState> {
         .collect())
 }
 
-fn guard_drained() -> Result<UnitState> {
-    let guard = unit_state(GUARD)?;
+pub(super) fn guard_drained(unit: &str) -> Result<UnitState> {
+    let guard = unit_state(unit)?;
     ensure!(
         guard
             .get("ActiveState")
@@ -317,7 +317,7 @@ fn guard_drained() -> Result<UnitState> {
             && guard.get("ControlPID").is_some_and(|s| s == "0")
             && guard.get("ControlGroup").is_some_and(String::is_empty)
             && guard.get("Job").is_some_and(String::is_empty)
-            && producer_drained(&format!("/system.slice/{GUARD}"))?,
+            && producer_drained(&format!("/system.slice/{unit}"))?,
         "epoch 266 guard process has not drained"
     );
     Ok(guard)
@@ -471,9 +471,7 @@ fn failed_verification(launch: &Reference, boot: &str, profile: &Profile) -> Res
     }))
 }
 
-/// Retire the exact producer's timer only after the independent terminal collector commits.
-pub(super) fn finish(launch_sha: &str, failed: bool) -> Result<Value> {
-    require_root()?;
+pub(super) fn lock_cadence() -> Result<File> {
     let lock = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
@@ -487,7 +485,13 @@ pub(super) fn finish(launch_sha: &str, failed: bool) -> Result<Value> {
         unsafe { libc::flock(std::os::fd::AsRawFd::as_raw_fd(&lock), libc::LOCK_EX) } == 0,
         "cannot lock Foundation cadence"
     );
+    Ok(lock)
+}
 
+/// Retire the exact producer's timer only after the independent terminal collector commits.
+pub(super) fn finish(launch_sha: &str, failed: bool) -> Result<Value> {
+    require_root()?;
+    let _lock = lock_cadence()?;
     let state = Path::new(STATE);
     let unit = exit::PREDECESSOR_UNIT;
     let (launch_ref, launch, pid) = exit::predecessor_launch(launch_sha)?;
@@ -576,12 +580,12 @@ pub(super) fn finish(launch_sha: &str, failed: bool) -> Result<Value> {
             "existing predecessor completion changed"
         );
         ensure!(
-            timer_state()?
+            timer_state(TIMER)?
                 .get("ActiveState")
                 .is_some_and(|s| s == "inactive"),
             "epoch 266 timer is active again"
         );
-        guard_drained()?;
+        guard_drained(GUARD)?;
         return Ok(json!({"terminal": reference, "already_completed": true}));
     }
 
@@ -595,7 +599,7 @@ pub(super) fn finish(launch_sha: &str, failed: bool) -> Result<Value> {
         "pid1_exit":exit_ref,"guard_plan":launch["guard_plan"],"guard_timer_invocation":timer_invocation,
         "publication_authorized":false});
     intent[proof_key] = proof.clone();
-    let timer = timer_state()?;
+    let timer = timer_state(TIMER)?;
     let active = timer.get("ActiveState").is_some_and(|s| s == "active");
     let already_intended = intent_path.try_exists()?;
     ensure!(
@@ -623,17 +627,17 @@ pub(super) fn finish(launch_sha: &str, failed: bool) -> Result<Value> {
     }
     // The timer cannot start another guard. Allow any current guard to exit on its own.
     let guard_after = {
-        let mut drained = guard_drained();
+        let mut drained = guard_drained(GUARD);
         for _ in 0..12 {
             if drained.is_ok() {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(250));
-            drained = guard_drained();
+            drained = guard_drained(GUARD);
         }
         drained?
     };
-    let timer_after = timer_state()?;
+    let timer_after = timer_state(TIMER)?;
     ensure!(
         timer_after
             .get("ActiveState")

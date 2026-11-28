@@ -243,3 +243,182 @@ pub(super) fn collect(launch_sha: &str, exit_sha: &str, destination: &Path) -> R
         json!({"terminal_evidence": Reference::new(destination.join("terminal-evidence.json"), &receipt.sha256)}),
     )
 }
+
+const STATE: &str = "/var/lib/jetstreamer/horizon266-window-114929698-114936474-runtime-v1";
+const TERMINAL: &str =
+    "/var/lib/jetstreamer/horizon266-window-terminal-collector-v1/evidence/terminal-evidence.json";
+const GUARD: &str = "horizon-266-window-114936474-protective-v1.service";
+const TIMER: &str = "horizon-266-window-114936474-protective-v1.timer";
+
+pub(super) fn finish(launch_sha: &str) -> Result<Value> {
+    require_root()?;
+    let _lock = predecessor::lock_cadence()?;
+    let (launch_ref, launch, pid) = exit::window266_launch(launch_sha)?;
+    let invocation = string(&launch, "invocation_id")?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    let (native, terminal) = predecessor::sealed_document(Path::new(TERMINAL))?;
+    let root = Path::new(RUN_ROOT);
+    let archive = root.join("output/epoch-266-slots-114929698-114936474.jet");
+    ensure!(
+        terminal["schema"] == "foundation-epoch266-private-window-terminal-evidence-v1"
+            && terminal["epoch"] == EPOCH
+            && terminal["unit"] == UNIT
+            && terminal["invocation_id"] == invocation
+            && terminal["producer_pid"] == pid
+            && terminal["launch"] == json!(launch_ref)
+            && terminal["boot_id"] == boot
+            && terminal["producer_exit_status"] == 0
+            && terminal["producer_drained"] == true
+            && terminal["native_manifest_complete_verified"] == true
+            && terminal["predecessor_consensus_fields_match"] == true
+            && terminal["first_slot"] == FIRST
+            && terminal["last_slot"] == LAST
+            && terminal["slot_count"] == LAST - BOOTSTRAP
+            && terminal["terminal_checkpoint"]["slot"] == LAST
+            && terminal["original_epoch_root_still_required"] == true
+            && terminal["publication_authorized"] == false,
+        "epoch 266 window terminal does not bind the original guarded producer"
+    );
+    let exit_ref: Reference = serde_json::from_value(terminal["pid1_exit"].clone())?;
+    ensure!(
+        exit_ref.path == Path::new(PID1_EXIT),
+        "foreign epoch 266 PID1 proof"
+    );
+    let captured = exit::read_window266(&exit_ref, &launch_ref, invocation, pid, &boot)?;
+    let group = format!("/system.slice/{UNIT}");
+    let verify = || -> Result<UnitState> {
+        let current = unit_state(UNIT)?;
+        clean_exit(
+            &current,
+            Some(&captured),
+            UNIT,
+            invocation,
+            pid,
+            producer_drained(&group)?,
+        )?;
+        for (key, path) in [
+            ("archive", archive.clone()),
+            (
+                "segment_manifest",
+                archive.with_extension("jet.segment.json"),
+            ),
+        ] {
+            let identity: FileIdentity = serde_json::from_value(terminal[key]["identity"].clone())?;
+            ensure!(
+                terminal[key]["path"] == json!(path)
+                    && hex(string(&terminal[key], "sha256")?, 64)
+                    && open_source(&path)?.1 == identity,
+                "epoch 266 window {key} changed after native readback"
+            );
+        }
+        ensure!(
+            native.read()? == terminal,
+            "epoch 266 native terminal changed"
+        );
+        Ok(current)
+    };
+    verify()?;
+
+    let token_ref: Reference = serde_json::from_value(launch["launch_token"].clone())?;
+    let token = token_ref.read()?;
+    let timer_invocation = string(&token, "guard_timer_invocation")?;
+    ensure!(
+        token["unit"] == UNIT
+            && token["invocation_id"] == invocation
+            && token["guard_plan"] == launch["guard_plan"]
+            && hex(timer_invocation, 32),
+        "epoch 266 window guard token differs"
+    );
+    let state = Path::new(STATE);
+    let completion = state.join("terminal.json");
+    let intent = state.join("terminal-drain-intent.json");
+    let expected = json!({
+        "schema":"foundation-epoch266-private-window-drain-intent-v1",
+        "unit":UNIT, "invocation_id":invocation, "launch":launch_ref, "pid1_exit":exit_ref,
+        "native_terminal":native, "guard_plan":launch["guard_plan"],
+        "guard_timer_invocation":timer_invocation, "publication_authorized":false,
+    });
+    let timer = predecessor::timer_state(TIMER)?;
+    let active = timer
+        .get("ActiveState")
+        .is_some_and(|value| value == "active");
+    ensure!(
+        timer.get("Id").is_some_and(|value| value == TIMER)
+            && timer.get("Job").is_some_and(String::is_empty)
+            && if active {
+                timer.get("Unit").is_some_and(|value| value == GUARD)
+                    && timer
+                        .get("InvocationID")
+                        .is_some_and(|value| value == timer_invocation)
+            } else {
+                timer
+                    .get("ActiveState")
+                    .is_some_and(|value| value == "inactive")
+            },
+        "epoch 266 window guard timer ownership changed"
+    );
+    if completion.try_exists()? {
+        let (receipt, done) = predecessor::sealed_document(&completion)?;
+        ensure!(
+            timer
+                .get("ActiveState")
+                .is_some_and(|value| value == "inactive")
+                && done["schema"] == "foundation-epoch266-private-window-drain-v1"
+                && done["launch"] == json!(launch_ref)
+                && done["native_terminal"] == json!(native)
+                && done["invocation_id"] == invocation
+                && done["guard_drained"] == true,
+            "existing epoch 266 window closure or guard changed"
+        );
+        predecessor::guard_drained(GUARD)?;
+        return Ok(json!({"terminal":receipt, "already_completed":true}));
+    }
+    let intent = if intent.try_exists()? {
+        let (receipt, prior) = predecessor::sealed_document(&intent)?;
+        ensure!(prior == expected, "epoch 266 window stop intent changed");
+        receipt
+    } else {
+        ensure!(
+            active,
+            "epoch 266 window guard timer stopped without a recorded intent"
+        );
+        predecessor::seal_in_state(&intent, &expected)?
+    };
+    if active {
+        command("/usr/bin/systemctl", &["--system", "stop", TIMER])?;
+    }
+    let timer_after = predecessor::timer_state(TIMER)?;
+    ensure!(
+        timer_after
+            .get("ActiveState")
+            .is_some_and(|value| value == "inactive")
+            && timer_after.get("Job").is_some_and(String::is_empty),
+        "epoch 266 window guard timer has not drained"
+    );
+    let guard_after = {
+        let mut observation = predecessor::guard_drained(GUARD);
+        for _ in 0..12 {
+            if observation.is_ok() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            observation = predecessor::guard_drained(GUARD);
+        }
+        observation?
+    };
+    let producer = verify()?;
+    let terminal = predecessor::seal_in_state(
+        &completion,
+        &json!({
+            "schema":"foundation-epoch266-private-window-drain-v1",
+            "epoch":EPOCH, "unit":UNIT, "invocation_id":invocation, "launch":launch_ref,
+            "pid1_exit":exit_ref, "native_terminal":native, "intent":intent,
+            "timer_after":timer_after, "guard_after":guard_after, "producer":producer,
+            "guard_drained":true, "state":"local-segment-committed", "publication_authorized":false,
+            "next_action":"Bind the verified private window to the epoch 266 continuation and retain original-epoch-root verification.",
+        }),
+    )?;
+    Ok(json!({"terminal":terminal, "already_completed":false}))
+}
