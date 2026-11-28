@@ -27,16 +27,47 @@ const PREDECESSOR_266_CUSTODY_SHA: &str =
     "afd03e2258229848a2878f1c2ff75b424ebf810b79fec65788c75ac5111a5959";
 const PREDECESSOR_266_RELEASE_SCHEMA: &str =
     "foundation-epoch266-original-predecessor-guard-release-fit-v1";
-const WINDOW_266_UNIT: &str = "horizon-qualify-checkpoint-continuation-266-window-114936474-v1.service";
-const WINDOW_266_ROOT: &str =
-    "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114936474-v1";
-const WINDOW_266_STATE: &str = "horizon266-window-114929698-114936474-runtime-v1";
-const WINDOW_266_PROFILE_SHA: &str =
-    "f7562054a31277bc38747652f9a79e6967b393d8713499e6998841390cb4c5d6";
-const WINDOW_266_PREFLIGHT_SHA: &str =
-    "9043e168fd2322c6c5e098bee42a40f69507fa9db7afd791ad59577354f3bed1";
-const WINDOW_266_CUSTODY_SHA: &str =
-    "98c28740a2bdb0f707624a07046fa8a316dd37ea225f31770cf410d5fd0b7001";
+struct WindowScope {
+    unit: &'static str,
+    root: &'static str,
+    state: &'static str,
+    admitted: &'static str,
+    profile_sha: &'static str,
+    preflight_sha: &'static str,
+    custody_sha: &'static str,
+    first: u64,
+    last: u64,
+}
+
+const WINDOW_266: WindowScope = WindowScope {
+    unit: "horizon-qualify-checkpoint-continuation-266-window-114936474-v1.service",
+    root: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114936474-v1",
+    state: "horizon266-window-114929698-114936474-runtime-v1",
+    admitted: "horizon266-window-admitted-v1",
+    profile_sha: "f7562054a31277bc38747652f9a79e6967b393d8713499e6998841390cb4c5d6",
+    preflight_sha: "9043e168fd2322c6c5e098bee42a40f69507fa9db7afd791ad59577354f3bed1",
+    custody_sha: "98c28740a2bdb0f707624a07046fa8a316dd37ea225f31770cf410d5fd0b7001",
+    first: 114_929_698,
+    last: 114_936_474,
+};
+
+const SUCCESSOR_266: WindowScope = WindowScope {
+    unit: "horizon-qualify-checkpoint-continuation-266-window-114943135-v1.service",
+    root: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114943135-v1",
+    state: "horizon266-window-114936475-114943135-runtime-v1",
+    admitted: "horizon266-successor-window-admitted-v1",
+    profile_sha: "eacf3e685a72ad196734b20d7a8a00924176cb6e324aea6ce52f55a983e1fc30",
+    preflight_sha: "90a972850c9dd75ec6939a081f5b117513e563db3813a7b3e7e115c15ad8d476",
+    custody_sha: "9d5a46a8e72e3de25c2031c3debe3e0e28ad7fe6d67e2b1d860e0b6479189a3a",
+    first: 114_936_475,
+    last: 114_943_135,
+};
+const SUCCESSOR_266_CUSTODY: &str =
+    "/var/lib/jetstreamer/horizon266-window-114936475-114943135-static-inputs-v1/bootstrap-custody.json";
+
+fn window_scope(unit: &str) -> Option<&'static WindowScope> {
+    [&WINDOW_266, &SUCCESSOR_266].into_iter().find(|scope| scope.unit == unit)
+}
 
 const NEXT_V1627_230_UNIT: &str = "horizon-qualify-230-next-v1627-99468089-v1.service";
 const NEXT_V1627_230_STATE: &str = "horizon230-next-v1627-window-runtime-v1";
@@ -139,9 +170,16 @@ const SCOPES: &[Scope] = &[
     },
     Scope {
         epoch: 266,
-        unit: WINDOW_266_UNIT,
+        unit: WINDOW_266.unit,
         attempt: "window-114936474-v1",
-        state: WINDOW_266_STATE,
+        state: WINDOW_266.state,
+        kind: "epoch266-private-hourly-window",
+    },
+    Scope {
+        epoch: 266,
+        unit: SUCCESSOR_266.unit,
+        attempt: "window-114943135-v1",
+        state: SUCCESSOR_266.state,
         kind: "epoch266-private-hourly-window",
     },
     Scope {
@@ -178,8 +216,8 @@ pub(crate) fn resource_only(unit: &str) -> bool {
 }
 
 fn run_root(scope: &Scope) -> String {
-    if scope.unit == WINDOW_266_UNIT {
-        WINDOW_266_ROOT.into()
+    if let Some(window) = window_scope(scope.unit) {
+        window.root.into()
     } else {
         format!(
             "/home/ubuntu/.jetstreamer-private/qualification-{}-{}",
@@ -191,7 +229,8 @@ fn run_root(scope: &Scope) -> String {
 pub(super) fn launch_matches(claim: &DiagnosticClaim, launch: &Value) -> Option<bool> {
     let scope = SCOPES
         .iter()
-        .find(|scope| scope.unit == claim.unit || launch["kind"] == scope.kind)?;
+        .find(|scope| scope.unit == claim.unit)
+        .or_else(|| SCOPES.iter().find(|scope| launch["kind"] == scope.kind))?;
     let root = run_root(scope);
     let registration = format!(
         "/var/lib/jetstreamer/{}/cadence-registration.json",
@@ -219,16 +258,21 @@ fn predecessor_profile(bound: &BoundFile) -> bool {
 fn evidence(registration: &Value, key: &str) -> Result<Value> {
     let bound: BoundFile = serde_json::from_value(registration[key].clone())?;
     let meta = fs::symlink_metadata(&bound.path)?;
+    let window_evidence = registration["unit"].as_str().and_then(window_scope).is_some_and(|scope| {
+        meta.mode() & 0o777 == 0o444
+            && ((matches!(key, "node_plan" | "admission")
+                && bound.path == Path::new(&format!("/var/lib/jetstreamer/{}/{key}.json", scope.admitted)))
+                || (scope.unit == SUCCESSOR_266.unit && key == "bootstrap_custody"
+                    && bound.path == Path::new(SUCCESSOR_266_CUSTODY)
+                    && bound.sha256 == scope.custody_sha))
+    });
     ensure!(
         bound.path.canonicalize()? == bound.path
             && meta.is_file()
             && meta.uid() == 0
             && meta.nlink() == 1
             && (meta.mode() & 0o077 == 0
-                || (registration["unit"] == WINDOW_266_UNIT
-                    && matches!(key, "node_plan" | "admission")
-                    && bound.path == Path::new(&format!("/var/lib/jetstreamer/horizon266-window-admitted-v1/{key}.json"))
-                    && meta.mode() & 0o777 == 0o444)
+                || window_evidence
                 || (key == "profile"
                     && predecessor_profile(&bound)
                     && meta.mode() & 0o777 == 0o444)),
@@ -296,6 +340,7 @@ pub(super) fn check_bindings(claim: &DiagnosticClaim, launch: &Value) -> Result<
         );
     }
     if claim.epoch == 266 {
+        let window = window_scope(&claim.unit);
         let release = evidence(launch, "guard_release_fit")?;
         let release_schema = if claim.unit == PREDECESSOR_266_UNIT {
             check_predecessor_scope(launch, &profile, &admission, &plan)?;
@@ -316,8 +361,8 @@ pub(super) fn check_bindings(claim: &DiagnosticClaim, launch: &Value) -> Result<
                 "epoch 266 predecessor bootstrap custody differs"
             );
             PREDECESSOR_266_RELEASE_SCHEMA
-        } else if claim.unit == WINDOW_266_UNIT {
-            check_window_scope(launch, &profile, &admission, &plan)?;
+        } else if let Some(scope) = window {
+            check_window_scope(scope, launch, &profile, &admission, &plan)?;
             ensure!(release["node_plan"] == launch["node_plan"], "epoch 266 released plan differs");
             "foundation-epoch266-private-window-guard-release-fit-v1"
         } else {
@@ -329,7 +374,7 @@ pub(super) fn check_bindings(claim: &DiagnosticClaim, launch: &Value) -> Result<
         };
         ensure!(
             (profile["diagnostic_only"] == true
-                || (claim.unit == WINDOW_266_UNIT && profile["private"] == true))
+                || (window.is_some() && profile["private"] == true))
                 && launch["diagnostic_only"] == true
                 && launch["predecessor_native_tuple_qualified"] == false
                 && launch["cursor_normalization_qualified"] == false
@@ -345,6 +390,7 @@ pub(super) fn check_bindings(claim: &DiagnosticClaim, launch: &Value) -> Result<
 }
 
 fn check_window_scope(
+    scope: &WindowScope,
     launch: &Value,
     profile: &Value,
     admission: &Value,
@@ -355,26 +401,27 @@ fn check_window_scope(
     let mut expected_plan = profile["node_plan_inputs"].clone();
     expected_plan["admission"] = launch["admission"].clone();
     expected_plan["minimum_free_bytes"] = admission["minimum_free_bytes"].clone();
+    let state = format!("/var/lib/jetstreamer/{}", scope.state);
     ensure!(
-        launch["profile"]["path"] == format!("/var/lib/jetstreamer/{WINDOW_266_STATE}/profile.json")
-            && launch["profile"]["sha256"] == WINDOW_266_PROFILE_SHA
+        launch["profile"]["path"] == format!("{state}/profile.json")
+            && launch["profile"]["sha256"] == scope.profile_sha
             && profile["schema"] == "foundation-epoch266-private-window-runtime-profile-v1"
-            && profile["first_slot"] == 114_929_698
-            && profile["last_slot"] == 114_936_474
+            && profile["first_slot"] == scope.first
+            && profile["last_slot"] == scope.last
             && launch["bootstrap_custody"] == profile["bootstrap_custody"]
-            && launch["bootstrap_custody"]["sha256"] == WINDOW_266_CUSTODY_SHA
+            && launch["bootstrap_custody"]["sha256"] == scope.custody_sha
             && custody["copy_drained"] == true
-            && custody["bootstrap_slot"] == 114_929_697
+            && custody["bootstrap_slot"] == scope.first - 1
             && custody["whole_file_sha256_rechecked"] == true
             && custody["input"]["sha256"] == native_plan["snapshot"]["sha256"]
             && admission["schema"] == "foundation-epoch266-private-window-admission-v1"
-            && admission["preflight"]["path"] == format!("/var/lib/jetstreamer/{WINDOW_266_STATE}/preflight.json")
-            && admission["preflight"]["sha256"] == WINDOW_266_PREFLIGHT_SHA
+            && admission["preflight"]["path"] == format!("{state}/preflight.json")
+            && admission["preflight"]["sha256"] == scope.preflight_sha
             && native_plan == expected_plan
             && guard["minimum_free_bytes"] == admission["minimum_free_bytes"]
             && guard["maximum_root_physical_bytes"] == profile["guarded_whole_tree_cap_bytes"]
             && guard["maximum_worker_vmas"] == 3_500_000
-            && guard["receipt_directory"] == format!("/var/lib/jetstreamer/{WINDOW_266_STATE}/guard-receipts"),
+            && guard["receipt_directory"] == format!("{state}/guard-receipts"),
         "private epoch 266 hourly window bindings differ"
     );
     Ok(())
@@ -423,11 +470,11 @@ pub(super) fn check_live(claim: &DiagnosticClaim, current: &Value) -> Result<()>
     let node = launch["node_path"]
         .as_str()
         .context("focused Foundation node")?;
-    let argv = if claim.unit == WINDOW_266_UNIT {
+    let argv = if let Some(scope) = window_scope(&claim.unit) {
         let plan: BoundFile = serde_json::from_value(launch["node_plan"].clone())?;
         format!(
-            "{node} 266 {WINDOW_266_ROOT}/ledger --verify --checkpoint-continuation-plan={} --checkpoint-continuation-plan-sha256={}",
-            plan.path.display(), plan.sha256
+            "{node} 266 {}/ledger --verify --checkpoint-continuation-plan={} --checkpoint-continuation-plan-sha256={}",
+            scope.root, plan.path.display(), plan.sha256
         )
     } else {
         profile["argv"]

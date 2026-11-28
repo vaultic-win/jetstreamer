@@ -193,6 +193,20 @@ WINDOW_266_TOKEN_PROBE = {
 }
 WINDOW_266_FLEET = V / "horizon266-window-fleet-v1/acceptance.json"
 WINDOW_266_PLAN = V / "horizon266-window-admitted-v1"
+SUCCESSOR_266 = replace(
+    WINDOW_266,
+    state=V / "horizon266-window-114936475-114943135-runtime-v1",
+    unit="horizon-qualify-checkpoint-continuation-266-window-114943135-v1.service",
+    guard="horizon-266-window-114943135-protective-v1.service",
+    profile_sha="eacf3e685a72ad196734b20d7a8a00924176cb6e324aea6ce52f55a983e1fc30",
+    preflight_sha="90a972850c9dd75ec6939a081f5b117513e563db3813a7b3e7e115c15ad8d476",
+)
+SUCCESSOR_266_TOKEN_PROBE = {
+    "path": str(SUCCESSOR_266.state / "evidence/prestart-token-probe.json"),
+    "sha256": "3ce24c5c17f48bd351110cb727bfcc15d1be5c5f457e26f6196777fc93a93db2",
+}
+SUCCESSOR_266_FLEET = V / "horizon266-successor-window-fleet-v1/acceptance.json"
+SUCCESSOR_266_PLAN = V / "horizon266-successor-window-admitted-v1"
 TRACE_296 = Scope(
     296, V / "horizon296-loader-log-v3",
     "horizon-qualify-296-loader-log-v3.service", "horizon-296-loader-log-protective-v3.service",
@@ -211,6 +225,7 @@ FEATURE_296 = Scope(
 )
 SCOPED_ARGS = {
     "--window266": WINDOW_266,
+    "--successor266": SUCCESSOR_266,
     "--epoch230": GAP_230, "--epoch258": RESTORE_258, "--epoch260": RESTORE_260,
     "--hourly230": HOURLY_230, "--hourly230-second": SECOND_HOURLY_230,
     "--overlap266": OVERLAP_266,
@@ -436,18 +451,27 @@ def predecessor_namespace(ops, scope, preflight, profile):
     }
 
 
-def launch_window_266(kit, roster_ref):
+def launch_window_266(kit, roster_ref, scope):
     """Use the existing invocation-bound startup for the sealed continuation."""
     ops = kit.ops
-    scope = WINDOW_266
+    if scope is SUCCESSOR_266:
+        fleet = SUCCESSOR_266_FLEET
+        plan_path = SUCCESSOR_266_PLAN
+        token_probe = SUCCESSOR_266_TOKEN_PROBE
+        release_schema = "foundation-epoch266-successor-window-fleet-release-v1"
+    else:
+        fleet = WINDOW_266_FLEET
+        plan_path = WINDOW_266_PLAN
+        token_probe = WINDOW_266_TOKEN_PROBE
+        release_schema = "foundation-epoch266-window-fleet-release-v1"
     state = scope.state
     roster = ops.bound(roster_ref)
     profile = ops.bound(scope.profile)
     root = Path(profile["run_root"])
     current_fit(kit, roster, root, scope)
-    assert not (state / "cadence-registration.json").exists() and not WINDOW_266_PLAN.exists()
-    acceptance = ops.bound(ops.ref(WINDOW_266_FLEET))
-    assert acceptance["schema"] == "foundation-epoch266-window-fleet-release-v1"
+    assert not (state / "cadence-registration.json").exists() and not plan_path.exists()
+    acceptance = ops.bound(ops.ref(fleet))
+    assert acceptance["schema"] == release_schema
     assert acceptance["preflight"] == scope.preflight and acceptance["fleet_reconcile_only"]
     assert acceptance["admission_authorized"] is False and acceptance["publication_authorized"] is False
     ops.checked_image(acceptance["fleet"])
@@ -467,9 +491,11 @@ def launch_window_266(kit, roster_ref):
     ops.bound(custody)
     assert roster["focused_266_quote"]["bootstrap_custody"] == custody
     tokens = state / "tokens"
-    probe = ops.bound(WINDOW_266_TOKEN_PROBE)
+    probe = ops.bound(token_probe)
     assert probe["token_root"] == str(tokens) and probe["prestart_hook"] == HOOK
     assert probe["qualification_only"] and probe["same_hook_reached_projected_token"]
+    if scope is SUCCESSOR_266:
+        assert probe["missing_token_rejected"] and probe["stale_token_rejected"]
     assert set(tokens.iterdir()) == {tokens / "qualification"}
     assert not any((state / "guard-receipts").iterdir())
     views = mount["snapshot_and_index_views"]
@@ -488,7 +514,9 @@ def launch_window_266(kit, roster_ref):
             "LoadState": "not-found", "ActiveState": "inactive", "Job": ""}
     assert not any((root / "scratch").iterdir())
     assert {p.name for p in (root / "ledger").iterdir()} == {"compact-indexes"}
-    remote = inventory(kit, epoch=266, unit="foundation-266-window-inventory-v1")
+    inventory_unit = ("foundation-266-successor-window-inventory-v1" if scope is SUCCESSOR_266
+                      else "foundation-266-window-inventory-v1")
+    remote = inventory(kit, epoch=266, unit=inventory_unit)
     measured = current_fit(kit, roster, root, scope)
     floor = roster["capacity"]["guard_floor_bytes"]
     node = profile["node"]["path"]
@@ -504,12 +532,12 @@ def launch_window_266(kit, roster_ref):
             "complete_fleet_and_century_floor_bound": True, "startup_guard_qualified": True,
             "publication_authorized": False,
         })
-        admission = dict(admission_draft, path=str(WINDOW_266_PLAN / "admission.json"))
+        admission = dict(admission_draft, path=str(plan_path / "admission.json"))
         draft = ops.funds.put(stage / "node_plan.json", dict(
             profile["node_plan_inputs"], admission=admission, minimum_free_bytes=floor))
-        node_plan = dict(draft, path=str(WINDOW_266_PLAN / "node_plan.json"))
+        node_plan = dict(draft, path=str(plan_path / "node_plan.json"))
         deployment = ops.funds.put(stage / "deployment.json", {
-            "schema": "jetstreamer-sealed-deployment-plan-v1", "destination": str(WINDOW_266_PLAN),
+            "schema": "jetstreamer-sealed-deployment-plan-v1", "destination": str(plan_path),
             "members": [dict(source=item["path"], name=Path(item["path"]).name,
                              sha256=item["sha256"], mode=0o444) for item in (admission_draft, draft)],
         })
@@ -530,7 +558,7 @@ def launch_window_266(kit, roster_ref):
                TMPDIR=str(root / "scratch"), CLOUDSDK_CONFIG=str(root / "scratch/isolated-empty-gcloud"))
     assert env["JETSTREAMER_HISTORICAL_WORKER_V1_8_11"] == profile["worker"]["path"]
     properties = dict(profile["properties"], BindReadOnlyPaths=" ".join(bindings),
-                      ReadOnlyPaths=f"{tokens} {WINDOW_266_PLAN}", OOMPolicy="kill",
+                      ReadOnlyPaths=f"{tokens} {plan_path}", OOMPolicy="kill",
                       TimeoutStartSec="180",
                       UnsetEnvironment="HORIZON_S3_ENDPOINT HORIZON_ACCESS_KEY_ID HORIZON_SECRET_ACCESS_KEY HORIZON_PUBLIC_BASE_URL")
     props = [f"--property={key}={value}" for key, value in properties.items()]
@@ -587,8 +615,8 @@ def launch_window_266(kit, roster_ref):
 
 
 def launch(kit, roster_ref, scope):
-    if scope is WINDOW_266:
-        return launch_window_266(kit, roster_ref)
+    if scope in (WINDOW_266, SUCCESSOR_266):
+        return launch_window_266(kit, roster_ref, scope)
     ops = kit.ops
     state = scope.state
     attempt = state

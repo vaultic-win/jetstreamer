@@ -32,6 +32,15 @@ WINDOW_266_UNIT = "horizon-qualify-checkpoint-continuation-266-window-114936474-
 WINDOW_266_ROOT = Path("/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114936474-v1")
 WINDOW_266_PROFILE_SHA = "f7562054a31277bc38747652f9a79e6967b393d8713499e6998841390cb4c5d6"
 WINDOW_266_PREFLIGHT_SHA = "9043e168fd2322c6c5e098bee42a40f69507fa9db7afd791ad59577354f3bed1"
+SUCCESSOR_266 = "window-114943135-v1"
+SUCCESSOR_266_UNIT = "horizon-qualify-checkpoint-continuation-266-window-114943135-v1.service"
+SUCCESSOR_266_ROOT = Path("/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114943135-v1")
+SUCCESSOR_266_PROFILE_SHA = "eacf3e685a72ad196734b20d7a8a00924176cb6e324aea6ce52f55a983e1fc30"
+SUCCESSOR_266_PREFLIGHT_SHA = "90a972850c9dd75ec6939a081f5b117513e563db3813a7b3e7e115c15ad8d476"
+WINDOWS_266 = {
+    WINDOW_266: (WINDOW_266_UNIT, WINDOW_266_ROOT, WINDOW_266_PROFILE_SHA, WINDOW_266_PREFLIGHT_SHA),
+    SUCCESSOR_266: (SUCCESSOR_266_UNIT, SUCCESSOR_266_ROOT, SUCCESSOR_266_PROFILE_SHA, SUCCESSOR_266_PREFLIGHT_SHA),
+}
 TRACE = "loader-log-v3"
 FEATURE_ACCOUNTS = "feature-account-v4"
 FOCUSED = {
@@ -50,6 +59,7 @@ FOCUSED = {
     OVERLAP_266: (266, "horizon266-hourly-overlap-114929697-runtime-v1", "epoch266-private-hourly-overlap"),
     PREDECESSOR_266: (266, "horizon266-original-predecessor-runtime-v1", "epoch266-private-original-predecessor"),
     WINDOW_266: (266, "horizon266-window-114929698-114936474-runtime-v1", "epoch266-private-hourly-window"),
+    SUCCESSOR_266: (266, "horizon266-window-114936475-114943135-runtime-v1", "epoch266-private-hourly-window"),
     TRACE: (296, "horizon296-loader-log-v3", "epoch296-private-loader-log-diagnostic"),
     FEATURE_ACCOUNTS: (296, "horizon296-feature-account-v4", "epoch296-private-feature-account-qualification"),
 }
@@ -61,8 +71,9 @@ def attempt_paths(version):
     assert version in ATTEMPTS
     if version in FOCUSED:
         epoch, directory, _ = FOCUSED[version]
-        if version == WINDOW_266:
-            return WINDOW_266_UNIT, V / directory, WINDOW_266_ROOT
+        if version in WINDOWS_266:
+            unit, root, _, _ = WINDOWS_266[version]
+            return unit, V / directory, root
         suffix = RESTORE if version == RESTORE_260 else version
         return (f"horizon-qualify-{epoch}-{suffix}.service", V / directory,
                 Path(f"/home/ubuntu/.jetstreamer-private/qualification-{epoch}-{suffix}"))
@@ -138,13 +149,14 @@ def registration(version):
         assert profile_ref["sha256"] == profile_sha
         assert admission["preflight"] == {"path": str(state / "preflight.json"), "sha256": preflight_sha}
         assert admission["schema"] == "foundation-epoch230-focused-admission-v1"
-    if version == WINDOW_266:
+    if version in WINDOWS_266:
         release = bound(row["guard_release_fit"])
         plan = bound(row["node_plan"])
-        assert profile_ref["sha256"] == WINDOW_266_PROFILE_SHA and profile["private"]
+        _, _, profile_sha, preflight_sha = WINDOWS_266[version]
+        assert profile_ref["sha256"] == profile_sha and profile["private"]
         assert row["bootstrap_custody"] == profile["bootstrap_custody"]
         assert admission["preflight"] == {"path": str(state / "preflight.json"),
-                                          "sha256": WINDOW_266_PREFLIGHT_SHA}
+                                          "sha256": preflight_sha}
         assert admission["schema"] == "foundation-epoch266-private-window-admission-v1"
         assert plan == dict(profile["node_plan_inputs"], admission=row["admission"],
                             minimum_free_bytes=admission["minimum_free_bytes"])
@@ -253,7 +265,7 @@ def register(plan, ordinary_replay=False, include_focused=True):
                for row in sample["replays"])
     }
     for version in ATTEMPTS:
-        if version in (PREDECESSOR_266, ADJACENT_230, WINDOW_266, NEXT_V1627_230, RETRY_NEXT_V1627_230):
+        if version in WINDOWS_266 or version in (PREDECESSOR_266, ADJACENT_230, NEXT_V1627_230, RETRY_NEXT_V1627_230):
             continue
         epoch = FOCUSED.get(version, (296,))[0]
         ordinary = (epoch == 296 and ordinary_replay) or epoch in ordinary_singletons
@@ -271,6 +283,10 @@ def register_adjacent_230(plan):
 
 def register_window_266(plan):
     register_attempt(plan, WINDOW_266, ordinary_replay=False, include_focused=True)
+
+
+def register_successor_266(plan):
+    register_attempt(plan, SUCCESSOR_266, ordinary_replay=False, include_focused=True)
 
 
 def register_next_v1627_230(plan):
