@@ -48,10 +48,16 @@ const O_PATH: c_int = 0x200000;
 const MAX_ENTRIES: u64 = 8_000_000;
 const MAX_DEPTH: u32 = 128;
 const MAX_RECEIPT: u64 = 16_384;
+#[cfg(not(anza143_hourly_prep))]
 const HASHER: &str = "/usr/lib/cargo/bin/coreutils/sha256sum";
+#[cfg(anza143_hourly_prep)]
+const HASHER: &str = "/usr/bin/sha256sum";
 // Its authenticity is independently established by the sealed deployment, not by
 // asking an untrusted hasher to authenticate itself.
+#[cfg(not(anza143_hourly_prep))]
 const HASHER_SHA256: &str = "27a7d8f6a005702618e92c88f20b829d38247ad3369e0c35b1ff219d15194bd1";
+#[cfg(anza143_hourly_prep)]
+const HASHER_SHA256: &str = "4d2db56c867e5324e0084c9e897f6360d37517de77ac96f2bd31494223d69a60";
 const PROPERTIES: &str = "Id,InvocationID,Type,LoadState,ActiveState,SubState,Result,MainPID,ControlPID,NRestarts,Restart,KillMode,Delegate,ControlGroup,MemoryMax,MemorySwapMax,TasksMax,CPUQuotaPerSecUSec,TimeoutStartUSec,RuntimeMaxUSec";
 const SCAN203_RETIREMENT_UNIT: &str = "horizon-scan203-retirement-v1.service";
 const SCAN203_STATE: &str = "/var/lib/jetstreamer/horizon-scan203-retirement-v1";
@@ -139,6 +145,13 @@ fn positive(value: &str) -> Result<u64> {
     require!(n > 0 && n < (1_u64 << 60), "positive finite bound required");
     Ok(n)
 }
+#[cfg(anza143_hourly_prep)]
+fn purpose_unit(unit: &str) -> bool {
+    matches!(unit, "horizon-prepare-143-hourly-copy-20261128-v1.service"
+                 | "horizon-prepare-143-hourly-build-20261128-v1.service")
+}
+
+#[cfg(not(anza143_hourly_prep))]
 fn purpose_unit(unit: &str) -> bool {
     if !unit.starts_with("horizon-qualify-")
         || !unit.ends_with(".service")
