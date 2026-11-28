@@ -23,9 +23,16 @@ PREVIOUS = 'horizon-qualify-170-from-73746882-20261127-v1.service'
 NEXT = 'horizon-qualify-170-from-73766969-20261127-v1.service'
 PREVIOUS_IID = 'c3ab30cfeb05428bb8f5c48a5a44822c'
 SCOPE = op.RT/'epoch162-first-hourly-completion-20261127-v2/issued-price-v3'
+STOPPED = SCOPE.with_name('issued-price-v5')
 FOURTH = op.RT/'epoch170-from-73766969-20261127-v1/operator-v5'
+STOP_170 = op.RT/'epoch170-from-73746882-20261127-v1/guard-receipts/stop-completion.json'
+PID1_170 = FOURTH.parent/'predecessor-exit/PID1_EXIT.json'
+STOP_169 = op.BASE/'epoch169-hourly-source-20261123-v1/hourly-guard-receipts/stop-completion.json'
+TERMINAL_169 = op.RT/'epoch169-hourly-admission-20261123-v1/results/TERMINAL.json'
+IID_169 = 'b01da82c3091478f920ddcc71f4d9191'
 PRICE = {
     SCOPE:('f431f64b7b51dc24d6427fbf2e42e98f749d27e2fc382bb9fb743376042e5f56','capacity.py'),
+    STOPPED:('6bff49a31525ee2e1cdd5861a9d1d30e43686ddc79e5932bf7a85f5a3df35a96','capacity.py'),
     FOURTH:('45011b4930da3a9b88c239441881905ae040790bae3297b2de85bccdefd921f9','continuation_price.py'),
 }
 M12_EXP = 'ea1623bdbf4a9b54fc5e7d167152877288976642f2baa55bf240fb8ecdfa0b06'
@@ -116,16 +123,41 @@ def external_price(directory,phase=None):
     return json.loads(subprocess.check_output(args,text=True,timeout=120)),seal
 
 
-def funding(live, disk, ram):
+def funding(live, disk, ram, *, stopped=False):
     # The common price already includes both independent 2 GiB slots. Use only
     # the holding slot here. Retain its full restoration reservation throughout.
     op.need(isinstance(disk,int) and isinstance(ram,int) and live['restore_overlap']==op.SLOT
             and live['serial_ram']==2*op.G and live['scanner_ram']==2*op.G
             and not live['credit'] and disk==live['available']-live['floor']
-            and live['following_growth']==36*op.G, 'different shared serial or 170 funding')
+            and live['following_growth']==(0 if stopped else 36*op.G), 'different shared serial or 170 funding')
     return dict(remaining_home=disk,remaining_ram=(0 if ram<0 else 2*op.G+ram),
                 floor=live['floor'],available_home=live['available'],post_reservation_ram_margin=ram,
                 serial_slot=op.SLOT,holding_ram_available_from_serial=2*op.G,resource_credit_bytes=0)
+
+
+def interrupted(base, raw):
+    """Bind this passive price to the two specific stops, including PID 1's signal evidence."""
+    stop169 = op.fixed(STOP_169, 'a49cf5140081a8e0c76e4a235e2610014c648a8b18dcc314cd208f126ada1445')
+    terminal169 = op.fixed(TERMINAL_169, '07e7f475687fecb9cb5fbd154951d84443e4a134c8889f0ce1d8857b884aef3e')
+    stop170 = op.fixed(STOP_170, '68148f92fdbad715b40200416efb1ac6dc040111bb167d0d5d5ceb33241ed680')
+    pid170 = op.fixed(PID1_170, '18ccc679eb54249a194df0dfc54876138dedb78db117373d6fee7b61e4468252')
+    actor = base['actor']
+    exit_status = op.bound(pid170)['properties']
+    failed = raw['failed_170']
+    op.need(actor['phase']=='terminal' and actor['invocation_id']==IID_169 and actor['terminal']==terminal169
+            and op.bound(stop169)['producer_invocation_id']==IID_169 and not actor['resource_credit_bytes']
+            and op.bound(stop170)['producer_invocation_id']==PREVIOUS_IID
+            and exit_status['Id']==PREVIOUS and exit_status['InvocationID']==PREVIOUS_IID
+            and exit_status['ExecMainCode']=='2' and exit_status['ExecMainStatus']=='15'
+            and raw['phase']=='stopped' and raw['priced_170_invocation'] is None
+            and failed['stop_completion']==stop170 and failed['pid1_exit']==pid170
+            and failed['invocation_id']==PREVIOUS_IID and not failed['resource_credit_bytes']
+            and raw['reserved_following_170_growth_bytes']==failed['retained_following_growth_bytes']==36*op.G
+            and failed['pending_replay_growth_bytes']==0 and failed['retained_producer_ram']==48*op.G
+            and failed['retained_guard_ram']==op.G
+            and {r['epoch'] for r in base['observed_actors']}.isdisjoint({169,170}),
+            'passive price lost an exact interrupted producer')
+    return dict(stop169=stop169,terminal169=terminal169,stop170=stop170,pid1_170=pid170)
 
 
 def owners(q):
@@ -146,14 +178,16 @@ def owners(q):
 def price():
     current=list_units('horizon-qualify-*')
     op.need(not {PREVIOUS,NEXT}<=current,'overlapping 170 producers')
-    if PREVIOUS in current:
-        q,seal=external_price(SCOPE)
+    stopped=not {PREVIOUS,NEXT}.intersection(current) and STOP_170.exists()
+    if PREVIOUS in current or stopped:
+        q,seal=external_price(STOPPED if stopped else SCOPE)
         base=q['base_169']; raw=base['native']['raw']
         op.need(q['schema']=='horizon-168-post-assembly-six-owner-price-v1' and q['resource_credit_bytes']==0
-                and base['resource_credit_bytes']==0 and raw['priced_170_invocation']==PREVIOUS_IID
+                and base['resource_credit_bytes']==0
                 and raw['assembly168']['state']=='queued-or-drained'
                 and not raw['resource_credit_bytes'] and q['fleet']==base['fleet']
-                and q['package']==seal,'foreign five-owner price')
+                and q['package']==seal and q['prospective_162'] is (q['existing_162'] is None),
+                'foreign shared native price')
         # An unissued 162 file is the outcome of reclamation. Once issued, use
         # its actual additional space, guard floor and remaining reservations.
         selected=base if q['prospective_162'] else q
@@ -164,7 +198,11 @@ def price():
         # The native minimum includes historical protections as well as hard
         # floors. Reconstruct that exact effective floor for resumed restoration.
         proof['floor']=q['available_home']-selected['home_margin']
-        amounts=funding(proof,selected['home_margin'],selected['ram_margin'])
+        if stopped:
+            proof['interrupted']=interrupted(base,raw)
+        else:
+            op.need(raw['priced_170_invocation']==PREVIOUS_IID,'different original 170 invocation')
+        amounts=funding(proof,selected['home_margin'],selected['ram_margin'],stopped=stopped)
         holding=base['accounting']['holding']
         native_time=q['recorded_unix_seconds']
     else:

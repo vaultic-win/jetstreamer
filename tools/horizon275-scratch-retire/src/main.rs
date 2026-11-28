@@ -478,6 +478,7 @@ fn main() -> Result<()> {
     if matches!(
         args.get(1).map(String::as_str),
         Some("--check-bootstrap-296" | "--retire-bootstrap-296"
+            | "--check-bootstrap-230-99430284" | "--retire-bootstrap-230-99430284"
             | "--check-bootstrap-230-99437433" | "--retire-bootstrap-230-99437433"
             | "--check-bootstrap-230-99461591" | "--retire-bootstrap-230-99461591"
             | "--check-bootstrap-230-99476782" | "--retire-bootstrap-230-99476782")

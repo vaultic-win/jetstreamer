@@ -16,8 +16,9 @@ ISSUED_PRICE = FIRST/"attempt-2/issued-price-v47"
 FOCUSED169_PRICE = RT/"epoch169-hourly-admission-20261123-v1/issued-split-v1"
 SPLIT162_PRICE = RT/"epoch162-first-hourly-completion-20261127-v2/issued-price-v2"
 CHAIN162_PRICE = SPLIT162_PRICE.with_name("issued-price-v3")
+STOPPED162_PRICE = SPLIT162_PRICE.with_name("issued-price-v5")
 ISSUED_PRICES = (ISSUED_PRICE, FOCUSED169_PRICE, SPLIT162_PRICE, CHAIN162_PRICE)
-RETRY = OPERATOR in ISSUED_PRICES or OPERATOR.parent == FIRST/"attempt-2" and OPERATOR.name in ("operator-v1", "operator-v2", "operator-v3")
+RETRY = OPERATOR in (*ISSUED_PRICES, STOPPED162_PRICE) or OPERATOR.parent == FIRST/"attempt-2" and OPERATOR.name in ("operator-v1", "operator-v2", "operator-v3")
 DEP = ATTEMPT = FIRST/"attempt-2" if RETRY else FIRST
 OLD = prior.DEP / "attempt-2"
 BRIDGE = prior.UNIT
@@ -253,8 +254,9 @@ def issued_tree_bounds(actor):
 
 
 def price(phase, *, native169=None, native162=None):
-    need(phase in ("read","start","held"),"unknown continuation phase")
-    need((native169 is None and native162 is None) or OPERATOR in (FOCUSED169_PRICE, SPLIT162_PRICE, CHAIN162_PRICE), "peer is outside this operator")
+    stopped = OPERATOR == STOPPED162_PRICE
+    need(phase == "stopped" if stopped else phase in ("read","start","held"), "unknown continuation phase")
+    need((native169 is None and native162 is None) or OPERATOR in (FOCUSED169_PRICE, SPLIT162_PRICE, CHAIN162_PRICE, STOPPED162_PRICE), "peer is outside this operator")
     need(OPERATOR not in ISSUED_PRICES or phase == "held", "issued-price-v47 only prices the live 170 worker")
     if SPLIT_PEERS:
         peers_spec = importlib.util.spec_from_file_location("following_peers", OPERATOR / "following_peers.py")
@@ -324,7 +326,13 @@ def price(phase, *, native169=None, native162=None):
              and actor["producer_invocation_id"] == plan["invocation_id"] == s["InvocationID"]
              and bound(sample)["plan_sha256"] == identity["sha256"], "different active 170 tree cap")
         cap = plan["maximum_root_physical_bytes"]
-    need(0 < low <= high <= cap <= 384*G, "original subtree exceeds admitted cap")
+    if stopped:
+        # The latest interval tripped its growth guard. The caller verifies that
+        # exact terminal before and after pricing. Charge the closed tree in
+        # place and preserve a full 36 GiB future booking under the 384 GiB cap.
+        need(0 < low <= high <= 384*G, "retained subtree exceeds whole-tree cap")
+    else:
+        need(0 < low <= high <= cap <= 384*G, "original subtree exceeds admitted cap")
     if hourly is not None: need(bound(hourly)["producer_stop_enabled"],"unprotected hourly producer")
     highest = max(hourly_floor, *(bound(r)["minimum_free_bytes"] for r in joint["guard_samples"].values()))
     # During readback the predecessor's full remaining tree still belongs to 170.
@@ -384,6 +392,6 @@ def price(phase, *, native169=None, native162=None):
                 return peers.finish(prior, quote, first, providers)
             return quote
         return quote
-    if OPERATOR in (FIRST/"attempt-2/operator-v3", *ISSUED_PRICES):
+    if OPERATOR in (FIRST/"attempt-2/operator-v3", *ISSUED_PRICES, STOPPED162_PRICE):
         return overlay.apply_170(result, assembly, use_phase=True)
     return overlay.apply_170(result, assembly)
