@@ -135,8 +135,14 @@ def quote(phase, held_invocation, profile, enrollment):
     free=disk.f_bavail*disk.f_frsize
     ram=next(int(line.split()[1])*1024 for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemAvailable:"))
     geom=geometry(whole,phase,held_invocation,free,ram)
-    return dict(schema="horizon-169-adjacent-fleet-price-v1",phase=phase,unit=layout["UNIT"],scratch_gib=44,
+    result=dict(schema="horizon-169-adjacent-fleet-price-v1",phase=phase,unit=layout["UNIT"],scratch_gib=44,
                 profile=profile,held_invocation=held_invocation,donor=donor,enrollment=enrollment,
                 exclusive_169_lease=True,boot_id=layout["BOOT"].read_text().strip(),fleet=whole["fleet"],writer=whole["writer"],
                 adjacent_169_predecessor=model["previous"],whole_roster=whole,available_ram=ram,current_free_home=free,
                 recorded_unix=time.time(),resource_credit_bytes=0,**geom)
+    if not result["fits"] and not spec.get("preview",False):
+        # The sealed launcher checks positivity before its normal PRESTART or
+        # POST_GUARD save. Preserve a measured refusal while that gate is held.
+        name=f"ADJACENT_PRICE_DECLINED_{phase}_{time.time_ns()}.json"
+        result["decision_receipt"]=layout["save"](ROOT/name,result,0o400)
+    return result
