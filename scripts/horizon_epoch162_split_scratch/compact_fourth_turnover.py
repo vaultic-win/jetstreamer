@@ -216,19 +216,47 @@ def spec(layout, revision):
     active = max(writer.ROOT.glob("FAILED166_CADENCE_V*_ACTIVE.json"),key=lambda p:int(p.name.split("_V")[1].split("_")[0]))
     intent, ref = layout.pinned(active)
     ready = layout.bound(intent["ready"])
-    price = V36/"fourth162_price.py"
-    package = layout.bound(issue["package"])
-    need(original.latest_provider()==V36 and issue["source_commit"]==revision and issue["interface"]==interface
+    directory = original.latest_provider()
+    price = directory/"fourth162_price.py"
+    current = compact.reference(directory/"deployment-seal-receipt.json")
+    package = layout.bound(current)
+    preceding_quote = dict(path=str(BASE/"FOURTH_54_PRICE_1795872281650073077.json"),
+                           sha256="fe0893edb1dddd9d3fe07b6d4dac17d650ede2b6d36347948bf5599b1521eaac")
+    proof = {}
+    if directory != V36:
+        denied = layout.bound(preceding_quote)
+        need(denied["whole_roster"]["package"]==issue["package"] and denied["phase"]=="prestart"
+             and denied["home_margin"]==-11_578_705_228 and not denied["fits"]
+             and denied["ram_margin"]==13_573_349_376 and denied["held_invocation"] is None,
+             "different original 162 decision")
+        link = current
+        lineage = []
+        for version in range(int(directory.name.removeprefix("issued-price-v")),36,-1):
+            root = V36.with_name(f"issued-price-v{version}")
+            pkg = layout.bound(link)
+            need(link["path"]==str(root/"deployment-seal-receipt.json") and pkg["destination"]==str(root),
+                 "noncontiguous shared price lineage")
+            record, source_ref = layout.pinned(root/"SOURCE.json")
+            need(any(m["name"]=="SOURCE.json" and m["sha256"]==source_ref["sha256"] for m in pkg["members"])
+                 and record["fourth162_interface"]==interface and record["fourth162_qualification"]==info["kernel_qualification"]
+                 and any(m["name"]=="fourth162_peer.py" and m["sha256"]==compact.digest(V36/"fourth162_peer.py") for m in pkg["members"]),
+                 "new roster changed the compact 162 provider")
+            lineage.append(link)
+            link = record["prior_shared_price"]
+        need(link==issue["package"] and lineage and ready["next_hourly170_interface"]==record["next_hourly170_interface"],
+             "new roster and writer did not inherit V36 and the next 170 registration")
+        proof = dict(original_unissued_price=preceding_quote,price_lineage=lineage+[link])
+    need(issue["source_commit"]=="ceb07bd403e3f2a39f3e00e75428e97e7fefc929" and issue["interface"]==interface
          and issue["predecessor"]==compact.reference(V35/"deployment-seal-receipt.json") and issue["full_size"]==full
-         and package["destination"]==str(V36) and any(m["name"]==price.name and m["sha256"]==compact.digest(price) for m in package["members"])
+         and package["destination"]==str(directory) and any(m["name"]==price.name and m["sha256"]==compact.digest(price) for m in package["members"])
          and ready["fourth162_provider"]==info["provider"] and ready["fourth162_scope"]==info["scope"]
          and ready["fourth162_reader"]["sha256"]==info["reader"]["sha256"] and ready["fourth162_interface"]==interface
          and ready["fourth162_predecessor"]==info["previous"] and ready["fourth162_kernel_qualification"]==info["kernel_qualification"]
          and ready["epoch167_assembly_owner"] and ready["adjacent169_interface"],"unregistered compact 162 issuer")
     return dict(schema="horizon-private-162-fourth-enrollment-v1",writer_active=ref,operator=info["provider"],
-             donor=dict(path=str(layout.DONOR),sha256=layout.DONOR_SHA),capacity=compact.reference(price),whole_roster=issue["package"],
+             donor=dict(path=str(layout.DONOR),sha256=layout.DONOR_SHA),capacity=compact.reference(price),whole_roster=current,
              third_terminal=info["previous"],interface=interface,guard_validation=info["guard_validation"],
-             bootstrap=info["bootstrap"]["verified_local_custody"],source_commit=revision,kernel_qualification=info["kernel_qualification"])
+             bootstrap=info["bootstrap"]["verified_local_custody"],source_commit=revision,kernel_qualification=info["kernel_qualification"],**proof)
 
 
 def act(mode, revision):
