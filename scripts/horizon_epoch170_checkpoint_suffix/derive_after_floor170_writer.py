@@ -54,6 +54,10 @@ def cycle(code, version):
     if not isinstance(version,int) or version < 67:
         raise ValueError("the disk stop needs its accepted predecessor writer")
     enable = f"FAILED166_VERSION >= {version}"
+    existing_hourly = code.count("c.hourly170")
+    if not existing_hourly or "c.after_floor170" in code:
+        raise ValueError("existing 170 context changed or recovery receiver already registered")
+
 
     def change(old,new):
         nonlocal code
@@ -63,44 +67,44 @@ def cycle(code, version):
         change(old,old + "\n" + new)
 
     append("                import after_ram170_status",f"                if {enable}:\n                    import after_floor170_status")
-    change("    after_ram_prior = None\n    third_ram_prior = None","    hourly170_prior = None\n    after_ram_prior = None\n    third_ram_prior = None")
+    change("    after_ram_prior = None\n    third_ram_prior = None","    after_floor_prior = None\n    after_ram_prior = None\n    third_ram_prior = None")
     begin = "        ram_cfg = c.cfg\n"
     change(begin,begin + f"""        if {enable}:
-            hourly170_prior = after_floor170_status.retained_population(c.fleet,ram_cfg)
+            after_floor_prior = after_floor170_status.retained_population(c.fleet,ram_cfg)
             ram_cfg = after_floor170_status.history_config(c.fleet,ram_cfg)
 """)
-    change("private_successor=after_ram_prior or ", "private_successor=hourly170_prior or after_ram_prior or ")
-    change("c.bridge170_prior = after_ram_prior or ", "c.bridge170_prior = hourly170_prior or after_ram_prior or ")
+    change("private_successor=after_ram_prior or ", "private_successor=after_floor_prior or after_ram_prior or ")
+    change("c.bridge170_prior = after_ram_prior or ", "c.bridge170_prior = after_floor_prior or after_ram_prior or ")
     append("        after_ram170_status.project(c, c.after_ram170)",f"""    if {enable}:
-        c.hourly170 = after_floor170_status.observe(c, hourly170_prior, cycle.observed_lane)
-        if after_floor170_status.active(c.hourly170):
+        c.after_floor170 = after_floor170_status.observe(c, after_floor_prior, cycle.observed_lane)
+        if after_floor170_status.active(c.after_floor170):
             need(c.after_ram170 and c.after_ram170["phase"] == "terminal"
                  and not any(v.get("epoch", key) in (170, "170") for key, v in native_owners.items() if isinstance(v, dict))
                  and 170 not in c.new_rows and c.stopped170, "duplicate active 170 on the hourly replacement")
-            if c.hourly170["phase"] != "held":
-                native_owners = dict(native_owners, after_floor170=c.hourly170)
-        after_floor170_status.project(c, c.hourly170)""")
+            if c.after_floor170["phase"] != "held":
+                native_owners = dict(native_owners, after_floor170=c.after_floor170)
+        after_floor170_status.project(c, c.after_floor170)""")
     for older, newer in (
-        ("after_ram170_status.recheck(c.after_ram170)", "after_floor170_status.recheck(c.hourly170)"),
-        ("if c.after_ram170: cap[after_ram170_status.FIELD] = c.after_ram170", "if c.hourly170: cap[after_floor170_status.FIELD] = c.hourly170"),
-        ("diagnostic_count += int(after_ram170_status.active(c.after_ram170))", "diagnostic_count += int(after_floor170_status.active(c.hourly170))"),
-        ("after_ram170_status.install(fleet,c.after_ram170)", "after_floor170_status.install(fleet,c.hourly170)"),
+        ("after_ram170_status.recheck(c.after_ram170)", "after_floor170_status.recheck(c.after_floor170)"),
+        ("if c.after_ram170: cap[after_ram170_status.FIELD] = c.after_ram170", "if c.after_floor170: cap[after_floor170_status.FIELD] = c.after_floor170"),
+        ("diagnostic_count += int(after_ram170_status.active(c.after_ram170))", "diagnostic_count += int(after_floor170_status.active(c.after_floor170))"),
+        ("after_ram170_status.install(fleet,c.after_ram170)", "after_floor170_status.install(fleet,c.after_floor170)"),
     ):
         append("        "+older, f"    if {enable}:\n        "+newer)
     append("            extra.update(after_ram170_status.status_fields(c.after_ram170))",
-           f"        if {enable} and epoch == 170 and c.hourly170:\n            extra.update(after_floor170_status.status_fields(c.hourly170))")
+           f"        if {enable} and epoch == 170 and c.after_floor170:\n            extra.update(after_floor170_status.status_fields(c.after_floor170))")
     modules = "modules += [after_ram170_status, after_ram170_status.contract, after_ram170_status.following]"
     match, = re.finditer(r"^( *)"+re.escape(modules)+"$",code,re.M)
     indent = match[1]
     append(indent+modules,indent+f"if {enable}:\n"+indent+"    modules += [after_floor170_status, after_floor170_status.contract, after_floor170_status.gap, after_floor170_status.gap.workspace]")
-    change("            after_ram_prior = None\n", f"""            hourly170_prior = None
+    change("            after_ram_prior = None\n", f"""            after_floor_prior = None
             if {enable}:
                 need(ready['after_floor170_interface'] == after_floor170_status.INTERFACE, 'unregistered hourly 170 receiver')
-                hourly170_prior = after_floor170_status.retained_population(fleet,previous_cfg)
+                after_floor_prior = after_floor170_status.retained_population(fleet,previous_cfg)
                 previous_cfg = after_floor170_status.history_config(fleet,previous_cfg)
             after_ram_prior = None
 """)
-    change("            prior = after_ram_prior or ", "            prior = hourly170_prior or after_ram_prior or ")
+    change("            prior = after_ram_prior or ", "            prior = after_floor_prior or after_ram_prior or ")
     enrollment, = re.finditer(r"^    if [^\n]+sys.argv\[1\] == '--enroll-after-ram-170':$",code,re.M)
     new = f"""    if {enable} and len(sys.argv) == 4 and sys.argv[1] == '{ENROLL_OPTION}':
         head = dict(path=str(Path(sys.argv[2])), sha256=sys.argv[3])
@@ -110,5 +114,7 @@ def cycle(code, version):
         return
 """
     code = code[:enrollment.start()] + new + code[enrollment.start():]
+    if code.count("c.hourly170") != existing_hourly:
+        raise ValueError("the existing hourly observation was changed")
     ast.parse(code)
     return code
