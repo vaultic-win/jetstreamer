@@ -38,6 +38,9 @@ V1627_UNIT = "horizon-qualify-230-v1627-window-v1.service"
 ADJACENT_REGISTRATION = V / "horizon230-adjacent-99445304-runtime-v1/cadence-registration.json"
 ADJACENT_UNIT = "horizon-qualify-230-adjacent-99445304-v1.service"
 
+NEXT_V1627_REGISTRATION = V / "horizon230-next-v1627-window-runtime-v1/cadence-registration.json"
+NEXT_V1627_UNIT = "horizon-qualify-230-next-v1627-99468089-v1.service"
+
 FIRST_7871_STATUS = FIRST_7871_REGISTRATION.parent / "repair-status-after-checkpoint-v1/completion.json"
 if FIRST_7871_STATUS.is_file():
     CHECKPOINT_STATUS[230] = FIRST_7871_STATUS
@@ -47,6 +50,11 @@ def registration_for_sample(epoch, sample):
     if epoch != 230:
         return REGISTRATIONS[epoch]
     units = {row["producer_unit"] for row in sample["diagnostic_replays"]}
+    if NEXT_V1627_UNIT in units:
+        assert NEXT_V1627_REGISTRATION.is_file()
+        assert units.isdisjoint((ADJACENT_UNIT, V1627_UNIT, FIRST_7871_UNIT,
+                                "horizon-qualify-230-middle-hourly-second-v1.service"))
+        return NEXT_V1627_REGISTRATION
     if ADJACENT_UNIT in units:
         assert ADJACENT_REGISTRATION.is_file() and units.isdisjoint((V1627_UNIT, FIRST_7871_UNIT))
         return ADJACENT_REGISTRATION
@@ -119,6 +127,29 @@ def placement(epoch, sample):
         retained = closed["last_slot"] - closed["first_slot"] + 1
         assert retained == closed["slot_count"] == 39522
         evidence.append(closed_ref)
+    elif registration == NEXT_V1627_REGISTRATION:
+        assert launch["unit"] == NEXT_V1627_UNIT and (window_start, window_end) == (99468090, 99476782)
+        for registration_path, digest, bounds in (
+            (FIRST_7871_REGISTRATION, "16d546332a37fccd20a7b2609908288b426276a01908c6e255db886aba6ea8d2",
+             (99437434, 99445304)),
+            (ADJACENT_REGISTRATION, "db282c37da8fe4dae091a3047dc4e7020bdf60e93905bc2bfc738b0dd4dd3ba7",
+             (99445305, 99461591)),
+            (V1627_REGISTRATION, "db618cf906b39ffe64f80b7a0c90febaa4d54054cac4a74e2fed12cea772846e",
+             (99461592, 99468089)),
+            (REGISTRATIONS[230], "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56",
+             (99476783, 99516304)),
+        ):
+            closed_ref = ref(registration_path.parent / "terminal.json")
+            assert closed_ref["sha256"] == digest
+            closed = bound(closed_ref)
+            assert closed["state"] == "local-segment-committed" and closed["guard_drained"]
+            if registration_path == V1627_REGISTRATION:
+                evidence.append(closed["native_terminal"])
+                closed = bound(closed["native_terminal"])
+            assert (closed["first_slot"], closed["last_slot"]) == bounds
+            assert closed["slot_count"] == bounds[1] - bounds[0] + 1
+            retained += closed["slot_count"]
+            evidence.append(closed_ref)
     elif registration in (V1627_REGISTRATION, ADJACENT_REGISTRATION):
         if registration == ADJACENT_REGISTRATION:
             assert launch["unit"] == ADJACENT_UNIT and (window_start, window_end) == (99445305, 99461591)
@@ -148,7 +179,7 @@ def placement(epoch, sample):
             phase = "replay"
     rate = 1.6
     allowance = 12 * 3600
-    canonical_credit = 0 if registration in (V1627_REGISTRATION, ADJACENT_REGISTRATION) else accepted
+    canonical_credit = 0 if registration in (V1627_REGISTRATION, ADJACENT_REGISTRATION, NEXT_V1627_REGISTRATION) else accepted
     seconds = math.ceil((last - first + 1 - retained - canonical_credit) / rate) + allowance + DELIVERY_SECONDS
     path = Path(next(arg.split("=", 1)[1] for arg in profile["argv"] if arg.startswith("--horizon-output=")))
     assert path.is_relative_to(root / "work/output")

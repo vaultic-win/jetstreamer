@@ -11,7 +11,7 @@ mod replay258;
 mod replay260;
 mod replay296;
 use focused::{
-    ADJACENT_230, FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, OVERLAP_266,
+    ADJACENT_230, FEATURE_296, FIRST_7871_230, GAP_230, HOURLY_230, LOADER_296, NEXT_V1627_230, OVERLAP_266,
     OVERLAP_266_EXCLUSIVE, PREDECESSOR_266, RESTORE_258, RESTORE_260, SCOPES, SECOND_HOURLY_230,
     WINDOW_266,
     TRACE_296, V1627_230,
@@ -1431,8 +1431,12 @@ fn measure(
     let first_7871_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == FIRST_7871_230.unit);
     let v1627_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == V1627_230.unit);
     let adjacent_replay_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == ADJACENT_230.unit);
+    let next_v1627_candidate = matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == NEXT_V1627_230.unit);
     let checkpoint_predecessor = (v1627_candidate || adjacent_replay_candidate)
         .then(|| focused::first_7871_drained(n))
+        .transpose()?;
+    let next_predecessor = next_v1627_candidate
+        .then(|| focused::next_v1627_predecessor(n))
         .transpose()?;
     let completion = latest_completion()?;
     let done = completion.json()?;
@@ -1615,6 +1619,7 @@ fn measure(
     let mut closed_adjacent_230 = None;
     let mut closed_overlap_266 = None;
     let mut closed_predecessor_266 = None;
+    let mut closed_window_266 = None;
     let rows = admission_fleet["active"].as_array_mut().context("Foundation active roster")?;
     if quote.is_some() && !live_replays.contains_key(&230)
         && let Some(index) = rows.iter().position(|row| {
@@ -1647,6 +1652,14 @@ fn measure(
         && let Some(proof) = focused::predecessor_266_drained(n, &rows[index])?
     {
         closed_predecessor_266 = Some((rows.remove(index), proof));
+    }
+    if quote.is_some() && !live_replays.contains_key(&266)
+        && let Some(index) = rows.iter().position(|row| {
+            row["epoch"] == 266 && row["producer"]["Id"] == WINDOW_266.unit
+        })
+        && let Some(proof) = focused::window_266_drained(n, &rows[index])?
+    {
+        closed_window_266 = Some((rows.remove(index), proof));
     }
     let roster = fleet_roster(
         &admission_fleet,
@@ -1796,7 +1809,7 @@ fn measure(
             replay296::verify_cpu_group(FIRST_7871_230.cpus, &bridge_group)?;
             &bridge_group
         }
-        Some(Quote::Focused(spec, _)) if v1627_candidate || adjacent_replay_candidate => {
+        Some(Quote::Focused(spec, _)) if v1627_candidate || adjacent_replay_candidate || next_v1627_candidate => {
             replay296::verify_cpu_group(spec.cpus, &bridge_group)?;
             &bridge_group
         }
@@ -1857,7 +1870,7 @@ fn measure(
         require_disjoint_cpus(epoch, exclusive, unit, owner)?;
         recorded.insert(unit.to_owned(), (owner.clone(), *memory, *ticks));
     }
-    let bridge_windows = [FIRST_7871_230.unit, V1627_230.unit, ADJACENT_230.unit];
+    let bridge_windows = [FIRST_7871_230.unit, V1627_230.unit, ADJACENT_230.unit, NEXT_V1627_230.unit];
     for replay in live_replays.values() {
         require_disjoint_cpus(epoch, exclusive, replay.unit, &replay.owner)?;
         if [OVERLAP_266.unit, PREDECESSOR_266.unit, WINDOW_266.unit].contains(&replay.unit) {
@@ -2016,6 +2029,12 @@ fn measure(
             "epoch 266 predecessor terminal changed during roster binding"
         );
     }
+    if let Some((row, proof)) = &closed_window_266 {
+        ensure!(
+            focused::window_266_drained(n, row)?.as_ref() == Some(proof),
+            "epoch 266 checkpoint window terminal changed during roster binding"
+        );
+    }
     if let Some(proof) = &extraction_drain {
         terminal_extract_226(n, &booking, proof)?;
     }
@@ -2024,6 +2043,9 @@ fn measure(
     }
     if let Some(expected) = &checkpoint_predecessor {
         ensure!(&focused::first_7871_drained(n)? == expected, "epoch 230 predecessor changed");
+    }
+    if let Some(expected) = &next_predecessor {
+        ensure!(&focused::next_v1627_predecessor(n)? == expected, "epoch 230 v1.6.27 predecessor changed");
     }
     if let Some(Quote::Replay296(full)) = &quote {
         let checkpoint = full.checkpoint.sealed()?;
@@ -2241,6 +2263,7 @@ fn measure(
         230 if first_7871_candidate => "foundation-epoch230-first-7871-roster-binding-v1",
         230 if adjacent_replay_candidate => "foundation-epoch230-adjacent-replay-roster-binding-v1",
         230 if v1627_candidate => "foundation-epoch230-v1627-window-roster-binding-v1",
+        230 if next_v1627_candidate => "foundation-epoch230-next-v1627-roster-binding-v1",
         230 => "foundation-epoch230-short-gap-roster-binding-v1",
         252 => "foundation-epoch252-delivery-roster-binding-v1",
         256 => replay256::ROSTER_SCHEMA,
@@ -2269,6 +2292,7 @@ fn measure(
         "closed_adjacent_230_replay":closed_adjacent_230.map(|(_, proof)| proof),
         "closed_overlap_266_replay":closed_overlap_266.map(|(_, proof)| proof),
         "closed_predecessor_266_replay":closed_predecessor_266.map(|(_, proof)| proof),
+        "closed_window_266_replay":closed_window_266.map(|(_, proof)| proof),
         "closed_extraction_226":extraction_drain,
         "active_suffix_226_registration":live_replays.get(&226).map(|replay| &replay.reference),
         "active_diagnostic_230_registration":live_replays.get(&230).map(|replay| &replay.reference),
@@ -2378,7 +2402,7 @@ fn measure(
             Path::new("/var/lib/jetstreamer/horizon230-middle-hourly-second-runtime-v1/terminal.json"),
             "2ed2322cffebec1575bc9ba4dea1894e9e710c3b970c9db504153869f70a9b56"));
     }
-    if let (Some(Quote::Focused(spec, _)), Some(predecessor)) = (&quote, checkpoint_predecessor) {
+    if let (Some(Quote::Focused(spec, _)), Some(predecessor)) = (&quote, checkpoint_predecessor.or(next_predecessor)) {
         let binding = &mut evidence[spec.quote_key()];
         binding["exclusive_online_cpus"] = json!(bridge_group);
         binding["predecessor_terminal"] = json!(predecessor);
@@ -2471,6 +2495,7 @@ pub fn run() -> Result<()> {
                         | "--hourly230-second-quote"
                         | "--first7871-230-quote"
                         | "--v1627-230-quote"
+                        | "--next-v1627-230-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
                         | "--overlap266-quote"
@@ -2500,7 +2525,7 @@ pub fn run() -> Result<()> {
                 .map_err(|_| anyhow::anyhow!("invalid controller name"))?,
         ),
         Some(_) => bail!(
-            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --first7871-230-quote, --v1627-230-quote, --focused258-quote, --focused260-quote, --overlap266-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote, --interval141-fourth-quote, --interval141-fifth-quote, --interval141-sixth-quote or --interval141-seventh-quote"
+            "use --as-controller UNIT, --full-replay-quote, --full256-quote, --full258-quote, --full260-quote, --delivery252-quote, --delivery261-quote, --replay296-quote, --focused230-quote, --hourly230-quote, --hourly230-second-quote, --first7871-230-quote, --v1627-230-quote, --next-v1627-230-quote, --focused258-quote, --focused260-quote, --overlap266-quote, --focused296-quote, --trace296-quote, --feature296-quote, --suffix226-preview, --interval141-third-quote, --interval141-fourth-quote, --interval141-fifth-quote, --interval141-sixth-quote or --interval141-seventh-quote"
         ),
     };
     let synchronize = match args.next() {
@@ -2568,6 +2593,7 @@ pub fn run() -> Result<()> {
                         | "--hourly230-second-quote"
                         | "--first7871-230-quote"
                         | "--v1627-230-quote"
+                        | "--next-v1627-230-quote"
                         | "--adjacent230-replay-quote"
                         | "--focused258-quote"
                         | "--focused260-quote"
@@ -2586,6 +2612,7 @@ pub fn run() -> Result<()> {
                 Some("--hourly230-second-quote") => &SECOND_HOURLY_230,
                 Some("--first7871-230-quote") => &FIRST_7871_230,
                 Some("--v1627-230-quote") => &V1627_230,
+                Some("--next-v1627-230-quote") => &NEXT_V1627_230,
                 Some("--adjacent230-replay-quote") => &ADJACENT_230,
                 Some("--focused258-quote") => &RESTORE_258,
                 Some("--focused260-quote") => &RESTORE_260,

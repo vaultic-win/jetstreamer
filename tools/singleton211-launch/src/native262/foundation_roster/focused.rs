@@ -145,6 +145,20 @@ pub(super) const ADJACENT_230: Focused = Focused {
     profile_sha: "d01cf1c1a583c41e885ea74f57aea21a5e5178554e94bca16d01674a5bff1d1b",
 };
 
+pub(super) const NEXT_V1627_230: Focused = Focused {
+    unit: "horizon-qualify-230-next-v1627-99468089-v1.service",
+    guard: "horizon-230-next-v1627-99468089-protective-v1",
+    root: "/home/ubuntu/.jetstreamer-private/qualification-230-next-v1627-99468089-v1",
+    first: 99_468_090,
+    last: 99_476_782,
+    kind: "epoch230-private-next-v1627-window",
+    preflight_schema: "foundation-epoch230-next-v1627-runtime-preflight-v1",
+    state: "/var/lib/jetstreamer/horizon230-next-v1627-window-runtime-v1",
+    preflight_sha: "c54b1b9fc120a920e23d220b3d223565b7e0a5cd92f6206103c426b545431c48",
+    profile_sha: "f289cdf8e6c6d85f387a2deac22c2c7ef19fcb1b4b98bc75230162a2cbf71447",
+    ..ADJACENT_230
+};
+
 const V1627_INVOCATION: &str = "6c878d138821422d8a848d6bd16d63a9";
 const V1627_LAUNCH_SHA: &str =
     "3a2f5a058c76a59707af77f98973c283d4542c8308d5a514a22ae1cb6534a7a6";
@@ -290,13 +304,14 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 14] = [
+pub(super) const SCOPES: [&Focused; 15] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
     &FIRST_7871_230,
     &V1627_230,
     &ADJACENT_230,
+    &NEXT_V1627_230,
     &RESTORE_258,
     &RESTORE_260,
     &OVERLAP_266,
@@ -662,6 +677,96 @@ pub(super) fn adjacent_230_drained(n: &mut Native, row: &Value) -> Result<Option
     Ok(Some(reference))
 }
 
+pub(super) fn next_v1627_predecessor(n: &mut Native) -> Result<Bound> {
+    let reference = Bound::new(
+        Path::new(V1627_230.state).join("terminal.json"),
+        "db618cf906b39ffe64f80b7a0c90febaa4d54054cac4a74e2fed12cea772846e",
+    );
+    let receipt = reference.sealed()?;
+    let native_ref = binding(&receipt["native_terminal"])?;
+    let native = native_ref.sealed()?;
+    ensure!(
+        receipt["unit"] == V1627_230.unit
+            && receipt["invocation_id"] == V1627_INVOCATION
+            && receipt["guard_drained"] == true
+            && receipt["state"] == "local-segment-committed"
+            && native_ref.path == Path::new(V1627_TERMINAL)
+            && native["invocation_id"] == V1627_INVOCATION
+            && native["last_slot"] == NEXT_V1627_230.first - 1
+            && native["terminal_checkpoint"]["slot"] == NEXT_V1627_230.first - 1
+            && native["native_manifest_complete_verified"] == true,
+        "next epoch 230 window lacks its verified v1.6.27 predecessor"
+    );
+    check_terminal_output(Path::new(V1627_ARCHIVE), &native["archive"])?;
+    drained(n, V1627_230.unit, V1627_230.guard, V1627_INVOCATION)?;
+    Ok(reference)
+}
+
+pub(super) fn window_266_drained(n: &mut Native, row: &Value) -> Result<Option<Bound>> {
+    const INVOCATION: &str = "b092a57c368a46a6bb367359b9fd7aae";
+    const LAUNCH_SHA: &str = "6a60c3ca7b40c7b7ef9e7f6235b1168ad2dc863a60ca49aa4dff993da94b7e73";
+    const NATIVE: &str = "/var/lib/jetstreamer/horizon266-window-terminal-collector-v1/evidence/terminal-evidence.json";
+    let state = Path::new(WINDOW_266.state);
+    let path = state.join("terminal.json");
+    if !path.try_exists()? {
+        return Ok(None);
+    }
+    let reference = Bound::new(&path, hash(&path)?);
+    let receipt = reference.sealed()?;
+    let launch = Bound::new(state.join("cadence-registration.json"), LAUNCH_SHA);
+    launch.sealed()?;
+    let terminal_ref = binding(&receipt["native_terminal"])?;
+    ensure!(
+        terminal_ref.path == Path::new(NATIVE),
+        "foreign epoch 266 window terminal source"
+    );
+    let terminal = terminal_ref.sealed()?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    let pid = text(&row["producer"], "MainPID")?.parse::<u64>()?;
+    ensure!(
+        row["epoch"] == WINDOW_266.epoch
+            && row["phase"] == "diagnostic-qualification"
+            && row["producer"]["Id"] == WINDOW_266.unit
+            && row["producer"]["InvocationID"] == INVOCATION
+            && row["launch_receipt"] == json!(launch.path)
+            && row["launch_receipt_sha256"] == launch.sha256
+            && receipt["schema"] == "foundation-epoch266-private-window-drain-v1"
+            && receipt["state"] == "local-segment-committed"
+            && receipt["unit"] == WINDOW_266.unit
+            && receipt["invocation_id"] == INVOCATION
+            && receipt["launch"] == json!(launch)
+            && receipt["guard_drained"] == true
+            && receipt["publication_authorized"] == false
+            && terminal["schema"] == "foundation-epoch266-private-window-terminal-evidence-v1"
+            && terminal["launch"] == json!(launch)
+            && terminal["unit"] == WINDOW_266.unit
+            && terminal["invocation_id"] == INVOCATION
+            && terminal["producer_pid"] == pid
+            && terminal["boot_id"] == boot
+            && terminal["producer_exit_status"] == 0
+            && terminal["producer_drained"] == true
+            && terminal["native_manifest_complete_verified"] == true
+            && terminal["predecessor_consensus_fields_match"] == true
+            && terminal["first_slot"] == WINDOW_266.first
+            && terminal["last_slot"] == WINDOW_266.last
+            && terminal["slot_count"] == WINDOW_266.last - WINDOW_266.first + 1
+            && terminal["terminal_checkpoint"]["slot"] == WINDOW_266.last
+            && terminal["original_epoch_root_still_required"] == true
+            && terminal["publication_authorized"] == false,
+        "closed epoch 266 evidence does not bind the sampled checkpoint window"
+    );
+    let archive = Path::new(WINDOW_266.root).join("output/epoch-266-slots-114929698-114936474.jet");
+    check_terminal_output(&archive, &terminal["archive"])?;
+    check_terminal_output(
+        &archive.with_extension("jet.segment.json"),
+        &terminal["segment_manifest"],
+    )?;
+    drained(n, WINDOW_266.unit, WINDOW_266.guard, INVOCATION)?;
+    Ok(Some(reference))
+}
+
 #[cfg(test)]
 #[test]
 fn adjacent_230_release_requires_the_exact_successful_terminal() {
@@ -1020,6 +1125,42 @@ impl Focused {
                 && receipt["profile"] == json!(profile_ref)
                 && guard["validated"] == true
                 && guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
+        } else if self.unit == NEXT_V1627_230.unit {
+            let custody = binding(&receipt["bootstrap_custody"])?;
+            let held = custody.sealed()?;
+            let bootstrap = &held["bootstrap"];
+            let snapshot = Path::new(text(bootstrap, "path")?);
+            let metadata = fs::symlink_metadata(snapshot)?;
+            let guard = binding(&receipt["static_guard_validation"])?.sealed()?;
+            let mount = binding(&receipt["mount_preflight"])?.sealed()?;
+            let image = binding(&profile["node"])?;
+            image.artifact()?;
+            receipt["first_slot"] == self.first
+                && receipt["profile"] == json!(profile_ref)
+                && receipt["worker_execution"] == false
+                && receipt["private_namespace_validated"] == true
+                && receipt["writable_private_state_validated"] == true
+                && mount["worker_execution"] == false
+                && mount["views"].as_array().is_some_and(|views| {
+                    views.len() == 4 && views.iter().all(|view| view["readonly"] == true)
+                })
+                && guard["validated"] == true
+                && guard["unit"] == self.unit
+                && guard["plan_sha256"] == profile["static_guard_plan"]["sha256"]
+                && profile["bootstrap_custody"] == receipt["bootstrap_custody"]
+                && custody.sha256
+                    == "1c205232c283ef1748202da048b50406aeaffdc7f3f1b4e22887ac73941de8af"
+                && bootstrap["generation"] == "1633487072511006"
+                && bootstrap["sha256"]
+                    == "a1dcd477a8bd99c7ff52876e8b268d4392b31207bc99f2799f46c732644fb45d"
+                && metadata.is_file()
+                && metadata.nlink() == 1
+                && metadata.uid() == 0
+                && metadata.mode() & 0o222 == 0
+                && snapshot.canonicalize()? == snapshot
+                && metadata.dev() == num(bootstrap, "device")?
+                && metadata.ino() == num(bootstrap, "inode")?
+                && metadata.len() == num(bootstrap, "size")?
         } else if self.unit == ADJACENT_230.unit {
             let custody = Bound::new(
                 "/var/lib/jetstreamer/horizon230-adjacent-input-99445304-v1/custody.json",

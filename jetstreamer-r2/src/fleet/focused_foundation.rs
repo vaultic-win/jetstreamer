@@ -38,6 +38,13 @@ const WINDOW_266_PREFLIGHT_SHA: &str =
 const WINDOW_266_CUSTODY_SHA: &str =
     "98c28740a2bdb0f707624a07046fa8a316dd37ea225f31770cf410d5fd0b7001";
 
+const NEXT_V1627_230_UNIT: &str = "horizon-qualify-230-next-v1627-99468089-v1.service";
+const NEXT_V1627_230_STATE: &str = "horizon230-next-v1627-window-runtime-v1";
+const NEXT_V1627_230_PROFILE_SHA: &str =
+    "f289cdf8e6c6d85f387a2deac22c2c7ef19fcb1b4b98bc75230162a2cbf71447";
+const NEXT_V1627_230_PREFLIGHT_SHA: &str =
+    "c54b1b9fc120a920e23d220b3d223565b7e0a5cd92f6206103c426b545431c48";
+
 const SCOPES: &[Scope] = &[
     Scope {
         epoch: 230,
@@ -80,6 +87,13 @@ const SCOPES: &[Scope] = &[
         attempt: "adjacent-99445304-v1",
         state: "horizon230-adjacent-99445304-runtime-v1",
         kind: "epoch230-private-adjacent-99445304-window",
+    },
+    Scope {
+        epoch: 230,
+        unit: NEXT_V1627_230_UNIT,
+        attempt: "next-v1627-99468089-v1",
+        state: NEXT_V1627_230_STATE,
+        kind: "epoch230-private-next-v1627-window",
     },
     Scope {
         epoch: 258,
@@ -245,6 +259,21 @@ pub(super) fn check_bindings(claim: &DiagnosticClaim, launch: &Value) -> Result<
             && guard["trip_reason"].is_null(),
         "focused Foundation launch and admission bindings differ"
     );
+    if claim.unit == NEXT_V1627_230_UNIT {
+        let state = format!("/var/lib/jetstreamer/{NEXT_V1627_230_STATE}");
+        ensure!(
+            launch["profile"]["path"] == format!("{state}/profile.json")
+                && launch["profile"]["sha256"] == NEXT_V1627_230_PROFILE_SHA
+                && profile["schema"] == "foundation-epoch230-next-v1627-profile-v1"
+                && profile["replay_bounds"]["first_slot"] == 99_468_090
+                && profile["replay_bounds"]["last_slot"] == 99_476_782
+                && admission["schema"] == "foundation-epoch230-focused-admission-v1"
+                && admission["preflight"]["path"] == format!("{state}/preflight.json")
+                && admission["preflight"]["sha256"] == NEXT_V1627_230_PREFLIGHT_SHA
+                && plan["receipt_directory"] == format!("{state}/guard-receipts"),
+            "epoch 230 v1.6.27 continuation bindings differ"
+        );
+    }
     if claim.epoch == 266 {
         let release = evidence(launch, "guard_release_fit")?;
         let release_schema = if claim.unit == PREDECESSOR_266_UNIT {
