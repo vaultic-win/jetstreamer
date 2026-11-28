@@ -88,6 +88,8 @@ mod epoch226_interior;
 compile_error!("epoch 140 suffix recording must use its dedicated build");
 #[cfg(feature = "epoch140-suffix-recording")]
 mod epoch140_suffix_recording;
+#[cfg(feature = "epoch143-hourly-continuation-diagnostic")]
+mod epoch143_hourly_continuation;
 // These two private replay profiles share the authoritative legacy wire and PoH modules.
 #[cfg(standalone_original_entries)]
 #[path = "../../jetstreamer-utils/src/horizon_legacy_bundle.rs"]
@@ -20272,6 +20274,20 @@ async fn main() {
                 .await
         {
             eprintln!("private epoch 140 suffix recording failed: {error}");
+            exit(1);
+        }
+        return;
+    }
+    #[cfg(feature = "epoch143-hourly-continuation-diagnostic")]
+    {
+        let plan = epoch143_hourly_continuation::parse(&probe_args).unwrap_or_else(|error| {
+            eprintln!("{error}");
+            exit(2);
+        });
+        if let Err(error) =
+            epoch143_hourly_continuation::run(plan, shutdown, cursor, restart_tracker).await
+        {
+            eprintln!("private epoch 143 hourly run failed: {error}");
             exit(1);
         }
         return;
