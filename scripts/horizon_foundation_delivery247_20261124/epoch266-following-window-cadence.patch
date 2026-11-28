@@ -1,0 +1,26 @@
+--- cycle.py
++++ cycle.py
+@@ -1250,6 +1250,23 @@
+         fleet_image = Path(publication_handoff.checked_image(release["fleet"]))
+         diagnostic296_meter.register_successor_230(plan)
+         add(plan["gates"]["230"], release_ref, release["preflight"])
++    following_266_release = V / "horizon266-following-window-fleet-v1/acceptance.json"
++    if following_266_release.is_file():
++        release_ref = sealed_226_file(following_266_release)
++        release = bound(release_ref)
++        assert release["schema"] == "foundation-epoch266-following-window-fleet-release-v1"
++        assert release["fleet_reconcile_only"] and release["admission_authorized"] is False
++        assert release["publication_authorized"] is False
++        assert release["predecessor_acceptance"] == sealed_226_file(successor_230_release)
++        assert bound(release["predecessor_acceptance"])["fleet"] == release["predecessor"]
++        _, following_state, _ = diagnostic296_meter.attempt_paths(diagnostic296_meter.FOLLOWING_266)
++        assert release["preflight"] == sealed_226_file(following_state / "preflight.json")
++        assert release["preflight"]["sha256"] == diagnostic296_meter.FOLLOWING_266_PREFLIGHT_SHA
++        assert bound(release["preflight"])["profile"] == sealed_226_file(following_state / "profile.json")
++        assert publication_handoff.checked_image(release["predecessor"]) == str(fleet_image)
++        fleet_image = Path(publication_handoff.checked_image(release["fleet"]))
++        diagnostic296_meter.register_following_266(plan)
++        add(plan["gates"]["266"], release_ref, release["preflight"])
+     active_private_intervals = set()
+     for ordinal, cohort_label in ((2, "-private141"), (3, "-private141-third"), (4, "-private141-fourth"), (5, "-private141-fifth"), (6, "-private141-sixth"), (7, "-private141-seventh"), (8, "-private141-eighth")):
+         interval141_launch = V / f"horizon141-foundation-interval{ordinal}-runtime-v1/replay-launch.json"

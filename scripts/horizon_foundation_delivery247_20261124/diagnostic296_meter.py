@@ -40,9 +40,15 @@ SUCCESSOR_266_UNIT = "horizon-qualify-checkpoint-continuation-266-window-1149431
 SUCCESSOR_266_ROOT = Path("/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114943135-v1")
 SUCCESSOR_266_PROFILE_SHA = "eacf3e685a72ad196734b20d7a8a00924176cb6e324aea6ce52f55a983e1fc30"
 SUCCESSOR_266_PREFLIGHT_SHA = "90a972850c9dd75ec6939a081f5b117513e563db3813a7b3e7e115c15ad8d476"
+FOLLOWING_266 = "window-114949777-v1"
+FOLLOWING_266_UNIT = "horizon-qualify-checkpoint-continuation-266-window-114949777-v1.service"
+FOLLOWING_266_ROOT = Path("/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114949777-v1")
+FOLLOWING_266_PROFILE_SHA = "4709cbc3baf7d27acc46e2ea6d2aec7a658bf4ecc23a70f0f571c27ba61068f6"
+FOLLOWING_266_PREFLIGHT_SHA = "4b830983a43c0a90eeb1ade4c90664940d2b56152b93c73fd09df2582d28c700"
 WINDOWS_266 = {
     WINDOW_266: (WINDOW_266_UNIT, WINDOW_266_ROOT, WINDOW_266_PROFILE_SHA, WINDOW_266_PREFLIGHT_SHA),
     SUCCESSOR_266: (SUCCESSOR_266_UNIT, SUCCESSOR_266_ROOT, SUCCESSOR_266_PROFILE_SHA, SUCCESSOR_266_PREFLIGHT_SHA),
+    FOLLOWING_266: (FOLLOWING_266_UNIT, FOLLOWING_266_ROOT, FOLLOWING_266_PROFILE_SHA, FOLLOWING_266_PREFLIGHT_SHA),
 }
 TRACE = "loader-log-v3"
 FEATURE_ACCOUNTS = "feature-account-v4"
@@ -65,6 +71,7 @@ FOCUSED = {
     PREDECESSOR_266: (266, "horizon266-original-predecessor-runtime-v1", "epoch266-private-original-predecessor"),
     WINDOW_266: (266, "horizon266-window-114929698-114936474-runtime-v1", "epoch266-private-hourly-window"),
     SUCCESSOR_266: (266, "horizon266-window-114936475-114943135-runtime-v1", "epoch266-private-hourly-window"),
+    FOLLOWING_266: (266, "horizon266-window-114943136-114949777-runtime-v1", "epoch266-private-hourly-window"),
     TRACE: (296, "horizon296-loader-log-v3", "epoch296-private-loader-log-diagnostic"),
     FEATURE_ACCOUNTS: (296, "horizon296-feature-account-v4", "epoch296-private-feature-account-qualification"),
 }
@@ -299,6 +306,10 @@ def register_window_266(plan):
 
 def register_successor_266(plan):
     register_attempt(plan, SUCCESSOR_266, ordinary_replay=False, include_focused=True)
+
+
+def register_following_266(plan):
+    register_attempt(plan, FOLLOWING_266, ordinary_replay=False, include_focused=True)
 
 
 def register_next_v1627_230(plan):

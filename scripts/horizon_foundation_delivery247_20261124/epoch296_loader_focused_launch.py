@@ -217,6 +217,24 @@ SUCCESSOR_266_TOKEN_PROBE = {
 }
 SUCCESSOR_266_FLEET = V / "horizon266-successor-window-fleet-v1/acceptance.json"
 SUCCESSOR_266_PLAN = V / "horizon266-successor-window-admitted-v1"
+FOLLOWING_266 = replace(
+    WINDOW_266,
+    state=V / "horizon266-window-114943136-114949777-runtime-v1",
+    unit="horizon-qualify-checkpoint-continuation-266-window-114949777-v1.service",
+    guard="horizon-266-window-114949777-protective-v1.service",
+    profile_sha="4709cbc3baf7d27acc46e2ea6d2aec7a658bf4ecc23a70f0f571c27ba61068f6",
+    preflight_sha="4b830983a43c0a90eeb1ade4c90664940d2b56152b93c73fd09df2582d28c700",
+)
+FOLLOWING_266_TOKEN_PROBE = {
+    "path": str(FOLLOWING_266.state / "evidence/prestart-token-probe.json"),
+    "sha256": "3e88db7fbf8a97afe25940fc4bce205a76012a03cc12e82886b30b898dc06b31",
+}
+FOLLOWING_266_FLEET = V / "horizon266-following-window-fleet-v1/acceptance.json"
+FOLLOWING_266_PLAN = V / "horizon266-following-window-admitted-v1"
+FOLLOWING_266_DRAIN = {
+    "path": str(SUCCESSOR_266.state / "terminal.json"),
+    "sha256": "939d32b372e8052de5f8b154720e0600de837d5f02c79334cf5e5d4e0af868b1",
+}
 TRACE_296 = Scope(
     296, V / "horizon296-loader-log-v3",
     "horizon-qualify-296-loader-log-v3.service", "horizon-296-loader-log-protective-v3.service",
@@ -236,6 +254,7 @@ FEATURE_296 = Scope(
 SCOPED_ARGS = {
     "--window266": WINDOW_266,
     "--successor266": SUCCESSOR_266,
+    "--following266": FOLLOWING_266,
     "--epoch230": GAP_230, "--epoch258": RESTORE_258, "--epoch260": RESTORE_260,
     "--hourly230": HOURLY_230, "--hourly230-second": SECOND_HOURLY_230,
     "--overlap266": OVERLAP_266,
@@ -465,7 +484,12 @@ def predecessor_namespace(ops, scope, preflight, profile):
 def launch_window_266(kit, roster_ref, scope):
     """Use the existing invocation-bound startup for the sealed continuation."""
     ops = kit.ops
-    if scope is SUCCESSOR_266:
+    if scope is FOLLOWING_266:
+        fleet = FOLLOWING_266_FLEET
+        plan_path = FOLLOWING_266_PLAN
+        token_probe = FOLLOWING_266_TOKEN_PROBE
+        release_schema = "foundation-epoch266-following-window-fleet-release-v1"
+    elif scope is SUCCESSOR_266:
         fleet = SUCCESSOR_266_FLEET
         plan_path = SUCCESSOR_266_PLAN
         token_probe = SUCCESSOR_266_TOKEN_PROBE
@@ -505,7 +529,7 @@ def launch_window_266(kit, roster_ref, scope):
     probe = ops.bound(token_probe)
     assert probe["token_root"] == str(tokens) and probe["prestart_hook"] == HOOK
     assert probe["qualification_only"] and probe["same_hook_reached_projected_token"]
-    if scope is SUCCESSOR_266:
+    if scope in (SUCCESSOR_266, FOLLOWING_266):
         assert probe["missing_token_rejected"] and probe["stale_token_rejected"]
     assert set(tokens.iterdir()) == {tokens / "qualification"}
     assert not any((state / "guard-receipts").iterdir())
@@ -520,13 +544,30 @@ def launch_window_266(kit, roster_ref, scope):
         assert (info.st_dev, info.st_ino, info.st_size) == tuple(expected[key] for key in ("device", "inode", "bytes"))
         assert target.lstat().st_size == 0
         bindings.append(f"{source}:{target}")
+    projection = None
+    if scope is FOLLOWING_266:
+        assert roster["focused_266_quote"]["predecessor_drain"] == FOLLOWING_266_DRAIN
+        drained = ops.bound(FOLLOWING_266_DRAIN)
+        assert drained["unit"] == SUCCESSOR_266.unit and drained["guard_drained"]
+        assert drained["state"] == "local-segment-committed"
+        projection = profile["bootstrap_custody_projection"]
+        assert mount["custody_mount"] == dict(projection, readonly=True, exact_bytes=True)
+        assert projection["host_custody"] == custody
+        assert projection["source_custody"]["sha256"] == custody["sha256"]
+        assert Path(custody["path"]).parent == Path(projection["target"])
+        read_only_custody = Path(projection["source"]) / "custody.json"
+        assert ops.ref(read_only_custody) == projection["source_custody"]
+        assert read_only_custody.stat().st_uid == 0 and not read_only_custody.stat().st_mode & 0o222
+        bindings.append("{source}:{target}".format(**projection))
     for unit in (scope.unit, scope.guard, scope.guard.removesuffix(".service") + ".timer"):
         assert ops.props(unit, ["LoadState", "ActiveState", "Job"]) == {
             "LoadState": "not-found", "ActiveState": "inactive", "Job": ""}
     assert not any((root / "scratch").iterdir())
     assert {p.name for p in (root / "ledger").iterdir()} == {"compact-indexes"}
-    inventory_unit = ("foundation-266-successor-window-inventory-v1" if scope is SUCCESSOR_266
-                      else "foundation-266-window-inventory-v1")
+    inventory_unit = {
+        FOLLOWING_266.unit: "foundation-266-following-window-inventory-v1",
+        SUCCESSOR_266.unit: "foundation-266-successor-window-inventory-v1",
+    }.get(scope.unit, "foundation-266-window-inventory-v1")
     remote = inventory(kit, epoch=266, unit=inventory_unit)
     measured = current_fit(kit, roster, root, scope)
     floor = roster["capacity"]["guard_floor_bytes"]
@@ -593,6 +634,11 @@ def launch_window_266(kit, roster_ref, scope):
             info = opened.stat()
             assert os.statvfs(opened).f_flag & os.ST_RDONLY
             assert (info.st_dev, info.st_ino, info.st_size) == tuple(view[key] for key in ("device", "inode", "bytes"))
+        if projection is not None:
+            mounted_custody = namespace / Path(projection["host_custody"]["path"]).relative_to("/")
+            assert os.statvfs(mounted_custody).f_flag & os.ST_RDONLY
+            assert mounted_custody.samefile(projection["source_custody"]["path"])
+            assert ops.ref(mounted_custody)["sha256"] == custody["sha256"]
         scratch = root / "scratch"
         mounted, = (line.split(" - ", 1)[1].split()
                     for line in (process / "mountinfo").read_text().splitlines()
@@ -626,7 +672,7 @@ def launch_window_266(kit, roster_ref, scope):
 
 
 def launch(kit, roster_ref, scope):
-    if scope in (WINDOW_266, SUCCESSOR_266):
+    if scope in (WINDOW_266, SUCCESSOR_266, FOLLOWING_266):
         return launch_window_266(kit, roster_ref, scope)
     ops = kit.ops
     state = scope.state
