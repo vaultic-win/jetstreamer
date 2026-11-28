@@ -813,7 +813,14 @@ fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
             let receipts = if plan.unit == "horizon-qualify-143-second-hourly-20261128-v1.service" {
                 "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v1/guard-receipts"
             } else {
-                "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v2/guard-receipts"
+                #[cfg(feature = "epoch143-second-hourly-floor-successor")]
+                {
+                    "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v3/guard-receipts"
+                }
+                #[cfg(not(feature = "epoch143-second-hourly-floor-successor"))]
+                {
+                    "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v2/guard-receipts"
+                }
             };
             (
                 "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1",
