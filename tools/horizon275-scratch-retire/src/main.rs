@@ -489,6 +489,22 @@ fn main() -> Result<()> {
     }
     if matches!(
         args.get(1).map(String::as_str),
+        Some("--check-bootstrap-288-full" | "--retire-bootstrap-288-full")
+    ) {
+        ensure!(
+            unsafe { libc::geteuid() } == 0 && args.len() == 4,
+            "usage: horizon275-scratch-retire --check-bootstrap-288-full|--retire-bootstrap-288-full SELF_SHA256 PROOF_SHA256"
+        );
+        let mut binary = File::open("/proc/self/exe")?;
+        let metadata = binary.metadata()?;
+        ensure!(
+            metadata.uid() == 0 && metadata.mode() & 0o222 == 0 && digest(&mut binary)? == args[2],
+            "unsealed retirement image"
+        );
+        return snapshot288::run_full(args[1].starts_with("--retire"), &args[2], &args[3]);
+    }
+    if matches!(
+        args.get(1).map(String::as_str),
         Some("--check-bootstrap-296" | "--retire-bootstrap-296"
             | "--check-bootstrap-266-114910768" | "--retire-bootstrap-266-114910768"
             | "--check-bootstrap-266-114923430" | "--retire-bootstrap-266-114923430"

@@ -284,6 +284,130 @@ struct VerifiedDuplicate<'a> {
     closed: fn() -> Result<()>,
 }
 
+pub(super) fn run_full(apply: bool, self_sha: &str, proof_sha: &str) -> Result<()> {
+    const STATE_FULL: &str = "/var/lib/jetstreamer/horizon288-full-bootstrap-copy-retirement-v1";
+    const ROOT_FULL: &str =
+        "/home/ubuntu/.jetstreamer-private/qualification-288-full-shrink-debt-v1";
+    const UNIT_FULL: &str = "horizon-qualify-288-root-shrink-debt-v1.service";
+    const GUARD_FULL: &str = "horizon-288-full-shrink-debt-protective-v1.service";
+    const TIMER_FULL: &str = "horizon-288-full-shrink-debt-protective-v1.timer";
+    const IID_FULL: &str = "88edf4dd09f343c9ac90cfff907c7b18";
+    const STOP_FULL: &str =
+        "/var/lib/jetstreamer/horizon288-full-shrink-debt-v1/physical-budget-stop-v1/terminal.json";
+    const STOP_SHA: &str = "fe0895438e423135c37541fcfab74452e75be1d0661d7fa8bc25899f1515c6a6";
+    const PROFILE_FULL: &str = "/var/lib/jetstreamer/horizon288-full-shrink-debt-v1/profile.json";
+    const PROFILE_FULL_SHA: &str =
+        "d9e6fabb8b0a859ea375e160edd9299999c328ae25eca5f094daae58200ba026";
+
+    fn closed_full() -> Result<()> {
+        closed_units(UNIT_FULL, GUARD_FULL, TIMER_FULL)
+    }
+
+    let state = Path::new(STATE_FULL);
+    let mode = state.symlink_metadata()?;
+    ensure!(
+        state.canonicalize()? == state
+            && mode.is_dir()
+            && mode.uid() == 0
+            && mode.mode() & 0o077 == 0,
+        "unsafe epoch 288 full replay retirement evidence directory"
+    );
+    let proof: Value = read_bound(&state.join("proof.json"), proof_sha, JSON_LIMIT)?;
+    let terminal: Value = read_bound(Path::new(STOP_FULL), STOP_SHA, JSON_LIMIT)?;
+    let profile: Value = read_bound(Path::new(PROFILE_FULL), PROFILE_FULL_SHA, JSON_LIMIT)?;
+    ensure!(
+        proof["schema"] == "foundation-epoch288-full-bootstrap-duplicate-v1"
+            && proof["epoch"] == 288
+            && proof["bytes_match"] == true
+            && proof["publication_authorized"] == false
+            && proof["terminal"] == json!({"path":STOP_FULL,"sha256":STOP_SHA})
+            && proof["profile"] == json!({"path":PROFILE_FULL,"sha256":PROFILE_FULL_SHA})
+            && terminal["schema"] == "foundation-epoch288-physical-budget-stop-v1"
+            && terminal["epoch"] == 288
+            && terminal["unit"] == UNIT_FULL
+            && terminal["invocation_id"] == IID_FULL
+            && terminal["guard_drained"] == true
+            && terminal["producer"]["MainPID"] == "0"
+            && terminal["guard_service_after"]["Id"] == GUARD_FULL
+            && terminal["guard_timer_after"]["ActiveState"] == "inactive"
+            && terminal["cohort_marker"]["status"] == "running-private"
+            && terminal["publication_authorized"] == false
+            && profile["unit"] == UNIT_FULL
+            && profile["run_root"] == ROOT_FULL,
+        "epoch 288 duplicate does not bind the drained full replay"
+    );
+
+    let pin: Asset = serde_json::from_value(proof["pin"].clone())?;
+    let copy: Asset = serde_json::from_value(proof["duplicate"].clone())?;
+    let archive = PathBuf::from(
+        terminal["retained_partial"]["path"]
+            .as_str()
+            .context("partial path")?,
+    );
+    let run = archive
+        .parent()
+        .and_then(Path::parent)
+        .context("retained run path")?;
+    let worker = run.join("scratch/.historical-runtime/jetstreamer-historical-parent-wtgjsB");
+    let bank = worker.join("jetstreamer-historical-v1.8.11-tTXR6V/accounts-state");
+    let archive_stamp: Stamp = serde_json::from_value(proof["partial_archive"]["stamp"].clone())?;
+    let bank_stamp: Stamp = serde_json::from_value(proof["bank"]["stamp"].clone())?;
+    let snapshot = &profile["snapshot"];
+    ensure!(
+        run.starts_with(Path::new(ROOT_FULL).join("state"))
+            && archive == run.join("archives/epoch-288.jet")
+            && proof["partial_archive"]["path"] == json!(archive)
+            && terminal["retained_partial"]["inode"] == archive_stamp.inode
+            && terminal["retained_partial"]["device"] == archive_stamp.device
+            && terminal["retained_partial"]["bytes"] == archive_stamp.logical_bytes
+            && proof["bank"]["path"] == json!(bank)
+            && bank.symlink_metadata()?.is_dir()
+            && bank.canonicalize()? == bank
+            && copy.path == worker.join("bound-bootstrap").join(SNAPSHOT)
+            && pin.path
+                == Path::new("/home/ubuntu/.jetstreamer-private/epoch288-pinned-root-v303")
+                    .join(SNAPSHOT)
+            && snapshot["path"] == json!(pin.path)
+            && snapshot["sha256"] == pin.sha256
+            && snapshot["device"] == pin.stamp.device
+            && snapshot["inode"] == pin.stamp.inode
+            && snapshot["bytes"] == pin.stamp.logical_bytes
+            && pin.stamp.uid == 0
+            && pin.stamp.mode & 0o222 == 0
+            && copy.stamp.uid == 1000
+            && copy.stamp.mode & 0o777 == 0o600
+            && pin.stamp.links == 1
+            && copy.stamp.links == 1
+            && copy.stamp.device == pin.stamp.device
+            && copy.stamp.inode != pin.stamp.inode
+            && copy.stamp.logical_bytes == pin.stamp.logical_bytes
+            && copy.sha256 == pin.sha256,
+        "epoch 288 full replay duplicate, archive, or evolved bank identity differs"
+    );
+    retire_verified(
+        apply,
+        self_sha,
+        VerifiedDuplicate {
+            epoch: 288,
+            proof_sha,
+            invocation: IID_FULL,
+            scope: Path::new(ROOT_FULL),
+            state,
+            run,
+            pin: &pin,
+            copy: &copy,
+            archive: &archive,
+            archive_stamp: &archive_stamp,
+            bank: &bank,
+            bank_stamp: &bank_stamp,
+            parent_inode: proof["duplicate_parent_inode"]
+                .as_u64()
+                .context("duplicate parent inode")?,
+            closed: closed_full,
+        },
+    )
+}
+
 fn retire_verified(apply: bool, self_sha: &str, qualified: VerifiedDuplicate<'_>) -> Result<()> {
     let VerifiedDuplicate {
         epoch,
