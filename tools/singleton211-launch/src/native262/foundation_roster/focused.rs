@@ -577,12 +577,19 @@ pub(super) fn v1627_230_drained(n: &mut Native, row: &Value) -> Result<Option<Bo
     let terminal = terminal_ref.sealed()?;
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
     v1627_terminal_matches(row, &receipt, &terminal, &launch, &boot.trim().replace('-', ""))?;
-    let archive = fs::symlink_metadata(V1627_ARCHIVE)?;
-    let identity = &terminal["archive"]["identity"];
+    check_terminal_output(Path::new(V1627_ARCHIVE), &terminal["archive"])?;
+    drained(n, V1627_230.unit, V1627_230.guard, V1627_INVOCATION)?;
+    Ok(Some(reference))
+}
+
+fn check_terminal_output(path: &Path, output: &Value) -> Result<()> {
+    let archive = fs::symlink_metadata(path)?;
+    let identity = &output["identity"];
     let nanos =
         |seconds: i64, fraction: i64| seconds.checked_mul(1_000_000_000)?.checked_add(fraction);
     ensure!(
-        archive.is_file()
+        output["path"] == json!(path)
+            && archive.is_file()
             && archive.dev() == num(identity, "device")?
             && archive.ino() == num(identity, "inode")?
             && archive.len() == num(identity, "bytes")?
@@ -590,10 +597,100 @@ pub(super) fn v1627_230_drained(n: &mut Native, row: &Value) -> Result<Option<Bo
                 == identity["mtime_ns"].as_i64().context("archive mtime missing")?
             && nanos(archive.ctime(), archive.ctime_nsec()).context("archive ctime overflow")?
                 == identity["ctime_ns"].as_i64().context("archive ctime missing")?,
-        "the retained epoch 230 v1.6.27 archive changed after terminal verification"
+        "retained terminal output changed after verification: {}", path.display()
     );
-    drained(n, V1627_230.unit, V1627_230.guard, V1627_INVOCATION)?;
+    Ok(())
+}
+
+const ADJACENT_230_INVOCATION: &str = "f7f7aec34ae04d10bf41261ec552273b";
+const ADJACENT_230_LAUNCH_SHA: &str =
+    "aeaa1889903df19f737eed77bcd38e0df66f61b268ee1b38afe834b6bb28964f";
+const ADJACENT_230_TERMINAL: &str =
+    "/var/lib/jetstreamer/horizon230-adjacent-terminal-collector-state-v1/evidence/terminal-evidence.json";
+const ADJACENT_230_ARCHIVE: &str =
+    "/home/ubuntu/.jetstreamer-private/qualification-230-adjacent-99445304-v1/work/output/epoch-230-slots-99445305-99461591.jet";
+
+fn adjacent_230_terminal_matches(row: &Value, terminal: &Value, launch: &Bound, boot: &str) -> Result<()> {
+    let pid = text(&row["producer"], "MainPID")?.parse::<u64>()?;
+    ensure!(
+        row["epoch"] == 230
+            && row["phase"] == "diagnostic-qualification"
+            && row["producer"]["Id"] == ADJACENT_230.unit
+            && row["producer"]["InvocationID"] == ADJACENT_230_INVOCATION
+            && row["launch_receipt"] == json!(launch.path)
+            && row["launch_receipt_sha256"] == launch.sha256
+            && terminal["schema"] == "foundation-epoch230-adjacent-private-terminal-evidence-v1"
+            && terminal["epoch"] == 230
+            && terminal["unit"] == ADJACENT_230.unit
+            && terminal["invocation_id"] == ADJACENT_230_INVOCATION
+            && terminal["producer_pid"] == pid
+            && terminal["boot_id"] == boot
+            && terminal["launch"] == json!(launch)
+            && terminal["producer_exit_status"] == 0
+            && terminal["producer_drained"] == true
+            && terminal["native_manifest_complete_verified"] == true
+            && terminal["first_slot"] == ADJACENT_230.first
+            && terminal["last_slot"] == ADJACENT_230.last
+            && terminal["slot_count"] == ADJACENT_230.last - ADJACENT_230.first + 1
+            && terminal["terminal_checkpoint"]["slot"] == ADJACENT_230.last
+            && terminal["publication_authorized"] == false,
+        "closed epoch 230 evidence does not bind the sampled adjacent window"
+    );
+    Ok(())
+}
+
+pub(super) fn adjacent_230_drained(n: &mut Native, row: &Value) -> Result<Option<Bound>> {
+    let path = Path::new(ADJACENT_230_TERMINAL);
+    if !path.try_exists()? {
+        return Ok(None);
+    }
+    let reference = Bound::new(path, hash(path)?);
+    let terminal = reference.sealed()?;
+    let launch = Bound::new(
+        Path::new(ADJACENT_230.state).join("cadence-registration.json"),
+        ADJACENT_230_LAUNCH_SHA,
+    );
+    launch.sealed()?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim().replace('-', "");
+    adjacent_230_terminal_matches(row, &terminal, &launch, &boot)?;
+    check_terminal_output(Path::new(ADJACENT_230_ARCHIVE), &terminal["archive"])?;
+    check_terminal_output(
+        Path::new(&format!("{ADJACENT_230_ARCHIVE}.segment.json")),
+        &terminal["segment_manifest"],
+    )?;
+    drained(n, ADJACENT_230.unit, ADJACENT_230.guard, ADJACENT_230_INVOCATION)?;
     Ok(Some(reference))
+}
+
+#[cfg(test)]
+#[test]
+fn adjacent_230_release_requires_the_exact_successful_terminal() {
+    let launch = Bound::new(
+        Path::new(ADJACENT_230.state).join("cadence-registration.json"),
+        ADJACENT_230_LAUNCH_SHA,
+    );
+    let boot = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    let row = json!({
+        "epoch":230, "phase":"diagnostic-qualification", "launch_receipt":launch.path,
+        "launch_receipt_sha256":launch.sha256, "producer":{
+            "Id":ADJACENT_230.unit,"InvocationID":ADJACENT_230_INVOCATION,"MainPID":"3034376"
+        }
+    });
+    let mut terminal = json!({
+        "schema":"foundation-epoch230-adjacent-private-terminal-evidence-v1",
+        "epoch":230,"unit":ADJACENT_230.unit,"invocation_id":ADJACENT_230_INVOCATION,
+        "producer_pid":3034376,"boot_id":boot,"launch":launch,
+        "producer_exit_status":0,"producer_drained":true,
+        "native_manifest_complete_verified":true,"first_slot":ADJACENT_230.first,
+        "last_slot":ADJACENT_230.last,"slot_count":ADJACENT_230.last-ADJACENT_230.first+1,
+        "terminal_checkpoint":{"slot":ADJACENT_230.last},"publication_authorized":false
+    });
+    assert!(adjacent_230_terminal_matches(&row, &terminal, &launch, boot).is_ok());
+    terminal["producer_exit_status"] = json!(1);
+    assert!(adjacent_230_terminal_matches(&row, &terminal, &launch, boot).is_err());
+    terminal["producer_exit_status"] = json!(0);
+    terminal["terminal_checkpoint"]["slot"] = json!(ADJACENT_230.last - 1);
+    assert!(adjacent_230_terminal_matches(&row, &terminal, &launch, boot).is_err());
 }
 
 #[cfg(test)]

@@ -1612,6 +1612,7 @@ fn measure(
         None
     };
     let mut closed_v1627_230 = None;
+    let mut closed_adjacent_230 = None;
     let mut closed_overlap_266 = None;
     let mut closed_predecessor_266 = None;
     let rows = admission_fleet["active"].as_array_mut().context("Foundation active roster")?;
@@ -1622,6 +1623,14 @@ fn measure(
         && let Some(proof) = focused::v1627_230_drained(n, &rows[index])?
     {
         closed_v1627_230 = Some((rows.remove(index), proof));
+    }
+    if quote.is_some() && !live_replays.contains_key(&230)
+        && let Some(index) = rows.iter().position(|row| {
+            row["epoch"] == 230 && row["producer"]["Id"] == ADJACENT_230.unit
+        })
+        && let Some(proof) = focused::adjacent_230_drained(n, &rows[index])?
+    {
+        closed_adjacent_230 = Some((rows.remove(index), proof));
     }
     if quote.is_some() && !live_replays.contains_key(&266)
         && let Some(index) = rows.iter().position(|row| {
@@ -1989,6 +1998,12 @@ fn measure(
             "epoch 230 v1.6.27 terminal changed during roster binding"
         );
     }
+    if let Some((row, proof)) = &closed_adjacent_230 {
+        ensure!(
+            focused::adjacent_230_drained(n, row)?.as_ref() == Some(proof),
+            "epoch 230 adjacent terminal changed during roster binding"
+        );
+    }
     if let Some((row, proof)) = &closed_overlap_266 {
         ensure!(
             focused::overlap_266_drained(n, row)?.as_ref() == Some(proof),
@@ -2251,6 +2266,7 @@ fn measure(
         "closed_middle_replay":closed_230,
         "closed_first_7871_replay":closed_first_7871,
         "closed_v1627_230_replay":closed_v1627_230.map(|(_, proof)| proof),
+        "closed_adjacent_230_replay":closed_adjacent_230.map(|(_, proof)| proof),
         "closed_overlap_266_replay":closed_overlap_266.map(|(_, proof)| proof),
         "closed_predecessor_266_replay":closed_predecessor_266.map(|(_, proof)| proof),
         "closed_extraction_226":extraction_drain,
