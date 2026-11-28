@@ -11,6 +11,9 @@ SEAL = "a45a40a3a5e4e16754a63c9ed2a61d1768416fab11e1a0f06aaa8107ca24b120"
 SOURCE = Path(__file__).resolve().parent.parent / "horizon_epoch162_split_scratch/second_reserved_peer.py"
 
 
+ALLOCATION = Path(__file__).resolve().with_name("reserved162_suballocations.py")
+
+
 def members(staging, revision):
     ref = dict(path=str(PREVIOUS / "deployment-seal-receipt.json"),sha256=SEAL)
     seal = f.read(ref)
@@ -35,6 +38,10 @@ def members(staging, revision):
         if name == "successor_price.py":
             s = one(s, 'native162["unit"]["Id"] == "horizon-qualify-162-second-replay-20261128-v2.service"',
                     'native162["unit"]["Id"] == "horizon-qualify-162-second-replay-20261128-v3.service"')
+        if name == "capacity.py":
+            s = one(s, "'closed167_tail.py','ram170_residency.py'", "'closed167_tail.py','reserved162_suballocations.py','ram170_residency.py'")
+            call = "    runpy.run_path(str(STOPPED.parent/'closed167_tail.py'))['reserve'](vars(core),final,base['native'])"
+            s = one(s, call, call + "\n" + call.replace("closed167_tail.py", ALLOCATION.name))
         if not expected:
             members[name] = (old,0o444)
         else:
@@ -42,8 +49,10 @@ def members(staging, revision):
             out = staging/name
             out.write_text(s)
             members[name] = (out,0o444)
+    ast.parse(ALLOCATION.read_text())
+    members[ALLOCATION.name] = (ALLOCATION, 0o444)
     source = staging/"SOURCE.json"
     history = f.read(f.reference(PREVIOUS/"SOURCE.json"))
-    f.save(source,dict(history,revision=revision,previous_162_postguard_price=ref,second_162_reserved_peer=f.reference(SOURCE)["sha256"]))
+    f.save(source,dict(history,revision=revision,previous_162_postguard_price=ref,second_162_reserved_peer=f.reference(SOURCE)["sha256"],closed_tail_allocations=f.reference(ALLOCATION)["sha256"]))
     members[source.name] = (source,0o444)
     return members
