@@ -9,7 +9,7 @@ import sys
 import time
 
 PERMITS = Path("/run/horizon143-preparation-permits")
-ACTIONS = {"copy","build","fixture"}
+ACTIONS = {"copy","copy-v2","build","fixture"}
 
 
 def read_gate(path, invocation, unit):
@@ -34,7 +34,8 @@ def wait_for_token(action):
     invocation = os.environ.get("INVOCATION_ID","")
     if action not in ACTIONS or not re.fullmatch("[0-9a-f]{32}", invocation):
         raise ValueError("expected exact systemd preparation invocation")
-    unit = f"horizon-prepare-143-hourly-{action}-20261128-v1.service"
+    unit = ("horizon-prepare-143-hourly-copy-20261128-v2.service" if action == "copy-v2"
+            else f"horizon-prepare-143-hourly-{action}-20261128-v1.service")
     if Path("/proc/self/cgroup").read_text().strip() != f"0::/system.slice/{unit}":
         raise ValueError("preparation gate is outside its native service")
     path = PERMITS / f"{action}-{invocation}.json"

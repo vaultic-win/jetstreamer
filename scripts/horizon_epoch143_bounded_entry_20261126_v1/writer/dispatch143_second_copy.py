@@ -11,11 +11,11 @@ import time
 
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = RT / "epoch143-second-hourly-20261128-v1"
-PACKAGE = BASE / "preparation-tools-v1"
+PACKAGE = BASE / "preparation-tools-v2"
 RUN = Path("/home/sol/.jetstreamer-private") / BASE.name
 INPUT = RUN / "input"
-UNIT = "horizon-prepare-143-hourly-copy-20261128-v1"
-GUARD = UNIT + "-guard"
+UNIT = "horizon-prepare-143-hourly-copy-20261128-v2"
+GUARD = "horizon-guard-143-hourly-copy-20261128-v2"
 LOCK = Path("/run/horizon-epoch171-to136-g1.operation.lock")
 PRICE = RT / "epoch162-first-hourly-completion-20261127-v2/issued-price-v18"
 PRICE_SHA = "8c326db152e86c7723771501a225607de66012c6cc6f619e9da452335c627e4a"
@@ -95,7 +95,7 @@ def wait_until(get, description, limit=26):
 
 
 def first_guard():
-    files = sorted((BASE / "copy-guard").glob("sample-*.json"))
+    files = sorted((BASE / "copy-guard-v2").glob("sample-*.json"))
     if not files:
         return None
     sample = files[0]
@@ -127,7 +127,7 @@ def dispatch():
              and quote["ram_margin"] >= 0 and 0 <= time.time()-quote["recorded_unix_seconds"] < 20,
              "closed 143 preparation lacks fresh full capacity")
         floor = quote["required_home"]
-        intent = save(BASE/"COPY_ADMISSION.json",dict(
+        intent = save(BASE/"COPY_ADMISSION_V2.json",dict(
             schema="horizon-143-guarded-copy-admission-v1",source=SOURCE,snapshot_bytes=BYTES,
             memory=MEM,cap=MAX_BYTES,home_reserved_once=True,guard_floor=floor,
             capacity=quote,package=package,replay_authorized=False,resource_credit_bytes=0))
@@ -147,7 +147,7 @@ def dispatch():
                 "--setenv=CLOUDSDK_STORAGE_PARALLEL_PROCESS_COUNT=1","--setenv=CLOUDSDK_STORAGE_PARALLEL_THREAD_COUNT=1",
                 "--setenv=CLOUDSDK_STORAGE_SLICED_OBJECT_DOWNLOAD_MAX_COMPONENTS=1",
                 f"--property=BindReadOnlyPaths={PACKAGE}:/run/horizon143-prep-tools {BASE / 'permits'}:/run/horizon143-preparation-permits",
-                "--property=ExecStartPre=/usr/bin/python3 -IB /run/horizon143-prep-tools/prepare143_second_gate.py copy",
+                "--property=ExecStartPre=/usr/bin/python3 -IB /run/horizon143-prep-tools/prepare143_second_gate.py copy-v2",
                 "--","/usr/bin/python3","-IB","/run/horizon143-prep-tools/restore_bound_gcs_snapshot.py",
                 "--gcloud-bin=/usr/bin/gcloud","--gcloud-account="+pinned["gcloud_account"],
                 "--billing-project="+pinned["billing_project"],"--versioned-uri="+SOURCE,
@@ -169,7 +169,7 @@ def dispatch():
                 "--",str(guard),"--unit",UNIT+".service","--expected-invocation-id",iid,
                 "--self-sha256",ref(guard)["sha256"],"--root",str(INPUT),"--root-uid",str(info.st_uid),
                 "--root-device",str(info.st_dev),"--root-inode",str(info.st_ino),
-                "--receipt-directory",str(BASE/"copy-guard"),"--minimum-free-bytes",str(floor),
+                "--receipt-directory",str(BASE/"copy-guard-v2"),"--minimum-free-bytes",str(floor),
                 "--maximum-root-bytes",str(MAX_BYTES),"--expected-memory-max-bytes",str(MEM),
                 "--expected-memory-swap-max-bytes","0","--expected-tasks-max","128",
                 "--expected-cpu-quota-usec","500000","--expected-max-run-usec",str(RUNTIME*1_000_000))
@@ -181,7 +181,7 @@ def dispatch():
                  and sample["available_bytes"]>=floor and sample["minimum_free_bytes"]==floor
                  and sample["conservative_physical_bytes"]<=MAX_BYTES and sample["maximum_root_bytes"]==MAX_BYTES,
                  "copy first guard does not cover the original pre-start actor")
-            issued = save(BASE/"permits"/f"copy-{iid}.json",dict(
+            issued = save(BASE/"permits"/f"copy-v2-{iid}.json",dict(
                 schema="horizon-143-preparation-permit-v1",unit=UNIT+".service",boot_id=boot,invocation=iid,
                 admission=intent,guard=ref(path),guard_terminal_cursor=terminal["__CURSOR"],first_guard_success=True,
                 replay_authorized=False,resource_credit_bytes=0),0o444)

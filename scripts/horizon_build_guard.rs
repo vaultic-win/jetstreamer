@@ -148,6 +148,7 @@ fn positive(value: &str) -> Result<u64> {
 #[cfg(anza143_hourly_prep)]
 fn purpose_unit(unit: &str) -> bool {
     matches!(unit, "horizon-prepare-143-hourly-copy-20261128-v1.service"
+                 | "horizon-prepare-143-hourly-copy-20261128-v2.service"
                  | "horizon-prepare-143-hourly-build-20261128-v1.service")
 }
 
