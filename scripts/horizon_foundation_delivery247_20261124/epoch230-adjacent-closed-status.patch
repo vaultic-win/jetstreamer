@@ -1,0 +1,82 @@
+--- a/seven_status.py
++++ b/seven_status.py
+@@ -8,10 +8,19 @@
+ DELIVERY_252_CORRECTION = V/'horizon252-current-reader-delivery-v1/forecast-correction-v1'
+ 
+ def closed_230_comparison(intent):
+-    terminal_ref = {
+-        'path': str(V/'horizon230-v1627-replay-runtime-v1/terminal.json'),
+-        'sha256': 'db618cf906b39ffe64f80b7a0c90febaa4d54054cac4a74e2fed12cea772846e',
+-    }
++    adjacent = intent['owner']['Id'] == 'horizon-qualify-230-adjacent-99445304-v1.service'
++    if adjacent:
++        terminal_ref = {
++            'path': str(V/'horizon230-adjacent-99445304-runtime-v1/terminal.json'),
++            'sha256': 'db282c37da8fe4dae091a3047dc4e7020bdf60e93905bc2bfc738b0dd4dd3ba7',
++        }
++        slots = (99445305, 99461591, 16287)
++    else:
++        terminal_ref = {
++            'path': str(V/'horizon230-v1627-replay-runtime-v1/terminal.json'),
++            'sha256': 'db618cf906b39ffe64f80b7a0c90febaa4d54054cac4a74e2fed12cea772846e',
++        }
++        slots = (99461592, 99468089, 6498)
+     terminal = bound(terminal_ref)
+     launch = bound(terminal['launch'])
+     proof = bound(terminal['native_terminal'])
+@@ -21,7 +30,23 @@
+     assert intent['owner']['InvocationID'] == launch['invocation_id'] == terminal['invocation_id']
+     assert terminal['launch'] in intent['evidence'] and proof['launch'] == terminal['launch']
+     assert proof['producer_exit_status'] == 0 and proof['producer_drained']
+-    assert (proof['first_slot'], proof['last_slot'], proof['slot_count']) == (99461592, 99468089, 6498)
++    assert (proof['first_slot'], proof['last_slot'], proof['slot_count']) == slots
++    evidence = [terminal_ref]
++    verified = 0
++    if adjacent:
++        poh_ref = {
++            'path': str(V/'horizon230-adjacent-poh-readback-v1/receipt.json'),
++            'sha256': '4e938a0759756632db0d85cbc1142434beaed3eb6d092470801f9d7c99ea26de',
++        }
++        poh = bound(poh_ref)
++        assert proof['adjacent_checkpoints']['consensus_fields_match']
++        assert poh['schema'] == 'foundation-epoch230-closed-window-full-poh-v1'
++        assert poh['native_terminal'] == terminal['native_terminal']
++        assert poh['archive_sha256'] == proof['archive']['sha256']
++        assert (poh['first_slot'], poh['last_slot'], poh['slots']) == slots
++        assert poh['all_positions_read'] and poh['full_poh_verified'] and not poh['publication_authorized']
++        evidence.append(poh_ref)
++        verified = slots[2]
+     manager = bound(terminal['pid1_exit'])['properties']
+     assert (manager['ExecMainCode'], manager['ExecMainStatus'], manager['Result']) == ('1', '0', 'success')
+     runtime = int(manager['ExecMainExitTimestampMonotonic']) - int(manager['ExecMainStartTimestampMonotonic'])
+@@ -30,13 +55,17 @@
+     first, last = forecast['remaining_slot_range']
+     retained = forecast['completed_window_positions']
+     assert (first, last, retained, forecast['window_positions_credited']) == (99437434, 99791404, 47393, 0)
+-    remaining = last - first + 1 - retained
++    remaining = last - first + 1 - retained - verified
+     seconds = (math.ceil(remaining / forecast['replay_slots_per_sec'])
+                + forecast['repair_and_turnover_seconds'] + forecast['delivery_seconds'])
+     basis = ('The private v1.6.27 comparison verified 6,498 positions and drained. The remaining '
+              'estimate holds these positions pending adjacent checkpoint verification and retains '
+              'the observed replay rate and existing turnover and delivery allowances.')
+-    return terminal_ref, dict(phase='verification', jet_size_bytes=proof['archive']['identity']['bytes'],
++    if adjacent:
++        basis = ('The private adjacent window matched both neighboring checkpoints and verified all '
++                 '16,287 positions through independent PoH readback. The remaining planning estimate '
++                 'credits those positions and retains the prior rate and turnover and delivery allowances.')
++    return evidence, dict(phase='verification', jet_size_bytes=proof['archive']['identity']['bytes'],
+                               elapsed_execution_millis=runtime // 1000,
+                               estimated_remaining_millis=seconds * 1000), basis
+ 
+@@ -209,8 +238,8 @@
+             # The closed private worker's elapsed execution clock is frozen. Its absolute planning deadline covers capacity, replay and the downstream stages.
+             prior_intent = bound(old['intent'])
+             if e == 230 and 'basis' not in prior_intent:
+-                terminal, preparation, basis = closed_230_comparison(prior_intent)
+-                evidence.append(terminal)
++                terminal_evidence, preparation, basis = closed_230_comparison(prior_intent)
++                evidence.extend(terminal_evidence)
+                 v.update(preparation)
+             else:
+                 remaining=v['estimated_remaining_millis']-round(delta*1000)
