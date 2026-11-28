@@ -139,9 +139,52 @@ def snapshot(core):
 
 
 def holding(core, support, previous):
-    """Price M attempt 12 within the restored serial holding envelope if it is issued."""
+    """Match the single native transfer to its paid holding slot."""
     units = support.active_units('horizon-closed186-*','horizon-*park*','horizon-*holding*','horizon-*retire*','horizon-*restore*')
+    if any(name.startswith('horizon-closed157-park-lanej-') for name in units):
+        return lanej_park_owner(core, units)
     return m12_owner(core,units) if any('-m12-' in name for name in units) else previous()
+
+
+def lanej_park_owner(core, units):
+    core.need(len(units) == 1, 'more than one native holding operator')
+    name = next(iter(units))
+    match = re.fullmatch(r'horizon-closed157-park-lanej-([0-9]+)\.service', name)
+    core.need(match is not None, 'unknown epoch 157 holding operator')
+    directory = RT/'epoch157-lanej-rotation-20261128-v1'
+    package = directory/'park-package-v1'
+    row, record = core.read(directory/f'PARK_ADMISSION_{match[1]}.json')
+    start, start_ref = core.read(directory/f'PARK_START_{match[1]}.json')
+    expected, identity = core.read(package/'expected.json', 'c4c24a560270605e2c0151ae802f64574785ea25a4592aa6e7b0b475160732e0')
+    plan, plan_ref = core.read(package/'plan.json', 'd3d19bcdcbb8de8752b28910194f26289b92b8af821dbb28b8269da628653c88')
+    image = Path('/usr/local/lib/jetstreamer/horizon-holding-candidate-20261023-v1/jetstreamer-r2')
+    digest = '909248d8e4c1db4c3cd89e1a4f15205b4a59d442494f35b7635038152025bb7e'
+    core.need(row['schema'] == 'horizon-157-lanej-park-admission-v1' and row['unit'] == start['unit'] == name
+              and start['admission'] == record and plan_ref == row['plan'] == expected['park']
+              and row['expected'] == identity and plan['sha256'] == expected['sha256']
+              and row['restore_peak'] == plan['length'] + 16*M == 122423339643
+              and row['restore_slot'] == 123350028052 and row['ram'] == 2*G and row['cpu_micros'] == 2000000
+              and row['swap'] == row['resource_credit_bytes'] == 0 and row['canonical_publication'] is False,
+              'epoch 157 holding admission differs')
+    s = core.state(name)
+    core.need(s['ActiveState'] == 'active' and not s['Job'] and s['ControlPID'] == '0'
+              and s['InvocationID'] == start['invocation'] and re.fullmatch('[0-9a-f]{32}',s['InvocationID'])
+              and int(s['MainPID']) == start['pid'] > 0 and s['MemoryMax'] == str(2*G)
+              and s['MemorySwapMax'] == '0' and s['CPUQuotaPerSecUSec'] == '2s'
+              and s['ControlGroup'] == '/system.slice/'+name, 'epoch 157 holding scope changed')
+    proc = Path('/proc')/s['MainPID']
+    group = Path('/sys/fs/cgroup'+s['ControlGroup'])
+    argv = [str(image), 'holding-park', str(package/'plan.json'), '--spec-sha256', plan_ref['sha256'],
+            '--self-sha256', digest]
+    core.need((group/'cgroup.procs').read_text().split() == [s['MainPID']]
+              and (group/'memory.max').read_text().strip() == str(2*G)
+              and (group/'memory.swap.max').read_text().strip() == '0'
+              and (group/'cpu.max').read_text().split() == ['200000','100000']
+              and (proc/'exe').samefile(image)
+              and (proc/'cmdline').read_bytes().split(b'\0') == [os.fsencode(arg) for arg in argv]+[b'']
+              and int((proc/'stat').read_text().rsplit(') ',1)[1].split()[19]) == start['start_ticks']
+              and core.state(name) == s, 'epoch 157 Rust transfer identity or kernel limits changed')
+    return dict(phase='park', admission=record, start=start_ref, native=s, expected=identity, resource_credit_bytes=0)
 
 
 def m12_owner(core, units):
