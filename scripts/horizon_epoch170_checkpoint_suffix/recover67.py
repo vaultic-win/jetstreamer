@@ -101,7 +101,13 @@ def recover(digest, apply):
                         committed=evidence["preserved_writes"], forecast=evidence["forecast_166"])
         evidence_path = c.ROOT / "V67_094808_FORECAST_RECOVERY.json"
         c.durable(evidence_path,evidence)
-        c.durable(h.READY,ready)
+        if h.READY.exists():
+            c.need(h.doc(h.READY) == ready, "different staged handoff")
+        else:
+            h.private_write(h.READY, (json.dumps(ready, sort_keys=True)+"\n").encode(), 0o400)
+        os.chmod(h.READY, 0o400)
+        with h.READY.open("rb") as ready_file:
+            os.fsync(ready_file.fileno())
         directory = h.SYSTEMD_DIRECTORY / (h.WRITER + ".d")
         previous = max(directory.glob("*-v66-*.conf"),key=lambda p:p.name)
         raw = previous.read_bytes()
