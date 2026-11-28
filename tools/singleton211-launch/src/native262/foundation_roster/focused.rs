@@ -353,6 +353,17 @@ pub(super) const FOLLOWING_WINDOW_266: Focused = Focused {
     profile_sha: "4709cbc3baf7d27acc46e2ea6d2aec7a658bf4ecc23a70f0f571c27ba61068f6",
     ..WINDOW_266
 };
+pub(super) const FOLLOWING_WINDOW_266_RETRY: Focused = Focused {
+    unit: "horizon-qualify-checkpoint-continuation-266-window-114949777-v2.service",
+    guard: "horizon-266-window-114949777-protective-v2",
+    root: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114949777-v2",
+    first: 114_943_136,
+    last: 114_949_777,
+    state: "/var/lib/jetstreamer/horizon266-window-114943136-114949777-runtime-v2",
+    preflight_sha: "5d44090c466c4ed15251b784b35cbd0aebf34f679cbd77da3c5f693b2e3d5bf7",
+    profile_sha: "b930774d546a33409b81273b413a6833e2220eabc3e9eb8f1b5cfae1dec35cfa",
+    ..WINDOW_266
+};
 const FOLLOWING_WINDOW_266_CUSTODY: (&str, &str) = (
     "/var/lib/jetstreamer/horizon266-next-114943135-intake-v1/custody.json",
     "2e3e0c35c5775bd5efea97e282e5cfccb7b3374c6529646db76e029d8248ff0a",
@@ -411,7 +422,7 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 19] = [
+pub(super) const SCOPES: [&Focused; 20] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
@@ -428,6 +439,7 @@ pub(super) const SCOPES: [&Focused; 19] = [
     &WINDOW_266,
     &SUCCESSOR_WINDOW_266,
     &FOLLOWING_WINDOW_266,
+    &FOLLOWING_WINDOW_266_RETRY,
     &LOADER_296,
     &TRACE_296,
     &FEATURE_296,
@@ -1215,7 +1227,11 @@ pub(super) fn predecessor_266_drained(n: &mut Native, row: &Value) -> Result<Opt
 
 impl Focused {
     pub(super) fn is_window_266(&self) -> bool {
-        [WINDOW_266.unit, SUCCESSOR_WINDOW_266.unit, FOLLOWING_WINDOW_266.unit].contains(&self.unit)
+        [WINDOW_266.unit, SUCCESSOR_WINDOW_266.unit].contains(&self.unit) || self.is_following_window_266()
+    }
+
+    pub(super) fn is_following_window_266(&self) -> bool {
+        [FOLLOWING_WINDOW_266.unit, FOLLOWING_WINDOW_266_RETRY.unit].contains(&self.unit)
     }
 
     pub(super) fn control_memory(&self) -> u64 {
@@ -1277,7 +1293,7 @@ impl Focused {
 
     pub(super) fn window_266_custody(&self) -> Result<Bound> {
         ensure!(self.is_window_266(), "foreign epoch 266 checkpoint window");
-        let ((path, digest), schema, remote) = if self.unit == FOLLOWING_WINDOW_266.unit {
+        let ((path, digest), schema, remote) = if self.is_following_window_266() {
             (
                 FOLLOWING_WINDOW_266_CUSTODY,
                 "foundation-epoch266-following-bootstrap-private-custody-v1",
@@ -1353,7 +1369,21 @@ impl Focused {
             let mount = binding(&receipt["mount_preflight"])?.sealed()?;
             let build = binding(&receipt["node_build"])?.sealed()?;
             let seal = binding(&receipt["node_seal"])?.sealed()?;
-            if self.unit == FOLLOWING_WINDOW_266.unit {
+            if self.unit == FOLLOWING_WINDOW_266_RETRY.unit {
+                let node_created_paths = json!(["output", "receipts", "ledger/genesis.tar.bz2"]);
+                let failure = binding(&receipt["prior_failed_start"])?.sealed()?;
+                ensure!(
+                    receipt["producer_created_paths_absent"] == node_created_paths
+                        && mount["producer_created_paths_absent"] == node_created_paths
+                        && failure["schema"] == "foundation-epoch266-private-window-failed-start-v1"
+                        && failure["failed_unit"] == FOLLOWING_WINDOW_266.unit
+                        && failure["failure_before_first_bank"] == true
+                        && failure["guard_drained"] == true
+                        && failure["pid1"]["ExecMainStatus"] == "1",
+                    "epoch 266 retry requires the failed start and a fresh producer layout"
+                );
+            }
+            if self.is_following_window_266() {
                 let projection = &profile["bootstrap_custody_projection"];
                 let host = binding(&projection["host_custody"])?;
                 let staged = binding(&projection["source_custody"])?;

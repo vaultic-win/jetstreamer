@@ -11,7 +11,7 @@ mod replay258;
 mod replay260;
 mod replay296;
 use focused::{
-    ADJACENT_230, FEATURE_296, FIRST_7871_230, FOLLOWING_WINDOW_266, GAP_230, HOURLY_230, LOADER_296, NEXT_V1627_230, OVERLAP_266,
+    ADJACENT_230, FEATURE_296, FIRST_7871_230, FOLLOWING_WINDOW_266, FOLLOWING_WINDOW_266_RETRY, GAP_230, HOURLY_230, LOADER_296, NEXT_V1627_230, OVERLAP_266,
     OVERLAP_266_EXCLUSIVE, PREDECESSOR_266, RESTORE_258, RESTORE_260, RETRY_NEXT_V1627_230, SCOPES, SECOND_HOURLY_230,
     SUCCESSOR_REPLAY_230, SUCCESSOR_WINDOW_266, WINDOW_266,
     TRACE_296, V1627_230,
@@ -1594,7 +1594,7 @@ fn measure(
         .then(|| focused::next_v1627_predecessor(n))
         .transpose()?;
     let following_266_replay =
-        matches!(&quote, Some(Quote::Focused(scope, _)) if scope.unit == FOLLOWING_WINDOW_266.unit);
+        matches!(&quote, Some(Quote::Focused(scope, _)) if scope.is_following_window_266());
     let following_266_drain = if following_266_replay
         || matches!(&quote, Some(Quote::FollowingIntake266(_)))
     {
@@ -2076,7 +2076,7 @@ fn measure(
     ];
     for replay in live_replays.values() {
         require_disjoint_cpus(epoch, exclusive, replay.unit, &replay.owner)?;
-        if [OVERLAP_266.unit, PREDECESSOR_266.unit, WINDOW_266.unit, SUCCESSOR_WINDOW_266.unit, FOLLOWING_WINDOW_266.unit]
+        if [OVERLAP_266.unit, PREDECESSOR_266.unit, WINDOW_266.unit, SUCCESSOR_WINDOW_266.unit, FOLLOWING_WINDOW_266.unit, FOLLOWING_WINDOW_266_RETRY.unit]
             .contains(&replay.unit)
         {
             replay296::verify_cpu_group("30,32-39", &overlap_exclusive)?;
@@ -2546,7 +2546,7 @@ fn measure(
         "active_predecessor_266_registration":live_replays.get(&266).filter(|replay| replay.unit == PREDECESSOR_266.unit).map(|replay| &replay.reference),
         "active_window_266_registration":live_replays.get(&266).filter(|replay| replay.unit == WINDOW_266.unit).map(|replay| &replay.reference),
         "active_successor_window_266_registration":live_replays.get(&266).filter(|replay| replay.unit == SUCCESSOR_WINDOW_266.unit).map(|replay| &replay.reference),
-        "active_following_window_266_registration":live_replays.get(&266).filter(|replay| replay.unit == FOLLOWING_WINDOW_266.unit).map(|replay| &replay.reference),
+        "active_following_window_266_registration":live_replays.get(&266).filter(|replay| [FOLLOWING_WINDOW_266.unit, FOLLOWING_WINDOW_266_RETRY.unit].contains(&replay.unit)).map(|replay| &replay.reference),
         "active_interval_141_launch":active_interval_141.iter().find(|interval| interval.ordinal() <= 3).map(|interval| &interval.launch),
         "active_interval_141_fourth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 4).map(|interval| &interval.launch),
         "active_interval_141_fifth_launch":active_interval_141.iter().find(|interval| interval.ordinal() == 5).map(|interval| &interval.launch),
@@ -2787,6 +2787,7 @@ pub fn run() -> Result<()> {
                         | "--window266-quote"
                         | "--successor266-replay-quote"
                         | "--following266-replay-quote"
+                        | "--following266-retry-quote"
                         | "--predecessor266-quote"
                         | "--adjacent230-intake-quote"
                         | "--successor230-intake-quote"
@@ -2900,6 +2901,7 @@ pub fn run() -> Result<()> {
                         | "--window266-quote"
                         | "--successor266-replay-quote"
                         | "--following266-replay-quote"
+                        | "--following266-retry-quote"
                         | "--predecessor266-quote"
                         | "--focused296-quote"
                         | "--trace296-quote"
@@ -2923,6 +2925,7 @@ pub fn run() -> Result<()> {
                 Some("--window266-quote") => &WINDOW_266,
                 Some("--successor266-replay-quote") => &SUCCESSOR_WINDOW_266,
                 Some("--following266-replay-quote") => &FOLLOWING_WINDOW_266,
+                Some("--following266-retry-quote") => &FOLLOWING_WINDOW_266_RETRY,
                 Some("--predecessor266-quote") => &PREDECESSOR_266,
                 Some("--trace296-quote") => &TRACE_296,
                 Some("--feature296-quote") => &FEATURE_296,

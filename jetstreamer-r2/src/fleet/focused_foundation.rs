@@ -77,8 +77,22 @@ const FOLLOWING_266: WindowScope = WindowScope {
     last: 114_949_777,
 };
 
+const FOLLOWING_266_RETRY: WindowScope = WindowScope {
+    unit: "horizon-qualify-checkpoint-continuation-266-window-114949777-v2.service",
+    root: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114949777-v2",
+    state: "horizon266-window-114943136-114949777-runtime-v2",
+    admitted: "horizon266-following-window-admitted-v2",
+    profile_sha: "b930774d546a33409b81273b413a6833e2220eabc3e9eb8f1b5cfae1dec35cfa",
+    preflight_sha: "5d44090c466c4ed15251b784b35cbd0aebf34f679cbd77da3c5f693b2e3d5bf7",
+    custody_sha: "2e3e0c35c5775bd5efea97e282e5cfccb7b3374c6529646db76e029d8248ff0a",
+    first: 114_943_136,
+    last: 114_949_777,
+};
+
 fn window_scope(unit: &str) -> Option<&'static WindowScope> {
-    [&WINDOW_266, &SUCCESSOR_266, &FOLLOWING_266].into_iter().find(|scope| scope.unit == unit)
+    [&WINDOW_266, &SUCCESSOR_266, &FOLLOWING_266, &FOLLOWING_266_RETRY]
+        .into_iter()
+        .find(|scope| scope.unit == unit)
 }
 
 const NEXT_V1627_230_UNIT: &str = "horizon-qualify-230-next-v1627-99468089-v1.service";
@@ -213,6 +227,13 @@ const SCOPES: &[Scope] = &[
         unit: FOLLOWING_266.unit,
         attempt: "window-114949777-v1",
         state: FOLLOWING_266.state,
+        kind: "epoch266-private-hourly-window",
+    },
+    Scope {
+        epoch: 266,
+        unit: FOLLOWING_266_RETRY.unit,
+        attempt: "window-114949777-v2",
+        state: FOLLOWING_266_RETRY.state,
         kind: "epoch266-private-hourly-window",
     },
     Scope {

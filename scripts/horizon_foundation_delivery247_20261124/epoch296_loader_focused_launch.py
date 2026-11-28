@@ -235,6 +235,26 @@ FOLLOWING_266_DRAIN = {
     "path": str(SUCCESSOR_266.state / "terminal.json"),
     "sha256": "939d32b372e8052de5f8b154720e0600de837d5f02c79334cf5e5d4e0af868b1",
 }
+FOLLOWING_266_RETRY = replace(
+    FOLLOWING_266,
+    state=V / "horizon266-window-114943136-114949777-runtime-v2",
+    unit="horizon-qualify-checkpoint-continuation-266-window-114949777-v2.service",
+    guard="horizon-266-window-114949777-protective-v2.service",
+    profile_sha="b930774d546a33409b81273b413a6833e2220eabc3e9eb8f1b5cfae1dec35cfa",
+    preflight_sha="5d44090c466c4ed15251b784b35cbd0aebf34f679cbd77da3c5f693b2e3d5bf7",
+)
+FOLLOWING_266_RETRY_TOKEN_PROBE = {
+    "path": str(FOLLOWING_266_RETRY.state / "evidence/prestart-token-probe.json"),
+    "sha256": "00873ab77119efa638ff0db47b768b4cda30b47072eeb9281e992b25ae315b",
+}
+FOLLOWING_266_RETRY_FLEET = V / "horizon266-following-window-fleet-v2/acceptance.json"
+FOLLOWING_266_RETRY_PLAN = V / "horizon266-following-window-admitted-v2"
+FOLLOWING_266_RETRY_FAILURE = {
+    "path": str(FOLLOWING_266_RETRY.state / "evidence/failed-v1-terminal.json"),
+    "sha256": "65d57227b4f9af9eeead1351acd49cdf63276629cedf53a879338f1df9c14367",
+}
+WINDOW_266_NODE_CREATED_PATHS = ("output", "receipts", "ledger/genesis.tar.bz2")
+
 TRACE_296 = Scope(
     296, V / "horizon296-loader-log-v3",
     "horizon-qualify-296-loader-log-v3.service", "horizon-296-loader-log-protective-v3.service",
@@ -255,6 +275,7 @@ SCOPED_ARGS = {
     "--window266": WINDOW_266,
     "--successor266": SUCCESSOR_266,
     "--following266": FOLLOWING_266,
+    "--following266-retry": FOLLOWING_266_RETRY,
     "--epoch230": GAP_230, "--epoch258": RESTORE_258, "--epoch260": RESTORE_260,
     "--hourly230": HOURLY_230, "--hourly230-second": SECOND_HOURLY_230,
     "--overlap266": OVERLAP_266,
@@ -484,7 +505,12 @@ def predecessor_namespace(ops, scope, preflight, profile):
 def launch_window_266(kit, roster_ref, scope):
     """Use the existing invocation-bound startup for the sealed continuation."""
     ops = kit.ops
-    if scope is FOLLOWING_266:
+    if scope is FOLLOWING_266_RETRY:
+        fleet = FOLLOWING_266_RETRY_FLEET
+        plan_path = FOLLOWING_266_RETRY_PLAN
+        token_probe = FOLLOWING_266_RETRY_TOKEN_PROBE
+        release_schema = "foundation-epoch266-following-window-fleet-release-v2"
+    elif scope is FOLLOWING_266:
         fleet = FOLLOWING_266_FLEET
         plan_path = FOLLOWING_266_PLAN
         token_probe = FOLLOWING_266_TOKEN_PROBE
@@ -529,7 +555,7 @@ def launch_window_266(kit, roster_ref, scope):
     probe = ops.bound(token_probe)
     assert probe["token_root"] == str(tokens) and probe["prestart_hook"] == HOOK
     assert probe["qualification_only"] and probe["same_hook_reached_projected_token"]
-    if scope in (SUCCESSOR_266, FOLLOWING_266):
+    if scope in (SUCCESSOR_266, FOLLOWING_266, FOLLOWING_266_RETRY):
         assert probe["missing_token_rejected"] and probe["stale_token_rejected"]
     assert set(tokens.iterdir()) == {tokens / "qualification"}
     assert not any((state / "guard-receipts").iterdir())
@@ -545,7 +571,7 @@ def launch_window_266(kit, roster_ref, scope):
         assert target.lstat().st_size == 0
         bindings.append(f"{source}:{target}")
     projection = None
-    if scope is FOLLOWING_266:
+    if scope in (FOLLOWING_266, FOLLOWING_266_RETRY):
         assert roster["focused_266_quote"]["predecessor_drain"] == FOLLOWING_266_DRAIN
         drained = ops.bound(FOLLOWING_266_DRAIN)
         assert drained["unit"] == SUCCESSOR_266.unit and drained["guard_drained"]
@@ -564,7 +590,22 @@ def launch_window_266(kit, roster_ref, scope):
             "LoadState": "not-found", "ActiveState": "inactive", "Job": ""}
     assert not any((root / "scratch").iterdir())
     assert {p.name for p in (root / "ledger").iterdir()} == {"compact-indexes"}
+    if scope is FOLLOWING_266_RETRY:
+        assert preflight["prior_failed_start"] == FOLLOWING_266_RETRY_FAILURE
+        failed = ops.bound(FOLLOWING_266_RETRY_FAILURE)
+        assert failed["failed_unit"] == FOLLOWING_266.unit and failed["failure_before_first_bank"]
+        assert failed["guard_drained"] and failed["pid1"]["ExecMainStatus"] == "1"
+        assert preflight["producer_created_paths_absent"] == list(WINDOW_266_NODE_CREATED_PATHS)
+        assert mount["producer_created_paths_absent"] == list(WINDOW_266_NODE_CREATED_PATHS)
+        assert ops.props(failed["timer_unit"], ["ActiveState", "Job"]) == {
+            "ActiveState": "inactive", "Job": ""}
+        for prior in (FOLLOWING_266.unit, FOLLOWING_266.guard):
+            observed = ops.props(prior, ["ActiveState", "MainPID", "ControlGroup", "Job"])
+            assert observed["ActiveState"] in ("inactive", "failed")
+            assert observed["MainPID"] == "0" and not observed["ControlGroup"] and not observed["Job"]
+    assert all(not os.path.lexists(root / path) for path in WINDOW_266_NODE_CREATED_PATHS)
     inventory_unit = {
+        FOLLOWING_266_RETRY.unit: "foundation-266-following-window-retry-inventory-v2",
         FOLLOWING_266.unit: "foundation-266-following-window-inventory-v1",
         SUCCESSOR_266.unit: "foundation-266-successor-window-inventory-v1",
     }.get(scope.unit, "foundation-266-window-inventory-v1")
@@ -646,6 +687,8 @@ def launch_window_266(kit, roster_ref, scope):
         assert mounted[0] == "tmpfs" and "noswap" in mounted[2].split(",")
         stats = os.statvfs(namespace / scratch.relative_to("/"))
         assert stats.f_frsize * stats.f_blocks == profile["scratch_tmpfs_bytes"]
+        mounted_root = namespace / root.relative_to("/")
+        assert all(not os.path.lexists(mounted_root / path) for path in WINDOW_266_NODE_CREATED_PATHS)
         confirmation = current_fit(kit, roster, root, scope, held=True)
         ops.funds.put(state / "guard-release-fit.json", {
             "schema": "foundation-epoch266-private-window-guard-release-fit-v1",
@@ -672,7 +715,7 @@ def launch_window_266(kit, roster_ref, scope):
 
 
 def launch(kit, roster_ref, scope):
-    if scope in (WINDOW_266, SUCCESSOR_266, FOLLOWING_266):
+    if scope in (WINDOW_266, SUCCESSOR_266, FOLLOWING_266, FOLLOWING_266_RETRY):
         return launch_window_266(kit, roster_ref, scope)
     ops = kit.ops
     state = scope.state
