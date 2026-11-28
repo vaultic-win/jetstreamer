@@ -67,6 +67,38 @@ def exited_service(common, svc):
             return not os.path.lexists("/sys/fs/cgroup" + group)
     return True
 
+def consumed_static_calendar(common, timer, fetch):
+    never = (1 << 64) - 1
+    target = str(timer["Unit"])
+    if not (common["UnitFileState"] == "static" and not common["Transient"]
+            and common["ActiveState"] == "active" and common["SubState"] == "elapsed"
+            and not common["Job"][0] and not common["TriggeredBy"]
+            and list(common["Triggers"]) == [target] and target.endswith(".service")
+            and not common["OnSuccess"] and not common["OnFailure"] and timer["RemainAfterElapse"]
+            and not timer["Persistent"] and not timer["OnClockChange"] and not timer["OnTimezoneChange"]
+            and timer["LastTriggerUSec"] > 0 and timer["LastTriggerUSecMonotonic"] > 0
+            and timer["NextElapseUSecRealtime"] == timer["NextElapseUSecMonotonic"] == never
+            and not timer["TimersMonotonic"] and len(timer["TimersCalendar"]) == 1):
+        return None
+    base, spec, next_time = timer["TimersCalendar"][0]
+    if base != "OnCalendar" or next_time != 0:
+        return None
+    try:
+        time = datetime.datetime.strptime(str(spec), "%Y-%m-%d %H:%M:%S UTC").replace(tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return None
+    if time.timestamp() > timer["LastTriggerUSec"] / 1e6 + 1:
+        return None
+    up, sp = fetch(target, "Service")
+    if not (up["UnitFileState"] == "static" and up["ActiveState"] == "inactive" and up["SubState"] == "dead"
+            and not up["Job"][0] and list(up["TriggeredBy"]) == [common["Id"]]
+            and not sp["MainPID"] and not sp["ControlPID"] and not sp["ControlGroup"] and sp["Restart"] == "no"
+            and sp["Result"] == "success" and sp["ExecMainStatus"] == 0
+            and sp["ExecMainExitTimestampMonotonic"] >= timer["LastTriggerUSecMonotonic"]):
+        return None
+    return {"timer":str(common["Id"]),"service":target,"consumed_static_calendar":str(spec),
+            "last_trigger_usec":int(timer["LastTriggerUSec"]),"exit_usec":int(sp["ExecMainExitTimestamp"])}
+
 def closed_activation(kind, common, detail, fetch):
     if kind == "Service" and common["SubState"] == "exited":
         if not exited_service(common, detail):
@@ -121,6 +153,8 @@ for unit in sys.argv[2:]:
             row["projection"] = projection(kind, common, detail)
             try:
                 row["closed"] = closed_activation(kind, common, detail, fetch)
+                if follow_armed_targets and not row["closed"] and kind == "Timer":
+                    row["closed"] = consumed_static_calendar(common, detail, fetch)
             except dbus.DBusException as exc:
                 if exc.get_dbus_name() not in ("org.freedesktop.systemd1.NoSuchUnit", "org.freedesktop.DBus.Error.UnknownObject"):
                     raise
@@ -130,7 +164,10 @@ for unit in sys.argv[2:]:
                 if kind in ("Timer", "Path"):
                     targets.add(str(detail["Unit"]))
                 for target in sorted(t for t in targets if t.endswith(".service")):
-                    up, sp = fetch(target, "Service")
+                    try:
+                        up, sp = fetch(target, "Service")
+                    except dbus.DBusException as exc:
+                        raise ValueError("unresolved activation target " + target + " for " + unit) from exc
                     row["projection"] += "\n" + projection("Service", up, sp)
         rows.append(row)
     except dbus.DBusException as error:

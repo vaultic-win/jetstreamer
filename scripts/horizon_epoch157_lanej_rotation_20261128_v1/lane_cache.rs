@@ -345,7 +345,7 @@ fn terms(text: &str) -> Vec<&'static str> {
         if text.contains(&format!("{selector}{}", base.display()))
             || tokens(text)
                 .map(Path::new)
-                .any(|p| p == target || p == epoch || p == indexes || p == output)
+                .any(|p| p == target || p == epoch || p == indexes || p == output || p == base)
         {
             found.insert(label);
         }
@@ -640,6 +640,7 @@ pub(super) fn staged() -> Result<Value> {
     let mut closed = 0;
     let mut examined = 0;
     let mut gone = 0;
+    let mut unresolved = Vec::new();
     for batch in potential.chunks(128) {
         for plan in native_plans(batch, true)? {
             if matches!(plan.state.as_str(), "inactive" | "failed" | "gone") {
@@ -652,14 +653,9 @@ pub(super) fn staged() -> Result<Value> {
             }
             let direct = terms(&plan.projection);
             let nested = artifacts(&plan.projection, &mut cache)?;
-            ensure!(
-                direct.is_empty() && nested.is_empty(),
-                "unresolved staged reader {} ({}): direct {:?}, plans {:?}",
-                plan.unit,
-                plan.sub,
-                direct,
-                nested.iter().take(8).collect::<Vec<_>>()
-            );
+            if !direct.is_empty() || !nested.is_empty() {
+                unresolved.push(json!({"unit":plan.unit,"state":plan.state,"sub":plan.sub,"direct":direct,"plans":nested.iter().take(20).collect::<Vec<_>>(),"plan_count":nested.len()}));
+            }
             examined += 1;
         }
     }
@@ -667,6 +663,25 @@ pub(super) fn staged() -> Result<Value> {
         examined > 0 && closed + gone + examined == potential.len(),
         "incomplete activation inventory"
     );
+    if !unresolved.is_empty() {
+        let iid = std::env::var("INVOCATION_ID")?;
+        ensure!(
+            iid.len() == 32 && iid.bytes().all(|b| b.is_ascii_hexdigit()),
+            "missing invocation"
+        );
+        let diagnostic = json!({"fleet":current,"unresolved":unresolved,"units":potential.len(),"closed":closed,"material":cache.examined});
+        ensure!(
+            serde_json::to_vec(&diagnostic)?.len() < 2 << 20,
+            "diagnostic size bound"
+        );
+        let report = evidence::receipt(
+            &Path::new(RUNTIME)
+                .join(DIR)
+                .join(format!("STAGED_REVIEW_{iid}.json")),
+            &diagnostic,
+        )?;
+        anyhow::bail!("unresolved staged reader(s), see {report}");
+    }
     Ok(
         json!({"fleet":current,"definitions":definitions,"original_services":old,"original_timer":timer,"potential_units":potential.len(),"conclusively_closed_activations":closed,"inactive_or_collected":gone,"executable_activations":examined,"scheduled_files":cron,"resolved_plans":cache.examined}),
     )
@@ -699,6 +714,26 @@ mod tests {
         }
         assert!(terms(index_path(&scope[2]).to_str().unwrap()).is_empty());
         assert!(!terms(INDEX).is_empty());
+    }
+    #[test]
+    fn consumed_calendar_requires_one_fixed_past_date_and_a_closed_target() {
+        let test = r#"
+u=dict(Id="old.timer",UnitFileState="static",Transient=False,ActiveState="active",SubState="elapsed",Job=[0],TriggeredBy=[],Triggers=["old.service"],OnSuccess=[],OnFailure=[])
+t=dict(Unit="old.service",RemainAfterElapse=True,Persistent=False,OnClockChange=False,OnTimezoneChange=False,LastTriggerUSec=1792176600219944,LastTriggerUSecMonotonic=100,NextElapseUSecRealtime=2**64-1,NextElapseUSecMonotonic=2**64-1,TimersMonotonic=[],TimersCalendar=[("OnCalendar","2026-10-16 18:50:00 UTC",0)])
+up=dict(UnitFileState="static",ActiveState="inactive",SubState="dead",Job=[0],TriggeredBy=["old.timer"])
+sp=dict(MainPID=0,ControlPID=0,ControlGroup="",Restart="no",Result="success",ExecMainStatus=0,ExecMainExitTimestampMonotonic=101,ExecMainExitTimestamp=1792176601219944)
+def fetch(n,k):return up,sp
+assert consumed_static_calendar(u,t,fetch)
+assert not consumed_static_calendar(u,dict(t,OnClockChange=True),fetch)
+assert not consumed_static_calendar(u,dict(t,NextElapseUSecRealtime=10),fetch)
+assert not consumed_static_calendar(u,dict(t,TimersCalendar=[("OnCalendar","daily",0)]),fetch)
+assert not consumed_static_calendar(u,t,lambda n,k:(up,dict(sp,MainPID=17)))
+"#;
+        command(
+            "/usr/bin/python3",
+            &["-IB", "-c", &format!("{INERT_ACTIVATIONS}\n{test}")],
+        )
+        .unwrap();
     }
     #[test]
     fn staged_lane_controller_and_independent_checkpoint_are_distinguishable() {
