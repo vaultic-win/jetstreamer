@@ -1,0 +1,18 @@
+--- cycle.py
++++ cycle.py
+@@ -392,3 +392,2 @@
+ cfg['diagnostic_replays'] += diagnostic226_suffix.configuration()
+-cfg['diagnostic_replays'] += diagnostic226_assembly.configuration()
+ cfg['diagnostic_replays'] += diagnostic296_meter.configuration()
+@@ -1329,2 +1328,11 @@
+         add(plan["gates"]["226"], assembly_ref, assembly_fleet["preflight"])
++        telemetry_release = V / "horizon226-assembly-telemetry-v3/acceptance.json"
++        if telemetry_release.is_file():
++            telemetry_ref = sealed_226_file(telemetry_release)
++            telemetry = bound(telemetry_ref)
++            assert telemetry["schema"] == "foundation-epoch226-assembly-telemetry-release-v3"
++            assert telemetry["predecessor"] == assembly_ref and telemetry["publication_authorized"] is False
++            assert telemetry["installation"]["cycle"] == sealed_226_file(Path(__file__))
++            fleet_image = Path(publication_handoff.checked_image(telemetry["fleet"]))
++            add(plan["gates"]["226"], telemetry_ref)
+     active_private_intervals = set()

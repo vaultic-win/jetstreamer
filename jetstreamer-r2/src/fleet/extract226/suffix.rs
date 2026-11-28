@@ -383,6 +383,7 @@ fn newest_sample(iid: &str, guard_plan: &Value, sub: &str, pid: u64) -> Result<O
 pub(super) fn guard_sample(
     directory: &Path, iid: &str, guard_plan: &Value, sub: &str, pid: u64,
 ) -> Result<Option<Value>> {
+    let mut newest = None;
     for file in fs::read_dir(&directory)? {
         let p = file?.path();
         let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
@@ -400,22 +401,30 @@ pub(super) fn guard_sample(
         {
             continue;
         }
-        ensure!(
-            sample["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
-                && sample["guard_invocation_id"] == guard_id
-                && iid_is_valid(guard_id)
-                && sample["guard_sha256"] == GUARD_SHA
-                && sample["plan_sha256"] == guard_plan["sha256"]
-                && sample["producer_stop_enabled"] == true
-                && sample["trip_reason"].is_null()
-                && sample["root_physical_observation_error"].is_null()
-                && sample["worker_observation_error"].is_null()
-                && sample["maximum_root_physical_bytes"] == ROOT_CAP,
-            "epoch 226 live guard sample rejected"
-        );
-        return Ok(Some(binding));
+        let recorded = sample["recorded_unix_seconds"]
+            .as_u64()
+            .context("epoch 226 guard sample time")?;
+        if newest.as_ref().is_none_or(|(prior, _, _, _)| recorded > *prior) {
+            newest = Some((recorded, guard_id.to_owned(), sample, binding));
+        }
     }
-    Ok(None)
+    let Some((_, guard_id, sample, binding)) = newest else {
+        return Ok(None);
+    };
+    ensure!(
+        sample["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+            && sample["guard_invocation_id"] == guard_id
+            && iid_is_valid(&guard_id)
+            && sample["guard_sha256"] == GUARD_SHA
+            && sample["plan_sha256"] == guard_plan["sha256"]
+            && sample["producer_stop_enabled"] == true
+            && sample["trip_reason"].is_null()
+            && sample["root_physical_observation_error"].is_null()
+            && sample["worker_observation_error"].is_null()
+            && sample["maximum_root_physical_bytes"] == ROOT_CAP,
+        "epoch 226 live guard sample rejected"
+    );
+    Ok(Some(binding))
 }
 
 fn iid_is_valid(value: &str) -> bool {

@@ -3807,9 +3807,11 @@ pub(super) async fn run() -> Result<()> {
             if assembly144::namespace(claim) {
                 assembly144::validate_live(claim, current)?;
             }
-            if extract226::assembly::namespace(claim) {
-                extract226::assembly::validate_live(claim, current)?;
-            }
+            let assembly_work = if extract226::assembly::namespace(claim) {
+                Some(extract226::assembly::observe_live(claim, current)?)
+            } else {
+                None
+            };
             if retained220::namespace(claim) {
                 retained220::validate_live(claim, current)?;
             }
@@ -3983,6 +3985,9 @@ pub(super) async fn run() -> Result<()> {
                 "ordinary_replay_claim":false,"current_sidecar_eta_valid":false});
             if let Some(resources) = extraction_resources {
                 entry["capacity_owners"] = resources;
+            }
+            if let Some(work) = assembly_work {
+                entry["assembly_work"] = work;
             }
             active.push(entry);
         }

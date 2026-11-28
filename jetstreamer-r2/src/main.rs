@@ -3945,6 +3945,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("launch-epoch226-assembly") {
         return fleet::extract226::launch_assembly();
     }
+    if env::args().nth(1).as_deref() == Some("finish-epoch226-assembly") {
+        return fleet::extract226::assembly::terminal::run();
+    }
     if env::args().nth(1).as_deref() == Some("admit-singleton227") {
         return fleet::admit_singleton227();
     }

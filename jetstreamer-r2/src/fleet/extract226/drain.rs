@@ -83,7 +83,7 @@ pub(super) fn show(name: &str) -> Result<Value> {
     Ok(properties)
 }
 
-fn quiet_service(unit_name: &str, row: &Value) -> bool {
+pub(super) fn quiet_service(unit_name: &str, row: &Value) -> bool {
     matches!(row["ActiveState"].as_str(), Some("inactive" | "failed"))
         && row["MainPID"] == "0"
         && row["ControlPID"] == "0"
@@ -94,9 +94,7 @@ fn quiet_service(unit_name: &str, row: &Value) -> bool {
             .exists()
 }
 
-fn exact_success(source: &Source, handoff: &Value, launch: &Value) -> Result<Value> {
-    let original = &handoff["terminal"];
-    let unit = source.profile.unit;
+pub(super) fn clean_success(unit: &str, invocation: &str) -> Result<(Value, Value)> {
     let now = show(unit)?;
     ensure!(
         quiet_service(unit, &now)
@@ -105,12 +103,9 @@ fn exact_success(source: &Source, handoff: &Value, launch: &Value) -> Result<Val
             && now["ExecMainStatus"] == "0"
             && now["Result"] == "success"
             && now["NRestarts"] == "0"
-            && (now["InvocationID"] == "" || now["InvocationID"] == launch["invocation_id"]),
-        "epoch 226 extraction has no clean terminal manager state"
+            && (now["InvocationID"] == "" || now["InvocationID"] == invocation),
+        "epoch 226 stage has no clean terminal manager state"
     );
-    let invocation = launch["invocation_id"]
-        .as_str()
-        .context("extraction invocation")?;
     let result = ProcessCommand::new("/usr/bin/journalctl")
         .args([
             "-b",
@@ -129,13 +124,25 @@ fn exact_success(source: &Source, handoff: &Value, launch: &Value) -> Result<Val
     ensure!(
         result.status.success()
             && rows.next().is_none()
-            && event["__CURSOR"] == original["pid1_cursor"]
-            && event["__REALTIME_TIMESTAMP"] == original["terminal_unix_microseconds"]
             && event["INVOCATION_ID"] == invocation
             && event["UNIT"] == unit,
+        "epoch 226 PID 1 success differs from the stage"
+    );
+    Ok((now, event))
+}
+
+fn exact_success(source: &Source, handoff: &Value, launch: &Value) -> Result<Value> {
+    let original = &handoff["terminal"];
+    let invocation = launch["invocation_id"]
+        .as_str()
+        .context("extraction invocation")?;
+    let (manager, event) = clean_success(source.profile.unit, invocation)?;
+    ensure!(
+        event["__CURSOR"] == original["pid1_cursor"]
+            && event["__REALTIME_TIMESTAMP"] == original["terminal_unix_microseconds"],
         "epoch 226 PID 1 success differs from the sealed prefix handoff"
     );
-    Ok(now)
+    Ok(manager)
 }
 
 fn authenticate_owners(source: &Source, launch: &Value) -> Result<Value> {

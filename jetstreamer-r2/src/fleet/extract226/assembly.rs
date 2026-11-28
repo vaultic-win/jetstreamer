@@ -3,12 +3,15 @@ use super::{drain, suffix, *};
 use horizon_singleton211_launch::native262::foundation_roster::{self, assembly226 as spec};
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
+pub(crate) mod terminal;
+
 const RELEASE: &str = "/var/lib/jetstreamer/horizon226-assembly-fleet-v1/acceptance.json";
 const LAUNCHER_RELEASE: &str = "/var/lib/jetstreamer/horizon226-assembly-launcher-v2/acceptance.json";
 const MAX_LAUNCHER_BYTES: u64 = 128 << 20;
 const PRESTART: &str = "/var/lib/jetstreamer/horizon226-suffix-v1/pre-start.sh";
 const PRESTART_SHA: &str = "14c316bf3fc8ff28800c9b7bb673f42f95995a2a2b1ac0b9654c36c0a83832e0";
 const LEASE: &str = "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-226.lock";
+const ARCHIVE: &str = "output/epoch-226-worker-transition-v3.jet";
 
 fn path(name: &str) -> PathBuf {
     Path::new(spec::STATE).join(name)
@@ -376,7 +379,7 @@ pub(in crate::fleet) fn validate_launch(claim: &DiagnosticClaim, row: &Value) ->
     Ok(())
 }
 
-pub(in crate::fleet) fn validate_live(claim: &DiagnosticClaim, current: &Value) -> Result<()> {
+pub(in crate::fleet) fn observe_live(claim: &DiagnosticClaim, current: &Value) -> Result<Value> {
     let row = bound_json(&claim.launch_receipt)?;
     let pid = row["main_pid"].as_u64().context("assembly PID")?;
     let proc = PathBuf::from(format!("/proc/{pid}"));
@@ -391,7 +394,43 @@ pub(in crate::fleet) fn validate_live(claim: &DiagnosticClaim, current: &Value) 
             && clock["InvocationID"] == row["launch_token"]["guard_timer_invocation"],
         "epoch 226 live assembly or timer changed"
     );
-    suffix::check_cgroup(current, spec::MEMORY)
+    suffix::check_cgroup(current, spec::MEMORY)?;
+    let (guard, measurement) = sample(
+        &path("guard-receipts"),
+        &claim.invocation_id,
+        &row["guard_plan"],
+        "running",
+        pid,
+    )?
+    .context("epoch 226 assembly has no matching physical guard sample")?;
+    let physical_bytes = measurement["root_physical_observation"]["conservative_physical_bytes"]
+        .as_u64()
+        .context("epoch 226 assembly physical guard measurement")?;
+    Ok(json!({
+        "guard": guard,
+        "recorded_unix_seconds": measurement["recorded_unix_seconds"],
+        "physical_bytes": physical_bytes,
+        "archive": archive_identity()?,
+    }))
+}
+
+fn archive_identity() -> Result<Option<Value>> {
+    let archive = Path::new(spec::ROOT).join(ARCHIVE);
+    let info = match fs::symlink_metadata(&archive) {
+        Ok(info) => info,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    ensure!(
+        info.is_file()
+            && archive.canonicalize()? == archive
+            && info.uid() == 1000
+            && info.nlink() == 1
+            && info.mode() & 0o777 == 0o600
+            && info.size() <= spec::CAP,
+        "epoch 226 assembly archive is outside its private scope"
+    );
+    Ok(Some(json!({"path":archive,"identity":identity(&info)})))
 }
 
 pub(crate) fn run() -> Result<()> {
