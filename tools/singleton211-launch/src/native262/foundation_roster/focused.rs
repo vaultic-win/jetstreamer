@@ -130,7 +130,7 @@ pub(super) const V1627_230: Focused = Focused {
 pub(super) const ADJACENT_230: Focused = Focused {
     epoch: 230,
     unit: "horizon-qualify-230-adjacent-99445304-v1.service",
-    guard: "horizon-230-adjacent-99445304-protective-v1.service",
+    guard: "horizon-230-adjacent-99445304-protective-v1",
     cpus: "48-55",
     scratch_cap: 96 << 30,
     receipt_disk: 256 << 20,
@@ -407,6 +407,17 @@ fn overlap_private_tmpfs(path: &str, mountinfo: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn focused_guard_stems_allow_service_and_timer_lookup() {
+        for scope in SCOPES {
+            assert!(
+                !scope.guard.ends_with(".service") && !scope.guard.ends_with(".timer"),
+                "expected a guard unit stem for {}",
+                scope.unit
+            );
+        }
+    }
 
     #[test]
     fn overlap_requires_exact_writable_no_swap_tmpfs() {
