@@ -182,7 +182,7 @@ fn parse_properties(
     }
     Ok(v)
 }
-fn properties(unit: &str, iid: &str, pinned_history: bool) -> Result<Value> {
+pub(super) fn properties(unit: &str, iid: &str, pinned_history: bool) -> Result<Value> {
     let o=Command::new("/usr/bin/systemctl").args(["show",unit,"--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,NRestarts,Restart,Job,Result,ExecMainStatus"]).output()?;
     parse_properties(
         unit,

@@ -6,6 +6,7 @@ mod capture266;
 mod delivery252;
 mod focused;
 mod holding296;
+pub mod holding288;
 mod restore266;
 mod interval141;
 mod replay256;
@@ -173,6 +174,7 @@ enum Quote {
     Suffix226(Bound),
     Suffix226Preview,
     Assembly226(Bound),
+    Holding288(Bound),
     Delivery252,
     Delivery261(Bound),
     AdjacentIntake230(Bound),
@@ -1739,6 +1741,14 @@ fn measure(
         .contains(holding296::UNIT)
         .then(|| holding296::active(n))
         .transpose()?;
+    let active_holding_288 = before
+        .contains(holding288::UNIT)
+        .then(|| holding288::active(n))
+        .transpose()?;
+    ensure!(
+        !matches!(&quote, Some(Quote::Holding288(_))) || active_holding_288.is_none(),
+        "epoch 288 custody is already running"
+    );
     let active_restore_266 = before
         .contains(restore266::UNIT)
         .then(|| restore266::active(n))
@@ -1749,6 +1759,7 @@ fn measure(
         .transpose()?;
     let auxiliary = [
         (holding296::UNIT, active_holding_296.as_ref()),
+        (holding288::UNIT, active_holding_288.as_ref()),
         (restore266::UNIT, active_restore_266.as_ref()),
         (capture266::UNIT, active_capture_266.as_ref()),
     ];
@@ -1779,6 +1790,7 @@ fn measure(
         Some(Quote::Interval141(_)) => 141,
         Some(Quote::FullReplay(full)) => full.epoch,
         Some(Quote::Suffix226(_) | Quote::Suffix226Preview | Quote::Assembly226(_)) => 226,
+        Some(Quote::Holding288(_)) => 288,
         Some(Quote::Delivery252) => 252,
         Some(Quote::Delivery261(_)) => 261,
         Some(Quote::AdjacentIntake230(_) | Quote::SuccessorIntake230(_)) => 230,
@@ -2062,16 +2074,19 @@ fn measure(
         260 => RESTORE_260.cpus,
         266 if next_266 => NEXT_266_CPU,
         266 => OVERLAP_266.cpus,
+        288 => holding288::CPUS,
         252 | 261 => "24-31",
         296 if matches!(&quote, Some(Quote::Replay296(_))) => replay296::CPUS,
         296 => "56-63",
         _ => "40-47",
         })?
     };
-    let cpu_width = if copy_230 || next_266 { 1 } else if private_141.is_some() { 3 } else { 8 };
+    let cpu_width = if copy_230 || next_266 { 1 } else if private_141.is_some() { 3 }
+        else if matches!(&quote, Some(Quote::Holding288(_))) { 2 } else { 8 };
     let cpus = units::affinity_width(&json!({"cpu_affinity":selected}), cpu_width)?;
     let private_exclusive = private_141.as_ref().map(interval141::Candidate::exclusive).transpose()?;
     let assembly_exclusive = units::parse_cpu_list(assembly226::EXCLUSIVE)?;
+    let holding_exclusive = units::parse_cpu_list(holding288::EXCLUSIVE)?;
     let overlap_exclusive = units::parse_cpu_list(OVERLAP_266_EXCLUSIVE)?;
     let bridge_group = units::parse_cpu_list("48-55,112-119")?;
     let adjacent_copy_group = units::parse_cpu_list("48,112")?;
@@ -2080,6 +2095,10 @@ fn measure(
         Some(Quote::Assembly226(_)) => {
             replay296::verify_cpu_group("14,16-23", &assembly_exclusive)?;
             &assembly_exclusive
+        }
+        Some(Quote::Holding288(_)) => {
+            replay296::verify_cpu_group(holding288::CPUS, &holding_exclusive)?;
+            &holding_exclusive
         }
         Some(Quote::NextIntake266(_) | Quote::SuccessorIntake266(_) | Quote::FollowingIntake266(_)) => {
             replay296::verify_cpu_group(NEXT_266_CPU, &next_266_group)?;
@@ -2138,6 +2157,12 @@ fn measure(
             require_disjoint_cpus(epoch, exclusive, unit, &aux.owner)?;
             recorded.insert(unit.to_owned(), (aux.owner.clone(), aux.memory, aux.ticks));
         }
+    }
+    if active_holding_288.is_some() {
+        ensure!(
+            exclusive.is_disjoint(&holding_exclusive),
+            "epoch {epoch} overlaps the epoch 288 custody physical cores"
+        );
     }
     if active_restore_266.is_some() {
         ensure!(exclusive.is_disjoint(&units::parse_cpu_list("32-39,96-103")?),
@@ -2428,6 +2453,7 @@ fn measure(
         .values()
         .try_fold(0, |total, replay| capacity::add(total, replay.receipt_disk))?;
     let holding_296_disk = active_holding_296.as_ref().map_or(0, |_| holding296::RECEIPT_DISK);
+    let holding_288_disk = active_holding_288.as_ref().map_or(0, |_| holding288::RECEIPT_BYTES);
     let restore_266_disk = active_restore_266.as_ref().map_or(0, |_| restore266::RECEIPT_DISK);
     let interval_141_disk = active_interval_141.len() as u64 * interval141::DISK;
     let shares_suffix = copy_230 || next_266 || matches!(&quote, Some(Quote::Focused(scope, _))
@@ -2451,7 +2477,7 @@ fn measure(
                 capacity::add(capacity::add(replay_disk, restore_266_disk)?, capacity::add(holding_296_disk, interval_141_disk)?)?,
             )?,
         )?,
-        capacity::add(growth, pending_suffix_disk)?,
+        capacity::add(capacity::add(growth, pending_suffix_disk)?, holding_288_disk)?,
     )?;
     let (candidate_disk, candidate) = match &quote {
         Some(Quote::Interval141(_)) => private_141.as_ref().context("private 141 inputs")?.resources()?,
@@ -2470,6 +2496,7 @@ fn measure(
             capacity::add(assembly226::CAP, assembly226::RECEIPTS)?,
             capacity::add(assembly226::MEMORY, capacity::add(CONTROLLER_MEMORY, 1 << 30)?)?,
         ),
+        Some(Quote::Holding288(_)) => (holding288::RECEIPT_BYTES, holding288::MEMORY_BYTES),
         Some(Quote::Delivery252) => (
             UPLOAD_261_DISK,
             capacity::add(UPLOAD_261_MEMORY, CONTROLLER_MEMORY)?,
@@ -2564,6 +2591,7 @@ fn measure(
     let fit = json!({"guard_floor_bytes":disk_floor,"inherited_non_guard_disk_bytes":non_guard_disk,
         "active_delivery_252_disk_bytes":delivery_252_disk,"active_delivery_261_disk_bytes":delivery_261_disk,
         "active_holding_296_disk_bytes":holding_296_disk,
+        "active_holding_288_disk_bytes":holding_288_disk,
         "active_restore_266_receipt_bytes":restore_266_disk,
         "active_restore_266_additional_memory_bytes":restore_allowance,
         "active_interval_141_disk_bytes":interval_141_disk,
@@ -2596,6 +2624,7 @@ fn measure(
         141 => private_schema.as_deref().context("private 141 schema")?,
         226 if matches!(&quote, Some(Quote::Assembly226(_))) => assembly226::ROSTER_SCHEMA,
         226 => "foundation-epoch226-suffix-roster-binding-v1",
+        288 => holding288::ROSTER_SCHEMA,
         230 if adjacent_230 => "foundation-epoch230-adjacent-intake-roster-binding-v1",
         230 if copy_230 => "foundation-epoch230-successor-intake-roster-binding-v1",
         230 if matches!(&quote, Some(Quote::Focused(spec, _)) if spec.unit == HOURLY_230.unit) => {
@@ -2658,6 +2687,7 @@ fn measure(
         "active_replay_260_registration":live_replays.get(&260).filter(|r| r.unit == replay260::UNIT).map(|r| &r.reference),
         "closed_delivery_257":closed_257,
         "active_holding_296_launch":active_holding_296.as_ref().map(|holding| &holding.launch),
+        "active_holding_288_launch":active_holding_288.as_ref().map(|holding| &holding.launch),
         "active_restore_266_launch":active_restore_266.as_ref().map(|restore| &restore.launch),
         "active_capture_266_producer":active_capture_266.as_ref().map(|capture| &capture.launch),
         "active_overlap_266_registration":live_replays.get(&266).filter(|replay| replay.unit == OVERLAP_266.unit).map(|replay| &replay.reference),
@@ -2684,6 +2714,13 @@ fn measure(
             "producer_unit":assembly226::UNIT,"assembly_only_no_replay":true,
             "candidate_cap_bytes":assembly226::CAP,"candidate_memory_max_bytes":assembly226::MEMORY,
             "candidate_cpus":selected,"exclusive_online_cpus":assembly_exclusive,
+        });
+    }
+    if let Some(Quote::Holding288(source)) = &quote {
+        evidence["partial_288_custody_quote"] = json!({
+            "source":source,"terminal":closed_288,
+            "producer_unit":holding288::UNIT,"candidate_cpus":selected,
+            "exclusive_online_cpus":holding_exclusive,"tmpfs_bytes":holding288::TMPFS_BYTES,
         });
     }
     if let Some(Quote::FullReplay(quote)) = &quote {
@@ -2939,6 +2976,7 @@ pub fn run() -> Result<()> {
                         | "--feature296-quote"
                         | "--suffix226-preview"
                         | "--assembly226-quote"
+                        | "--partial288-custody-quote"
                         | "--interval141-third-quote"
                         | "--interval141-fourth-quote"
                         | "--interval141-fifth-quote"
@@ -3078,6 +3116,8 @@ pub fn run() -> Result<()> {
         }
         Some(flag) if flag == "--assembly226-quote" => assembly226::preparation(&mut native)
             .and_then(|proof| measure(&mut native, None, Some(Quote::Assembly226(proof)))),
+        Some(flag) if flag == "--partial288-custody-quote" => holding288::preparation()
+            .and_then(|proof| measure(&mut native, None, Some(Quote::Holding288(proof)))),
         Some(flag) if flag == "--interval141-third-quote" => measure(&mut native, None, Some(Quote::Interval141(3))),
         Some(flag) if flag == "--interval141-fourth-quote" => measure(&mut native, None, Some(Quote::Interval141(4))),
         Some(flag) if flag == "--interval141-fifth-quote" => measure(&mut native, None, Some(Quote::Interval141(5))),

@@ -27,6 +27,8 @@ mod failed296;
 mod old237;
 #[path = "holding_foundation_private_partial223.rs"]
 mod partial223;
+#[path = "holding_foundation_partial288.rs"]
+mod partial288;
 #[path = "holding_foundation_private_retire.rs"]
 mod retirement;
 #[path = "holding_foundation_private_runner.rs"]
@@ -1018,6 +1020,9 @@ async fn restore(client: &Client, p: RestoreSpec, spec: &Bound) -> Result<()> {
 }
 
 pub(super) fn command(s: &str) -> bool {
+    if partial288::command(s) {
+        return true;
+    }
     matches!(s, accounts229::ACTION | accounts229::RECHECK | accounts229::RESTORE | failed296::CHECK | failed296::ACTION | failed296::RECHECK) || canary224::command(s) || ext4_228::command(s) || appendvec288::command(s) || appendvec292::command(s) || matches!(
         s,
         "holding-foundation-private-inspect"
@@ -1065,6 +1070,9 @@ pub(super) async fn run(action: &str, v: Value, spec: &Bound) -> Result<()> {
     );
     if appendvec292::command(action) {
         return appendvec292::run(action, v, spec).await;
+    }
+    if partial288::command(action) {
+        return partial288::run(action, v, spec).await;
     }
     if action == failed296::RECHECK {
         return failed296::recheck(v, spec).await;
