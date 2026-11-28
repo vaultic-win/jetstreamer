@@ -156,7 +156,7 @@ def accept(scan_if_needed):
     if not scan_if_needed:
         return dict(exit=terminal_ref, guard=guard, checkpoint=checkpoints[TERMINAL], manifest=manifest_ref)
     boot = source["bootstrap"]
-    boot_ref, boot_length = helper.file_ref(Path(boot["path"]), 0)
+    boot_ref, boot_length = helper.file_ref(Path(boot["path"]), 1001)
     require(boot_ref["sha256"] == boot["sha256"] and boot_length == boot["size"],
             "original projected bootstrap payload changed")
     modes = {str(path): restrict_to_owner(path) for path in (archive, mp)}
