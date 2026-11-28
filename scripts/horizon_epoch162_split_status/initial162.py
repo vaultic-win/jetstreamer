@@ -259,6 +259,10 @@ def journal_progress(unit, row):
             rows.append({"slot":slot, "transactions":tx, "monotonic_us":stamp, "cursor":record["__CURSOR"]})
     if len(rows) < 2:
         return None
+    # journalctl combines --grep and -n in reverse chronological order.
+    rows.sort(key=lambda r: r["monotonic_us"])
+    if any(a["slot"] > b["slot"] or a["transactions"] > b["transactions"] for a, b in zip(rows, rows[1:])):
+        return None
     first, last = rows[0], rows[-1]
     if (last["monotonic_us"] <= first["monotonic_us"] or last["slot"] <= first["slot"]
         or last["transactions"] <= first["transactions"]
