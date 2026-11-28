@@ -50,7 +50,7 @@ def frozen():
                        time_extension=extension, expectations=expect_ref), native
 
 
-def capture(unit, actor, bindings, expected, destination, mode):
+def capture(unit, actor, bindings, expected, destination, mode, *, epoch=141):
     pid = actor["producer_pid"]
     iid = actor["producer_invocation_id"]
     suffix.AUTHORITY = destination
@@ -68,7 +68,7 @@ def capture(unit, actor, bindings, expected, destination, mode):
                     and live["CollectMode"] == "inactive" and all(live[k] == expected[k] for k in
                     ("RuntimeMaxUSec","ExecMainStartTimestampMonotonic")) and not select.select([fd], [], [], 0)[0],
                     "native producer changed before pidfd attachment")
-            arm = dict(schema="horizon-141-first-hourly-native-exit-armed-v1", timestamp=time.time(),
+            arm = dict(schema=f"horizon-{epoch}-first-hourly-native-exit-armed-v1", timestamp=time.time(),
                        actor=actor, bindings=bindings, unit_reference_held=True, pidfd_bound=True, native=live,
                        watcher_invocation=os.environ.get("INVOCATION_ID"), publication_authorized=False)
             if mode == "check":
@@ -87,7 +87,7 @@ def capture(unit, actor, bindings, expected, destination, mode):
                         "foreign terminal producer")
                 if (end["ActiveState"] in ("inactive", "failed") and end["MainPID"] == end["ControlPID"] == "0"
                         and int(end["ExecMainExitTimestampMonotonic"]) > int(live["ExecMainStartTimestampMonotonic"])):
-                    receipt = dict(schema="horizon-141-first-hourly-native-exit-v1", actor=actor, bindings=bindings,
+                    receipt = dict(schema=f"horizon-{epoch}-first-hourly-native-exit-v1", actor=actor, bindings=bindings,
                                    armed=arm_ref, properties=end, timestamp=time.time(), publication_authorized=False)
                     suffix.persist(destination/"PID1_EXIT.json", receipt)
                     return receipt
