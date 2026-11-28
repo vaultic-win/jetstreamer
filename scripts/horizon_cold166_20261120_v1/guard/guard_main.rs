@@ -708,7 +708,8 @@ fn validate_plan(plan: &Plan) -> Result<()> {
     feature = "epoch141-first-hourly",
     feature = "epoch141-third-hourly",
     feature = "epoch143-first-hourly",
-    feature = "epoch162-second-hourly"
+    feature = "epoch162-second-hourly",
+    feature = "epoch162-second-retry"
 ))]
 fn validate_checkpoint_scope(plan: &Plan) -> Result<()> {
     let (worker_root, receipts, minimum_floor, maximum_tree_bytes) = match plan.unit.as_str() {
@@ -1254,7 +1255,8 @@ fn run() -> Result<()> {
         feature = "epoch141-first-hourly",
         feature = "epoch141-third-hourly",
         feature = "epoch143-first-hourly",
-        feature = "epoch162-second-hourly"
+        feature = "epoch162-second-hourly",
+        feature = "epoch162-second-retry"
     ))]
     validate_checkpoint_scope(&plan)?;
     #[cfg(not(any(
@@ -1267,7 +1269,8 @@ fn run() -> Result<()> {
         feature = "epoch141-first-hourly",
         feature = "epoch141-third-hourly",
         feature = "epoch143-first-hourly",
-        feature = "epoch162-second-hourly"
+        feature = "epoch162-second-hourly",
+        feature = "epoch162-second-retry"
     )))]
     ensure!(
         plan.unit == data_fulfillment::COLD_UNIT
