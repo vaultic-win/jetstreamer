@@ -8,15 +8,15 @@ G = 1 << 30
 CONTROL = 64 << 20
 OUTPUT = 3 * G
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch162-second-replay-20261128-v2")
-PKG = ROOT / "issued-split-v2"
+PKG = ROOT / "issued-split-v3"
 UNIT = "horizon-qualify-162-second-replay-20261128-v2.service"
 FIELD = "current_private162_second_retry"
-INTERFACE = dict(path=str(ROOT / "RETRY_INTERFACE.json"),
-                 sha256="c010fe101d3edafb732bbf87f7f8de7fd41a11d9b8b967e14ac5a4f372a8e279")
+INTERFACE = dict(path=str(ROOT / "RETRY_INTERFACE_V3.json"),
+                 sha256="2192e657ff4cf56a9404dc41cf5d3223cb437afa3eb7225676b4116d95c18712")
 PROVIDER = dict(path=str(PKG / "deployment-seal-receipt.json"),
-                sha256="b4a4c5205f3f890a26a43f838c074bb1163d1bbffce5784da485a2fc50aa455b")
+                sha256="051fcc7f5a7ef31a8fa6fb31372d029c83428e5c4eceb1eecc6dd7235fd64393")
 READER = dict(path=str(PKG / "status162.py"),
-              sha256="d6274d04dea06ed65924962cd05a31f15a171b130ecda9339d980f30145e90a4")
+              sha256="7fb5906b790419dee2f89bde43941603212153cb92db3817343093aceb030e5c")
 PREVIOUS = "0a4f55edf2b14df6a8a99a41d09834fc"
 OLD_UNIT = "horizon-qualify-162-second-replay-20261128-v1.service"
 CLOSURE = dict(path=str(ROOT / "UNRELEASED_PREDECESSOR.json"),

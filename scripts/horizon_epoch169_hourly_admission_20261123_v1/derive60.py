@@ -15,7 +15,7 @@ NEW = OLD.with_name(OLD.name.replace("v59", "v60"))
 OWNER = "40de245ea6f29f9b8fb7a9f603fdb5a7fbb2e5d45be1ec8b8f3d5175f935b638"
 SEAL = "6dc55b32864dddb27365e15d0160b771c5e7bd31b640fee556ce9ce7d0f65f93"
 SECOND = OLD.parent.parent / "epoch162-second-replay-20261128-v2"
-INTERFACE = "c010fe101d3edafb732bbf87f7f8de7fd41a11d9b8b967e14ac5a4f372a8e279"
+INTERFACE = "2192e657ff4cf56a9404dc41cf5d3223cb437afa3eb7225676b4116d95c18712"
 
 
 def cycle(source):
@@ -102,9 +102,14 @@ def transition(source):
 
 def stage(folder):
     plan = json.loads(verified(OLD / "deployment-seal-receipt.json", SEAL))
-    interface = json.loads(verified(SECOND / "RETRY_INTERFACE.json", INTERFACE))
+    interface = json.loads(verified(SECOND / "RETRY_INTERFACE_V3.json", INTERFACE))
     if Path(plan["destination"]) != OLD or interface["unit"] != "horizon-qualify-162-second-replay-20261128-v2.service":
         raise ValueError("wrong V59 or interval-two retry")
+    validation = interface["guard_validation"]
+    actual = json.loads(verified(Path(validation["path"]), validation["sha256"]))
+    if (actual["guard"]["sha256"] != interface["guard"]["sha256"] or actual["production_started"]
+            or [case["exit"] for case in actual["checks"]] != [0, 1, 1, 1]):
+        raise ValueError("unqualified service guard")
     folder.mkdir(mode=0o700)
     members = {}
     for member in plan["members"]:

@@ -11,9 +11,9 @@ FIRST = history.FIRST
 SECOND = "horizon-qualify-162-second-replay-20261128-v2.service"
 PRIOR = "0a4f55edf2b14df6a8a99a41d09834fc"
 CUSTODY = history.CUSTODY
-SCOPE = dict(path=str(second.PKG.parent / "SCOPE-V2.json"), sha256="7fea44b1ed8b1182f81c30c1f8df61061883f4744907b223ca2e237c9b14e35f")
+SCOPE = dict(path=str(second.PKG.parent / "SCOPE-V3.json"), sha256="23a39f7991db3f69c91000a0e9e6f86782409cc130f7eeaf8bdc34e8a60f0f61")
 CLOSED = dict(path=str(second.PKG.parent / "UNRELEASED_PREDECESSOR.json"), sha256="7e29859237415f95d8d8d7b070df842900dadc09f4829c4983ac97c02f10d038")
-INTERFACE = dict(path=str(second.PKG.parent / "RETRY_INTERFACE.json"), sha256="c010fe101d3edafb732bbf87f7f8de7fd41a11d9b8b967e14ac5a4f372a8e279")
+INTERFACE = dict(path=str(second.PKG.parent / "RETRY_INTERFACE_V3.json"), sha256="2192e657ff4cf56a9404dc41cf5d3223cb437afa3eb7225676b4116d95c18712")
 
 def receiver(row):
     if row["unit"]["Id"] != SECOND:
