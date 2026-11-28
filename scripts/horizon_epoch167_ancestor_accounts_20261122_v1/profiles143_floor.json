@@ -1,0 +1,141 @@
+{
+  "profiles": {
+    "second-v2": {
+      "closure": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch143-first-hourly-20261127-v1/terminal-capture-v1/PRIVATE_FIRST_HOURLY_ACCEPTANCE.json",
+        "sha256": "105f7fbf58843f7475eae951ec5d482cc7372204401036db01d4ef4fdbbfe95d"
+      },
+      "contract": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v2/contract-v1/LAUNCH_PROFILE.json",
+        "sha256": "70262270f521d874155fb94252b87ae67481666b6d3fd22b37a92ee7959b000c"
+      },
+      "expected_bytes": 24372051968,
+      "expected_entries": 365733,
+      "iid": "a04721854c644797903440d2a7eade08",
+      "inode": 120127494,
+      "protected": [
+        {
+          "gid": 1003,
+          "identity": [
+            64512,
+            119213949,
+            2350018921,
+            1795850219592154465,
+            1795850239219260078
+          ],
+          "links": 1,
+          "mode": "0o600",
+          "path": "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1/input/snapshot-61787631-2y3Q8vdnvB77rU4KHomsesrMWeTPrh9hsp9shn1uEwus.tar.zst",
+          "sha256": "3d5d0c29ff96023775c6d515b0777b0be17d3fa82896da5588d2dc73b5eb3363",
+          "uid": 1001
+        },
+        {
+          "gid": 1003,
+          "identity": [
+            64512,
+            119216052,
+            0,
+            1795855583122227216,
+            1795855583122227216
+          ],
+          "links": 1,
+          "mode": "0o644",
+          "path": "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1/epoch-143-through-61794627.jet",
+          "uid": 1001
+        },
+        {
+          "gid": 1003,
+          "identity": [
+            64512,
+            120127492,
+            27723659,
+            1611290130000000000,
+            1795855426288516615
+          ],
+          "links": 1,
+          "mode": "0o644",
+          "path": "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1/scratch/.historical-runtime/jetstreamer-historical-parent-NM5GOs/jetstreamer-historical-v1.4.25-GEHzvy/unpacked/snapshots/61787631/61787631",
+          "uid": 1001
+        },
+        {
+          "gid": 1003,
+          "identity": [
+            64512,
+            108347108,
+            2957714353,
+            1795848472105129425,
+            1795848805124253334
+          ],
+          "links": 1,
+          "mode": "0o600",
+          "path": "/home/sol/.jetstreamer-private/epoch143-first-hourly-20261127-v1/epoch-143-first-hourly.jet",
+          "sha256": "9c4743320e5f4f27440bf81a408dfd12016e554b1003d88af6b0aaafb77d68db",
+          "uid": 1001
+        },
+        {
+          "gid": 1003,
+          "identity": [
+            64512,
+            108350579,
+            1806,
+            1795848645244261502,
+            1795848645247261521
+          ],
+          "links": 1,
+          "mode": "0o600",
+          "path": "/home/sol/.jetstreamer-private/epoch143-first-hourly-20261127-v1/epoch-143-first-hourly.jet.segment.json",
+          "sha256": "3ee4854757f8d5585a3ebe50336ddf1bc4a7a4783632d0b752ae235e36eace53",
+          "uid": 1001
+        }
+      ],
+      "shards": {
+        "0": 120127495,
+        "1": 120127496,
+        "2": 120127497,
+        "3": 120127498
+      },
+      "source": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v1/INPUT_CUSTODY.json",
+        "sha256": "29bae456ca9d5e7c14a0b96a6ba4709556da62079028b6a8b5687fc315d3134c"
+      },
+      "target": "/home/sol/.jetstreamer-private/epoch143-second-hourly-20261128-v1/scratch/.historical-runtime/jetstreamer-historical-parent-NM5GOs/jetstreamer-historical-v1.4.25-GEHzvy/accounts-state",
+      "terminal": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch143-second-hourly-20261128-v2/floor-stop-a04721854c644797903440d2a7eade08/TERMINAL.json",
+        "sha256": "4f736b6ca61ab274c7c643cc237520c59ad62508dddbf6f640f71f8aa2584fcc"
+      },
+      "unit": "horizon-qualify-143-second-hourly-20261128-v2.service"
+    }
+  },
+  "scope": {
+    "leases": {
+      "global_operation": {
+        "gid": 0,
+        "identity": [
+          26,
+          3453440,
+          0,
+          1795169932336156440,
+          1795169932336156440
+        ],
+        "links": 1,
+        "mode": "0o600",
+        "path": "/run/horizon-epoch171-to136-g1.operation.lock",
+        "uid": 0
+      },
+      "local_mutation": {
+        "gid": 1003,
+        "identity": [
+          64512,
+          101135013,
+          0,
+          1791494730459052358,
+          1791494730459052358
+        ],
+        "links": 1,
+        "mode": "0o600",
+        "path": "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock",
+        "uid": 1001
+      }
+    }
+  }
+}
