@@ -27,20 +27,26 @@ mod route {
         "snapshot-71998051-6GepGUiRjT1G4UpKJKDbCahrzyTeZLPqgZzw7g9td7jm.tar.zst";
     pub(super) const TERMINAL_SLOT: u64 = 72_004_310;
 }
-#[cfg(all(epoch162_second_retry, not(epoch162_second_hourly)))]
+#[cfg(any(all(any(epoch162_second_retry,epoch162_second_reserved), not(epoch162_second_hourly)), all(epoch162_second_retry,epoch162_second_reserved)))]
 compile_error!("the 162 second-interval retry requires its bounded hourly route");
 #[cfg(epoch162_second_hourly)]
 mod route {
     pub(super) const EPOCH: u64 = 162;
-    #[cfg(not(epoch162_second_retry))]
+    #[cfg(epoch162_second_reserved)]
+    pub(super) const UNIT: &str = "horizon-qualify-162-second-replay-20261128-v3.service";
+    #[cfg(epoch162_second_reserved)]
+    pub(super) const ALIAS: &str = "/run/horizon-162-second-replay-v3";
+    #[cfg(epoch162_second_reserved)]
+    pub(super) const RUN: &str = "/home/sol/.jetstreamer-private/epoch162-second-replay-20261128-v3";
+    #[cfg(not(any(epoch162_second_retry,epoch162_second_reserved)))]
     pub(super) const UNIT: &str = "horizon-qualify-162-second-replay-20261128-v1.service";
     #[cfg(epoch162_second_retry)]
     pub(super) const UNIT: &str = "horizon-qualify-162-second-replay-20261128-v2.service";
-    #[cfg(not(epoch162_second_retry))]
+    #[cfg(not(any(epoch162_second_retry,epoch162_second_reserved)))]
     pub(super) const ALIAS: &str = "/run/horizon-162-second-replay-v1";
     #[cfg(epoch162_second_retry)]
     pub(super) const ALIAS: &str = "/run/horizon-162-second-replay-v2";
-    #[cfg(not(epoch162_second_retry))]
+    #[cfg(not(any(epoch162_second_retry,epoch162_second_reserved)))]
     pub(super) const RUN: &str =
         "/home/sol/.jetstreamer-private/epoch162-second-replay-20261128-v1";
     #[cfg(epoch162_second_retry)]

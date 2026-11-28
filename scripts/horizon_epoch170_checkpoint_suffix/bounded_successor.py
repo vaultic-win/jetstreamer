@@ -33,11 +33,17 @@ CONTINUATIONS = ENROLLING_OPERATORS | {FOLLOWING_DEPLOYMENT, NEXT_DEPLOYMENT, NE
 GAP_DEPLOYMENT = NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-20261128-v1/operator-v1"
 RAM_GAP_DEPLOYMENT = NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-ram-20261128-v1/operator-v1"
 SECOND_RAM_GAP = Path(__file__).resolve().parent == NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-ram-20261128-v2/operator-v1"
-RAM_GAP = SECOND_RAM_GAP or Path(__file__).resolve().parent == RAM_GAP_DEPLOYMENT
+THIRD_RAM_GAP = Path(__file__).resolve().parent == NEXT_DEPLOYMENT.parent.parent / "epoch170-from-73760367-ram-20261128-v3/operator-v1"
+RAM_GAP = THIRD_RAM_GAP or SECOND_RAM_GAP or Path(__file__).resolve().parent == RAM_GAP_DEPLOYMENT
 GAP = RAM_GAP or Path(__file__).resolve().parent == GAP_DEPLOYMENT
 ENTRY_FIELD = "independent_checkpoint" if GAP else "closed_comparison"
 if RAM_GAP:
-    q = load("ram170_second_price" if SECOND_RAM_GAP else "ram170_price")
+    if THIRD_RAM_GAP:
+        q = load("ram170_third_price")
+    elif SECOND_RAM_GAP:
+        q = load("ram170_second_price")
+    else:
+        q = load("ram170_price")
     workspace = load("ram170_workspace")
 elif GAP:
     q = load("gap170_price")
@@ -276,7 +282,7 @@ def funded_guard(fit, floor, cap):
     # runway separate from the constant free-space threshold enforced by 170.
     growth = fit.get("candidate_170_growth_bytes", fit["joint"]["candidate_growth"])
     required = fit["required_home"] + (floor - fit["guard_floor"]) + max(0, remaining - growth)
-    return fit["available_home"] >= required
+    return fit["available_home"] >= required + fit.get("shared_drawdown_allowance", 0)
 
 
 def arm():
@@ -284,7 +290,7 @@ def arm():
     a,ar=same_actor()
     intent,_=current("SUCCESSOR_START_INTENT.json")
     fit=checked_price("held")
-    if SECOND_RAM_GAP:
+    if SECOND_RAM_GAP or THIRD_RAM_GAP:
         # The locked held fit already measures outstanding peer growth. The
         # release step rechecks this floor against its new complete-fleet fit.
         floor=fit["guard_floor"]

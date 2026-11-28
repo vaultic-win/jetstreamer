@@ -317,9 +317,24 @@ pub(super) const WINDOW_266: Focused = Focused {
     preflight_sha: "9043e168fd2322c6c5e098bee42a40f69507fa9db7afd791ad59577354f3bed1",
     profile_sha: "f7562054a31277bc38747652f9a79e6967b393d8713499e6998841390cb4c5d6",
 };
+pub(super) const SUCCESSOR_WINDOW_266: Focused = Focused {
+    unit: "horizon-qualify-checkpoint-continuation-266-window-114943135-v1.service",
+    guard: "horizon-266-window-114943135-protective-v1",
+    root: "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-266-window-114943135-v1",
+    first: 114_936_475,
+    last: 114_943_135,
+    state: "/var/lib/jetstreamer/horizon266-window-114936475-114943135-runtime-v1",
+    preflight_sha: "90a972850c9dd75ec6939a081f5b117513e563db3813a7b3e7e115c15ad8d476",
+    profile_sha: "eacf3e685a72ad196734b20d7a8a00924176cb6e324aea6ce52f55a983e1fc30",
+    ..WINDOW_266
+};
 const WINDOW_266_CUSTODY: (&str, &str) = (
     "/var/lib/jetstreamer/horizon266-next-114929697-intake-v2/custody.json",
     "98c28740a2bdb0f707624a07046fa8a316dd37ea225f31770cf410d5fd0b7001",
+);
+const SUCCESSOR_WINDOW_266_CUSTODY: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon266-window-114936475-114943135-static-inputs-v1/bootstrap-custody.json",
+    "9d5a46a8e72e3de25c2031c3debe3e0e28ad7fe6d67e2b1d860e0b6479189a3a",
 );
 const WINDOW_266_ADMISSION: &str = "foundation-epoch266-private-window-admission-v1";
 const PREDECESSOR_CUSTODY: (&str, &str) = (
@@ -363,7 +378,7 @@ pub(super) const FEATURE_296: Focused = Focused {
     profile_sha: "975056b8b99b13a3d43c5b118e9f2a2ba45b2f46f1bcb9f074f0509f28d8620d",
 };
 
-pub(super) const SCOPES: [&Focused; 16] = [
+pub(super) const SCOPES: [&Focused; 17] = [
     &GAP_230,
     &HOURLY_230,
     &SECOND_HOURLY_230,
@@ -377,6 +392,7 @@ pub(super) const SCOPES: [&Focused; 16] = [
     &OVERLAP_266,
     &PREDECESSOR_266,
     &WINDOW_266,
+    &SUCCESSOR_WINDOW_266,
     &LOADER_296,
     &TRACE_296,
     &FEATURE_296,
@@ -1053,6 +1069,10 @@ pub(super) fn predecessor_266_drained(n: &mut Native, row: &Value) -> Result<Opt
 }
 
 impl Focused {
+    pub(super) fn is_window_266(&self) -> bool {
+        [WINDOW_266.unit, SUCCESSOR_WINDOW_266.unit].contains(&self.unit)
+    }
+
     pub(super) fn control_memory(&self) -> u64 {
         if self.epoch == 266 {
             1 << 30
@@ -1111,8 +1131,22 @@ impl Focused {
     }
 
     pub(super) fn window_266_custody(&self) -> Result<Bound> {
-        ensure!(self.unit == WINDOW_266.unit, "foreign epoch 266 checkpoint window");
-        let reference = Bound::new(WINDOW_266_CUSTODY.0, WINDOW_266_CUSTODY.1);
+        ensure!(self.is_window_266(), "foreign epoch 266 checkpoint window");
+        let successor = self.unit == SUCCESSOR_WINDOW_266.unit;
+        let (path, digest, schema) = if successor {
+            (
+                SUCCESSOR_WINDOW_266_CUSTODY.0,
+                SUCCESSOR_WINDOW_266_CUSTODY.1,
+                "foundation-epoch266-successor-bootstrap-private-custody-v1",
+            )
+        } else {
+            (
+                WINDOW_266_CUSTODY.0,
+                WINDOW_266_CUSTODY.1,
+                "foundation-epoch266-next-bootstrap-private-custody-v1",
+            )
+        };
+        let reference = Bound::new(path, digest);
         let custody = reference.sealed()?;
         let profile = self.profile().sealed()?;
         let input = &custody["input"];
@@ -1121,7 +1155,7 @@ impl Focused {
         let meta = fs::symlink_metadata(path)?;
         let projections = profile["readonly_bindings"].as_array().context("window input bindings")?;
         ensure!(
-            custody["schema"] == "foundation-epoch266-next-bootstrap-private-custody-v1"
+            custody["schema"] == schema
                 && custody["epoch"] == 266
                 && custody["bootstrap_slot"] == self.first - 1
                 && custody["copy_drained"] == true
@@ -1141,6 +1175,19 @@ impl Focused {
                 && meta.ino() == num(input, "inode")?,
             "private epoch 266 checkpoint window lacks its exact retained bootstrap"
         );
+        if successor {
+            let nanos = |seconds, fraction| i128::from(seconds) * 1_000_000_000 + i128::from(fraction);
+            ensure!(
+                input["generation"] == "1641767207323715"
+                    && input["bytes"] == 15_568_220_095_u64
+                    && input["mtime_ns"] == json!(nanos(meta.mtime(), meta.mtime_nsec()))
+                    && input["ctime_ns"] == json!(nanos(meta.ctime(), meta.ctime_nsec()))
+                    && custody["source_window"]["sha256"]
+                        == profile["node_plan_inputs"]["source_window"]["sha256"]
+                    && profile["node_plan_inputs"]["bootstrap_custody"] == json!(reference),
+                "epoch 266 successor bootstrap generation, identity or source scope changed"
+            );
+        }
         Ok(reference)
     }
 
@@ -1150,7 +1197,7 @@ impl Focused {
         let receipt = reference.sealed()?;
         let profile_ref = self.profile();
         let profile = profile_ref.sealed()?;
-        let proven_inputs = if self.unit == WINDOW_266.unit {
+        let proven_inputs = if self.is_window_266() {
             self.window_266_custody()?;
             let guard = binding(&receipt["static_guard_validation"])?.sealed()?;
             let mount = binding(&receipt["mount_preflight"])?.sealed()?;
@@ -1329,7 +1376,7 @@ impl Focused {
                 && launch["worker"] == profile["worker"]
                 && launch["main_pid"] == pid
                 && profile_ref == self.profile()
-                && admission["schema"] == if self.unit == WINDOW_266.unit {
+                && admission["schema"] == if self.is_window_266() {
                     WINDOW_266_ADMISSION.to_owned()
                 } else {
                     format!("foundation-epoch{}-focused-admission-v1", self.epoch)
@@ -1359,14 +1406,14 @@ impl Focused {
         );
         if self.epoch == 266 {
             let released = binding(&launch["guard_release_fit"])?.sealed()?;
-            let mount = if self.unit == WINDOW_266.unit {
+            let mount = if self.is_window_266() {
                 format!("{}/scratch", self.root)
             } else {
                 format!("{}/work/scratch", self.root)
             };
             let mountinfo = fs::read_to_string(format!("/proc/{pid}/mountinfo"))?;
 
-            let scope_bound = if self.unit == WINDOW_266.unit {
+            let scope_bound = if self.is_window_266() {
                 let custody = json!(self.window_266_custody()?);
                 let node_plan = binding(&launch["node_plan"])?;
                 let plan = node_plan.sealed()?;

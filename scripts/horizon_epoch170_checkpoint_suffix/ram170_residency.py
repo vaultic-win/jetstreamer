@@ -16,14 +16,14 @@ def memory(group):
                 swap_current=int((group / 'memory.swap.current').read_text()))
 
 
-def lower(first, last, pss_anon, scratch_used):
+def lower(first, last, pss_anon, scratch_used, *, scratch_limit=SCRATCH_LIMIT):
     for counters in (first, last):
         if counters['maximum'] != LIMIT or counters['swap_max'] or counters['swap_current']:
-            raise ValueError('unexpected 170 cgroup limit or swap')
+            raise ValueError('unexpected cgroup limit or swap')
         if min(counters['anon'], counters['shmem'], counters['current']) < 0:
-            raise ValueError('negative 170 cgroup usage')
-    if pss_anon < 0 or not 0 <= scratch_used <= SCRATCH_LIMIT:
-        raise ValueError('invalid 170 process or tmpfs usage')
+            raise ValueError('negative cgroup usage')
+    if pss_anon < 0 or not 0 <= scratch_used <= scratch_limit:
+        raise ValueError('invalid process or tmpfs usage')
     anon = min(first['anon'], last['anon'], pss_anon)
     shmem = min(first['shmem'], last['shmem'], scratch_used)
     return min(LIMIT, first['current'], last['current'], anon + shmem)
