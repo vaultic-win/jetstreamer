@@ -5,7 +5,7 @@ use super::*;
 use std::os::fd::AsRawFd;
 
 pub(super) const BASE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/closed145198-input-retirement-20261128-v1";
+    "/var/lib/jetstreamer/horizon_runtime_data/closed145198-input-retirement-20261128-v2";
 pub(super) const PROFILE: &[u8] = include_bytes!("profiles145198_closed.json");
 pub(super) const CHECK_SCHEMA: &str = "horizon-145198-closed-input-check-v1";
 pub(super) const COMPLETE_SCHEMA: &str = "horizon-145198-closed-input-complete-v1";
@@ -193,7 +193,7 @@ pub(super) fn check_inventory(
                 row["directory"] == false
                     && row["inode"] == member["inode"]
                     && row["blocks"] == member["blocks"]
-                    && row["length"] == member["length"],
+                    && row["size"] == member["length"],
                 "closed index identity changed"
             );
         }
@@ -205,4 +205,40 @@ pub(super) fn check_inventory(
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn compact_index_inventory_matches_captured_file_size() -> Result<()> {
+        let path = tempfile::tempdir()?;
+        let root = path.path();
+        fs::set_permissions(root, fs::Permissions::from_mode(0o700))?;
+        let index = root.join("compact.index");
+        fs::write(&index, b"compact index bytes")?;
+        fs::set_permissions(&index, fs::Permissions::from_mode(0o600))?;
+        let root_meta = root.metadata()?;
+        let index_meta = index.metadata()?;
+        let fd = stopped_tree::open_root(root, root_meta.dev(), root_meta.ino())?;
+        let ledger = stopped_tree::capture(&fd, root_meta.dev(), root_meta.uid(), root_meta.gid())?;
+        let allocated = (root_meta.blocks() + index_meta.blocks()) * 512;
+        let mut profile = json!({
+            "target": I145,
+            "inode": root_meta.ino(),
+            "expected_bytes": allocated,
+            "expected_entries": 1,
+            "indexes": {"compact.index": {
+                "inode": index_meta.ino(),
+                "blocks": index_meta.blocks(),
+                "length": index_meta.len()
+            }}
+        });
+        check_inventory(&profile, &Value::Null, &ledger, allocated)?;
+        profile["indexes"]["compact.index"]["length"] = json!(index_meta.len() + 1);
+        assert!(check_inventory(&profile, &Value::Null, &ledger, allocated).is_err());
+        Ok(())
+    }
 }
