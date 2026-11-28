@@ -189,10 +189,10 @@ def adapt(name, old, scope_hash):
     raise ValueError(name)
 
 
-def seal(stage_contents,dest,save):
+def seal(stage_contents,dest,save,plan_root=None):
     members=[dict(name=name,source=str(p),sha256=digest(p),mode=mode) for name,(p,mode) in stage_contents.items()]
     plan=dict(schema="jetstreamer-sealed-deployment-plan-v1",destination=str(dest),members=members)
-    plan_ref=save(BASE/(dest.name+"-plan.json"),plan)
+    plan_ref=save((plan_root or BASE)/(dest.name+"-plan.json"),plan)
     need(digest(SEALER)==SEALER_SHA,"different deployment sealer")
     if not dest.exists():
         subprocess.run([str(SEALER),plan_ref["path"],"--plan-sha256",plan_ref["sha256"],"--self-sha256",SEALER_SHA],check=True,stdout=subprocess.DEVNULL)

@@ -50,31 +50,35 @@ def checkpoints():
          and len(names) == 2, "different checkpoint names")
     for values in zip(pins, witnesses, SLOTS, GENERATIONS, SIZES, names):
         validate_source(*values)
+    validate_previous(end, witnesses[0], SLOTS[0])
+    return prior, pins, witnesses, names
+
+
+def validate_previous(end, witness, slot):
     archive = end["archive"]
     manifest = archive["typed_manifest"]
     point = manifest["terminal"]
     need(end["private_checkpoint_matched"] and end["pid1"]["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
          and manifest["epoch"] == 162 and archive["sha256"] == manifest["archive_sha256"]
-         and manifest["output_slot_start"] + manifest["output_slot_count"] - 1 == SLOTS[0]
-         and all(point[k] == witnesses[0]["bank"][k] for k in BANK_FIELDS)
-         and point["accounts_hash"] == witnesses[0]["accounts_hash"]
+         and manifest["output_slot_start"] + manifest["output_slot_count"] - 1 == slot
+         and all(point[k] == witness["bank"][k] for k in BANK_FIELDS)
+         and point["accounts_hash"] == witness["accounts_hash"]
          and point["write_count"] == end["terminal_bank"]["observed_writes"]
          and point["next_write_version"] == end["terminal_bank"]["observed_next_write_version"],
          "preceding segment does not end at this bootstrap")
-    return prior, pins, witnesses, names
 
 
-def local_bootstrap(pin, witness):
-    receipt_path = INPUT / "incoming/BOOTSTRAP_CUSTODY.json"
+def local_bootstrap(pin, witness, *, inputs=INPUT, slot=SLOTS[0], generation=GENERATIONS[0], size=SIZES[0]):
+    receipt_path = inputs / "incoming/BOOTSTRAP_CUSTODY.json"
     receipt_ref = reference(receipt_path)
     receipt = bind(receipt_ref)
-    path = INPUT / "incoming" / Path(pin["name"]).name
+    path = inputs / "incoming" / Path(pin["name"]).name
     st = path.lstat()
     payload = receipt["file"]
     remote = receipt["remote_object"]
     need(receipt["schema"] == "jetstreamer-bound-gcs-snapshot-restore-v1"
-         and receipt["destination"] == str(path) and receipt["snapshot_slot"] == SLOTS[0]
-         and receipt["generation"] == remote["generation"] == GENERATIONS[0]
+         and receipt["destination"] == str(path) and receipt["snapshot_slot"] == slot
+         and receipt["generation"] == remote["generation"] == generation
          and receipt["versioned_uri"] == remote["versioned_uri"] == pin["storage_url"]
          and receipt["script_sha256"] == "38a2b4bf9d3e854694e114caaf04ca92599dc131ce2db4d407962c190d7c325a"
          and receipt["gcloud_account"] == "gce-ci@principal-lane-200702.iam.gserviceaccount.com"
@@ -82,7 +86,7 @@ def local_bootstrap(pin, witness):
          and payload["sha256"] == witness["raw_archive_readback"]["sha256"]
          and payload["crc32c_base64"] == remote["crc32c_base64"] == pin["crc32c_hash"]
          and payload["md5_base64"] == remote["md5_base64"] == pin["md5_hash"]
-         and remote["size"] == payload["size"] == SIZES[0]
+         and remote["size"] == payload["size"] == size
          and path.resolve(strict=True) == path and stat.S_ISREG(st.st_mode) and st.st_nlink == 1
          and (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_uid) ==
              tuple(payload[k] for k in ("device", "inode", "size", "mtime_ns", "uid"))

@@ -45,35 +45,40 @@ def route(text):
             .replace(OLD_ALIAS, ALIAS).replace("hold-162-second", "hold-162-third"))
 
 
-def scope(revision, prior, pins, witnesses, names, proof):
-    snap, custody = local_bootstrap(pins[0], witnesses[0])
+def successor_profile(prior, names, snap, proof, slots, previous_base, next_base, alias, hashes_path, gate_name, relocate):
     previous_snap = Path(second.bind(prior["bootstrap"]["verified_local_custody"])["destination"])
     old = prior["profile"]
     def relocated(value):
-        return route(value).replace(previous_snap.name, snap.name)
+        return relocate(value).replace(previous_snap.name, snap.name)
     rows = []
     for row in old["readonly_projections"]:
         view = relocated(row["readonly_view"])
         source = row["source"]
-        if source == str(previous_snap) or view == ALIAS + "/canonical-hashes.txt":
-            p = snap if source == str(previous_snap) else NAMES
+        if source == str(previous_snap) or view == alias + "/canonical-hashes.txt":
+            p = snap if source == str(previous_snap) else hashes_path
             st = p.lstat()
             rows.append(dict(source=str(p), readonly_view=view,
                              identity=[st.st_dev, st.st_ino, st.st_size, st.st_ctime_ns, st.st_mtime_ns]))
         elif source == prior["first_hourly_gate"]["path"]:
             rows.append(dict(source=proof["hold"]["path"], readonly_view=view, sha256=proof["hold"]["sha256"]))
-        elif source == str(PRIOR / "barrier"):
-            rows.append(dict(row, source=str(BASE / "barrier"), readonly_view=view))
+        elif source == str(previous_base / "barrier"):
+            rows.append(dict(row, source=str(next_base / "barrier"), readonly_view=view))
         else:
             rows.append(dict(row, readonly_view=view))
     actual = [relocated(arg) for arg in old["actual_node_argv"]]
-    need(actual[-1] == "--qualification-end-slot=" + str(SLOTS[0]), "different native entry")
-    actual[-1] = "--qualification-end-slot=" + str(SLOTS[1])
+    need(actual[-1] == "--qualification-end-slot=" + str(slots[0]), "different native entry")
+    actual[-1] = "--qualification-end-slot=" + str(slots[1])
     profile = dict(old, actual_node_argv=actual, main_argv=[relocated(v) for v in old["main_argv"]],
                    environment={k: relocated(v) for k,v in old["environment"].items()}, readonly_projections=rows)
     need(len(set(r["readonly_view"] for r in rows)) == len(rows)
-         and profile["main_argv"] == [ALIAS + "/hold-162-third"]
-         and actual[4] == "--snapshot-archive=" + ALIAS + "/" + names[0], "ambiguous bootstrap or gate")
+         and profile["main_argv"] == [alias + "/" + gate_name]
+         and actual[4] == "--snapshot-archive=" + alias + "/" + names[0], "ambiguous bootstrap or gate")
+    return profile
+
+
+def scope(revision, prior, pins, witnesses, names, proof):
+    snap, custody = local_bootstrap(pins[0], witnesses[0])
+    profile = successor_profile(prior, names, snap, proof, SLOTS, PRIOR, BASE, ALIAS, NAMES, "hold-162-third", route)
     inherited = ("capped_worker", "node", "producer_ram", "guard_ram", "producer_cpu_micros", "guard_cpu_micros",
                  "tmpfs_bytes", "control_bytes", "mutable_image_bytes", "unreleased_predecessor", "postguard_predecessor")
     return dict({k: prior[k] for k in inherited}, schema="horizon-private-162-third-native-contract-v1",
