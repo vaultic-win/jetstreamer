@@ -1,4 +1,4 @@
-"""Observe the two registered first-hourly replays in the existing fleet census."""
+"""Observe registered private hourly replays in the existing fleet census."""
 import hashlib
 import json
 from pathlib import Path
@@ -11,7 +11,7 @@ from evidence import bound, checked, need
 
 class FirstHourlyProfile:
     def __init__(self, epoch, *, bootstrap, terminal, tree_gib, producer_ram_gib,
-                 contract_sha, node, worker_sha):
+                 contract_sha, node, worker_sha, interval="first", date="20261127"):
         self.epoch = epoch
         self.bootstrap = bootstrap
         self.terminal = terminal
@@ -19,13 +19,15 @@ class FirstHourlyProfile:
         self.producer_ram = producer_ram_gib << 30
         self.node = Path(node)
         self.worker_sha = worker_sha
-        name = f"epoch{epoch}-first-hourly-20261127-v1"
+        self.interval = interval
+        suffix = f"{epoch}-{interval}-hourly-{date}-v1"
+        name = f"epoch{suffix}"
         self.base = Path("/var/lib/jetstreamer/horizon_runtime_data") / name
         self.run = Path("/home/sol/.jetstreamer-private") / name
-        self.unit = f"horizon-qualify-{epoch}-first-hourly-20261127-v1.service"
-        self.guard_timer = f"horizon-guard-{epoch}-first-hourly-20261127-v1.timer"
+        self.unit = f"horizon-qualify-{suffix}.service"
+        self.guard_timer = f"horizon-guard-{suffix}.timer"
         self.cgroup = f"/system.slice/{self.unit}"
-        self.field = f"current_private{epoch}_first_hourly"
+        self.field = f"current_private{epoch}_{interval}_hourly"
         self.contract = {"path": str(self.base / "contract-v1/LAUNCH_PROFILE.json"), "sha256": contract_sha}
 
 
@@ -219,7 +221,7 @@ def live_actor(manager, actor, profile=EPOCH143):
         f"{profile.epoch} producer or hard limits changed",
     )
     exe = Path(f"/proc/{pid}/exe")
-    retry = profile.epoch == 143 and Path(checked(actor["booking"])["sealed_operator"]["path"]).parent in {
+    retry = profile is EPOCH143 and Path(checked(actor["booking"])["sealed_operator"]["path"]).parent in {
         profile.base / f"booking-price-v{version}" for version in RETRY_BOOKER_SEALS
     }
     held = corrected_gate(exe, actor, profile) if retry else exe.samefile(profile.base / f"tools-v1/hold-{profile.epoch}")
@@ -301,7 +303,7 @@ def observe(context, profile=EPOCH143):
     prior = context.fleet.get(profile.field)
     receipt_ref = bound(active_receipt) if active_receipt.exists() else None
     history = None
-    if profile.epoch == 143 and prior:
+    if profile is EPOCH143 and prior:
         old_actor = prior["held_owner"]["sha256"] == FAILED_BOOTSTRAP_ACTOR
         if (old_actor and prior["held_owner"] != receipt_ref) or RETRY_HISTORY in prior:
             history, earlier = bootstrap_history(profile)
@@ -329,7 +331,7 @@ def observe(context, profile=EPOCH143):
     actor = checked(actor_ref)
     contract = checked(profile.contract)
     need(
-        actor["schema"] == f"horizon-epoch{profile.epoch}-first-hourly-held-owner-v1"
+        actor["schema"] == f"horizon-epoch{profile.epoch}-{profile.interval}-hourly-held-owner-v1"
         and actor["unit"] == contract["unit"] == profile.unit and actor["contract"] == profile.contract
         and actor["producer_pid"] > 1 and actor["start_ticks"] > 0
         and actor["boot_id"] == Path("/proc/sys/kernel/random/boot_id").read_text().strip()

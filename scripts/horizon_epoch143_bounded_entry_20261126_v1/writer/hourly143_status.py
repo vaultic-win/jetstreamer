@@ -45,10 +45,10 @@ def evidence(row):
     return first
 
 
-def recorded_pair(row, first, until):
+def recorded_pair(row, first, until, *, profile=PROFILE, first_path=FIRST):
     """Measure the recorded interval from its retained first block to the same node's latest marker."""
     actor = row["actor"]
-    selectors = {"_SYSTEMD_UNIT": PROFILE.unit, "_SYSTEMD_INVOCATION_ID": actor["producer_invocation_id"],
+    selectors = {"_SYSTEMD_UNIT": profile.unit, "_SYSTEMD_INVOCATION_ID": actor["producer_invocation_id"],
                  "_PID": str(actor["producer_pid"]), "_BOOT_ID": actor["boot_id"].replace("-", "")}
     since = dt.datetime.fromisoformat(first["event_at"])
     result = subprocess.check_output(
@@ -62,12 +62,12 @@ def recorded_pair(row, first, until):
         slot, end, tx = map(int, match.groups())
         micros = int(event["__REALTIME_TIMESTAMP"])
         start_us = round(since.timestamp() * 1_000_000)
-        need(START <= slot <= end == PROFILE.terminal and micros <= until.timestamp() * 1_000_000,
+        need(max(START, profile.bootstrap + 1) <= slot <= end == profile.terminal and micros <= until.timestamp() * 1_000_000,
              "recorded progress outside the accepted interval or clock")
         if slot > first["slot"] and tx > first["transactions"] and micros > start_us:
             return dict(slot=slot, transactions=tx, cursor=event["__CURSOR"], realtime_us=micros,
                         slots_per_second=(slot-first["slot"])*1_000_000/(micros-start_us),
-                        first=bound(FIRST), selectors=selectors)
+                        first=bound(first_path), selectors=selectors)
     return None
 
 
