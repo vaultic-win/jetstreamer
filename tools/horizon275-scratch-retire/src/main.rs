@@ -483,6 +483,7 @@ fn main() -> Result<()> {
             | "--check-bootstrap-266-114923430" | "--retire-bootstrap-266-114923430"
             | "--check-bootstrap-230-99430284" | "--retire-bootstrap-230-99430284"
             | "--check-bootstrap-230-99437433" | "--retire-bootstrap-230-99437433"
+            | "--check-bootstrap-230-99445304" | "--retire-bootstrap-230-99445304"
             | "--check-bootstrap-230-99461591" | "--retire-bootstrap-230-99461591"
             | "--check-bootstrap-230-99476782" | "--retire-bootstrap-230-99476782")
     ) {

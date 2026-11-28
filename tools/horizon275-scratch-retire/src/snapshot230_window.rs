@@ -28,6 +28,36 @@ pub(super) struct Window {
     timer: &'static str,
 }
 
+const ADJACENT: Window = Window {
+    slot: 99_445_304,
+    end: 99_461_591,
+    cache: "/home/ubuntu/.jetstreamer-private/epoch230-adjacent-input-99445304-v1",
+    name: "snapshot-99445304-2pNDSLmCHAnK2eLvMHmEBnfUmjnSDfqcQ45zak3VR9kc.tar.zst",
+    size: 10_310_927_058,
+    owner: 0,
+    sha: "7d800626402ab248da37cda34f4b4c2bd8e6e9301f04ad2a999f8de89be0f20b",
+    generation: 1_633_495_970_251_676,
+    bucket: "mainnet-beta-ledger-europe-fr2",
+    prefix: "99359376/hourly",
+    crc32c: "5gcBCg==",
+    md5: "M2BJKcmEIRupKTRT/LhO6Q==",
+    etag: "CJyHstj+tPMCEAE=",
+    restore_sha: "f3130a8a60ee815ce503877cceba8eb1eb88594398ce097a330ce00135e6ab0c",
+    closure: (
+        "/var/lib/jetstreamer/horizon230-adjacent-99445304-runtime-v1/terminal.json",
+        "db282c37da8fe4dae091a3047dc4e7020bdf60e93905bc2bfc738b0dd4dd3ba7",
+        "foundation-epoch230-adjacent-verified-drain-v1",
+    ),
+    native: Some((
+        "/var/lib/jetstreamer/horizon230-adjacent-terminal-collector-state-v1/evidence/terminal-evidence.json",
+        "e1c9499b94eb0845d1310bb571a1c641bfb42a709d5f2a070e8a37dffb425d5b",
+    )),
+    playback: "/var/lib/jetstreamer/horizon230-adjacent-poh-readback-v1/receipt.json",
+    archive_sha: "774a9963277be674f9c3f1f20da6f0bc90a5506c058caab192d06b8c9cc62b39",
+    unit: "horizon-qualify-230-adjacent-99445304-v1.service",
+    timer: "horizon-230-adjacent-99445304-protective-v1.timer",
+};
+
 const V1627: Window = Window {
     slot: 99_461_591,
     end: 99_468_089,
@@ -120,6 +150,7 @@ const VOTE_FAILED_SCAN_SHA: &str =
 pub(super) fn for_command(command: &str) -> Option<&'static Window> {
     match command {
         "--check-bootstrap-230-99430284" | "--retire-bootstrap-230-99430284" => Some(&VOTE),
+        "--check-bootstrap-230-99445304" | "--retire-bootstrap-230-99445304" => Some(&ADJACENT),
         "--check-bootstrap-230-99461591" | "--retire-bootstrap-230-99461591" => Some(&V1627),
         "--check-bootstrap-230-99476782" | "--retire-bootstrap-230-99476782" => Some(&SECOND),
         _ => None,
@@ -283,19 +314,26 @@ pub(super) fn run(
             && played["publication_authorized"] == false,
         "independent epoch 230 playback is incomplete"
     );
-    let adjacent: Value = read_bound(
-        Path::new("/var/lib/jetstreamer/horizon230-adjacent-99445304-runtime-v1/profile.json"),
-        "d01cf1c1a583c41e885ea74f57aea21a5e5178554e94bca16d01674a5bff1d1b",
-        JSON_LIMIT,
-    )?;
+    let (replacement_path, replacement_sha) = if window.slot == ADJACENT.slot {
+        (
+            "/var/lib/jetstreamer/horizon230-next-v1627-window-runtime-v1/profile.json",
+            "f289cdf8e6c6d85f387a2deac22c2c7ef19fcb1b4b98bc75230162a2cbf71447",
+        )
+    } else {
+        (
+            "/var/lib/jetstreamer/horizon230-adjacent-99445304-runtime-v1/profile.json",
+            "d01cf1c1a583c41e885ea74f57aea21a5e5178554e94bca16d01674a5bff1d1b",
+        )
+    };
+    let replacement: Value = read_bound(Path::new(replacement_path), replacement_sha, JSON_LIMIT)?;
     ensure!(
-        adjacent["readonly_bindings"]
+        replacement["readonly_bindings"]
             .as_array()
             .is_some_and(|rows| rows.len() == 4
                 && rows
                     .iter()
                     .all(|row| row["path"].as_str().is_some_and(|p| Path::new(p) != path))),
-        "the adjacent epoch 230 replay needs this bootstrap"
+        "the replacement epoch 230 replay needs this bootstrap"
     );
     let archive_path = Path::new(archive["path"].as_str().context("archive path")?);
     let archive_state = || -> Result<()> {
