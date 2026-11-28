@@ -466,7 +466,7 @@ pub(super) fn enter(a: &Bound) -> Result<Value> {
     Err(Command::new(&args[0]).args(&args[1..]).exec().into())
 }
 pub(super) fn root_snapshot(binding: &Bound) -> Result<Value> {
-    let (observed, doc) = read_finished(&binding.path)?;
+    let (observed, doc) = read_finished(&binding.path, 64 << 20)?;
     ensure!(
         observed == *binding,
         "root snapshot changed: {}",
@@ -475,7 +475,7 @@ pub(super) fn root_snapshot(binding: &Bound) -> Result<Value> {
     Ok(doc)
 }
 
-fn read_finished(path: &Path) -> Result<(Bound, Value)> {
+fn read_finished(path: &Path, limit: u64) -> Result<(Bound, Value)> {
     let before = fs::symlink_metadata(path)?;
     ensure!(
         path.canonicalize()? == path
@@ -485,8 +485,10 @@ fn read_finished(path: &Path) -> Result<(Bound, Value)> {
             && before.nlink() == 1
             && before.mode() & 0o022 == 0
             && before.len() > 0
-            && before.len() < 4 << 20,
-        "invalid completed report"
+            && before.len() <= limit,
+        "invalid completed report {} ({} bytes)",
+        path.display(),
+        before.len()
     );
     let mut file = fs::OpenOptions::new()
         .read(true)
@@ -526,13 +528,16 @@ pub(super) fn finish() -> Result<Value> {
         v["phase"] == "awaiting_verified_receipt" && v["event"]["id"] == GOOD,
         "publisher did not exit cleanly"
     );
-    let (r, receipt) = read_finished(&root().join("publication-receipts/epoch-168.r2.json"))?;
+    let (r, receipt) = read_finished(
+        &root().join("publication-receipts/epoch-168.r2.json"),
+        4 << 20,
+    )?;
     let pr = reference(&receipt, "current_reader_playback")?;
     ensure!(
         pr.path.starts_with(root().join("publication-scratch")),
         "remote report outside the appointed scratch"
     );
-    let (rr, report) = read_finished(&pr.path)?;
+    let (rr, report) = read_finished(&pr.path, 4 << 20)?;
     let actor: Bound = serde_json::from_value(v["actor"].clone())?;
     let start = actor.json()?;
     let attempt = reference(&start, "attempt")?.json()?;
@@ -583,7 +588,22 @@ mod tests {
         fs::write(&p, b"{}").unwrap();
         assert!(root_snapshot(&binding).is_err());
         fs::set_permissions(&p, fs::Permissions::from_mode(0o660)).unwrap();
-        assert!(read_finished(&p).is_err());
+        assert!(read_finished(&p, 64 << 20).is_err());
+    }
+
+    #[test]
+    fn verifies_full_fleet_documents_larger_than_publication_receipts() {
+        let fixture = tempfile::tempdir().unwrap();
+        let p = fixture.path().join("ROOT_COMPLETE_OPERATIONAL_FLEET.json");
+        let data =
+            serde_json::to_vec(&json!({"owner":"/root","row":"x".repeat((5<<20)+3)})).unwrap();
+        fs::write(&p, &data).unwrap();
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(read_finished(&p, 4 << 20).is_err());
+        assert_eq!(
+            root_snapshot(&fixed(&p, &custody::digest(&data))).unwrap()["owner"],
+            "/root"
+        );
     }
 
     #[test]
