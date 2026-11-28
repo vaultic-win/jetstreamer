@@ -68,6 +68,7 @@ def prepare(gate, guard, commit):
     scope = checked(l.HANDOFF,OLD_SCOPE)
     older = runpy.run_path(str(OP/"status162.py"))
     helper = runpy.run_path(str(HERE/"second_interval.py"))
+    helper["seal"].__globals__["BASE"] = NEW
     s = NEW/"source"; NEW.mkdir(mode=0o700,exist_ok=True);s.mkdir(mode=0o700,exist_ok=True)
     for folder in (s,NEW):
         assert folder.resolve()==folder and folder.stat().st_uid==0 and folder.stat().st_mode&0o077==0
