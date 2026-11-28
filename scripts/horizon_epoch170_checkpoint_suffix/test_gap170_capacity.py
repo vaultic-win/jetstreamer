@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 
 import continuation_dispatch as dispatch
 import gap170_capacity as capacity
+import ram170_capacity as retry
 
 
 def require(ok, reason):
@@ -101,6 +102,42 @@ class IndependentGapTests(TestCase):
         self.assertEqual(result["independent_checkpoint"], "checkpoint")
         operator.start.assert_not_called()
         lock.release.assert_called_once()
+
+
+class RamReservationTests(TestCase):
+    def test_storage_replacement_preserves_both_screens_and_both_guards(self):
+        g = retry.G
+        native = dict(raw=dict(reserved_following_170_growth_bytes=36*g,
+                              joint=dict(candidate_growth=36*g,producer_allowance=48*g),
+                              terminal_tree_bounds=[350*g,350*g],required_home=100*g,guard_floor=64*g),
+                      independent_gap_funding=dict(new_guard_cpu_micros=1_000_000,cpu_donor="159"),
+                      stopped_169_compute_handoff=dict(retained_159_ram=48*g,retained_guard_ram=g),
+                      available_home=120*g, required_home=102*g, historical_home_margin=9*g,
+                      available_ram=100*g,required_ram=65*g)
+        prepared = dict(new_home_output=4*g,new_home_control=64<<20,incremental_ram_bytes=8*g,
+                        producer_memory_max=56*g,guard_memory_max=g,returned_159_loan=dict(scope="159"),
+                        producer_cpu_micros=2_000_000,guard_cpu_micros=1_000_000,
+                        stage="prepare-only",admission=False)
+        core = SimpleNamespace(need=require,read=lambda *_: (prepared,"169 quote"))
+        retry.charge(core,native,"terminal")
+        retry.reserve_169(core,native)
+        home_charge = 4*g + (64 << 20)
+        self.assertEqual(native["required_home"], 74*g + home_charge)
+        self.assertEqual(native["home_margin"], 37*g - home_charge)
+        self.assertEqual(native["ram_margin"], 19*g)
+        self.assertTrue(native["ram_retry_cost"]["original_guard_still_budgeted"])
+        native["raw"]["terminal_tree_bounds"] = [378*g,378*g]
+        with self.assertRaisesRegex(ValueError,"retained 170 tree"):
+            retry.charge(core,native,"terminal")
+
+    def test_prestart_refuses_a_native_actor_before_the_next_fleet(self):
+        core = SimpleNamespace(need=require,inactive=Mock(),state=lambda *_: {"ActiveState":"inactive","Job":""})
+        with TemporaryDirectory() as tmp, patch.object(retry,"ROOT",Path(tmp)):
+            fleet = {"actual_active_private_diagnostics":[]}
+            self.assertIsNone(retry.before_issue(core,fleet))
+            (Path(tmp)/"SUCCESSOR_START_INTENT.json").touch()
+            with self.assertRaisesRegex(ValueError,"already issued"):
+                retry.before_issue(core,fleet)
 
 
 if __name__ == "__main__":
