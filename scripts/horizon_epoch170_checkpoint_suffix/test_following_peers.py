@@ -1,5 +1,9 @@
 """Check simultaneous split outputs against each guard's actual floor."""
 from unittest import TestCase
+from unittest.mock import Mock
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 import following_peers as pricing
 
@@ -29,3 +33,24 @@ class SplitPeerCosts(TestCase):
             pricing.amounts(basis|{'split_peers':{}},disks,2*g,g,2*g)
         self.assertFalse(pricing.amounts(basis|{'available_home':141*g},disks,2*g,g,2*g)['fits'])
         self.assertFalse(pricing.amounts(basis|{'phase':'start','terminal_tree_bounds':[379*g,380*g]},disks,0,0,0)['fits'])
+
+    def test_successive_writer_versions_must_be_contiguous(self):
+        with TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            for version in (48,49,50,51):
+                (d/f'FAILED166_CADENCE_V{version}_ACTIVE.json').touch()
+            self.assertEqual(pricing.writer_versions(d,49),[49,50,51])
+            (d/'FAILED166_CADENCE_V50_ACTIVE.json').unlink()
+            with self.assertRaisesRegex(ValueError,'noncontiguous'):
+                pricing.writer_versions(d,49)
+
+    def test_holding_serial_rejects_duplicate_m12(self):
+        support = SimpleNamespace(active_units=Mock(return_value=set()))
+        previous = Mock(return_value={'existing':True})
+        self.assertEqual(pricing.holding(None,support,previous),{'existing':True})
+        def need(ok, reason):
+            if not ok:
+                raise ValueError(reason)
+        support.active_units.return_value = {'horizon-closed186-park-m12-8.service','old-holding'}
+        with self.assertRaisesRegex(ValueError,'several owners'):
+            pricing.holding(SimpleNamespace(need=need),support,previous)

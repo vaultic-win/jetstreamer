@@ -12,7 +12,7 @@ PHASE_END = RT/'epoch143-first-hourly-20261127-v1/PHASE_170_FIRST_168_RELEASED.j
 END_SHA = 'f97355db620e55478840e20ded06943a59ac9b85a6cd3a7d348882407ea1be88'
 
 
-def budget169(core, native, snapshot, operations, paid, verification, extra_home):
+def budget169(core, native, snapshot, operations, paid, verification, extra_home, helper):
     other, peer169, peer162 = operations
     cap = other['capacity']
     fleet, ref = core.current_fleet()
@@ -25,7 +25,9 @@ def budget169(core, native, snapshot, operations, paid, verification, extra_home
     recovery = support.recovery_reservation(compiler)
     serial = support.repeated_serial_slot(native['raw'], book)
     copier, micro = campaign['input_cost'](support), campaign['micro_cost'](support)
-    holder = campaign['holding'](support)
+    def serial_owner():
+        return helper['holding'](core,support,lambda: campaign['holding'](support))
+    holder = serial_owner()
     rooms = support.margins(native, book, compiler['image_physically_funded_bytes'], serial['repeated_serial_bytes'])
     settled = cap['terminal_charges'](recovery, rooms, copier, compiler)
     v47 = core.bound(paid['funding_V47'])
@@ -52,7 +54,7 @@ def budget169(core, native, snapshot, operations, paid, verification, extra_home
     ram -= verification['additional_ram'] + recovery['maximum_memory'] + v47['additional_RAM_bytes'] - book['build_memory_bytes']
     ram -= copier['additional_ram'] + micro['witness_ram']
     ram += settled['compiler_excess_ram'] + settled['concluded_copier_ram']
-    core.need(campaign['holding'](support) == holder and campaign['input_cost'](support) == copier and
+    core.need(serial_owner() == holder and campaign['input_cost'](support) == copier and
               campaign['micro_cost'](support) == micro and recovery == support.recovery_reservation(compiler) and
               cap['verification168'](book) == verification and core.current_fleet()[1] == ref,
               'post-assembly ownership changed')
@@ -135,6 +137,6 @@ def price(helper, package_dir):
     verification=cap['verification168'](fleet['retry9_auxiliary_commitments'])
     # Files installed after the funded V48 operator remain occupied on HOME.
     extra_home = helper['package_home']()
-    result=budget169(core,raw,first,operations,paid,verification,extra_home)
+    result=budget169(core,raw,first,operations,paid,verification,extra_home,helper)
     core.need(helper['current_writer'](core,first['provider']) == first['writer'], 'writer changed after post-assembly quote')
     return result
